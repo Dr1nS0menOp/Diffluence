@@ -56,18 +56,26 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 // A role name cannot be a query parameter, so it is quoted as an identifier.
 func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 	ident := pgx.Identifier{role}.Sanitize()
-	for _, stmt := range []string{
-		"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + ident,
-		"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + ident,
-		"REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM " + ident,
-		"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM " + ident,
-		"REVOKE UPDATE, DELETE, TRUNCATE ON audit_checkpoints FROM " + ident,
-	} {
-		if _, err := owner.Exec(ctx, stmt); err != nil {
-			return fmt.Errorf("db: grant to application role: %w", err)
+	return pgx.BeginFunc(ctx, owner, func(tx pgx.Tx) error {
+		// GRANT rewrites catalog rows, so two nodes doing it at once would fail with
+		// "tuple concurrently updated". The migration lock makes them take turns, and
+		// makes this wait for a migration that is still running.
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", migrationLockKey); err != nil {
+			return fmt.Errorf("db: take migration lock: %w", err)
 		}
-	}
-	return nil
+		for _, stmt := range []string{
+			"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO " + ident,
+			"GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO " + ident,
+			"REVOKE UPDATE, DELETE, TRUNCATE ON audit_events FROM " + ident,
+			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON schema_migrations FROM " + ident,
+			"REVOKE UPDATE, DELETE, TRUNCATE ON audit_checkpoints FROM " + ident,
+		} {
+			if _, err := tx.Exec(ctx, stmt); err != nil {
+				return fmt.Errorf("db: grant to application role: %w", err)
+			}
+		}
+		return nil
+	})
 }
 
 // RoleOf returns the user name in a connection URL.

@@ -16,7 +16,7 @@ Needs Docker with the Compose plugin.
 
 ```sh
 sh scripts/setup-secrets.sh
-docker compose up -d --build
+docker compose up -d --build --wait
 printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name "You"
 ```
 

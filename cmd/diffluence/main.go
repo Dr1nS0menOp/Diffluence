@@ -142,30 +142,36 @@ func cmdMigrate(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	rep, err := migrateDatabase(ctx, cfg, migs, db.Options{IncludeContract: *contract, Log: app.NewLogger(cfg.LogLevel)})
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "applied %d migration(s); %d contract migration(s) pending\n", len(rep.Applied), len(rep.PendingContract))
+	return nil
+}
+
+// migrateDatabase applies migrations, as the owner of the tables when one is
+// configured, and gives the application role its rights. Safe to run next to a
+// starting server: an advisory lock makes them take turns.
+func migrateDatabase(ctx context.Context, cfg config.Config, migs []db.Migration, opts db.Options) (db.Report, error) {
 	url := cfg.DatabaseURL
 	if cfg.MigrateDatabaseURL != "" {
 		url = cfg.MigrateDatabaseURL
 	}
 	pool, err := db.Open(ctx, url)
 	if err != nil {
-		return err
+		return db.Report{}, err
 	}
 	defer pool.Close()
-	rep, err := db.Migrate(ctx, pool, migs, db.Options{IncludeContract: *contract, Log: app.NewLogger(cfg.LogLevel)})
+	rep, err := db.Migrate(ctx, pool, migs, opts)
+	if err != nil || cfg.MigrateDatabaseURL == "" {
+		return rep, err
+	}
+	role, err := db.RoleOf(cfg.DatabaseURL)
 	if err != nil {
-		return err
+		return rep, err
 	}
-	if cfg.MigrateDatabaseURL != "" {
-		role, err := db.RoleOf(cfg.DatabaseURL)
-		if err != nil {
-			return err
-		}
-		if err := db.GrantApp(ctx, pool, role); err != nil {
-			return err
-		}
-	}
-	fmt.Fprintf(stdout, "applied %d migration(s); %d contract migration(s) pending\n", len(rep.Applied), len(rep.PendingContract))
-	return nil
+	return rep, db.GrantApp(ctx, pool, role)
 }
 
 func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
@@ -194,17 +200,15 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 	if err != nil {
 		return err
 	}
+	// The server may still be starting, so this does not rely on it having migrated.
+	if _, err := migrateDatabase(ctx, cfg, migs, db.Options{}); err != nil {
+		return err
+	}
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
-	// In a split-role setup the running server has already migrated.
-	if cfg.MigrateDatabaseURL == "" {
-		if _, err := db.Migrate(ctx, pool, migs, db.Options{}); err != nil {
-			return err
-		}
-	}
 	instID, err := instance.Ensure(ctx, pool, cfg.InstanceName)
 	if err != nil {
 		return err

@@ -10,7 +10,7 @@ Needs Docker with the Compose plugin.
 git clone https://github.com/Dr1nS0menOp/Diffluence.git && cd Diffluence
 sh scripts/setup-secrets.sh                 # creates ./secrets, never overwrites
 export DIFFLUENCE_PUBLIC_URL=https://wiki.example.com
-docker compose up -d --build
+docker compose up -d --build --wait
 printf '%s\n' 'a long password' | docker compose exec -T diffluence \
   diffluence user create-admin --email you@example.com --name "You"
 ```

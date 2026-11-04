@@ -10,6 +10,8 @@ import (
 	"testing"
 	"testing/fstest"
 
+	"github.com/google/uuid"
+
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/testutil"
 )
@@ -141,5 +143,31 @@ func TestFailedMigrationRollsBack(t *testing.T) {
 	_ = tdb.Pool.QueryRow(ctx, "SELECT to_regclass('ok_table') IS NOT NULL").Scan(&exists)
 	if exists {
 		t.Fatal("partial migration was not rolled back")
+	}
+}
+
+// Nodes that start together all hand out the application role's rights. Found by
+// running create-admin right after "docker compose up": without a lock PostgreSQL
+// refuses with "tuple concurrently updated".
+func TestGrantAppIsSafeFromManyNodes(t *testing.T) {
+	tdb := testutil.Database(t)
+	ctx := context.Background()
+	role := "dfl_grant_" + strings.ReplaceAll(uuid.NewString()[:8], "-", "")
+	if _, err := tdb.Pool.Exec(ctx, "CREATE ROLE "+role); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = tdb.Pool.Exec(ctx, "DROP OWNED BY "+role)
+		_, _ = tdb.Pool.Exec(ctx, "DROP ROLE "+role)
+	})
+	const nodes = 8
+	errs := make(chan error, nodes)
+	for range nodes {
+		go func() { errs <- db.GrantApp(ctx, tdb.Pool, role) }()
+	}
+	for range nodes {
+		if err := <-errs; err != nil {
+			t.Fatal(err)
+		}
 	}
 }

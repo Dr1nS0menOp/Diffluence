@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Reference installation: one node, embedded queue, local disk.
 #   sh scripts/setup-secrets.sh
-#   docker compose up -d
+#   docker compose up -d --wait
 #   printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name You
 # See docs/operations/install.md. Put a TLS reverse proxy in front of it.
 services:
