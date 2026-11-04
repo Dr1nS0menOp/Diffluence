@@ -12,7 +12,7 @@ compose=(docker compose -f compose.dev.yaml)
 set -e
 cd /work/web && npx vite build >/dev/null
 cd /work && CGO_ENABLED=0 go build -o /tmp/diffluence ./cmd/diffluence
-pkill -f '/tmp/diffluence serve' 2>/dev/null || true
+[ -f /tmp/e2e.pid ] && kill "$(cat /tmp/e2e.pid)" 2>/dev/null || true
 export PGPASSWORD=diffluence
 psql -q -h db -U diffluence -d diffluence -c 'DROP DATABASE IF EXISTS diffluence_e2e WITH (FORCE)' -c 'CREATE DATABASE diffluence_e2e'
 rm -rf /tmp/dfl-e2e
@@ -26,6 +26,7 @@ ENV
 . /tmp/e2e-env
 echo 'correct horse battery staple' | /tmp/diffluence user create-admin --email admin@example.com --name Admin >/dev/null
 nohup /tmp/diffluence serve >/tmp/e2e.log 2>&1 &
+echo $! >/tmp/e2e.pid
 for i in $(seq 1 50); do
   curl -sf http://localhost:8080/readyz >/dev/null && break
   sleep 0.2
@@ -35,5 +36,5 @@ EOF
 
 status=0
 "${compose[@]}" --profile e2e run --rm -T e2e npx playwright test "$@" || status=$?
-"${compose[@]}" exec -T dev sh -c "pkill -f '/tmp/diffluence serve' || true; grep -iE 'panic|\"level\":\"ERROR\"' /tmp/e2e.log | head -20 || true"
+"${compose[@]}" exec -T dev sh -c 'kill "$(cat /tmp/e2e.pid)" 2>/dev/null; grep -iE "panic|\"level\":\"ERROR\"" /tmp/e2e.log | head -20; true' || true
 exit "$status"
