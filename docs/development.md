@@ -7,6 +7,7 @@ scripts/dev up                 # database and toolbox (Go, Node)
 scripts/dev sh -c "cd web && npm ci"
 scripts/dev make check         # what CI runs: format, vet, staticcheck, govulncheck, licences, frontend, tests
 scripts/e2e                    # real binary, PostgreSQL and Chromium; add -g "passkey" for a selection
+scripts/dev sh scripts/ci-local.sh   # the CI steps in a fresh clone of what is committed
 scripts/dev make mutation      # breaks security rules on purpose and fails if the tests stay green
 scripts/dev make fuzz          # fuzzes the parsers
 scripts/dev down
