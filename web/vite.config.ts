@@ -29,6 +29,6 @@ export default defineConfig({
     proxy: { '/api': 'http://localhost:8080' },
   },
   test: {
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.mjs'],
   },
 });

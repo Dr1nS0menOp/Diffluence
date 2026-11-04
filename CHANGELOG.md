@@ -4,6 +4,23 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the design
+- A new look: a calm white and blue design with a top bar, a sidebar per space and one reading column, in light and dark
+- A new editor: a strip with Close, the save status, the summary, Discard draft and Publish, one row of tools, and an open sheet with a large title
+- A page tree with visible branches. A branch can be collapsed and stays collapsed while you read on. The sidebar can be put away
+- A start screen with your spaces, recent pages and favourites, a login card, and a vertical menu in the admin console
+- Our own logo and icons, a More menu for less used page actions, and an account menu
+- Our own confirmation and link dialogs. The browser's dialogs are gone
+- The page shows who wrote it, when it was updated and which version it is
+- Diffluence now uses the system font. An administrator can import a font under Administration, Settings
+- The design standard in `docs/design/README.md`, enforced by `npm run design` and by approved pictures of every screen
+
+### Fixed
+- `user create-admin` failed with "permission denied" while a new server was still migrating
+- Many nodes starting at once could fail while granting database rights
+
+Upgrade impact: none. New routes only, no database change.
+
 ### Added: phases 1 and 2
 - Spaces, a page tree with drag and drop, stable page addresses, breadcrumbs, favourites and recently viewed pages
 - A visual editor with Markdown shortcuts, tables, task lists, highlighted code blocks and images. Autosaved private drafts, publishing with conflict protection

@@ -123,7 +123,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		return nil, err
 	}
 	a.perms = permissions.NewService(a.pool)
-	a.settings = settings.NewService(a.pool)
+	a.settings = settings.NewService(a.pool, a.store)
 	a.attach = attachments.NewService(a.pool, a.perms, a.store, a.settings, a.instanceID)
 	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.instanceID)
 	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.instanceID)

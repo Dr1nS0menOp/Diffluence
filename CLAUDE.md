@@ -6,6 +6,7 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 1. `docs/blueprint/00-README.md` and the blueprint documents relevant to the task
 2. The latest note in `docs/handoff/`
 3. The spec for the task in `docs/specs/` (if there is none, write it first, together with the product owner)
+4. For anything visible: `docs/design/README.md`
 
 ## Hard rules
 - **Clean-room:** never fetch, read or reproduce source code of Confluence, Docmost, Plane, OpenProject, Huly or similar products. Never ask "how does X implement this". Build from our specs and ADRs. See `docs/blueprint/02-clean-room-and-licensing.md`.
@@ -17,7 +18,8 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 - **Migrations** live in `internal/db/migrations/`, are numbered, and start with `-- phase: expand` or `-- phase: contract`. Never edit a merged migration. Expand migrations must keep the previous release working (N and N+1 run together).
 - **SQL** only through parameterised queries. No string-built SQL.
 - **Secrets** never in logs, errors or audit details.
-- **UI text** (once the frontend exists) only through translation files.
+- **UI text** only through translation files.
+- **Design:** every screen follows `docs/design/README.md` (the product owner's decision, ADR-021). Values come only from `web/src/design/tokens.css`. Build from the listed frames and components, never a second way. A new screen gets a picture in `web/e2e/0-design.spec.ts`. Look at every new or changed picture before committing, and never update one just to get past a failure. Changing the look itself is the product owner's decision.
 - **IDs** are UUIDv7 (`ids.New()`).
 
 ## Layout
@@ -49,6 +51,7 @@ internal/webui/        serves the built frontend from the binary
 internal/ids/          UUIDv7 helper
 internal/testutil/     helpers for integration tests (fresh database per test)
 web/                   frontend: React, TipTap, i18next; e2e/ holds the browser tests
+web/src/design/        the design system: tokens and all styles (docs/design/README.md)
 scripts/               dev environment, drills, gates; docs/development.md explains them
 deploy/                database init, systemd unit, LXC install
 docs/                  blueprint, specs, operations, security, handoff notes
@@ -57,12 +60,13 @@ Modules talk through their exported Go API and events, never through each other'
 
 ## Commands
 - `scripts/dev up`, then `scripts/dev make check`: everything CI runs (see docs/development.md). The host needs only Docker; on Windows use WSL.
-- `scripts/e2e`: real binary, PostgreSQL and Chromium
+- `scripts/e2e`: real binary, PostgreSQL and Chromium, with the design pictures
+- `scripts/e2e design.spec.ts --update-snapshots`: new pictures after an intended change of look
 - `scripts/dev make mutation`: proves the tests catch injected bugs. Add a line for every new security rule.
 - Integration tests need `DIFFLUENCE_TEST_DATABASE_URL` pointing to a Postgres role that may create databases (`scripts/dev` sets it).
 
 ## Definition of done
-Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · docs and changelog updated · `make check` green · a plain-language "How to test" checklist in the PR · a handoff note written.
+Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · the design standard followed and new pictures looked at · docs and changelog updated · `make check` and `scripts/e2e` green · a plain-language "How to test" checklist in the PR · a handoff note written.
 
 ## End of every session
 Write `docs/handoff/YYYY-MM-DD-<topic>.md`: what was done, what is unfinished, what is next, and anything the product owner must decide.

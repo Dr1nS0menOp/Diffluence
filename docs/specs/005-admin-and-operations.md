@@ -10,7 +10,7 @@ An operator must be able to run Diffluence without touching the database, and up
 
 **Admin console.** Administrators manage users, groups, global permissions, all spaces (including recover access), settings, SCIM tokens, the audit log, and see system health: nodes, versions, migrations, queue, storage and failed jobs.
 
-**Settings.** Trash retention and maximum upload size can be changed at runtime. Authentication providers are configured by the environment, because they hold secrets, and are shown read-only.
+**Settings.** Trash retention and maximum upload size can be changed at runtime. So can the font (spec 006). Authentication providers are configured by the environment, because they hold secrets, and are shown read-only.
 
 **Background jobs** run in the worker and only once across nodes: remove expired sessions and challenges, remove old published outbox rows, purge expired trash, delete stored files of purged items, verify the audit chain daily, sign a daily audit checkpoint with Ed25519, and run imports.
 
@@ -19,7 +19,7 @@ An operator must be able to run Diffluence without touching the database, and up
 **Upgrade test.** A script starts the previous build with traffic, starts this build next to it on the same database, stops the old node, and fails on any failed request.
 
 ## Permissions and audit
-All admin routes need *administrator*. Events: `settings.updated`, `audit.checkpoint_signed`, `audit.verified`, `system.contract_migrated`.
+All admin routes need *administrator*. Events: `settings.updated`, `settings.font_changed`, `audit.checkpoint_signed`, `audit.verified`, `system.contract_migrated`.
 
 ## Acceptance criteria
 - [x] Two workers never run the same periodic job at the same moment

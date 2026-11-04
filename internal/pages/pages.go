@@ -8,6 +8,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -64,6 +65,8 @@ type Detail struct {
 	Page
 	Document      json.RawMessage `json:"document"`
 	SchemaVersion int             `json:"schema_version"`
+	CreatedByName string          `json:"created_by_name"`
+	UpdatedByName string          `json:"updated_by_name"`
 	Breadcrumbs   []Crumb         `json:"breadcrumbs"`
 	HasDraft      bool            `json:"has_draft"`
 	Favourite     bool            `json:"favourite"`
@@ -304,6 +307,13 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		Scan(&d.HasDraft, &d.Favourite, &d.Restricted)
 	if err != nil {
 		return d, err
+	}
+	err = s.pool.QueryRow(ctx, `SELECT
+			COALESCE((SELECT display_name FROM users WHERE id = $1), ''),
+			COALESCE((SELECT display_name FROM users WHERE id = $2), '')`, p.CreatedBy, p.UpdatedBy).
+		Scan(&d.CreatedByName, &d.UpdatedByName)
+	if err != nil {
+		return d, fmt.Errorf("pages: read author names: %v", err)
 	}
 	if d.Can, err = s.capabilities(ctx, c, id); err != nil {
 		return d, err

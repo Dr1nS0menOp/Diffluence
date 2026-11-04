@@ -14,5 +14,6 @@
 - [ ] State changes write audit + outbox events in the same transaction
 - [ ] Migrations are new files (no edits to merged ones) and keep the previous release working
 - [ ] No new dependency, or its licence is MIT/BSD/Apache-2.0/ISC and the reason is given
+- [ ] Visible change: follows `docs/design/README.md`, and I looked at every new or changed picture in `web/e2e/design-baselines/` (say which and why)
 - [ ] Docs and handoff note updated
 - [ ] Clean-room: no competitor code or text was consulted

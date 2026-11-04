@@ -25,6 +25,7 @@ docker build -t diffluence:local . && bash scripts/idp-test/run.sh  # real Authe
 
 - Every route has an access rule. `docs/api/routes.txt` lists them all, and a test fails when it differs from the code: regenerate with `UPDATE_ROUTES=1 go test ./internal/app/ -run RouteTable` and review the diff.
 - All UI text goes through `web/src/locales/en.json`: `npm run strings` fails on hard-coded text and unknown keys.
+- Everything visible follows `docs/design/README.md`: `npm run design` checks tokens, contrast, icons and more, and `web/e2e/0-design.spec.ts` compares every screen with its approved picture. After an intended change of look, run `scripts/e2e design.spec.ts --update-snapshots`, and look at the pictures in `web/e2e/design-baselines/` before committing. Pictures depend on the browser image, so updating Playwright means new pictures.
 - No `dangerouslySetInnerHTML`, enforced by ESLint.
 - Every browser test fails on a Content Security Policy or Trusted Types violation.
 - Licences are checked by `scripts/check-licenses.mjs`.

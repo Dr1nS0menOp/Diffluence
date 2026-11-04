@@ -28,6 +28,7 @@ Because the product owner does not read code, **the automated checks are the cod
 | Integration tests | Real PostgreSQL and NATS in containers (Testcontainers) |
 | Permission matrix | Generated tests from 05. Must be 100% green. |
 | End-to-end | Playwright on the built app, including accessibility checks (axe) |
+| Design | `docs/design/README.md`: tokens, contrast, icons and dialogs through `npm run design`; approved pictures of every screen in the end-to-end run |
 | Upgrade test | Start the previous release with traffic, upgrade to this build, no failed requests allowed |
 | Security | `govulncheck`, Trivy (image and dependencies), Semgrep, CodeQL, licence scan, OWASP ZAP baseline |
 | Fuzzing | Go native fuzzing on parsers (Markdown, imports, sanitiser), nightly |
@@ -52,7 +53,7 @@ Because the product owner does not read code, **the automated checks are the cod
 
 ## Definition of done
 
-The feature matches its spec and acceptance criteria, all gates are green, permissions and audit events are covered, the UI text goes through translation files, the docs are updated, the upgrade test passes, and the product owner has ticked the "How to test" checklist.
+The feature matches its spec and acceptance criteria, all gates are green, permissions and audit events are covered, the UI text goes through translation files, the screen follows the design standard, the docs are updated, the upgrade test passes, and the product owner has ticked the "How to test" checklist.
 
 ## Working within Claude Max limits
 

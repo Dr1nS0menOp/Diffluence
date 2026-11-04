@@ -1095,3 +1095,98 @@ func TestEveryObjectRouteIsProtected(t *testing.T) {
 		t.Fatalf("stranger sees the space: %s", out)
 	}
 }
+
+func (u *user) putFont(name string, body []byte) (int, string) {
+	u.e.t.Helper()
+	req, _ := http.NewRequest("PUT", u.e.srv.URL+"/api/v1/admin/appearance/font?filename="+url.QueryEscape(name), bytes.NewReader(body))
+	req.Header.Set("Content-Type", "application/octet-stream")
+	resp, err := u.c.Do(req)
+	if err != nil {
+		u.e.t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	out, _ := io.ReadAll(resp.Body)
+	return resp.StatusCode, string(out)
+}
+
+// The system font is the default. An administrator can import a house font, and
+// the login page must be able to load it before anyone is logged in.
+func TestAdministratorImportsReplacesAndRemovesAFont(t *testing.T) {
+	e := newEnv(t)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	member := e.user("member@example.com", identity.PermUseProduct)
+	anonymous := e.client()
+
+	if resp, body := e.do(anonymous, "GET", "/api/v1/appearance", ""); resp.StatusCode != 200 || !strings.Contains(body, `"font":null`) {
+		t.Fatalf("default: %d %s", resp.StatusCode, body)
+	}
+	if resp, _ := e.do(anonymous, "GET", "/api/v1/appearance/font", ""); resp.StatusCode != 404 {
+		t.Fatalf("no font yet: %d", resp.StatusCode)
+	}
+
+	font := append([]byte("wOF2"), bytes.Repeat([]byte{1}, 512)...)
+	if status, _ := member.putFont("house.woff2", font); status != http.StatusForbidden {
+		t.Fatalf("a member may not import a font: %d", status)
+	}
+	if status, _ := admin.putFont("trick.woff2", []byte("<html><script>alert(1)</script>")); status != http.StatusBadRequest {
+		t.Fatalf("a file that is not a font: %d", status)
+	}
+	if status, _ := admin.putFont("huge.woff2", append([]byte("wOF2"), make([]byte, 2<<20)...)); status != http.StatusRequestEntityTooLarge {
+		t.Fatalf("a font over the limit: %d", status)
+	}
+	if status, body := admin.putFont("../../House Sans.woff2", font); status != 200 || !strings.Contains(body, `"name":"House Sans.woff2"`) {
+		t.Fatalf("import: %d %s", status, body)
+	}
+
+	resp, body := e.do(anonymous, "GET", "/api/v1/appearance/font", "")
+	if resp.StatusCode != 200 || resp.Header.Get("Content-Type") != "font/woff2" || resp.Header.Get("X-Content-Type-Options") != "nosniff" || body != string(font) {
+		t.Fatalf("serving: %d %v", resp.StatusCode, resp.Header)
+	}
+	if got := resp.Header.Get("Cache-Control"); got != "no-cache" {
+		t.Fatalf("an address without the version must not be cached for long: %q", got)
+	}
+	resp, body = e.do(anonymous, "GET", "/api/v1/appearance", "")
+	if resp.StatusCode != 200 || strings.Contains(body, "object_key") || !strings.Contains(body, "House Sans") {
+		t.Fatalf("appearance: %s", body)
+	}
+	var appearance struct {
+		Font struct {
+			Version string `json:"version"`
+		} `json:"font"`
+	}
+	if err := json.Unmarshal([]byte(body), &appearance); err != nil {
+		t.Fatal(err)
+	}
+	if resp, _ := e.do(anonymous, "GET", "/api/v1/appearance/font?v="+appearance.Font.Version, ""); !strings.Contains(resp.Header.Get("Cache-Control"), "immutable") {
+		t.Fatalf("the versioned address can be kept: %v", resp.Header)
+	}
+
+	// A second font replaces the first, whose file goes away.
+	if status, _ := admin.putFont("Other.woff", append([]byte("wOFF"), 1, 2, 3)); status != 200 {
+		t.Fatalf("replace: %d", status)
+	}
+	var queued int
+	_ = e.app.Pool().QueryRow(context.Background(), "SELECT count(*) FROM storage_deletions").Scan(&queued)
+	if queued != 1 {
+		t.Fatalf("old font file queued: %d", queued)
+	}
+
+	admin.want(204, "DELETE", "/api/v1/admin/appearance/font", nil)
+	if resp, body := e.do(anonymous, "GET", "/api/v1/appearance", ""); resp.StatusCode != 200 || !strings.Contains(body, `"font":null`) {
+		t.Fatalf("after removing: %s", body)
+	}
+	if e.auditActions("settings.font_changed") != 3 || e.outboxCount("settings.font_changed") != 3 {
+		t.Fatal("font changes must be audited and published")
+	}
+}
+
+func TestPageNamesItsAuthors(t *testing.T) {
+	e := newEnv(t)
+	a := e.user("a@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := a.space("ENG")
+	id := a.page(space, nil, "Page", "x")
+	p := a.ok("GET", "/api/v1/pages/"+id, nil)
+	if p["created_by_name"] != "Test a@example.com" || p["updated_by_name"] != "Test a@example.com" {
+		t.Fatalf("names: %+v", p)
+	}
+}

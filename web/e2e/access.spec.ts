@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
+import type { Page } from '@playwright/test';
 import {
   ADMIN,
   checkAccessibility,
@@ -9,6 +10,7 @@ import {
   login,
   newSpace,
   publishedPage,
+  realFont,
   test,
   totpCode,
   unique,
@@ -187,7 +189,8 @@ test('a passkey logs in without a password', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Add a passkey' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Test key' })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Log out' }).first().click();
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menuitem', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByRole('button', { name: 'Log in with a passkey' }).click();
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
@@ -224,11 +227,60 @@ test('every tab of the admin console works and is accessible', async ({ page }) 
   await expect(page.getByRole('row', { name: /Ready/ })).toContainText('ready');
 });
 
+test('an administrator can reach the admin console from the account menu', async ({ page }) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menuitem', { name: 'Administration' }).click();
+  await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible();
+});
+
+test('an imported font is used everywhere, also before logging in, and can be removed', async ({
+  page,
+  browser,
+}) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  await page.goto('/admin/settings');
+  await expect(page.getByText('This installation uses the system font.')).toBeVisible();
+
+  await page.getByLabel('Import a font').setInputFiles({
+    name: 'Refuse me.woff2',
+    mimeType: 'font/woff2',
+    buffer: Buffer.from('this is not a font'),
+  });
+  await expect(page.getByRole('alert')).toContainText('WOFF2 or WOFF');
+
+  await page.getByLabel('Import a font').setInputFiles({
+    name: 'House Serif.woff',
+    mimeType: 'font/woff',
+    buffer: realFont(),
+  });
+  await expect(page.getByText('Imported font: House Serif.woff')).toBeVisible();
+  const usesImportedFont = (p: Page) =>
+    expect
+      .poll(() => p.evaluate(() => getComputedStyle(document.body).fontFamily))
+      .toContain('Diffluence Imported');
+  await usesImportedFont(page);
+  expect(await page.evaluate(() => document.fonts.check('16px "Diffluence Imported"'))).toBe(true);
+
+  const anonymous = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+  await anonymous.goto('/login');
+  await usesImportedFont(anonymous);
+  await anonymous.context().close();
+
+  await page.getByRole('button', { name: 'Use the system font' }).click();
+  await expect(page.getByText('This installation uses the system font.')).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily))
+    .not.toContain('Diffluence Imported');
+});
+
 test('a normal user has no way into the admin console', async ({ page, browser }) => {
   const email = `${unique('plain')}@example.com`;
   await createUser(browser, email);
   await login(page, email);
-  await expect(page.getByRole('link', { name: 'Administration' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Account' }).click();
+  await expect(page.getByRole('menuitem', { name: 'Your account' })).toBeVisible();
+  await expect(page.getByRole('menuitem', { name: 'Administration' })).toHaveCount(0);
   await page.goto('/admin/users');
   await expect(page.getByRole('alert')).toBeVisible();
   const res = await page.request.get('/api/v1/admin/users');

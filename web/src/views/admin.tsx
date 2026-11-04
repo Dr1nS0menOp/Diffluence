@@ -14,7 +14,8 @@ import {
 } from '../api';
 import { Link } from '../router';
 import { SubjectPicker } from '../components/picker';
-import { Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+import { AppearanceSection } from './admin-appearance';
 
 const TABS = ['users', 'groups', 'spaces', 'audit', 'settings', 'scim', 'system'] as const;
 
@@ -159,9 +160,11 @@ function NewUserDialog({ onClose }: { onClose: () => void }) {
             required
           />
         </Field>
-        <button type="submit" className="primary">
-          {t('common.create')}
-        </button>
+        <div className="dialog-actions">
+          <button type="submit" className="primary">
+            {t('common.create')}
+          </button>
+        </div>
       </form>
     </Dialog>
   );
@@ -429,15 +432,12 @@ function SpacesTab() {
                 <button type="button" onClick={() => restore.mutate(i.id)}>
                   {t('trash.restore')}
                 </button>
-                <button
-                  type="button"
+                <ConfirmButton
+                  label={t('trash.purge')}
+                  message={t('trash.confirmPurge')}
                   className="danger"
-                  onClick={() => {
-                    if (window.confirm(t('trash.confirmPurge'))) purge.mutate(i.id);
-                  }}
-                >
-                  {t('trash.purge')}
-                </button>
+                  onConfirm={() => purge.mutate(i.id)}
+                />
               </li>
             ))}
           </ul>
@@ -456,9 +456,11 @@ function SpacesTab() {
             <Field label={t('admin.reason')}>
               <input value={reason} onChange={(e) => setReason(e.target.value)} required autoFocus />
             </Field>
-            <button type="submit" className="primary">
-              {t('admin.recover')}
-            </button>
+            <div className="dialog-actions">
+              <button type="submit" className="primary">
+                {t('admin.recover')}
+              </button>
+            </div>
           </form>
         </Dialog>
       )}
@@ -593,6 +595,7 @@ function SettingsTab() {
           {t('common.save')}
         </button>
       </form>
+      <AppearanceSection />
       <h2>{t('admin.authTitle')}</h2>
       <p className="muted">{t('admin.authHelp')}</p>
       <p>{system.data?.oidc_configured ? t('admin.oidcOn') : t('admin.oidcOff')}</p>
@@ -768,24 +771,41 @@ function SystemTab() {
 
 export function AdminView({ tab, me }: { tab: string; me: Me }) {
   const { t } = useTranslation();
-  if (!me.global_permissions.includes('administrator')) return <p role="alert">{t('app.notFound')}</p>;
+  if (!me.global_permissions.includes('administrator')) {
+    return (
+      <main id="main" className="plain reading">
+        <p role="alert">{t('app.notFound')}</p>
+      </main>
+    );
+  }
   return (
-    <>
-      <h1>{t('admin.title')}</h1>
-      <nav className="tabs" aria-label={t('admin.title')}>
-        {TABS.map((name) => (
-          <Link key={name} href={`/admin/${name}`} aria-current={name === tab ? 'page' : undefined}>
-            {t(`admin.${name}`)}
-          </Link>
-        ))}
-      </nav>
-      {tab === 'users' && <UsersTab />}
-      {tab === 'groups' && <GroupsTab />}
-      {tab === 'spaces' && <SpacesTab />}
-      {tab === 'audit' && <AuditTab />}
-      {tab === 'settings' && <SettingsTab />}
-      {tab === 'scim' && <ScimTab />}
-      {tab === 'system' && <SystemTab />}
-    </>
+    <div className="split">
+      <aside className="sidebar">
+        <nav aria-label={t('admin.title')}>
+          {TABS.map((name) => (
+            <Link
+              key={name}
+              href={`/admin/${name}`}
+              className="side-link"
+              aria-current={name === tab ? 'page' : undefined}
+            >
+              {t(`admin.${name}`)}
+            </Link>
+          ))}
+        </nav>
+      </aside>
+      <main id="main" className="content">
+        <div className="column wide">
+          <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
+          {tab === 'users' && <UsersTab />}
+          {tab === 'groups' && <GroupsTab />}
+          {tab === 'spaces' && <SpacesTab />}
+          {tab === 'audit' && <AuditTab />}
+          {tab === 'settings' && <SettingsTab />}
+          {tab === 'scim' && <ScimTab />}
+          {tab === 'system' && <SystemTab />}
+        </div>
+      </main>
+    </div>
   );
 }

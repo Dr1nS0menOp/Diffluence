@@ -17,8 +17,7 @@ test('writing a page with Markdown shortcuts and publishing it', async ({ page }
   await page.getByRole('dialog').getByLabel('Title').fill('Shortcuts');
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
 
-  const body = page.getByRole('textbox', { name: 'Title', exact: true }).last();
-  await body.click();
+  await page.getByRole('textbox', { name: 'Page content' }).click();
   await page.keyboard.type('# Big heading');
   await page.keyboard.press('Enter');
   await page.keyboard.type('Some **bold** text and `code`.');
@@ -100,7 +99,8 @@ test('drafts survive a reload, and history compares and restores', async ({ page
   await page.getByRole('button', { name: 'Publish' }).click();
   await expect(page.locator('.prose')).toContainText('and more');
 
-  await page.getByRole('link', { name: 'History', exact: true }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'History' }).click();
   await expect(page.getByText('Added words')).toBeVisible();
   await page.getByRole('checkbox', { name: 'Version 1' }).check();
   await page.getByRole('checkbox', { name: 'Version 2' }).check();
@@ -109,8 +109,8 @@ test('drafts survive a reload, and history compares and restores', async ({ page
   await checkAccessibility(page);
 
   await page.goto(`/pages/${id}/history`);
-  page.once('dialog', (d) => void d.accept());
   await page.getByRole('button', { name: 'Restore' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Restore' }).click();
   await expect(page.getByRole('heading', { name: 'Story', level: 1 })).toBeVisible();
   await expect(page.locator('.prose')).not.toContainText('and more');
 });
@@ -178,12 +178,13 @@ test('the page tree supports drag and drop and keeps the address', async ({ page
   const tree = page.getByRole('navigation', { name: 'Pages' });
 
   await tree.getByRole('link', { name: 'Beta' }).dragTo(tree.getByRole('link', { name: 'Alpha' }));
-  await expect(tree.getByRole('button', { name: 'Alpha' })).toBeVisible();
+  await expect(tree.getByRole('button', { name: 'Alpha', exact: true })).toBeVisible();
 
   await page.goto(`/pages/${b}`);
   await expect(page.getByRole('navigation', { name: 'Breadcrumbs' })).toContainText('Alpha');
 
-  await page.getByRole('button', { name: 'Rename' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Rename' }).click();
   await page.getByLabel('New title').fill('Beta renamed');
   await page.getByRole('dialog').getByRole('button', { name: 'Save' }).click();
   await expect(page.getByRole('heading', { name: 'Beta renamed', level: 1 })).toBeVisible();
@@ -192,12 +193,116 @@ test('the page tree supports drag and drop and keeps the address', async ({ page
   await checkAccessibility(page);
 });
 
+test('a branch of the tree collapses, and stays collapsed while you read on', async ({ page }) => {
+  const space = await newSpace(page, 'Branch space');
+  const parent = await publishedPage(page, space.id, 'Parent', 'p');
+  await publishedPage(page, space.id, 'Child', 'c', parent);
+  const other = await publishedPage(page, space.id, 'Other', 'o');
+  await page.goto(`/pages/${other}`);
+  const tree = page.getByRole('navigation', { name: 'Pages' });
+  const toggle = tree.getByRole('button', { name: 'Parent', exact: true });
+
+  await expect(tree.getByRole('link', { name: 'Child' })).toBeVisible();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  await toggle.click();
+  await expect(tree.getByRole('link', { name: 'Child' })).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+
+  await tree.getByRole('link', { name: 'Parent' }).click();
+  await expect(page.getByRole('heading', { name: 'Parent', level: 1 })).toBeVisible();
+  await expect(tree.getByRole('link', { name: 'Child' })).toHaveCount(0);
+  await page.reload();
+  await expect(tree.getByRole('link', { name: 'Parent' })).toBeVisible();
+  await expect(tree.getByRole('link', { name: 'Child' })).toHaveCount(0);
+
+  await toggle.click();
+  await expect(tree.getByRole('link', { name: 'Child' })).toBeVisible();
+});
+
+test('going to a page reveals it, also inside a collapsed branch', async ({ page }) => {
+  const space = await newSpace(page, 'Reveal space');
+  const parent = await publishedPage(page, space.id, 'Outer', 'p');
+  const child = await publishedPage(page, space.id, 'Inner', 'c', parent);
+  await page.goto(`/pages/${parent}`);
+  const tree = page.getByRole('navigation', { name: 'Pages' });
+  await tree.getByRole('button', { name: 'Outer', exact: true }).click();
+  await expect(tree.getByRole('link', { name: 'Inner' })).toHaveCount(0);
+
+  await page.goto(`/pages/${child}`);
+  await expect(tree.getByRole('link', { name: 'Inner' })).toHaveAttribute('aria-current', 'page');
+});
+
+test('Create adds a page below the one you are reading', async ({ page }) => {
+  const space = await newSpace(page, 'Create space');
+  const parent = await publishedPage(page, space.id, 'Reading', 'x');
+  await page.goto(`/pages/${parent}`);
+  await expect(page.getByRole('heading', { name: 'Reading', level: 1 })).toBeVisible();
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: 'New page' });
+  await dialog.getByLabel('Title').fill('Below');
+  await dialog.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('textbox', { name: 'Page content' }).click();
+  await page.keyboard.type('text');
+  await page.getByRole('button', { name: 'Publish' }).click();
+  await expect(page.getByRole('heading', { name: 'Below', level: 1 })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Breadcrumbs' })).toContainText('Reading');
+});
+
+test('outside a space, Create starts a new space', async ({ page }) => {
+  await page.getByRole('button', { name: 'Create', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'New space' })).toBeVisible();
+});
+
+test('the sidebar can be put away and brought back', async ({ page }) => {
+  const space = await newSpace(page, 'Sidebar space');
+  await page.goto(`/spaces/${space.key}`);
+  const tree = page.getByRole('navigation', { name: 'Pages' });
+  await expect(tree).toBeVisible();
+  await page.getByRole('button', { name: 'Hide sidebar' }).click();
+  await expect(tree).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Show sidebar' })).toBeVisible();
+  await page.getByRole('button', { name: 'Show sidebar' }).click();
+  await expect(tree).toBeVisible();
+});
+
+test('a link is added through our own dialog, and no browser dialog ever opens', async ({ page }) => {
+  const space = await newSpace(page, 'Link space');
+  const id = await publishedPage(page, space.id, 'Links', 'start');
+  let browserDialogs = 0;
+  page.on('dialog', async (d) => {
+    browserDialogs++;
+    await d.dismiss();
+  });
+  await page.goto(`/pages/${id}/edit`);
+  await page.locator('.prose.editing').click();
+  await page.keyboard.press('Control+A');
+  await page.getByRole('button', { name: 'Link', exact: true }).click();
+  await page.getByRole('dialog', { name: 'Link' }).getByLabel('Link address').fill('https://example.com/');
+  await page.getByRole('dialog', { name: 'Link' }).getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('button', { name: 'Link', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+
+  await page.getByLabel('Text style').selectOption({ label: 'Heading 2' });
+  await page.getByRole('button', { name: 'Publish' }).click();
+  await expect(page.locator('.prose h2 a')).toHaveAttribute('href', 'https://example.com/');
+
+  await page.getByRole('link', { name: 'Edit', exact: true }).click();
+  await page.getByRole('button', { name: 'Discard draft' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  expect(browserDialogs).toBe(0);
+});
+
 test('trash: delete, restore, and purge', async ({ page }) => {
   const space = await newSpace(page, 'Trash space');
   const id = await publishedPage(page, space.id, 'Doomed', 'x');
   await page.goto(`/pages/${id}`);
-  page.once('dialog', (d) => void d.accept());
-  await page.getByRole('button', { name: 'Delete' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
 
   await page.goto(`/spaces/${space.key}/trash`);

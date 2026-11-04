@@ -1,0 +1,272 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* The document, in reading and in editing, and the editor around it. */
+.prose {
+  outline: none;
+  overflow-wrap: anywhere;
+  font-size: var(--text-prose);
+  line-height: var(--leading-prose);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.prose h1 {
+  margin-block: var(--space-6) var(--space-2);
+  font-size: var(--text-heading);
+}
+
+.prose h2 {
+  margin-block: var(--space-6) var(--space-2);
+  font-size: var(--text-heading);
+}
+
+.prose h3 {
+  margin-block: var(--space-5) var(--space-1);
+  font-size: var(--text-section);
+}
+
+.prose p {
+  margin-block: 0 var(--space-3);
+}
+
+.prose li > p {
+  margin-block: 0;
+}
+
+.prose li {
+  margin-block: var(--space-1);
+}
+
+.prose ul,
+.prose ol {
+  margin-block: 0 var(--space-3);
+}
+
+.prose img {
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+.prose blockquote {
+  margin-inline: 0;
+  padding-inline-start: var(--space-4);
+  border-inline-start: 3px solid var(--color-guide);
+  color: var(--color-muted);
+}
+
+.prose pre {
+  padding: var(--space-3);
+  overflow-x: auto;
+  border-radius: var(--radius);
+  background: var(--color-code);
+  direction: ltr;
+  white-space: pre;
+}
+
+.prose code {
+  padding-inline: var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-code);
+}
+
+.prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.prose ul[data-type='taskList'] {
+  padding-inline-start: var(--space-1);
+  list-style: none;
+}
+
+.prose ul[data-type='taskList'] li {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.prose ul[data-type='taskList'] li > div {
+  flex: 1;
+}
+
+.prose ul[data-type='taskList'] p {
+  margin: 0;
+}
+
+.prose table th,
+.prose table td {
+  min-inline-size: 3rem;
+}
+
+.prose table p {
+  margin: 0;
+}
+
+.prose .selectedCell {
+  background: var(--color-accent-tint);
+}
+
+.ProseMirror-gapcursor {
+  position: absolute;
+  display: none;
+  pointer-events: none;
+}
+
+.ProseMirror-focused .ProseMirror-gapcursor {
+  display: block;
+}
+
+.hljs-keyword,
+.hljs-built_in {
+  color: var(--color-syntax-keyword);
+}
+
+.hljs-string,
+.hljs-attr {
+  color: var(--color-syntax-string);
+}
+
+.hljs-comment {
+  color: var(--color-muted);
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-literal {
+  color: var(--color-syntax-number);
+}
+
+.hljs-title,
+.hljs-function {
+  color: var(--color-syntax-title);
+}
+
+.diff {
+  margin-block: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+}
+
+.diff.changed {
+  background: var(--color-code);
+}
+
+.diff.added,
+.diff .added {
+  background: var(--color-added);
+}
+
+.diff.removed,
+.diff .removed {
+  background: var(--color-removed);
+  text-decoration: line-through;
+}
+
+/* The editor: a strip with the page's fate, the tools, then an open sheet. */
+.focus {
+  min-block-size: calc(100vh - var(--size-topbar));
+}
+
+.edit-bar {
+  position: sticky;
+  inset-block-start: var(--size-topbar);
+  z-index: var(--layer-bar);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  min-block-size: var(--size-editbar);
+  padding: var(--space-2) var(--space-5);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+
+.edit-status {
+  font-size: var(--text-small);
+}
+
+.edit-summary {
+  flex: 1;
+  max-inline-size: var(--size-summary);
+  margin-inline-start: auto;
+}
+
+.toolbar {
+  position: sticky;
+  inset-block-start: calc(var(--size-topbar) + var(--size-editbar));
+  z-index: var(--layer-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding: var(--space-1-5) var(--space-5);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-side);
+}
+
+.tool-style {
+  min-block-size: var(--size-tool);
+  margin-inline-end: var(--space-1);
+}
+
+.tool {
+  inline-size: var(--size-tool);
+  min-block-size: var(--size-tool);
+  padding: 0;
+  background: none;
+  color: var(--color-ink);
+}
+
+.tool.on,
+.tool.on:hover {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.tool-separator {
+  align-self: stretch;
+  inline-size: 1px;
+  margin: var(--space-1);
+  background: var(--color-line);
+}
+
+.editor-sheet {
+  max-inline-size: var(--size-editor);
+  margin-inline: auto;
+  padding: var(--space-8) var(--space-6) var(--space-12);
+}
+
+.title-input {
+  inline-size: 100%;
+  margin-block-end: var(--space-4);
+  padding: 0;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  border-radius: 0;
+  background: none;
+  color: var(--color-strong);
+  font-size: var(--text-edit-title);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-title);
+}
+
+.title-input:focus-visible {
+  border-block-end-color: var(--color-accent);
+  outline: none;
+}
+
+.prose.editing {
+  min-block-size: 40vh;
+}
+
+@media (max-width: 50rem) {
+  .edit-bar,
+  .toolbar {
+    position: static;
+  }
+
+  .edit-summary {
+    flex-basis: 100%;
+    order: 1;
+    max-inline-size: none;
+    margin-inline-start: 0;
+  }
+}

@@ -35,7 +35,11 @@
     "admin": "Administration",
     "profile": "Your account",
     "logout": "Log out",
-    "mainMenu": "Main"
+    "mainMenu": "Main",
+    "spaces": "Spaces",
+    "allSpaces": "All spaces",
+    "create": "Create",
+    "accountMenu": "Account"
   },
   "login": {
     "title": "Log in",
@@ -58,7 +62,8 @@
     "newSpace": "New space",
     "recent": "Recently viewed",
     "favourites": "Favourites",
-    "nothingYet": "Nothing here yet."
+    "nothingYet": "Nothing here yet.",
+    "welcome": "Welcome back, {{name}}"
   },
   "space": {
     "key": "Key",
@@ -82,7 +87,10 @@
     "importing": "Importing…",
     "importDone": "Imported {{pages}} pages and {{files}} files.",
     "importFailed": "The import failed: {{error}}",
-    "emptyTree": "No pages yet."
+    "emptyTree": "No pages yet.",
+    "addChild": "Add a page under {{title}}",
+    "hideSidebar": "Hide sidebar",
+    "showSidebar": "Show sidebar"
   },
   "permissions": {
     "subject": "Who",
@@ -140,7 +148,10 @@
     "breadcrumbs": "Breadcrumbs",
     "why": "Why can or can't they?",
     "title": "Title",
-    "untitled": "Untitled"
+    "untitled": "Untitled",
+    "moreActions": "More actions",
+    "byline": "By {{name}}",
+    "lastUpdated": "Last updated {{date}}"
   },
   "editor": {
     "toolbar": "Formatting",
@@ -181,7 +192,13 @@
     "overwrite": "Publish anyway",
     "keepEditing": "Keep editing",
     "compare": "Compare versions",
-    "uploadFailed": "The file could not be uploaded."
+    "uploadFailed": "The file could not be uploaded.",
+    "close": "Close",
+    "titlePlaceholder": "Give this page a title",
+    "content": "Page content",
+    "textStyle": "Text style",
+    "paragraph": "Paragraph",
+    "linkRemove": "Remove link"
   },
   "history": {
     "title": "Version history",
@@ -197,7 +214,8 @@
     "current": "Current",
     "confirmRestore": "Publish a new version with this content?",
     "unchanged": "No changes.",
-    "pick": "Choose two versions"
+    "pick": "Choose two versions",
+    "comparing": "Version {{from}} compared with version {{to}}"
   },
   "attachments": {
     "title": "Attachments",
@@ -343,6 +361,12 @@
     "gone": "Gone",
     "lastSeen": "Last seen",
     "ok": "OK",
-    "problem": "Problem"
+    "problem": "Problem",
+    "appearance": "Appearance",
+    "fontSystem": "This installation uses the system font.",
+    "fontImported": "Imported font: {{name}}",
+    "fontImport": "Import a font",
+    "fontRemove": "Use the system font",
+    "fontHelp": "WOFF2 or WOFF, at most 2 MiB. Check that your licence allows use on a website."
   }
 }

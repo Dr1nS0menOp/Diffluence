@@ -40,6 +40,7 @@ func (s *Server) registerRoutes() {
 
 	s.registerContentRoutes()
 	s.registerIdentityRoutes()
+	s.registerAppearanceRoutes()
 }
 
 type userJSON struct {

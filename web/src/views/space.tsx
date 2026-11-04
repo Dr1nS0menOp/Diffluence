@@ -1,145 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  api,
-  NIL_ID,
-  type Grant,
-  type Job,
-  type Page,
-  type PageDetail,
-  type Space,
-  type Subject,
-  type TrashItem,
-  type TreeNode,
-} from '../api';
-import { Link, navigate } from '../router';
-import { Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+import { api, NIL_ID, type Grant, type Job, type Space, type Subject, type TrashItem } from '../api';
+import { navigate } from '../router';
+import { Frame, spaceByKeyQuery } from '../components/frame';
+import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, formatDate, Loading } from '../components/ui';
 import { SubjectPicker } from '../components/picker';
-import { PageTree } from '../components/tree';
 
 function useSpaceByKey(key: string) {
-  return useQuery({
-    queryKey: ['space', key],
-    queryFn: () => api.get<Space>(`/space-keys/${encodeURIComponent(key)}`),
-  });
-}
-
-function NewPage({ space, parent, onClose }: { space: Space; parent: string | null; onClose: () => void }) {
-  const { t } = useTranslation();
-  const [title, setTitle] = useState('');
-  const create = useMutation({
-    mutationFn: () => api.post<Page>('/pages', { space_id: space.id, parent_id: parent, title }),
-    onSuccess: (p) => navigate(`/pages/${p.id}/edit`),
-  });
-  return (
-    <Dialog title={t('space.newPage')} onClose={onClose}>
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          create.mutate();
-        }}
-      >
-        <ErrorNote error={create.error} />
-        <Field label={t('page.title')}>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
-        </Field>
-        <button type="submit" className="primary" disabled={create.isPending}>
-          {t('common.create')}
-        </button>
-      </form>
-    </Dialog>
-  );
-}
-
-function Sidebar({ space, current, parent }: { space: Space; current?: string; parent: string | null }) {
-  const { t } = useTranslation();
-  const [adding, setAdding] = useState(false);
-  const tree = useQuery({
-    queryKey: ['tree', space.id],
-    queryFn: () => api.get<{ pages: TreeNode[] }>(`/spaces/${space.id}/tree`),
-  });
-  const canCreate = space.can?.['page.create'] ?? false;
-  return (
-    <aside className="sidebar">
-      <h2>
-        <Link href={`/spaces/${space.key}`}>
-          <span aria-hidden="true">{space.icon}</span> {space.name}
-        </Link>
-      </h2>
-      {canCreate && (
-        <button type="button" onClick={() => setAdding(true)}>
-          {t('space.newPage')}
-        </button>
-      )}
-      {tree.isPending && <Loading />}
-      <ErrorNote error={tree.error} />
-      {tree.data && (
-        <PageTree spaceId={space.id} nodes={tree.data.pages} current={current} canMove={canCreate} />
-      )}
-      {space.can?.['space.administer'] && (
-        <nav className="side-links" aria-label={t('space.settings')}>
-          <Link href={`/spaces/${space.key}/settings`}>{t('space.settings')}</Link>
-          <Link href={`/spaces/${space.key}/trash`}>{t('space.trash')}</Link>
-        </nav>
-      )}
-      {adding && <NewPage space={space} parent={parent} onClose={() => setAdding(false)} />}
-    </aside>
-  );
-}
-
-function Frame({
-  space,
-  current,
-  parent,
-  children,
-}: {
-  space: Space;
-  current?: string;
-  parent?: string | null;
-  children: ReactNode;
-}) {
-  const { t } = useTranslation();
-  return (
-    <div className="split">
-      <Sidebar space={space} current={current} parent={parent ?? null} />
-      <main id="main" className="content">
-        {space.status === 'archived' && (
-          <p role="status" className="note">
-            {t('space.archived')}
-          </p>
-        )}
-        {children}
-      </main>
-    </div>
-  );
-}
-
-/** Frames a page with the sidebar of its space. */
-export function SpaceShell({ pageId, children }: { pageId: string; children: ReactNode }) {
-  const page = useQuery({
-    queryKey: ['page', pageId],
-    queryFn: () => api.get<PageDetail>(`/pages/${pageId}`),
-  });
-  const space = useQuery({
-    queryKey: ['space-id', page.data?.space_id],
-    queryFn: () => api.get<Space>(`/spaces/${page.data?.space_id}`),
-    enabled: !!page.data,
-  });
-  if (page.isPending || (page.data && space.isPending)) return <Loading />;
-  if (page.error || space.error || !space.data) {
-    return (
-      <main id="main" className="plain">
-        <ErrorNote error={page.error ?? space.error} />
-      </main>
-    );
-  }
-  return (
-    <Frame space={space.data} current={pageId} parent={page.data?.status === 'published' ? pageId : null}>
-      {children}
-    </Frame>
-  );
+  return useQuery(spaceByKeyQuery(key));
 }
 
 /** Opening a space goes to its home page. */
@@ -150,7 +20,7 @@ export function SpaceHome({ spaceKey }: { spaceKey: string }) {
   }, [space.data]);
   if (space.error) {
     return (
-      <main id="main" className="plain">
+      <main id="main" className="plain reading">
         <ErrorNote error={space.error} />
       </main>
     );
@@ -161,7 +31,6 @@ export function SpaceHome({ spaceKey }: { spaceKey: string }) {
 function ImportBox({ space }: { space: Space }) {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const file = useRef<HTMLInputElement>(null);
   const [job, setJob] = useState<string | null>(null);
   const start = useMutation({
     mutationFn: (f: File) =>
@@ -182,16 +51,7 @@ function ImportBox({ space }: { space: Space }) {
     <section>
       <h2>{t('space.import')}</h2>
       <p className="muted">{t('space.importHelp')}</p>
-      <input
-        ref={file}
-        type="file"
-        accept=".md,.markdown,.zip"
-        aria-label={t('space.import')}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) start.mutate(f);
-        }}
-      />
+      <FilePicker label={t('space.import')} accept=".md,.markdown,.zip" onPick={(f) => start.mutate(f)} />
       <ErrorNote error={start.error} />
       {job && status.data?.status !== 'done' && status.data?.status !== 'failed' && (
         <p role="status">{t('space.importing')}</p>
@@ -387,7 +247,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   });
   if (q.error) {
     return (
-      <main id="main" className="plain">
+      <main id="main" className="plain reading">
         <ErrorNote error={q.error} />
       </main>
     );
@@ -445,15 +305,12 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
               {t('space.archive')}
             </button>
           )}
-          <button
-            type="button"
+          <ConfirmButton
+            label={t('space.deleteSpace')}
+            message={t('space.confirmDelete')}
             className="danger"
-            onClick={() => {
-              if (window.confirm(t('space.confirmDelete'))) remove.mutate();
-            }}
-          >
-            {t('space.deleteSpace')}
-          </button>
+            onConfirm={() => remove.mutate()}
+          />
         </div>
       </section>
     </Frame>
@@ -481,7 +338,7 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
   const purge = useMutation({ mutationFn: (id: string) => api.del(`/trash/${id}`), onSettled: refresh });
   if (q.error) {
     return (
-      <main id="main" className="plain">
+      <main id="main" className="plain reading">
         <ErrorNote error={q.error} />
       </main>
     );
@@ -514,15 +371,12 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
                   <button type="button" onClick={() => restore.mutate(i.id)}>
                     {t('trash.restore')}
                   </button>
-                  <button
-                    type="button"
+                  <ConfirmButton
+                    label={t('trash.purge')}
+                    message={t('trash.confirmPurge')}
                     className="danger"
-                    onClick={() => {
-                      if (window.confirm(t('trash.confirmPurge'))) purge.mutate(i.id);
-                    }}
-                  >
-                    {t('trash.purge')}
-                  </button>
+                    onConfirm={() => purge.mutate(i.id)}
+                  />
                 </td>
               </tr>
             ))}

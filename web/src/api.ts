@@ -48,6 +48,7 @@ export const api = {
   patch: <T>(path: string, body: unknown) => json<T>('PATCH', path, body),
   del: <T = void>(path: string) => json<T>('DELETE', path),
   upload: <T>(path: string, file: Blob | File) => json<T>('POST', path, undefined, file),
+  replace: <T>(path: string, file: Blob | File) => json<T>('PUT', path, undefined, file),
 };
 
 export type Json = Record<string, unknown>;
@@ -97,6 +98,8 @@ export interface Page {
 export interface PageDetail extends Page {
   document: Json;
   breadcrumbs: { id: string; title: string }[];
+  created_by_name: string;
+  updated_by_name: string;
   has_draft: boolean;
   favourite: boolean;
   restricted: boolean;

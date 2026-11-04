@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ApiError } from '../api';
+import { ApiError, type Space } from '../api';
+import { IconClose, IconUpload } from './icons';
+
+const TINT_COUNT = 4;
 
 export function Loading() {
   const { t } = useTranslation();
@@ -44,14 +47,87 @@ export function Dialog({
   }, []);
   return (
     <dialog ref={ref} onClose={onClose} aria-label={title} className={wide ? 'wide' : undefined}>
-      <header className="row">
+      <header className="dialog-head">
         <h2>{title}</h2>
-        <button type="button" className="ghost" onClick={onClose}>
-          {t('common.close')}
+        <button type="button" className="icon" aria-label={t('common.close')} onClick={onClose}>
+          <IconClose />
         </button>
       </header>
       {children}
     </dialog>
+  );
+}
+
+/** Asks before something that is hard to undo. The browser's own dialog does not fit the design. */
+export function ConfirmDialog({
+  title,
+  message,
+  confirmLabel,
+  tone = 'danger',
+  onConfirm,
+  onClose,
+}: {
+  title: string;
+  message: string;
+  confirmLabel: string;
+  tone?: 'danger' | 'primary';
+  onConfirm: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <p>{message}</p>
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          className={tone}
+          onClick={() => {
+            onClose();
+            onConfirm();
+          }}
+        >
+          {confirmLabel}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+/** A button that asks first. */
+export function ConfirmButton({
+  label,
+  message,
+  className,
+  tone,
+  onConfirm,
+}: {
+  label: string;
+  message: string;
+  className?: string;
+  tone?: 'danger' | 'primary';
+  onConfirm: () => void;
+}) {
+  const [asking, setAsking] = useState(false);
+  return (
+    <>
+      <button type="button" className={className} onClick={() => setAsking(true)}>
+        {label}
+      </button>
+      {asking && (
+        <ConfirmDialog
+          title={label}
+          message={message}
+          confirmLabel={label}
+          tone={tone}
+          onConfirm={onConfirm}
+          onClose={() => setAsking(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -65,9 +141,74 @@ export function Field({ label, help, children }: { label: string; help?: string;
   );
 }
 
+/** A file input that looks like a button, and still works from the keyboard. */
+export function FilePicker({
+  label,
+  accept,
+  onPick,
+}: {
+  label: string;
+  accept?: string;
+  onPick: (file: File) => void;
+}) {
+  return (
+    <label className="button file-picker">
+      <IconUpload size={16} /> {label}
+      <input
+        type="file"
+        className="visually-hidden"
+        accept={accept}
+        onChange={(e) => {
+          const file = e.target.files?.[0];
+          if (file) onPick(file);
+          e.target.value = '';
+        }}
+      />
+    </label>
+  );
+}
+
+/** The same text always gets the same colour. */
+export function tintIndex(text: string): number {
+  return Array.from(text).reduce((sum, c) => sum + (c.codePointAt(0) ?? 0), 0) % TINT_COUNT;
+}
+
+export function initials(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const firstLetter = (word: string | undefined) => Array.from(word ?? '')[0] ?? '';
+  const last = words.length > 1 ? firstLetter(words[words.length - 1]) : '';
+  return (firstLetter(words[0]) + last).toUpperCase() || '?';
+}
+
+function firstCharacter(text: string): string {
+  const [first] = new Intl.Segmenter().segment(text);
+  return first?.segment ?? '';
+}
+
+export function Avatar({ name, size }: { name: string; size?: 'small' }) {
+  return (
+    <span className={`avatar tint-${tintIndex(name)} ${size ?? ''}`} aria-hidden="true">
+      {initials(name)}
+    </span>
+  );
+}
+
+export function SpaceBadge({ space, size }: { space: Space; size?: 'small' | 'large' }) {
+  const mark = firstCharacter(space.icon.trim()) || firstCharacter(space.name).toUpperCase();
+  return (
+    <span className={`space-badge tint-${tintIndex(space.key)} ${size ?? ''}`} aria-hidden="true">
+      {mark}
+    </span>
+  );
+}
+
 export function formatDate(value: string | null | undefined): string {
   if (!value) return '';
   return new Date(value).toLocaleString();
+}
+
+export function formatDay(value: string): string {
+  return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 export function formatSize(bytes: number): string {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHmac } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { expect, test as base, type APIRequestContext, type Browser, type Page } from '@playwright/test';
 import AxeBuilder from '@axe-core/playwright';
 
@@ -64,6 +65,18 @@ export async function createUser(browser: Browser, email: string, type = 'member
   return user.id;
 }
 
+/** A user with a real name, for screens where the name shows. */
+export async function createNamedUser(browser: Browser, email: string, displayName: string) {
+  const { api, close } = await adminRequest(browser);
+  const res = await api.post('/api/v1/admin/users', {
+    data: { email, display_name: displayName, type: 'member', password: PASSWORD, global_permissions: null },
+  });
+  expect(res.status(), await res.text()).toBe(201);
+  const user = (await res.json()) as { id: string };
+  await close();
+  return user.id;
+}
+
 export async function newSpace(page: Page, name: string) {
   const key = unique('S');
   const res = await page.request.post('/api/v1/spaces', { data: { key, name } });
@@ -118,6 +131,48 @@ export async function checkAccessibility(page: Page) {
     (v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`,
   );
   expect(summary).toEqual([]);
+}
+
+const WOFF_HEADER_BYTES = 44;
+const WOFF_ENTRY_BYTES = 20;
+const SFNT_ENTRY_BYTES = 16;
+const SFNT_HEADER_BYTES = 12;
+const padded = (length: number) => (length + 3) & ~3;
+
+/** A real web font from a font in the test image: WOFF may store its tables uncompressed. */
+export function realFont(path = '/usr/share/fonts/truetype/liberation/LiberationSerif-Regular.ttf'): Buffer {
+  const font = readFileSync(path);
+  const tableCount = font.readUInt16BE(4);
+  const tables = Array.from({ length: tableCount }, (_, i) => {
+    const at = SFNT_HEADER_BYTES + i * SFNT_ENTRY_BYTES;
+    return {
+      tag: font.subarray(at, at + 4),
+      checksum: font.readUInt32BE(at + 4),
+      offset: font.readUInt32BE(at + 8),
+      length: font.readUInt32BE(at + 12),
+    };
+  });
+  const bodyStart = WOFF_HEADER_BYTES + tableCount * WOFF_ENTRY_BYTES;
+  const bodySize = tables.reduce((sum, table) => sum + padded(table.length), 0);
+  const woff = Buffer.alloc(bodyStart + bodySize);
+  woff.write('wOFF', 0, 'latin1');
+  woff.writeUInt32BE(font.readUInt32BE(0), 4);
+  woff.writeUInt32BE(woff.length, 8);
+  woff.writeUInt16BE(tableCount, 12);
+  woff.writeUInt32BE(SFNT_HEADER_BYTES + tableCount * SFNT_ENTRY_BYTES + bodySize, 16);
+  woff.writeUInt16BE(1, 20);
+  let cursor = bodyStart;
+  tables.forEach((table, i) => {
+    const entry = WOFF_HEADER_BYTES + i * WOFF_ENTRY_BYTES;
+    table.tag.copy(woff, entry);
+    woff.writeUInt32BE(cursor, entry + 4);
+    woff.writeUInt32BE(table.length, entry + 8);
+    woff.writeUInt32BE(table.length, entry + 12);
+    woff.writeUInt32BE(table.checksum, entry + 16);
+    font.copy(woff, cursor, table.offset, table.offset + table.length);
+    cursor += padded(table.length);
+  });
+  return woff;
 }
 
 /** RFC 6238, written out so the test does not share code with the server. */

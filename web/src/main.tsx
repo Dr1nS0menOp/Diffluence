@@ -5,7 +5,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiError } from './api';
 import { App } from './app';
 import './i18n';
-import './styles.css';
+import './design/tokens.css';
+import './design/base.css';
+import './design/controls.css';
+import './design/layout.css';
+import './design/document.css';
 
 const client = new QueryClient({
   defaultOptions: {

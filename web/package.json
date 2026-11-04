@@ -12,6 +12,7 @@
     "format": "prettier --write src e2e",
     "test": "vitest run",
     "strings": "node scripts/check-ui-strings.mjs",
+    "design": "node scripts/check-design.mjs",
     "e2e": "playwright test"
   },
   "dependencies": {

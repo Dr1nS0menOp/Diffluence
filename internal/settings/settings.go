@@ -16,6 +16,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/storage"
 )
 
 const (
@@ -34,11 +35,14 @@ var Defaults = Values{TrashRetentionDays: 30, MaxUploadMiB: 100}
 
 // Service reads and writes settings.
 type Service struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	store storage.Store
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func NewService(pool *pgxpool.Pool, store storage.Store) *Service {
+	return &Service{pool: pool, store: store}
+}
 
 // Get returns the current values.
 func (s *Service) Get(ctx context.Context) (Values, error) {

@@ -64,6 +64,9 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 **ADR-020: Accounts link across SCIM and OIDC on a shared stable id**
 *Proposed.* Found by testing against real Authentik: it does not mark e-mail addresses as verified, but its SCIM `externalId` equals the OIDC subject. Linking on that id needs no trust in an address users may change. Consequence: Entra ID needs `externalId` mapped to `objectId`. Local accounts with a password never link.
 
+**ADR-021: One design standard, enforced by checks**
+*Accepted by the product owner, 2026-11-04.* After ten designs and two rounds of iteration, the product owner chose the Helder style and layout, the Rail editor, and a page tree with collapsible branches, in the system font with an optional imported font. `docs/design/README.md` is the standard. Design values live only in `web/src/design/tokens.css`; `web/scripts/check-design.mjs` and approved pictures in the browser tests enforce it. Consequence: a change that drifts from the design fails, and every new screen needs a picture. Pictures are tied to one browser image, so updating Playwright means new pictures. No new dependency: icons, logo, menus and dialogs are our own. The look is the product owner's to change, through a new ADR.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

@@ -41,7 +41,7 @@ licenses:
 	node scripts/check-licenses.mjs
 
 web-check:
-	cd web && npx tsc --noEmit && npx eslint src e2e && npx prettier --check src e2e && npm run -s strings && npx vitest run
+	cd web && npx tsc --noEmit && npx eslint src e2e && npx prettier --check src e2e && npm run -s strings && npm run -s design && npx vitest run
 
 # Do the tests catch real bugs? Slow, so not part of every check.
 mutation:

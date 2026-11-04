@@ -14,6 +14,8 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/jackc/pgx/v5"
 )
 
 // ErrNotFound means the object does not exist.
@@ -21,6 +23,15 @@ var ErrNotFound = errors.New("storage: object not found")
 
 // ErrTooLarge means the input exceeded the limit given to Put.
 var ErrTooLarge = errors.New("storage: object too large")
+
+// QueueDeletion schedules a stored file for removal, inside the caller's
+// transaction, so a crash can never leave a file behind for good.
+func QueueDeletion(ctx context.Context, tx pgx.Tx, key string) error {
+	if _, err := tx.Exec(ctx, "INSERT INTO storage_deletions (object_key) VALUES ($1) ON CONFLICT DO NOTHING", key); err != nil {
+		return fmt.Errorf("storage: queue deletion: %v", err)
+	}
+	return nil
+}
 
 // Object is the result of storing a file.
 type Object struct {

@@ -5,7 +5,8 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Draft, type Json, type PageDetail } from '../api';
 import { Link, navigate } from '../router';
 import { DocumentEditor } from '../components/editor';
-import { Dialog, ErrorNote, Field, Loading } from '../components/ui';
+import { IconArrowBack } from '../components/icons';
+import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 
 const AUTOSAVE_MS = 1500;
 
@@ -97,7 +98,6 @@ function Form({ data }: { data: Loaded }) {
   };
 
   const discard = async () => {
-    if (!window.confirm(t('editor.confirmDiscard'))) return;
     clearTimeout(timer.current);
     dirty.current = false;
     await api.del(`/pages/${page.id}/draft`);
@@ -106,17 +106,39 @@ function Form({ data }: { data: Loaded }) {
 
   return (
     <>
-      <Field label={t('page.title')}>
+      <div className="edit-bar">
+        <Link className="button quiet edit-close" href={`/pages/${page.id}`}>
+          <IconArrowBack size={18} /> {t('editor.close')}
+        </Link>
+        <span role="status" className="muted edit-status">
+          {state === 'saving' && t('editor.saving')}
+          {state === 'saved' && t('editor.saved')}
+          {state === 'failed' && t('editor.saveFailed')}
+        </span>
         <input
-          className="title-input"
-          value={title}
-          onChange={(e) => {
-            setTitle(e.target.value);
-            schedule();
-          }}
-          required
+          className="edit-summary"
+          value={summary}
+          onChange={(e) => setSummary(e.target.value)}
+          maxLength={500}
+          aria-label={t('editor.summary')}
+          placeholder={t('editor.summary')}
         />
-      </Field>
+        <ConfirmButton
+          label={t('editor.discard')}
+          message={t('editor.confirmDiscard')}
+          className="quiet"
+          onConfirm={() => void discard()}
+        />
+        <button type="button" className="primary" onClick={() => void publish(false)}>
+          {t('editor.publish')}
+        </button>
+      </div>
+      {uploadFailed && (
+        <p role="alert" className="note note-error">
+          {t('editor.uploadFailed')}
+        </p>
+      )}
+      <ErrorNote error={error} />
       <DocumentEditor
         pageId={page.id}
         initial={data.document}
@@ -125,41 +147,32 @@ function Form({ data }: { data: Loaded }) {
           schedule();
         }}
         onUploadError={() => setUploadFailed(true)}
+        header={
+          <input
+            className="title-input"
+            value={title}
+            aria-label={t('page.title')}
+            placeholder={t('editor.titlePlaceholder')}
+            onChange={(e) => {
+              setTitle(e.target.value);
+              schedule();
+            }}
+            required
+          />
+        }
       />
-      {uploadFailed && (
-        <p role="alert" className="note note-error">
-          {t('editor.uploadFailed')}
-        </p>
-      )}
-      <ErrorNote error={error} />
-      <Field label={t('editor.summary')}>
-        <input value={summary} onChange={(e) => setSummary(e.target.value)} maxLength={500} />
-      </Field>
-      <div className="row actions">
-        <button type="button" className="primary" onClick={() => void publish(false)}>
-          {t('editor.publish')}
-        </button>
-        <button type="button" onClick={() => void discard()}>
-          {t('editor.discard')}
-        </button>
-        <span role="status" className="muted">
-          {state === 'saving' && t('editor.saving')}
-          {state === 'saved' && t('editor.saved')}
-          {state === 'failed' && t('editor.saveFailed')}
-        </span>
-      </div>
       {conflict && (
         <Dialog title={t('editor.conflictTitle')} onClose={() => setConflict(false)}>
           <p>{t('editor.conflictText')}</p>
-          <div className="row">
-            <button type="button" className="primary" onClick={() => setConflict(false)}>
-              {t('editor.keepEditing')}
-            </button>
+          <div className="dialog-actions">
             <Link className="button" href={`/pages/${page.id}/history`}>
               {t('editor.compare')}
             </Link>
             <button type="button" className="danger" onClick={() => void publish(true)}>
               {t('editor.overwrite')}
+            </button>
+            <button type="button" className="primary" onClick={() => setConflict(false)}>
+              {t('editor.keepEditing')}
             </button>
           </div>
         </Dialog>

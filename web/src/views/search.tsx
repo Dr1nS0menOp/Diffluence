@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, type SearchResult, type Space } from '../api';
 import { Link, navigate, useLocation } from '../router';
-import { ErrorNote, Field, Loading } from '../components/ui';
+import { ErrorNote, Loading } from '../components/ui';
 
 /** Snippets are plain text with markers around matches, never HTML. */
 export function highlight(snippet: string): { text: string; hit: boolean }[] {
@@ -69,9 +69,13 @@ export function SearchView() {
             </option>
           ))}
         </select>
-        <Field label={t('search.since')}>
-          <input type="date" value={since} onChange={(e) => go({ since: e.target.value })} />
-        </Field>
+        <input
+          type="date"
+          aria-label={t('search.since')}
+          title={t('search.since')}
+          value={since}
+          onChange={(e) => go({ since: e.target.value })}
+        />
         <button type="submit" className="primary">
           {t('common.search')}
         </button>

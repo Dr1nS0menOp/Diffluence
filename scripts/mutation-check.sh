@@ -67,6 +67,14 @@ mutate "reading a page skips the check" internal/pages/pages.go \
   's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Detail{}, err\n\t}", "")' $app
 mutate "downloads skip the check" internal/attachments/attachments.go \
   's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app
+mutate "any member can import a font" internal/httpapi/handlers_appearance.go \
+  's.replace("admin := Permission(identity.PermAdministrator)", "admin := Permission(identity.PermUseProduct)")' $app
+mutate "any file passes as a font" internal/settings/font.go \
+  's.replace(`return "", false`, `return "woff2", true`)' $app
+mutate "font changes are not audited" internal/settings/font.go \
+  's.replace(`c.Event("settings.font_changed"`, `c.Event("settings.updated"`)' $app
+mutate "a replaced font file stays on disk" internal/settings/font.go \
+  's.replace("if found {", "if false && found {")' $app
 mutate "publishing skips the check" internal/pages/versions.go \
   's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion")' $app
 mutate "search ignores permissions" internal/search/search.go \
@@ -108,6 +116,9 @@ mutate "contract migrations ignore older nodes" internal/app/ops.go \
   's.replace("if oldest < pending[len(pending)-1].Version {", "if oldest < 0 {")' $app -run TestContract
 mutate "disabled users keep their sessions" internal/identity/users.go \
   's.replace("if _, err := tx.Exec(ctx, \"DELETE FROM sessions WHERE user_id = $1\", id); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tif err := s.keepsAnAdministrator", "if err := s.keepsAnAdministrator")' $app -run TestAdminUserManagement
+
+mutate "nodes hand out rights at the same time" internal/db/db.go \
+  's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

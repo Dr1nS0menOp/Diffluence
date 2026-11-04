@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
 import type { AnyExtension } from '@tiptap/core';
@@ -10,8 +10,34 @@ import { TableKit } from '@tiptap/extension-table';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { api, type Attachment, type Json } from '../api';
+import {
+  IconBold,
+  IconBullet,
+  IconCode,
+  IconCodeBlock,
+  IconColumnAdd,
+  IconColumnDelete,
+  IconImage,
+  IconItalic,
+  IconLink,
+  IconNumbered,
+  IconQuote,
+  IconRedo,
+  IconRowAdd,
+  IconRowDelete,
+  IconRule,
+  IconStrike,
+  IconTable,
+  IconTask,
+  IconTrash,
+  IconUnderline,
+  IconUndo,
+} from './icons';
+import { Dialog, Field } from './ui';
 
 const lowlight = createLowlight(common);
+const HEADING_LEVELS = [1, 2, 3] as const;
+const TOOL_ICON_SIZE = 18;
 
 /**
  * Images are attachments, never external addresses (spec 001). Pasted images
@@ -65,7 +91,7 @@ export function DocumentView({ document }: { document: Json }) {
       content: document,
       editable: false,
       injectCSS: false,
-      editorProps: { attributes: { class: 'prose', 'aria-label': t('page.title') } },
+      editorProps: { attributes: { class: 'prose', 'aria-label': t('editor.content') } },
     },
     [document],
   );
@@ -77,21 +103,15 @@ function Tool({
   label,
   active,
   run,
-  text,
+  children,
 }: {
   editor: Editor;
   label: string;
-  active?: string | [string, Record<string, unknown>];
+  active?: string;
   run: () => void;
-  text: string;
+  children: ReactNode;
 }) {
-  const on = useEditorState({
-    editor,
-    selector: (s) => {
-      if (!active) return false;
-      return Array.isArray(active) ? s.editor.isActive(active[0], active[1]) : s.editor.isActive(active);
-    },
-  });
+  const on = useEditorState({ editor, selector: (s) => (active ? s.editor.isActive(active) : false) });
   return (
     <button
       type="button"
@@ -102,167 +122,253 @@ function Tool({
       onMouseDown={(e) => e.preventDefault()}
       onClick={run}
     >
-      {text}
+      {children}
     </button>
+  );
+}
+
+function ToolSeparator() {
+  return <span className="tool-separator" />;
+}
+
+function TextStyle({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const current = useEditorState({
+    editor,
+    selector: (s) => HEADING_LEVELS.find((level) => s.editor.isActive('heading', { level })) ?? 0,
+  });
+  const apply = (value: number) => {
+    const level = HEADING_LEVELS.find((l) => l === value);
+    const chain = editor.chain().focus();
+    if (level) chain.setHeading({ level }).run();
+    else chain.setParagraph().run();
+  };
+  return (
+    <select
+      className="tool-style"
+      aria-label={t('editor.textStyle')}
+      value={current}
+      onChange={(e) => apply(Number(e.target.value))}
+    >
+      <option value={0}>{t('editor.paragraph')}</option>
+      {HEADING_LEVELS.map((level) => (
+        <option key={level} value={level}>
+          {t(`editor.h${level}`)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function InlineTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const chain = () => editor.chain().focus();
+  return (
+    <>
+      <Tool editor={editor} label={t('editor.bold')} active="bold" run={() => chain().toggleBold().run()}>
+        <IconBold size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.italic')}
+        active="italic"
+        run={() => chain().toggleItalic().run()}
+      >
+        <IconItalic size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.underline')}
+        active="underline"
+        run={() => chain().toggleUnderline().run()}
+      >
+        <IconUnderline size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.strike')}
+        active="strike"
+        run={() => chain().toggleStrike().run()}
+      >
+        <IconStrike size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.code')} active="code" run={() => chain().toggleCode().run()}>
+        <IconCode size={TOOL_ICON_SIZE} />
+      </Tool>
+    </>
+  );
+}
+
+function BlockTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const chain = () => editor.chain().focus();
+  return (
+    <>
+      <Tool
+        editor={editor}
+        label={t('editor.bullet')}
+        active="bulletList"
+        run={() => chain().toggleBulletList().run()}
+      >
+        <IconBullet size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.ordered')}
+        active="orderedList"
+        run={() => chain().toggleOrderedList().run()}
+      >
+        <IconNumbered size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.task')}
+        active="taskList"
+        run={() => chain().toggleTaskList().run()}
+      >
+        <IconTask size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.quote')}
+        active="blockquote"
+        run={() => chain().toggleBlockquote().run()}
+      >
+        <IconQuote size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.codeBlock')}
+        active="codeBlock"
+        run={() => chain().toggleCodeBlock().run()}
+      >
+        <IconCodeBlock size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.rule')} run={() => chain().setHorizontalRule().run()}>
+        <IconRule size={TOOL_ICON_SIZE} />
+      </Tool>
+    </>
+  );
+}
+
+function TableTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const chain = () => editor.chain().focus();
+  return (
+    <>
+      <ToolSeparator />
+      <Tool editor={editor} label={t('editor.tableAddRow')} run={() => chain().addRowAfter().run()}>
+        <IconRowAdd size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.tableAddCol')} run={() => chain().addColumnAfter().run()}>
+        <IconColumnAdd size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.tableDeleteRow')} run={() => chain().deleteRow().run()}>
+        <IconRowDelete size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.tableDeleteCol')} run={() => chain().deleteColumn().run()}>
+        <IconColumnDelete size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.tableDelete')} run={() => chain().deleteTable().run()}>
+        <IconTrash size={TOOL_ICON_SIZE} />
+      </Tool>
+    </>
+  );
+}
+
+function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+  const { t } = useTranslation();
+  const isLink = editor.isActive('link');
+  const [href, setHref] = useState((editor.getAttributes('link').href as string | undefined) ?? '');
+  const apply = (e: FormEvent) => {
+    e.preventDefault();
+    onClose();
+    if (editor.state.selection.empty && !isLink) {
+      const link = { type: 'link', attrs: { href } };
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: 'text', text: href, marks: [link] })
+        .run();
+      return;
+    }
+    editor.chain().focus().extendMarkRange('link').setLink({ href }).run();
+  };
+  const remove = () => {
+    onClose();
+    editor.chain().focus().extendMarkRange('link').unsetLink().run();
+  };
+  return (
+    <Dialog title={t('editor.link')} onClose={onClose}>
+      <form onSubmit={apply}>
+        <Field label={t('editor.linkPrompt')}>
+          <input type="url" value={href} onChange={(e) => setHref(e.target.value)} required autoFocus />
+        </Field>
+        <div className="dialog-actions">
+          {isLink && (
+            <button type="button" className="quiet" onClick={remove}>
+              {t('editor.linkRemove')}
+            </button>
+          )}
+          <button type="submit" className="primary">
+            {t('common.save')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
   );
 }
 
 function Toolbar({ editor, onImage }: { editor: Editor; onImage: (file: File) => void }) {
   const { t } = useTranslation();
   const file = useRef<HTMLInputElement>(null);
+  const [linking, setLinking] = useState(false);
   const chain = () => editor.chain().focus();
   const inTable = useEditorState({ editor, selector: (s) => s.editor.isActive('table') });
-  const link = () => {
-    const previous = (editor.getAttributes('link').href as string | undefined) ?? '';
-    const href = window.prompt(t('editor.linkPrompt'), previous);
-    if (href === null) return;
-    if (href === '') chain().unsetLink().run();
-    else chain().setLink({ href }).run();
-  };
   return (
-    <div role="toolbar" aria-label={t('editor.toolbar')} className="toolbar">
-      <Tool
-        editor={editor}
-        label={t('editor.bold')}
-        active="bold"
-        text="B"
-        run={() => chain().toggleBold().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.italic')}
-        active="italic"
-        text="I"
-        run={() => chain().toggleItalic().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.underline')}
-        active="underline"
-        text="U"
-        run={() => chain().toggleUnderline().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.strike')}
-        active="strike"
-        text="S"
-        run={() => chain().toggleStrike().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.code')}
-        active="code"
-        text="`"
-        run={() => chain().toggleCode().run()}
-      />
-      <span className="sep" />
-      {([1, 2, 3] as const).map((level) => (
-        <Tool
-          key={level}
-          editor={editor}
-          label={t(`editor.h${level}`)}
-          active={['heading', { level }]}
-          text={`H${level}`}
-          run={() => chain().toggleHeading({ level }).run()}
+    <>
+      <div role="toolbar" aria-label={t('editor.toolbar')} className="toolbar">
+        <TextStyle editor={editor} />
+        <InlineTools editor={editor} />
+        <ToolSeparator />
+        <BlockTools editor={editor} />
+        <ToolSeparator />
+        <Tool editor={editor} label={t('editor.link')} active="link" run={() => setLinking(true)}>
+          <IconLink size={TOOL_ICON_SIZE} />
+        </Tool>
+        <Tool editor={editor} label={t('editor.image')} run={() => file.current?.click()}>
+          <IconImage size={TOOL_ICON_SIZE} />
+        </Tool>
+        <input
+          ref={file}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          hidden
+          aria-label={t('editor.image')}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) onImage(f);
+            e.target.value = '';
+          }}
         />
-      ))}
-      <span className="sep" />
-      <Tool
-        editor={editor}
-        label={t('editor.bullet')}
-        active="bulletList"
-        text="•"
-        run={() => chain().toggleBulletList().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.ordered')}
-        active="orderedList"
-        text="1."
-        run={() => chain().toggleOrderedList().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.task')}
-        active="taskList"
-        text="☑"
-        run={() => chain().toggleTaskList().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.quote')}
-        active="blockquote"
-        text="❝"
-        run={() => chain().toggleBlockquote().run()}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.codeBlock')}
-        active="codeBlock"
-        text="{ }"
-        run={() => chain().toggleCodeBlock().run()}
-      />
-      <Tool editor={editor} label={t('editor.rule')} text="―" run={() => chain().setHorizontalRule().run()} />
-      <span className="sep" />
-      <Tool editor={editor} label={t('editor.link')} active="link" text="🔗" run={link} />
-      <Tool editor={editor} label={t('editor.image')} text="🖼" run={() => file.current?.click()} />
-      <input
-        ref={file}
-        type="file"
-        accept="image/png,image/jpeg,image/gif,image/webp"
-        hidden
-        aria-label={t('editor.image')}
-        onChange={(e) => {
-          const f = e.target.files?.[0];
-          if (f) onImage(f);
-          e.target.value = '';
-        }}
-      />
-      <Tool
-        editor={editor}
-        label={t('editor.table')}
-        text="▦"
-        run={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      />
-      {inTable && (
-        <>
-          <Tool
-            editor={editor}
-            label={t('editor.tableAddRow')}
-            text="+R"
-            run={() => chain().addRowAfter().run()}
-          />
-          <Tool
-            editor={editor}
-            label={t('editor.tableAddCol')}
-            text="+C"
-            run={() => chain().addColumnAfter().run()}
-          />
-          <Tool
-            editor={editor}
-            label={t('editor.tableDeleteRow')}
-            text="−R"
-            run={() => chain().deleteRow().run()}
-          />
-          <Tool
-            editor={editor}
-            label={t('editor.tableDeleteCol')}
-            text="−C"
-            run={() => chain().deleteColumn().run()}
-          />
-          <Tool
-            editor={editor}
-            label={t('editor.tableDelete')}
-            text="✕"
-            run={() => chain().deleteTable().run()}
-          />
-        </>
-      )}
-      <span className="sep" />
-      <Tool editor={editor} label={t('editor.undo')} text="↶" run={() => chain().undo().run()} />
-      <Tool editor={editor} label={t('editor.redo')} text="↷" run={() => chain().redo().run()} />
-    </div>
+        <Tool
+          editor={editor}
+          label={t('editor.table')}
+          run={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
+        >
+          <IconTable size={TOOL_ICON_SIZE} />
+        </Tool>
+        {inTable && <TableTools editor={editor} />}
+        <ToolSeparator />
+        <Tool editor={editor} label={t('editor.undo')} run={() => chain().undo().run()}>
+          <IconUndo size={TOOL_ICON_SIZE} />
+        </Tool>
+        <Tool editor={editor} label={t('editor.redo')} run={() => chain().redo().run()}>
+          <IconRedo size={TOOL_ICON_SIZE} />
+        </Tool>
+      </div>
+      {linking && <LinkDialog editor={editor} onClose={() => setLinking(false)} />}
+    </>
   );
 }
 
@@ -270,11 +376,13 @@ function Toolbar({ editor, onImage }: { editor: Editor; onImage: (file: File) =>
 export function DocumentEditor({
   pageId,
   initial,
+  header,
   onChange,
   onUploadError,
 }: {
   pageId: string;
   initial: Json;
+  header: ReactNode;
   onChange: (doc: Json) => void;
   onUploadError: () => void;
 }) {
@@ -289,7 +397,7 @@ export function DocumentEditor({
     editorProps: {
       attributes: {
         class: 'prose editing',
-        'aria-label': t('page.title'),
+        'aria-label': t('editor.content'),
         role: 'textbox',
         'aria-multiline': 'true',
       },
@@ -337,9 +445,12 @@ export function DocumentEditor({
 
   if (!editor) return null;
   return (
-    <div className="editor">
+    <div>
       <Toolbar editor={editor} onImage={(f) => void insertImage(f)} />
-      <EditorContent editor={editor} />
+      <div className="editor-sheet">
+        {header}
+        <EditorContent editor={editor} />
+      </div>
     </div>
   );
 }

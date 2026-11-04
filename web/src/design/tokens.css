@@ -1,0 +1,155 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/*
+ * The one place for design values. docs/design/README.md is the standard; the
+ * check in web/scripts/check-design.mjs keeps every other file to these names.
+ */
+:root {
+  color-scheme: light dark;
+
+  /* Type. --font-sans is the only family the interface asks for, so an imported
+     font can replace it at run time (web/src/appearance.ts). */
+  --font-system: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-sans: var(--font-system);
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+
+  --text-caption: 0.8125rem;
+  --text-label: 0.84375rem;
+  --text-small: 0.875rem;
+  --text-code: 0.90625rem;
+  --text-ui: 0.9375rem;
+  --text-prose: 1.0625rem;
+  --text-section: 1.1875rem;
+  --text-heading: 1.4375rem;
+  --text-greeting: 2rem;
+  --text-title: 2.25rem;
+  --text-edit-title: 2.375rem;
+
+  --weight-regular: 400;
+  --weight-strong: 600;
+  --weight-title: 700;
+
+  --leading-title: 1.2;
+  --leading-ui: 1.5;
+  --leading-prose: 1.65;
+
+  /* Space. */
+  --space-0-5: 2px;
+  --space-1: 4px;
+  --space-1-5: 6px;
+  --space-2: 8px;
+  --space-2-5: 10px;
+  --space-3: 12px;
+  --space-3-5: 14px;
+  --space-4: 16px;
+  --space-4-5: 18px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Sizes of the fixed parts. */
+  --size-control: 34px;
+  --size-tool: 32px;
+  --size-twist: 24px;
+  --size-avatar-small: 28px;
+  --size-avatar: 34px;
+  --size-badge-small: 22px;
+  --size-badge: 30px;
+  --size-badge-large: 40px;
+  --size-topbar: 56px;
+  --size-editbar: 52px;
+  --size-sidebar: 18rem;
+  --size-search: 15rem;
+  --size-summary: 26rem;
+  --size-login: 24rem;
+  --size-menu: 14rem;
+  --size-reading: 47.5rem;
+  --size-editor: 50rem;
+  --size-wide: 70rem;
+  --size-card: 17.5rem;
+
+  /* The branches of the page tree. */
+  --tree-indent: 13px;
+  --tree-gutter: 9px;
+
+  /* Corners, depth, layers, motion. */
+  --radius: 4px;
+  --radius-card: 6px;
+  --radius-round: 50%;
+  --shadow-menu: 0 4px 16px rgb(19 28 43 / 16%);
+  --shadow-dialog: 0 12px 40px rgb(19 28 43 / 24%);
+  --layer-sticky: 2;
+  --layer-bar: 3;
+  --layer-menu: 10;
+  --motion-fast: 120ms;
+
+  /* Colour. */
+  --color-surface: #ffffff;
+  --color-side: #f5f7fa;
+  --color-ink: #1e2a3b;
+  --color-strong: #131c2b;
+  --color-muted: #566278;
+  --color-line: #dde2ea;
+  --color-field: #8591a5;
+  --color-guide: #b9c6d8;
+  --color-accent: #1d5fbf;
+  --color-accent-hover: #174c99;
+  --color-accent-tint: #e4edfa;
+  --color-on-accent: #ffffff;
+  --color-subtle: #eef1f5;
+  --color-subtle-hover: #e2e7ee;
+  --color-code: #f1f3f7;
+  --color-lozenge: #fbefd5;
+  --color-on-lozenge: #7a4b00;
+  --color-danger: #b3261e;
+  --color-danger-tint: #fbe9e7;
+  --color-ok-tint: #e4f4ee;
+  --color-added: #d9f2e3;
+  --color-removed: #fbdcd9;
+  --color-tint-1: #0e7c6b;
+  --color-tint-2: #2f6fde;
+  --color-tint-3: #b45309;
+  --color-tint-4: #7048c6;
+  --color-on-tint: #ffffff;
+  --color-backdrop: rgb(19 28 43 / 45%);
+  --color-syntax-keyword: #a0359b;
+  --color-syntax-string: #24702d;
+  --color-syntax-number: #8f4f0a;
+  --color-syntax-title: #1c5fa8;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-menu: 0 4px 16px rgb(0 0 0 / 50%);
+    --shadow-dialog: 0 12px 40px rgb(0 0 0 / 60%);
+
+    --color-surface: #11161f;
+    --color-side: #171d27;
+    --color-ink: #dce3ee;
+    --color-strong: #f2f5fa;
+    --color-muted: #a3afc2;
+    --color-line: #2e3848;
+    --color-field: #66748a;
+    --color-guide: #445269;
+    --color-accent: #7fb0f5;
+    --color-accent-hover: #a2c6f8;
+    --color-accent-tint: #1e3150;
+    --color-on-accent: #0b1420;
+    --color-subtle: #242c3a;
+    --color-subtle-hover: #2e3848;
+    --color-code: #1c2330;
+    --color-lozenge: #4a3513;
+    --color-on-lozenge: #f5d9a0;
+    --color-danger: #ff9d94;
+    --color-danger-tint: #452019;
+    --color-ok-tint: #17372c;
+    --color-added: #17402c;
+    --color-removed: #4c211c;
+    --color-backdrop: rgb(0 0 0 / 60%);
+    --color-syntax-keyword: #e39ae0;
+    --color-syntax-string: #8fd896;
+    --color-syntax-number: #e8b56a;
+    --color-syntax-title: #8cc0f5;
+  }
+}
