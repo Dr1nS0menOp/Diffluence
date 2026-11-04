@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "Europe/Amsterdam",
+  "postUpdateOptions": ["gomodTidy"],
+  "packageRules": [
+    { "matchManagers": ["gomod"], "groupName": "go dependencies" },
+    { "matchManagers": ["github-actions"], "groupName": "github actions" }
+  ],
+  "vulnerabilityAlerts": { "enabled": true, "schedule": ["at any time"] }
+}

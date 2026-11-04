@@ -1,0 +1,12 @@
+.git
+.github
+bin
+data
+dist
+docs
+secrets
+web/node_modules
+web/test-results
+web/playwright-report
+internal/webui/dist/assets
+internal/webui/dist/index.html

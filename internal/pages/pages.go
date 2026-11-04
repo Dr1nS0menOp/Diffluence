@@ -1,0 +1,434 @@
+// SPDX-License-Identifier: Apache-2.0
+
+// Package pages owns pages, the page tree, versions and drafts (spec 001).
+// Every method takes the Caller and checks permissions itself.
+package pages
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"strings"
+	"time"
+	"unicode/utf8"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/search"
+	"github.com/diffluence/diffluence/internal/settings"
+)
+
+// Page statuses.
+const (
+	StatusDraft     = "draft"
+	StatusPublished = "published"
+	StatusTrashed   = "trashed"
+)
+
+const maxTitleRunes = 255
+
+// Page is the metadata of a page.
+type Page struct {
+	ID             uuid.UUID  `json:"id"`
+	SpaceID        uuid.UUID  `json:"space_id"`
+	ParentID       *uuid.UUID `json:"parent_id"`
+	Position       int        `json:"position"`
+	Title          string     `json:"title"`
+	Status         string     `json:"status"`
+	CurrentVersion int        `json:"current_version"`
+	CreatedBy      uuid.UUID  `json:"created_by"`
+	UpdatedBy      uuid.UUID  `json:"updated_by"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// Crumb is one step of the breadcrumb trail.
+type Crumb struct {
+	ID    uuid.UUID `json:"id"`
+	Title string    `json:"title"`
+}
+
+// Detail is a page with everything the reading view needs.
+type Detail struct {
+	Page
+	Document      json.RawMessage `json:"document"`
+	SchemaVersion int             `json:"schema_version"`
+	Breadcrumbs   []Crumb         `json:"breadcrumbs"`
+	HasDraft      bool            `json:"has_draft"`
+	Favourite     bool            `json:"favourite"`
+	Restricted    bool            `json:"restricted"`
+	Can           map[string]bool `json:"can"`
+}
+
+// Service manages pages.
+type Service struct {
+	pool        *pgxpool.Pool
+	perms       *permissions.Service
+	attachments *attachments.Service
+	settings    *settings.Service
+	instanceID  uuid.UUID
+}
+
+// NewService creates the service.
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, att *attachments.Service, st *settings.Service, instanceID uuid.UUID) *Service {
+	return &Service{pool: pool, perms: perms, attachments: att, settings: st, instanceID: instanceID}
+}
+
+func cleanTitle(title string) (string, error) {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return "", apperr.Invalid("A page needs a title.")
+	}
+	if !utf8.ValidString(title) || utf8.RuneCountInString(title) > maxTitleRunes {
+		return "", apperr.Invalid("A title can have at most 255 characters.")
+	}
+	if strings.ContainsAny(title, "\r\n\x00") {
+		return "", apperr.Invalid("A title must be one line.")
+	}
+	return title, nil
+}
+
+const pageColumns = "id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at"
+
+func scanPage(r pgx.Row) (Page, error) {
+	var p Page
+	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
+		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt)
+	return p, err
+}
+
+func load(ctx context.Context, q db.Querier, id uuid.UUID) (Page, error) {
+	p, err := scanPage(q.QueryRow(ctx, "SELECT "+pageColumns+" FROM pages WHERE id = $1", id))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return p, apperr.NotFound()
+	}
+	return p, err
+}
+
+// lockTree makes tree changes within a space take turns, so two concurrent
+// moves cannot create a loop. NO KEY keeps foreign-key checks unblocked.
+func lockTree(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID) error {
+	var id uuid.UUID
+	err := tx.QueryRow(ctx, "SELECT id FROM spaces WHERE id = $1 FOR NO KEY UPDATE", spaceID).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return apperr.NotFound()
+	}
+	return err
+}
+
+func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, p Page, details map[string]any) error {
+	if details == nil {
+		details = map[string]any{}
+	}
+	details["title"] = p.Title
+	if _, err := audit.Record(ctx, tx, c.Event(action, "page", p.ID.String(), p.SpaceID.String(), details)); err != nil {
+		return err
+	}
+	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"page_id": p.ID, "space_id": p.SpaceID})
+	return err
+}
+
+// insert adds a page row and its closure rows, at the end of its siblings.
+func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, parent *uuid.UUID, title string, author uuid.UUID) (Page, error) {
+	id := ids.New()
+	var pos int
+	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(position) + 1, 0) FROM pages
+		WHERE space_id = $1 AND parent_id IS NOT DISTINCT FROM $2`, spaceID, parent).Scan(&pos); err != nil {
+		return Page{}, err
+	}
+	p, err := scanPage(tx.QueryRow(ctx, `INSERT INTO pages (id, origin_instance_id, space_id, parent_id, position, title, status, created_by, updated_by)
+		VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $7) RETURNING `+pageColumns,
+		id, s.instanceID, spaceID, parent, pos, title, author))
+	if err != nil {
+		return p, err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO page_tree (ancestor_id, descendant_id, depth)
+		SELECT ancestor_id, $2::uuid, depth + 1 FROM page_tree WHERE descendant_id = $1
+		UNION ALL SELECT $2::uuid, $2::uuid, 0`, parent, id); err != nil {
+		return p, err
+	}
+	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": parent})
+}
+
+// NewPage is the input for Create.
+type NewPage struct {
+	SpaceID  uuid.UUID
+	ParentID *uuid.UUID
+	Title    string
+}
+
+// checkParent makes sure a page may go under parent.
+func (s *Service) checkParent(ctx context.Context, q db.Querier, c identity.Caller, spaceID uuid.UUID, parent uuid.UUID) error {
+	if err := s.perms.RequirePage(ctx, q, c.UserID, parent, permissions.PageCreate, uuid.Nil); err != nil {
+		return err
+	}
+	pp, err := load(ctx, q, parent)
+	if err != nil {
+		return err
+	}
+	if pp.SpaceID != spaceID {
+		return apperr.Invalid("The parent page is in another space.")
+	}
+	if pp.Status != StatusPublished {
+		return apperr.Conflict("parent_unpublished", "Publish the parent page first.")
+	}
+	return nil
+}
+
+// Create starts a new unpublished page, visible only to its creator.
+func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Page, error) {
+	title, err := cleanTitle(in.Title)
+	if err != nil {
+		return Page{}, err
+	}
+	var p Page
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {
+			return err
+		}
+		if err := lockTree(ctx, tx, in.SpaceID); err != nil {
+			return err
+		}
+		if in.ParentID != nil {
+			if err := s.checkParent(ctx, tx, c, in.SpaceID, *in.ParentID); err != nil {
+				return err
+			}
+		}
+		p, err = s.insert(ctx, tx, c, in.SpaceID, in.ParentID, title, c.UserID)
+		return err
+	})
+	return p, err
+}
+
+// CreatePublished adds a published page inside tx. The caller has already
+// checked permissions. It is for home pages, copies and imports.
+func (s *Service) CreatePublished(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, parent *uuid.UUID, title string, doc document.Node, author uuid.UUID) (Page, error) {
+	p, err := s.insert(ctx, tx, c, spaceID, parent, title, author)
+	if err != nil {
+		return p, err
+	}
+	return s.appendVersion(ctx, tx, c, p, title, doc, author, "", nil)
+}
+
+// appendVersion writes the next version and updates the page and search index.
+func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, title string, doc document.Node, author uuid.UUID, summary string, restoredFrom *int) (Page, error) {
+	raw, err := document.Marshal(doc)
+	if err != nil {
+		return p, err
+	}
+	number := p.CurrentVersion + 1
+	if _, err := tx.Exec(ctx, `INSERT INTO page_versions (id, origin_instance_id, page_id, number, title, document, schema_version, author_id, summary, restored_from)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, summary, restoredFrom); err != nil {
+		return p, err
+	}
+	p, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now()
+		WHERE id = $1 RETURNING `+pageColumns, p.ID, number, title, author))
+	if err != nil {
+		return p, err
+	}
+	if err := search.Index(ctx, tx, p.ID, title, document.Text(doc)); err != nil {
+		return p, err
+	}
+	// Attachment names were not indexed while the page had no search row yet.
+	rows, err := tx.Query(ctx, "SELECT filename FROM attachments WHERE page_id = $1 AND status = 'active'", p.ID)
+	if err != nil {
+		return p, err
+	}
+	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return p, err
+	}
+	if err := search.SetAttachmentNames(ctx, tx, p.ID, names); err != nil {
+		return p, err
+	}
+	details := map[string]any{"version": number}
+	if restoredFrom != nil {
+		details["restored_from"] = *restoredFrom
+	}
+	return p, record(ctx, tx, c, "page.published", p, details)
+}
+
+// Get returns a page for reading, and remembers it in the user's recent list.
+func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Detail, error) {
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
+		return Detail{}, err
+	}
+	p, err := load(ctx, s.pool, id)
+	if err != nil {
+		return Detail{}, err
+	}
+	d := Detail{Page: p}
+	if p.CurrentVersion > 0 {
+		err = s.pool.QueryRow(ctx, "SELECT document, schema_version FROM page_versions WHERE page_id = $1 AND number = $2", id, p.CurrentVersion).
+			Scan(&d.Document, &d.SchemaVersion)
+		if err != nil {
+			return d, err
+		}
+	} else {
+		d.Document, _ = document.Marshal(document.Empty())
+		d.SchemaVersion = document.SchemaVersion
+	}
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
+		WHERE t.descendant_id = $1 AND t.depth > 0 ORDER BY t.depth DESC`, id)
+	if err != nil {
+		return d, err
+	}
+	d.Breadcrumbs, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Crumb, error) {
+		var b Crumb
+		err := r.Scan(&b.ID, &b.Title)
+		return b, err
+	})
+	if err != nil {
+		return d, err
+	}
+	if d.Breadcrumbs == nil {
+		d.Breadcrumbs = []Crumb{}
+	}
+	err = s.pool.QueryRow(ctx, `SELECT
+			EXISTS (SELECT 1 FROM drafts WHERE page_id = $1 AND user_id = $2),
+			EXISTS (SELECT 1 FROM favourites WHERE page_id = $1 AND user_id = $2),
+			EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id
+			        WHERE t.descendant_id = $1 AND (r.kind = 'view' OR t.depth = 0))`, id, c.UserID).
+		Scan(&d.HasDraft, &d.Favourite, &d.Restricted)
+	if err != nil {
+		return d, err
+	}
+	if d.Can, err = s.capabilities(ctx, c, id); err != nil {
+		return d, err
+	}
+	s.touchRecent(ctx, c.UserID, id)
+	return d, nil
+}
+
+// capabilities tells the UI which buttons to show. The server still checks
+// every action; this only avoids offering what would be refused.
+func (s *Service) capabilities(ctx context.Context, c identity.Caller, id uuid.UUID) (map[string]bool, error) {
+	u, err := s.perms.LoadUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return nil, err
+	}
+	space, page, err := s.perms.LoadPage(ctx, s.pool, id)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string]bool{}
+	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.ActionPageDelete,
+		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister} {
+		d := permissions.Evaluate(permissions.Input{User: u, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
+		out[action] = d.Allowed
+	}
+	return out, nil
+}
+
+// touchRecent is a convenience list, so a failure must never fail the read.
+func (s *Service) touchRecent(ctx context.Context, userID, pageID uuid.UUID) {
+	_, _ = s.pool.Exec(ctx, `INSERT INTO recent_pages (user_id, page_id) VALUES ($1, $2)
+		ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at = now()`, userID, pageID)
+	_, _ = s.pool.Exec(ctx, `DELETE FROM recent_pages WHERE user_id = $1 AND page_id NOT IN
+		(SELECT page_id FROM recent_pages WHERE user_id = $1 ORDER BY viewed_at DESC LIMIT 50)`, userID)
+}
+
+// Node is one entry of the page tree.
+type Node struct {
+	ID       uuid.UUID  `json:"id"`
+	ParentID *uuid.UUID `json:"parent_id"`
+	Position int        `json:"position"`
+	Title    string     `json:"title"`
+	Status   string     `json:"status"`
+}
+
+// Tree returns the pages of a space the user may see, in order.
+func (s *Service) Tree(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]Node, error) {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceView); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.parent_id, p.position, p.title, p.status
+		FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
+		WHERE p.space_id = $2 ORDER BY p.parent_id NULLS FIRST, p.position, p.id`, c.UserID, spaceID)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Node, error) {
+		var n Node
+		err := r.Scan(&n.ID, &n.ParentID, &n.Position, &n.Title, &n.Status)
+		return n, err
+	})
+	if out == nil {
+		out = []Node{}
+	}
+	return out, err
+}
+
+// ListItem is an entry of a personal list.
+type ListItem struct {
+	ID        uuid.UUID `json:"id"`
+	Title     string    `json:"title"`
+	SpaceID   uuid.UUID `json:"space_id"`
+	SpaceKey  string    `json:"space_key"`
+	SpaceName string    `json:"space_name"`
+	At        time.Time `json:"at"`
+}
+
+func collectList(rows pgx.Rows, err error) ([]ListItem, error) {
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ListItem, error) {
+		var v ListItem
+		err := r.Scan(&v.ID, &v.Title, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.At)
+		return v, err
+	})
+	if out == nil {
+		out = []ListItem{}
+	}
+	return out, err
+}
+
+// Recent lists recently viewed pages the user may still see.
+func (s *Service) Recent(ctx context.Context, c identity.Caller) ([]ListItem, error) {
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.space_id, s.key, s.name, r.viewed_at
+		FROM recent_pages r
+		JOIN perm_visible_pages($1) v ON v.page_id = r.page_id
+		JOIN pages p ON p.id = r.page_id
+		JOIN spaces s ON s.id = p.space_id
+		WHERE r.user_id = $1 ORDER BY r.viewed_at DESC LIMIT 20`, c.UserID)
+	return collectList(rows, err)
+}
+
+// Favourites lists favourite pages the user may still see.
+func (s *Service) Favourites(ctx context.Context, c identity.Caller) ([]ListItem, error) {
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.space_id, s.key, s.name, f.created_at
+		FROM favourites f
+		JOIN perm_visible_pages($1) v ON v.page_id = f.page_id
+		JOIN pages p ON p.id = f.page_id
+		JOIN spaces s ON s.id = p.space_id
+		WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT 200`, c.UserID)
+	return collectList(rows, err)
+}
+
+// SetFavourite adds or removes a favourite. It is a personal preference, so it
+// is not audited.
+func (s *Service) SetFavourite(ctx context.Context, c identity.Caller, id uuid.UUID, on bool) error {
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
+		return err
+	}
+	var err error
+	if on {
+		_, err = s.pool.Exec(ctx, "INSERT INTO favourites (user_id, page_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", c.UserID, id)
+	} else {
+		_, err = s.pool.Exec(ctx, "DELETE FROM favourites WHERE user_id = $1 AND page_id = $2", c.UserID, id)
+	}
+	return err
+}

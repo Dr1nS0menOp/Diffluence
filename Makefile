@@ -1,0 +1,57 @@
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
+LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(VERSION)
+STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
+GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
+
+.PHONY: all build web run test test-race fmt fmt-check vet staticcheck vuln licenses web-check mutation fuzz check clean
+
+all: web build
+
+build:
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/diffluence ./cmd/diffluence
+
+web:
+	cd web && npm ci --no-fund --no-audit && npx vite build
+
+run: build
+	./bin/diffluence serve
+
+test:
+	go test ./...
+
+test-race:
+	go test -race -count=1 ./...
+
+fmt:
+	gofmt -w .
+
+fmt-check:
+	@test -z "$$(gofmt -l cmd internal)" || (echo "gofmt needed on:"; gofmt -l cmd internal; exit 1)
+
+vet:
+	go vet ./...
+
+staticcheck:
+	go run $(STATICCHECK) ./...
+
+vuln:
+	go run $(GOVULNCHECK) ./...
+
+licenses:
+	node scripts/check-licenses.mjs
+
+web-check:
+	cd web && npx tsc --noEmit && npx eslint src e2e && npx prettier --check src e2e && npm run -s strings && npx vitest run
+
+# Do the tests catch real bugs? Slow, so not part of every check.
+mutation:
+	bash scripts/mutation-check.sh
+
+fuzz:
+	go test ./internal/document/ -run '^$$' -fuzz FuzzFromMarkdown -fuzztime 60s
+	go test ./internal/document/ -run '^$$' -fuzz FuzzNormalize -fuzztime 60s
+
+check: fmt-check vet staticcheck vuln licenses web-check test-race
+
+clean:
+	rm -rf bin dist

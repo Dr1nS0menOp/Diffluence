@@ -1,0 +1,40 @@
+# SPDX-License-Identifier: Apache-2.0
+# Diffluence as a systemd service, for LXC containers and bare Linux.
+[Unit]
+Description=Diffluence wiki
+Documentation=https://github.com/Dr1nS0menOp/Diffluence
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=diffluence
+Group=diffluence
+EnvironmentFile=/etc/diffluence/diffluence.env
+ExecStart=/usr/local/bin/diffluence serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=45
+
+# Sandboxing: the process sees almost nothing of the host.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+StateDirectory=diffluence
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/diffluence
+
+[Install]
+WantedBy=multi-user.target

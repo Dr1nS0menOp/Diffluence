@@ -1,0 +1,201 @@
+// SPDX-License-Identifier: Apache-2.0
+
+// Package httpapi is the HTTP layer: the router with mandatory access rules,
+// middleware, and the /api/v1 handlers.
+package httpapi
+
+import (
+	"context"
+	"errors"
+	"log/slog"
+	"net/http"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/jobs"
+	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/scim"
+	"github.com/diffluence/diffluence/internal/search"
+	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/diffluence/diffluence/internal/sso"
+	"github.com/diffluence/diffluence/internal/trash"
+)
+
+// Deps are what the API needs from the rest of the application.
+type Deps struct {
+	Config   config.Config
+	Pool     *pgxpool.Pool
+	Identity *identity.Service
+
+	Permissions *permissions.Service
+	Spaces      *spaces.Service
+	Pages       *pages.Service
+	Attachments *attachments.Service
+	Search      *search.Service
+	Trash       *trash.Service
+	Settings    *settings.Service
+	Jobs        *jobs.Service
+	Exchange    *exchange.Service
+	SCIM        *scim.Service
+	SSO         *sso.Provider // nil when no OIDC provider is configured
+
+	// SystemStatus reports nodes, versions and queues for the admin console.
+	SystemStatus func(ctx context.Context) (any, error)
+
+	InstanceID uuid.UUID
+	Log        *slog.Logger
+	// Ready returns nil when this node may receive traffic, or an error whose
+	// message is a short reason code ("database", "queue", "migrations", "draining").
+	Ready func(ctx context.Context) error
+}
+
+// Server is the API handler.
+type Server struct {
+	deps       Deps
+	router     *Router
+	handler    http.Handler
+	cookieName string
+	loginByIP  *limiter
+	loginByAcc *limiter
+}
+
+// New builds the API.
+func New(d Deps) (*Server, error) {
+	if d.Log == nil {
+		d.Log = slog.New(slog.DiscardHandler)
+	}
+	s := &Server{
+		deps:       d,
+		cookieName: "diffluence_session",
+		loginByIP:  newLimiter(50, loginWindow),
+		loginByAcc: newLimiter(10, loginWindow),
+	}
+	if d.Config.SecureCookies() {
+		// The __Host- prefix makes browsers refuse the cookie unless it is
+		// Secure, has Path=/ and no Domain, which blocks subdomain overrides.
+		s.cookieName = "__Host-diffluence_session"
+	}
+	s.router = newRouter(s.enforce)
+	s.registerRoutes()
+
+	cop := http.NewCrossOriginProtection()
+	if err := cop.AddTrustedOrigin(d.Config.PublicOrigin()); err != nil {
+		return nil, err
+	}
+	cop.SetDenyHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		writeError(w, http.StatusForbidden, "cross_origin_blocked", "Cross-origin requests are not allowed.")
+	}))
+
+	s.handler = chain(s.router,
+		withRequestID,
+		withClientIP(d.Config.TrustedProxies),
+		withLogAndRecover(d.Log),
+		withSecurityHeaders(d.Config.SecureCookies()),
+		cop.Handler,
+		withSession(d.Identity, s.cookieName, d.Log),
+	)
+	return s, nil
+}
+
+// Handler returns the complete HTTP handler.
+func (s *Server) Handler() http.Handler { return s.handler }
+
+// Routes lists every registered route with its access rule.
+func (s *Server) Routes() []Route { return s.router.Routes() }
+
+// enforce wraps a handler with its access rule.
+func (s *Server) enforce(a Access, h http.Handler) http.Handler {
+	switch a.kind {
+	case accessPublic:
+		return h
+	case accessAuthenticated, accessObject:
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if PrincipalFrom(r.Context()) == nil {
+				writeError(w, http.StatusUnauthorized, "unauthenticated", "Please log in.")
+				return
+			}
+			h.ServeHTTP(w, r)
+		})
+	case accessPermission:
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p := PrincipalFrom(r.Context())
+			if p == nil {
+				writeError(w, http.StatusUnauthorized, "unauthenticated", "Please log in.")
+				return
+			}
+			ok, err := s.deps.Identity.HasGlobalPermission(r.Context(), p.User.ID, a.permission)
+			if err != nil {
+				s.internalError(w, r, err)
+				return
+			}
+			if !ok {
+				if err := s.deps.Identity.RecordAccessDenied(r.Context(), *p, a.permission, r.Method, r.URL.Path, metaFrom(r)); err != nil {
+					s.internalError(w, r, err)
+					return
+				}
+				writeError(w, http.StatusForbidden, "forbidden", "You do not have permission to do this.")
+				return
+			}
+			h.ServeHTTP(w, r)
+		})
+	case accessSCIM:
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			c, ok := s.deps.SCIM.Authenticate(r)
+			if !ok {
+				w.Header().Set("WWW-Authenticate", "Bearer")
+				scim.WriteError(w, http.StatusUnauthorized, "", "A valid bearer token is required.")
+				return
+			}
+			c.Meta = metaFrom(r)
+			h.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxSCIMCaller, c)))
+		})
+	default:
+		panic("httpapi: unknown access kind")
+	}
+}
+
+func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	s.deps.Log.Error("request failed", "error", err, "request_id", RequestIDFrom(r.Context()))
+	writeError(w, http.StatusInternalServerError, "internal_error", "Something went wrong.")
+}
+
+// HealthOnly serves just /livez and /readyz, for processes with role=worker.
+func HealthOnly(ready func(context.Context) error, log *slog.Logger) http.Handler {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /livez", handleLivez)
+	mux.HandleFunc("GET /readyz", readyzHandler(ready, log))
+	return mux
+}
+
+func handleLivez(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func readyzHandler(ready func(context.Context) error, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if err := ready(r.Context()); err != nil {
+			reason := "unknown"
+			var re ReadyError
+			if errors.As(err, &re) {
+				reason = string(re)
+			} else if log != nil {
+				log.Warn("readiness check failed", "error", err)
+			}
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "reason": reason})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+	}
+}
+
+// ReadyError is a short, safe-to-expose readiness reason.
+type ReadyError string
+
+func (e ReadyError) Error() string { return string(e) }

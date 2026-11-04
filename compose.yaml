@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+# Reference installation: one node, embedded queue, local disk.
+#   sh scripts/setup-secrets.sh
+#   docker compose up -d
+#   printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name You
+# See docs/operations/install.md. Put a TLS reverse proxy in front of it.
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: diffluence_owner
+      POSTGRES_DB: diffluence
+      POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
+    secrets: [db_owner_password, db_app_password]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diffluence_owner -d diffluence"]
+      interval: 5s
+      retries: 10
+
+  diffluence:
+    image: ${DIFFLUENCE_IMAGE:-diffluence:local}
+    build: .
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DIFFLUENCE_ROLE: all
+      DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-http://localhost:8080}
+      # The application connects as a role that does not own the tables, so it
+      # cannot disable the audit log's protection. Migrations use the owner.
+      DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
+      DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+    secrets: [database_url, migrate_database_url]
+    ports: ["${DIFFLUENCE_PORT:-8080}:8080"]
+    volumes: [data:/var/lib/diffluence]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+
+secrets:
+  db_owner_password:
+    file: ./secrets/db_owner_password.txt
+  db_app_password:
+    file: ./secrets/db_app_password.txt
+  database_url:
+    file: ./secrets/database_url.txt
+  migrate_database_url:
+    file: ./secrets/migrate_database_url.txt
+
+volumes:
+  pgdata:
+  data:

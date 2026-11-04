@@ -1,0 +1,6 @@
+# Always LF in the repository and in working trees, also on Windows:
+# scripts run in Linux containers and gofmt rejects CRLF.
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.zip binary

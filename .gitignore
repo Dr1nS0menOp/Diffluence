@@ -1,0 +1,14 @@
+/bin/
+/data/
+/dist/
+*.test
+*.out
+coverage.*
+.env
+node_modules/
+.DS_Store
+/secrets/
+/internal/webui/dist/*
+!/internal/webui/dist/.placeholder
+/web/test-results/
+/web/playwright-report/

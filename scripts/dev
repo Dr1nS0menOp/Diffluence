@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: Apache-2.0
+# Shortcut for the development containers. Run it from WSL or Linux.
+#   scripts/dev up          start the database and the toolbox
+#   scripts/dev down        stop them (the database is thrown away)
+#   scripts/dev <command>   run a command in the toolbox, e.g. scripts/dev make check
+set -euo pipefail
+cd "$(dirname "$0")/.."
+compose=(docker compose -f compose.dev.yaml)
+case "${1:-}" in
+  up) exec "${compose[@]}" up -d --build --wait ;;
+  down) exec "${compose[@]}" down ;;
+  "") echo "usage: scripts/dev up|down|<command>" >&2; exit 2 ;;
+  *) exec "${compose[@]}" exec -T dev "$@" ;;
+esac

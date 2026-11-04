@@ -1,0 +1,68 @@
+# SPDX-License-Identifier: Apache-2.0
+# A throw-away Authentik next to Diffluence. See scripts/idp-test/run.sh.
+name: dfl-idp
+services:
+  ak-db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: authentik
+      POSTGRES_PASSWORD: authentik
+      POSTGRES_DB: authentik
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U authentik"]
+      interval: 2s
+      retries: 30
+  ak-redis:
+    image: redis:7-alpine
+  ak-server:
+    image: ghcr.io/goauthentik/server:${AK_TAG:-2026.8.5}
+    command: server
+    environment: &ak
+      AUTHENTIK_SECRET_KEY: test-secret-key-for-a-throw-away-instance-only-0123456789
+      AUTHENTIK_POSTGRESQL__HOST: ak-db
+      AUTHENTIK_POSTGRESQL__USER: authentik
+      AUTHENTIK_POSTGRESQL__PASSWORD: authentik
+      AUTHENTIK_POSTGRESQL__NAME: authentik
+      AUTHENTIK_REDIS__HOST: ak-redis
+      AUTHENTIK_BOOTSTRAP_PASSWORD: bootstrap-password-for-testing
+      AUTHENTIK_BOOTSTRAP_TOKEN: bootstrap-token-for-testing-0123456789
+      AUTHENTIK_BOOTSTRAP_EMAIL: akadmin@example.com
+      AUTHENTIK_ERROR_REPORTING__ENABLED: "false"
+      AUTHENTIK_DISABLE_UPDATE_CHECK: "true"
+    depends_on:
+      ak-db:
+        condition: service_healthy
+    ports: ["127.0.0.1:19000:9000"]
+  ak-worker:
+    image: ghcr.io/goauthentik/server:${AK_TAG:-2026.8.5}
+    command: worker
+    environment: *ak
+    depends_on:
+      ak-db:
+        condition: service_healthy
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: diffluence
+      POSTGRES_PASSWORD: diffluence
+      POSTGRES_DB: diffluence
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U diffluence"]
+      interval: 2s
+      retries: 30
+  diffluence:
+    image: diffluence:local
+    environment:
+      DIFFLUENCE_DATABASE_URL: postgres://diffluence:diffluence@db:5432/diffluence?sslmode=disable
+      DIFFLUENCE_PUBLIC_URL: http://localhost:8080
+      DIFFLUENCE_OIDC_ISSUER: http://ak-server:9000/application/o/diffluence/
+      DIFFLUENCE_OIDC_CLIENT_ID: diffluence-client
+      DIFFLUENCE_OIDC_CLIENT_SECRET: diffluence-secret
+      DIFFLUENCE_OIDC_DISPLAY_NAME: Authentik
+      DIFFLUENCE_OIDC_GROUPS_CLAIM: groups
+    depends_on:
+      db:
+        condition: service_healthy
+    ports: ["127.0.0.1:19080:8080"]
