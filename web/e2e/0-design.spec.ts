@@ -358,6 +358,12 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}/history`);
     await expect(page.getByText('Added the first day')).toBeVisible();
+    // The width of a time moves the table, so it must not change between runs.
+    await page.locator('td .muted').evaluateAll((times) => {
+      times.forEach((time) => {
+        time.textContent = '05/11/2026, 12:00:00';
+      });
+    });
     await picture(page, 'history', [page.locator('td .muted')]);
     await page.context().close();
   });
@@ -393,6 +399,95 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.getByText('The trash is empty.')).toBeVisible();
     await picture(page, 'trash');
     await page.context().close();
+  });
+
+  test('DirectoryView: all spaces', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces');
+    await expect(page.getByRole('link', { name: 'Engineering Handbook' })).toBeVisible();
+    await picture(page, 'directory', [page.locator('time')]);
+    await page.context().close();
+  });
+
+  test('RecentView: recent pages', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/recent');
+    await expect(page.getByRole('link', { name: 'Your first week' })).toBeVisible();
+    await picture(page, 'recent', [page.locator('time')]);
+    await page.context().close();
+  });
+
+  test('FavouritesView: favourites, empty', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/favourites');
+    await expect(page.getByText('Press the star on a page')).toBeVisible();
+    await picture(page, 'favourites');
+    await page.context().close();
+  });
+
+  test('SpaceOverviewView: the overview of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/overview');
+    await expect(page.getByRole('heading', { name: 'Latest changes' })).toBeVisible();
+    await picture(page, 'overview', [page.locator('time')]);
+    await page.context().close();
+  });
+
+  test('PreferencesView: preferences', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/me/preferences');
+    await expect(page.getByLabel('Theme')).toBeVisible();
+    await picture(page, 'preferences');
+    await page.context().close();
+  });
+
+  test('the quick search panel', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/');
+    await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+    await page.keyboard.press('/');
+    await page.keyboard.type('week');
+    await expect(page.getByRole('option', { name: /Your first week/ })).toBeVisible();
+    await picture(page, 'quick-search');
+    await page.context().close();
+  });
+
+  test('a page with contents and details', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { width: 1500, height: 900 },
+    });
+    const page = await context.newPage();
+    await login(page, READER.email, PASSWORD);
+    const headed = await page.request.post('/api/v1/pages', {
+      data: {
+        space_id: (await (await page.request.get(`/api/v1/pages/${pageId}`)).json()).space_id,
+        title: 'Long read',
+      },
+    });
+    const id = ((await headed.json()) as { id: string }).id;
+    const section = (text: string) => [
+      { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text }] },
+      words('Some words to read in this part of the page, so the column has something in it.'),
+    ];
+    const done = await page.request.post(`/api/v1/pages/${id}/publish`, {
+      data: {
+        title: 'Long read',
+        base_version: 0,
+        document: { type: 'doc', content: [...section('One'), ...section('Two'), ...section('Three')] },
+      },
+    });
+    expect(done.ok(), await done.text()).toBeTruthy();
+    await page.goto(`/pages/${id}`);
+    await expect(page.getByRole('navigation', { name: 'On this page' })).toBeVisible();
+    await picture(page, 'page-contents', [page.getByTestId('last-updated')]);
+    await page.keyboard.press('i');
+    await expect(page.getByRole('complementary', { name: 'Details' })).toContainText('Contributors');
+    await picture(page, 'page-details', [
+      page.getByTestId('last-updated'),
+      page.locator('.details-facts dd'),
+    ]);
+    await context.close();
   });
 
   test('a narrow screen', async ({ browser }) => {

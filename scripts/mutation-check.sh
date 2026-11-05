@@ -127,6 +127,27 @@ mutate "contract migrations ignore older nodes" internal/app/ops.go \
 mutate "disabled users keep their sessions" internal/identity/users.go \
   's.replace("if _, err := tx.Exec(ctx, \"DELETE FROM sessions WHERE user_id = $1\", id); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tif err := s.keepsAnAdministrator", "if err := s.keepsAnAdministrator")' $app -run TestAdminUserManagement
 
+mutate "links reveal hidden pages" internal/pages/details.go \
+  's.replace("refJoins   = `JOIN perm_visible_pages($1) v ON v.page_id = p.id", "refJoins   = `JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestDetailsNeverRevealHiddenPages
+mutate "a header can be a file from another page" internal/attachments/attachments.go \
+  's.replace("WHERE a.id = $1 AND a.page_id = $2 AND a.status = \x27active\x27`, id, pageID)", "WHERE a.id = $1 AND $2::uuid IS NOT NULL AND a.status = \x27active\x27`, id, pageID)")' $app -run TestPageLook
+mutate "anyone can undo a delete" internal/trash/trash.go \
+  's.replace("AND deleted_by = $2", "AND $2::uuid IS NOT NULL")' $app -run TestUndoOfADelete
+mutate "undo never runs out" internal/trash/trash.go \
+  's.replace("AND deleted_at > now() - make_interval(secs => $3) FOR UPDATE", "AND $3::float8 > 0 FOR UPDATE")' $app -run TestUndoOfADelete
+mutate "any theme is accepted" internal/identity/preferences.go \
+  's.replace("case !slices.Contains(themes, p.Theme):", "case len(p.Theme) < 0:")' $app -run TestPreferences
+mutate "a shortcut may go anywhere" internal/spaces/shortcuts.go \
+  's.replace("if err != nil || strings.HasPrefix(lower", "if (err != nil && len(lower) < 0) || strings.HasPrefix(lower")' $app -run TestShortcuts
+mutate "the directory counts hidden pages" internal/spaces/directory.go \
+  's.replace("FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id", "FROM pages p")' $app -run TestDirectory
+mutate "quick search shows people to everyone" internal/httpapi/handlers_reading.go \
+  's.replace("if err != nil || !allowed {", "if err != nil || (!allowed && len(text) < 0) {")' $app -run TestQuickSearch
+mutate "quick search shows hidden files" internal/attachments/attachments.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestQuickSearch
+mutate "a row menu counts as a visit" internal/pages/details.go \
+  's.replace("out.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, id)\n\tout.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err")' $app -run TestOpeningARowMenu
+
 mutate "nodes hand out rights at the same time" internal/db/db.go \
   's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 

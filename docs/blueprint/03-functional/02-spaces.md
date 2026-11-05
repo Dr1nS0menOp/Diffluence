@@ -6,7 +6,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 
 - **SPC-001** · built · A person with *create spaces* creates a space with a name and a key. Description and icon are optional.
 - **SPC-002** · built · A key has 2 to 32 letters, digits, dashes or underscores, and is unique ignoring case.
-- **SPC-003** · new · The key is suggested from the name while typing, and can be changed before saving. The form says at once when a key is taken.
+- **SPC-003** · built · The key is suggested from the name while typing, and can be changed before saving. The form says at once when a key is taken.
 - **SPC-004** · built · The creator becomes space administrator, and a home page is created.
 - **SPC-005** · built · A space can start from a permission set: *Team space* (all members can edit) or *Read-only knowledge base* (all members can view).
 - **SPC-006** · new · A space can start from a space template, which brings a home page, a set of pages, templates and labels (ORG-055).
@@ -26,23 +26,23 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 
 ## 2.3 The overview of a space
 
-- **SPC-017** · partly · Opening a space shows its home page. Built: the page itself. New: the fields below.
-- **SPC-018** · new · The overview shows the space name, description, owners and the number of pages.
-- **SPC-019** · new · It shows recent changes in the space and the most viewed pages, each of which can be turned off.
+- **SPC-017** · built · Opening a space shows its home page.
+- **SPC-018** · built · The overview shows the space name, description, owners and the number of pages.
+- **SPC-019** · partly · It shows recent changes in the space and the most viewed pages, each of which can be turned off. Still open: most viewed pages (wave H), and turning parts off.
 - **SPC-020** · new · It shows the space's newest blog posts when the space has a blog.
-- **SPC-021** · new · A person can favourite and watch the space from here.
+- **SPC-021** · partly · A person can favourite and watch the space from here. Still open: watching (wave C).
 
 ## 2.4 The sidebar of a space
 
 - **SPC-022** · built · The sidebar shows the space badge and name, a button to hide it, and the page tree.
 - **SPC-023** · built · The sidebar can be hidden and comes back at the same state after a reload.
-- **SPC-024** · new · The sidebar can be made wider or narrower by dragging its edge. The width is remembered per person.
-- **SPC-025** · new · A section **Shortcuts** holds links chosen by space administrators: to pages, other spaces or outside addresses, each with its own label and an order that can be changed by dragging.
-- **SPC-026** · new · Fixed entries sit above the tree: **Overview**, **Blog** when turned on, **Calendar** later, and **Files** (FIL-043).
+- **SPC-024** · built · The sidebar can be made wider or narrower by dragging its edge. The width is remembered per person.
+- **SPC-025** · partly · A section **Shortcuts** holds links chosen by space administrators: to pages, other spaces or outside addresses, each with its own label and an order that can be changed by dragging. Still open: dragging: Move up and Move down do the job.
+- **SPC-026** · partly · Fixed entries sit above the tree: **Overview**, **Blog** when turned on, **Calendar** later, and **Files** (FIL-043). Still open: Blog (wave D), Files (wave E), Calendar.
 - **SPC-027** · built · Space administrators see links to Space settings and Trash at the bottom.
-- **SPC-028** · new · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings.
-- **SPC-029** · new · The sidebar has a filter on page titles. Typing narrows the tree to matching rows with their parents, and matching words are marked.
-- **SPC-030** · new · A view switch offers **Tree**, **Last visited by me**, **Last updated** and **A to Z**. The chosen view stays. Only the tree can be rearranged, and the other views say so.
+- **SPC-028** · partly · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings. Still open: Watch (wave C).
+- **SPC-029** · built · The sidebar has a filter on page titles. Typing narrows the tree to matching rows with their parents, and matching words are marked.
+- **SPC-030** · built · A view switch offers **Tree**, **Last visited by me**, **Last updated** and **A to Z**. The chosen view stays. Only the tree can be rearranged, and the other views say so.
 - **SPC-031** · new · A long tree loads branches as they open, so a space with 50,000 pages still opens at once.
 
 ## 2.5 The page tree
@@ -53,14 +53,14 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-035** · built · Going to a page reveals it, also inside a collapsed branch.
 - **SPC-036** · built · The current page has a tint and shows the add button. Other rows show it on hover or focus.
 - **SPC-037** · built · A person who may move pages can drag a row onto another page to make it a child, or between rows to reorder it.
-- **SPC-038** · new · A **More** button on each row offers: Open in new tab, Copy link, Rename, Move, Copy, Favourite, Watch, Archive, Delete. Each is shown only to those who may.
-- **SPC-039** · new · Hovering over or focusing a row shows a small card with the owner, the last change and the status. It can be turned off in the preferences.
-- **SPC-040** · new · The row shows the page's emoji (PAG-123), a lock when it has a restriction, and a draft mark when the person has an unpublished change.
-- **SPC-041** · new · The current person's unpublished pages appear in the tree in a muted style, only for them.
-- **SPC-042** · new · A button collapses all branches at once, and another reveals the current page.
+- **SPC-038** · partly · A **More** button on each row offers: Open in new tab, Copy link, Rename, Move, Copy, Favourite, Watch, Archive, Delete. Each is shown only to those who may. Still open: Watch (wave C), Archive (wave D).
+- **SPC-039** · partly · Hovering over or focusing a row shows a small card with the owner, the last change and the status. It can be turned off in the preferences. Still open: the owner and the status (wave D).
+- **SPC-040** · built · The row shows the page's emoji (PAG-123), a lock when it has a restriction, and a draft mark when the person has an unpublished change.
+- **SPC-041** · built · The current person's unpublished pages appear in the tree in a muted style, only for them.
+- **SPC-042** · built · A button collapses all branches at once, and another reveals the current page.
 - **SPC-043** · new · Several rows can be selected with Shift or Ctrl and moved together.
 - **SPC-044** · new · A row can be dragged to another space in the Spaces menu, with the same rules as a move (PAG-042).
-- **SPC-045** · new · A long drag scrolls the tree and opens a collapsed branch after a short wait.
+- **SPC-045** · built · A long drag scrolls the tree and opens a collapsed branch after a short wait.
 - **SPC-046** · built · A page cannot be moved below itself, and two people moving pages at once cannot create a loop.
 
 ## 2.6 Features of a space
@@ -98,7 +98,7 @@ Space administrators need a way to keep a growing space clean.
 ## 2.9 Archiving and deleting a space
 
 - **SPC-068** · built · A space administrator archives a space. It becomes read-only for everyone and can be restored.
-- **SPC-069** · new · An archived space disappears from the Spaces menu, the directory and quick search. Direct addresses still work, with a banner that says the space is archived.
+- **SPC-069** · built · An archived space disappears from the Spaces menu, the directory and quick search. Direct addresses still work, with a banner that says the space is archived.
 - **SPC-070** · new · Search can include archived spaces through a filter.
 - **SPC-071** · built · A space administrator deletes a space. It goes to the trash for the universal retention period.
 - **SPC-072** · built · Administrators restore or permanently remove spaces from the trash in the admin console.

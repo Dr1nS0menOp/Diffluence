@@ -215,6 +215,32 @@ export function formatDay(value: string): string {
   return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+const SECOND = 1000;
+const MINUTE = 60 * SECOND;
+const HOUR = 60 * MINUTE;
+const DAY = 24 * HOUR;
+const RELATIVE_DAYS = 30;
+
+/** "3 hours ago" in the person's language. Older than a month is a date. */
+export function relativeTime(value: string, now = Date.now(), locale?: string): string {
+  const past = now - new Date(value).getTime();
+  if (past >= RELATIVE_DAYS * DAY) return formatDay(value);
+  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
+  if (past >= DAY) return format.format(-Math.floor(past / DAY), 'day');
+  if (past >= HOUR) return format.format(-Math.floor(past / HOUR), 'hour');
+  if (past >= MINUTE) return format.format(-Math.floor(past / MINUTE), 'minute');
+  return format.format(0, 'second');
+}
+
+/** A time that reads easily, with the exact moment on hover and for screen readers. */
+export function RelativeTime({ value }: { value: string }) {
+  return (
+    <time dateTime={value} title={formatDate(value)}>
+      {relativeTime(value)}
+    </time>
+  );
+}
+
 export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KiB`;

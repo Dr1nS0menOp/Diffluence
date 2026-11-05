@@ -180,3 +180,28 @@ func (s *Service) RequirePage(ctx context.Context, q db.Querier, userID, pageID 
 	}
 	return nil
 }
+
+// Administrators names who holds administer in each space, directly or through a
+// group. Everyone who can see a space may know who to ask (SPC-013).
+func (s *Service) Administrators(ctx context.Context, q db.Querier, spaceIDs []uuid.UUID) (map[uuid.UUID][]string, error) {
+	rows, err := q.Query(ctx, `SELECT g.space_id, COALESCE(u.display_name, gr.name)
+		FROM space_grants g
+		LEFT JOIN users u ON g.subject_type = 'user' AND u.id = g.subject_id
+		LEFT JOIN groups gr ON g.subject_type = 'group' AND gr.id = g.subject_id
+		WHERE g.permission = $1 AND g.space_id = ANY($2) AND (u.id IS NOT NULL OR gr.id IS NOT NULL)
+		ORDER BY 2`, SpaceAdminister, spaceIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[uuid.UUID][]string{}
+	for rows.Next() {
+		var id uuid.UUID
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], name)
+	}
+	return out, rows.Err()
+}

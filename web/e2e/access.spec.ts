@@ -216,7 +216,7 @@ test('every tab of the admin console works and is accessible', async ({ page }) 
 
   await page.goto('/admin/audit');
   await page.getByRole('button', { name: 'Verify the chain' }).click();
-  await expect(page.getByRole('status')).toContainText('The audit chain is intact');
+  await expect(page.getByRole('status').filter({ hasText: 'The audit chain is intact' })).toBeVisible();
 
   await page.goto('/admin/scim');
   await page.getByLabel('Token name').fill(unique('token'));

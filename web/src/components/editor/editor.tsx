@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useRef, useState, type DragEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import { api, type Attachment, type Json } from '../../api';
+import { navigate } from '../../router';
+import { useCopy } from '../toast';
 import { ErrorNote } from '../ui';
+import type { ShownImage } from '../viewers';
 import { attachmentNode } from './attachments';
 import { BlockHandle, useBlockTracking } from './block-handle';
 import { documentExtensions } from './extensions';
@@ -11,14 +14,76 @@ import { FindBar, FindReplace } from './find';
 import { EmojiSuggestions, InsertDialog, SlashCommands } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
 import { LinkDialog } from './link-dialog';
+import { HeadingAnchors } from './outline';
 import { Toolbar } from './toolbar';
 
-/** Shows a stored document. The editor renders it, so no HTML is ever injected. */
-export function DocumentView({ document }: { document: Json }) {
+function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: ShownImage }[] {
+  return Array.from(root.querySelectorAll<HTMLImageElement>('figure.doc-image img')).map((element) => ({
+    element,
+    shown: {
+      src: element.src,
+      alt: element.alt,
+      caption: element.closest('figure')?.querySelector('figcaption')?.textContent ?? '',
+    },
+  }));
+}
+
+/** Every collapsible section opens for printing, and goes back afterwards. */
+function usePrintOpensSections() {
+  useEffect(() => {
+    const opened: HTMLDetailsElement[] = [];
+    const before = () => {
+      globalThis.document.querySelectorAll<HTMLDetailsElement>('.prose details:not([open])').forEach((d) => {
+        d.open = true;
+        opened.push(d);
+      });
+    };
+    const after = () => {
+      opened.splice(0).forEach((d) => {
+        d.open = false;
+      });
+    };
+    window.addEventListener('beforeprint', before);
+    window.addEventListener('afterprint', after);
+    return () => {
+      window.removeEventListener('beforeprint', before);
+      window.removeEventListener('afterprint', after);
+    };
+  }, []);
+}
+
+/**
+ * Shows a stored document. The editor renders it, so no HTML is ever injected.
+ * `plain` leaves out what only makes sense on the page itself, such as heading links.
+ */
+export function DocumentView({
+  document,
+  plain,
+  onImage,
+}: {
+  document: Json;
+  plain?: boolean;
+  onImage?: (images: ShownImage[], start: number) => void;
+}) {
   const { t } = useTranslation();
+  const copy = useCopy();
+  const copyHeading = useRef((slug: string) => {
+    const address = `${window.location.origin}${window.location.pathname}#${slug}`;
+    void copy(address, t('page.headingLinkCopied'));
+  });
   const editor = useEditor(
     {
-      extensions: documentExtensions(),
+      extensions: [
+        ...documentExtensions(),
+        ...(plain
+          ? []
+          : [
+              HeadingAnchors.configure({
+                label: t('page.copyHeadingLink'),
+                onCopy: (slug) => copyHeading.current(slug),
+              }),
+            ]),
+      ],
       content: document,
       editable: false,
       injectCSS: false,
@@ -26,7 +91,32 @@ export function DocumentView({ document }: { document: Json }) {
     },
     [document],
   );
-  return <EditorContent editor={editor} />;
+  usePrintOpensSections();
+
+  const follow = (e: MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    const image = target.closest<HTMLImageElement>('figure.doc-image img');
+    if (image && onImage) {
+      const images = shownImages(e.currentTarget);
+      onImage(
+        images.map((i) => i.shown),
+        images.findIndex((i) => i.element === image),
+      );
+      return;
+    }
+    const link = target.closest<HTMLAnchorElement>('a[href^="/"]');
+    const plainClick = e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+    if (!link || !plainClick || link.hasAttribute('download')) return;
+    e.preventDefault();
+    navigate(link.getAttribute('href') ?? '/');
+  };
+
+  return (
+    // The keyboard reaches links by themselves, and images through their own buttons.
+    <div onClick={follow}>
+      <EditorContent editor={editor} />
+    </div>
+  );
 }
 
 const carriesFiles = (transfer: DataTransfer | null) => transfer?.types.includes('Files') ?? false;

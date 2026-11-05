@@ -8,7 +8,10 @@ import { join } from 'node:path';
 import ts from 'typescript';
 
 const messages = JSON.parse(readFileSync('src/locales/en.json', 'utf8'));
-const hasKey = (key) => key.split('.').reduce((o, p) => (o && typeof o === 'object' ? o[p] : undefined), messages) !== undefined;
+const inMessages = (key) =>
+  key.split('.').reduce((o, p) => (o && typeof o === 'object' ? o[p] : undefined), messages) !== undefined;
+// A text with a count lives under its plural forms, such as key_one and key_other.
+const hasKey = (key) => inMessages(key) || inMessages(`${key}_other`);
 
 // Symbols are not language: separators and the like.
 const neutral = /^[\s\p{P}\p{S}\d]*$/u;
@@ -22,15 +25,32 @@ function report(file, node, text) {
 }
 
 function check(file) {
-  const src = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+  const src = ts.createSourceFile(
+    file,
+    readFileSync(file, 'utf8'),
+    ts.ScriptTarget.Latest,
+    true,
+    ts.ScriptKind.TSX,
+  );
   const visit = (node) => {
     if (ts.isJsxText(node) && !neutral.test(node.text)) {
       report(file, node, `hard-coded text: ${node.text.trim()}`);
     }
-    if (ts.isJsxAttribute(node) && textAttributes.has(node.name.getText()) && node.initializer && ts.isStringLiteral(node.initializer)) {
-      if (!neutral.test(node.initializer.text)) report(file, node, `hard-coded ${node.name.getText()}: ${node.initializer.text}`);
+    if (
+      ts.isJsxAttribute(node) &&
+      textAttributes.has(node.name.getText()) &&
+      node.initializer &&
+      ts.isStringLiteral(node.initializer)
+    ) {
+      if (!neutral.test(node.initializer.text))
+        report(file, node, `hard-coded ${node.name.getText()}: ${node.initializer.text}`);
     }
-    if (ts.isCallExpression(node) && node.expression.getText() === 't' && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
+    if (
+      ts.isCallExpression(node) &&
+      node.expression.getText() === 't' &&
+      node.arguments[0] &&
+      ts.isStringLiteral(node.arguments[0])
+    ) {
       const key = node.arguments[0].text;
       if (!hasKey(key)) report(file, node, `unknown translation key: ${key}`);
     }

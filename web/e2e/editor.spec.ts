@@ -436,7 +436,7 @@ test('search finds a page and marks the word', async ({ page }) => {
   const space = await newSpace(page, 'Search space');
   await publishedPage(page, space.id, 'Findable', 'the quick zebracrossing here');
   await page.goto('/');
-  await page.getByRole('searchbox', { name: 'Search' }).fill('zebracross');
+  await page.getByRole('combobox', { name: 'Search' }).fill('zebracross');
   await page.keyboard.press('Enter');
   await expect(page.getByRole('link', { name: 'Findable' })).toBeVisible();
   await expect(page.locator('mark')).toHaveText('zebracrossing');

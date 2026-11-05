@@ -47,6 +47,7 @@ type Space struct {
 	CreatedBy   uuid.UUID       `json:"created_by"`
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
+	Favourite   bool            `json:"favourite"`
 	Can         map[string]bool `json:"can,omitempty"`
 }
 
@@ -155,10 +156,12 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 	return out, err
 }
 
-// List returns the spaces the user may view.
+// List returns the active spaces the user may view. Archived spaces only show in
+// the directory, under their own filter (SPC-069).
 func (s *Service) List(ctx context.Context, c identity.Caller) ([]Space, error) {
 	rows, err := s.pool.Query(ctx, `SELECT `+columns+` FROM spaces
-		WHERE id IN (SELECT space_id FROM perm_spaces($1, 'space.view')) ORDER BY lower(name), id`, c.UserID)
+		WHERE status = 'active' AND id IN (SELECT space_id FROM perm_spaces($1, 'space.view'))
+		ORDER BY lower(name), id`, c.UserID)
 	return collect(rows, err)
 }
 
@@ -186,6 +189,10 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 		return Space{}, err
 	}
 	sp, err := load(ctx, s.pool, id)
+	if err != nil {
+		return sp, err
+	}
+	err = s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM space_favourites WHERE user_id = $1 AND space_id = $2)", c.UserID, id).Scan(&sp.Favourite)
 	if err != nil {
 		return sp, err
 	}

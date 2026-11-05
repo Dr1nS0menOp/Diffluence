@@ -39,6 +39,7 @@ func (s *Server) registerRoutes() {
 	r.HandleFunc("GET /api/v1/admin/audit-events/verify", Permission(identity.PermAdministrator), s.handleAuditVerify)
 
 	s.registerContentRoutes()
+	s.registerReadingRoutes()
 	s.registerIdentityRoutes()
 	s.registerAppearanceRoutes()
 }
@@ -125,7 +126,12 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	if perms == nil {
 		perms = []string{}
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms})
+	preferences, err := s.deps.Identity.Preferences(r.Context(), p.User.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms, "preferences": preferences})
 }
 
 func (s *Server) handleSystemInfo(w http.ResponseWriter, _ *http.Request) {

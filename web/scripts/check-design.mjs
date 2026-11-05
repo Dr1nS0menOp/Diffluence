@@ -53,14 +53,26 @@ export const CONTRAST_PAIRS = [
   ['syntax-title', 'code', NORMAL_TEXT],
   ['field', 'surface', LARGE_OR_CONTROL],
   ['accent', 'subtle', LARGE_OR_CONTROL],
-  ...['grey', 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink', 'brown'].map(
-    (name) => [`text-${name}`, 'surface', NORMAL_TEXT],
-  ),
+  ...[
+    'grey',
+    'slate',
+    'red',
+    'orange',
+    'amber',
+    'green',
+    'teal',
+    'blue',
+    'indigo',
+    'purple',
+    'pink',
+    'brown',
+  ].map((name) => [`text-${name}`, 'surface', NORMAL_TEXT]),
   ...['grey', 'yellow', 'green', 'blue', 'purple', 'red'].map((name) => ['ink', `mark-${name}`, NORMAL_TEXT]),
   ['text-green', 'code', NORMAL_TEXT],
 ];
 
-const NAMED_COLOURS = /(?<![\w-])(white|black|red|green|blue|gray|grey|yellow|orange|purple|pink|brown|silver|navy|teal)(?![\w-])/i;
+const NAMED_COLOURS =
+  /(?<![\w-])(white|black|red|green|blue|gray|grey|yellow|orange|purple|pink|brown|silver|navy|teal)(?![\w-])/i;
 const COLOUR_LITERAL = /#[0-9a-f]{3,8}\b|\b(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\(/i;
 const LITERAL_LENGTH = /(?<![\w.-])-?\d*\.?\d+(px|rem|em)\b/;
 const SPACING_PROPERTY = /^(margin|padding|gap|row-gap|column-gap|inset)(-|$)/;
@@ -83,14 +95,27 @@ const blankComments = (css) => css.replace(/\/\*[\s\S]*?\*\//g, (comment) => com
 
 const lineOf = (text, index) => text.slice(0, index).split('\n').length;
 
+/** Splits light-dark(a, b) at its own comma, not at the commas inside a colour. */
+function themeValues(value) {
+  const inner = value.match(/^light-dark\((.*)\)$/s)?.[1];
+  if (inner === undefined) return [value, value];
+  let depth = 0;
+  for (let i = 0; i < inner.length; i++) {
+    if (inner[i] === '(') depth++;
+    if (inner[i] === ')') depth--;
+    if (inner[i] === ',' && depth === 0) return [inner.slice(0, i).trim(), inner.slice(i + 1).trim()];
+  }
+  return [value, value];
+}
+
 /** The custom properties of the light theme and the dark theme. */
 export function parseTokens(css) {
   const clean = blankComments(css);
-  const darkStart = clean.indexOf('@media (prefers-color-scheme: dark)');
-  const collect = (text) => new Map([...text.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
-  const light = collect(darkStart === -1 ? clean : clean.slice(0, darkStart));
-  const dark = new Map([...light, ...collect(darkStart === -1 ? '' : clean.slice(darkStart))]);
-  return { light, dark };
+  const found = [...clean.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], themeValues(m[2].trim())]);
+  return {
+    light: new Map(found.map(([name, values]) => [name, values[0]])),
+    dark: new Map(found.map(([name, values]) => [name, values[1]])),
+  };
 }
 
 function relativeLuminance(hex) {
@@ -116,12 +141,18 @@ export function checkContrast(tokens, pairs = CONTRAST_PAIRS) {
       const a = values.get(`--color-${foreground}`);
       const b = values.get(`--color-${background}`);
       if (!a || !b) {
-        problems.push({ line: 1, message: `${theme}: contrast pair ${foreground} on ${background} has no such token` });
+        problems.push({
+          line: 1,
+          message: `${theme}: contrast pair ${foreground} on ${background} has no such token`,
+        });
         continue;
       }
       const ratio = contrastRatio(a, b);
       if (ratio < minimum) {
-        problems.push({ line: 1, message: `${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1, needs ${minimum}:1` });
+        problems.push({
+          line: 1,
+          message: `${theme}: ${foreground} on ${background} is ${ratio.toFixed(2)}:1, needs ${minimum}:1`,
+        });
       }
     }
   }
@@ -130,7 +161,8 @@ export function checkContrast(tokens, pairs = CONTRAST_PAIRS) {
 
 function declarationProblem(property, value, tokens) {
   const bareValue = value.replace(/var\(--[\w-]+\)/g, '');
-  if (COLOUR_LITERAL.test(value) || NAMED_COLOURS.test(bareValue)) return `colour outside the tokens: ${property}: ${value}`;
+  if (COLOUR_LITERAL.test(value) || NAMED_COLOURS.test(bareValue))
+    return `colour outside the tokens: ${property}: ${value}`;
   if (value.includes('!important')) return `!important: ${property}: ${value}`;
   if (PHYSICAL_PROPERTY.test(property)) return `physical property, use the logical one: ${property}`;
   if (/^(text-align|float|clear)$/.test(property) && /^(left|right)$/.test(value)) {
@@ -191,7 +223,12 @@ function collectClasses(node, found) {
     collectClasses(node.whenFalse, found);
     return;
   }
-  if (ts.isStringLiteralLike(node) || ts.isTemplateHead(node) || ts.isTemplateMiddle(node) || ts.isTemplateTail(node)) {
+  if (
+    ts.isStringLiteralLike(node) ||
+    ts.isTemplateHead(node) ||
+    ts.isTemplateMiddle(node) ||
+    ts.isTemplateTail(node)
+  ) {
     found.push(...classesInLiteral(node).filter(Boolean));
   }
   ts.forEachChild(node, (child) => collectClasses(child, found));
@@ -216,15 +253,22 @@ export function checkSource(file, source, classNames) {
         }
       }
     }
-    if ((ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) && node.tagName.getText() === 'svg') {
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText() === 'svg'
+    ) {
       if (!file.replaceAll('\\', '/').endsWith(ICONS_FILE)) report(node, `svg outside ${ICONS_FILE}`);
     }
-    if (ts.isCallExpression(node) && BROWSER_DIALOGS.has(node.expression.getText().replace(/^window\./, ''))) {
+    if (
+      ts.isCallExpression(node) &&
+      BROWSER_DIALOGS.has(node.expression.getText().replace(/^window\./, ''))
+    ) {
       report(node, `browser dialog: use ConfirmDialog or Dialog instead of ${node.expression.getText()}`);
     }
     if (ts.isJsxText(node) || ts.isStringLiteralLike(node)) {
       if (PICTOGRAPH.test(node.text)) report(node, `glyph used as an icon: ${node.text.trim()}`);
-      if (/^(#[0-9a-f]{3,8}|(rgb|hsl)a?\(.*)$/i.test(node.text.trim())) report(node, `colour outside the tokens: ${node.text}`);
+      if (/^(#[0-9a-f]{3,8}|(rgb|hsl)a?\(.*)$/i.test(node.text.trim()))
+        report(node, `colour outside the tokens: ${node.text}`);
     }
     ts.forEachChild(node, visit);
   };
@@ -234,7 +278,9 @@ export function checkSource(file, source, classNames) {
 
 /** A screen without an approved picture could drift without anyone noticing. */
 export function checkScreenPictures(viewSources, pictureTests) {
-  const screens = viewSources.flatMap((source) => [...source.matchAll(/export function (\w+View)\(/g)].map((m) => m[1]));
+  const screens = viewSources.flatMap((source) =>
+    [...source.matchAll(/export function (\w+View)\(/g)].map((m) => m[1]),
+  );
   return screens
     .filter((screen) => !pictureTests.includes(`${screen}:`))
     .map((screen) => ({ line: 1, message: `screen without a picture: add a test named '${screen}: ...'` }));

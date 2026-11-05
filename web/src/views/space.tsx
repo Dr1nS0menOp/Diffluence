@@ -2,11 +2,22 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, NIL_ID, type Grant, type Job, type Space, type Subject, type TrashItem } from '../api';
+import {
+  api,
+  NIL_ID,
+  type Grant,
+  type Job,
+  type Shortcut,
+  type Space,
+  type Subject,
+  type TrashItem,
+} from '../api';
 import { navigate } from '../router';
 import { Frame, spaceByKeyQuery } from '../components/frame';
+import { IconArrowDown, IconArrowUp } from '../components/icons';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, formatDate, Loading } from '../components/ui';
 import { SubjectPicker } from '../components/picker';
+import { moved } from './lists';
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
@@ -223,6 +234,94 @@ function PermissionsSection({ space }: { space: Space }) {
   );
 }
 
+function ShortcutsSection({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const key = ['shortcuts', space.id];
+  const q = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ shortcuts: Shortcut[] }>(`/spaces/${space.id}/shortcuts`),
+  });
+  const [label, setLabel] = useState('');
+  const [target, setTarget] = useState('');
+  const save = useMutation({
+    mutationFn: (shortcuts: Shortcut[]) =>
+      api.put(`/spaces/${space.id}/shortcuts`, {
+        shortcuts: shortcuts.map((s) => ({ label: s.label, target: s.target })),
+      }),
+    onSuccess: () => {
+      setLabel('');
+      setTarget('');
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  const list = q.data?.shortcuts ?? [];
+  return (
+    <section>
+      <h2>{t('shortcutLinks.title')}</h2>
+      <p className="muted">{t('shortcutLinks.help')}</p>
+      <ErrorNote error={q.error ?? save.error} />
+      <ul className="page-list">
+        {list.map((s, at) => (
+          <li key={s.id ?? s.label}>
+            <span className="grow">{s.label}</span>
+            <span className="muted">{s.target}</span>
+            <button
+              type="button"
+              className="icon"
+              aria-label={t('favourites.moveUp', { title: s.label })}
+              disabled={at === 0}
+              onClick={() => save.mutate(moved(list, at, -1))}
+            >
+              <IconArrowUp size={16} />
+            </button>
+            <button
+              type="button"
+              className="icon"
+              aria-label={t('favourites.moveDown', { title: s.label })}
+              disabled={at === list.length - 1}
+              onClick={() => save.mutate(moved(list, at, 1))}
+            >
+              <IconArrowDown size={16} />
+            </button>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => save.mutate(list.filter((_, i) => i !== at))}
+            >
+              {t('common.remove')}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <form
+        className="row"
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          save.mutate([...list, { label, target }]);
+        }}
+      >
+        <input
+          value={label}
+          aria-label={t('shortcutLinks.label')}
+          placeholder={t('shortcutLinks.label')}
+          required
+          onChange={(e) => setLabel(e.target.value)}
+        />
+        <input
+          className="grow"
+          value={target}
+          aria-label={t('shortcutLinks.target')}
+          placeholder={t('shortcutLinks.target')}
+          required
+          onChange={(e) => setTarget(e.target.value)}
+        />
+        <button type="submit">{t('common.add')}</button>
+      </form>
+    </section>
+  );
+}
+
 export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -287,6 +386,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
           </button>
         </form>
       </section>
+      <ShortcutsSection space={space} />
       <PermissionsSection space={space} />
       <ImportBox space={space} />
       <section>

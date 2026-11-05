@@ -76,6 +76,9 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 **ADR-024: Four product waves before phase 3, and a study before every phase**
 *Accepted by the product owner, 2026-11-05.* Most of what makes a wiki feel complete sits in the editor and on the page, so waves A to D of `03-functional-requirements.md` come before production hardening. The product owner also decided that every phase starts like blueprint 03: a large study, then every detail planned, because that is how the product gets as complete as possible. Consequence: `09-way-of-working.md` holds the steps, and a phase has no code before its plan exists. `@tiptap/suggestion` is approved for wave A. Supersedes the order of phases in 08.
 
+**ADR-025: How a page looks is page data, and one token holds both themes**
+Status: decided (2026-11-05). Context: wave B adds an emoji, full width, title alignment and a header image, and a person's own theme. Decision: page look lives on the page, not in a version, and applies at once. Tokens use `light-dark()` instead of a second list of dark values, and `data-theme` on the root element beats the system. Consequences: restoring an old version does not change how a page looks. There is one list of colours, whose values did not change. See spec 009.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

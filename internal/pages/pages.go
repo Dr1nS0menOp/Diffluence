@@ -52,12 +52,14 @@ type Page struct {
 	UpdatedBy      uuid.UUID  `json:"updated_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+	Look
 }
 
 // Crumb is one step of the breadcrumb trail.
 type Crumb struct {
 	ID    uuid.UUID `json:"id"`
 	Title string    `json:"title"`
+	Emoji string    `json:"emoji"`
 }
 
 // Detail is a page with everything the reading view needs.
@@ -102,12 +104,14 @@ func cleanTitle(title string) (string, error) {
 	return title, nil
 }
 
-const pageColumns = "id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at"
+const pageColumns = `id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at,
+	emoji, full_width, title_align, hide_children, header_attachment_id, header_position`
 
 func scanPage(r pgx.Row) (Page, error) {
 	var p Page
 	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
-		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt)
+		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt,
+		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition)
 	return p, err
 }
 
@@ -244,6 +248,9 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err := search.Index(ctx, tx, p.ID, title, document.Text(doc)); err != nil {
 		return p, err
 	}
+	if err := syncLinks(ctx, tx, p.ID, doc); err != nil {
+		return p, err
+	}
 	// Attachment names were not indexed while the page had no search row yet.
 	rows, err := tx.Query(ctx, "SELECT filename FROM attachments WHERE page_id = $1 AND status = 'active'", p.ID)
 	if err != nil {
@@ -283,14 +290,14 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		d.Document, _ = document.Marshal(document.Empty())
 		d.SchemaVersion = document.SchemaVersion
 	}
-	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
 		WHERE t.descendant_id = $1 AND t.depth > 0 ORDER BY t.depth DESC`, id)
 	if err != nil {
 		return d, err
 	}
 	d.Breadcrumbs, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Crumb, error) {
 		var b Crumb
-		err := r.Scan(&b.ID, &b.Title)
+		err := r.Scan(&b.ID, &b.Title, &b.Emoji)
 		return b, err
 	})
 	if err != nil {
@@ -308,18 +315,35 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if err != nil {
 		return d, err
 	}
-	err = s.pool.QueryRow(ctx, `SELECT
-			COALESCE((SELECT display_name FROM users WHERE id = $1), ''),
-			COALESCE((SELECT display_name FROM users WHERE id = $2), '')`, p.CreatedBy, p.UpdatedBy).
-		Scan(&d.CreatedByName, &d.UpdatedByName)
-	if err != nil {
-		return d, fmt.Errorf("pages: read author names: %v", err)
+	if d.CreatedByName, d.UpdatedByName, err = s.authorNames(ctx, p); err != nil {
+		return d, err
 	}
 	if d.Can, err = s.capabilities(ctx, c, id); err != nil {
 		return d, err
 	}
+	if d.HeaderAttachmentID != nil {
+		// A file in the trash shows no header, and comes back with a restore.
+		shown, err := s.attachments.IsImageOf(ctx, s.pool, *d.HeaderAttachmentID, id)
+		if err != nil {
+			return d, err
+		}
+		if !shown {
+			d.HeaderAttachmentID = nil
+		}
+	}
 	s.touchRecent(ctx, c.UserID, id)
 	return d, nil
+}
+
+func (s *Service) authorNames(ctx context.Context, p Page) (created, updated string, err error) {
+	err = s.pool.QueryRow(ctx, `SELECT
+			COALESCE((SELECT display_name FROM users WHERE id = $1), ''),
+			COALESCE((SELECT display_name FROM users WHERE id = $2), '')`, p.CreatedBy, p.UpdatedBy).
+		Scan(&created, &updated)
+	if err != nil {
+		return "", "", fmt.Errorf("pages: read author names: %v", err)
+	}
+	return created, updated, nil
 }
 
 // capabilities tells the UI which buttons to show. The server still checks
@@ -350,13 +374,20 @@ func (s *Service) touchRecent(ctx context.Context, userID, pageID uuid.UUID) {
 		(SELECT page_id FROM recent_pages WHERE user_id = $1 ORDER BY viewed_at DESC LIMIT 50)`, userID)
 }
 
-// Node is one entry of the page tree.
+// Node is one entry of the page tree, with what its row shows. HasDraft and
+// VisitedAt are about the person asking.
 type Node struct {
-	ID       uuid.UUID  `json:"id"`
-	ParentID *uuid.UUID `json:"parent_id"`
-	Position int        `json:"position"`
-	Title    string     `json:"title"`
-	Status   string     `json:"status"`
+	ID            uuid.UUID  `json:"id"`
+	ParentID      *uuid.UUID `json:"parent_id"`
+	Position      int        `json:"position"`
+	Title         string     `json:"title"`
+	Status        string     `json:"status"`
+	Emoji         string     `json:"emoji"`
+	Restricted    bool       `json:"restricted"`
+	HasDraft      bool       `json:"has_draft"`
+	UpdatedAt     time.Time  `json:"updated_at"`
+	UpdatedByName string     `json:"updated_by_name"`
+	VisitedAt     *time.Time `json:"visited_at"`
 }
 
 // Tree returns the pages of a space the user may see, in order.
@@ -364,81 +395,25 @@ func (s *Service) Tree(ctx context.Context, c identity.Caller, spaceID uuid.UUID
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceView); err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT p.id, p.parent_id, p.position, p.title, p.status
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.parent_id, p.position, p.title, p.status, p.emoji,
+			EXISTS (SELECT 1 FROM page_restrictions r WHERE r.page_id = p.id),
+			d.page_id IS NOT NULL, p.updated_at, COALESCE(u.display_name, ''), rp.viewed_at
 		FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
+		LEFT JOIN users u ON u.id = p.updated_by
+		LEFT JOIN drafts d ON d.page_id = p.id AND d.user_id = $1
+		LEFT JOIN recent_pages rp ON rp.page_id = p.id AND rp.user_id = $1
 		WHERE p.space_id = $2 ORDER BY p.parent_id NULLS FIRST, p.position, p.id`, c.UserID, spaceID)
 	if err != nil {
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Node, error) {
 		var n Node
-		err := r.Scan(&n.ID, &n.ParentID, &n.Position, &n.Title, &n.Status)
+		err := r.Scan(&n.ID, &n.ParentID, &n.Position, &n.Title, &n.Status, &n.Emoji,
+			&n.Restricted, &n.HasDraft, &n.UpdatedAt, &n.UpdatedByName, &n.VisitedAt)
 		return n, err
 	})
 	if out == nil {
 		out = []Node{}
 	}
 	return out, err
-}
-
-// ListItem is an entry of a personal list.
-type ListItem struct {
-	ID        uuid.UUID `json:"id"`
-	Title     string    `json:"title"`
-	SpaceID   uuid.UUID `json:"space_id"`
-	SpaceKey  string    `json:"space_key"`
-	SpaceName string    `json:"space_name"`
-	At        time.Time `json:"at"`
-}
-
-func collectList(rows pgx.Rows, err error) ([]ListItem, error) {
-	if err != nil {
-		return nil, err
-	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ListItem, error) {
-		var v ListItem
-		err := r.Scan(&v.ID, &v.Title, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.At)
-		return v, err
-	})
-	if out == nil {
-		out = []ListItem{}
-	}
-	return out, err
-}
-
-// Recent lists recently viewed pages the user may still see.
-func (s *Service) Recent(ctx context.Context, c identity.Caller) ([]ListItem, error) {
-	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.space_id, s.key, s.name, r.viewed_at
-		FROM recent_pages r
-		JOIN perm_visible_pages($1) v ON v.page_id = r.page_id
-		JOIN pages p ON p.id = r.page_id
-		JOIN spaces s ON s.id = p.space_id
-		WHERE r.user_id = $1 ORDER BY r.viewed_at DESC LIMIT 20`, c.UserID)
-	return collectList(rows, err)
-}
-
-// Favourites lists favourite pages the user may still see.
-func (s *Service) Favourites(ctx context.Context, c identity.Caller) ([]ListItem, error) {
-	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.space_id, s.key, s.name, f.created_at
-		FROM favourites f
-		JOIN perm_visible_pages($1) v ON v.page_id = f.page_id
-		JOIN pages p ON p.id = f.page_id
-		JOIN spaces s ON s.id = p.space_id
-		WHERE f.user_id = $1 ORDER BY f.created_at DESC LIMIT 200`, c.UserID)
-	return collectList(rows, err)
-}
-
-// SetFavourite adds or removes a favourite. It is a personal preference, so it
-// is not audited.
-func (s *Service) SetFavourite(ctx context.Context, c identity.Caller, id uuid.UUID, on bool) error {
-	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
-		return err
-	}
-	var err error
-	if on {
-		_, err = s.pool.Exec(ctx, "INSERT INTO favourites (user_id, page_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", c.UserID, id)
-	} else {
-		_, err = s.pool.Exec(ctx, "DELETE FROM favourites WHERE user_id = $1 AND page_id = $2", c.UserID, id)
-	}
-	return err
 }

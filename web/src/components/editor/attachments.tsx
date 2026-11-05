@@ -16,8 +16,9 @@ interface ImageAttrs {
   align: string | null;
 }
 
-function ImageView({ node }: ReactNodeViewProps) {
+function ImageView({ node, editor }: ReactNodeViewProps) {
   const { attachment_id: id, alt, caption, size, align } = node.attrs as ImageAttrs;
+  const image = <img src={`/api/v1/attachments/${id}/content`} alt={alt ?? ''} />;
   return (
     <NodeViewWrapper
       as="figure"
@@ -25,7 +26,14 @@ function ImageView({ node }: ReactNodeViewProps) {
       data-size={size ?? undefined}
       data-align={align ?? undefined}
     >
-      <img src={`/api/v1/attachments/${id}/content`} alt={alt ?? ''} />
+      {/* A reader opens it large. The button gives the keyboard a way in. */}
+      {editor.isEditable ? (
+        image
+      ) : (
+        <button type="button" className="image-open">
+          {image}
+        </button>
+      )}
       {caption && <figcaption>{caption}</figcaption>}
     </NodeViewWrapper>
   );

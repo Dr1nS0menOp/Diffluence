@@ -276,6 +276,28 @@ fieldset.matrix label {
   box-shadow: var(--shadow-menu);
 }
 
+.menu-list.floating {
+  position: fixed;
+  inset-block-start: auto;
+}
+
+.menu-note {
+  max-inline-size: var(--size-card-note);
+  margin: var(--space-1-5) var(--space-2);
+  color: var(--color-muted);
+}
+
+.menu-page {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+  white-space: normal;
+}
+
+.menu-page .muted {
+  font-size: var(--text-caption);
+}
+
 .menu-list.start {
   inset-inline-start: 0;
 }
@@ -324,6 +346,142 @@ fieldset.matrix label {
   display: flex;
   flex-direction: column;
   padding: var(--space-1-5) var(--space-2);
+}
+
+.toast-region {
+  position: fixed;
+  inset-block-end: var(--space-4);
+  inset-inline-start: 50%;
+  z-index: var(--layer-menu);
+  transform: translateX(-50%);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  white-space: nowrap;
+}
+
+.dialog-filter {
+  inline-size: 100%;
+}
+
+.shortcut-list {
+  margin: 0;
+}
+
+.shortcut-list div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding-block: var(--space-1);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.shortcut-list dd {
+  display: inline-flex;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+kbd {
+  min-inline-size: var(--size-twist);
+  padding-inline: var(--space-1-5);
+  border: 1px solid var(--color-field);
+  border-radius: var(--radius);
+  background: var(--color-code);
+  font-family: var(--font-mono);
+  font-size: var(--text-small);
+  text-align: center;
+}
+
+.emoji-choice {
+  margin-block-end: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.emoji-choice input {
+  inline-size: 100%;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-control), 1fr));
+  gap: var(--space-0-5);
+  margin-block: var(--space-2);
+}
+
+.emoji-grid button {
+  min-block-size: var(--size-control);
+  font-size: var(--text-section);
+}
+
+.emoji-grid button[aria-pressed='true'] {
+  background: var(--color-accent-tint);
+}
+
+dialog.lightbox,
+dialog.presentation {
+  inline-size: 100vw;
+  max-inline-size: none;
+  block-size: 100vh;
+  max-block-size: none;
+  border-radius: 0;
+}
+
+dialog.lightbox[open],
+dialog.presentation[open] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+}
+
+.lightbox figure {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-block-size: 0;
+  margin: 0;
+}
+
+.lightbox img {
+  flex: 1;
+  min-block-size: 0;
+  max-inline-size: 100%;
+  object-fit: contain;
+}
+
+.lightbox-close {
+  position: absolute;
+  inset-block-start: var(--space-3);
+  inset-inline-end: var(--space-3);
+}
+
+.lightbox-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.presentation-slide {
+  flex: 1;
+  inline-size: 100%;
+  max-inline-size: var(--size-editor);
+  overflow-y: auto;
+  font-size: var(--text-section);
 }
 
 dialog {

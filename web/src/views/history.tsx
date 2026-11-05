@@ -100,10 +100,71 @@ export function HistoryView({ pageId }: { pageId: string }) {
       )}
       {shown !== null && (
         <Dialog title={t('history.version', { number: shown })} onClose={() => setShown(null)} wide>
-          {version.data?.document ? <DocumentView document={version.data.document} /> : <Loading />}
+          {version.data?.document ? (
+            <>
+              <p role="status" className="note">
+                {t('history.oldVersion', {
+                  number: version.data.number,
+                  name: version.data.author_name,
+                  date: formatDate(version.data.created_at),
+                })}{' '}
+                <Link href={`/pages/${pageId}`}>{t('history.toCurrent')}</Link>
+              </p>
+              <DocumentView document={version.data.document} plain />
+            </>
+          ) : (
+            <Loading />
+          )}
         </Dialog>
       )}
     </>
+  );
+}
+
+const UNCHANGED_KEPT = 2;
+
+export interface CompareRun {
+  blocks: DiffBlock[];
+  folded: boolean;
+}
+
+/** Long stretches without changes fold, and the blocks next to a change stay. */
+export function foldUnchanged(blocks: DiffBlock[]): CompareRun[] {
+  const runs: CompareRun[] = [];
+  let at = 0;
+  while (at < blocks.length) {
+    let end = at;
+    const same = blocks[at]?.op === 'equal';
+    while (end < blocks.length && (blocks[end]?.op === 'equal') === same) end++;
+    const run = blocks.slice(at, end);
+    const first = at === 0;
+    const last = end === blocks.length;
+    const keptBefore = first ? 0 : UNCHANGED_KEPT;
+    const keptAfter = last ? 0 : UNCHANGED_KEPT;
+    if (same && run.length > keptBefore + keptAfter) {
+      if (keptBefore) runs.push({ blocks: run.slice(0, keptBefore), folded: false });
+      runs.push({ blocks: run.slice(keptBefore, run.length - keptAfter), folded: true });
+      if (keptAfter) runs.push({ blocks: run.slice(-keptAfter), folded: false });
+    } else {
+      runs.push({ blocks: run, folded: false });
+    }
+    at = end;
+  }
+  return runs;
+}
+
+function FoldedRun({ blocks }: { blocks: DiffBlock[] }) {
+  const { t } = useTranslation();
+  const [open, setOpen] = useState(false);
+  if (open) {
+    return blocks.map((b, i) => <Block key={i} block={b} />);
+  }
+  return (
+    <p className="diff-fold">
+      <button type="button" className="ghost" onClick={() => setOpen(true)}>
+        {t('history.showUnchanged', { count: blocks.length })}
+      </button>
+    </p>
   );
 }
 
@@ -148,9 +209,13 @@ export function CompareView({ pageId }: { pageId: string }) {
       <p>{t('history.comparing', { from: q.data.from.number, to: q.data.to.number })}</p>
       {!changed && <p className="muted">{t('history.unchanged')}</p>}
       <div>
-        {q.data.blocks.map((b, i) => (
-          <Block key={i} block={b} />
-        ))}
+        {foldUnchanged(q.data.blocks).map((run, i) =>
+          run.folded ? (
+            <FoldedRun key={i} blocks={run.blocks} />
+          ) : (
+            run.blocks.map((b, j) => <Block key={`${i}-${j}`} block={b} />)
+          ),
+        )}
       </div>
     </>
   );

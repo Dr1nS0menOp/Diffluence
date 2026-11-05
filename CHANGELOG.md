@@ -4,6 +4,22 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: reading and getting around (wave B)
+- The search box finds pages, spaces, files and people while you type, works with the arrow keys, remembers recent searches, and can stay inside a space
+- The top bar gains Recent and Favourites menus, a help menu, and a small menu on Create
+- All spaces has its own screen with a filter, sorting and archived spaces. Spaces can get a star
+- Recent has tabs for visited pages, pages worked on and drafts. Favourites can be reordered and removed together
+- The tree has a filter, three flat views, a menu on each row, a card on hover, and keys: arrows, Home, End and letters. Rows show the emoji, a lock and a draft mark
+- The sidebar can be made wider, has an Overview and shortcuts chosen by space administrators
+- A page shows its read time, a list of headings beside it, links to each heading, its child pages, and a Details panel with contributors and links in and out
+- Page look in the editor: emoji, full width, title position and a header image
+- Images open large. Reader mode, presentation and print are there
+- Deleting names what it touches, and Undo takes it back
+- Preferences: light, dark or system, shortcuts, contents, cards. They follow you to other devices
+- Keyboard shortcuts everywhere, with `?` for the list
+
+Upgrade impact: migration 0006 adds columns and tables, and fills the list of links between pages once. Expand only, so the previous release keeps working.
+
 ### Added: the editor grows up (wave A)
 - Type `/` to add anything at the cursor, or use Insert in the tools
 - Every block has a grip to drag it and a menu: move, duplicate, delete, turn into another block. Alt with the arrows moves it

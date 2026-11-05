@@ -320,3 +320,69 @@ a.file-tile:hover {
     margin-inline-start: 0;
   }
 }
+
+/* Headings have an address, and the link to it shows on hover or focus. */
+.prose :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-block-start: calc(var(--size-topbar) + var(--space-4));
+}
+
+.heading-link {
+  min-block-size: 0;
+  margin-inline-start: var(--space-1);
+  padding: 0;
+  background: none;
+  color: var(--color-muted);
+  opacity: 0;
+  vertical-align: middle;
+}
+
+.prose :is(h1, h2, h3, h4, h5, h6):hover .heading-link,
+.heading-link:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .heading-link {
+    opacity: 1;
+  }
+}
+
+.heading-target {
+  background: var(--color-mark-yellow);
+  transition: background-color var(--motion-fast);
+}
+
+/* A wide table scrolls in its own frame, so the page itself never scrolls sideways. */
+.prose .tableWrapper {
+  margin-block: var(--space-3);
+  overflow-x: auto;
+}
+
+.prose .tableWrapper table {
+  margin-block: 0;
+}
+
+.diff-fold {
+  margin-block: var(--space-1);
+  padding-block: var(--space-1);
+  border-block: 1px dashed var(--color-line);
+  text-align: center;
+}
+
+.image-open {
+  display: block;
+  min-block-size: 0;
+  padding: 0;
+  background: none;
+  cursor: zoom-in;
+}
+
+.image-open:hover {
+  background: none;
+}
+
+@media print {
+  .heading-link {
+    display: none;
+  }
+}

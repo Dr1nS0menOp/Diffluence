@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import {
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type AnchorHTMLAttributes,
@@ -11,6 +12,17 @@ import {
 import { Link } from '../router';
 
 const ENABLED_ITEMS = '[role^=menuitem]:not(:disabled)';
+const FLOATING_GAP_PX = 4;
+
+/** Places a list on the screen beside its button, flipped when it would not fit. */
+function placeBeside(list: HTMLElement, button: HTMLElement) {
+  const anchor = button.getBoundingClientRect();
+  const fitsBelow = anchor.bottom + FLOATING_GAP_PX + list.offsetHeight <= window.innerHeight;
+  const top = fitsBelow ? anchor.bottom + FLOATING_GAP_PX : anchor.top - FLOATING_GAP_PX - list.offsetHeight;
+  const left = Math.min(anchor.left, window.innerWidth - list.offsetWidth - FLOATING_GAP_PX);
+  list.style.top = `${Math.max(top, FLOATING_GAP_PX)}px`;
+  list.style.left = `${Math.max(left, FLOATING_GAP_PX)}px`;
+}
 
 /** The item a key leads to: arrows, Home, End, or the next item that starts with a letter. */
 function itemForKey(key: string, items: HTMLElement[], at: number): HTMLElement | undefined {
@@ -30,16 +42,32 @@ export function Menu({
   className,
   children,
   align = 'end',
+  floating,
 }: {
   label: string;
   trigger: ReactNode;
   className?: string;
   children: ReactNode;
   align?: 'start' | 'end';
+  /** For a menu inside a scrolling area, which would otherwise be cut off. */
+  floating?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
+  const list = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
+
+  useLayoutEffect(() => {
+    if (open && floating && list.current && button.current) placeBeside(list.current, button.current);
+  }, [open, floating]);
+
+  useEffect(() => {
+    if (!open || !floating) return;
+    // A fixed list would stay behind while its button scrolls away.
+    const close = () => setOpen(false);
+    window.addEventListener('scroll', close, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', close, { capture: true });
+  }, [open, floating]);
 
   useEffect(() => {
     if (!open) return;
@@ -84,9 +112,10 @@ export function Menu({
       </button>
       {open && (
         <div
+          ref={list}
           role="menu"
           aria-label={label}
-          className={`menu-list ${align}`}
+          className={floating ? 'menu-list floating' : `menu-list ${align}`}
           onKeyDown={keys}
           onClick={() => setOpen(false)}
         >

@@ -105,14 +105,14 @@ A page goes through a simple life: a private draft, a published page, new versio
 
 - **PAG-076** · built · A person with *delete own* or *delete any* deletes a page. It goes to the trash with everything below it.
 - **PAG-077** · built · A delete is refused when the person cannot view or delete every page in that branch, so nobody deletes what they cannot see.
-- **PAG-078** · partly · Deleting asks first. Built: the question. New: it names the number of pages when there are children.
-- **PAG-079** · new · The dialog lists pages that link to the page, because those links will break.
+- **PAG-078** · built · Deleting asks first.
+- **PAG-079** · built · The dialog lists pages that link to the page, because those links will break.
 - **PAG-080** · built · A space administrator restores a page from the trash of the space. It returns to its old place with its restrictions.
 - **PAG-081** · built · A page cannot be restored while its parent is in the trash, so a restriction can never be lost that way.
 - **PAG-082** · built · Purging removes a page, everything below it, its versions, search entries and files for good.
 - **PAG-083** · built · After the retention period (default 30 days) a job purges expired items.
 - **PAG-084** · new · The trash can be searched and sorted, shows who deleted what, and offers bulk restore and bulk purge.
-- **PAG-085** · new · A person gets a short **Undo** right after deleting a page, also without *administer*, for as long as the message shows.
+- **PAG-085** · built · A person gets a short **Undo** right after deleting a page, also without *administer*, for as long as the message shows.
 
 ## 3.10 Versions
 
@@ -121,10 +121,10 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-088** · built · The history lists the number, author, date, summary and whether it was restored from another version.
 - **PAG-089** · built · Restoring a version publishes a new version with that content. Nothing is overwritten.
 - **PAG-090** · built · Compare shows added, removed and changed blocks, with changed words marked.
-- **PAG-091** · new · Compare can collapse parts that did not change, with a control to show them.
+- **PAG-091** · built · Compare can collapse parts that did not change, with a control to show them.
 - **PAG-092** · new · Compare also shows changes in tables per cell, in images and in files.
 - **PAG-093** · new · A reader sees **What changed** beside the byline after an update, with the differences since their last visit.
-- **PAG-094** · new · An old version shows a banner: which version it is, who made it, and a link to the current one.
+- **PAG-094** · built · An old version shows a banner: which version it is, who made it, and a link to the current one.
 - **PAG-095** · new · Comments are not part of a version, and stay with the page when a version is restored.
 - **PAG-096** · new · Deleting one version is not offered: versions are immutable, because the audit trail relies on them. If a secret ended up in a version, an administrator removes that one version with a reason, the audit log records it, and the version number stays visible as "removed".
 
@@ -133,33 +133,33 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-097** · built · A page has breadcrumbs, the actions, the title, the byline and the document.
 - **PAG-098** · built · The reading column is at most 47.5rem wide and centred in the space beside the sidebar. It keeps that width however short the text is.
 - **PAG-099** · built · The breadcrumbs start with the space, and leave out the home page.
-- **PAG-100** · new · Long breadcrumbs fold the middle into a menu.
+- **PAG-100** · built · Long breadcrumbs fold the middle into a menu.
 - **PAG-101** · built · The actions on the page are Edit, the star, the lock and More. Rarely used actions live in More, never as a row of buttons.
 - **PAG-102** · new · A **Share** button joins them (COL-042), and a **Watch** toggle joins More.
-- **PAG-103** · partly · The byline shows the owner, the date of the last update and the version. Built: creator, date, version, restricted mark. New: owner, read time, view count, status.
-- **PAG-104** · new · **Read time** is estimated at 230 words per minute, with a minimum of one minute. It is left out for very short pages.
+- **PAG-103** · partly · The byline shows the owner, the date of the last update and the version. Built: creator, date, version, restricted mark. New: owner, read time, view count, status. Still open: the owner, view count and status (waves D and H).
+- **PAG-104** · built · **Read time** is estimated at 230 words per minute, with a minimum of one minute. It is left out for very short pages.
 - **PAG-105** · new · **View count** shows after the byline for those allowed to see analytics, and opens page insights (PLT-008).
-- **PAG-106** · new · **Contributors:** selecting the byline shows who worked on the page, with their share of versions.
-- **PAG-107** · new · **Page width:** each page is normal or full width. Full width is chosen in the editor and stays with the page. A very wide screen is still limited to a comfortable maximum.
-- **PAG-108** · new · **Contents beside the page:** on wide screens, a page with three or more headings shows a floating list of headings that follows the scroll position. It can be turned off per person.
-- **PAG-109** · new · Every heading has a link icon on hover or focus, which copies an address that jumps straight to that heading.
-- **PAG-110** · new · An address that jumps to a heading scrolls to it and marks it briefly.
-- **PAG-111** · new · Long code blocks and wide tables scroll inside their own frame, so the page itself never scrolls sideways.
+- **PAG-106** · built · **Contributors:** selecting the byline shows who worked on the page, with their share of versions.
+- **PAG-107** · built · **Page width:** each page is normal or full width. Full width is chosen in the editor and stays with the page. A very wide screen is still limited to a comfortable maximum.
+- **PAG-108** · built · **Contents beside the page:** on wide screens, a page with three or more headings shows a floating list of headings that follows the scroll position. It can be turned off per person.
+- **PAG-109** · built · Every heading has a link icon on hover or focus, which copies an address that jumps straight to that heading.
+- **PAG-110** · built · An address that jumps to a heading scrolls to it and marks it briefly.
+- **PAG-111** · built · Long code blocks and wide tables scroll inside their own frame, so the page itself never scrolls sideways.
 - **PAG-112** · new · Selecting text shows a small floating button to comment on it (COL-013) and to copy a link to the selection.
-- **PAG-113** · new · Selecting an image opens it large on top of the page, with arrows to the next image.
-- **PAG-114** · new · A page can be shown in a presentation mode: full screen, one section per heading, moved with the arrow keys.
-- **PAG-115** · new · **Page information** in More shows the owner, created, last changed, length, read time, labels, incoming links, outgoing links, watchers and the page's address.
-- **PAG-116** · new · A **Details** panel opens beside the page, from a small button at the far edge, with labels, attachments, status and information on one screen. It replaces the need for many menu items.
-- **PAG-117** · new · **Incoming links** lists all pages the person may see that link to this page.
-- **PAG-118** · new · The page lists its child pages at the bottom when the document does not do so already, and this can be turned off per page.
+- **PAG-113** · built · Selecting an image opens it large on top of the page, with arrows to the next image.
+- **PAG-114** · built · A page can be shown in a presentation mode: full screen, one section per heading, moved with the arrow keys.
+- **PAG-115** · partly · **Page information** in More shows the owner, created, last changed, length, read time, labels, incoming links, outgoing links, watchers and the page's address. Still open: labels and watchers (waves C and D).
+- **PAG-116** · partly · A **Details** panel opens beside the page, from a small button at the far edge, with labels, attachments, status and information on one screen. It replaces the need for many menu items. Still open: labels and status (wave D).
+- **PAG-117** · built · **Incoming links** lists all pages the person may see that link to this page.
+- **PAG-118** · built · The page lists its child pages at the bottom when the document does not do so already, and this can be turned off per page.
 - **PAG-119** · new · At the bottom of a page: labels, then reactions, then comments (chapter 7).
 - **PAG-120** · phase 4 · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
-- **PAG-121** · new · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
+- **PAG-121** · built · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
 - **PAG-122** · built · Stored documents are only ever rendered by the editor, so no HTML from a document reaches the browser.
 
 ## 3.12 The page header
 
-- **PAG-123** · new · A page can have an emoji beside its title. It shows in the tree, breadcrumbs, cards, search results and the browser tab.
-- **PAG-124** · new · A page can have a **header image** above the title. It is chosen by upload, repositioned by dragging up or down, and can be changed or removed.
-- **PAG-125** · new · The header image is an attachment of the page, and follows its rules. External image libraries are not used, because they would tell a third party who is reading.
-- **PAG-126** · new · The title can be left-aligned or centred, and a space administrator can set a default.
+- **PAG-123** · built · A page can have an emoji beside its title. It shows in the tree, breadcrumbs, cards, search results and the browser tab.
+- **PAG-124** · partly · A page can have a **header image** above the title. It is chosen by upload, repositioned by dragging up or down, and can be changed or removed. Still open: a number places the image, dragging it does not yet.
+- **PAG-125** · built · The header image is an attachment of the page, and follows its rules. External image libraries are not used, because they would tell a third party who is reading.
+- **PAG-126** · partly · The title can be left-aligned or centred, and a space administrator can set a default. Still open: a default per space (wave D).

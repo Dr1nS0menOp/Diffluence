@@ -60,9 +60,23 @@ export interface User {
   type: string;
 }
 
+export interface Preferences {
+  theme: string;
+  shortcuts: boolean;
+  contents: boolean;
+  hover_cards: boolean;
+  sidebar_width: number;
+  tree_view: string;
+}
+
 export interface Me {
   user: User;
   global_permissions: string[];
+  preferences: Preferences;
+}
+
+export interface SystemInfo {
+  version: string;
 }
 
 export interface Space {
@@ -73,7 +87,26 @@ export interface Space {
   icon: string;
   status: string;
   home_page_id: string | null;
+  favourite?: boolean;
   can?: Record<string, boolean>;
+}
+
+export interface DirectorySpace extends Space {
+  page_count: number;
+  last_changed: string;
+  administrators: string[];
+}
+
+export interface Shortcut {
+  id?: string;
+  label: string;
+  target: string;
+}
+
+export interface SpaceOverview {
+  page_count: number;
+  administrators: string[];
+  recent: ListedPage[];
 }
 
 export interface TreeNode {
@@ -82,9 +115,24 @@ export interface TreeNode {
   position: number;
   title: string;
   status: string;
+  emoji: string;
+  restricted: boolean;
+  has_draft: boolean;
+  updated_at: string;
+  updated_by_name: string;
+  visited_at: string | null;
 }
 
-export interface Page {
+export interface PageLook {
+  emoji: string;
+  full_width: boolean;
+  title_align: string;
+  hide_children: boolean;
+  header_attachment_id: string | null;
+  header_position: number;
+}
+
+export interface Page extends PageLook {
   id: string;
   space_id: string;
   parent_id: string | null;
@@ -95,15 +143,19 @@ export interface Page {
   updated_at: string;
 }
 
-export interface PageDetail extends Page {
+/** A page without its text: enough for a menu or a dialog. */
+export interface PageSummary extends Page {
+  favourite: boolean;
+  can: Record<string, boolean>;
+}
+
+export interface PageDetail extends PageSummary {
   document: Json;
-  breadcrumbs: { id: string; title: string }[];
+  breadcrumbs: { id: string; title: string; emoji: string }[];
   created_by_name: string;
   updated_by_name: string;
   has_draft: boolean;
-  favourite: boolean;
   restricted: boolean;
-  can: Record<string, boolean>;
 }
 
 export interface Draft {
@@ -190,8 +242,43 @@ export interface SearchResult {
 export interface ListedPage {
   id: string;
   title: string;
+  emoji: string;
   space_key: string;
   space_name: string;
+  at: string;
+  unpublished: boolean;
+}
+
+export interface PageRef {
+  id: string;
+  title: string;
+  emoji: string;
+  space_key: string;
+  space_name: string;
+}
+
+export interface PageFacts {
+  created_at: string;
+  created_by_name: string;
+  updated_at: string;
+  updated_by_name: string;
+  contributors: { id: string; name: string; versions: number }[];
+  incoming: PageRef[];
+  outgoing: PageRef[];
+  children: PageRef[];
+}
+
+export interface DeleteImpact {
+  pages: number;
+  incoming: PageRef[];
+  incoming_total: number;
+}
+
+export interface QuickResults {
+  pages: SearchResult[];
+  spaces: Space[];
+  files: { id: string; filename: string; page_id: string; page_title: string; space_name: string }[];
+  people: { id: string; name: string }[];
 }
 
 export interface Job {

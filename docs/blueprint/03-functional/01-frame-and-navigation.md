@@ -13,24 +13,24 @@ How to read this chapter: see `../03-functional-requirements.md`. Every line has
 - **NAV-007** · built · Every screen handles five states: loading, failed, empty, no permission and busy. An empty list says what will appear there.
 - **NAV-008** · built · Addresses are stable. A page keeps its address when it is renamed or moved, so links in mail and chat keep working.
 - **NAV-009** · built · The back and forward buttons work, and every screen has its own address that can be shared or reloaded.
-- **NAV-010** · new · After a reload, a person returns to the same scroll position in a long page.
-- **NAV-011** · new · The browser tab shows the page title and the instance name, so many open tabs stay readable.
+- **NAV-010** · built · After a reload, a person returns to the same scroll position in a long page.
+- **NAV-011** · built · The browser tab shows the page title and the instance name, so many open tabs stay readable.
 - **NAV-012** · new · A failed action never loses typed text. The form stays open with the message beside it.
 
 ## 1.2 The top bar
 
 - **NAV-013** · built · Far side from the reading direction: logo and instance name, which go to the start screen.
 - **NAV-014** · built · **Home** goes to the start screen.
-- **NAV-015** · partly · **Spaces** opens a menu of spaces. Built: the list of spaces. New: favourite spaces first, then recently visited spaces, then a link to the spaces directory.
-- **NAV-016** · new · **Recent** opens a menu with the last pages the person visited, with tabs for pages they visited, pages they worked on and their drafts. Each row shows the title, the space and when.
-- **NAV-017** · new · **Favourites** opens a menu with favourite pages. It stays empty with one sentence that explains how to add one.
+- **NAV-015** · built · **Spaces** opens a menu of spaces.
+- **NAV-016** · partly · **Recent** opens a menu with the last pages the person visited, with tabs for pages they visited, pages they worked on and their drafts. Each row shows the title, the space and when. Still open: the tabs live on the Recent screen, and the menu lists visited pages.
+- **NAV-017** · built · **Favourites** opens a menu with favourite pages. It stays empty with one sentence that explains how to add one.
 - **NAV-018** · built · **Create** is the one primary button of the top bar. Inside a space it adds a page below the page being read, if the person may. Outside a space it starts a new space.
-- **NAV-019** · new · Create offers a small menu when there is more than one thing to make: page, page from a template, blog post, space. The most used choice stays one click away.
-- **NAV-020** · partly · The search box sits on the far side. Built: type and press Enter for the results page. New: quick results while typing (ORG-001).
+- **NAV-019** · partly · Create offers a small menu when there is more than one thing to make: page, page from a template, blog post, space. The most used choice stays one click away. Still open: page from a template and blog post (wave D).
+- **NAV-020** · built · The search box sits on the far side.
 - **NAV-021** · new · A bell shows how many unread notifications there are, and opens the notification panel (chapter 7).
-- **NAV-022** · new · A help menu offers the keyboard shortcuts, the documentation and the version number.
+- **NAV-022** · built · A help menu offers the keyboard shortcuts, the documentation and the version number.
 - **NAV-023** · built · The account menu shows the person, a link to their account, Administration when they are an administrator, and Log out.
-- **NAV-024** · new · The account menu also offers their personal space, their profile and their preferences.
+- **NAV-024** · partly · The account menu also offers their personal space, their profile and their preferences. Still open: the personal space (wave F).
 - **NAV-025** · new · An administrator can set the instance name and logo, and the logo replaces ours in the top bar (ADM-013).
 
 ## 1.3 The start screen
@@ -54,24 +54,24 @@ The first screen after login. Its job is to answer "where was I, and what change
 ## 1.4 Personal lists
 
 - **NAV-039** · built · Favourites: a person marks a page with the star at the top of the page. A second press removes it.
-- **NAV-040** · new · A person can also mark a space as a favourite, on the space card and in the sidebar.
-- **NAV-041** · new · A full **Favourites** screen lists pages and spaces, can be filtered by title, and lets a person remove several at once.
+- **NAV-040** · built · A person can also mark a space as a favourite, on the space card and in the sidebar.
+- **NAV-041** · built · A full **Favourites** screen lists pages and spaces, can be filtered by title, and lets a person remove several at once.
 - **NAV-042** · built · Recent pages: the last pages a person viewed are remembered per person. This is a convenience list, not statistics.
-- **NAV-043** · new · A full **Recent** screen with the tabs Visited, Worked on and Drafts, and a filter on the title. The filter looks at titles only, and says so.
-- **NAV-044** · new · **Worked on** lists pages the person created, published or commented on, newest first.
-- **NAV-045** · partly · **Drafts** lists the person's unpublished pages and pages with unsaved changes. Built: a note on the page itself. New: the list, with the time of the last change and a delete action per draft.
+- **NAV-043** · built · A full **Recent** screen with the tabs Visited, Worked on and Drafts, and a filter on the title. The filter looks at titles only, and says so.
+- **NAV-044** · partly · **Worked on** lists pages the person created, published or commented on, newest first. Still open: comments count from wave C.
+- **NAV-045** · built · **Drafts** lists the person's unpublished pages and pages with unsaved changes.
 - **NAV-046** · phase 4 · **Tasks** lists tasks assigned to the person from every page they may see, with a filter on open or done, and on due date (chapter 7).
-- **NAV-047** · new · A person can reorder their favourites by dragging.
+- **NAV-047** · built · A person can reorder their favourites by dragging.
 
 ## 1.5 The spaces directory
 
-- **NAV-048** · partly · A screen lists all spaces the person may see. Built: the cards on the start screen. New: a screen of its own with the features below.
-- **NAV-049** · new · It can be filtered by title and by key, and by the kinds **All**, **Favourites**, **Team**, **Personal** and **Archived**.
-- **NAV-050** · new · It can be sorted by name, by last change and by number of pages.
-- **NAV-051** · new · Each row shows the badge, name, key, description, its administrators and the time of the last change.
+- **NAV-048** · built · A screen lists all spaces the person may see.
+- **NAV-049** · partly · It can be filtered by title and by key, and by the kinds **All**, **Favourites**, **Team**, **Personal** and **Archived**. Still open: the kinds Team and Personal (wave F).
+- **NAV-050** · built · It can be sorted by name, by last change and by number of pages.
+- **NAV-051** · built · Each row shows the badge, name, key, description, its administrators and the time of the last change.
 - **NAV-052** · new · Space categories: an administrator of a space adds one or more categories, and the directory can filter on them.
-- **NAV-053** · new · A person with *create spaces* sees a button to create a space here.
-- **NAV-054** · new · Archived spaces only appear under the Archived filter.
+- **NAV-053** · built · A person with *create spaces* sees a button to create a space here.
+- **NAV-054** · built · Archived spaces only appear under the Archived filter.
 
 ## 1.6 The people directory
 
@@ -86,18 +86,18 @@ The first screen after login. Its job is to answer "where was I, and what change
 
 Shortcuts are single keys, only when the focus is not in a text field. A person can turn them off in their preferences, because they can conflict with assistive technology (WCAG 2.1.4).
 
-- **NAV-061** · new · `/` moves to the search box. `?` shows all shortcuts.
-- **NAV-062** · new · `g` then `h` goes home, `g` then `s` opens the spaces directory, `g` then `n` opens notifications.
-- **NAV-063** · new · `c` creates a page, `e` edits the current page, `s` toggles the favourite, `w` toggles watching.
-- **NAV-064** · new · `[` shows or hides the sidebar.
+- **NAV-061** · built · `/` moves to the search box. `?` shows all shortcuts.
+- **NAV-062** · partly · `g` then `h` goes home, `g` then `s` opens the spaces directory, `g` then `n` opens notifications. Still open: `g` then `n`, with notifications (wave C).
+- **NAV-063** · partly · `c` creates a page, `e` edits the current page, `s` toggles the favourite, `w` toggles watching. Still open: `w`, with watching (wave C).
+- **NAV-064** · built · `[` shows or hides the sidebar.
 - **NAV-065** · new · `m` jumps to the comment box, `n` and `p` go to the next and previous unread comment.
-- **NAV-066** · new · In the page tree, the arrow keys move between rows, right opens a branch, left closes it, and Enter opens the page.
-- **NAV-067** · new · The shortcuts overview lists all shortcuts by group, is searchable, and shows the keys for the person's system.
+- **NAV-066** · built · In the page tree, the arrow keys move between rows, right opens a branch, left closes it, and Enter opens the page.
+- **NAV-067** · built · The shortcuts overview lists all shortcuts by group, is searchable, and shows the keys for the person's system.
 
 ## 1.8 Help, about and first use
 
-- **NAV-068** · new · The help menu links to documentation that the administrator can point to their own address.
-- **NAV-069** · new · An About dialog shows the version, the licence and a link to the third-party licences.
+- **NAV-068** · partly · The help menu links to documentation that the administrator can point to their own address. Still open: the address an administrator chooses (wave F).
+- **NAV-069** · built · An About dialog shows the version, the licence and a link to the third-party licences.
 - **NAV-070** · new · A new user sees a short tour of three steps at most, which can be skipped and never returns.
 - **NAV-071** · new · A new space starts with a useful home page, with sections to fill in, so it is never a blank screen.
 
@@ -105,12 +105,12 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 
 - **NAV-072** · built · Below 50rem the top bar wraps, sticky bars let go, and the sidebar starts hidden.
 - **NAV-073** · built · Dark mode follows the operating system.
-- **NAV-074** · new · A person can choose light, dark or system in their preferences. The choice follows them to other devices.
+- **NAV-074** · built · A person can choose light, dark or system in their preferences. The choice follows them to other devices.
 - **NAV-075** · built · All layout works right-to-left. No screen has a separate right-to-left style.
 - **NAV-076** · built · All words come from translation files. English ships first.
 - **NAV-077** · new · A person picks their language, time zone, date format and first day of the week. Dates and times everywhere follow these.
-- **NAV-078** · new · Long dates show as relative time ("3 hours ago") with the exact time on hover or focus.
+- **NAV-078** · built · Long dates show as relative time ("3 hours ago") with the exact time on hover or focus.
 - **NAV-079** · built · WCAG 2.2 AA is the goal, checked by automated tests on screens in the browser tests.
 - **NAV-080** · new · Screen reader users hear new notifications and save states through live regions, without being interrupted.
-- **NAV-081** · new · Motion stops when the system asks for reduced motion. The tree and panels still work.
-- **NAV-082** · new · A sensible browser print of any page: no bars, sidebars or buttons, and every collapsible section open.
+- **NAV-081** · built · Motion stops when the system asks for reduced motion. The tree and panels still work.
+- **NAV-082** · built · A sensible browser print of any page: no bars, sidebars or buttons, and every collapsible section open.

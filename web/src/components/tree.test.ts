@@ -8,12 +8,18 @@ import {
   openBranch,
   readBranchMemory,
   revealPage,
-} from './tree';
+} from './tree-model';
 
 const node = (id: string, parent_id: string | null, position: number) => ({
   id,
   parent_id,
   position,
+  emoji: '',
+  restricted: false,
+  has_draft: false,
+  updated_at: '2026-01-01T00:00:00Z',
+  updated_by_name: '',
+  visited_at: null,
   title: id,
   status: 'published',
 });

@@ -161,6 +161,38 @@ func (s *Service) Restore(ctx context.Context, c identity.Caller, id uuid.UUID) 
 	return s.run(ctx, c, id, func(h Handler, tx pgx.Tx, it Item) error { return h.Restore(ctx, tx, c, it) })
 }
 
+// undoWindow is longer than the message that offers Undo, to allow for a slow
+// connection. Anything older belongs to the trash and its administrators.
+const undoWindow = 60 * time.Second
+
+// UndoDelete lets the person who just deleted a page take it back, also without
+// administer (PAG-085). Nobody else can, and it does not work for long.
+func (s *Service) UndoDelete(ctx context.Context, c identity.Caller, pageID uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		it, err := scan(tx.QueryRow(ctx, "SELECT "+columns+` FROM trash_items
+			WHERE object_id = $1 AND object_type = 'page' AND deleted_by = $2
+			  AND deleted_at > now() - make_interval(secs => $3) FOR UPDATE`, pageID, c.UserID, undoWindow.Seconds()))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound()
+		}
+		if err != nil {
+			return err
+		}
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, it.SpaceID, permissions.SpaceView); err != nil {
+			return err
+		}
+		h, ok := s.handlers[it.ObjectType]
+		if !ok {
+			return fmt.Errorf("trash: no handler for %q", it.ObjectType)
+		}
+		if err := h.Restore(ctx, tx, c, it); err != nil {
+			return err
+		}
+		_, err = tx.Exec(ctx, "DELETE FROM trash_items WHERE id = $1", it.ID)
+		return err
+	})
+}
+
 // Purge removes an item for good, before its retention period ends.
 func (s *Service) Purge(ctx context.Context, c identity.Caller, id uuid.UUID) error {
 	return s.run(ctx, c, id, func(h Handler, tx pgx.Tx, it Item) error { return h.Purge(ctx, tx, c, it) })

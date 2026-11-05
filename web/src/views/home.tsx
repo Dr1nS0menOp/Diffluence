@@ -5,7 +5,8 @@ import { useQuery } from '@tanstack/react-query';
 import { api, type ListedPage, type Me, type Space } from '../api';
 import { Link } from '../router';
 import { NewSpaceDialog } from '../components/create';
-import { IconPage, IconPlus } from '../components/icons';
+import { IconPlus } from '../components/icons';
+import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading, SpaceBadge } from '../components/ui';
 
 function PageList({ title, path }: { title: string; path: string }) {
@@ -19,7 +20,7 @@ function PageList({ title, path }: { title: string; path: string }) {
       <ul className="page-list">
         {q.data?.pages.map((p) => (
           <li key={p.id}>
-            <IconPage size={16} />
+            <PageMark page={p} />
             <Link href={`/pages/${p.id}`}>{p.title}</Link>
             <span className="muted">{p.space_name}</span>
           </li>

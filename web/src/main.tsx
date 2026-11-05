@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ApiError } from './api';
 import { App } from './app';
+import { applyStoredTheme } from './preferences';
 import './i18n';
 import './design/tokens.css';
 import './design/base.css';
@@ -21,6 +22,8 @@ const client = new QueryClient({
     },
   },
 });
+
+applyStoredTheme();
 
 const root = document.getElementById('root');
 if (root) {

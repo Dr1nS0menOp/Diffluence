@@ -59,6 +59,8 @@ type Query struct {
 	Until    time.Time
 	Limit    int
 	Offset   int
+	// ActiveSpacesOnly leaves out archived spaces, as quick search does (SPC-069).
+	ActiveSpacesOnly bool
 }
 
 // Result is one found page.
@@ -127,6 +129,7 @@ const searchSQL = `SELECT p.id, p.space_id, s.key, s.name, p.title,
 	  AND ($4::uuid IS NULL OR p.updated_by = $4)
 	  AND ($5::timestamptz IS NULL OR p.updated_at >= $5)
 	  AND ($6::timestamptz IS NULL OR p.updated_at < $6)
+	  AND (NOT $9::boolean OR s.status = 'active')
 	ORDER BY ts_rank(d.tsv, q.query) DESC, p.updated_at DESC, p.id
 	LIMIT $7 OFFSET $8`
 
@@ -140,7 +143,7 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) ([]Resu
 		q.Limit = 25
 	}
 	rows, err := s.pool.Query(ctx, searchSQL, userID, text, optID(q.SpaceID), optID(q.AuthorID),
-		optTime(q.Since), optTime(q.Until), q.Limit, max(q.Offset, 0))
+		optTime(q.Since), optTime(q.Until), q.Limit, max(q.Offset, 0), q.ActiveSpacesOnly)
 	if err != nil {
 		return nil, err
 	}

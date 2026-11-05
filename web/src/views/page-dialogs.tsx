@@ -5,19 +5,21 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api,
   type Attachment,
+  type DeleteImpact,
   type DirectoryEntry,
   type NamedSubject,
   type Page,
-  type PageDetail,
+  type PageSummary,
   type Restrictions,
   type TreeNode,
 } from '../api';
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
+import { useToast } from '../components/toast';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
-export function AttachmentsDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const key = ['attachments', page.id];
@@ -102,7 +104,7 @@ function SubjectList({
   );
 }
 
-function WhyPanel({ page }: { page: PageDetail }) {
+function WhyPanel({ page }: { page: PageSummary }) {
   const { t } = useTranslation();
   const [who, setWho] = useState<DirectoryEntry | null>(null);
   const [action, setAction] = useState('page.view');
@@ -152,7 +154,7 @@ function WhyPanel({ page }: { page: PageDetail }) {
   );
 }
 
-export function RestrictionsDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const key = ['restrictions', page.id];
@@ -209,7 +211,7 @@ export function RestrictionsDialog({ page, onClose }: { page: PageDetail; onClos
   );
 }
 
-export function MoveDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+export function MoveDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const tree = useQuery({
@@ -256,7 +258,7 @@ export function MoveDialog({ page, onClose }: { page: PageDetail; onClose: () =>
   );
 }
 
-export function RenameDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+export function RenameDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [title, setTitle] = useState(page.title);
@@ -290,7 +292,72 @@ export function RenameDialog({ page, onClose }: { page: PageDetail; onClose: () 
   );
 }
 
-export function CopyDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+/** Says what a delete touches first, and offers Undo after it (spec 009, B11). */
+export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const toast = useToast();
+  const impact = useQuery({
+    queryKey: ['impact', page.id],
+    queryFn: () => api.get<DeleteImpact>(`/pages/${page.id}/impact`),
+    staleTime: 0,
+  });
+  const refresh = () => client.invalidateQueries({ queryKey: ['tree', page.space_id] });
+  const undo = async () => {
+    try {
+      await api.post(`/pages/${page.id}/undo-delete`);
+      await refresh();
+      navigate(`/pages/${page.id}`);
+    } catch (e) {
+      toast({ message: e instanceof Error ? e.message : t('app.error') });
+    }
+  };
+  const remove = useMutation({
+    mutationFn: () => api.del(`/pages/${page.id}`),
+    onSuccess: async () => {
+      await refresh();
+      client.removeQueries({ queryKey: ['page', page.id] });
+      onClose();
+      navigate(page.parent_id ? `/pages/${page.parent_id}` : '/');
+      toast({
+        message: t('page.deleted', { title: page.title }),
+        action: { label: t('page.undo'), run: () => void undo() },
+      });
+    },
+  });
+  const pages = impact.data?.pages ?? 1;
+  const links = impact.data?.incoming ?? [];
+  const moreLinks = (impact.data?.incoming_total ?? 0) - links.length;
+  return (
+    <Dialog title={t('page.delete')} onClose={onClose}>
+      <ErrorNote error={impact.error ?? remove.error} />
+      <p>{pages > 1 ? t('page.confirmDeleteMany', { count: pages }) : t('page.confirmDelete')}</p>
+      {links.length > 0 && (
+        <>
+          <p>{t('page.linksWillBreak')}</p>
+          <ul className="plain-list">
+            {links.map((l) => (
+              <li key={l.id}>
+                <Link href={`/pages/${l.id}`}>{l.title}</Link>
+              </li>
+            ))}
+          </ul>
+          {moreLinks > 0 && <p className="muted">{t('page.moreLinks', { count: moreLinks })}</p>}
+        </>
+      )}
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button type="button" className="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
+          {t('page.delete')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+export function CopyDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [children, setChildren] = useState(false);

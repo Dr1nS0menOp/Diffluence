@@ -148,3 +148,41 @@ export function Logo({ size = 28 }: { size?: number }) {
     </svg>
   );
 }
+
+export const IconHome = line('M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6');
+export const IconHelp = line(
+  'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.8.4-1.2 1-1.2 1.8M12 17h.01',
+);
+export const IconInfo = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01');
+export const IconCollapse = line('M7 10l5-5 5 5M7 14l5 5 5-5');
+export const IconLocate = line('M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12zM12 2v4M12 18v4M2 12h4M18 12h4');
+export const IconExternal = line('M14 5h5v5M19 5l-8 8M18 14v5H5V6h5');
+export const IconPrint = line('M7 9V4h10v5M7 17H4v-7h16v7h-3M7 14h10v6H7z');
+export const IconPresent = line('M3 5h18v11H3zM12 16v4M8 20h8');
+export const IconReader = line(
+  'M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z',
+);
+export const IconArrowUp = line('M12 19V5M6 11l6-6 6 6');
+export const IconArrowDown = line('M12 5v14M6 13l6 6 6-6');
+
+/** The same link icon, for the heading marks that ProseMirror builds outside React. */
+export function linkIconElement(): SVGSVGElement {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '16');
+  svg.setAttribute('height', '16');
+  svg.setAttribute('fill', 'none');
+  svg.setAttribute('stroke', 'currentColor');
+  svg.setAttribute('stroke-width', '1.8');
+  svg.setAttribute('stroke-linecap', 'round');
+  svg.setAttribute('stroke-linejoin', 'round');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute(
+    'd',
+    'M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1',
+  );
+  svg.append(path);
+  return svg;
+}

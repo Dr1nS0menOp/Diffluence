@@ -77,7 +77,13 @@ describe('style sheets', () => {
   });
 
   it('finds tokens nothing uses', () => {
-    const unused = checkUnusedTokens(new Map([['--space-1', '4px'], ['--space-2', '8px']]), ['.a { gap: var(--space-1); }']);
+    const unused = checkUnusedTokens(
+      new Map([
+        ['--space-1', '4px'],
+        ['--space-2', '8px'],
+      ]),
+      ['.a { gap: var(--space-1); }'],
+    );
     expect(messages(unused)).toBe('unused token: --space-2');
   });
 
@@ -94,8 +100,16 @@ describe('contrast', () => {
     expect(contrastRatio('#777777', '#ffffff')).toBeCloseTo(4.48, 1);
   });
 
-  const css = `:root { --color-a: #777777; --color-b: #ffffff; }
-    @media (prefers-color-scheme: dark) { :root { --color-a: #333333; --color-b: #000000; } }`;
+  const css = `:root { --color-a: light-dark(#777777, #333333); --color-b: light-dark(#ffffff, #000000); }`;
+
+  it('reads a colour with commas inside light-dark', () => {
+    const { light, dark } = parseTokens(
+      ':root { --color-a: light-dark(rgb(1, 2, 3), rgb(4, 5, 6)); --size: 1px; }',
+    );
+    expect(light.get('--color-a')).toBe('rgb(1, 2, 3)');
+    expect(dark.get('--color-a')).toBe('rgb(4, 5, 6)');
+    expect(dark.get('--size')).toBe('1px');
+  });
 
   it('checks the light and the dark theme separately', () => {
     const problems = messages(checkContrast(parseTokens(css), [['a', 'b', 4.5]]));
@@ -113,7 +127,10 @@ describe('contrast', () => {
 });
 
 describe('pictures of screens', () => {
-  const views = ['export function HomeView({ me }) {}\nfunction Helper() {}', 'export function TrashView() {}'];
+  const views = [
+    'export function HomeView({ me }) {}\nfunction Helper() {}',
+    'export function TrashView() {}',
+  ];
 
   it('refuses a screen without a picture', () => {
     const problems = messages(checkScreenPictures(views, "test('HomeView: the start screen', ...)"));

@@ -6,6 +6,7 @@ import { api, ApiError, type Draft, type Json, type PageDetail } from '../api';
 import { Link, navigate } from '../router';
 import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack } from '../components/icons';
+import { PageLookDialog } from '../components/page-look';
 import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 
 const AUTOSAVE_MS = 1500;
@@ -35,6 +36,7 @@ function Form({ data }: { data: Loaded }) {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [error, setError] = useState<unknown>(null);
   const [conflict, setConflict] = useState(false);
+  const [lookOpen, setLookOpen] = useState(false);
   const doc = useRef(data.document);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -122,6 +124,9 @@ function Form({ data }: { data: Loaded }) {
           aria-label={t('editor.summary')}
           placeholder={t('editor.summary')}
         />
+        <button type="button" className="quiet" onClick={() => setLookOpen(true)}>
+          {t('look.title')}
+        </button>
         <ConfirmButton
           label={t('editor.discard')}
           message={t('editor.confirmDiscard')}
@@ -160,6 +165,7 @@ function Form({ data }: { data: Loaded }) {
           />
         }
       />
+      {lookOpen && <PageLookDialog page={page} onClose={() => setLookOpen(false)} />}
       {conflict && (
         <Dialog title={t('editor.conflictTitle')} onClose={() => setConflict(false)}>
           <p>{t('editor.conflictText')}</p>

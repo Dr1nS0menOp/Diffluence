@@ -1,73 +1,62 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, type Me, type Space } from './api';
+import { api, ApiError, type Me } from './api';
 import { useImportedFont } from './appearance';
 import { Link, match, navigate, useLocation } from './router';
+import { applyTheme } from './preferences';
 import { NewPageDialog, NewSpaceDialog } from './components/create';
-import { SpaceShell, useCreateTarget } from './components/frame';
-import { IconChevronDown, IconPlus, IconSearch, Logo } from './components/icons';
-import { Menu, MenuItem, MenuLink, MenuSeparator } from './components/menu';
-import { Avatar, ErrorNote, Loading, SpaceBadge } from './components/ui';
+import { SpaceShell, useCreateTarget, useCurrentSpace } from './components/frame';
+import { IconChevronDown, IconPlus, Logo } from './components/icons';
+import { Menu, MenuItem } from './components/menu';
+import { QuickSearch } from './components/quick-search';
+import { ShortcutsProvider, useShortcut } from './components/shortcuts';
+import { ToastProvider } from './components/toast';
+import { AccountMenu, FavouritesMenu, HelpMenu, RecentMenu, SpacesMenu } from './components/topbar';
+import { ErrorNote, Loading } from './components/ui';
 import { AdminView } from './views/admin';
+import { DirectoryView } from './views/directory';
 import { HomeView } from './views/home';
+import { FavouritesView, RecentView } from './views/lists';
 import { LoginView } from './views/login';
 import { EditView } from './views/edit';
 import { CompareView, HistoryView } from './views/history';
+import { SpaceOverviewView } from './views/overview';
 import { PageView } from './views/page';
+import { PreferencesView } from './views/preferences';
 import { ProfileView } from './views/profile';
 import { SearchView } from './views/search';
 import { SpaceHome, SpaceSettingsView, TrashView } from './views/space';
 
-const SPACES_IN_MENU = 12;
+type Creating = 'page' | 'space' | null;
 
-function SpacesMenu() {
+function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => void }) {
   const { t } = useTranslation();
-  const spaces = useQuery({ queryKey: ['spaces'], queryFn: () => api.get<{ spaces: Space[] }>('/spaces') });
+  const target = useCreateTarget();
+  const canCreateSpace = me.global_permissions.includes('create_space');
+  const main = target ? 'page' : 'space';
+  useShortcut('create', () => {
+    if (target || canCreateSpace) onCreate(main);
+  });
+  if (!target && !canCreateSpace) return null;
   return (
-    <Menu
-      label={t('nav.spaces')}
-      align="start"
-      className="nav-link"
-      trigger={
-        <>
-          {t('nav.spaces')} <IconChevronDown size={16} />
-        </>
-      }
-    >
-      {spaces.data?.spaces.slice(0, SPACES_IN_MENU).map((s) => (
-        <MenuLink key={s.id} href={`/spaces/${s.key}`}>
-          <SpaceBadge space={s} size="small" /> {s.name}
-        </MenuLink>
-      ))}
-      {(spaces.data?.spaces.length ?? 0) > 0 && <MenuSeparator />}
-      <MenuLink href="/">{t('nav.allSpaces')}</MenuLink>
-    </Menu>
-  );
-}
-
-function AccountMenu({ me, onLogout }: { me: Me; onLogout: () => void }) {
-  const { t } = useTranslation();
-  const isAdmin = me.global_permissions.includes('administrator');
-  return (
-    <div className="top-account">
-      <Menu
-        label={t('nav.accountMenu')}
-        className="avatar-button"
-        trigger={<Avatar name={me.user.display_name} />}
-      >
-        <div role="none" className="menu-heading">
-          <strong>{me.user.display_name}</strong>
-          <span className="muted">{me.user.email}</span>
-        </div>
-        <MenuSeparator />
-        <MenuLink href="/me">{t('nav.profile')}</MenuLink>
-        {isAdmin && <MenuLink href="/admin/users">{t('nav.admin')}</MenuLink>}
-        <MenuSeparator />
-        <MenuItem onClick={onLogout}>{t('nav.logout')}</MenuItem>
-      </Menu>
-    </div>
+    <span className="top-create">
+      <button type="button" className="primary" onClick={() => onCreate(main)}>
+        <IconPlus size={16} /> {t('nav.create')}
+      </button>
+      {target && canCreateSpace && (
+        <Menu
+          label={t('nav.createMenu')}
+          align="start"
+          className="primary top-create-more"
+          trigger={<IconChevronDown size={16} />}
+        >
+          <MenuItem onClick={() => onCreate('page')}>{t('space.newPage')}</MenuItem>
+          <MenuItem onClick={() => onCreate('space')}>{t('home.newSpace')}</MenuItem>
+        </Menu>
+      )}
+    </span>
   );
 }
 
@@ -75,18 +64,13 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const { pathname } = useLocation();
-  const [q, setQ] = useState('');
   const target = useCreateTarget();
-  const [creating, setCreating] = useState(false);
-  const canCreate = target !== null || me.global_permissions.includes('create_space');
+  const { space } = useCurrentSpace();
+  const [creating, setCreating] = useState<Creating>(null);
   const logout = async () => {
     await api.post('/auth/logout');
     client.clear();
     navigate('/login');
-  };
-  const search = (e: FormEvent) => {
-    e.preventDefault();
-    navigate('/search?q=' + encodeURIComponent(q));
   };
   return (
     <>
@@ -102,29 +86,19 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
             {t('nav.home')}
           </Link>
           <SpacesMenu />
-          {canCreate && (
-            <button type="button" className="primary top-create" onClick={() => setCreating(true)}>
-              <IconPlus size={16} /> {t('nav.create')}
-            </button>
-          )}
+          <RecentMenu />
+          <FavouritesMenu />
+          <CreateButton me={me} onCreate={setCreating} />
         </nav>
-        <form role="search" onSubmit={search} className="top-search">
-          <IconSearch size={18} />
-          <input
-            type="search"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder={t('nav.searchPlaceholder')}
-            aria-label={t('nav.search')}
-          />
-        </form>
+        <QuickSearch space={space} />
+        <HelpMenu />
         <AccountMenu me={me} onLogout={() => void logout()} />
       </header>
       {children}
-      {creating && target && (
-        <NewPageDialog space={target.space} parent={target.parent} onClose={() => setCreating(false)} />
+      {creating === 'page' && target && (
+        <NewPageDialog space={target.space} parent={target.parent} onClose={() => setCreating(null)} />
       )}
-      {creating && !target && <NewSpaceDialog onClose={() => setCreating(false)} />}
+      {creating === 'space' && <NewSpaceDialog onClose={() => setCreating(null)} />}
     </>
   );
 }
@@ -162,8 +136,37 @@ function Routes({ me }: { me: Me }) {
       </Plain>
     );
   }
+  if ((m = match('/me/preferences', pathname))) {
+    return (
+      <Plain width="reading">
+        <PreferencesView />
+      </Plain>
+    );
+  }
+  if ((m = match('/recent', pathname))) {
+    return (
+      <Plain width="reading">
+        <RecentView />
+      </Plain>
+    );
+  }
+  if ((m = match('/favourites', pathname))) {
+    return (
+      <Plain width="reading">
+        <FavouritesView />
+      </Plain>
+    );
+  }
+  if ((m = match('/spaces', pathname))) {
+    return (
+      <Plain>
+        <DirectoryView me={me} />
+      </Plain>
+    );
+  }
   if ((m = match('/admin/:tab', pathname))) return <AdminView tab={m.tab ?? 'users'} me={me} />;
   if ((m = match('/spaces/:key', pathname))) return <SpaceHome spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/overview', pathname))) return <SpaceOverviewView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings', pathname))) return <SpaceSettingsView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/trash', pathname))) return <TrashView spaceKey={m.key ?? ''} />;
   if ((m = match('/pages/:id/edit', pathname))) {
@@ -205,6 +208,10 @@ export function App() {
   const { pathname } = useLocation();
   const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
   useImportedFont();
+  const theme = me.data?.preferences.theme;
+  useEffect(() => {
+    if (theme) applyTheme(theme);
+  }, [theme]);
 
   if (pathname === '/login') return <LoginView />;
   if (me.isPending) return <Loading />;
@@ -216,8 +223,12 @@ export function App() {
     return <ErrorNote error={me.error} />;
   }
   return (
-    <Shell me={me.data}>
-      <Routes me={me.data} />
-    </Shell>
+    <ToastProvider>
+      <ShortcutsProvider enabled={me.data.preferences.shortcuts}>
+        <Shell me={me.data}>
+          <Routes me={me.data} />
+        </Shell>
+      </ShortcutsProvider>
+    </ToastProvider>
   );
 }

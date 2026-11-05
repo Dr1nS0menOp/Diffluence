@@ -1080,6 +1080,10 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 		return path, `{"title":"x"}`
 	case pattern == "PATCH /api/v1/spaces/{id}":
 		return path, `{"name":"x"}`
+	case strings.HasSuffix(pattern, "/look"):
+		return path, `{"title_align":"start","header_position":50}`
+	case strings.HasSuffix(pattern, "/shortcuts") && strings.HasPrefix(pattern, "PUT"):
+		return path, `{"shortcuts":[]}`
 	case strings.HasSuffix(pattern, "/grants") && strings.HasPrefix(pattern, "PUT"):
 		return path, `{"subject":` + subject + `,"permissions":["space.view"]}`
 	case strings.HasSuffix(pattern, "/preset"):

@@ -69,6 +69,58 @@ var inlineTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/
 // IsInline reports whether a detected content type may be shown in the browser.
 func IsInline(contentType string) bool { return inlineTypes[contentType] }
 
+// IsImageOf reports whether an attachment is an active image on this page, which
+// is what a page may show as its header.
+func (s *Service) IsImageOf(ctx context.Context, q db.Querier, id, pageID uuid.UUID) (bool, error) {
+	var contentType string
+	err := q.QueryRow(ctx, `SELECT v.content_type FROM attachments a
+		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
+		WHERE a.id = $1 AND a.page_id = $2 AND a.status = 'active'`, id, pageID).Scan(&contentType)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return IsInline(contentType), err
+}
+
+// Found is a file that matched a quick search.
+type Found struct {
+	ID        uuid.UUID `json:"id"`
+	Filename  string    `json:"filename"`
+	PageID    uuid.UUID `json:"page_id"`
+	PageTitle string    `json:"page_title"`
+	SpaceName string    `json:"space_name"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// Find looks for files by name on pages the user may see. A zero spaceID means
+// every space. Files in archived spaces stay out of quick search (SPC-069).
+func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spaceID uuid.UUID, limit int) ([]Found, error) {
+	var within *uuid.UUID
+	if spaceID != uuid.Nil {
+		within = &spaceID
+	}
+	rows, err := s.pool.Query(ctx, `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
+		FROM attachments a
+		JOIN perm_visible_pages($1) v ON v.page_id = a.page_id
+		JOIN pages p ON p.id = a.page_id
+		JOIN spaces sp ON sp.id = a.space_id
+		WHERE a.status = 'active' AND sp.status = 'active' AND position(lower($2) IN lower(a.filename)) > 0
+		  AND ($3::uuid IS NULL OR a.space_id = $3)
+		ORDER BY a.updated_at DESC, a.id LIMIT $4`, c.UserID, text, within, limit)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Found, error) {
+		var f Found
+		err := r.Scan(&f.ID, &f.Filename, &f.PageID, &f.PageTitle, &f.SpaceName, &f.UpdatedAt)
+		return f, err
+	})
+	if out == nil {
+		out = []Found{}
+	}
+	return out, err
+}
+
 // cleanFilename keeps a usable display name. Names are only ever shown, never
 // used as a path, but a clean name protects whoever downloads the file.
 func cleanFilename(name string) (string, error) {

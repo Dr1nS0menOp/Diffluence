@@ -872,7 +872,7 @@ func (s *Server) handleSettingsSet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleRecent(w http.ResponseWriter, r *http.Request) {
-	list, err := s.deps.Pages.Recent(r.Context(), s.caller(r))
+	list, err := s.deps.Pages.Recent(r.Context(), s.caller(r), r.URL.Query().Get("kind"))
 	if err != nil {
 		s.fail(w, r, err)
 		return

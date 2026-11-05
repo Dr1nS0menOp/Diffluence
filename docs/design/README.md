@@ -85,9 +85,9 @@ Every screen is one of these. Do not invent a fifth.
 
 The login page stands alone: one card on the sidebar colour.
 
-**Top bar:** logo and name, Home, Spaces, Create, then search and the account menu on the far side. Create adds a page in the current space, or a space when there is none.
+**Top bar:** logo and name, Home, Spaces, Recent, Favourites, Create, then search, help and the account menu on the far side. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox with one panel below it, and a chip shows when it stays inside a space.
 
-**A page:** breadcrumbs with Edit, star, lock and More on one line; the title; the byline; the document. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons.
+**A page:** breadcrumbs with Edit, star, lock and More on one line; the title; the byline; the document; child pages. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. Full width only widens the column up to the wide limit. Details is one panel on the far side, on top of the page, and does not block reading.
 
 ## Components
 
@@ -111,6 +111,11 @@ Use these. Reuse beats a new variant.
 | A space | `SpaceBadge` |
 | A status | `.lozenge` |
 | A message in the flow | `.note`, `.note-error`, `ErrorNote` |
+| A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
+| A time | `RelativeTime` |
+| Switching between lists | `.tabs` with `role="tab"`, as on the Recent screen |
+| A menu in something that scrolls | `Menu` with `floating` |
+| A page in a list | `PageMark`, which shows its emoji |
 
 ## The page tree
 
@@ -120,7 +125,9 @@ Use these. Reuse beats a new variant.
 - What a reader collapses stays collapsed, per space, across pages and reloads.
 - Going to a page reveals it, also when it sits in a collapsed branch.
 - The current page has the tint, and shows the add button. Other rows show it on hover or focus.
-- The sidebar itself can be put away, and starts hidden on narrow screens.
+- The sidebar itself can be put away, and starts hidden on narrow screens. Its width is a preference.
+- Above the tree: Overview and the shortcuts of the space, then a filter and a choice of view. The flat views have no guide lines, and say that the tree is where pages are arranged.
+- The tree is a `nav` with links and the keys of the tree pattern, so it is one Tab stop plus the buttons of the focused row.
 
 ## The editor
 
@@ -173,7 +180,7 @@ UI text is English, in sentence case, through `web/src/locales/en.json`. Name th
 ## Accessibility, dark mode, right-to-left, small screens
 
 - WCAG 2.2 AA is the goal. Everything works from the keyboard, focus is always visible, and menus follow arrow keys and Escape.
-- Dark mode follows the operating system. Both themes come from the same token names, so nothing needs a dark variant of its own.
+- Dark mode follows the operating system, or a person's choice in Preferences. A token holds both colours in `light-dark()`, so nothing needs a dark variant of its own.
 - Only logical properties, so a right-to-left language needs no new styles. Icons with a direction are mirrored in `layout.css`. Code stays left-to-right.
 - Below 50rem the top bar wraps, the sticky bars let go, and the sidebar starts hidden.
 - Motion is short and stops with `prefers-reduced-motion`.

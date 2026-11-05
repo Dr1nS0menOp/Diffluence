@@ -2,13 +2,13 @@
 
 ## 8.1 Quick search
 
-- **ORG-001** · new · Selecting the search box, or pressing `/`, opens a panel under it. Before typing, it shows recently visited pages and recent searches.
-- **ORG-002** · new · While typing, it shows the best matches in groups: Pages, Blog posts, Files, Spaces, People. Each row has a title, the space and the date of the last change.
-- **ORG-003** · new · Results appear within 300 ms of a pause in typing, and earlier answers never overwrite later ones.
-- **ORG-004** · new · Arrow keys move through the rows. Enter opens the selected row, or goes to the full results when none is selected.
-- **ORG-005** · new · The last row is always **All results for "…"**.
-- **ORG-006** · new · Inside a space, a chip limits the search to that space, and can be removed with Backspace.
-- **ORG-007** · new · A person can clear recent searches.
+- **ORG-001** · built · Selecting the search box, or pressing `/`, opens a panel under it. Before typing, it shows recently visited pages and recent searches.
+- **ORG-002** · partly · While typing, it shows the best matches in groups: Pages, Blog posts, Files, Spaces, People. Each row has a title, the space and the date of the last change. Still open: blog posts (wave D).
+- **ORG-003** · built · Results appear within 300 ms of a pause in typing, and earlier answers never overwrite later ones.
+- **ORG-004** · built · Arrow keys move through the rows. Enter opens the selected row, or goes to the full results when none is selected.
+- **ORG-005** · built · The last row is always **All results for "…"**.
+- **ORG-006** · built · Inside a space, a chip limits the search to that space, and can be removed with Backspace.
+- **ORG-007** · built · A person can clear recent searches.
 
 ## 8.2 The results screen
 
