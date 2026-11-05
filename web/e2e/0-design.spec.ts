@@ -604,6 +604,19 @@ test.describe('the look of every kind of screen', () => {
         `/api/v1/pages/${agreementsId}/reactions/${encodeURIComponent('🎉')}`,
       );
       expect(reacted.ok(), await reacted.text()).toBeTruthy();
+      // Notifications are made in the background, in the order they are picked up. The
+      // task comes first here, so the picture always shows the same order.
+      const reader = await newReaderPage(browser, 'light');
+      await expect
+        .poll(
+          async () => {
+            const res = await reader.request.get('/api/v1/me/notifications/count');
+            return ((await res.json()) as { unread: number }).unread;
+          },
+          { timeout: 20_000 },
+        )
+        .toBe(1);
+      await reader.context().close();
       const shared = await setup.request.post(`/api/v1/pages/${agreementsId}/share`, {
         data: {
           people: [{ type: 'user', id: readerId }],
