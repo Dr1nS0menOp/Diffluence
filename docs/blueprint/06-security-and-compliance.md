@@ -1,54 +1,121 @@
 # 06: Security and compliance
 
-## Biggest risks, and how we handle them
+A wiki holds what an organisation knows, including what it would rather keep inside. So this blueprint goes through Diffluence surface by surface: what can go wrong, what stops it today, and what is still needed. It then maps that to the standards customers ask about.
 
-| Risk | Control |
+This file is the index. The detail is in the chapters below.
+
+This is a design study of our own product. It comes from reading the code on `main` at commit `2970b0f`, the plans for waves C to H, and the [sources](06-security-and-compliance/sources.md). It is not an audit, and nobody outside has tested it. It is not legal advice either: a line marked *Lawyer* must be checked by a lawyer or data protection officer before anyone relies on it.
+
+## How to read it
+
+Each surface starts with **What can go wrong**, followed by numbered lines in the form `SEC-134 · status · text`. A number never changes and is never reused, so specs, tests and commits can point at it.
+
+| Status | Means |
 |---|---|
-| **Broken access control** (the most common serious bug in wikis) | One central permission function, the generated test matrix (05), and an `authz` annotation required on every endpoint, enforced by CI |
-| **Cross-site scripting** via content, attachments, embeds | Server-side sanitising (allow-list), strict Content Security Policy with nonces, Trusted Types, attachments served as downloads from a **separate origin** with `nosniff` |
-| Account takeover | Argon2id password hashing, TOTP and passkeys, rate limiting and lockout, breached-password check (offline list), OIDC with PKCE |
-| Session theft / CSRF | Opaque session tokens stored hashed, `HttpOnly` + `Secure` + `SameSite=Strict` cookies, CSRF token on state changes, short idle timeout, revocation on password or role change |
-| Injection | Parameterised SQL only (sqlc), no string-built queries, strict input validation at the API edge |
-| Supply chain | Few dependencies, `govulncheck`, Trivy, licence allow-list, Renovate, pinned GitHub Actions, signed releases |
-| Malicious imports | Imports run in the worker with size, time and memory limits. Parsers are fuzz-tested. Zip-slip and zip-bomb protection. |
+| **built** | In the code today |
+| **partly** | Some of it is in the code. The line says what is missing |
+| **wave X** | Planned in that wave's spec |
+| **phase N** | Planned in that phase of the roadmap |
+| **new** | Found by this study and in no plan yet. The line says where it belongs |
+| **later** | Left for later on purpose |
 
-A **threat model** (STRIDE per component) lives in `docs/security/threat-model.md` and is updated every phase.
+Open lines can carry **High**, **Medium** or **Low**. Chapter 1.6 says what these mean. In short, a High line is fixed in the wave it touches, and always before 1.0.
 
-## Encryption
+Every ASVS reference is to version 5.0.0, so `ASVS 6.2.1` stands for `v5.0.0-6.2.1`. The aim is Level 2.
 
-**In transit**
-- TLS 1.3 at the edge. Go's TLS stack uses hybrid post-quantum key exchange (X25519 + ML-KEM) by default.
-- Optional mutual TLS between internal components (api ↔ NATS ↔ worker)
+## Chapters
 
-**At rest: three layers**
-1. **Disk:** LUKS or ZFS native encryption on hosts (operator responsibility, documented)
-2. **Application, envelope encryption:** every attachment and every secret field (TOTP seeds, OIDC client secrets, API tokens, webhook secrets) is encrypted with **AES-256-GCM** using its own data key. Data keys are wrapped by a key-encryption key (KEK) held in a **KMS**: OpenBao/Vault Transit, a PKCS#11 HSM, or for small installs a key file outside the database. KEK rotation runs as a background job without downtime.
-3. **Backups:** encrypted with AES-256 before they leave the host
+| Chapter | Covers | Lines |
+|---|---|---|
+| [01 Method and assets](06-security-and-compliance/01-method-and-assets.md) | The aim, what we protect, classes of data, attackers, trust boundaries, risk levels | 14 |
+| [02 Accounts and login](06-security-and-compliance/02-accounts-and-login.md) | Passwords, authenticator and recovery codes, passkeys, OIDC, SCIM, pushing people to stronger login, sessions, the life of an account | 79 |
+| [03 Access, the API and the browser](06-security-and-compliance/03-access-api-and-browser.md) | Access rules, the API, cross-site requests, browser headers and storage, too much of everything | 54 |
+| [04 Content](06-security-and-compliance/04-content.md) | The document gate, links, files, previews, imports, exports, public sites | 58 |
+| [05 Messages and outward calls](06-security-and-compliance/05-messages-and-outward.md) | Mentions, comments, notifications, mail, the outward client, webhooks, automation, analytics | 38 |
+| [06 Optional services](06-security-and-compliance/06-optional-services.md) | Gotenberg, draw.io, office files, editing together, PdfCraft | 42 |
+| [07 Admin and operations](06-security-and-compliance/07-admin-and-operations.md) | The console, deployment, backups, upgrades, noticing an attack | 36 |
+| [08 Cryptography and secrets](06-security-and-compliance/08-cryptography-and-secrets.md) | Inventory, keys, secrets, encryption at rest and on the way | 22 |
+| [09 The audit log and other logs](06-security-and-compliance/09-audit-and-logging.md) | What it holds, whether it can be trusted, what it should not hold, retention, the application log | 30 |
+| [10 Privacy under the GDPR (AVG)](06-security-and-compliance/10-privacy.md) | Roles, what is stored about people, retention, rights, breaches, the works council | 27 |
+| [11 Supply chain and disclosure](06-security-and-compliance/11-supply-chain-and-disclosure.md) | Dependencies, the build, checks, reporting a hole, the Cyber Resilience Act, customers' rules | 29 |
+| [12 How this maps to standards](06-security-and-compliance/12-standards-mapping.md) | OWASP ASVS, OWASP Top 10, NIS2, BIO2 and ISO 27002, GDPR Article 32 | Table |
+| [Sources](06-security-and-compliance/sources.md) | What was read, and what could not be read | |
 
-**Trade-off, stated honestly:** page *text* is protected by layers 1 and 3, not individually encrypted in the database. Otherwise Postgres full-text search is impossible. An optional "encrypt page content" mode for very sensitive spaces can come later, with search limited to titles.
+## Where it stands
 
-## Audit log
+| Status | Lines |
+|---|---|
+| built | 153 |
+| partly | 39 |
+| planned in a wave | 119 |
+| planned in a phase | 8 |
+| new | 99 |
+| later | 11 |
+| **Total** | **429** |
 
-**What is recorded:** every authentication event (login, logout, failure, MFA change), every content action (create, edit, move, delete, restore, export, download), every permission change, every admin and system action (settings, users, keys, backups, upgrades), and every API call made with a token. **Page views are not audit events.** They come later as a separate, privacy-aware statistics feature (03, Analytics).
+Chapter 12 lists what is still open at ASVS Level 1 and 2.
 
-**Each event contains:** time (UTC), actor (user, service or system), on-behalf-of (for apps), action, object type and id, space, result (success or denied), source IP, user agent, request id, and for changes a before/after summary.
+## What matters most
 
-**Integrity:** append-only (the application's database role cannot update or delete rows), each row includes a **hash of the previous row** (a hash chain), and a daily **Ed25519-signed checkpoint**. Any tampering breaks the chain and is detected by a scheduled verification job.
+### High
 
-**Access and export:** filter in the admin console and export to CSV. Later: syslog (RFC 5424), CEF, GELF (Graylog), Microsoft Sentinel (Logs Ingestion API) and webhooks. Audit retention is **separate** from content retention, so deleting a page never deletes its audit trail.
+Wave F is finished on its branch but not merged. At `a017fdc` it closes none of the lines below that belong in wave F.
 
-## Privacy (GDPR / AVG)
+| Line | Problem | Belongs in |
+|---|---|---|
+| SEC-134 | Passkey login does not require user verification, so a stolen key without a PIN logs in with one factor | Wave F |
+| SEC-135 | Adding or removing a passkey needs no proof of identity, so a stolen session can leave itself a way back in | Wave F |
+| SEC-820 | A failed login stores the typed address in the audit log, which cannot be changed. People sometimes type a password there | Wave F |
+| SEC-265 | Recent searches and tree state stay in the browser after logout, so the next person sees them | Before wave C lands |
+| SEC-814 | Nothing checks the signatures on audit checkpoints, so the one defence against a full rewrite of the log never runs | The next commit that touches `internal/app` |
+| SEC-636 | Backups are not encrypted, and `master.key` is copied into the same folder | The script now, encryption in phase 3 |
+| SEC-521 | The draw.io editor must run on another origin, or its scripts get our cookies and API | Wave E |
+| SEC-555 | The PdfCraft frame must not have `allow-same-origin` on our own origin, or it can remove its own sandbox | Wave E |
+| SEC-542 | The service for editing together does not check rights again by itself, so someone whose access ended can go on | Wave H |
+| SEC-546 | Changes while editing together go past the document gate, so a hostile client can reach a colleague's browser | Wave H |
 
-- Data-subject export (everything about a user) and anonymisation of former users, while keeping audit integrity through pseudonymous ids
-- Telemetry is off by default
-- Data processing documentation for operators in `docs/compliance/`
+### Medium, by where it belongs
 
-## Supporting customers' frameworks
+- **Wave C:** SEC-266 comment drafts in the browser. SEC-416 the mail server's certificate check is not in spec 010. SEC-422 tokens in URL paths reach the logs (wave H as well).
+- **Waves C and D:** SEC-407 comment anchors keep text that was removed from a page.
+- **Wave E:** SEC-513 separate Gotenberg instances for PDF export and office files (wave G as well). SEC-523 and SEC-557 checks on `postMessage`. SEC-532 Collabora's security settings must be read before building.
+- **Wave F:** SEC-124 recovery codes. SEC-126 removing a factor leaves other sessions running. SEC-156 SCIM tokens never expire. None of these is closed on the branch.
+- **Wave G:** SEC-353 imported history can be made up. SEC-382 a policy for public sites. SEC-383 the search index of a public site.
+- **Wave H:** SEC-443 what a webhook body holds. SEC-807 reads by token leave no audit event.
+- **Any change to the gate:** SEC-308 a stricter rule leaves stored documents as they are.
+- **Phase 3:** SEC-713 the KEK cannot be rotated.
+- **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. SEC-1023 checks that the way of working lists are not in CI.
 
-Features map to common controls (BIO, ISO 27001 Annex A, NIS2 duties): access control, logging, encryption, backup, vulnerability handling. A mapping table ships with 1.0 so operators can use it in their own audits.
+## Where this differs from the earlier blueprint
 
-## Secure development and disclosure
+The earlier version of this file promised some things that were then built differently, or not yet. Its other facts moved into the chapters.
 
-- Security checks are part of CI (see 09). An external **penetration test before 1.0**.
-- `SECURITY.md`, a `security.txt` file, GitHub private vulnerability reporting, CVE assignment via GitHub, and fixes released within 7 days for critical issues
-- Container images: distroless, non-root, read-only root filesystem, SBOM attached, signed with cosign, SLSA build provenance
+| The earlier blueprint said | Today | Line |
+|---|---|---|
+| Content Security Policy with nonces | A stricter policy with `'self'` and no inline script, so no nonces are needed | SEC-250 |
+| Attachments from a separate origin | Same origin, locked down with headers, until phase 3 | SEC-331 |
+| SQL through sqlc | Hand-written parameterised queries with pgx | SEC-220 |
+| A CSRF token on changes | Go's cross-origin protection | SEC-240 |
+| OIDC client secrets sealed in the database | In the environment or a file, on purpose | SEC-720 |
+| TLS 1.3 with post-quantum key exchange at the edge | TLS ends at the operator's proxy, so that depends on the proxy | SEC-728 |
+| Backups encrypted before they leave the host | Not built | SEC-636 |
+| Every API call with a token in the audit log | Not built | SEC-807 |
+
+`docs/security/threat-model.md` is shorter than this document and should become a summary that points here. This study did not change it (SEC-007).
+
+## For the product owner to decide
+
+| Line | Question | Advice |
+|---|---|---|
+| SEC-014 | Does a High finding block a wave? | Yes. That means SEC-134, SEC-135 and SEC-820 go into wave F before it is merged |
+| SEC-176 | Keep sessions at 8 hours idle and 7 days, or move towards NIST's 1 hour and 24 hours? | Keep them as the default, write down why, and name the stricter values in the guide for sensitive installs |
+| SEC-164 | Must administrators have a second factor on a new instance? | Yes, after a grace period. It follows from your choice to push admins to passkeys and an identity provider |
+| SEC-606 | May administrators see titles of restricted pages in the audit screen? | No. Hide them on the screen and in exports, as spec 013 already does in a space's audit |
+| SEC-821 | Change the audit format, so personal data can be erased while the chain still holds? | Yes, and early, because every event written before the change stays as it is |
+| SEC-831 | How long does the audit log stay by default? | 12 months, as a setting, and longer only with a stated reason |
+| SEC-333 | Scan files for malware? ASVS asks for it at Level 2 | Yes, as an optional scanner that runs as a separate program |
+| SEC-547 | Editing together means one shared draft per page, which changes the promise of private drafts. Accept that? | Yes, as long as people can clearly see that a draft is shared |
+| SEC-1017 | When does branch protection go on? | Before the first outside contribution |
+| SEC-1040 | What role does the project have under the Cyber Resilience Act? | Ask a lawyer before a first paid customer. *Lawyer* |
+| SEC-1035 | Pay an experienced outside Go reviewer? | Yes, at least once before 1.0, next to the penetration test |
+| SEC-648 | How do operators learn about security updates? | A release feed they subscribe to, so there is no call home |

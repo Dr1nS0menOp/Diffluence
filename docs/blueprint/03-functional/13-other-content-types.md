@@ -19,11 +19,19 @@ The study also found content types beyond pages and blog posts. None of these is
 
 ## 13.3 Tables as data
 
-- **OTH-010** · later · A database is an item in the tree: rows are entries, columns are typed fields such as text, number, date, person, tag, link and page.
-- **OTH-011** · later · Views show it as a table, cards or a board, each with its own filter, sort and grouping.
-- **OTH-012** · later · A view can be shown in a page.
-- **OTH-013** · later · An entry can open as a page of its own.
-- **OTH-014** · later · Data can be imported from and exported to CSV.
+The product owner moved this up on 2026-11-05 (ADR-028): a database is literally a simple spreadsheet, and GridCraft may do the job better. Wave I starts with its own study, which also settles how these lines fit that choice.
+
+- **OTH-010** · new · A database is an item in the tree: rows are entries, columns are typed fields such as text, number, date, person, tag, link and page.
+- **OTH-011** · new · Views show it as a table, cards or a board, each with its own filter, sort and grouping.
+- **OTH-012** · new · A view can be shown in a page.
+- **OTH-013** · new · An entry can open as a page of its own.
+- **OTH-014** · new · Data can be imported from and exported to CSV.
+- **OTH-022** · new · A database works like a simple spreadsheet, so anyone who knows Excel can use it at once.
+- **OTH-023** · new · The study of wave I weighs GridCraft (its web build, MIT or Apache-2.0, alpha) against our own grid. If it fits, it runs in a sandboxed frame from our own origin, and a database can be opened and saved as an `.xlsx` file.
+
+## 13.3a Four kinds of item
+
+- **OTH-024** · new · Create offers Page, Blog post, Database and Folder, made the same way. A page holds text, a blog post brings news, a database holds data, and a folder structures pages and databases.
 
 ## 13.4 Calendars
 

@@ -90,7 +90,7 @@ If the product owner agrees, the 31 requirement numbers in this table stay open 
 
 ## The product owner's decisions (ADR-026)
 
-The list of what this wave does not build stands. Editing together: yes, with the service from blueprint 04, so Part 5 is built. OAuth for the API stays in phase 7. Name mode stays off by default.
+The list of what this wave does not build stands, except databases: they moved up to wave I (ADR-028). Editing together: yes, with the service from blueprint 04, so Part 5 is built. OAuth for the API stays in phase 7. Name mode stays off by default.
 
 ## For the product owner to decide
 

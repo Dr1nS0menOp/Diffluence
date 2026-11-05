@@ -72,7 +72,9 @@ Today a space can leave as Markdown and come in as Markdown, and that is all. No
 
 ## The product owner's decisions (ADR-026)
 
-PDF through Gotenberg as an optional container. `golang.org/x/net/html` joins. No Confluence sample yet, so the importer is marked "tested on our own files only". Public sites are a folder and a zip.
+PDF through Gotenberg as an optional container. `golang.org/x/net/html` joins. Public sites are a folder and a zip.
+
+**Moved out of this wave (ADR-028):** the product owner called migration a very large job that comes very late. The Confluence importer (G12, EXC-031), mapping users for it (EXC-032), other wikis (EXC-034), and everything else in this plan about Confluence wait for phase 11. Ignore those parts here. What was studied stays below as the start of that phase's study.
 
 ## For the product owner to decide
 

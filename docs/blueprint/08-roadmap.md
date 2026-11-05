@@ -48,8 +48,7 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 - Real-time co-editing (collab service)
 - Export formats: PDF, DOCX, ODT, HTML, Markdown, bundle
 
-## Phase 5: Migration, automation, publishing (about 6 to 8 weeks)
-- Confluence Cloud and Data Center importer (from documented formats and donated samples)
+## Phase 5: Automation and publishing (about 6 to 8 weeks)
 - Automation rules engine
 - Static public publishing to a separate host
 - **→ Release candidate**
@@ -67,6 +66,18 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 | 8 | **Linked instances:** trust between instances, migrating and merging spaces, users and history |
 | 9 | **Work module:** issues, boards, sprints, workflows, linked to pages, using the same permission and event model |
 | 10 | **Mobile apps** (nice to have) |
+| 11 | **Migration between products:** from Confluence to Diffluence, from Diffluence to Confluence and other apps, and from other large tools to Diffluence. A very large job, so it comes very late, when the product is far along (ADR-028) |
+
+## Kinds of item
+
+Create offers four kinds of item, made the same way, each with its own job (ADR-028):
+
+| Kind | Job | When |
+|---|---|---|
+| Page | Text that people write and keep up to date | Built |
+| Blog post | News, published with a date | Wave D |
+| Folder | Structure: groups pages and databases | Wave D |
+| Database | Data in rows and columns: a simple spreadsheet, or GridCraft if it fits | Wave I, after wave H, with its own study |
 
 ## Things decided now so later phases don't need a rewrite
 UUIDv7 IDs and `origin_instance_id` (phase 8), the outbox and event system (6, 7, automation), API-first with scopes (7), no hard-coded strings and RTL-ready CSS (translations), the structured document model (co-editing, macros), the `space_id` on everything (scaling and the work module).

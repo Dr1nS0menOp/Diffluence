@@ -32,11 +32,11 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 | [8. Finding and organising](03-functional/08-finding-and-organising.md) | Search, labels, templates, blog posts, folders | 74 |
 | [9. People and access](03-functional/09-people-and-access.md) | Login, profile, groups, guests, permissions, restrictions | 73 |
 | [10. Administration](03-functional/10-administration.md) | Console, look, rules, e-mail, audit, health | 58 |
-| [11. Import, export and publishing](03-functional/11-import-export-publishing.md) | Formats, importers, public websites | 46 |
+| [11. Import, export and publishing](03-functional/11-import-export-publishing.md) | Formats, importers, public websites | 48 |
 | [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules, API, AI, linked instances | 50 |
-| [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 21 |
+| [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 24 |
 
-In total 986 requirements: 301 built, 49 partly, 104 on the roadmap, 501 new and 31 for later.
+In total 991 requirements: 301 built, 49 partly, 108 on the roadmap, 507 new and 26 for later.
 
 ## Words we use
 
@@ -87,7 +87,7 @@ The product owner decided on 2026-11-05 (ADR-024). The study shows that most of 
 | C | **Working together** | Comments, inline comments, reactions, mentions, tasks with people and dates, sharing, watching, notifications, e-mail | A mail server setting |
 | D | **Organising** | Labels, templates, blog posts, owner and status, archive, first dynamic blocks | Nothing new |
 
-After that the roadmap continues: editing together, the other dynamic blocks, exports, the Confluence importer, automation and public websites.
+After that the roadmap continues with waves E to H, then wave I for databases. Moving to and from Confluence and other large tools comes very late (phase 11, ADR-028).
 
 ## Non-functional requirements
 
@@ -102,4 +102,4 @@ Details are in 06 and 07.
 
 ## After 1.0
 
-The order stays: AI, then the platform (API, webhooks, apps, marketplace), then linked instances, then the work module, then mobile apps.
+The order stays: AI, then the platform (API, webhooks, apps, marketplace), then linked instances, then the work module, then mobile apps, and last migration between products.

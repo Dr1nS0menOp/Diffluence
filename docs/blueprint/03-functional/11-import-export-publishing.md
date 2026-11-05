@@ -37,10 +37,12 @@ Nobody should feel locked in. Everything that goes in can come out.
 - **EXC-028** · new · **Several Word files** become pages under a restricted holding page, so they can be reviewed before others see them.
 - **EXC-029** · new · A Word file can also be imported into an open draft.
 - **EXC-030** · phase 5 · **HTML:** a zip with HTML pages and images makes a tree. All HTML goes through the allow-list.
-- **EXC-031** · phase 5 · **Confluence export:** a space export from Confluence Cloud or Data Center keeps pages, tree, attachments, comments, labels, versions and permissions where possible, from documented formats and donated samples.
-- **EXC-032** · new · **Mapping users:** the importer matches authors on e-mail, and asks what to do with those it cannot match.
+- **EXC-031** · phase 11 · **Confluence export:** a space export from Confluence Cloud or Data Center keeps pages, tree, attachments, comments, labels, versions and permissions where possible, from documented formats and donated samples.
+- **EXC-032** · phase 11 · **Mapping users:** the importer matches authors on e-mail, and asks what to do with those it cannot match.
 - **EXC-033** · new · **Dry run:** every import can first show what it would do, with a count and warnings, and change nothing.
-- **EXC-034** · new · **Other wikis:** importers for common open formats, such as MediaWiki XML and exports of other Markdown wikis.
+- **EXC-034** · phase 11 · **Other wikis:** importers for common open formats, such as MediaWiki XML and exports of other Markdown wikis.
+- **EXC-047** · phase 11 · **Leaving for Confluence and other apps:** a space can be moved from Diffluence to Confluence and other apps, with as much as those formats can hold, and a report of what could not come along.
+- **EXC-048** · phase 11 · **Other large tools:** people can migrate to Diffluence from other large tools. Which ones follows from what people ask for by then.
 - **EXC-035** · new · An import can be undone in one action, as long as nobody edited the imported pages.
 - **EXC-036** · new · Unknown content is kept as readable text with a note, never silently dropped.
 - **EXC-037** · phase 4 · **Bundle:** imports the signed archive, and checks the signature.

@@ -99,6 +99,9 @@ Status: decided by the product owner (2026-11-05). Context: the plans for waves 
 - **Mail for testing:** Mailpit (MIT).
 Consequences: a Confluence importer stays marked as tested on our own files until someone donates a sample. Everything that runs as a separate service stays optional, so a basic installation needs nothing extra.
 
+**ADR-028: Four kinds of item, and migration comes last**
+Status: decided by the product owner (2026-11-05). Context: The product owner set out what can be created, and how late migration comes. Decision: Create offers Page, Blog post, Database and Folder. Blog posts and folders stay in wave D. Databases become wave I, with GridCraft to be weighed against our own grid in its study. Moving from Confluence to Diffluence, from Diffluence to Confluence and other apps, and from other large tools becomes phase 11, after all other phases. Consequences: the Confluence importer leaves wave G and phase 5, so the first public releases have no way in from Confluence. Export of our own formats stays in wave G, so nobody is locked in.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).
