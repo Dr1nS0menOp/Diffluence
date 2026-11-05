@@ -8,7 +8,7 @@ A wiki needs files, needs to be searchable, must forgive mistakes, and must not 
 
 ## Behaviour
 
-**Attachments.** Users with *add attachments* upload files to a page, up to a configurable size (default 100 MiB). Uploading a file with the same name adds a new version of it. Files can be downloaded and deleted (to the trash). Access always follows the page.
+**Attachments.** Users with *add attachments* upload files to a page, up to a configurable size (default 100 MiB), while editing (spec 007). Uploading a file with the same name adds a new version of it. Files can be downloaded and deleted (to the trash). Access always follows the page.
 
 Files are never trusted. Only PNG, JPEG, GIF and WebP, detected from the content and not from the name, are shown inline. Everything else, including SVG and HTML, is sent as a download with a locked-down content policy.
 

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api,
+  type Attachment,
   type DirectoryEntry,
   type NamedSubject,
   type Page,
@@ -13,7 +14,51 @@ import {
 } from '../api';
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
-import { Dialog, ErrorNote, Field } from '../components/ui';
+import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+
+/** Every file of a page. Files are added in the editor, by dropping them into the document. */
+export function AttachmentsDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const key = ['attachments', page.id];
+  const q = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ attachments: Attachment[] }>(`/pages/${page.id}/attachments`),
+  });
+  const remove = useMutation({
+    mutationFn: (id: string) => api.del(`/attachments/${id}`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  const canAdd = page.can['attachment.add'];
+  return (
+    <Dialog title={t('attachments.title')} onClose={onClose}>
+      {q.isPending && <Loading />}
+      <ErrorNote error={q.error ?? remove.error} />
+      {q.data?.attachments.length === 0 && (
+        <>
+          <p className="muted">{t('attachments.none')}</p>
+          {canAdd && page.can['page.edit'] && <p className="muted">{t('attachments.howToAdd')}</p>}
+        </>
+      )}
+      <ul className="plain-list">
+        {q.data?.attachments.map((a) => (
+          <li key={a.id} className="row">
+            {a.inline && <img className="thumb" src={`/api/v1/attachments/${a.id}/content`} alt="" />}
+            <a href={`/api/v1/attachments/${a.id}/content?download=1`}>{a.filename}</a>
+            <span className="muted">
+              {t('attachments.version', { number: a.version })} · {formatSize(a.size)}
+            </span>
+            {canAdd && (
+              <button type="button" className="ghost" onClick={() => remove.mutate(a.id)}>
+                {t('common.delete')}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Dialog>
+  );
+}
 
 function SubjectList({
   title,

@@ -67,6 +67,12 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 **ADR-021: One design standard, enforced by checks**
 *Accepted by the product owner, 2026-11-04.* After ten designs and two rounds of iteration, the product owner chose the Helder style and layout, the Rail editor, and a page tree with collapsible branches, in the system font with an optional imported font. `docs/design/README.md` is the standard. Design values live only in `web/src/design/tokens.css`; `web/scripts/check-design.mjs` and approved pictures in the browser tests enforce it. Consequence: a change that drifts from the design fails, and every new screen needs a picture. Pictures are tied to one browser image, so updating Playwright means new pictures. No new dependency: icons, logo, menus and dialogs are our own. The look is the product owner's to change, through a new ADR.
 
+**ADR-022: A file belongs in the text**
+*Accepted by the product owner, 2026-11-05.* the product owner did not want an Upload button and an Attachments block under every page. Files are added while editing, by dragging them in or with the toolbar, and show in the text as a tile. A page has no upload, and the list of files moves to the More menu. Consequence: the document format gains a `file` block, and adding a file needs the editor, so a person with *add attachments* but without *edit* can no longer add files. Supersedes the page layout line of ADR-021.
+
+**ADR-023: Blueprint 03 is the full functional description**
+*Accepted by the product owner, 2026-11-05.* the product owner asked for a description of many pages with every detail. After a clean-room study of public help pages, 03 became 13 chapters with numbered requirements and a status each. Consequence: a build session finds the intended behaviour there, a status changes in the same pull request as the code, and numbers are never reused. Sources are in `03-functional/sources.md`. The proposed order of work in 03 does not change the roadmap until the product owner decides.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

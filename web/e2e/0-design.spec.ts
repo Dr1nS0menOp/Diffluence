@@ -21,7 +21,9 @@ import {
 const READER = { email: 'anna.visser@example.com', name: 'Anna Visser' };
 const NARROW_SCREEN = { width: 420, height: 800 };
 
-const documentWithEverything = {
+const FILE_NAME = 'Welcome pack.pdf';
+
+const documentWithEverything = (fileId: string) => ({
   type: 'doc',
   content: [
     {
@@ -51,8 +53,9 @@ const documentWithEverything = {
       attrs: { language: 'js' },
       content: [{ type: 'text', text: "const greeting = 'hello';" }],
     },
+    { type: 'file', attrs: { attachment_id: fileId, filename: FILE_NAME } },
   ],
-};
+});
 
 /**
  * Pictures must not depend on which font the test image calls its system font,
@@ -101,10 +104,16 @@ test.describe('the look of every kind of screen', () => {
     await publishedPage(setup, space.id, 'Tools we use', 'x', onboarding);
     await publishedPage(setup, space.id, 'Decisions', 'x', space.home_page_id);
     pageId = await publishedPage(setup, space.id, 'Your first week', 'x', onboarding);
+    const uploaded = await setup.request.post(
+      `/api/v1/pages/${pageId}/attachments?filename=${encodeURIComponent(FILE_NAME)}`,
+      { headers: { 'Content-Type': 'application/octet-stream' }, data: Buffer.from('%PDF-1.4 welcome') },
+    );
+    expect(uploaded.status(), await uploaded.text()).toBe(201);
+    const file = (await uploaded.json()) as { id: string };
     const published = await setup.request.post(`/api/v1/pages/${pageId}/publish`, {
       data: {
         title: 'Your first week',
-        document: documentWithEverything,
+        document: documentWithEverything(file.id),
         base_version: 1,
         summary: 'Added the first day',
       },
@@ -146,6 +155,16 @@ test.describe('the look of every kind of screen', () => {
     await page.getByRole('button', { name: 'More actions' }).click();
     await expect(page.getByRole('menuitem', { name: 'History' })).toBeVisible();
     await picture(page, 'page-menu', [page.getByTestId('last-updated')]);
+    await page.context().close();
+  });
+
+  test('the attachments of a page', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Attachments' }).click();
+    await expect(page.getByRole('dialog').getByRole('link', { name: FILE_NAME })).toBeVisible();
+    await picture(page, 'attachments', [page.getByTestId('last-updated')]);
     await page.context().close();
   });
 

@@ -93,6 +93,8 @@ mutate "publish loses its audit event" internal/pages/pages.go \
   's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
   's.replace("default:\n\t\treturn \"\", bad\n\t}\n\treturn href, nil", "default:\n\t}\n\treturn href, nil")' ./internal/document/
+mutate "a file may point anywhere" internal/document/document.go \
+  's.replace("return errors.New(\"files must point to an attachment\")", "id = uuid.Nil")' ./internal/document/
 
 mutate "a TOTP code can be replayed" internal/identity/factors.go \
   's.replace("WHERE user_id = $1 AND last_step < $2", "WHERE user_id = $1 AND last_step <= $2 + 100")' $app -run TestTOTP

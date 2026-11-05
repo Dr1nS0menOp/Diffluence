@@ -1,8 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { EditorContent, useEditor, useEditorState, type Editor } from '@tiptap/react';
-import type { AnyExtension } from '@tiptap/core';
+import {
+  EditorContent,
+  NodeViewWrapper,
+  ReactNodeViewRenderer,
+  useEditor,
+  useEditorState,
+  type Editor,
+  type ReactNodeViewProps,
+} from '@tiptap/react';
+import { Node as DocumentNode, type AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
 import { TaskList, TaskItem } from '@tiptap/extension-list';
@@ -11,16 +19,18 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
 import { api, type Attachment, type Json } from '../api';
 import {
+  IconAttach,
   IconBold,
   IconBullet,
   IconCode,
   IconCodeBlock,
   IconColumnAdd,
   IconColumnDelete,
-  IconImage,
+  IconDownload,
   IconItalic,
   IconLink,
   IconNumbered,
+  IconPage,
   IconQuote,
   IconRedo,
   IconRowAdd,
@@ -33,7 +43,7 @@ import {
   IconUnderline,
   IconUndo,
 } from './icons';
-import { Dialog, Field } from './ui';
+import { Dialog, ErrorNote, Field } from './ui';
 
 const lowlight = createLowlight(common);
 const HEADING_LEVELS = [1, 2, 3] as const;
@@ -63,6 +73,59 @@ const AttachmentImage = Image.extend({
   },
 });
 
+/** A file in the document: a tile to download. While editing it is a block to move or remove. */
+function FileTile({ node, editor }: ReactNodeViewProps) {
+  const { attachment_id: id, filename } = node.attrs as { attachment_id: string; filename: string };
+  const label = (
+    <>
+      <IconPage />
+      <span className="file-name">{filename}</span>
+    </>
+  );
+  return (
+    <NodeViewWrapper className="file-block">
+      {editor.isEditable ? (
+        <span className="file-tile">{label}</span>
+      ) : (
+        <a className="file-tile" href={`/api/v1/attachments/${id}/content?download=1`} download={filename}>
+          {label}
+          <IconDownload size={TOOL_ICON_SIZE} />
+        </a>
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+const AttachmentFile = DocumentNode.create({
+  name: 'file',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return {
+      attachment_id: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-attachment-id'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-attachment-id': attrs.attachment_id }),
+      },
+      filename: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-filename'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-filename': attrs.filename }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-attachment-file]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', { ...HTMLAttributes, 'data-attachment-file': '' }];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(FileTile);
+  },
+});
+
 export function extensions(): AnyExtension[] {
   return [
     StarterKit.configure({
@@ -79,6 +142,7 @@ export function extensions(): AnyExtension[] {
     TableKit.configure({ table: { resizable: false } }),
     CodeBlockLowlight.configure({ lowlight }),
     AttachmentImage,
+    AttachmentFile,
   ];
 }
 
@@ -319,7 +383,15 @@ function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () => void }
   );
 }
 
-function Toolbar({ editor, onImage }: { editor: Editor; onImage: (file: File) => void }) {
+function Toolbar({
+  editor,
+  canAttach,
+  onFiles,
+}: {
+  editor: Editor;
+  canAttach: boolean;
+  onFiles: (files: File[]) => void;
+}) {
   const { t } = useTranslation();
   const file = useRef<HTMLInputElement>(null);
   const [linking, setLinking] = useState(false);
@@ -336,21 +408,24 @@ function Toolbar({ editor, onImage }: { editor: Editor; onImage: (file: File) =>
         <Tool editor={editor} label={t('editor.link')} active="link" run={() => setLinking(true)}>
           <IconLink size={TOOL_ICON_SIZE} />
         </Tool>
-        <Tool editor={editor} label={t('editor.image')} run={() => file.current?.click()}>
-          <IconImage size={TOOL_ICON_SIZE} />
-        </Tool>
-        <input
-          ref={file}
-          type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          hidden
-          aria-label={t('editor.image')}
-          onChange={(e) => {
-            const f = e.target.files?.[0];
-            if (f) onImage(f);
-            e.target.value = '';
-          }}
-        />
+        {canAttach && (
+          <>
+            <Tool editor={editor} label={t('editor.attach')} run={() => file.current?.click()}>
+              <IconAttach size={TOOL_ICON_SIZE} />
+            </Tool>
+            <input
+              ref={file}
+              type="file"
+              multiple
+              hidden
+              aria-label={t('editor.attach')}
+              onChange={(e) => {
+                onFiles(Array.from(e.target.files ?? []));
+                e.target.value = '';
+              }}
+            />
+          </>
+        )}
         <Tool
           editor={editor}
           label={t('editor.table')}
@@ -372,23 +447,60 @@ function Toolbar({ editor, onImage }: { editor: Editor; onImage: (file: File) =>
   );
 }
 
+const carriesFiles = (transfer: DataTransfer | null) => transfer?.types.includes('Files') ?? false;
+
+/** What the server made of a file decides how it shows: only safe images show as images. */
+function attachmentNode(attachment: Attachment) {
+  return attachment.inline
+    ? { type: 'image', attrs: { attachment_id: attachment.id, alt: attachment.filename } }
+    : { type: 'file', attrs: { attachment_id: attachment.id, filename: attachment.filename } };
+}
+
 /** The editing surface. Markdown shortcuts (#, **, -, ```) come from the input rules. */
 export function DocumentEditor({
   pageId,
   initial,
+  canAttach,
   header,
   onChange,
-  onUploadError,
 }: {
   pageId: string;
   initial: Json;
+  canAttach: boolean;
   header: ReactNode;
   onChange: (doc: Json) => void;
-  onUploadError: () => void;
 }) {
   const { t } = useTranslation();
+  const [uploading, setUploading] = useState('');
+  const [uploadError, setUploadError] = useState<unknown>(null);
+  const [dropping, setDropping] = useState(false);
   const change = useRef(onChange);
   change.current = onChange;
+
+  const addFiles = async (files: File[]) => {
+    setUploadError(null);
+    if (!canAttach) {
+      setUploadError(new Error(t('editor.cannotAttach')));
+      return;
+    }
+    // One at a time, so files land in the order they were dropped.
+    for (const file of files) {
+      setUploading(file.name);
+      try {
+        const attachment = await api.upload<Attachment>(
+          `/pages/${pageId}/attachments?filename=${encodeURIComponent(file.name)}`,
+          file,
+        );
+        // After the selection, never over it: the previous file is still selected.
+        editor?.chain().focus().insertContentAt(editor.state.selection.to, attachmentNode(attachment)).run();
+      } catch (error) {
+        setUploadError(error);
+      }
+    }
+    setUploading('');
+  };
+  const add = useRef(addFiles);
+  add.current = addFiles;
 
   const editor = useEditor({
     extensions: extensions(),
@@ -401,53 +513,55 @@ export function DocumentEditor({
         role: 'textbox',
         'aria-multiline': 'true',
       },
+      // Files are taken by the area around the editor, so a drop beside the page counts too.
+      handleDrop: (_view, event) => carriesFiles(event.dataTransfer),
+      handlePaste: (_view, event) => {
+        const images = Array.from(event.clipboardData?.files ?? []).filter((f) =>
+          f.type.startsWith('image/'),
+        );
+        if (images.length === 0) return false;
+        void add.current(images);
+        return true;
+      },
     },
     onUpdate: ({ editor: e }) => change.current(e.getJSON() as Json),
   });
 
-  const insertImage = async (file: File) => {
-    if (!editor) return;
-    try {
-      const a = await api.upload<Attachment>(
-        `/pages/${pageId}/attachments?filename=${encodeURIComponent(file.name)}`,
-        file,
-      );
-      editor
-        .chain()
-        .focus()
-        .insertContent({ type: 'image', attrs: { attachment_id: a.id, alt: file.name } })
-        .run();
-    } catch {
-      onUploadError();
-    }
-  };
-  const insert = useRef(insertImage);
-  insert.current = insertImage;
-
-  useEffect(() => {
-    if (!editor) return;
-    const dom = editor.view.dom;
-    const take = (files: FileList | undefined | null, e: Event) => {
-      const images = Array.from(files ?? []).filter((f) => f.type.startsWith('image/'));
-      if (images.length === 0) return;
-      e.preventDefault();
-      images.forEach((f) => void insert.current(f));
-    };
-    const paste = (e: ClipboardEvent) => take(e.clipboardData?.files, e);
-    const drop = (e: DragEvent) => take(e.dataTransfer?.files, e);
-    dom.addEventListener('paste', paste);
-    dom.addEventListener('drop', drop);
-    return () => {
-      dom.removeEventListener('paste', paste);
-      dom.removeEventListener('drop', drop);
-    };
-  }, [editor]);
-
   if (!editor) return null;
+
+  const dropFiles = (e: DragEvent<HTMLDivElement>) => {
+    if (!carriesFiles(e.dataTransfer)) return;
+    e.preventDefault();
+    setDropping(false);
+    const target = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
+    if (target) editor.commands.setTextSelection(target.pos);
+    else if (!editor.isFocused) editor.commands.focus('end');
+    void addFiles(Array.from(e.dataTransfer.files));
+  };
+
   return (
-    <div>
-      <Toolbar editor={editor} onImage={(f) => void insertImage(f)} />
+    <div
+      className={dropping ? 'editor-area dropping' : 'editor-area'}
+      onDragOver={(e) => {
+        if (!carriesFiles(e.dataTransfer)) return;
+        e.preventDefault();
+        setDropping(true);
+      }}
+      onDragLeave={(e) => {
+        if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) {
+          setDropping(false);
+        }
+      }}
+      onDrop={dropFiles}
+    >
+      <Toolbar editor={editor} canAttach={canAttach} onFiles={(files) => void addFiles(files)} />
       <div className="editor-sheet">
+        {uploading && (
+          <p role="status" className="note">
+            {t('editor.uploading', { name: uploading })}
+          </p>
+        )}
+        <ErrorNote error={uploadError} />
         {header}
         <EditorContent editor={editor} />
       </div>

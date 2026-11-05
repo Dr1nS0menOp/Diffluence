@@ -4,6 +4,21 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Changed: files live in the text
+- Drag files into the editor, anywhere on or beside the page, or use Add image or file. Several at once land in order
+- A file shows in the text as a tile that downloads it. A page has no Upload button or Attachments block any more
+- More, Attachments lists every file of a page
+- Tiles survive copying a page, and export and import as Markdown
+- Search finds the name of a file in a page, and comparing versions shows when a file came or went
+
+### Fixed
+- A page with little text was shown in a narrow box instead of the full reading column
+
+### Added: the functional description
+- `docs/blueprint/03-functional-requirements.md` is now a full description of the product in 13 chapters and 986 numbered requirements
+
+Upgrade impact: no database change. Documents gain a new block, so while two versions run side by side, a node on the older version refuses a document with a file tile.
+
 ### Added: the design
 - A new look: a calm white and blue design with a top bar, a sidebar per space and one reading column, in light and dark
 - A new editor: a strip with Close, the save status, the summary, Discard draft and Publish, one row of tools, and an open sheet with a large title

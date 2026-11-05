@@ -40,7 +40,7 @@ Words alone do not keep a design together, so the rules are checks. A failing ch
 
 `web/scripts/check-design.test.mjs` proves that each rule fails on a violation.
 
-**What no check can see:** whether the right component was chosen, whether a new screen feels like the others, and whether the words are good. That is what the checklist below is for. A picture only guards the state it shows.
+**What no check can see:** whether the right component was chosen, whether a new screen feels like the others, and whether the words are good. That is what the checklist below is for. A picture only guards the state it shows: the first reading column looked fine with long text and collapsed with a short one. Look at a new screen with very little content as well as with a lot.
 
 ## Tokens
 
@@ -85,7 +85,7 @@ The login page stands alone: one card on the sidebar colour.
 
 **Top bar:** logo and name, Home, Spaces, Create, then search and the account menu on the far side. Create adds a page in the current space, or a space when there is none.
 
-**A page:** breadcrumbs with Edit, star, lock and More on one line; the title; the byline; the document; attachments under a line. Rarely used actions live in More, never as a row of buttons.
+**A page:** breadcrumbs with Edit, star, lock and More on one line; the title; the byline; the document. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons.
 
 ## Components
 
@@ -103,7 +103,8 @@ Use these. Reuse beats a new variant.
 | A form or detail on top of a screen | `Dialog`, with buttons in `.dialog-actions` |
 | A list of less used actions | `Menu`, `MenuItem`, `MenuLink`, `MenuDownload`, `MenuSeparator` |
 | A labelled input | `Field` |
-| Choosing a file | `FilePicker` |
+| Choosing a file outside the editor | `FilePicker` |
+| A file in a document | `.file-tile`, through the `file` block in `components/editor.tsx` |
 | A person | `Avatar` |
 | A space | `SpaceBadge` |
 | A status | `.lozenge` |
@@ -122,7 +123,8 @@ Use these. Reuse beats a new variant.
 ## The editor
 
 - Top strip: Close on the left with the save status beside it; on the right the summary, Discard draft and Publish.
-- Below it one row of tools: text style, marks, lists and blocks, then link, image and table, then undo and redo. Table tools appear only inside a table.
+- Below it one row of tools: text style, marks, lists and blocks, then link, image or file, and table, then undo and redo. Table tools appear only inside a table.
+- A file can be dropped anywhere below the strip. The sheet shows a dashed outline while it is above the editor.
 - An active tool is solid accent, so its state is clear without reading it.
 - The sheet has no border. The title is a large plain input, the body follows at most 800px wide.
 - Both bars stay visible while scrolling, except on narrow screens.

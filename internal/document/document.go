@@ -61,6 +61,7 @@ const (
 	TypeHorizontalRule = "horizontalRule"
 	TypeHardBreak      = "hardBreak"
 	TypeImage          = "image"
+	TypeFile           = "file"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
 	TypeTableCell      = "tableCell"
@@ -79,7 +80,7 @@ const (
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeTable}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable}
 	inlineTypes = []string{TypeText, TypeHardBreak}
 )
 
@@ -98,6 +99,7 @@ var children = map[string][]string{
 	TypeHorizontalRule: {},
 	TypeHardBreak:      {},
 	TypeImage:          {},
+	TypeFile:           {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},
 	TypeTableCell:      blockTypes,
@@ -106,6 +108,9 @@ var children = map[string][]string{
 }
 
 var languagePattern = regexp.MustCompile(`^[a-zA-Z0-9_+#.-]{1,32}$`)
+
+// maxFilenameBytes matches the limit on attachment names.
+const maxFilenameBytes = 255
 
 // Empty returns a document with one empty paragraph.
 func Empty() Node {
@@ -247,6 +252,18 @@ func cleanAttrs(n *Node) error {
 		if title, ok := stringAttr(in, "title", 1000); ok && title != "" {
 			out["title"] = title
 		}
+	case TypeFile:
+		s, _ := in["attachment_id"].(string)
+		id, err := uuid.Parse(s)
+		if err != nil {
+			return errors.New("files must point to an attachment")
+		}
+		name, ok := stringAttr(in, "filename", maxFilenameBytes)
+		if !ok || name == "" {
+			return errors.New("a file needs a name")
+		}
+		out["attachment_id"] = id.String()
+		out["filename"] = name
 	case TypeTableCell, TypeTableHeader:
 		for _, key := range []string{"colspan", "rowspan"} {
 			if v, ok := intAttr(in[key]); ok && v > 1 && v <= 1000 {
@@ -370,6 +387,10 @@ func inlineText(n Node, b *strings.Builder) {
 	if n.Type == TypeHardBreak {
 		b.WriteByte(' ')
 	}
+	if n.Type == TypeFile {
+		name, _ := n.Attrs["filename"].(string)
+		b.WriteString(name)
+	}
 	for _, c := range n.Content {
 		inlineText(c, b)
 	}
@@ -387,7 +408,7 @@ func Text(n Node) string {
 	var b strings.Builder
 	Walk(n, func(c Node) {
 		switch c.Type {
-		case TypeParagraph, TypeHeading, TypeCodeBlock:
+		case TypeParagraph, TypeHeading, TypeCodeBlock, TypeFile:
 			if t := BlockText(c); t != "" {
 				b.WriteString(t)
 				b.WriteByte('\n')
@@ -402,11 +423,13 @@ func Text(n Node) string {
 	return b.String()
 }
 
+func pointsToAttachment(n Node) bool { return n.Type == TypeImage || n.Type == TypeFile }
+
 // AttachmentIDs lists the attachments a document shows.
 func AttachmentIDs(n Node) []uuid.UUID {
 	var out []uuid.UUID
 	Walk(n, func(c Node) {
-		if c.Type == TypeImage {
+		if pointsToAttachment(c) {
 			if s, ok := c.Attrs["attachment_id"].(string); ok {
 				if id, err := uuid.Parse(s); err == nil {
 					out = append(out, id)
@@ -417,9 +440,9 @@ func AttachmentIDs(n Node) []uuid.UUID {
 	return out
 }
 
-// RemapAttachments points images at new attachments, after copying a page.
+// RemapAttachments points images and files at new attachments, after copying a page.
 func RemapAttachments(n *Node, mapping map[uuid.UUID]uuid.UUID) {
-	if n.Type == TypeImage {
+	if pointsToAttachment(*n) {
 		if s, ok := n.Attrs["attachment_id"].(string); ok {
 			if id, err := uuid.Parse(s); err == nil {
 				if to, found := mapping[id]; found {

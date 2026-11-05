@@ -31,7 +31,7 @@ People need a place to write and organise documents: spaces that hold a tree of 
 ## Document format (ADR-004)
 A JSON tree with a `schema_version`, based on the ProseMirror model. The server accepts only an allow-list of nodes, marks and attributes, and drops any attribute it does not know. Links must be http, https, mailto or a relative path. Images must point to an attachment: external images are refused, because they would leak who is reading. Documents are limited to 5 MiB and 100 levels of nesting.
 
-Allowed nodes: paragraph, heading (1 to 6), bullet list, ordered list, list item, task list, task item, blockquote, code block (with language), horizontal rule, hard break, image, table, table row, table cell, table header (with colspan and rowspan), text. Marks: bold, italic, underline, strike, code, link.
+Allowed nodes: paragraph, heading (1 to 6), bullet list, ordered list, list item, task list, task item, blockquote, code block (with language), horizontal rule, hard break, image, file (spec 007), table, table row, table cell, table header (with colspan and rowspan), text. Marks: bold, italic, underline, strike, code, link.
 
 ## Permissions and audit
 Who may do what is defined in spec 002. Audit and outbox events, each in the same transaction as the change:

@@ -543,7 +543,7 @@ func (m *importer) page(ctx context.Context, e entry) error {
 	}
 	id, err := m.publish(ctx, parent, title, document.Node{}, func(pageID uuid.UUID) (document.Node, error) {
 		doc, warnings := document.FromMarkdown(source, func(dest string) (uuid.UUID, bool) {
-			return m.image(ctx, pageID, folder, dest)
+			return m.attachment(ctx, pageID, folder, dest)
 		})
 		for _, w := range warnings {
 			m.warn("%s: %s", e.name, w)
@@ -558,15 +558,16 @@ func (m *importer) page(ctx context.Context, e entry) error {
 	return nil
 }
 
-// image uploads a file the Markdown points to, if the archive has it.
-func (m *importer) image(ctx context.Context, pageID uuid.UUID, folder, dest string) (uuid.UUID, bool) {
+// attachment uploads a file the Markdown points to, if the archive has it. A
+// link to another Markdown file is a link between pages, not a file.
+func (m *importer) attachment(ctx context.Context, pageID uuid.UUID, folder, dest string) (uuid.UUID, bool) {
 	dest = strings.NewReplacer("%20", " ", "%28", "(", "%29", ")").Replace(dest)
 	if strings.Contains(dest, "://") || strings.HasPrefix(dest, "/") {
 		return uuid.Nil, false
 	}
 	name := strings.TrimPrefix(path.Clean(path.Join(folder, dest)), "./")
 	e, ok := m.byName[name]
-	if !ok {
+	if !ok || isMarkdown(name) {
 		return uuid.Nil, false
 	}
 	data, err := m.read(e, MaxUnpackedBytes)

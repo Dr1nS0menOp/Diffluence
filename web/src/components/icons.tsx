@@ -72,7 +72,9 @@ export const IconRule = line('M4 12h16');
 export const IconLink = line(
   'M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1',
 );
-export const IconImage = line('M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 9h.01');
+export const IconAttach = line(
+  'M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.700 4.700l-8.700 8.700a1.700 1.700 0 0 1-2.400-2.400l8-8',
+);
 export const IconTable = line('M4 5h16v14H4zM4 10h16M4 15h16M10 5v14');
 export const IconRowAdd = line('M4 5h16v6H4zM12 15v6M9 18h6');
 export const IconColumnAdd = line('M4 4h6v16H4zM15 12h6M18 9v6');

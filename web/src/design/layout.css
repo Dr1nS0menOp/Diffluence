@@ -209,10 +209,14 @@
   padding: var(--space-4-5) var(--space-10) var(--space-12);
 }
 
-.column {
+.column,
+.page {
   display: flex;
   flex-direction: column;
   gap: var(--space-3-5);
+}
+
+.column {
   max-inline-size: var(--size-reading);
   margin-inline: auto;
 }
@@ -225,7 +229,8 @@
   margin-block-start: var(--space-1);
 }
 
-.column > p {
+.column > p,
+.page > p {
   margin-block: 0;
 }
 
@@ -385,12 +390,6 @@ span.twist {
   gap: var(--space-2);
   color: var(--color-muted);
   font-size: var(--text-small);
-}
-
-.attachments {
-  margin-block-start: var(--space-6);
-  padding-block-start: var(--space-2);
-  border-block-start: 1px solid var(--color-line);
 }
 
 .section-head {

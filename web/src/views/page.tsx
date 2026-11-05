@@ -2,10 +2,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Attachment, type PageDetail, type Space } from '../api';
+import { api, type PageDetail, type Space } from '../api';
 import { Link, navigate } from '../router';
 import { DocumentView } from '../components/editor';
 import {
+  IconAttach,
   IconClock,
   IconCopy,
   IconDownload,
@@ -18,18 +19,10 @@ import {
   IconTrash,
 } from '../components/icons';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
-import {
-  Avatar,
-  ConfirmDialog,
-  ErrorNote,
-  FilePicker,
-  formatDay,
-  formatSize,
-  Loading,
-} from '../components/ui';
-import { CopyDialog, MoveDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
+import { Avatar, ConfirmDialog, ErrorNote, formatDay, Loading } from '../components/ui';
+import { AttachmentsDialog, CopyDialog, MoveDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
 
-type PageDialog = 'restrictions' | 'move' | 'rename' | 'copy' | 'delete';
+type PageDialog = 'attachments' | 'restrictions' | 'move' | 'rename' | 'copy' | 'delete';
 
 function Breadcrumbs({ page }: { page: PageDetail }) {
   const { t } = useTranslation();
@@ -77,53 +70,6 @@ function Byline({ page }: { page: PageDetail }) {
   );
 }
 
-function Attachments({ page }: { page: PageDetail }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const key = ['attachments', page.id];
-  const q = useQuery({
-    queryKey: key,
-    queryFn: () => api.get<{ attachments: Attachment[] }>(`/pages/${page.id}/attachments`),
-  });
-  const upload = useMutation({
-    mutationFn: (f: File) =>
-      api.upload(`/pages/${page.id}/attachments?filename=${encodeURIComponent(f.name)}`, f),
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => api.del(`/attachments/${id}`),
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
-  });
-  const list = q.data?.attachments ?? [];
-  const canAdd = page.can['attachment.add'];
-  return (
-    <section className="attachments">
-      <div className="section-head">
-        <h2>{t('attachments.title')}</h2>
-        {canAdd && <FilePicker label={t('attachments.upload')} onPick={(f) => upload.mutate(f)} />}
-      </div>
-      <ErrorNote error={upload.error ?? remove.error} />
-      {list.length === 0 && <p className="muted">{t('attachments.none')}</p>}
-      <ul className="plain-list">
-        {list.map((a) => (
-          <li key={a.id} className="row">
-            {a.inline && <img className="thumb" src={`/api/v1/attachments/${a.id}/content`} alt="" />}
-            <a href={`/api/v1/attachments/${a.id}/content?download=1`}>{a.filename}</a>
-            <span className="muted">
-              {t('attachments.version', { number: a.version })} · {formatSize(a.size)}
-            </span>
-            {canAdd && (
-              <button type="button" className="ghost" onClick={() => remove.mutate(a.id)}>
-                {t('common.delete')}
-              </button>
-            )}
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
 function PageMenu({ page, onOpen }: { page: PageDetail; onOpen: (dialog: PageDialog) => void }) {
   const { t } = useTranslation();
   const canEdit = page.can['page.edit'];
@@ -133,6 +79,9 @@ function PageMenu({ page, onOpen }: { page: PageDetail; onOpen: (dialog: PageDia
       <MenuLink href={`/pages/${page.id}/history`}>
         <IconClock size={18} /> {t('page.history')}
       </MenuLink>
+      <MenuItem onClick={() => onOpen('attachments')}>
+        <IconAttach size={18} /> {t('attachments.title')}
+      </MenuItem>
       {canEdit && (
         <>
           <MenuItem onClick={() => onOpen('rename')}>
@@ -196,7 +145,7 @@ export function PageView({ pageId }: { pageId: string }) {
   const close = () => setDialog(null);
   const favouriteLabel = page.favourite ? t('page.unfavourite') : t('page.favourite');
   return (
-    <article className="column">
+    <article className="page">
       <div className="page-top">
         <Breadcrumbs page={page} />
         <div className="page-actions">
@@ -241,7 +190,7 @@ export function PageView({ pageId }: { pageId: string }) {
         </p>
       )}
       <DocumentView document={page.document} />
-      <Attachments page={page} />
+      {dialog === 'attachments' && <AttachmentsDialog page={page} onClose={close} />}
       {dialog === 'restrictions' && <RestrictionsDialog page={page} onClose={close} />}
       {dialog === 'move' && <MoveDialog page={page} onClose={close} />}
       {dialog === 'rename' && <RenameDialog page={page} onClose={close} />}

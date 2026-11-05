@@ -25,6 +25,9 @@ func TestNormalizeRefusesDangerousContent(t *testing.T) {
 		"protocol relative": `{"type":"paragraph","content":[{"type":"text","text":"x","marks":[{"type":"link","attrs":{"href":"//evil.example/x"}}]}]}`,
 		"backslash path":    `{"type":"paragraph","content":[{"type":"text","text":"x","marks":[{"type":"link","attrs":{"href":"/\\evil.example"}}]}]}`,
 		"external image":    `{"type":"image","attrs":{"src":"https://evil.example/pixel.gif"}}`,
+		"external file":     `{"type":"file","attrs":{"href":"https://evil.example/a.exe","filename":"a.exe"}}`,
+		"file with bad id":  `{"type":"file","attrs":{"attachment_id":"../../etc/passwd","filename":"a.pdf"}}`,
+		"file without name": `{"type":"file","attrs":{"attachment_id":"018f0000-0000-7000-8000-000000000000"}}`,
 		"heading no level":  `{"type":"heading","content":[{"type":"text","text":"x"}]}`,
 		"heading level 7":   `{"type":"heading","attrs":{"level":7}}`,
 		"text at top":       `{"type":"text","text":"x"}`,
@@ -100,6 +103,31 @@ func TestNormalizeKeepsEverythingTheEditorProduces(t *testing.T) {
 	}
 }
 
+func TestAFileIsPartOfTheDocument(t *testing.T) {
+	id, copied := ids.New(), ids.New()
+	n, err := Normalize(doc(`{"type":"file","attrs":{"attachment_id":"` + id.String() + `","filename":"plan.pdf","onclick":"x"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if attrs := n.Content[0].Attrs; len(attrs) != 2 || attrs["filename"] != "plan.pdf" {
+		t.Fatalf("attributes: %v", attrs)
+	}
+	if got := AttachmentIDs(n); len(got) != 1 || got[0] != id {
+		t.Fatalf("attachment ids: %v", got)
+	}
+	if !strings.Contains(Text(n), "plan.pdf") {
+		t.Fatalf("the name is not searchable: %q", Text(n))
+	}
+	empty, _ := Normalize(doc(`{"type":"paragraph"}`))
+	if got := Compare(empty, n); got[len(got)-1].Op != OpAdded || got[len(got)-1].After != "plan.pdf" {
+		t.Fatalf("a comparison must name the file: %+v", got)
+	}
+	RemapAttachments(&n, map[uuid.UUID]uuid.UUID{id: copied})
+	if got := AttachmentIDs(n); len(got) != 1 || got[0] != copied {
+		t.Fatalf("a copied page must point at the copied file: %v", got)
+	}
+}
+
 func TestCompare(t *testing.T) {
 	a, _ := Normalize(doc(`{"type":"paragraph","content":[{"type":"text","text":"same"}]},
 		{"type":"paragraph","content":[{"type":"text","text":"the old text here"}]},
@@ -149,11 +177,16 @@ Some **bold**, *italic*, ~~strike~~ and ` + "`code`" + ` with a [link](https://e
 | b | 2 |
 
 ![Diagram](images/diagram.png)
+
+[my notes.txt](files/my%20notes.txt)
 `
 
 func TestMarkdownRoundTrip(t *testing.T) {
-	id := ids.New()
-	resolve := func(dest string) (uuid.UUID, bool) { return id, dest == "images/diagram.png" }
+	targets := map[string]uuid.UUID{"images/diagram.png": ids.New(), "files/my%20notes.txt": ids.New()}
+	resolve := func(dest string) (uuid.UUID, bool) {
+		id, ok := targets[dest]
+		return id, ok
+	}
 	n, warnings := FromMarkdown([]byte(roundTripSource), resolve)
 	if len(warnings) > 0 {
 		t.Fatalf("warnings: %v", warnings)
@@ -165,13 +198,20 @@ func TestMarkdownRoundTrip(t *testing.T) {
 	}
 	types := map[string]bool{}
 	Walk(first, func(c Node) { types[c.Type] = true })
-	for _, want := range []string{TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeTable, TypeImage} {
+	for _, want := range []string{TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeTable, TypeImage, TypeFile} {
 		if !types[want] {
 			t.Errorf("node type %s missing after import", want)
 		}
 	}
-	out := ToMarkdown(first, func(uuid.UUID) string { return "images/diagram.png" })
-	for _, want := range []string{"# Heading", "**bold**", "*italic*", "~~strike~~", "`code`", "[link](https://example.com)", "- [x] done", "```go", "| a | 1 |", "![Diagram](images/diagram.png)", "3. three"} {
+	out := ToMarkdown(first, func(id uuid.UUID) string {
+		for dest, target := range targets {
+			if target == id {
+				return dest
+			}
+		}
+		return id.String()
+	})
+	for _, want := range []string{"# Heading", "**bold**", "*italic*", "~~strike~~", "`code`", "[link](https://example.com)", "- [x] done", "```go", "| a | 1 |", "![Diagram](images/diagram.png)", "[my notes.txt](files/my%20notes.txt)", "3. three"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("%q missing from export:\n%s", want, out)
 		}
@@ -181,6 +221,20 @@ func TestMarkdownRoundTrip(t *testing.T) {
 	b, _ := json.Marshal(second)
 	if string(a) != string(b) {
 		t.Fatalf("round trip changed the document\nfirst:  %s\nsecond: %s\nmarkdown:\n%s", a, b, out)
+	}
+}
+
+func TestMarkdownLinkToAFileInASentenceKeepsItsWords(t *testing.T) {
+	id := ids.New()
+	n, _ := FromMarkdown([]byte("See [the plan](plan.pdf) for more.\n"), func(string) (uuid.UUID, bool) { return id, true })
+	if got := Text(n); !strings.Contains(got, "See the plan for more.") {
+		t.Fatalf("the sentence lost words: %q", got)
+	}
+	if got := AttachmentIDs(n); len(got) != 1 || got[0] != id {
+		t.Fatalf("the file was lost: %v", got)
+	}
+	if name := n.Content[1].Attrs["filename"]; name != "plan.pdf" {
+		t.Fatalf("file name: %v", name)
 	}
 }
 

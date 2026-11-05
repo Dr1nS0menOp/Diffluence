@@ -35,7 +35,6 @@ function Form({ data }: { data: Loaded }) {
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [error, setError] = useState<unknown>(null);
   const [conflict, setConflict] = useState(false);
-  const [uploadFailed, setUploadFailed] = useState(false);
   const doc = useRef(data.document);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -133,20 +132,15 @@ function Form({ data }: { data: Loaded }) {
           {t('editor.publish')}
         </button>
       </div>
-      {uploadFailed && (
-        <p role="alert" className="note note-error">
-          {t('editor.uploadFailed')}
-        </p>
-      )}
       <ErrorNote error={error} />
       <DocumentEditor
         pageId={page.id}
         initial={data.document}
+        canAttach={page.can['attachment.add'] ?? false}
         onChange={(d) => {
           doc.current = d;
           schedule();
         }}
-        onUploadError={() => setUploadFailed(true)}
         header={
           <input
             className="title-input"

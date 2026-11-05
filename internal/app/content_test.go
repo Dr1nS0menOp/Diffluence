@@ -892,6 +892,69 @@ func TestMarkdownExportImportRoundTrip(t *testing.T) {
 	}
 }
 
+func TestFileInAPageSurvivesCopyExportAndImport(t *testing.T) {
+	e := newEnv(t)
+	a := e.user("a@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := a.space("ENG")
+	page := a.page(space, nil, "Guide", "Intro")
+	status, out := a.upload(page, "plan.txt", "the plan")
+	if status != 201 {
+		t.Fatalf("upload: %d %s", status, out)
+	}
+	var file struct {
+		ID string `json:"id"`
+	}
+	if err := json.Unmarshal([]byte(out), &file); err != nil {
+		t.Fatal(err)
+	}
+	withFile := map[string]any{"type": "doc", "content": []any{map[string]any{
+		"type": "file", "attrs": map[string]any{"attachment_id": file.ID, "filename": "plan.txt"}}}}
+	a.ok("POST", "/api/v1/pages/"+page+"/publish", map[string]any{"title": "Guide", "document": withFile, "base_version": 1})
+
+	copied := a.ok("POST", "/api/v1/pages/"+page+"/copy", map[string]any{})
+	duplicate := fmt.Sprint(a.ok("GET", "/api/v1/pages/"+copied["id"].(string), nil)["document"])
+	if !strings.Contains(duplicate, "plan.txt") || strings.Contains(duplicate, file.ID) {
+		t.Fatalf("a copy must point at its own file: %s", duplicate)
+	}
+
+	resp, md := e.do(a.c, "GET", "/api/v1/pages/"+page+"/export.md", "")
+	if resp.StatusCode != 200 || !strings.Contains(md, "[plan.txt](plan.txt)") {
+		t.Fatalf("export md: %d %s", resp.StatusCode, md)
+	}
+
+	resp, archive := e.do(a.c, "GET", "/api/v1/spaces/"+space+"/export.zip", "")
+	if resp.StatusCode != 200 {
+		t.Fatalf("export zip: %d", resp.StatusCode)
+	}
+	target, _ := a.space("COPY")
+	if job := a.importFile(target, "export.zip", []byte(archive)); job["status"] != jobs.StatusDone {
+		t.Fatalf("import: %+v", job)
+	}
+	var imported string
+	for _, n := range a.ok("GET", "/api/v1/spaces/"+target+"/tree", nil)["pages"].([]any) {
+		if m := n.(map[string]any); m["title"] == "Guide" {
+			imported = m["id"].(string)
+		}
+	}
+	if got := fmt.Sprint(a.ok("GET", "/api/v1/pages/"+imported, nil)["document"]); !strings.Contains(got, "type:file") {
+		t.Fatalf("the file left the page: %s", got)
+	}
+	files := a.ok("GET", "/api/v1/pages/"+imported+"/attachments", nil)["attachments"].([]any)
+	if len(files) != 1 || files[0].(map[string]any)["filename"] != "plan.txt" {
+		t.Fatalf("imported attachments: %+v", files)
+	}
+}
+
+func TestImportKeepsLinksBetweenPagesAsLinks(t *testing.T) {
+	e := newEnv(t)
+	a := e.user("a@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := a.space("ENG")
+	job := a.importFile(space, "pages.zip", zipOf(t, map[string]string{"A.md": "[to b](B.md)\n", "B.md": "text\n"}))
+	if result := job["result"].(map[string]any); job["status"] != jobs.StatusDone || result["files"] != float64(0) {
+		t.Fatalf("a page must not become an attachment of another page: %+v", job)
+	}
+}
+
 func TestImportRefusesHostileArchives(t *testing.T) {
 	e := newEnv(t)
 	a := e.user("a@example.com", identity.PermUseProduct, identity.PermCreateSpace)

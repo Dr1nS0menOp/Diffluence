@@ -5,6 +5,8 @@ package document
 import (
 	"bytes"
 	"fmt"
+	"net/url"
+	"path"
 	"strconv"
 	"strings"
 
@@ -18,15 +20,15 @@ import (
 
 var markdownParser = goldmark.New(goldmark.WithExtensions(extension.Table, extension.Strikethrough, extension.TaskList)).Parser()
 
-// ImageResolver turns an image destination from Markdown into an attachment.
-// It returns false when the image is not available as an attachment.
-type ImageResolver func(destination string) (uuid.UUID, bool)
+// AttachmentResolver turns a destination from Markdown into an attachment. It
+// returns false when the destination is not available as an attachment.
+type AttachmentResolver func(destination string) (uuid.UUID, bool)
 
 // FromMarkdown converts Markdown into a document. It always succeeds: anything
 // that has no safe equivalent becomes plain text or a link, with a warning.
 // The result passes Normalize.
-func FromMarkdown(source []byte, images ImageResolver) (Node, []string) {
-	c := &converter{src: source, images: images}
+func FromMarkdown(source []byte, attachments AttachmentResolver) (Node, []string) {
+	c := &converter{src: source, attachments: attachments}
 	root := markdownParser.Parse(text.NewReader(source))
 	doc := Node{Type: TypeDoc, Content: c.blocks(root)}
 	if len(doc.Content) == 0 {
@@ -36,9 +38,9 @@ func FromMarkdown(source []byte, images ImageResolver) (Node, []string) {
 }
 
 type converter struct {
-	src      []byte
-	images   ImageResolver
-	warnings []string
+	src         []byte
+	attachments AttachmentResolver
+	warnings    []string
 }
 
 func (c *converter) warn(format string, args ...any) {
@@ -181,8 +183,8 @@ func (c *converter) table(t *extast.Table) Node {
 	return node
 }
 
-// inlineWithImages converts inline content. Images are block nodes in our model,
-// so they are lifted out and placed after the text they appeared in.
+// inlineWithImages converts inline content. Images and files are block nodes in
+// our model, so they are lifted out and placed after the text they appeared in.
 func (c *converter) inlineWithImages(parent ast.Node) ([]Node, []Node) {
 	var hoisted []Node
 	inline := c.inline(parent, nil, &hoisted)
@@ -265,7 +267,25 @@ func autoLinkHref(v *ast.AutoLink, url string) string {
 	return url
 }
 
+// fileName is the last part of a Markdown destination, as a person would read it.
+func fileName(destination string) string {
+	base := path.Base(destination)
+	if decoded, err := url.PathUnescape(base); err == nil {
+		base = decoded
+	}
+	return truncate(base, maxFilenameBytes)
+}
+
 func (c *converter) link(dest, title string, n ast.Node, marks []Mark, hoisted *[]Node) []Node {
+	if c.attachments != nil {
+		if id, ok := c.attachments(dest); ok {
+			*hoisted = append(*hoisted, Node{Type: TypeFile, Attrs: map[string]any{"attachment_id": id.String(), "filename": fileName(dest)}})
+			if n.PreviousSibling() == nil && n.NextSibling() == nil {
+				return nil // the file was the whole line
+			}
+			return c.inline(n, marks, hoisted) // a sentence keeps its words
+		}
+	}
 	href, err := SafeHref(dest)
 	if err != nil {
 		c.warn("A link to %q is not allowed and was removed.", truncate(dest, 80))
@@ -286,8 +306,8 @@ func (c *converter) image(v *ast.Image, marks []Mark, hoisted *[]Node) []Node {
 			alt.Write(t.Segment.Value(c.src))
 		}
 	}
-	if c.images != nil {
-		if id, ok := c.images(dest); ok {
+	if c.attachments != nil {
+		if id, ok := c.attachments(dest); ok {
 			attrs := map[string]any{"attachment_id": id.String()}
 			if alt.Len() > 0 {
 				attrs["alt"] = truncate(alt.String(), 1000)
@@ -336,11 +356,11 @@ func mergeText(in []Node) []Node {
 	return out
 }
 
-// ImageTarget returns the Markdown destination and optional label of an attachment.
-type ImageTarget func(id uuid.UUID) string
+// AttachmentTarget returns the Markdown destination of an attachment.
+type AttachmentTarget func(id uuid.UUID) string
 
 // ToMarkdown writes a document as GitHub-flavoured Markdown.
-func ToMarkdown(doc Node, target ImageTarget) string {
+func ToMarkdown(doc Node, target AttachmentTarget) string {
 	w := &mdWriter{target: target}
 	w.blocks(doc.Content, "")
 	return strings.TrimRight(w.b.String(), "\n") + "\n"
@@ -348,7 +368,16 @@ func ToMarkdown(doc Node, target ImageTarget) string {
 
 type mdWriter struct {
 	b      strings.Builder
-	target ImageTarget
+	target AttachmentTarget
+}
+
+// destination returns where a node's attachment lives in the export.
+func (w *mdWriter) destination(n Node) string {
+	id, _ := n.Attrs["attachment_id"].(string)
+	if parsed, err := uuid.Parse(id); err == nil && w.target != nil {
+		return w.target(parsed)
+	}
+	return id
 }
 
 func (w *mdWriter) blocks(nodes []Node, prefix string) {
@@ -407,13 +436,11 @@ func (w *mdWriter) block(n Node, prefix string) {
 			w.listItem(item, prefix, marker)
 		}
 	case TypeImage:
-		id, _ := n.Attrs["attachment_id"].(string)
-		dest := id
-		if parsed, err := uuid.Parse(id); err == nil && w.target != nil {
-			dest = w.target(parsed)
-		}
 		alt, _ := n.Attrs["alt"].(string)
-		w.line(prefix, "!["+escapeInline(alt)+"]("+dest+")")
+		w.line(prefix, "!["+escapeInline(alt)+"]("+w.destination(n)+")")
+	case TypeFile:
+		name, _ := n.Attrs["filename"].(string)
+		w.line(prefix, "["+escapeInline(name)+"]("+w.destination(n)+")")
 	case TypeTable:
 		w.table(n, prefix)
 	default:

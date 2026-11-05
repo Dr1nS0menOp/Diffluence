@@ -1,10 +1,38 @@
 // SPDX-License-Identifier: Apache-2.0
-import { ADMIN, checkAccessibility, expect, login, newSpace, publishedPage, test } from './helpers';
+import type { Page } from '@playwright/test';
+import {
+  ADMIN,
+  checkAccessibility,
+  createUser,
+  expect,
+  grant,
+  login,
+  newSpace,
+  publishedPage,
+  test,
+  unique,
+} from './helpers';
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
   'base64',
 );
+const ADD_FILE = 'Add image or file';
+
+/** Does what the browser does when files from the desktop are let go above an element. */
+async function dropFiles(
+  page: Page,
+  selector: string,
+  files: { name: string; type: string; text: string }[],
+) {
+  const dataTransfer = await page.evaluateHandle((list) => {
+    const transfer = new DataTransfer();
+    for (const f of list) transfer.items.add(new File([f.text], f.name, { type: f.type }));
+    return transfer;
+  }, files);
+  await page.locator(selector).dispatchEvent('dragover', { dataTransfer });
+  await page.locator(selector).dispatchEvent('drop', { dataTransfer });
+}
 
 test.beforeEach(async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
@@ -143,12 +171,24 @@ test('publishing over someone else warns first', async ({ page, browser }) => {
   await expect(page.locator('.prose')).toContainText('mine');
 });
 
-test('images go in as attachments and files can be downloaded', async ({ page }) => {
-  const space = await newSpace(page, 'Files space');
-  const id = await publishedPage(page, space.id, 'Files', 'text');
+test('a short page still fills the reading column', async ({ page }) => {
+  const space = await newSpace(page, 'Width space');
+  const id = await publishedPage(page, space.id, 'Short', 'x');
+  await page.goto(`/pages/${id}`);
+  const body = page.locator('.prose');
+  await expect(body).toBeVisible();
+  const column = page.locator('main > .column');
+  const widthOf = (el: HTMLElement) => el.getBoundingClientRect().width;
+  expect(await body.evaluate(widthOf)).toBe(await column.evaluate(widthOf));
+  expect(await body.evaluate(widthOf)).toBeGreaterThan(700);
+});
+
+test('images go in through the toolbar and show on the page', async ({ page }) => {
+  const space = await newSpace(page, 'Images space');
+  const id = await publishedPage(page, space.id, 'Images', 'text');
   await page.goto(`/pages/${id}/edit`);
   await page.locator('.prose.editing').click();
-  await page.locator('input[type=file][aria-label="Image"]').setInputFiles({
+  await page.locator(`input[type=file][aria-label="${ADD_FILE}"]`).setInputFiles({
     name: 'dot.png',
     mimeType: 'image/png',
     buffer: PNG,
@@ -158,16 +198,85 @@ test('images go in as attachments and files can be downloaded', async ({ page })
   const image = page.locator('.prose img');
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1);
+});
 
-  await page.getByLabel('Upload a file').setInputFiles({
-    name: 'notes.txt',
-    mimeType: 'text/plain',
-    buffer: Buffer.from('hello'),
-  });
-  await expect(page.getByRole('link', { name: 'notes.txt' })).toBeVisible();
+test('a file dragged into the editor becomes part of the page', async ({ page }) => {
+  const space = await newSpace(page, 'Files space');
+  const id = await publishedPage(page, space.id, 'Files', 'text');
+  await page.goto(`/pages/${id}`);
+  await expect(page.getByRole('heading', { name: 'Files', level: 1 })).toBeVisible();
+  await expect(page.getByText('Upload a file')).toHaveCount(0);
+  await expect(page.getByRole('heading', { name: 'Attachments' })).toHaveCount(0);
+
+  await page.goto(`/pages/${id}/edit`);
+  await dropFiles(page, '.prose.editing', [{ name: 'notes.txt', type: 'text/plain', text: 'hello' }]);
+  await expect(page.locator('.prose.editing .file-tile')).toContainText('notes.txt');
+  await page.getByRole('button', { name: 'Publish' }).click();
+
+  const tile = page.locator('.prose').getByRole('link', { name: 'notes.txt' });
+  await expect(tile).toBeVisible();
   const download = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'notes.txt' }).click();
+  await tile.click();
   expect((await download).suggestedFilename()).toBe('notes.txt');
+  await checkAccessibility(page);
+
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Attachments' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Attachments' });
+  await expect(dialog.getByRole('link', { name: 'notes.txt' })).toBeVisible();
+  await checkAccessibility(page);
+  await dialog.getByRole('button', { name: 'Delete' }).click();
+  await expect(dialog.getByText('No attachments yet.')).toBeVisible();
+});
+
+test('several files can be dropped anywhere in the editor, also beside the page', async ({ page }) => {
+  const space = await newSpace(page, 'Drop space');
+  const id = await publishedPage(page, space.id, 'Drop', 'text');
+  await page.goto(`/pages/${id}/edit`);
+  await expect(page.locator('.prose.editing')).toBeVisible();
+  await dropFiles(page, '.editor-area', [
+    { name: 'first.txt', type: 'text/plain', text: 'one' },
+    { name: 'second.txt', type: 'text/plain', text: 'two' },
+  ]);
+  await expect(page.locator('.prose.editing .file-tile')).toHaveCount(2);
+  await expect(page.locator('.prose.editing .file-tile').first()).toContainText('first.txt');
+  await expect(page).toHaveURL(new RegExp(`/pages/${id}/edit$`));
+});
+
+test('a file that is too large says so, and leaves the page alone', async ({ page }) => {
+  const space = await newSpace(page, 'Limit space');
+  const id = await publishedPage(page, space.id, 'Limit', 'text');
+  await page.route('**/attachments?filename=*', (route) =>
+    route.fulfill({
+      status: 413,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'too_large', message: 'The file is larger than the limit.' } }),
+    }),
+  );
+  await page.goto(`/pages/${id}/edit`);
+  await dropFiles(page, '.prose.editing', [{ name: 'big.bin', type: 'text/plain', text: 'x' }]);
+  await expect(page.getByRole('alert')).toContainText('larger than the limit');
+  await expect(page.locator('.prose.editing .file-tile')).toHaveCount(0);
+});
+
+test('without the right to add files, the editor offers no upload and says why', async ({
+  page,
+  browser,
+}) => {
+  const space = await newSpace(page, 'No files space');
+  const id = await publishedPage(page, space.id, 'No files', 'text');
+  const email = `${unique('writer')}@example.com`;
+  const writer = await createUser(browser, email);
+  await grant(page, space.id, { type: 'user', id: writer }, ['space.view', 'page.edit']);
+
+  const other = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+  await login(other, email);
+  await other.goto(`/pages/${id}/edit`);
+  await expect(other.getByRole('toolbar', { name: 'Formatting' })).toBeVisible();
+  await expect(other.getByRole('button', { name: ADD_FILE })).toHaveCount(0);
+  await dropFiles(other, '.prose.editing', [{ name: 'notes.txt', type: 'text/plain', text: 'hello' }]);
+  await expect(other.getByRole('alert')).toContainText('cannot add files');
+  await other.context().close();
 });
 
 test('the page tree supports drag and drop and keeps the address', async ({ page }) => {
