@@ -1,5 +1,7 @@
 # 08: Roadmap
 
+> A proposal to change the order is open: `03-functional-requirements.md` suggests four waves of product work around phase 3. This roadmap stays as it is until the product owner decides.
+
 Every phase ends with an **exit check**: all its tests are green in CI, the product owner has done an acceptance session on the staging environment, and there are no open high or critical security findings. Durations are rough and depend on usage limits and review time.
 
 ## Phase 0: Foundation (about 1 to 2 weeks)

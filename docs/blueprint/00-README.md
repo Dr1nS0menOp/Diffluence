@@ -16,7 +16,7 @@
 |---|---|---|
 | 01 | Vision and scope | What we build, for whom, and what we don't build |
 | 02 | Clean-room and licensing | How we stay legally clean; CLA vs DCO; name |
-| 03 | Functional requirements | What v1 does, and what full parity means later |
+| 03 | Functional requirements | The full functional description, in 13 chapters under `03-functional/`, with a status per requirement |
 | 04 | Architecture | Components, stack, how they talk to each other |
 | 05 | Data and permission model | Core entities, IDs, and the permission rules |
 | 06 | Security and compliance | Threats, controls, crypto, audit log |

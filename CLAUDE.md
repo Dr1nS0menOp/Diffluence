@@ -66,7 +66,7 @@ Modules talk through their exported Go API and events, never through each other'
 - Integration tests need `DIFFLUENCE_TEST_DATABASE_URL` pointing to a Postgres role that may create databases (`scripts/dev` sets it).
 
 ## Definition of done
-Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · the design standard followed and new pictures looked at · docs and changelog updated · `make check` and `scripts/e2e` green · a plain-language "How to test" checklist in the PR · a handoff note written.
+Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · the design standard followed and new pictures looked at · docs and changelog updated, and the status lines in `docs/blueprint/03-functional/` · `make check` and `scripts/e2e` green · a plain-language "How to test" checklist in the PR · a handoff note written.
 
 ## End of every session
 Write `docs/handoff/YYYY-MM-DD-<topic>.md`: what was done, what is unfinished, what is next, and anything the product owner must decide.
