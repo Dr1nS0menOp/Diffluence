@@ -7,7 +7,7 @@
 | **The product owner** | Product owner (decides *what* and *why*), tester and operator. Reviews **behaviour**, not code. |
 | **Claude (build sessions)** | Developer: writes code, tests and documentation from specs and ADRs |
 | **Claude (review sessions)** | A fresh session that has **not** seen the build. Reviews a pull request or module against the specs, the security rules and this document. |
-| External (before 1.0) | A penetration tester. Ideally also one experienced Go developer who reviews at milestones. |
+| Volunteers (welcome, never assumed) | A penetration tester, or an experienced Go developer who reviews at milestones. There is no budget for paid help (ADR-029). |
 
 Because the product owner does not read code, **the automated checks are the code reviewer**. They must be stricter than in a normal team.
 

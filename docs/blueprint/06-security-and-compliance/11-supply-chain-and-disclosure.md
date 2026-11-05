@@ -21,7 +21,7 @@
 
 - **SEC-1015** · partly · Releases are not signed yet, and no provenance is published. The blueprint promises cosign and SLSA. GitHub's build provenance reaches SLSA Build Level 2 with little work. Belongs before the first beta.
 - **SEC-1016** · built · The image build uses `-trimpath`, and `scripts/ci-local.sh` fails when a frontend build touches tracked files.
-- **SEC-1017** · partly · `main` takes direct pushes in this phase, while `09-way-of-working.md` says pull requests with all checks required. The product owner chose direct pushes per wave, and CI runs after the push, so a bad commit is noticed, not stopped. Before others contribute, branch protection must go on. Decision for the product owner.
+- **SEC-1017** · partly · `main` takes direct pushes in this phase, while `09-way-of-working.md` says pull requests with all checks required. The product owner chose direct pushes per wave, and CI runs after the push, so a bad commit is noticed, not stopped. The product owner decided (ADR-029): branch protection goes on before the first outside contribution.
 - **SEC-1018** · partly · Commits have a DCO sign-off, and are not signed with a key, which the blueprint promised.
 
 ## 11.3 Checks on the code
@@ -40,7 +40,7 @@
 - **SEC-1032** · new · A `security.txt` (RFC 9116), with `Contact` and an `Expires` less than a year ahead, on the project's site. An instance can serve one too, pointing at its operator, from a setting. Low.
 - **SEC-1033** · partly · CVE assignment through GitHub is the plan, and has not been needed. *Pre-alpha* in `SECURITY.md` must change at the first beta.
 - **SEC-1034** · phase 3 · An external penetration test before 1.0. Scope: this document, and above all chapters 3, 4 and 6.
-- **SEC-1035** · new · One experienced outside Go reviewer at milestones, as `09-way-of-working.md` hopes. Decision for the product owner, because it costs money.
+- **SEC-1035** · later · One experienced outside Go reviewer at milestones, if a volunteer offers. There is no budget for it (ADR-029).
 
 ## 11.5 The Cyber Resilience Act
 
@@ -50,7 +50,7 @@ The Act treats free and open-source software differently. A project that is not 
 
 So the answer depends on what the product owner does with Diffluence: keep it a free project, start a foundation, or sell hosting or support. Several sources also note that the Commission published guidance on 27 July 2026, which was not read for this study.
 
-- **SEC-1040** · new · *Lawyer:* which role does the project have now, and which would it have after a first paid customer? Decision for the product owner.
+- **SEC-1040** · later · The role of the project under the Cyber Resilience Act. There is no budget for a lawyer and no paying customer (ADR-029). The product owner asks for donations. Whether donations change that role is unchecked, and worth a look if money ever comes in.
 - **SEC-1041** · partly · Much of what the Act asks is here already: a vulnerability process, a contact point, security updates, a secure default. SBOM (SEC-1006) and documented support periods are missing.
 - **SEC-1042** · new · A statement of how long a release gets security updates. Today none is supported before 1.0, and after that only the latest line. Check that against the Act before 1.0.
 

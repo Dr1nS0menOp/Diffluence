@@ -65,7 +65,7 @@ Found by reading blueprint 03, specs 008 to 016 and the code on 2026-11-05. For 
 
 ## 12.5 For the product owner to decide
 
-1. **Titles in the audit log.** An administrator cannot open a restricted page, but reads its title in the audit log and in exports of it. Advice: keep this, because an audit that cannot say what happened is of little use, and write it down: deliberate difference 2 is about documents, not about titles. The alternative is storing only ids, and then a purged page can never be named.
+1. **Titles in the audit log.** Decided (ADR-029): the id of the page with "(Censored title)", on the screen and in exports. The question was: an administrator cannot open a restricted page, but reads its title in the audit log and in exports of it. Advice: keep this, because an audit that cannot say what happened is of little use, and write it down: deliberate difference 2 is about documents, not about titles. The alternative is storing only ids, and then a purged page can never be named.
 2. **The trash and hidden pages (GAP-001).** Advice: a space administrator sees "A restricted page", can restore it, and cannot purge it by hand.
 3. **Copying a restricted page (GAP-003).** Advice: treat it like a move, so losing an inherited restriction needs *manage restrictions*.
 4. **Threads made while editing (GAP-006).** Should other editors see a thread on words from someone's private draft at all? Advice: yes for now, because COL-019 asks for it, but a quote that never reached a published version stays with the editors.

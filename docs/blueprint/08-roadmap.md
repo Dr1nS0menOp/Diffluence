@@ -54,7 +54,7 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 - **→ Release candidate**
 
 ## 1.0
-- External penetration test and fixes
+- A penetration test and fixes, if a volunteer or donations make one possible. Otherwise 1.0 says plainly that none was done (ADR-029)
 - Operator documentation, compliance mapping, `SECURITY.md` process live
 - From here: monthly releases and the upgrade promise. Translations open on a translation platform (for example Weblate).
 

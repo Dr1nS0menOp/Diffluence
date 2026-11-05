@@ -105,6 +105,14 @@ Status: decided by the product owner (2026-11-05). Context: the home page looked
 **ADR-028: Four kinds of item, and migration comes last**
 Status: decided by the product owner (2026-11-05). Context: The product owner set out what can be created, and how late migration comes. Decision: Create offers Page, Blog post, Database and Folder. Blog posts and folders stay in wave D. Databases become wave I, with GridCraft to be weighed against our own grid in its study. Moving from Confluence to Diffluence, from Diffluence to Confluence and other apps, and from other large tools becomes phase 11, after all other phases. Consequences: the Confluence importer leaves wave G and phase 5, so the first public releases have no way in from Confluence. Export of our own formats stays in wave G, so nobody is locked in.
 
+**ADR-029: What blueprints 04, 05 and 06 asked of the product owner**
+Status: decided by the product owner (2026-11-05). Context: the studies ended with questions. Decision: The product owner chose on four, and accepted the advice on the rest.
+- **Titles in the audit log:** an administrator sees the id of a restricted page with the words "(Censored title)". They can look the page up, and cannot read its title directly. This holds for the screen and for exports.
+- **Branch protection** goes on before the first outside contribution.
+- **No budget:** Diffluence has no paying customers and no money. There is no paid outside reviewer and no lawyer. The product owner will ask for donations.
+- **Accepted advice:** a High finding blocks a wave. Administrators need a second factor on a new instance, after a grace period. Editing together means one shared draft per page, shown clearly, and private drafts remain where the service is not installed. Live counts use polling. DOCX and ODT writers are our own. Files always go through the API. Sessions stay at 8 hours idle and 7 days, with stricter values in the guide. The audit format changes so personal data can be erased while the chain holds. The audit log stays 12 months by default. Malware scanning is an optional separate program. Operators follow a release feed, with no call home. A mention on a public site is neutral text, unless the site shows names.
+Consequences: what would need a professional stays unchecked until a volunteer or a donation makes it possible, and the documents say so instead of assuming it. The penetration test before 1.0 depends on the same: see the roadmap.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).
