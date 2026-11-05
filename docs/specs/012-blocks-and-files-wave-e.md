@@ -442,6 +442,17 @@ The wave is large. Commits can follow these steps, with one commit note each, wh
 | The wave is too large for one go | The build order has points where it can stop, and every step leaves the app working |
 | 100,000 words stays slow in the browser | It is measured, and a miss is reported, not hidden |
 
+## The product owner's decisions (ADR-026)
+
+These replace the options below, which stay as the record of what was asked.
+
+- **PDF:** PdfCraft instead of `pdfjs-dist`, if its web build is not too large. It is MIT or Apache-2.0, and alpha. Its WebAssembly static site is served from our own origin in a sandboxed frame, so the policy for WebAssembly applies to that frame only. Measure the size first, and pin the version. The product owner wants people to be able to change a PDF themselves: pages, comments and forms work today, and changing text is thin. Printing is missing from its web build. If it is too large, or cannot be embedded, say so and leave PDF as a download.
+- **Diagrams:** draw.io instead of `mermaid`, as an optional separate service in embed mode. A person draws in a frame, and the result is stored as a PNG with the diagram inside it (`xmlpng`), as a normal attachment. Only an address the administrator set is used: `embed.diagrams.net` would tell an outside party who is drawing what. The editor is Apache-2.0, its Docker wrapper is GPL-3.0, and that is a separate program. Stencils have terms of their own, to check.
+- **Office files:** chosen at installation. Collabora by its conversion route, LibreOffice through the Gotenberg container of wave G, or none. Euro-Office joins when its way of connecting is known: it is AGPLv3, a separate program, and no source read for this plan confirms how it connects.
+- **Drawing:** `components/chart.tsx` and `components/drawing.tsx` may hold SVG, by name, in the design check.
+- **EDT-006** is dropped.
+- **`golang.org/x/image`** is not needed.
+
 ## For the product owner to decide
 
 These block parts of the wave. Everything else can be built without them.

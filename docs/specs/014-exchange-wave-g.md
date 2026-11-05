@@ -70,6 +70,10 @@ Today a space can leave as Markdown and come in as Markdown, and that is all. No
 | D20 | Public links and sites need *administer* on the space, and a switch for the instance | Chapter 11 says "a person with permission". A new permission can follow if real use asks for it. |
 | D21 | Front matter is a small subset: `key: value` and simple lists. Anything else gives a warning | Not critical, so no YAML dependency. |
 
+## The product owner's decisions (ADR-026)
+
+PDF through Gotenberg as an optional container. `golang.org/x/net/html` joins. No Confluence sample yet, so the importer is marked "tested on our own files only". Public sites are a folder and a zip.
+
 ## For the product owner to decide
 
 | # | Question | Options | Advice |

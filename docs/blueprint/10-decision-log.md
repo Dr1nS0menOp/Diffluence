@@ -79,6 +79,26 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 **ADR-025: How a page looks is page data, and one token holds both themes**
 Status: decided (2026-11-05). Context: wave B adds an emoji, full width, title alignment and a header image, and a person's own theme. Decision: page look lives on the page, not in a version, and applies at once. Tokens use `light-dark()` instead of a second list of dark values, and `data-theme` on the root element beats the system. Consequences: restoring an old version does not change how a page looks. There is one list of colours, whose values did not change. See spec 009.
 
+**ADR-026: The product owner's choices for the remaining waves**
+Status: decided by the product owner (2026-11-05). Context: the plans for waves C to H left questions that were his to answer. Decision:
+- **Editing together:** yes, with the service from blueprint 04.
+- **PDF export:** Gotenberg as an optional container.
+- **HTML import:** `golang.org/x/net/html`.
+- **PDF in the browser:** PdfCraft (MIT or Apache-2.0), if its web build is not too large. The product owner wants people to be able to change a PDF themselves.
+- **Diagrams:** draw.io (editor Apache-2.0) as a separate service in embed mode, not `mermaid`.
+- **Office files:** the choice is made at installation. Default Collabora or Euro-Office, otherwise LibreOffice. These are separate programs, so they are not dependencies of ours.
+- **Leaked passwords:** an embedded list of up to 50 MB, from SecLists (MIT).
+- **Drawing:** `components/chart.tsx` and `components/drawing.tsx` may hold SVG beside `icons.tsx`.
+- **EDT-006**, a floating bar, is dropped.
+- **Passwords:** at least 15 characters. People are pushed towards 2FA and passkeys, administrators towards an identity provider and passkeys.
+- **Login history:** no place. A SIEM can work that out.
+- **Restoring below an archived page** is refused, with an offer to restore both.
+- **Analytics with names** stays off by default.
+- **OAuth for the API** stays in phase 7.
+- **Public sites:** a folder and a zip.
+- **Mail for testing:** Mailpit (MIT).
+Consequences: a Confluence importer stays marked as tested on our own files until someone donates a sample. Everything that runs as a separate service stays optional, so a basic installation needs nothing extra.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

@@ -88,6 +88,10 @@ If the product owner agrees, the 31 requirement numbers in this table stay open 
 | D23 | Presence is built now by polling, with no new dependency: who is reading, and who is editing | It gives PAG-034's warning and PAG-120, whatever the product owner decides about Part 5. |
 | D24 | Editing together is not started without the product owner's choice | It adds a runtime and changes what a draft is. |
 
+## The product owner's decisions (ADR-026)
+
+The list of what this wave does not build stands. Editing together: yes, with the service from blueprint 04, so Part 5 is built. OAuth for the API stays in phase 7. Name mode stays off by default.
+
 ## For the product owner to decide
 
 | # | Question | Options | Advice |
