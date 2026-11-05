@@ -21,6 +21,7 @@ export DIFFLUENCE_DATABASE_URL='postgres://diffluence:diffluence@db:5432/difflue
 export DIFFLUENCE_PUBLIC_URL=http://localhost:8080
 export DIFFLUENCE_DATA_DIR=/tmp/dfl-e2e
 export DIFFLUENCE_SHUTDOWN_DELAY=0s
+export DIFFLUENCE_EXAMPLE_SPACE=false
 export DIFFLUENCE_LOG_LEVEL=warn
 ENV
 . /tmp/e2e-env

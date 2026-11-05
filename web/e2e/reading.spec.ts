@@ -190,6 +190,8 @@ test('the tree works from the keyboard and is one Tab stop', async ({ page }) =>
   const gamma = tree.getByRole('link', { name: 'Gamma' });
   await expect(gamma).toHaveAttribute('tabindex', '0');
   await expect(tree.getByRole('link', { name: 'Alpha' })).toHaveAttribute('tabindex', '-1');
+  await expect(tree.getByRole('button', { name: 'Actions for Alpha' })).toHaveAttribute('tabindex', '-1');
+  await expect(tree.getByRole('button', { name: 'Actions for Gamma' })).toHaveAttribute('tabindex', '0');
 
   await gamma.focus();
   await page.keyboard.press('Home');
@@ -272,7 +274,7 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
   await page.getByRole('button', { name: 'Move Status up' }).click();
 
   const links = page.getByRole('navigation', { name: 'Space links' });
-  await expect(links.locator('.side-link').nth(1)).toContainText('Status');
+  await expect(links.locator('.side-link').nth(2)).toContainText('Status');
   const outside = links.getByRole('link', { name: /Status/ });
   await expect(outside).toHaveAttribute('target', '_blank');
   await expect(outside).toHaveAttribute('rel', /noopener/);

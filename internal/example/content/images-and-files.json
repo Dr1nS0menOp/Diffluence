@@ -1,0 +1,92 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Drag a file into the editor, anywhere on or beside the page. An image shows as an image, and anything else becomes a tile to download. The image at the top is this page's header, set in Page look."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Images"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Select an image here to see it large."
+    }
+   ]
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "attachment_id": "@file:river.png",
+    "alt": "A blue river between green hills",
+    "caption": "Large, with a caption",
+    "size": "large"
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "attachment_id": "@file:river.png",
+    "alt": "The same river, smaller",
+    "caption": "Medium, in the centre",
+    "size": "medium",
+    "align": "center"
+   }
+  },
+  {
+   "type": "image",
+   "attrs": {
+    "attachment_id": "@file:stones.png",
+    "alt": "Three grey stones",
+    "caption": "Small, at the end",
+    "size": "small",
+    "align": "end"
+   }
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Files"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A file is stored with its page, moves with it, and counts for search."
+    }
+   ]
+  },
+  {
+   "type": "file",
+   "attrs": {
+    "attachment_id": "@file:team-notes.txt",
+    "filename": "team-notes.txt"
+   }
+  }
+ ]
+}

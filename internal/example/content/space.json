@@ -1,0 +1,85 @@
+{
+ "key": "WELCOME",
+ "name": "Welcome to Diffluence",
+ "description": "An example of everything a page can do. Change it, or delete it when you are done.",
+ "icon": "👋",
+ "home": "home.json",
+ "pages": [
+  {
+   "slug": "start-here",
+   "title": "Start here",
+   "document": "start-here.json",
+   "emoji": "🧭"
+  },
+  {
+   "slug": "writing",
+   "title": "Writing a page",
+   "document": "writing.json",
+   "emoji": "✍️",
+   "children": [
+    {
+     "slug": "blocks",
+     "title": "Blocks",
+     "document": "blocks.json",
+     "emoji": "🧱"
+    },
+    {
+     "slug": "tables",
+     "title": "Tables",
+     "document": "tables.json",
+     "emoji": "📊"
+    },
+    {
+     "slug": "images-and-files",
+     "title": "Images and files",
+     "document": "images-and-files.json",
+     "emoji": "🖼️",
+     "files": [
+      "river.png",
+      "stones.png",
+      "team-notes.txt"
+     ],
+     "header": "banner.png",
+     "header_position": 40
+    },
+    {
+     "slug": "code",
+     "title": "Code",
+     "document": "code.json",
+     "emoji": "💻"
+    }
+   ]
+  },
+  {
+   "slug": "wide-page",
+   "title": "A wide page",
+   "document": "wide-page.json",
+   "emoji": "↔️",
+   "full_width": true,
+   "title_align": "center"
+  },
+  {
+   "slug": "long-read",
+   "title": "A long read",
+   "document": "long-read.json",
+   "emoji": "📖"
+  },
+  {
+   "slug": "owner-only",
+   "title": "Only the owner edits this",
+   "document": "owner-only.json",
+   "emoji": "🔒",
+   "edit_only_owner": true
+  }
+ ],
+ "shortcuts": [
+  {
+   "label": "Start here",
+   "target": "/pages/@page:start-here"
+  },
+  {
+   "label": "Source code",
+   "target": "https://github.com/Dr1nS0menOp/Diffluence"
+  }
+ ]
+}

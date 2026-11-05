@@ -372,6 +372,7 @@ test('outside a space, Create starts a new space', async ({ page }) => {
 
 test('the sidebar can be put away and brought back', async ({ page }) => {
   const space = await newSpace(page, 'Sidebar space');
+  await publishedPage(page, space.id, 'In the tree', 'x', space.home_page_id);
   await page.goto(`/spaces/${space.key}`);
   const tree = page.getByRole('navigation', { name: 'Pages' });
   await expect(tree).toBeVisible();

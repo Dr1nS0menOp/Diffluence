@@ -453,6 +453,18 @@ func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry,
 	return out, err
 }
 
+// FirstAdministrator finds the oldest active administrator who may use the
+// product, to own what the system sets up. Found is false while there is none.
+func (s *Service) FirstAdministrator(ctx context.Context) (id uuid.UUID, found bool, err error) {
+	err = s.pool.QueryRow(ctx, `SELECT id FROM users
+		WHERE perm_has_global(id, $1) AND perm_has_global(id, $2)
+		ORDER BY created_at, id LIMIT 1`, PermAdministrator, PermUseProduct).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, false, nil
+	}
+	return id, err == nil, err
+}
+
 // External describes an account that an identity provider manages.
 type External struct {
 	Email       string

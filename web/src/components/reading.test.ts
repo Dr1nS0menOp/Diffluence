@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import type { DiffBlock, QuickResults, TreeNode } from '../api';
+import type { DiffBlock, QuickResults, Space, TreeNode } from '../api';
 import { foldUnchanged } from '../views/history';
 import { moved } from '../views/lists';
 import { suggestKey } from './create';
 import { contentsOf, countWords, headingsOf, readingMinutes, slidesOf, slugify } from './editor/outline';
 import { addSearch, readSearches, rowsOf } from './quick-search';
-import { collapseEverything, filterTree, flatPages, matchParts, typeAheadRow } from './tree-model';
+import { orderSpaces, withCurrent } from './space-strip';
+import { buildTree, collapseEverything, filterTree, flatPages, matchParts, typeAheadRow } from './tree-model';
 import { relativeTime } from './ui';
 
 const heading = (level: number, text: string) => ({
@@ -99,6 +100,17 @@ describe('the tree', () => {
     expect(matchParts('Title', ' ')).toEqual([{ text: 'Title', hit: false }]);
   });
 
+  it('keeps the children of the home page first at the top, each group in its own order', () => {
+    const home = 'hidden-home';
+    const rows = [
+      node('free-1', null, 'Free one', { position: 0 }),
+      node('kid-2', home, 'Kid two', { position: 1 }),
+      node('free-2', null, 'Free two', { position: 1 }),
+      node('kid-1', home, 'Kid one', { position: 0 }),
+    ];
+    expect(buildTree(rows).map((b) => b.title)).toEqual(['Kid one', 'Kid two', 'Free one', 'Free two']);
+  });
+
   it('closes every branch at once', () => {
     expect(collapseEverything(nodes).collapsed.sort()).toEqual(['a', 'b']);
   });
@@ -167,6 +179,33 @@ describe('quick search', () => {
     expect(readSearches('{"a":1}')).toEqual([]);
     expect(readSearches('["a",1]')).toEqual(['a']);
     expect(readSearches(null)).toEqual([]);
+  });
+});
+
+describe('the strip of spaces', () => {
+  const space = (id: string): Space => ({
+    id,
+    key: id,
+    name: id,
+    description: '',
+    icon: '',
+    status: 'active',
+    home_page_id: null,
+  });
+
+  it('lists favourites, then recent spaces, then the rest, each once', () => {
+    const [a, b, c, d] = [space('a'), space('b'), space('c'), space('d')];
+    const mine = { favourites: [c], recent: [b] };
+    expect(orderSpaces(mine, [a, b, c, d]).map((s) => s.id)).toEqual(['c', 'b', 'a', 'd']);
+  });
+
+  it('has nothing to show before an answer', () => {
+    expect(orderSpaces(undefined, undefined)).toEqual([]);
+  });
+
+  it('always shows the current space, also when a list leaves it out', () => {
+    expect(withCurrent([space('a')], space('old')).map((s) => s.id)).toEqual(['old', 'a']);
+    expect(withCurrent([space('a')], space('a'))).toHaveLength(1);
   });
 });
 

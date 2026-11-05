@@ -1,0 +1,385 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "This space shows what a wiki page can do. Everything in it is an example, so change it, move it or delete it. Nothing can break, and every published change stays in the history of its page."
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "info"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "New here? Begin with "
+      },
+      {
+       "type": "text",
+       "text": "Start here",
+       "marks": [
+        {
+         "type": "link",
+         "attrs": {
+          "href": "/pages/@page:start-here"
+         }
+        }
+       ]
+      },
+      {
+       "type": "text",
+       "text": ". It takes five minutes."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "What is in this space"
+    }
+   ]
+  },
+  {
+   "type": "bulletList",
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Start here",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:start-here"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": how to get around, with a short list of things to try."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Writing a page",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:writing"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": text, headings, lists and colours."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Blocks",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:blocks"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": panels, sections that fold, columns, decisions and status marks."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Tables",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:tables"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": merged cells, header rows and colours."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Images and files",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:images-and-files"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": pictures, captions and files to download."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Code",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:code"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": code with a language, a title and line numbers."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A wide page",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:wide-page"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": a page that uses the whole width."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A long read",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:long-read"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": how a long page helps its reader."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Only the owner edits this",
+         "marks": [
+          {
+           "type": "link",
+           "attrs": {
+            "href": "/pages/@page:owner-only"
+           }
+          }
+         ]
+        },
+        {
+         "type": "text",
+         "text": ": what a lock on a page means."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Three words to know"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Space",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ": a collection of pages with its own permissions. This is one. The strip at the top of the sidebar moves you between spaces."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Page",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ": a document in the tree of a space. A page can have pages below it, as deep as you like."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Home",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ": the page you are reading now. Every space has one, and it sits above the tree in the sidebar, so you can always find your way back."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "When you are done"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Keep this space as a reference, or delete it in Space settings. An administrator can add it again in Administration, Settings."
+    }
+   ]
+  }
+ ]
+}

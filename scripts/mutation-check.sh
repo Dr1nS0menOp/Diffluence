@@ -148,6 +148,15 @@ mutate "quick search shows hidden files" internal/attachments/attachments.go \
 mutate "a row menu counts as a visit" internal/pages/details.go \
   's.replace("out.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, id)\n\tout.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err")' $app -run TestOpeningARowMenu
 
+mutate "the example space ignores its setting" internal/app/app.go \
+  's.replace("if a.cfg.ExampleSpace {", "if a.example != nil {")' $app -run TestTheSettingTurnsTheExampleOff
+mutate "a deleted example comes back" internal/example/example.go \
+  's.replace("if err != nil || offered {", "if err != nil || (offered && len(offeredMark) < 0) {")' $app -run TestADeletedExampleStaysGone
+mutate "an instance with spaces gets an example" internal/example/example.go \
+  's.replace("if empty {", "if empty || len(offeredMark) > 0 {")' $app -run TestAnInstanceWithSpaces
+mutate "any member can add the example space" internal/httpapi/handlers_reading.go \
+  's.replace("Permission(identity.PermAdministrator), s.handleExampleSpace", "Permission(identity.PermUseProduct), s.handleExampleSpace")' $app -run TestAnAdministratorCanAddTheExampleLater
+
 mutate "nodes hand out rights at the same time" internal/db/db.go \
   's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 

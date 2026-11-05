@@ -48,6 +48,7 @@ type Config struct {
 	TrustedProxies     []netip.Prefix
 	ShutdownDelay      time.Duration // time between "not ready" and closing connections
 	MasterKeyFile      string        // key-encryption key; empty = DATA_DIR/master.key
+	ExampleSpace       bool          // make the example space on a new instance
 	OIDC               OIDC
 }
 
@@ -91,6 +92,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		SessionMaxAge:      l.duration("SESSION_MAX_AGE", 7*24*time.Hour),
 		ShutdownDelay:      l.duration("SHUTDOWN_DELAY", 5*time.Second),
 		MasterKeyFile:      l.str("MASTER_KEY_FILE", ""),
+		ExampleSpace:       l.boolean("EXAMPLE_SPACE", true),
 		OIDC: OIDC{
 			Issuer:       l.str("OIDC_ISSUER", ""),
 			ClientID:     l.str("OIDC_CLIENT_ID", ""),

@@ -1,0 +1,160 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "The line under the title says how long this page takes to read. On a wide screen, a list of its headings stands beside it and follows you as you scroll."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Links to a heading"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Hover over a heading and press the link icon beside it. That copies an address that jumps straight to the heading, and marks it for a moment."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. "
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Details"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Press "
+    },
+    {
+     "type": "text",
+     "text": "i",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " to open the Details panel. It shows who worked on a page, and which pages link to it and from it."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. "
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "A smaller heading"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Headings of levels one to three appear in the list."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. "
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Reading without distraction"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Press "
+    },
+    {
+     "type": "text",
+     "text": "r",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " for reader mode, which hides the bars. Under More you find Present, which shows a page as slides, and Print."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. Long pages need a little help. A reader who arrives here wants to know how long it will take, what is in it, and how to reach the part that matters. This text is here to make the page long enough to show that. "
+    }
+   ]
+  }
+ ]
+}

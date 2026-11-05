@@ -79,6 +79,7 @@
   --size-quick-search: 30rem;
   --size-card-note: 16rem;
   --size-edge: 6px;
+  --size-space-chip: 7rem;
 
   /* Set per person or per page at run time. */
   --sidebar-width: var(--size-sidebar);

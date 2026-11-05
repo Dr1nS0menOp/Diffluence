@@ -22,8 +22,8 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 
 | Chapter | Covers | Requirements |
 |---|---|---|
-| [1. The frame and getting around](03-functional/01-frame-and-navigation.md) | Top bar, start screen, personal lists, directories, shortcuts, accessibility | 82 |
-| [2. Spaces](03-functional/02-spaces.md) | Creating, overview, sidebar, tree, features, permissions, clearing up, archive, personal spaces | 81 |
+| [1. The frame and getting around](03-functional/01-frame-and-navigation.md) | Top bar, start screen, personal lists, directories, shortcuts, accessibility | 87 |
+| [2. Spaces](03-functional/02-spaces.md) | Creating, overview, sidebar, tree, features, permissions, clearing up, archive, personal spaces | 86 |
 | [3. Pages: life cycle and reading](03-functional/03-pages.md) | Drafts, publishing, moving, status, owner, approvals, archive, trash, versions, reading | 126 |
 | [4. The editor](03-functional/04-editor.md) | Slash menu, blocks, text, links, images, tables, code, columns, charts, paste, find | 158 |
 | [5. Dynamic blocks](03-functional/05-dynamic-blocks.md) | Blocks that show something by themselves, with every setting | 69 |
@@ -36,7 +36,7 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 | [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules, API, AI, linked instances | 50 |
 | [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 24 |
 
-In total 991 requirements: 301 built, 49 partly, 108 on the roadmap, 507 new and 26 for later.
+In total 1001 requirements: 311 built, 49 partly, 108 on the roadmap, 507 new and 26 for later.
 
 ## Words we use
 

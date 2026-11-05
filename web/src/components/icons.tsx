@@ -149,6 +149,7 @@ export function Logo({ size = 28 }: { size?: number }) {
   );
 }
 
+export const IconApps = line('M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z');
 export const IconHome = line('M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6');
 export const IconHelp = line(
   'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.8.4-1.2 1-1.2 1.8M12 17h.01',

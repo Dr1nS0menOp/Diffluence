@@ -503,6 +503,27 @@ test.describe('the look of every kind of screen', () => {
     await context.close();
   });
 
+  test('the home of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK');
+    await expect(page.locator('.crumbs [aria-current]')).toHaveText('Home');
+    await picture(page, 'space-home', [page.getByTestId('last-updated')]);
+    await page.context().close();
+  });
+
+  test('the strip with more spaces than fit', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    for (const name of ['Customer care', 'Design', 'Finance', 'Human resources', 'Operations']) {
+      const res = await page.request.post('/api/v1/spaces', {
+        data: { key: name.slice(0, 4).toUpperCase(), name },
+      });
+      expect(res.status(), await res.text()).toBe(201);
+    }
+    await page.goto(`/pages/${pageId}`);
+    await expect(page.getByRole('navigation', { name: 'Your spaces' }).getByRole('link')).toHaveCount(7);
+    await picture(page, 'space-strip', [page.getByTestId('last-updated')]);
+  });
+
   test('right-to-left', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);

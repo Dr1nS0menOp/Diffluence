@@ -43,6 +43,7 @@ export function Menu({
   children,
   align = 'end',
   floating,
+  tabIndex,
 }: {
   label: string;
   trigger: ReactNode;
@@ -51,6 +52,8 @@ export function Menu({
   align?: 'start' | 'end';
   /** For a menu inside a scrolling area, which would otherwise be cut off. */
   floating?: boolean;
+  /** For a menu in a list with roving focus, where only one row is a Tab stop. */
+  tabIndex?: number;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -102,6 +105,7 @@ export function Menu({
         ref={button}
         type="button"
         className={className ?? 'icon'}
+        tabIndex={tabIndex}
         aria-label={label}
         title={label}
         aria-haspopup="menu"

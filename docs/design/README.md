@@ -126,7 +126,9 @@ Use these. Reuse beats a new variant.
 - Going to a page reveals it, also when it sits in a collapsed branch.
 - The current page has the tint, and shows the add button. Other rows show it on hover or focus.
 - The sidebar itself can be put away, and starts hidden on narrow screens. Its width is a preference.
-- Above the tree: Overview and the shortcuts of the space, then a filter and a choice of view. The flat views have no guide lines, and say that the tree is where pages are arranged.
+- The sidebar from top to bottom: the strip of spaces, the name of the space, Home, Overview, the shortcuts of the space, then a filter, a choice of view and the tree. The flat views have no guide lines, and say that the tree is where pages are arranged.
+- The home page is not a row of the tree. It has the fixed Home row, which is marked while it is open, and its children are the top rows. On the home page the breadcrumbs end in Home.
+- The strip of spaces scrolls sideways on its own, in the order of the Spaces menu, with the current space marked.
 - The tree is a `nav` with links and the keys of the tree pattern, so it is one Tab stop plus the buttons of the focused row.
 
 ## The editor

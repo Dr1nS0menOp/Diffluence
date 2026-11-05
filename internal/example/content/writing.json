@@ -1,0 +1,899 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "In the editor, type "
+    },
+    {
+     "type": "text",
+     "text": "/",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " at the start of a line to add anything. Markdown works too: "
+    },
+    {
+     "type": "text",
+     "text": "#",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " and a space makes a heading, "
+    },
+    {
+     "type": "text",
+     "text": "**bold**",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " makes bold text."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 1
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 1"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 2"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 3
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 3"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 4
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 4"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 5
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 5"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 6
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Heading 6"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Text"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Bold",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "italic",
+     "marks": [
+      {
+       "type": "italic"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "underlined",
+     "marks": [
+      {
+       "type": "underline"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", "
+    },
+    {
+     "type": "text",
+     "text": "struck through",
+     "marks": [
+      {
+       "type": "strike"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " and "
+    },
+    {
+     "type": "text",
+     "text": "code",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ". A formula like H"
+    },
+    {
+     "type": "text",
+     "text": "2",
+     "marks": [
+      {
+       "type": "subscript"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "O, or E = mc"
+    },
+    {
+     "type": "text",
+     "text": "2",
+     "marks": [
+      {
+       "type": "superscript"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A line can break here,"
+    },
+    {
+     "type": "hardBreak"
+    },
+    {
+     "type": "text",
+     "text": "and go on without starting a new paragraph."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A link goes to "
+    },
+    {
+     "type": "text",
+     "text": "another page",
+     "marks": [
+      {
+       "type": "link",
+       "attrs": {
+        "href": "/pages/@page:blocks"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": ", and survives when that page is renamed. Or it goes "
+    },
+    {
+     "type": "text",
+     "text": "outside",
+     "marks": [
+      {
+       "type": "link",
+       "attrs": {
+        "href": "https://www.w3.org/WAI/standards-guidelines/wcag/"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": "."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Colours"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A writer picks a name, never a value, so every colour also works in dark mode."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "grey",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "grey"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "slate",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "slate"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "red",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "red"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "orange",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "orange"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "amber",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "amber"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "green",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "green"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "teal",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "teal"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "blue",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "blue"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "indigo",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "indigo"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "purple",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "purple"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "pink",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "pink"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "brown",
+     "marks": [
+      {
+       "type": "textColor",
+       "attrs": {
+        "color": "brown"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "grey",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "grey"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "yellow",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "yellow"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "green",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "green"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "blue",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "blue"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "purple",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "purple"
+       }
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "text",
+     "text": "red",
+     "marks": [
+      {
+       "type": "highlight",
+       "attrs": {
+        "color": "red"
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Alignment and indent"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "This line sits in the centre."
+    }
+   ],
+   "attrs": {
+    "align": "center"
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "This one sits at the end."
+    }
+   ],
+   "attrs": {
+    "align": "end"
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "This one is indented by one step."
+    }
+   ],
+   "attrs": {
+    "indent": 1
+   }
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "And this one by two."
+    }
+   ],
+   "attrs": {
+    "indent": 2
+   }
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Lists"
+    }
+   ]
+  },
+  {
+   "type": "bulletList",
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A bullet"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A bullet with a list inside it"
+        }
+       ]
+      },
+      {
+       "type": "bulletList",
+       "content": [
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "One step in"
+            }
+           ]
+          }
+         ]
+        },
+        {
+         "type": "listItem",
+         "content": [
+          {
+           "type": "paragraph",
+           "content": [
+            {
+             "type": "text",
+             "text": "And another"
+            }
+           ]
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "orderedList",
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "First"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Second"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Third"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "orderedList",
+   "content": [
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A list can start at any number"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "listItem",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "This one started at four"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "attrs": {
+    "start": 4
+   }
+  },
+  {
+   "type": "taskList",
+   "content": [
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": true
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A task that is done"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A task that is still open"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Quotes and lines"
+    }
+   ]
+  },
+  {
+   "type": "blockquote",
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A quote stands out from the text around it."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "horizontalRule"
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A line, like the one above, separates two parts of a page."
+    }
+   ]
+  }
+ ]
+}

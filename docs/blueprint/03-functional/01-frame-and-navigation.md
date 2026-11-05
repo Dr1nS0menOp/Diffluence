@@ -100,6 +100,11 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 - **NAV-069** · built · An About dialog shows the version, the licence and a link to the third-party licences.
 - **NAV-070** · new · A new user sees a short tour of three steps at most, which can be skipped and never returns.
 - **NAV-071** · new · A new space starts with a useful home page, with sections to fill in, so it is never a blank screen.
+- **NAV-083** · built · A new instance gets an example space shortly after its first administrator. It shows everything a page can hold, as a first introduction, and all members can edit it.
+- **NAV-084** · built · The example space is made once. An instance that already has spaces gets none by itself, and a deleted example does not come back.
+- **NAV-085** · built · An administrator can add the example space later, in Administration, Settings.
+- **NAV-086** · built · A setting starts a new instance empty.
+- **NAV-087** · built · The example always shows every block and mark of the document format: a test fails when it does not. Waves C, D and E add comments, labels, a blog post, templates and dynamic blocks to it.
 
 ## 1.9 Narrow screens, dark mode, languages, accessibility
 

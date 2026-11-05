@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"sort"
 	"strings"
 	"unicode/utf8"
 
@@ -124,6 +125,22 @@ var children = map[string][]string{
 	TypeTableCell:      blockTypes,
 	TypeTableHeader:    blockTypes,
 	TypeText:           {},
+}
+
+// NodeTypes lists every node a document can hold.
+func NodeTypes() []string {
+	out := make([]string, 0, len(children))
+	for name := range children {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// MarkTypes lists every mark a text can have.
+func MarkTypes() []string {
+	return []string{MarkBold, MarkItalic, MarkUnderline, MarkStrike, MarkCode, MarkLink,
+		MarkSubscript, MarkSuperscript, MarkTextColor, MarkHighlight}
 }
 
 var languagePattern = regexp.MustCompile(`^[a-zA-Z0-9_+#.-]{1,32}$`)

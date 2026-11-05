@@ -1,0 +1,84 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A code block keeps every space and colours the words of its language. Readers get a Copy button."
+    }
+   ]
+  },
+  {
+   "type": "codeBlock",
+   "attrs": {
+    "language": "go",
+    "title": "main.go",
+    "line_numbers": true
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "package main\n\nimport \"fmt\"\n\nfunc main() {\n\tfmt.Println(\"hello\")\n}\n"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Long lines"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A long line scrolls inside its frame, unless the block wraps."
+    }
+   ]
+  },
+  {
+   "type": "codeBlock",
+   "attrs": {
+    "language": "bash",
+    "wrap": true
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "curl --silent --show-error --fail --location --header \"Accept: application/json\" https://wiki.example.com/api/v1/search?q=handbook"
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "No language"
+    }
+   ]
+  },
+  {
+   "type": "codeBlock",
+   "attrs": {},
+   "content": [
+    {
+     "type": "text",
+     "text": "Plain text stays plain text."
+    }
+   ]
+  }
+ ]
+}

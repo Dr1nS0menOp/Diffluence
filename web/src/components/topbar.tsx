@@ -4,10 +4,11 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { api, type ListedPage, type Me, type Space, type SystemInfo } from '../api';
+import { api, type ListedPage, type Me, type SystemInfo } from '../api';
 import { IconChevronDown, IconHelp, IconPage } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from './menu';
 import { ShortcutsDialog } from './shortcuts';
+import { useOrderedSpaces } from './space-strip';
 import { Avatar, Dialog, ErrorNote, Loading, RelativeTime, SpaceBadge } from './ui';
 
 const RECENT_IN_MENU = 8;
@@ -19,18 +20,7 @@ const THIRD_PARTY_LICENCES = 'https://github.com/Dr1nS0menOp/Diffluence/blob/mai
 
 function SpaceEntries() {
   const { t } = useTranslation();
-  const mine = useQuery({
-    queryKey: ['my-spaces'],
-    queryFn: () => api.get<{ favourites: Space[]; recent: Space[] }>('/me/spaces'),
-  });
-  const all = useQuery({
-    queryKey: ['spaces'],
-    queryFn: () => api.get<{ spaces: Space[] }>('/spaces'),
-  });
-  const known = [...(mine.data?.favourites ?? []), ...(mine.data?.recent ?? [])];
-  const knownIds = new Set(known.map((s) => s.id));
-  const others = (all.data?.spaces ?? []).filter((s) => !knownIds.has(s.id));
-  const entries = [...known, ...others].slice(0, SPACES_IN_MENU);
+  const entries = useOrderedSpaces().slice(0, SPACES_IN_MENU);
   return (
     <>
       {entries.map((s) => (

@@ -99,6 +99,9 @@ Status: decided by the product owner (2026-11-05). Context: the plans for waves 
 - **Mail for testing:** Mailpit (MIT).
 Consequences: a Confluence importer stays marked as tested on our own files until someone donates a sample. Everything that runs as a separate service stays optional, so a basic installation needs nothing extra.
 
+**ADR-027: The home page sits above the tree, and a new instance starts with an example**
+Status: decided by the product owner (2026-11-05). Context: the home page looked like any other row of the tree, and a new instance was empty. Decision: the sidebar gets a strip of spaces at the top, and a fixed Home row. The home page leaves the tree, and its children become the top rows. The worker makes an example space once, on an instance that has never had a space, and an administrator can add it later. Consequences: this changes the Space frame, so the design standard changes with it. The example must show everything the document format can hold, and a test fails when it does not. See spec 016.
+
 **ADR-028: Four kinds of item, and migration comes last**
 Status: decided by the product owner (2026-11-05). Context: The product owner set out what can be created, and how late migration comes. Decision: Create offers Page, Blog post, Database and Folder. Blog posts and folders stay in wave D. Databases become wave I, with GridCraft to be weighed against our own grid in its study. Moving from Confluence to Diffluence, from Diffluence to Confluence and other apps, and from other large tools becomes phase 11, after all other phases. Consequences: the Confluence importer leaves wave G and phase 5, so the first public releases have no way in from Confluence. Export of our own formats stays in wave G, so nobody is locked in.
 

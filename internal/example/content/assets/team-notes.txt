@@ -1,0 +1,3 @@
+Notes from the example space.
+
+A file can be anything. Only safe images show in the browser, and everything else is a download.

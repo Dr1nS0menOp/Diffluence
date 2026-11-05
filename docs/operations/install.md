@@ -19,6 +19,8 @@ printf '%s\n' 'a long password' | docker compose exec -T diffluence \
 
 Put a TLS reverse proxy in front (Traefik, nginx). If it sits on another machine or network, set `DIFFLUENCE_TRUSTED_PROXIES` to its CIDR range, or every user appears to come from the proxy, and the login rate limit counts them all as one.
 
+A new instance gets an example space within seconds of its first administrator: it shows everything a page can do, and can be deleted like any other space. To start empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`. An administrator can add it later under Administration, Settings.
+
 What you get: the container runs as non-root on a read-only filesystem with no capabilities, and the application connects with a database role that does not own the tables, so it cannot change or delete audit events.
 
 ## LXC on Proxmox, or bare Linux

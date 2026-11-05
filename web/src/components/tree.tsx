@@ -272,8 +272,9 @@ function RowTools({ node, tabStop, onAdd, onDialog }: RowProps) {
   const { t } = useTranslation();
   return (
     <>
-      <span className={tabStop ? 'node-tools shown' : 'node-tools'}>
+      <span className="node-tools">
         <Menu
+          tabIndex={tabStop ? 0 : -1}
           label={t('tree.rowMenu', { title: node.title })}
           className="node-add"
           trigger={<IconMore size={ROW_ICON_SIZE} />}
@@ -385,7 +386,9 @@ export function PageTree({
   });
 
   const draggable = canMove && !filtering && view === 'tree';
-  const tabRow = focusRow && nodes.some((n) => n.id === focusRow) ? focusRow : (current ?? nodes[0]?.id);
+  const flat = view === 'tree' ? [] : flatPages(nodes, view).filter((n) => !kept || kept.has(n.id));
+  const firstRow = view === 'tree' ? tree[0]?.id : flat[0]?.id;
+  const tabRow = focusRow && nodes.some((n) => n.id === focusRow) ? focusRow : (current ?? firstRow);
   const visibleRows = () =>
     Array.from(root.current?.querySelectorAll<HTMLAnchorElement>('a[data-row]') ?? []);
 
@@ -467,7 +470,7 @@ export function PageTree({
     card,
   });
 
-  const render = (list: Branch[], parent: string | null, depth: number): ReactNode => (
+  const render = (list: Branch[], depth: number): ReactNode => (
     <ul>
       {list.map((b) => {
         const expanded = filtering || isBranchOpen(memory, b.id, depth, ancestors);
@@ -480,7 +483,8 @@ export function PageTree({
                 data-testid={`gap-${b.title}`}
                 onDragOver={(e) => allow(e, 'gap:' + b.id)}
                 onDragLeave={() => setTarget(null)}
-                onDrop={(e) => finish(e, parent, b.id)}
+                // The real parent: rows at the top can have different ones.
+                onDrop={(e) => finish(e, b.parent_id, b.id)}
               />
             )}
             <div
@@ -532,14 +536,13 @@ export function PageTree({
               <RowMarks node={b} />
               <RowTools {...rowProps(b)} />
             </div>
-            {hasChildren && expanded && render(b.children, b.id, depth + 1)}
+            {hasChildren && expanded && render(b.children, depth + 1)}
           </li>
         );
       })}
     </ul>
   );
 
-  const flat = view === 'tree' ? [] : flatPages(nodes, view).filter((n) => !kept || kept.has(n.id));
   const nothing = view === 'tree' ? tree.length === 0 : flat.length === 0;
 
   if (nodes.length === 0) return <p className="muted">{t('space.emptyTree')}</p>;
@@ -552,7 +555,7 @@ export function PageTree({
       onDragOver={scrollNearEdge}
     >
       {nothing && <p className="muted">{filtering ? t('tree.noMatch') : t('tree.emptyView')}</p>}
-      {view === 'tree' ? render(tree, null, 0) : <FlatList nodes={flat} row={rowProps} />}
+      {view === 'tree' ? render(tree, 0) : <FlatList nodes={flat} row={rowProps} />}
       {view !== 'tree' && !nothing && <p className="muted tree-hint">{t('tree.viewHint')}</p>}
       {move.error && <ErrorNote error={move.error} />}
       {card.card && (

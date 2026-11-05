@@ -88,6 +88,7 @@ function Breadcrumbs({ page }: { page: PageDetail }) {
             <Crumb page={c} />
           </li>
         ))}
+        {page.id === space.data?.home_page_id && <li aria-current="page">{t('space.home')}</li>}
       </ol>
     </nav>
   );

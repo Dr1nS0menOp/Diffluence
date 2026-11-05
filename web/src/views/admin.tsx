@@ -12,7 +12,7 @@ import {
   type TrashItem,
   type UserDetail,
 } from '../api';
-import { Link } from '../router';
+import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
 import { AppearanceSection } from './admin-appearance';
@@ -541,6 +541,28 @@ interface Settings {
   max_upload_mib: number;
 }
 
+function ExampleSpaceSection() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const add = useMutation({
+    mutationFn: () => api.post<{ key: string }>('/admin/example-space'),
+    onSuccess: async ({ key }) => {
+      await client.invalidateQueries({ queryKey: ['spaces'] });
+      navigate(`/spaces/${key}`);
+    },
+  });
+  return (
+    <>
+      <h2>{t('admin.exampleTitle')}</h2>
+      <p className="muted">{t('admin.exampleHelp')}</p>
+      <ErrorNote error={add.error} />
+      <button type="button" disabled={add.isPending} onClick={() => add.mutate()}>
+        {t('admin.exampleAdd')}
+      </button>
+    </>
+  );
+}
+
 function SettingsTab() {
   const { t } = useTranslation();
   const q = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Settings>('/admin/settings') });
@@ -596,6 +618,7 @@ function SettingsTab() {
         </button>
       </form>
       <AppearanceSection />
+      <ExampleSpaceSection />
       <h2>{t('admin.authTitle')}</h2>
       <p className="muted">{t('admin.authHelp')}</p>
       <p>{system.data?.oidc_configured ? t('admin.oidcOn') : t('admin.oidcOff')}</p>

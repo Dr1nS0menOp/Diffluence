@@ -22,7 +22,9 @@ export function buildTree(nodes: TreeNode[]): Branch[] {
     list.forEach((b) => order(b.children));
   };
   order(roots);
-  return roots;
+  // The home page is above the tree, so its children are top rows beside pages
+  // without a parent. Each group numbers its own positions, so they cannot mix.
+  return [...roots.filter((b) => b.parent_id), ...roots.filter((b) => !b.parent_id)];
 }
 
 export function ancestorsOf(nodes: TreeNode[], id: string | undefined): Set<string> {

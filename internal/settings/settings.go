@@ -85,6 +85,19 @@ func (s *Service) MaxUploadBytes(ctx context.Context) (int64, error) {
 	return int64(v.MaxUploadMiB) << 20, err
 }
 
+// HasMark reports whether something the instance only does once has been done.
+func (s *Service) HasMark(ctx context.Context, name string) (bool, error) {
+	var found bool
+	err := s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM settings WHERE key = $1)", name).Scan(&found)
+	return found, err
+}
+
+// SetMark remembers that something the instance only does once has been done.
+func (s *Service) SetMark(ctx context.Context, name string) error {
+	_, err := s.pool.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, 'true') ON CONFLICT (key) DO NOTHING`, name)
+	return err
+}
+
 // Update stores new values. The caller must be an administrator (route rule).
 func (s *Service) Update(ctx context.Context, c identity.Caller, v Values) error {
 	if v.TrashRetentionDays < 1 || v.TrashRetentionDays > 3650 {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
@@ -43,6 +44,7 @@ type Deps struct {
 	Settings    *settings.Service
 	Jobs        *jobs.Service
 	Exchange    *exchange.Service
+	Example     *example.Service
 	SCIM        *scim.Service
 	SSO         *sso.Provider // nil when no OIDC provider is configured
 

@@ -1,0 +1,274 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A wiki works when people can find things. This page shows where everything is."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "The sidebar"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "The sidebar belongs to a space. From top to bottom you see your spaces, the name of this space, Home, Overview, the shortcuts of the space, and the tree of its pages."
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Type in "
+    },
+    {
+     "type": "text",
+     "text": "Filter pages",
+     "marks": [
+      {
+       "type": "bold"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " to narrow the tree. Drag a row to move a page. Hover over a row and press the three dots for more."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Searching"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Press "
+    },
+    {
+     "type": "text",
+     "text": "/",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " anywhere to jump to the search box. Results appear while you type, and the arrow keys move through them. Inside a space, a chip keeps the search in that space. Backspace removes the chip."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Shortcuts"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Press "
+    },
+    {
+     "type": "text",
+     "text": "?",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " to see every keyboard shortcut. You can turn them off in your preferences."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Your own lists"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "The star at the top of a page adds it to your favourites. Recent shows where you have been and what you worked on. Both are only yours."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Try these"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Open this page in the editor to tick them off."
+    }
+   ]
+  },
+  {
+   "type": "taskList",
+   "content": [
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": true
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Open the example space"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Press / and search for \"panel\""
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Add this page to your favourites"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Press ? and read the list of shortcuts"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Edit this page, and publish a change"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "taskItem",
+     "attrs": {
+      "checked": false
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Open More, History, and compare two versions"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  }
+ ]
+}

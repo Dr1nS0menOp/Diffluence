@@ -22,6 +22,7 @@ import (
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
 	"github.com/diffluence/diffluence/internal/httpapi"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -63,6 +64,7 @@ type App struct {
 	trash      *trash.Service
 	jobs       *jobs.Service
 	exchange   *exchange.Service
+	example    *example.Service
 	search     *search.Service
 	scim       *scim.Service
 	sso        *sso.Provider
@@ -134,6 +136,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.search = search.NewService(a.pool)
 	a.jobs = jobs.NewService(a.pool, log)
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, cfg.DataDir)
+	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms)
 	a.scim = scim.NewService(a.pool, a.identity, cfg.PublicOrigin(), log)
 	if cfg.OIDC.Issuer != "" {
 		a.sso = sso.New(sso.Config{Issuer: cfg.OIDC.Issuer, ClientID: cfg.OIDC.ClientID, ClientSecret: cfg.OIDC.ClientSecret,
@@ -144,7 +147,8 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	if cfg.Role.RunsAPI() {
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Search: a.search,
-			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, SCIM: a.scim, SSO: a.sso,
+			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
+			SCIM: a.scim, SSO: a.sso,
 			SystemStatus: a.SystemStatus,
 			InstanceID:   a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
@@ -296,9 +300,13 @@ func (a *App) Trash() *trash.Service { return a.trash }
 // Attachments exposes attachments (used by tests).
 func (a *App) Attachments() *attachments.Service { return a.attach }
 
+// exampleSpaceCheck is short, because the first person logs in right after
+// creating the administrator. Once decided, a check only reads one setting.
+const exampleSpaceCheck = 10 * time.Second
+
 // PeriodicTasks is the work the worker does on a schedule.
 func (a *App) PeriodicTasks() []jobs.Task {
-	return []jobs.Task{
+	tasks := []jobs.Task{
 		{Name: "purge-trash", Every: time.Hour, Run: func(ctx context.Context) error {
 			n, err := a.trash.PurgeExpired(ctx)
 			if n > 0 {
@@ -319,6 +327,10 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "audit-checkpoint", Every: 24 * time.Hour, Run: a.signCheckpoint},
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},
 	}
+	if a.cfg.ExampleSpace {
+		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})
+	}
+	return tasks
 }
 
 // Close releases connections.

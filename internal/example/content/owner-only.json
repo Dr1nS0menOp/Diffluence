@@ -1,0 +1,40 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A lock in the tree means a page has a restriction. This page can be read by everyone in the space, and edited only by its owner."
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "note"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A restriction can only narrow access, never widen it. Open the lock at the top of a page to see who can do what."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A page can also be hidden from everyone but a few people. Then it does not show in the tree, in search or in any list for anyone else."
+    }
+   ]
+  }
+ ]
+}

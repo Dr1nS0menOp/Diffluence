@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"sort"
 	"time"
 	"unicode/utf8"
 
@@ -44,6 +45,24 @@ var (
 	imageSizes    = choices("small", "medium", "large")
 	columnLayouts = choices("wide-start", "wide-end")
 )
+
+func (c choice) names() []string {
+	out := make([]string, 0, len(c))
+	for name := range c {
+		out = append(out, name)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// PanelKinds lists the kinds of panel.
+func PanelKinds() []string { return panelKinds.names() }
+
+// TextColors lists the colours a writer can give to text.
+func TextColors() []string { return textColors.names() }
+
+// MarkColors lists the colours of highlights, status marks and table cells.
+func MarkColors() []string { return markColors.names() }
 
 // keep copies a value from the list, and silently leaves out anything else.
 func (c choice) keep(in, out map[string]any, key string) {

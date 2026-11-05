@@ -1,0 +1,493 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Blocks give a page structure. Hover over a block in the editor to see its grip: drag it to move the block, or open its menu to turn it into something else."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Panels"
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "info"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "An info panel says something useful."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "note"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A note panel adds something worth keeping in mind."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "success"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A success panel says what went well."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "warning"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "A warning panel asks for care."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "panel",
+   "attrs": {
+    "kind": "error"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "An error panel says what must not happen."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Sections that fold"
+    }
+   ]
+  },
+  {
+   "type": "expand",
+   "attrs": {
+    "title": "A section that starts open",
+    "open": true
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Readers open and close these. Printing opens them all."
+      }
+     ]
+    },
+    {
+     "type": "expand",
+     "attrs": {
+      "title": "A section inside a section"
+     },
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "They can go one inside the other."
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "expand",
+   "attrs": {
+    "title": "A section that starts closed"
+   },
+   "content": [
+    {
+     "type": "paragraph",
+     "content": [
+      {
+       "type": "text",
+       "text": "Long details stay out of the way until someone wants them."
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Columns"
+    }
+   ]
+  },
+  {
+   "type": "columns",
+   "content": [
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Two columns",
+         "marks": [
+          {
+           "type": "bold"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "They stack on a narrow screen."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A column can hold any block."
+        }
+       ]
+      },
+      {
+       "type": "panel",
+       "attrs": {
+        "kind": "info"
+       },
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Even a panel."
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "columns",
+   "content": [
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A wide first column",
+         "marks": [
+          {
+           "type": "bold"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Columns come in equal widths, or with one side wider."
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "A narrow one."
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "attrs": {
+    "layout": "wide-start"
+   }
+  },
+  {
+   "type": "columns",
+   "content": [
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "One"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Two"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "column",
+     "content": [
+      {
+       "type": "paragraph",
+       "content": [
+        {
+         "type": "text",
+         "text": "Three"
+        }
+       ]
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Decisions"
+    }
+   ]
+  },
+  {
+   "type": "decision",
+   "content": [
+    {
+     "type": "text",
+     "text": "We keep the example space on every new instance."
+    }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Status marks and dates"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Idea",
+      "color": "grey"
+     }
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Started",
+      "color": "blue"
+     }
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Waiting",
+      "color": "yellow"
+     }
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Review",
+      "color": "purple"
+     }
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Done",
+      "color": "green"
+     }
+    },
+    {
+     "type": "text",
+     "text": " "
+    },
+    {
+     "type": "status",
+     "attrs": {
+      "text": "Blocked",
+      "color": "red"
+     }
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Type "
+    },
+    {
+     "type": "text",
+     "text": "//",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " for a date, such as "
+    },
+    {
+     "type": "date",
+     "attrs": {
+      "value": "2026-11-05"
+     }
+    },
+    {
+     "type": "text",
+     "text": ". Type "
+    },
+    {
+     "type": "text",
+     "text": ":",
+     "marks": [
+      {
+       "type": "code"
+      }
+     ]
+    },
+    {
+     "type": "text",
+     "text": " and a word for an emoji, such as 🌊."
+    }
+   ]
+  }
+ ]
+}

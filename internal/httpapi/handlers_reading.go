@@ -40,8 +40,18 @@ func (s *Server) registerReadingRoutes() {
 	r.HandleFunc("GET /api/v1/pages/{id}/details", Object("page.view"), s.handlePageDetails)
 	r.HandleFunc("GET /api/v1/pages/{id}/summary", Object("page.view"), s.handlePageSummary)
 	r.HandleFunc("GET /api/v1/pages/{id}/impact", Object("page.delete"), s.handlePageImpact)
+	r.HandleFunc("POST /api/v1/admin/example-space", Permission(identity.PermAdministrator), s.handleExampleSpace)
 	// Personal: only the person who deleted the page can use this, for a short time.
 	r.HandleFunc("POST /api/v1/pages/{id}/undo-delete", me, s.handleUndoDelete)
+}
+
+func (s *Server) handleExampleSpace(w http.ResponseWriter, r *http.Request) {
+	sp, err := s.deps.Example.Create(r.Context(), s.caller(r))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"key": sp.Key})
 }
 
 func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {

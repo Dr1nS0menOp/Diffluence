@@ -1,5 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type PageDetail, type PageSummary, type Shortcut, type Space, type TreeNode } from '../api';
@@ -13,6 +21,7 @@ import {
   IconDownload,
   IconExternal,
   IconHome,
+  IconInfo,
   IconLink,
   IconMore,
   IconSliders,
@@ -21,6 +30,7 @@ import {
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuLink } from './menu';
 import { useShortcut } from './shortcuts';
+import { SpaceStrip } from './space-strip';
 import { useCopy } from './toast';
 import { PagesSection, type RowDialog } from './tree';
 import { ErrorNote, Loading, SpaceBadge } from './ui';
@@ -136,7 +146,7 @@ function ShortcutLink({ shortcut }: { shortcut: Shortcut }) {
   );
 }
 
-function SpaceLinks({ space }: { space: Space }) {
+function SpaceLinks({ space, current }: { space: Space; current?: string }) {
   const { t } = useTranslation();
   const { pathname } = useLocation();
   const shortcuts = useQuery({
@@ -146,8 +156,17 @@ function SpaceLinks({ space }: { space: Space }) {
   const overview = `/spaces/${space.key}/overview`;
   return (
     <nav className="side-links" aria-label={t('space.links')}>
+      {space.home_page_id && (
+        <Link
+          href={`/pages/${space.home_page_id}`}
+          className="side-link"
+          aria-current={current === space.home_page_id ? 'page' : undefined}
+        >
+          <IconHome size={LINK_ICON_SIZE} /> {t('space.home')}
+        </Link>
+      )}
       <Link href={overview} className="side-link" aria-current={pathname === overview ? 'page' : undefined}>
-        <IconHome size={LINK_ICON_SIZE} /> {t('space.overview')}
+        <IconInfo size={LINK_ICON_SIZE} /> {t('space.overview')}
       </Link>
       {shortcuts.data?.shortcuts.map((s) => (
         <ShortcutLink key={s.id} shortcut={s} />
@@ -189,8 +208,12 @@ function Sidebar({
     queryFn: () => api.get<{ pages: TreeNode[] }>(`/spaces/${space.id}/tree`),
   });
   const canCreate = space.can?.['page.create'] ?? false;
+  // The home page has its own row above the tree, so its children are the top rows.
+  const home = space.home_page_id;
+  const rows = useMemo(() => tree.data?.pages.filter((n) => n.id !== home), [tree.data, home]);
   return (
     <aside className="sidebar">
+      <SpaceStrip current={space} />
       <div className="sidebar-head">
         <Link href={`/spaces/${space.key}`} className="space-link">
           <SpaceBadge space={space} /> {space.name}
@@ -206,18 +229,18 @@ function Sidebar({
           <IconChevronLeft size={MENU_ICON_SIZE} />
         </button>
       </div>
-      <SpaceLinks space={space} />
+      <SpaceLinks space={space} current={current} />
       {tree.isPending && <Loading />}
       <ErrorNote error={tree.error} />
-      {tree.data && (
+      {rows && (
         <PagesSection
           key={space.id}
           spaceId={space.id}
-          nodes={tree.data.pages}
-          current={current}
+          nodes={rows}
+          current={current === home ? undefined : current}
           canMove={canCreate}
           onAdd={canCreate ? (id) => setAdding({ parent: id }) : undefined}
-          onAddRoot={canCreate ? () => setAdding({ parent }) : undefined}
+          onAddRoot={canCreate ? () => setAdding({ parent: parent ?? home }) : undefined}
           onDialog={(page, dialog) => setRowDialog({ page, dialog })}
         />
       )}

@@ -215,6 +215,13 @@ func (s *Service) Find(ctx context.Context, c identity.Caller, text string, limi
 	return collect(rows, err)
 }
 
+// NoneExist reports whether the instance has no space at all, also not in the trash.
+func (s *Service) NoneExist(ctx context.Context) (bool, error) {
+	var found bool
+	err := s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM spaces)").Scan(&found)
+	return !found, err
+}
+
 // KeyFree reports whether a key can still be used. A space in the trash keeps its key.
 func (s *Service) KeyFree(ctx context.Context, key string) (bool, error) {
 	var id uuid.UUID

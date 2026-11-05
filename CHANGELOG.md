@@ -4,6 +4,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the home of a space, and an example space
+- The home page is no longer a row of the tree. It has a fixed Home row above it, which is marked while you are there, and the breadcrumbs say Home
+- A strip at the top of the sidebar moves you between spaces. It scrolls on its own, and marks where you are
+- A new instance starts with an example space that shows everything a page can do. An administrator can add it later in Administration, Settings
+
+Upgrade impact: no database change. An instance that already has spaces gets no example by itself. To start a new instance empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`.
+
 ### Added: reading and getting around (wave B)
 - The search box finds pages, spaces, files and people while you type, works with the arrow keys, remembers recent searches, and can stay inside a space
 - The top bar gains Recent and Favourites menus, a help menu, and a small menu on Create
