@@ -18,10 +18,12 @@ export function Lightbox({
   images,
   start,
   onClose,
+  onComment,
 }: {
   images: ShownImage[];
   start: number;
   onClose: () => void;
+  onComment?: (image: ShownImage) => void;
 }) {
   const { t } = useTranslation();
   const [at, setAt] = useState(start);
@@ -55,6 +57,11 @@ export function Lightbox({
         <img src={image.src} alt={image.alt} />
         {image.caption && <figcaption>{image.caption}</figcaption>}
       </figure>
+      {onComment && (
+        <button type="button" className="lightbox-comment" onClick={() => onComment(image)}>
+          {t('comments.comment')}
+        </button>
+      )}
       {many && (
         <div className="lightbox-steps">
           <button type="button" className="icon" aria-label={t('viewer.previous')} onClick={() => move(-1)}>

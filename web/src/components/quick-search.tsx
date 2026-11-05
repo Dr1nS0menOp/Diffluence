@@ -5,11 +5,11 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, type ListedPage, type QuickResults, type Space } from '../api';
+import { personalKey, usePerson } from '../personal';
 import { navigate } from '../router';
 import { IconClose, IconSearch } from './icons';
 import { formatDay } from './ui';
 
-const SEARCHES_KEY = 'diffluence.searches';
 const MAX_SEARCHES = 8;
 const PAUSE_MS = 200;
 const RECENT_PAGES_SHOWN = 5;
@@ -92,6 +92,7 @@ function useDelayed(value: string): string {
 
 export function QuickSearch({ space }: { space: Space | null }) {
   const { t } = useTranslation();
+  const searchesKey = personalKey(usePerson(), 'searches');
   const listId = useId();
   const root = useRef<HTMLFormElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -99,7 +100,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
   const [open, setOpen] = useState(false);
   const [marked, setMarked] = useState(-1);
   const [chipRemoved, setChipRemoved] = useState(false);
-  const [searches, setSearches] = useState(() => readSearches(localStorage.getItem(SEARCHES_KEY)));
+  const [searches, setSearches] = useState(() => readSearches(localStorage.getItem(searchesKey)));
   const typed = useDelayed(text.trim());
   const within = space && !chipRemoved ? space : null;
 
@@ -178,7 +179,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
   const rememberAndSearch = (query: string) => {
     const next = addSearch(searches, query);
     setSearches(next);
-    localStorage.setItem(SEARCHES_KEY, JSON.stringify(next));
+    localStorage.setItem(searchesKey, JSON.stringify(next));
     const params = new URLSearchParams({ q: query });
     if (within) params.set('space_id', within.id);
     navigate(`/search?${params.toString()}`);
@@ -192,7 +193,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
   const choose = (row: QuickRow | undefined) => {
     if (row?.run === 'clear') {
       setSearches([]);
-      localStorage.removeItem(SEARCHES_KEY);
+      localStorage.removeItem(searchesKey);
       return;
     }
     close();

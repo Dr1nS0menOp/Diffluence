@@ -17,6 +17,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/tasks"
 )
 
 // Draft is a user's private work in progress on a page.
@@ -75,6 +76,10 @@ func (s *Service) GetDraft(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return d, apperr.NotFound()
 	}
+	if err != nil {
+		return d, err
+	}
+	d.Document, err = s.withNames(ctx, d.Document)
 	return d, err
 }
 
@@ -94,6 +99,7 @@ type PublishInput struct {
 	BaseVersion int
 	Summary     string
 	Overwrite   bool // publish even though someone else published in between
+	Silent      bool // tell no watcher: a small fix (PAG-025)
 }
 
 func checkSummary(summary string) (string, error) {
@@ -139,7 +145,7 @@ func (s *Service) Publish(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		if p.CurrentVersion != in.BaseVersion && !in.Overwrite {
 			return apperr.Conflict("version_conflict", "Someone else published this page while you were editing.")
 		}
-		if out, err = s.appendVersion(ctx, tx, c, p, title, doc, c.UserID, summary, nil); err != nil {
+		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID, Summary: summary, Silent: in.Silent}); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, "DELETE FROM drafts WHERE page_id = $1 AND user_id = $2", id, c.UserID)
@@ -184,7 +190,7 @@ func (s *Service) Rename(ctx context.Context, c identity.Caller, id uuid.UUID, t
 		if err != nil {
 			return err
 		}
-		if out, err = s.appendVersion(ctx, tx, c, p, title, doc, c.UserID, "", nil); err != nil {
+		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID}); err != nil {
 			return err
 		}
 		return record(ctx, tx, c, "page.renamed", out, map[string]any{"previous_title": p.Title})
@@ -243,7 +249,12 @@ func (s *Service) GetVersion(ctx context.Context, c identity.Caller, id uuid.UUI
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return Version{}, err
 	}
-	return s.version(ctx, id, number)
+	v, err := s.version(ctx, id, number)
+	if err != nil {
+		return v, err
+	}
+	v.Document, err = s.withNames(ctx, v.Document)
+	return v, err
 }
 
 // Comparison is the difference between two versions.
@@ -266,11 +277,11 @@ func (s *Service) Compare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if err != nil {
 		return Comparison{}, err
 	}
-	da, err := document.Parse(a.Document)
+	da, err := s.readable(ctx, a.Document)
 	if err != nil {
 		return Comparison{}, err
 	}
-	db, err := document.Parse(b.Document)
+	db, err := s.readable(ctx, b.Document)
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -302,10 +313,46 @@ func (s *Service) RestoreVersion(ctx context.Context, c identity.Caller, id uuid
 		if err != nil {
 			return err
 		}
-		if out, err = s.appendVersion(ctx, tx, c, p, title, doc, c.UserID, "", &number); err != nil {
+		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID, RestoredFrom: &number}); err != nil {
 			return err
 		}
 		return record(ctx, tx, c, "page.version_restored", out, map[string]any{"restored_from": number})
+	})
+	return out, err
+}
+
+// SetTaskDone ticks a task. The document is the truth, so a tick publishes a silent
+// version: it is a change, and it is not news (spec 010, D8).
+func (s *Service) SetTaskDone(ctx context.Context, c identity.Caller, taskID uuid.UUID, done bool) (Page, error) {
+	pageID, err := tasks.PageOf(ctx, s.pool, taskID)
+	if err != nil {
+		return Page{}, err
+	}
+	var out Page
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.PageEdit, uuid.Nil); err != nil {
+			return err
+		}
+		p, err := lockPage(ctx, tx, pageID)
+		if err != nil {
+			return err
+		}
+		doc, err := currentDocument(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+		if !document.SetTaskDone(&doc, taskID, done) {
+			return apperr.NotFound()
+		}
+		out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: p.Title, Doc: doc, Author: c.UserID, Silent: true})
+		if err != nil {
+			return err
+		}
+		action := "task.reopened"
+		if done {
+			action = "task.done"
+		}
+		return recordEvent(ctx, tx, c, action, out, map[string]any{"task_id": taskID}, map[string]any{"task_id": taskID})
 	})
 	return out, err
 }

@@ -34,7 +34,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-022** · built · An optional summary says what changed. It shows in the history.
 - **PAG-023** · built · If someone else published in between, the person is told. They can compare, keep editing, or publish anyway.
 - **PAG-024** · new · A small arrow beside Publish opens the publish options: location, who can see it, notify watchers or not, and a schedule.
-- **PAG-025** · new · **Silent update:** the person can choose not to notify watchers, for small fixes.
+- **PAG-025** · built · **Silent update:** the person can choose not to notify watchers, for small fixes.
 - **PAG-026** · new · **Scheduled publishing:** a page or a change can be published at a chosen date and time. Until then a clear mark says so, the person can change or cancel it, and no notification is sent. Later edits are included.
 - **PAG-027** · new · **Publish location:** a person can pick another parent or space at publishing time, with the same rules as a move.
 - **PAG-028** · new · A page can be previewed before publishing, in the reading layout, without leaving the editor.
@@ -125,7 +125,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-092** · new · Compare also shows changes in tables per cell, in images and in files.
 - **PAG-093** · new · A reader sees **What changed** beside the byline after an update, with the differences since their last visit.
 - **PAG-094** · built · An old version shows a banner: which version it is, who made it, and a link to the current one.
-- **PAG-095** · new · Comments are not part of a version, and stay with the page when a version is restored.
+- **PAG-095** · built · Comments are not part of a version, and stay with the page when a version is restored.
 - **PAG-096** · new · Deleting one version is not offered: versions are immutable, because the audit trail relies on them. If a secret ended up in a version, an administrator removes that one version with a reason, the audit log records it, and the version number stays visible as "removed".
 
 ## 3.11 Reading a page
@@ -135,7 +135,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-099** · built · The breadcrumbs start with the space, and leave out the home page.
 - **PAG-100** · built · Long breadcrumbs fold the middle into a menu.
 - **PAG-101** · built · The actions on the page are Edit, the star, the lock and More. Rarely used actions live in More, never as a row of buttons.
-- **PAG-102** · new · A **Share** button joins them (COL-042), and a **Watch** toggle joins More.
+- **PAG-102** · built · A **Share** button joins them (COL-042), and a **Watch** toggle joins More.
 - **PAG-103** · partly · The byline shows the owner, the date of the last update and the version. Built: creator, date, version, restricted mark. New: owner, read time, view count, status. Still open: the owner, view count and status (waves D and H).
 - **PAG-104** · built · **Read time** is estimated at 230 words per minute, with a minimum of one minute. It is left out for very short pages.
 - **PAG-105** · new · **View count** shows after the byline for those allowed to see analytics, and opens page insights (PLT-008).
@@ -145,14 +145,14 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-109** · built · Every heading has a link icon on hover or focus, which copies an address that jumps straight to that heading.
 - **PAG-110** · built · An address that jumps to a heading scrolls to it and marks it briefly.
 - **PAG-111** · built · Long code blocks and wide tables scroll inside their own frame, so the page itself never scrolls sideways.
-- **PAG-112** · new · Selecting text shows a small floating button to comment on it (COL-013) and to copy a link to the selection.
+- **PAG-112** · built · Selecting text shows a small floating button to comment on it (COL-013) and to copy a link to the selection.
 - **PAG-113** · built · Selecting an image opens it large on top of the page, with arrows to the next image.
 - **PAG-114** · built · A page can be shown in a presentation mode: full screen, one section per heading, moved with the arrow keys.
-- **PAG-115** · partly · **Page information** in More shows the owner, created, last changed, length, read time, labels, incoming links, outgoing links, watchers and the page's address. Still open: labels and watchers (waves C and D).
+- **PAG-115** · partly · **Page information** in More shows the owner, created, last changed, length, read time, labels, incoming links, outgoing links, watchers and the page's address. Still open: labels (wave D).
 - **PAG-116** · partly · A **Details** panel opens beside the page, from a small button at the far edge, with labels, attachments, status and information on one screen. It replaces the need for many menu items. Still open: labels and status (wave D).
 - **PAG-117** · built · **Incoming links** lists all pages the person may see that link to this page.
 - **PAG-118** · built · The page lists its child pages at the bottom when the document does not do so already, and this can be turned off per page.
-- **PAG-119** · new · At the bottom of a page: labels, then reactions, then comments (chapter 7).
+- **PAG-119** · partly · At the bottom of a page: labels, then reactions, then comments (chapter 7). Still open: labels (wave D).
 - **PAG-120** · phase 4 · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
 - **PAG-121** · built · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
 - **PAG-122** · built · Stored documents are only ever rendered by the editor, so no HTML from a document reaches the browser.

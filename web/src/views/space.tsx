@@ -234,6 +234,38 @@ function PermissionsSection({ space }: { space: Space }) {
   );
 }
 
+const FEATURES = ['comments', 'reactions', 'access_requests'] as const;
+
+function FeaturesSection({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const features = space.features ?? { comments: true, reactions: true, access_requests: false };
+  const save = useMutation({
+    mutationFn: (next: typeof features) => api.patch(`/spaces/${space.id}/features`, next),
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: ['space', space.key] });
+      await client.invalidateQueries({ queryKey: ['space-id', space.id] });
+    },
+  });
+  return (
+    <section>
+      <h2>{t('space.features')}</h2>
+      <p className="muted">{t('space.featuresHelp')}</p>
+      <ErrorNote error={save.error} />
+      {FEATURES.map((name) => (
+        <label key={name} className="check">
+          <input
+            type="checkbox"
+            checked={features[name]}
+            onChange={(e) => save.mutate({ ...features, [name]: e.target.checked })}
+          />
+          {t(`space.feature_${name}`)}
+        </label>
+      ))}
+    </section>
+  );
+}
+
 function ShortcutsSection({ space }: { space: Space }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -386,6 +418,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
           </button>
         </form>
       </section>
+      <FeaturesSection space={space} />
       <ShortcutsSection space={space} />
       <PermissionsSection space={space} />
       <ImportBox space={space} />

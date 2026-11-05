@@ -1,12 +1,30 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type SpaceOverview } from '../api';
+import { api, type Space, type SpaceOverview } from '../api';
 import { Link } from '../router';
-import { Frame, spaceByKeyQuery } from '../components/frame';
-import { IconStar } from '../components/icons';
+import { Frame, spaceByKeyQuery, useSpaceWatch } from '../components/frame';
+import { IconEye, IconStar } from '../components/icons';
 import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge } from '../components/ui';
+
+function WatchButton({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const watch = useSpaceWatch(space);
+  const label = watch.watching ? t('watching.stopSpace') : t('watching.watchSpace');
+  return (
+    <button
+      type="button"
+      className="icon"
+      aria-label={label}
+      title={label}
+      aria-pressed={watch.watching}
+      onClick={() => watch.set(!watch.watching)}
+    >
+      <IconEye />
+    </button>
+  );
+}
 
 export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
@@ -43,16 +61,19 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
         <h1 className="overview-title">
           <SpaceBadge space={space} size="large" /> {space.name}
         </h1>
-        <button
-          type="button"
-          className="icon"
-          aria-label={label}
-          title={label}
-          aria-pressed={space.favourite}
-          onClick={() => star.mutate()}
-        >
-          <IconStar />
-        </button>
+        <span className="row">
+          <WatchButton space={space} />
+          <button
+            type="button"
+            className="icon"
+            aria-label={label}
+            title={label}
+            aria-pressed={space.favourite}
+            onClick={() => star.mutate()}
+          >
+            <IconStar />
+          </button>
+        </span>
       </div>
       {space.description && <p>{space.description}</p>}
       <ErrorNote error={overview.error ?? star.error} />

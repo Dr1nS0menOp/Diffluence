@@ -71,6 +71,7 @@ const (
 	TypeDecision       = "decision"
 	TypeStatus         = "status"
 	TypeDate           = "date"
+	TypeMention        = "mention"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
 	TypeTableCell      = "tableCell"
@@ -94,7 +95,7 @@ const (
 
 var (
 	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention}
 )
 
 // children says which node types may appear inside each node type.
@@ -120,6 +121,7 @@ var children = map[string][]string{
 	TypeDecision:       inlineTypes,
 	TypeStatus:         {},
 	TypeDate:           {},
+	TypeMention:        {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},
 	TypeTableCell:      blockTypes,
@@ -305,6 +307,9 @@ func wordsOf(n Node) string {
 	}
 	if n.Type == TypeHardBreak {
 		return " "
+	}
+	if n.Type == TypeMention {
+		return mentionText(n)
 	}
 	s, _ := n.Attrs[key].(string)
 	return s

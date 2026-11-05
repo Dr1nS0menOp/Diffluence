@@ -7,6 +7,7 @@ import {
   GLOBAL_PERMISSIONS,
   type AuditEvent,
   type Group,
+  type MailEntry,
   type Me,
   type Space,
   type TrashItem,
@@ -17,7 +18,8 @@ import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
 import { AppearanceSection } from './admin-appearance';
 
-const TABS = ['users', 'groups', 'spaces', 'audit', 'settings', 'scim', 'system'] as const;
+const TABS = ['users', 'groups', 'spaces', 'audit', 'settings', 'mail', 'scim', 'system'] as const;
+const MAIL_SWITCHES = ['mail_enabled', 'mail_excerpts', 'reactions_enabled', 'group_mentions'] as const;
 
 function GlobalPermissions({ current, onChange }: { current: string[]; onChange: (next: string[]) => void }) {
   const { t } = useTranslation();
@@ -626,6 +628,87 @@ function SettingsTab() {
   );
 }
 
+type MailSettings = Record<(typeof MAIL_SWITCHES)[number], boolean>;
+
+function MailQueue({ entries }: { entries: MailEntry[] }) {
+  const { t } = useTranslation();
+  if (entries.length === 0) return <p className="muted">{t('admin.mailEmpty')}</p>;
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>{t('admin.when')}</th>
+          <th>{t('common.type')}</th>
+          <th>{t('common.status')}</th>
+          <th>{t('admin.mailAttempts')}</th>
+          <th>{t('admin.mailError')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {entries.map((m) => (
+          <tr key={m.id}>
+            <td>{formatDate(m.created_at)}</td>
+            <td>{m.kind}</td>
+            <td>{m.status}</td>
+            <td>{m.attempts}</td>
+            <td>{m.last_error}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
+function MailTab() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const settings = useQuery({
+    queryKey: ['settings'],
+    queryFn: () => api.get<MailSettings>('/admin/settings'),
+  });
+  const mail = useQuery({
+    queryKey: ['mail-queue'],
+    queryFn: () => api.get<{ configured: boolean; queue: MailEntry[] }>('/admin/mail'),
+  });
+  const save = useMutation({
+    mutationFn: (change: Partial<MailSettings>) => api.put('/admin/settings', change),
+    onSettled: () => client.invalidateQueries({ queryKey: ['settings'] }),
+  });
+  const test = useMutation({
+    mutationFn: () => api.post('/admin/mail/test'),
+    onSettled: () => client.invalidateQueries({ queryKey: ['mail-queue'] }),
+  });
+  if (settings.error || mail.error) return <ErrorNote error={settings.error ?? mail.error} />;
+  if (!settings.data || !mail.data) return <Loading />;
+  const current = settings.data;
+  return (
+    <>
+      <ErrorNote error={save.error ?? test.error} />
+      {!mail.data.configured && <p className="note">{t('admin.mailOff')}</p>}
+      {MAIL_SWITCHES.map((name) => (
+        <label key={name} className="check">
+          <input
+            type="checkbox"
+            checked={current[name]}
+            onChange={(e) => save.mutate({ [name]: e.target.checked })}
+          />
+          {t(`admin.${name}`)}
+        </label>
+      ))}
+      <button type="button" disabled={!mail.data.configured} onClick={() => test.mutate()}>
+        {t('admin.mailTest')}
+      </button>
+      {test.isSuccess && (
+        <p role="status" className="note">
+          {t('admin.mailTestQueued')}
+        </p>
+      )}
+      <h2>{t('admin.mailQueue')}</h2>
+      <MailQueue entries={mail.data.queue} />
+    </>
+  );
+}
+
 interface ScimToken {
   id: string;
   name: string;
@@ -825,6 +908,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
           {tab === 'spaces' && <SpacesTab />}
           {tab === 'audit' && <AuditTab />}
           {tab === 'settings' && <SettingsTab />}
+          {tab === 'mail' && <MailTab />}
           {tab === 'scim' && <ScimTab />}
           {tab === 'system' && <SystemTab />}
         </div>

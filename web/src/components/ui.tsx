@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError, type Space } from '../api';
 import { IconClose, IconUpload } from './icons';
@@ -233,6 +233,53 @@ export function relativeTime(value: string, now = Date.now(), locale?: string): 
 }
 
 /** A time that reads easily, with the exact moment on hover and for screen readers. */
+/** Tabs with the keys of the ARIA tabs pattern: the arrows move, and the focus moves along. */
+export function Tabs<Name extends string>({
+  names,
+  current,
+  label,
+  nameOf,
+  panel,
+  onChange,
+}: {
+  names: readonly Name[];
+  current: Name;
+  label: string;
+  nameOf: (name: Name) => string;
+  panel?: string;
+  onChange: (next: Name) => void;
+}) {
+  const keys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const forward = getComputedStyle(e.currentTarget).direction === 'rtl' ? 'ArrowLeft' : 'ArrowRight';
+    const backward = forward === 'ArrowLeft' ? 'ArrowRight' : 'ArrowLeft';
+    const step = e.key === forward ? 1 : e.key === backward ? -1 : 0;
+    if (!step) return;
+    e.preventDefault();
+    const at = (names.indexOf(current) + step + names.length) % names.length;
+    const next = names[at];
+    if (!next) return;
+    onChange(next);
+    e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[at]?.focus();
+  };
+  return (
+    <div role="tablist" aria-label={label} className="tabs" onKeyDown={keys}>
+      {names.map((name) => (
+        <button
+          key={name}
+          type="button"
+          role="tab"
+          aria-selected={current === name}
+          aria-controls={panel}
+          tabIndex={current === name ? 0 : -1}
+          onClick={() => onChange(name)}
+        >
+          {nameOf(name)}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function RelativeTime({ value }: { value: string }) {
   return (
     <time dateTime={value} title={formatDate(value)}>

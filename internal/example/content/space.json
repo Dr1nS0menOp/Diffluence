@@ -51,6 +51,24 @@
    ]
   },
   {
+   "slug": "working-together",
+   "title": "Working together",
+   "document": "working-together.json",
+   "emoji": "🤝",
+   "comments": [
+    {
+     "text": "A comment under the page. Reply to it, or write your own below."
+    },
+    {
+     "text": "A comment on these words. Select them to see the thread beside the page.",
+     "quote": "The words you select"
+    }
+   ],
+   "reactions": [
+    "🎉"
+   ]
+  },
+  {
    "slug": "wide-page",
    "title": "A wide page",
    "document": "wide-page.json",

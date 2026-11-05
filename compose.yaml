@@ -35,6 +35,14 @@ services:
       # cannot disable the audit log's protection. Migrations use the owner.
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
       DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+      # Mail. Without a host it is off, and mail waits in the queue.
+      DIFFLUENCE_SMTP_HOST: ${DIFFLUENCE_SMTP_HOST:-}
+      DIFFLUENCE_SMTP_PORT: ${DIFFLUENCE_SMTP_PORT:-587}
+      DIFFLUENCE_SMTP_USERNAME: ${DIFFLUENCE_SMTP_USERNAME:-}
+      DIFFLUENCE_SMTP_PASSWORD: ${DIFFLUENCE_SMTP_PASSWORD:-}
+      DIFFLUENCE_SMTP_FROM: ${DIFFLUENCE_SMTP_FROM:-}
+      DIFFLUENCE_SMTP_REPLY_TO: ${DIFFLUENCE_SMTP_REPLY_TO:-}
+      DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-starttls}
     secrets: [database_url, migrate_database_url]
     ports: ["${DIFFLUENCE_PORT:-8080}:8080"]
     volumes: [data:/var/lib/diffluence]

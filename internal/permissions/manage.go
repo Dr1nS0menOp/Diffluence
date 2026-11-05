@@ -288,6 +288,79 @@ func (s *Service) Restrictions(ctx context.Context, c identity.Caller, pageID uu
 	return out, up.Err()
 }
 
+// BlockingLevel is one restriction that keeps a person out of a page.
+type BlockingLevel struct {
+	PageID uuid.UUID
+	Kind   string
+}
+
+// LevelsBlocking lists every restriction that keeps a person out of a page. Each one
+// must change before they can get in, and one on a page above opens that whole branch.
+func (s *Service) LevelsBlocking(ctx context.Context, q db.Querier, pageID, user uuid.UUID, edit bool) ([]BlockingLevel, error) {
+	_, page, err := s.LoadPage(ctx, q, pageID)
+	if err != nil {
+		return nil, err
+	}
+	facts, err := s.LoadUser(ctx, q, user)
+	if err != nil {
+		return nil, err
+	}
+	out := []BlockingLevel{}
+	for _, level := range page.ViewChain {
+		if !facts.matchesAny(level.Subjects) {
+			out = append(out, BlockingLevel{PageID: level.PageID, Kind: "view"})
+		}
+	}
+	if edit && len(page.EditSubjects) > 0 && !facts.matchesAny(page.EditSubjects) {
+		out = append(out, BlockingLevel{PageID: pageID, Kind: "edit"})
+	}
+	return out, nil
+}
+
+// OpenRestrictionsFor adds one person to the restrictions that keep them out of a page.
+// It only opens what the caller may manage, so it cannot widen anything quietly.
+func (s *Service) OpenRestrictionsFor(ctx context.Context, tx pgx.Tx, c identity.Caller, pageID, user uuid.UUID, edit bool) error {
+	levels, err := s.LevelsBlocking(ctx, tx, pageID, user, edit)
+	if err != nil {
+		return err
+	}
+	me := Subject{Type: SubjectUser, ID: user}
+	for _, level := range levels {
+		if err := s.addRestriction(ctx, tx, c, level.PageID, level.Kind, me); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) addRestriction(ctx context.Context, tx pgx.Tx, c identity.Caller, pageID uuid.UUID, kind string, sub Subject) error {
+	if err := s.RequirePage(ctx, tx, c.UserID, pageID, RestrictionManage, uuid.Nil); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
+		VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, pageID, kind, sub.Type, sub.ID); err != nil {
+		return err
+	}
+	space, err := spaceOfPage(ctx, tx, pageID)
+	if err != nil {
+		return err
+	}
+	return recordChange(ctx, tx, c, "permission.restriction.added", "page", pageID.String(), space, map[string]any{"kind": kind, "subject": sub})
+}
+
+// GrantEditor makes someone an editor of a whole space, for a request a space
+// administrator allowed. The caller's right to do so is checked here as well.
+func (s *Service) GrantEditor(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID, user uuid.UUID) error {
+	if err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceAdminister); err != nil {
+		return err
+	}
+	sub := Subject{Type: SubjectUser, ID: user}
+	if err := ApplyTemplateTx(ctx, tx, spaceID, sub, TemplateEditor); err != nil {
+		return err
+	}
+	return recordChange(ctx, tx, c, "permission.space.granted", sub.Type, sub.ID.String(), spaceID.String(), map[string]any{"template": TemplateEditor})
+}
+
 func spaceOfPage(ctx context.Context, q db.Querier, pageID uuid.UUID) (string, error) {
 	var id uuid.UUID
 	err := q.QueryRow(ctx, "SELECT space_id FROM pages WHERE id = $1", pageID).Scan(&id)

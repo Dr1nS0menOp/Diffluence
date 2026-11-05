@@ -18,6 +18,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -36,6 +37,7 @@ const offeredMark = "example_space_offered"
 const (
 	firstVersionText    = "This page is about to be filled in."
 	secondVersionReason = "Filled in the example"
+	filledVersion       = 2
 )
 
 // Placeholders in the documents, which become real ids once they exist.
@@ -44,18 +46,29 @@ var (
 	pagePlaceholder = regexp.MustCompile(`@page:([a-z0-9-]+)`)
 )
 
+// ownerPlaceholder is the person the example belongs to, for a mention and a task.
+const ownerPlaceholder = "@person:owner"
+
+// planComment is a comment under a page, or on words of it when it has a quote.
+type planComment struct {
+	Text  string `json:"text"`
+	Quote string `json:"quote"`
+}
+
 type planPage struct {
-	Slug           string     `json:"slug"`
-	Title          string     `json:"title"`
-	Document       string     `json:"document"`
-	Emoji          string     `json:"emoji"`
-	FullWidth      bool       `json:"full_width"`
-	TitleAlign     string     `json:"title_align"`
-	Header         string     `json:"header"`
-	HeaderPosition int        `json:"header_position"`
-	Files          []string   `json:"files"`
-	EditOnlyOwner  bool       `json:"edit_only_owner"`
-	Children       []planPage `json:"children"`
+	Slug           string        `json:"slug"`
+	Title          string        `json:"title"`
+	Document       string        `json:"document"`
+	Emoji          string        `json:"emoji"`
+	FullWidth      bool          `json:"full_width"`
+	TitleAlign     string        `json:"title_align"`
+	Header         string        `json:"header"`
+	HeaderPosition int           `json:"header_position"`
+	Files          []string      `json:"files"`
+	EditOnlyOwner  bool          `json:"edit_only_owner"`
+	Comments       []planComment `json:"comments"`
+	Reactions      []string      `json:"reactions"`
+	Children       []planPage    `json:"children"`
 }
 
 type planShortcut struct {
@@ -114,6 +127,7 @@ func (p plan) assets() []string {
 type references struct {
 	files map[string]uuid.UUID
 	pages map[string]uuid.UUID
+	owner uuid.UUID
 }
 
 func replaceAll(raw []byte, pattern *regexp.Regexp, ids map[string]uuid.UUID) ([]byte, error) {
@@ -138,7 +152,11 @@ func (r references) fill(raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return replaceAll(out, pagePlaceholder, r.pages)
+	out, err = replaceAll(out, pagePlaceholder, r.pages)
+	if err != nil {
+		return nil, err
+	}
+	return bytes.ReplaceAll(out, []byte(ownerPlaceholder), []byte(r.owner.String())), nil
 }
 
 // Service makes the example space.
@@ -149,12 +167,13 @@ type Service struct {
 	pages       *pages.Service
 	attachments *attachments.Service
 	permissions *permissions.Service
+	comments    *comments.Service
 }
 
 // NewService creates the service.
 func NewService(id *identity.Service, st *settings.Service, sp *spaces.Service, pg *pages.Service,
-	att *attachments.Service, perms *permissions.Service) *Service {
-	return &Service{identity: id, settings: st, spaces: sp, pages: pg, attachments: att, permissions: perms}
+	att *attachments.Service, perms *permissions.Service, cm *comments.Service) *Service {
+	return &Service{identity: id, settings: st, spaces: sp, pages: pg, attachments: att, permissions: perms, comments: cm}
 }
 
 // OnNewInstance makes the example space on an instance that has never had a
@@ -199,7 +218,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller) (spaces.Space, 
 	if sp.HomePageID == nil {
 		return sp, fmt.Errorf("example: the space has no home page")
 	}
-	refs := references{files: map[string]uuid.UUID{}, pages: map[string]uuid.UUID{}}
+	refs := references{files: map[string]uuid.UUID{}, pages: map[string]uuid.UUID{}, owner: c.UserID}
 	if err := s.upload(ctx, c, *sp.HomePageID, p.HomeFiles, refs); err != nil {
 		return sp, err
 	}
@@ -306,11 +325,33 @@ func (s *Service) finish(ctx context.Context, c identity.Caller, page planPage, 
 	if _, err := s.pages.SetLook(ctx, c, id, look); err != nil {
 		return err
 	}
+	if err := s.respond(ctx, c, page, id); err != nil {
+		return err
+	}
 	if !page.EditOnlyOwner {
 		return nil
 	}
 	owner := permissions.Subject{Type: permissions.SubjectUser, ID: c.UserID}
 	return s.permissions.SetRestrictions(ctx, c, id, "edit", []permissions.Subject{owner})
+}
+
+// respond adds the comments and reactions of a page, after its real text is there.
+func (s *Service) respond(ctx context.Context, c identity.Caller, page planPage, id uuid.UUID) error {
+	for _, comment := range page.Comments {
+		in := comments.NewComment{Body: oneLine(comment.Text)}
+		if comment.Quote != "" {
+			in.Anchor = &comments.Anchor{Kind: comments.AnchorText, Exact: comment.Quote, Version: filledVersion}
+		}
+		if _, err := s.comments.Create(ctx, c, id, in); err != nil {
+			return err
+		}
+	}
+	for _, emoji := range page.Reactions {
+		if err := s.comments.SetReaction(ctx, c, comments.TargetPage, id, emoji, true); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) setShortcuts(ctx context.Context, c identity.Caller, spaceID uuid.UUID, p plan, refs references) error {

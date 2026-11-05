@@ -10,7 +10,15 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type PageDetail, type PageSummary, type Shortcut, type Space, type TreeNode } from '../api';
+import {
+  api,
+  ApiError,
+  type PageDetail,
+  type PageSummary,
+  type Shortcut,
+  type Space,
+  type TreeNode,
+} from '../api';
 import { Link, match, useLocation } from '../router';
 import { usePreferences } from '../preferences';
 import { CopyDialog, DeleteDialog, MoveDialog, RenameDialog } from '../views/page-dialogs';
@@ -20,6 +28,7 @@ import {
   IconChevronRight,
   IconDownload,
   IconExternal,
+  IconEye,
   IconHome,
   IconInfo,
   IconLink,
@@ -92,10 +101,27 @@ function useSidebar(): [boolean, (visible: boolean) => void] {
   return [visible, set];
 }
 
+/** Whether you watch a space, and the way to change it. */
+export function useSpaceWatch(space: Space) {
+  const client = useQueryClient();
+  const key = ['space-watch', space.id];
+  const state = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ watching: boolean }>(`/spaces/${space.id}/watch`),
+  });
+  const set = useMutation({
+    mutationFn: (on: boolean) =>
+      on ? api.put(`/spaces/${space.id}/watch`) : api.del(`/spaces/${space.id}/watch`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  return { watching: state.data?.watching ?? false, set: set.mutate };
+}
+
 function SpaceMenu({ space }: { space: Space }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const copy = useCopy();
+  const watch = useSpaceWatch(space);
   const favourite = useMutation({
     mutationFn: (on: boolean) =>
       on ? api.put(`/spaces/${space.id}/favourite`) : api.del(`/spaces/${space.id}/favourite`),
@@ -109,6 +135,10 @@ function SpaceMenu({ space }: { space: Space }) {
     <Menu label={t('space.more')} trigger={<IconMore size={MENU_ICON_SIZE} />} floating>
       <MenuItem onClick={() => favourite.mutate(!space.favourite)}>
         <IconStar size={MENU_ICON_SIZE} /> {space.favourite ? t('space.unfavourite') : t('space.favourite')}
+      </MenuItem>
+      <MenuItem onClick={() => watch.set(!watch.watching)}>
+        <IconEye size={MENU_ICON_SIZE} />{' '}
+        {watch.watching ? t('watching.stopSpace') : t('watching.watchSpace')}
       </MenuItem>
       <MenuItem
         onClick={() => void copy(`${window.location.origin}/spaces/${space.key}`, t('tree.linkCopied'))}
@@ -377,6 +407,31 @@ export function Frame({
   );
 }
 
+/** "Not found", with a way to ask only when the space of the page chose that (COL-049). */
+function PageMissing({ pageId, error }: { pageId: string; error: unknown }) {
+  const { t } = useTranslation();
+  const ask = useMutation({
+    mutationFn: () => api.post(`/pages/${pageId}/access-requests`, { kind: 'view' }),
+  });
+  const mayAsk = error instanceof ApiError && error.code === 'not_found_ask';
+  return (
+    <main id="main" className="plain reading">
+      <ErrorNote error={error} />
+      <ErrorNote error={ask.error} />
+      {ask.isSuccess && (
+        <p role="status" className="note">
+          {t('share.asked')}
+        </p>
+      )}
+      {mayAsk && !ask.isSuccess && (
+        <button type="button" disabled={ask.isPending} onClick={() => ask.mutate()}>
+          {t('share.askForAccess')}
+        </button>
+      )}
+    </main>
+  );
+}
+
 /** Frames a page with the sidebar of its space. */
 export function SpaceShell({ pageId, children }: { pageId: string; children: ReactNode }) {
   const page = useQuery({
@@ -392,11 +447,7 @@ export function SpaceShell({ pageId, children }: { pageId: string; children: Rea
   });
   if (page.isPending || (page.data && space.isPending)) return <Loading />;
   if (page.error || space.error || !space.data) {
-    return (
-      <main id="main" className="plain reading">
-        <ErrorNote error={page.error ?? space.error} />
-      </main>
-    );
+    return <PageMissing pageId={pageId} error={page.error ?? space.error} />;
   }
   return (
     <Frame space={space.data} current={pageId} parent={page.data?.status === 'published' ? pageId : null}>

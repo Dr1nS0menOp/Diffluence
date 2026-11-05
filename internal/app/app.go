@@ -20,15 +20,19 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/httpapi"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -36,11 +40,14 @@ import (
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/spaces"
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/storage"
+	"github.com/diffluence/diffluence/internal/tasks"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/version"
+	"github.com/diffluence/diffluence/internal/watches"
 )
 
 // NewLogger returns the JSON logger used everywhere.
@@ -68,6 +75,13 @@ type App struct {
 	search     *search.Service
 	scim       *scim.Service
 	sso        *sso.Provider
+	comments   *comments.Service
+	watches    *watches.Service
+	tasks      *tasks.Service
+	notify     *notify.Service
+	mail       *mail.Service
+	sharing    *sharing.Service
+	feed       *feed.Service
 	keyring    *keys.Keyring
 	nodeID     uuid.UUID
 	api        *httpapi.Server
@@ -133,10 +147,20 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.trash.Register(trash.TypePage, a.pages)
 	a.trash.Register(trash.TypeAttachment, a.attach)
 	a.trash.Register(trash.TypeSpace, a.spaces)
+	a.comments = comments.NewService(a.pool, a.perms, a.settings, a.instanceID)
+	a.trash.Register(trash.TypeComment, a.comments)
+	a.watches = watches.NewService(a.pool, a.perms)
+	a.tasks = tasks.NewService(a.pool)
+	a.feed = feed.NewService(a.pool)
+	a.notify = notify.NewService(a.pool, a.perms, a.settings, a.watches, notify.Options{
+		InstanceName: cfg.InstanceName, PublicOrigin: cfg.PublicOrigin(), Keyring: a.keyring})
+	a.mail = mail.NewService(a.pool, mailSender(cfg), log)
+	a.mail.SetRenderer(a.notify.Render)
+	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify)
 	a.search = search.NewService(a.pool)
 	a.jobs = jobs.NewService(a.pool, log)
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, cfg.DataDir)
-	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms)
+	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments)
 	a.scim = scim.NewService(a.pool, a.identity, cfg.PublicOrigin(), log)
 	if cfg.OIDC.Issuer != "" {
 		a.sso = sso.New(sso.Config{Issuer: cfg.OIDC.Issuer, ClientID: cfg.OIDC.ClientID, ClientSecret: cfg.OIDC.ClientSecret,
@@ -148,7 +172,8 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
-			SCIM: a.scim, SSO: a.sso,
+			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
+			Sharing: a.sharing, Feed: a.feed,
 			SystemStatus: a.SystemStatus,
 			InstanceID:   a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
@@ -157,6 +182,14 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		}
 	}
 	return a, nil
+}
+
+// mailSender is the mail server, or nothing, and then mail waits in the queue.
+func mailSender(cfg config.Config) mail.Sender {
+	if cfg.SMTP.Host == "" {
+		return nil
+	}
+	return mail.SMTP{Config: cfg.SMTP, ListID: cfg.InstanceName + " <notifications." + cfg.PublicURL.Hostname() + ">"}
 }
 
 // migrate applies migrations, as the owner of the tables when one is configured.
@@ -245,10 +278,17 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 
 	if a.cfg.Role.RunsWorker() {
 		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log}
-		wg.Add(3)
+		wg.Add(5)
 		go func() { defer wg.Done(); relay.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.RunPeriodic(workCtx, a.PeriodicTasks()) }()
+		go func() { defer wg.Done(); a.mail.Run(workCtx) }()
+		go func() {
+			defer wg.Done()
+			if err := a.queue.Consume(workCtx, notificationConsumer, a.handleEvent); err != nil {
+				a.log.Error("notifications stopped", "error", err)
+			}
+		}()
 	}
 
 	wg.Add(1)
@@ -291,6 +331,35 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	return runErr
 }
 
+// notificationConsumer is the durable name of the fan-out in the event stream.
+const notificationConsumer = "notifications"
+
+// handleEvent turns one event from the stream into notifications.
+func (a *App) handleEvent(ctx context.Context, data []byte) error {
+	return a.notify.Publish(ctx, "", data, "")
+}
+
+// Notify exposes notifications (used by tests).
+func (a *App) Notify() *notify.Service { return a.notify }
+
+// Mail exposes the mail queue (used by tests).
+func (a *App) Mail() *mail.Service { return a.mail }
+
+// Logger exposes the logger (used by tests).
+func (a *App) Logger() *slog.Logger { return a.log }
+
+// DeliverEvents hands every waiting event straight to the notifications, as the
+// worker does through the queue. Tests use it to stay in step.
+func (a *App) DeliverEvents(ctx context.Context) error {
+	relay := &outbox.Relay{Pool: a.pool, Publisher: a.notify, Log: a.log}
+	for {
+		n, err := relay.RunOnce(ctx)
+		if err != nil || n == 0 {
+			return err
+		}
+	}
+}
+
 // Jobs exposes the job runner (used by tests).
 func (a *App) Jobs() *jobs.Service { return a.jobs }
 
@@ -326,6 +395,9 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "audit-verify", Every: 24 * time.Hour, Run: a.verifyAudit},
 		{Name: "audit-checkpoint", Every: 24 * time.Hour, Run: a.signCheckpoint},
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},
+		{Name: "task-reminders", Every: time.Hour, Run: a.notify.RemindDue},
+		{Name: "notification-digests", Every: time.Hour, Run: a.notify.SendDigests},
+		{Name: "purge-notifications", Every: 24 * time.Hour, Run: a.notify.Purge},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

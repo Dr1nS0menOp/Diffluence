@@ -2,11 +2,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, type Draft, type Json, type PageDetail } from '../api';
+import type { EditorView } from '@tiptap/pm/view';
+import { api, ApiError, type CommentAnchor, type Draft, type Json, type PageDetail } from '../api';
 import { Link, navigate } from '../router';
+import { anchorOfSelection } from '../components/comments/anchor';
+import { NewThread } from '../components/comments/selection-bar';
 import { DocumentEditor } from '../components/editor/editor';
-import { IconArrowBack } from '../components/icons';
+import { IconArrowBack, IconChevronDown } from '../components/icons';
+import { Menu, MenuItem } from '../components/menu';
 import { PageLookDialog } from '../components/page-look';
+import { ShareDialog } from '../components/share-dialog';
+import { useToast } from '../components/toast';
 import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 
 const AUTOSAVE_MS = 1500;
@@ -30,6 +36,7 @@ async function load(id: string): Promise<Loaded> {
 function Form({ data }: { data: Loaded }) {
   const { t } = useTranslation();
   const client = useQueryClient();
+  const toast = useToast();
   const { page } = data;
   const [title, setTitle] = useState(data.title);
   const [summary, setSummary] = useState('');
@@ -37,6 +44,12 @@ function Form({ data }: { data: Loaded }) {
   const [error, setError] = useState<unknown>(null);
   const [conflict, setConflict] = useState(false);
   const [lookOpen, setLookOpen] = useState(false);
+  const [commenting, setCommenting] = useState<CommentAnchor | null>(null);
+  const [sharing, setSharing] = useState(false);
+  const editorView = useRef<EditorView | null>(null);
+  const keepView = useCallback((view: EditorView) => {
+    editorView.current = view;
+  }, []);
   const doc = useRef(data.document);
   const titleRef = useRef(title);
   titleRef.current = title;
@@ -74,7 +87,14 @@ function Form({ data }: { data: Loaded }) {
     navigate(`/pages/${page.id}`);
   };
 
-  const publish = async (overwrite: boolean) => {
+  const startComment = () => {
+    const view = editorView.current;
+    const anchor = view && anchorOfSelection(view, page.current_version);
+    if (anchor) setCommenting(anchor);
+    else toast({ message: t('comments.selectFirst') });
+  };
+
+  const publish = async (overwrite: boolean, silent = false) => {
     clearTimeout(timer.current);
     dirty.current = false;
     setError(null);
@@ -85,6 +105,7 @@ function Form({ data }: { data: Loaded }) {
         base_version: data.base,
         summary,
         overwrite,
+        silent,
       });
       await finish();
     } catch (e) {
@@ -124,6 +145,16 @@ function Form({ data }: { data: Loaded }) {
           aria-label={t('editor.summary')}
           placeholder={t('editor.summary')}
         />
+        {page.status === 'published' && (
+          <button
+            type="button"
+            className="quiet"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={startComment}
+          >
+            {t('comments.comment')}
+          </button>
+        )}
         <button type="button" className="quiet" onClick={() => setLookOpen(true)}>
           {t('look.title')}
         </button>
@@ -133,9 +164,18 @@ function Form({ data }: { data: Loaded }) {
           className="quiet"
           onConfirm={() => void discard()}
         />
-        <button type="button" className="primary" onClick={() => void publish(false)}>
-          {t('editor.publish')}
-        </button>
+        <span className="top-create">
+          <button type="button" className="primary" onClick={() => void publish(false)}>
+            {t('editor.publish')}
+          </button>
+          <Menu
+            label={t('editor.publishOptions')}
+            className="primary top-create-more"
+            trigger={<IconChevronDown size={16} />}
+          >
+            <MenuItem onClick={() => void publish(false, true)}>{t('editor.publishSilent')}</MenuItem>
+          </Menu>
+        </span>
       </div>
       <ErrorNote error={error} />
       <DocumentEditor
@@ -146,6 +186,8 @@ function Form({ data }: { data: Loaded }) {
           doc.current = d;
           schedule();
         }}
+        onView={keepView}
+        onShare={() => setSharing(true)}
         onPublish={() => void publish(false)}
         onSave={() => {
           dirty.current = true;
@@ -166,6 +208,10 @@ function Form({ data }: { data: Loaded }) {
         }
       />
       {lookOpen && <PageLookDialog page={page} onClose={() => setLookOpen(false)} />}
+      {sharing && <ShareDialog page={page} onClose={() => setSharing(false)} />}
+      {commenting && (
+        <NewThread page={page} anchor={commenting} editorsOnly onDone={() => setCommenting(null)} />
+      )}
       {conflict && (
         <Dialog title={t('editor.conflictTitle')} onClose={() => setConflict(false)}>
           <p>{t('editor.conflictText')}</p>

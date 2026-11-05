@@ -149,6 +149,11 @@ export function Logo({ size = 28 }: { size?: number }) {
   );
 }
 
+export const IconBell = line('M6 16v-5a6 6 0 0 1 12 0v5l2 2H4zM10 21h4');
+export const IconEye = line(
+  'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+);
+export const IconComment = line('M4 5h16v11H9l-5 4z');
 export const IconApps = line('M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z');
 export const IconHome = line('M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6');
 export const IconHelp = line(

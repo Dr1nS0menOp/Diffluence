@@ -56,6 +56,14 @@ services:
       - .:/work
       - web_modules:/work/web/node_modules
 
+  # Catches all mail in a web screen, so nothing leaves the machine. Optional: it only
+  # starts with this profile. See "Mail while developing" in docs/development.md.
+  mailpit:
+    image: axllent/mailpit:v1.33.0
+    profiles: [mail]
+    ports:
+      - "127.0.0.1:${DEV_MAIL_PORT:-18025}:8025"
+
 volumes:
   cache:
   prev:

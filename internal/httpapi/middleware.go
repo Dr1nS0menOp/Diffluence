@@ -125,8 +125,21 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
-// withLogAndRecover logs every request (path only, never the query string,
-// which may hold tokens) and turns panics into 500 responses.
+// tokenPaths are paths that end in a secret. A proxy or a log server must not get it.
+var tokenPaths = []string{"/api/v1/mail/unsubscribe/", "/unsubscribe/", "/hooks/"}
+
+// loggedPath is the path for the log: it keeps the route, and leaves out a token.
+func loggedPath(path string) string {
+	for _, prefix := range tokenPaths {
+		if strings.HasPrefix(path, prefix) {
+			return prefix + "{token}"
+		}
+	}
+	return path
+}
+
+// withLogAndRecover logs every request (path only, never the query string, and never a
+// token in the path) and turns panics into 500 responses.
 func withLogAndRecover(log *slog.Logger) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -146,7 +159,7 @@ func withLogAndRecover(log *slog.Logger) func(http.Handler) http.Handler {
 				if r.URL.Path == "/livez" || r.URL.Path == "/readyz" {
 					level = slog.LevelDebug
 				}
-				log.Log(r.Context(), level, "http request", "method", r.Method, "path", r.URL.Path,
+				log.Log(r.Context(), level, "http request", "method", r.Method, "path", loggedPath(r.URL.Path),
 					"status", rec.status, "duration_ms", time.Since(start).Milliseconds(),
 					"ip", ClientIPFrom(r.Context()), "request_id", RequestIDFrom(r.Context()))
 			}()

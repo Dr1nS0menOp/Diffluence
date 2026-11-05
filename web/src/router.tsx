@@ -20,10 +20,15 @@ export function useLocation(): URL {
 }
 
 export function navigate(to: string, replace = false): void {
+  const page = window.location.pathname;
   if (replace) window.history.replaceState(null, '', to);
   else window.history.pushState(null, '', to);
   listeners.forEach((l) => l());
   window.scrollTo(0, 0);
+  // Moving within a page raises no event by itself, and the page may have to jump.
+  if (window.location.hash && window.location.pathname === page) {
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+  }
 }
 
 /** Returns the named parts when the path fits the pattern: /pages/:id/edit */

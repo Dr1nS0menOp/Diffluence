@@ -38,11 +38,20 @@ func (s *Service) ForExport(ctx context.Context, c identity.Caller, spaceID uuid
 	if err != nil {
 		return nil, err
 	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ExportPage, error) {
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (ExportPage, error) {
 		var p ExportPage
 		err := r.Scan(&p.ID, &p.ParentID, &p.Title, &p.Document)
 		return p, err
 	})
+	if err != nil {
+		return nil, err
+	}
+	for i := range out {
+		if out[i].Document, err = s.withNames(ctx, out[i].Document); err != nil {
+			return nil, err
+		}
+	}
+	return out, nil
 }
 
 // SpaceOf returns the space of a page the user may view.

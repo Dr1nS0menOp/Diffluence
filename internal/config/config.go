@@ -50,6 +50,25 @@ type Config struct {
 	MasterKeyFile      string        // key-encryption key; empty = DATA_DIR/master.key
 	ExampleSpace       bool          // make the example space on a new instance
 	OIDC               OIDC
+	SMTP               SMTP
+}
+
+// The ways a connection to a mail server is encrypted.
+const (
+	SMTPTLSStart    = "starttls"
+	SMTPTLSImplicit = "implicit"
+	SMTPTLSNone     = "none"
+)
+
+// SMTP is the mail server. Host empty = mail is off, and waits in the queue.
+type SMTP struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	From     string
+	ReplyTo  string
+	TLS      string
 }
 
 // OIDC configures login through an identity provider. Issuer empty = off.
@@ -101,6 +120,23 @@ func Load(lookup LookupFunc) (Config, error) {
 			AutoCreate:   l.boolean("OIDC_AUTO_CREATE", true),
 			GroupsClaim:  l.str("OIDC_GROUPS_CLAIM", ""),
 		},
+		SMTP: SMTP{
+			Host:     l.str("SMTP_HOST", ""),
+			Port:     l.integer("SMTP_PORT", 587),
+			Username: l.str("SMTP_USERNAME", ""),
+			Password: l.str("SMTP_PASSWORD", ""),
+			From:     l.str("SMTP_FROM", ""),
+			ReplyTo:  l.str("SMTP_REPLY_TO", ""),
+			TLS:      l.str("SMTP_TLS", SMTPTLSStart),
+		},
+	}
+	if c.SMTP.Host != "" && c.SMTP.From == "" {
+		l.fail("SMTP_HOST", errors.New("needs SMTP_FROM as well"))
+	}
+	switch c.SMTP.TLS {
+	case SMTPTLSStart, SMTPTLSImplicit, SMTPTLSNone:
+	default:
+		l.fail("SMTP_TLS", fmt.Errorf("must be starttls, implicit or none, got %q", c.SMTP.TLS))
 	}
 	if c.OIDC.Issuer != "" && (c.OIDC.ClientID == "" || c.OIDC.ClientSecret == "") {
 		l.fail("OIDC_ISSUER", errors.New("needs OIDC_CLIENT_ID and OIDC_CLIENT_SECRET as well"))
@@ -216,6 +252,19 @@ func (l *loader) boolean(key string, def bool) bool {
 		return def
 	}
 	return b
+}
+
+func (l *loader) integer(key string, def int) int {
+	v, ok := l.raw(key)
+	if !ok || v == "" {
+		return def
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		l.fail(key, fmt.Errorf("must be a number, got %q", v))
+		return def
+	}
+	return n
 }
 
 func (l *loader) duration(key string, def time.Duration) time.Duration {

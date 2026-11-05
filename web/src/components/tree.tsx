@@ -21,6 +21,7 @@ import {
   IconCollapse,
   IconCopy,
   IconExternal,
+  IconEye,
   IconLink,
   IconLocate,
   IconLock,
@@ -33,6 +34,7 @@ import {
   IconTrash,
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuSeparator } from './menu';
+import { personalKey, usePerson } from '../personal';
 import { useCopy } from './toast';
 import {
   ancestorsOf,
@@ -68,7 +70,7 @@ export type RowDialog = 'rename' | 'move' | 'copy' | 'delete';
 
 /** Collapsed branches stay collapsed while the reader moves through the space. */
 function useBranchMemory(spaceId: string): [BranchMemory, (next: BranchMemory) => void] {
-  const key = `diffluence.tree.${spaceId}`;
+  const key = personalKey(usePerson(), `tree.${spaceId}`);
   const [memory, setMemory] = useState(() => readBranchMemory(localStorage.getItem(key)));
   useEffect(() => localStorage.setItem(key, JSON.stringify(memory)), [key, memory]);
   return [memory, setMemory];
@@ -96,6 +98,15 @@ function RowActions({
       await client.invalidateQueries({ queryKey: ['page-facts', node.id] });
     },
   });
+  const watching = useQuery({
+    queryKey: ['watch', node.id],
+    queryFn: () => api.get<{ page: boolean }>(`/pages/${node.id}/watch`),
+  });
+  const watch = useMutation({
+    mutationFn: (on: boolean) =>
+      on ? api.put(`/pages/${node.id}/watch`) : api.del(`/pages/${node.id}/watch`),
+    onSettled: () => client.invalidateQueries({ queryKey: ['watch', node.id] }),
+  });
   const page = facts.data;
   const published = page?.status === 'published';
   return (
@@ -112,6 +123,10 @@ function RowActions({
         <>
           <MenuItem onClick={() => favourite.mutate(!page.favourite)}>
             <IconStar size={MENU_ICON_SIZE} /> {page.favourite ? t('page.unfavourite') : t('page.favourite')}
+          </MenuItem>
+          <MenuItem onClick={() => watch.mutate(!watching.data?.page)}>
+            <IconEye size={MENU_ICON_SIZE} />{' '}
+            {watching.data?.page ? t('watching.stopPage') : t('watching.watchPage')}
           </MenuItem>
           {page.can['page.edit'] && (
             <>

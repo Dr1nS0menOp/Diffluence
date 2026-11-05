@@ -17,7 +17,7 @@ func documents(t *testing.T) map[string]document.Node {
 	if err != nil {
 		t.Fatal(err)
 	}
-	refs := references{files: map[string]uuid.UUID{}, pages: map[string]uuid.UUID{}}
+	refs := references{files: map[string]uuid.UUID{}, pages: map[string]uuid.UUID{}, owner: uuid.New()}
 	for _, name := range plan.assets() {
 		refs.files[name] = uuid.New()
 	}
@@ -102,6 +102,29 @@ func TestTheExampleShowsEverythingTheFormatCanHold(t *testing.T) {
 	}
 	if len(missing) > 0 {
 		t.Fatalf("the example does not show: %s. Add it to internal/example/content.", strings.Join(missing, ", "))
+	}
+}
+
+func TestEveryQuoteOfACommentIsInItsPage(t *testing.T) {
+	plan, err := loadPlan()
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs := documents(t)
+	quotes := 0
+	plan.walk(func(p planPage, _ *planPage) {
+		for _, comment := range p.Comments {
+			if comment.Quote == "" {
+				continue
+			}
+			quotes++
+			if !document.HoldsQuote(docs[p.Document], comment.Quote) {
+				t.Errorf("%s does not hold %q", p.Document, comment.Quote)
+			}
+		}
+	})
+	if quotes == 0 {
+		t.Fatal("the example should show a comment on words")
 	}
 }
 

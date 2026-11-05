@@ -2,19 +2,22 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
+import type { EditorView } from '@tiptap/pm/view';
 import { api, type Attachment, type Json } from '../../api';
 import { navigate } from '../../router';
-import { useCopy } from '../toast';
+import { CommentHighlights, refreshHighlights, type Highlight } from '../comments/anchor';
+import { useCopy, useToast } from '../toast';
 import { ErrorNote } from '../ui';
 import type { ShownImage } from '../viewers';
 import { attachmentNode } from './attachments';
 import { BlockHandle, useBlockTracking } from './block-handle';
-import { documentExtensions } from './extensions';
+import { documentExtensions, type TaskToggle } from './extensions';
 import { FindBar, FindReplace } from './find';
-import { EmojiSuggestions, InsertDialog, SlashCommands } from './insert';
+import { EmojiSuggestions, InsertDialog, MentionSuggestions, SlashCommands } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
 import { LinkDialog } from './link-dialog';
 import { HeadingAnchors } from './outline';
+import { TaskDates } from './people';
 import { Toolbar } from './toolbar';
 
 function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: ShownImage }[] {
@@ -60,13 +63,29 @@ export function DocumentView({
   document,
   plain,
   onImage,
+  highlights,
+  onFound,
+  onHighlight,
+  onTask,
+  onView,
 }: {
   document: Json;
   plain?: boolean;
   onImage?: (images: ShownImage[], start: number) => void;
+  highlights?: Highlight[];
+  onFound?: (ids: string[]) => void;
+  onHighlight?: (id: string) => void;
+  onTask?: TaskToggle;
+  onView?: (view: EditorView) => void;
 }) {
   const { t } = useTranslation();
   const copy = useCopy();
+  const marks = useRef<Highlight[]>([]);
+  marks.current = highlights ?? [];
+  const found = useRef(onFound);
+  found.current = onFound;
+  const tick = useRef(onTask);
+  tick.current = onTask;
   const copyHeading = useRef((slug: string) => {
     const address = `${window.location.origin}${window.location.pathname}#${slug}`;
     void copy(address, t('page.headingLinkCopied'));
@@ -74,13 +93,19 @@ export function DocumentView({
   const editor = useEditor(
     {
       extensions: [
-        ...documentExtensions(),
+        ...documentExtensions(onTask ? (id, done) => tick.current?.(id, done) : undefined),
+        TaskDates.configure({ overdueWord: t('tasks.overdue') }),
         ...(plain
           ? []
           : [
               HeadingAnchors.configure({
                 label: t('page.copyHeadingLink'),
                 onCopy: (slug) => copyHeading.current(slug),
+              }),
+              CommentHighlights.configure({
+                highlights: () => marks.current,
+                // Later: this runs while the editor is made, in the middle of a render.
+                onFound: (ids) => queueMicrotask(() => found.current?.(ids)),
               }),
             ]),
       ],
@@ -93,8 +118,20 @@ export function DocumentView({
   );
   usePrintOpensSections();
 
+  useEffect(() => {
+    if (!plain) editor.view.dispatch(editor.state.tr.setMeta(refreshHighlights, true));
+  }, [editor, highlights, plain]);
+  useEffect(() => onView?.(editor.view), [editor, onView]);
+
+  const openMark = (target: HTMLElement): boolean => {
+    const id = target.closest<HTMLElement>('[data-comment]')?.dataset.comment;
+    if (id) onHighlight?.(id);
+    return id !== undefined;
+  };
+
   const follow = (e: MouseEvent<HTMLDivElement>) => {
     const target = e.target as HTMLElement;
+    if (openMark(target)) return;
     const image = target.closest<HTMLImageElement>('figure.doc-image img');
     if (image && onImage) {
       const images = shownImages(e.currentTarget);
@@ -113,7 +150,12 @@ export function DocumentView({
 
   return (
     // The keyboard reaches links by themselves, and images through their own buttons.
-    <div onClick={follow}>
+    <div
+      onClick={follow}
+      onKeyDown={(e) => {
+        if ((e.key === 'Enter' || e.key === ' ') && openMark(e.target as HTMLElement)) e.preventDefault();
+      }}
+    >
       <EditorContent editor={editor} />
     </div>
   );
@@ -130,6 +172,8 @@ export function DocumentEditor({
   onChange,
   onPublish,
   onSave,
+  onView,
+  onShare,
 }: {
   pageId: string;
   initial: Json;
@@ -138,8 +182,11 @@ export function DocumentEditor({
   onChange: (doc: Json) => void;
   onPublish: () => void;
   onSave: () => void;
+  onView?: (view: EditorView) => void;
+  onShare?: () => void;
 }) {
   const { t } = useTranslation();
+  const toast = useToast();
   const [uploading, setUploading] = useState('');
   const [uploadError, setUploadError] = useState<unknown>(null);
   const [dropping, setDropping] = useState(false);
@@ -183,6 +230,7 @@ export function DocumentEditor({
       ...documentExtensions(),
       SlashCommands.configure({ actions: () => actions.current }),
       EmojiSuggestions,
+      MentionSuggestions.configure({ pageId, onNoAccess: (name) => actions.current.mentionNoAccess(name) }),
       FindReplace.configure({ onOpen: () => actions.current.openFind() }),
       EditorKeys.configure({ actions: () => actions.current }),
     ],
@@ -209,6 +257,7 @@ export function DocumentEditor({
     onUpdate: ({ editor: e }) => change.current(e.getJSON() as Json),
   });
   const tracker = useBlockTracking(editor);
+  useEffect(() => onView?.(editor.view), [editor, onView]);
 
   actions.current = {
     pickFiles: () => fileInput.current?.click(),
@@ -217,6 +266,11 @@ export function DocumentEditor({
     openBlockMenu: tracker.openAtCursor,
     publish: onPublish,
     save: onSave,
+    mentionNoAccess: (name) =>
+      toast({
+        message: t('mentions.noAccess', { name }),
+        action: onShare ? { label: t('share.button'), run: onShare } : undefined,
+      }),
   };
 
   const dropFiles = (e: DragEvent<HTMLDivElement>) => {

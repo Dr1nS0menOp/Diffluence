@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -20,6 +21,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -28,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/tasks"
 )
 
 // Page statuses.
@@ -52,6 +55,7 @@ type Page struct {
 	UpdatedBy      uuid.UUID  `json:"updated_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+	CommentsClosed bool       `json:"comments_closed"`
 	Look
 }
 
@@ -74,6 +78,8 @@ type Detail struct {
 	Favourite     bool            `json:"favourite"`
 	Restricted    bool            `json:"restricted"`
 	Can           map[string]bool `json:"can"`
+
+	Features permissions.Features `json:"features"`
 }
 
 // Service manages pages.
@@ -105,12 +111,12 @@ func cleanTitle(title string) (string, error) {
 }
 
 const pageColumns = `id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at,
-	emoji, full_width, title_align, hide_children, header_attachment_id, header_position`
+	comments_closed, emoji, full_width, title_align, hide_children, header_attachment_id, header_position`
 
 func scanPage(r pgx.Row) (Page, error) {
 	var p Page
 	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
-		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt,
+		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt, &p.CommentsClosed,
 		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition)
 	return p, err
 }
@@ -135,6 +141,12 @@ func lockTree(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID) error {
 }
 
 func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, p Page, details map[string]any) error {
+	return recordEvent(ctx, tx, c, action, p, details, nil)
+}
+
+// recordEvent is record with more in the event for other modules. Events hold ids,
+// never a title or a sentence.
+func recordEvent(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, p Page, details, payload map[string]any) error {
 	if details == nil {
 		details = map[string]any{}
 	}
@@ -142,7 +154,14 @@ func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, p 
 	if _, err := audit.Record(ctx, tx, c.Event(action, "page", p.ID.String(), p.SpaceID.String(), details)); err != nil {
 		return err
 	}
-	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"page_id": p.ID, "space_id": p.SpaceID})
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payload["page_id"], payload["space_id"], payload["version"] = p.ID, p.SpaceID, p.CurrentVersion
+	if _, set := payload["actor_id"]; !set {
+		payload["actor_id"] = c.UserID
+	}
+	_, err := outbox.Enqueue(ctx, tx, action, payload)
 	return err
 }
 
@@ -225,19 +244,57 @@ func (s *Service) CreatePublished(ctx context.Context, tx pgx.Tx, c identity.Cal
 	if err != nil {
 		return p, err
 	}
-	return s.appendVersion(ctx, tx, c, p, title, doc, author, "", nil)
+	return s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: author})
+}
+
+// newVersion is what the next version of a page holds.
+type newVersion struct {
+	Title        string
+	Doc          document.Node
+	Author       uuid.UUID
+	Summary      string
+	RestoredFrom *int
+	Silent       bool // reaches no watcher, and the history still shows it (PAG-025)
+}
+
+// syncMentions keeps the list of people and groups a page mentions, and returns those
+// that are new in this version, so nobody is told again on every later edit.
+func syncMentions(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc document.Node) (people, groups []uuid.UUID, err error) {
+	rows, err := tx.Query(ctx, "SELECT user_id FROM page_mentions WHERE page_id = $1", pageID)
+	if err != nil {
+		return nil, nil, err
+	}
+	before, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, nil, err
+	}
+	isNew := func(list []uuid.UUID) []uuid.UUID {
+		return slices.DeleteFunc(slices.Clone(list), func(id uuid.UUID) bool { return slices.Contains(before, id) })
+	}
+	current, currentGroups := document.MentionedUsers(doc), document.MentionedGroups(doc)
+	if _, err := tx.Exec(ctx, "DELETE FROM page_mentions WHERE page_id = $1", pageID); err != nil {
+		return nil, nil, err
+	}
+	_, err = tx.Exec(ctx, "INSERT INTO page_mentions (page_id, user_id) SELECT $1, person FROM unnest($2::uuid[]) AS person",
+		pageID, append(slices.Clone(current), currentGroups...))
+	return isNew(current), isNew(currentGroups), err
 }
 
 // appendVersion writes the next version and updates the page and search index.
-func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, title string, doc document.Node, author uuid.UUID, summary string, restoredFrom *int) (Page, error) {
+func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, in newVersion) (Page, error) {
+	title, doc, author := in.Title, in.Doc, in.Author
+	if err := tasks.AssignIDs(ctx, tx, p.ID, &doc); err != nil {
+		return p, err
+	}
 	raw, err := document.Marshal(doc)
 	if err != nil {
 		return p, err
 	}
+	first := p.CurrentVersion == 0
 	number := p.CurrentVersion + 1
-	if _, err := tx.Exec(ctx, `INSERT INTO page_versions (id, origin_instance_id, page_id, number, title, document, schema_version, author_id, summary, restored_from)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, summary, restoredFrom); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO page_versions (id, origin_instance_id, page_id, number, title, document, schema_version, author_id, summary, restored_from, silent)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, in.Summary, in.RestoredFrom, in.Silent); err != nil {
 		return p, err
 	}
 	p, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now()
@@ -249,6 +306,17 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 		return p, err
 	}
 	if err := syncLinks(ctx, tx, p.ID, doc); err != nil {
+		return p, err
+	}
+	mentions, mentionedGroups, err := syncMentions(ctx, tx, p.ID, doc)
+	if err != nil {
+		return p, err
+	}
+	assigned, err := tasks.Sync(ctx, tx, p.ID, p.SpaceID, author, doc)
+	if err != nil {
+		return p, err
+	}
+	if err := comments.ReleaseEditorsOnly(ctx, tx, p.ID, doc); err != nil {
 		return p, err
 	}
 	// Attachment names were not indexed while the page had no search row yet.
@@ -264,10 +332,11 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 		return p, err
 	}
 	details := map[string]any{"version": number}
-	if restoredFrom != nil {
-		details["restored_from"] = *restoredFrom
+	if in.RestoredFrom != nil {
+		details["restored_from"] = *in.RestoredFrom
 	}
-	return p, record(ctx, tx, c, "page.published", p, details)
+	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.Silent, "first": first,
+		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned})
 }
 
 // Get returns a page for reading, and remembers it in the user's recent list.
@@ -280,10 +349,16 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		return Detail{}, err
 	}
 	d := Detail{Page: p}
+	if d.Features, err = s.perms.LoadFeatures(ctx, s.pool, p.SpaceID); err != nil {
+		return d, err
+	}
 	if p.CurrentVersion > 0 {
 		err = s.pool.QueryRow(ctx, "SELECT document, schema_version FROM page_versions WHERE page_id = $1 AND number = $2", id, p.CurrentVersion).
 			Scan(&d.Document, &d.SchemaVersion)
 		if err != nil {
+			return d, err
+		}
+		if d.Document, err = s.withNames(ctx, d.Document); err != nil {
 			return d, err
 		}
 	} else {
@@ -335,6 +410,33 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	return d, nil
 }
 
+// readable parses a stored document and fills in today's names. A stored document holds
+// ids only, so a mention follows a rename and survives anonymising (spec 010, D6).
+func (s *Service) readable(ctx context.Context, raw json.RawMessage) (document.Node, error) {
+	n, err := document.Parse(raw)
+	if err != nil {
+		return n, fmt.Errorf("pages: read document: %v", err)
+	}
+	names, err := identity.DisplayNames(ctx, s.pool, append(document.MentionedUsers(n), document.MentionedGroups(n)...))
+	if err != nil {
+		return n, err
+	}
+	document.FillMentionNames(&n, names)
+	return n, nil
+}
+
+// withNames is readable for a document on its way out as JSON.
+func (s *Service) withNames(ctx context.Context, raw json.RawMessage) (json.RawMessage, error) {
+	if !document.HasMentions(raw) {
+		return raw, nil
+	}
+	n, err := s.readable(ctx, raw)
+	if err != nil {
+		return nil, err
+	}
+	return document.Marshal(n)
+}
+
 func (s *Service) authorNames(ctx context.Context, p Page) (created, updated string, err error) {
 	err = s.pool.QueryRow(ctx, `SELECT
 			COALESCE((SELECT display_name FROM users WHERE id = $1), ''),
@@ -359,7 +461,8 @@ func (s *Service) capabilities(ctx context.Context, c identity.Caller, id uuid.U
 	}
 	out := map[string]bool{}
 	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.ActionPageDelete,
-		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister} {
+		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
+		permissions.CommentAdd, permissions.ActionReact} {
 		d := permissions.Evaluate(permissions.Input{User: u, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
 		out[action] = d.Allowed
 	}

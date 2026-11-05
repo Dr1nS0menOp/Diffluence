@@ -158,6 +158,40 @@ async function useFixedFont(page: Page) {
   });
 }
 
+const asDocument = (text: string) => ({ type: 'doc', content: [words(text)] });
+
+const documentWithTask = (person: string) => ({
+  type: 'doc',
+  content: [
+    words('We keep the kitchen rota up to date.'),
+    {
+      type: 'taskList',
+      content: [
+        {
+          type: 'taskItem',
+          attrs: { checked: false },
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'Empty the dishwasher ' },
+                { type: 'mention', attrs: { id: person, kind: 'user', label: READER.name } },
+                { type: 'text', text: ' ' },
+                { type: 'date', attrs: { value: '2020-01-02' } },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+});
+
+async function addComment(page: Page, pageId: string, data: object) {
+  const res = await page.request.post(`/api/v1/pages/${pageId}/comments`, { data });
+  expect(res.status(), await res.text()).toBe(201);
+}
+
 async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
   await page.evaluate(() => document.fonts.ready);
@@ -176,6 +210,8 @@ test.describe('the look of every kind of screen', () => {
   test.describe.configure({ mode: 'serial' });
   let pageId = '';
   let blocksPageId = '';
+  let readerId = '';
+  let spaceId = '';
 
   test.beforeAll(async ({ browser }) => {
     const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
@@ -185,9 +221,12 @@ test.describe('the look of every kind of screen', () => {
     });
     expect(created.status(), await created.text()).toBe(201);
     const space = (await created.json()) as { id: string; home_page_id: string };
-    const reader = await createNamedUser(browser, READER.email, READER.name);
-    await grant(setup, space.id, { type: 'user', id: reader }, [
+    readerId = await createNamedUser(browser, READER.email, READER.name);
+    spaceId = space.id;
+    await grant(setup, space.id, { type: 'user', id: readerId }, [
       ...EDITOR,
+      'comment.add',
+      'comment.delete_own',
       'page.delete_any',
       'space.administer',
     ]);
@@ -230,8 +269,8 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/pages/${pageId}`);
     await expect(page.getByRole('heading', { name: 'Your first week', level: 1 })).toBeVisible();
     await page.goto('/');
-    await expect(page.getByRole('link', { name: 'Your first week' })).toBeVisible();
-    await picture(page, 'start');
+    await expect(page.getByRole('link', { name: 'Your first week' }).first()).toBeVisible();
+    await picture(page, 'start', [page.locator('time')]);
     await page.context().close();
   });
 
@@ -531,5 +570,146 @@ test.describe('the look of every kind of screen', () => {
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
     await picture(page, 'right-to-left', [page.getByTestId('last-updated')]);
     await page.context().close();
+  });
+
+  // Last, because from here on the bell of the reader shows a number.
+  test.describe('working together', () => {
+    const QUOTE = 'the kitchen rota';
+    let agreementsId = '';
+
+    test.beforeAll(async ({ browser }) => {
+      const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+      await login(setup, ADMIN.email, ADMIN.password);
+      agreementsId = await publishedPage(setup, spaceId, 'Team agreements', 'x');
+      const published = await setup.request.post(`/api/v1/pages/${agreementsId}/publish`, {
+        data: { title: 'Team agreements', base_version: 1, document: documentWithTask(readerId) },
+      });
+      expect(published.ok(), await published.text()).toBeTruthy();
+      const text = `We keep ${QUOTE} up to date.`;
+      await addComment(setup, agreementsId, {
+        body: asDocument('Could we also agree on the coffee machine?'),
+      });
+      await addComment(setup, agreementsId, {
+        body: asDocument('This rota is out of date.'),
+        anchor: {
+          kind: 'text',
+          exact: QUOTE,
+          prefix: 'We keep ',
+          suffix: ' up to date.',
+          offset: text.indexOf(QUOTE),
+          version: 2,
+        },
+      });
+      const reacted = await setup.request.put(
+        `/api/v1/pages/${agreementsId}/reactions/${encodeURIComponent('🎉')}`,
+      );
+      expect(reacted.ok(), await reacted.text()).toBeTruthy();
+      const shared = await setup.request.post(`/api/v1/pages/${agreementsId}/share`, {
+        data: {
+          people: [{ type: 'user', id: readerId }],
+          message: 'Please read this before Monday.',
+          notify: true,
+        },
+      });
+      expect(shared.ok(), await shared.text()).toBeTruthy();
+      await setup.context().close();
+    });
+
+    test('NotificationsView: all notifications', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await expect
+        .poll(
+          async () => {
+            const res = await page.request.get('/api/v1/me/notifications/count');
+            return ((await res.json()) as { unread: number }).unread;
+          },
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(1);
+      await page.goto('/notifications');
+      await expect(page.getByText('Please read this before Monday.')).toBeVisible();
+      await picture(page, 'notifications', [page.locator('time')]);
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+
+    test('the bell with its panel', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.getByRole('button', { name: /^Notifications, \d+ unread$/ }).click();
+      const panel = page.getByRole('region', { name: 'Notifications' });
+      await expect(panel.getByText('Please read this before Monday.')).toBeVisible();
+      await picture(page, 'bell', [page.locator('time')]);
+      await page.context().close();
+    });
+
+    for (const colorScheme of ['light', 'dark'] as const) {
+      test(`comments under a page, ${colorScheme}`, async ({ browser }) => {
+        const page = await newReaderPage(browser, colorScheme);
+        await page.setViewportSize({ width: 1280, height: 1100 });
+        await page.goto(`/pages/${agreementsId}`);
+        await expect(page.getByRole('article', { name: /Comment by/ })).toBeVisible();
+        await expect(page.locator('.comment-mark')).toBeVisible();
+        await picture(page, `comments-${colorScheme}`, [
+          page.locator('time'),
+          page.getByTestId('last-updated'),
+        ]);
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+    }
+
+    test('a thread beside the page', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.goto(`/pages/${agreementsId}`);
+      await page.locator('.comment-mark').click();
+      const panel = page.getByRole('complementary', { name: 'Comments' });
+      await expect(panel).toContainText('This rota is out of date.');
+      await picture(page, 'thread-panel', [page.locator('time'), page.getByTestId('last-updated')]);
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+
+    test('the share dialog', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.goto(`/pages/${agreementsId}`);
+      await page.getByRole('button', { name: 'Share' }).click();
+      const dialog = page.getByRole('dialog', { name: 'Share this page' });
+      await expect(dialog.getByText(READER.name)).toBeVisible();
+      await picture(page, 'share', [page.getByTestId('last-updated')]);
+      await page.context().close();
+    });
+
+    test('TasksView: your tasks', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.goto('/tasks');
+      await expect(page.getByRole('link', { name: /Empty the dishwasher/ })).toBeVisible();
+      await picture(page, 'tasks');
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+
+    test('WatchingView: what you watch', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      const watched = await page.request.put(`/api/v1/pages/${agreementsId}/watch`);
+      expect(watched.ok(), await watched.text()).toBeTruthy();
+      await page.goto('/me/watching');
+      await expect(page.getByRole('link', { name: 'Team agreements' })).toBeVisible();
+      await picture(page, 'watching', [page.locator('time')]);
+      await page.context().close();
+    });
+
+    test('NotificationSettingsView: notification settings', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.goto('/me/notifications');
+      await expect(page.getByRole('heading', { name: 'Quiet hours' })).toBeVisible();
+      await picture(page, 'notification-settings');
+      await page.context().close();
+    });
+
+    test('UnsubscribeView: stopping a mail', async ({ page }) => {
+      await page.goto('/unsubscribe/token');
+      await expect(page.getByRole('heading', { name: 'Stop this mail' })).toBeVisible();
+      await picture(page, 'unsubscribe');
+    });
   });
 });

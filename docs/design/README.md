@@ -85,9 +85,9 @@ Every screen is one of these. Do not invent a fifth.
 
 The login page stands alone: one card on the sidebar colour.
 
-**Top bar:** logo and name, Home, Spaces, Recent, Favourites, Create, then search, help and the account menu on the far side. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox with one panel below it, and a chip shows when it stays inside a space.
+**Top bar:** logo and name, Home, Spaces, Recent, Favourites, Create, then search, the bell, help and the account menu on the far side. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox with one panel below it, and a chip shows when it stays inside a space.
 
-**A page:** breadcrumbs with Edit, star, lock and More on one line; the title; the byline; the document; child pages. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. Full width only widens the column up to the wide limit. Details is one panel on the far side, on top of the page, and does not block reading.
+**A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. Full width only widens the column up to the wide limit. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
 
 ## Components
 
@@ -113,7 +113,9 @@ Use these. Reuse beats a new variant.
 | A message in the flow | `.note`, `.note-error`, `ErrorNote` |
 | A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
 | A time | `RelativeTime` |
-| Switching between lists | `.tabs` with `role="tab"`, as on the Recent screen |
+| Switching between lists | `Tabs`, which brings the arrow keys |
+| Writing a comment | `CommentBox` |
+| Counting responses | `Reactions`, for a page or a comment |
 | A menu in something that scrolls | `Menu` with `floating` |
 | A page in a list | `PageMark`, which shows its emoji |
 
@@ -156,6 +158,16 @@ Use these. Reuse beats a new variant.
 | Status mark, date | A soft box in the line of text |
 | Code block | A header with title, language and Copy for readers. Always left-to-right |
 | Image | A `figure` with a caption, in three sizes or its own |
+
+## Working together
+
+`web/src/design/together.css` holds comments, reactions, mentions, the bell and the feed.
+
+- A comment on words is a soft tint with an underline, so it does not rest on colour alone. It is a `button`, and its name says who wrote what.
+- A selection in a page shows one small floating row. This is the only floating bar, because a reader has no row of tools.
+- A person mentioned is a soft box with `@`. An overdue task date is red and says "overdue" in words.
+- The bell carries a number capped at 99+. A hidden `role="status"` line only changes when the number goes up.
+- Six common reactions come from `components/comments/common-reactions.json`. They are content, not icons.
 
 ## States
 

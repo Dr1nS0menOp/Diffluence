@@ -14,6 +14,7 @@ import { Extension, type Editor } from '@tiptap/core';
 import { NodeSelection, PluginKey } from '@tiptap/pm/state';
 import { ReactRenderer } from '@tiptap/react';
 import Suggestion, { type SuggestionProps } from '@tiptap/suggestion';
+import { api, type MentionCandidate } from '../../api';
 import i18n from '../../i18n';
 import {
   IconAttach,
@@ -312,6 +313,55 @@ export const EmojiSuggestions = Extension.create({
         render: popupRender<(typeof emoji)[number]>(
           () => i18n.t('insert.emoji.name'),
           (entry) => ({ id: entry.glyph, name: entry.glyph, hint: entry.words }),
+        ),
+      }),
+    ];
+  },
+});
+
+/** `@` opens the same list as `/`: people who can see the page come first. */
+export const MentionSuggestions = Extension.create<{ pageId: string; onNoAccess: (name: string) => void }>({
+  name: 'mentionSuggestions',
+  priority: 1100,
+  addOptions() {
+    return { pageId: '', onNoAccess: () => undefined };
+  },
+  addProseMirrorPlugins() {
+    const { pageId, onNoAccess } = this.options;
+    return [
+      Suggestion<MentionCandidate>({
+        editor: this.editor,
+        char: '@',
+        pluginKey: new PluginKey('mentionSuggestions'),
+        allow: ({ editor }) => !editor.isActive('codeBlock'),
+        items: async ({ query }) => {
+          const path = `/pages/${pageId}/mention-candidates?q=${encodeURIComponent(query)}`;
+          const found = await api.get<{ candidates: MentionCandidate[] }>(path);
+          return found.candidates;
+        },
+        command: ({ editor, range, props }) => {
+          const attrs = { id: props.id, kind: props.kind, label: props.name };
+          editor
+            .chain()
+            .focus()
+            .insertContentAt(range, [
+              { type: 'mention', attrs },
+              { type: 'text', text: ' ' },
+            ])
+            .run();
+          if (!props.can_view) onNoAccess(props.name);
+        },
+        render: popupRender<MentionCandidate>(
+          () => i18n.t('mentions.title'),
+          (entry) => ({
+            id: entry.id,
+            name: entry.name,
+            hint: entry.can_view
+              ? entry.kind === 'group'
+                ? i18n.t('mentions.members', { count: entry.members ?? 0 })
+                : ''
+              : i18n.t('mentions.cannotSee'),
+          }),
         ),
       }),
     ];

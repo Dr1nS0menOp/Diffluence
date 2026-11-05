@@ -39,6 +39,24 @@ Every setting is in `.env.example`. Any variable can come from a file by adding 
 
 Identity providers: see `identity-providers.md`.
 
+## Mail
+
+Diffluence works without mail: notifications show in the app, and mail waits in the queue. Any SMTP server works, whether your own or one from a provider. Set these:
+
+| Setting | Means |
+|---|---|
+| `DIFFLUENCE_SMTP_HOST`, `DIFFLUENCE_SMTP_PORT` | The server. The port is 587 unless you set another |
+| `DIFFLUENCE_SMTP_USERNAME`, `DIFFLUENCE_SMTP_PASSWORD` | Optional. Use `DIFFLUENCE_SMTP_PASSWORD_FILE` to read the password from a file |
+| `DIFFLUENCE_SMTP_FROM` | The sender, required with a host |
+| `DIFFLUENCE_SMTP_REPLY_TO` | Optional |
+| `DIFFLUENCE_SMTP_TLS` | `starttls` (default), `implicit` for port 465, or `none` for a relay on the same machine |
+
+With `starttls`, a server that does not offer encryption gets nothing: there is no quiet fall back to plain text. Administration, Mail shows the queue and has a Send test.
+
+Mail is not signed by Diffluence. Let your mail server sign with DKIM, because providers trust one-click unsubscribe only on signed mail. The link in every mail works either way.
+
+Mailpit is a tool for developers and catches mail without delivering it, so it is not for production. See `docs/development.md`.
+
 ## The encryption key
 
 Diffluence creates `master.key` in the data directory on first start. It encrypts TOTP seeds and derives the key that signs audit checkpoints. **Back it up separately from your data.** Without it, users must set up their authenticator app again.

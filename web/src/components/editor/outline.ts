@@ -144,6 +144,23 @@ export const HeadingAnchors = Extension.create<{ label: string; onCopy: (slug: s
   },
 });
 
+/** Scrolls to the words a thread points at, and marks them briefly. */
+export function jumpToComment(id: string): void {
+  const mark = document.querySelector<HTMLElement>(`[data-comment="${id}"]`);
+  if (!mark) return;
+  mark.scrollIntoView({ block: 'center' });
+  mark.classList.add('heading-target');
+  setTimeout(() => mark.classList.remove('heading-target'), 2000);
+}
+
+/** The next thread for `n` and `p`, going round. */
+export function nextThread(ids: string[], current: string | null, step: 1 | -1): string | null {
+  if (ids.length === 0) return null;
+  const at = current === null ? -1 : ids.indexOf(current);
+  if (at < 0) return step === 1 ? (ids[0] ?? null) : (ids[ids.length - 1] ?? null);
+  return ids[(at + step + ids.length) % ids.length] ?? null;
+}
+
 /** Scrolls to a heading and marks it briefly. A section around it opens first. */
 export function jumpToHeading(slug: string, moveFocus: boolean): boolean {
   const heading = document.getElementById(slug);

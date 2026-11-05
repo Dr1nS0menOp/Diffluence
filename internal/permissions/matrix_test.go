@@ -47,9 +47,10 @@ type grantCase struct {
 	perms   []string
 }
 
-var viewerPerms = []string{permissions.SpaceView, permissions.SpaceExport}
+var viewerPerms = []string{permissions.SpaceView, permissions.SpaceExport, permissions.CommentAdd, permissions.CommentDeleteOwn}
 var editorPerms = []string{permissions.SpaceView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
-	permissions.PageDeleteOwn, permissions.AttachmentAdd, permissions.AttachmentDeleteOwn}
+	permissions.PageDeleteOwn, permissions.AttachmentAdd, permissions.AttachmentDeleteOwn,
+	permissions.CommentAdd, permissions.CommentDeleteOwn}
 var adminPerms = permissions.AllSpacePermissions
 
 var grantCases = []grantCase{
@@ -106,6 +107,7 @@ var actions = []string{
 	permissions.ActionPageView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
 	permissions.ActionPageDelete, permissions.AttachmentAdd, permissions.ActionAttachmentDelete,
 	permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
+	permissions.CommentAdd, permissions.ActionCommentDelete, permissions.ActionReact,
 }
 
 // literalRule is the rule of spec 002, written out independently of Evaluate.
@@ -171,13 +173,17 @@ func literalRule(u userCase, g grantCase, r restrictionCase, pageStatus string, 
 	}
 	// Space permission for the action.
 	switch action {
-	case permissions.ActionPageView:
+	case permissions.ActionPageView, permissions.ActionReact:
 	case permissions.ActionPageDelete:
 		if !has(permissions.PageDeleteAny) && !(ownPage && has(permissions.PageDeleteOwn)) {
 			return false
 		}
 	case permissions.ActionAttachmentDelete:
 		if !has(permissions.AttachmentDeleteAny) && !(ownPage && has(permissions.AttachmentDeleteOwn)) {
+			return false
+		}
+	case permissions.ActionCommentDelete:
+		if !has(permissions.CommentDeleteAny) && !(ownPage && has(permissions.CommentDeleteOwn)) {
 			return false
 		}
 	default:

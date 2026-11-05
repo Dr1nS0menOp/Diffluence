@@ -70,7 +70,11 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 		return collectList(rows, err)
 	case RecentWorked:
 		rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, p.space_id, s.key, s.name, w.at, false
-			FROM (SELECT page_id, max(created_at) AS at FROM page_versions WHERE author_id = $1 GROUP BY page_id) w
+			FROM (SELECT page_id, max(at) AS at FROM (
+					SELECT page_id, created_at AS at FROM page_versions WHERE author_id = $1
+					UNION ALL
+					SELECT page_id, created_at FROM comments WHERE author_id = $1 AND trash_item_id IS NULL
+				) made GROUP BY page_id) w
 			JOIN perm_visible_pages($1) v ON v.page_id = w.page_id
 			JOIN pages p ON p.id = w.page_id
 			JOIN spaces s ON s.id = p.space_id

@@ -453,6 +453,29 @@ func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry,
 	return out, err
 }
 
+// DisplayNames gives today's names of people and groups, for a mention.
+func DisplayNames(ctx context.Context, q db.Querier, ids []uuid.UUID) (map[uuid.UUID]string, error) {
+	out := map[uuid.UUID]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT id, display_name FROM users WHERE id = ANY($1)
+		UNION ALL SELECT id, name FROM groups WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
+}
+
 // FirstAdministrator finds the oldest active administrator who may use the
 // product, to own what the system sets up. Found is false while there is none.
 func (s *Service) FirstAdministrator(ctx context.Context) (id uuid.UUID, found bool, err error) {

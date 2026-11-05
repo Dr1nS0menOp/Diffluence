@@ -4,6 +4,7 @@ package spaces
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -204,6 +205,27 @@ func (s *Service) Overview(ctx context.Context, c identity.Caller, id uuid.UUID)
 		out.Administrators = []string{}
 	}
 	return out, nil
+}
+
+// SetFeatures turns parts of a space on or off. Turning one off deletes nothing.
+func (s *Service) SetFeatures(ctx context.Context, c identity.Caller, id uuid.UUID, f permissions.Features) error {
+	raw, err := json.Marshal(f)
+	if err != nil {
+		return err
+	}
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceAdminister); err != nil {
+			return err
+		}
+		sp, err := load(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "UPDATE spaces SET features = $2, updated_at = now() WHERE id = $1", id, raw); err != nil {
+			return err
+		}
+		return record(ctx, tx, c, "space.features_changed", sp, map[string]any{"features": f})
+	})
 }
 
 // Find looks for active spaces by name or key, for quick search.

@@ -4,11 +4,12 @@
 import { useEffect, useRef, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { api, type Attachment, type PageDetail, type PageFacts, type PageRef } from '../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, type Attachment, type Me, type PageDetail, type PageFacts, type PageRef } from '../api';
 import { Link } from '../router';
 import { countWords, readingMinutes } from './editor/outline';
 import { IconClose } from './icons';
+import { SubjectPicker } from './picker';
 import { PageMark } from './topbar';
 import { ErrorNote, formatDate, formatSize, Loading } from './ui';
 
@@ -57,6 +58,63 @@ function Files({ pageId }: { pageId: string }) {
           </li>
         ))}
       </ul>
+    </section>
+  );
+}
+
+function FollowButton({ person }: { person: string }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
+  const q = useQuery({
+    queryKey: ['following'],
+    queryFn: () => api.get<{ following: string[] }>('/me/following'),
+  });
+  const following = q.data?.following.includes(person) ?? false;
+  const set = useMutation({
+    mutationFn: () => (following ? api.del(`/users/${person}/follow`) : api.put(`/users/${person}/follow`)),
+    onSettled: () => client.invalidateQueries({ queryKey: ['following'] }),
+  });
+  if (me.data?.user.id === person || !me.data?.global_permissions.includes('view_profiles')) return null;
+  return (
+    <button type="button" className="ghost" onClick={() => set.mutate()}>
+      {following ? t('details.unfollow') : t('details.follow')}
+    </button>
+  );
+}
+
+function Watchers({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const key = ['watchers', pageId];
+  const q = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ watchers: { id: string; name: string }[] }>(`/pages/${pageId}/watchers`),
+  });
+  const remove = useMutation({
+    mutationFn: (user: string) => api.del(`/pages/${pageId}/watchers/${user}`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  const add = useMutation({
+    mutationFn: (user: string) => api.put(`/pages/${pageId}/watchers/${user}`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  return (
+    <section>
+      <h3>{t('details.watchers')}</h3>
+      <ErrorNote error={q.error ?? remove.error ?? add.error} />
+      {q.data?.watchers.length === 0 && <p className="muted">{t('details.noWatchers')}</p>}
+      <ul className="plain-list details-links">
+        {q.data?.watchers.map((w) => (
+          <li key={w.id}>
+            {w.name}
+            <button type="button" className="ghost" onClick={() => remove.mutate(w.id)}>
+              {t('common.remove')}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <SubjectPicker label={t('details.addWatcher')} usersOnly onPick={(entry) => add.mutate(entry.id)} />
     </section>
   );
 }
@@ -122,6 +180,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
                 <li key={c.id}>
                   {c.name || t('common.unknown')}
                   <span className="muted">{t('details.versions', { count: c.versions })}</span>
+                  <FollowButton person={c.id} />
                 </li>
               ))}
             </ul>
@@ -129,6 +188,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
           <PageLinks title={t('details.incoming')} pages={facts.incoming} empty={t('details.noIncoming')} />
           <PageLinks title={t('details.outgoing')} pages={facts.outgoing} empty={t('details.noOutgoing')} />
           <Files pageId={page.id} />
+          {page.can['space.administer'] && <Watchers pageId={page.id} />}
         </>
       )}
     </aside>,

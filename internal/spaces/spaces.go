@@ -49,6 +49,8 @@ type Space struct {
 	UpdatedAt   time.Time       `json:"updated_at"`
 	Favourite   bool            `json:"favourite"`
 	Can         map[string]bool `json:"can,omitempty"`
+
+	Features *permissions.Features `json:"features,omitempty"`
 }
 
 // Input is what a user fills in.
@@ -196,6 +198,11 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 	if err != nil {
 		return sp, err
 	}
+	features, err := s.perms.LoadFeatures(ctx, s.pool, id)
+	if err != nil {
+		return sp, err
+	}
+	sp.Features = &features
 	sp.Can = map[string]bool{}
 	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport} {
 		d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, id, action)

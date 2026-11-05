@@ -4,7 +4,9 @@ package permissions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -115,6 +117,31 @@ func (s *Service) LoadPage(ctx context.Context, q db.Querier, id uuid.UUID) (Spa
 		}
 	}
 	return space, p, rows.Err()
+}
+
+// Features are the parts a space can turn on or off. Turning one off hides it and
+// deletes nothing (SPC-048).
+type Features struct {
+	Comments       bool `json:"comments"`
+	Reactions      bool `json:"reactions"`
+	AccessRequests bool `json:"access_requests"`
+}
+
+// LoadFeatures reads what is on in a space. What was never set has its default.
+func (s *Service) LoadFeatures(ctx context.Context, q db.Querier, spaceID uuid.UUID) (Features, error) {
+	out := Features{Comments: true, Reactions: true}
+	var raw []byte
+	err := q.QueryRow(ctx, "SELECT features FROM spaces WHERE id = $1", spaceID).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return out, apperr.NotFound()
+	}
+	if err != nil {
+		return out, err
+	}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return out, fmt.Errorf("permissions: read features: %v", err)
+	}
+	return out, nil
 }
 
 // CheckSpace evaluates a space-level action.

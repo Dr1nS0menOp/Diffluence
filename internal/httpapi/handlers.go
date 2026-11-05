@@ -40,6 +40,7 @@ func (s *Server) registerRoutes() {
 
 	s.registerContentRoutes()
 	s.registerReadingRoutes()
+	s.registerTogetherRoutes()
 	s.registerIdentityRoutes()
 	s.registerAppearanceRoutes()
 }

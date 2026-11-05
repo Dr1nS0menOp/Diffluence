@@ -12,6 +12,7 @@ import (
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/diffluence/diffluence/internal/trash"
 )
 
 // quickGroupSize is how many rows each group of quick search shows.
@@ -237,7 +238,9 @@ func (s *Server) handlePageImpact(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUndoDelete(w http.ResponseWriter, r *http.Request) {
-	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error { return s.deps.Trash.UndoDelete(r.Context(), c, id) })
+	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error {
+		return s.deps.Trash.UndoDelete(r.Context(), c, trash.TypePage, id)
+	})
 }
 
 // quickPerson leaves the e-mail address out: quick search only needs a name.

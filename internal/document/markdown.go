@@ -561,7 +561,7 @@ func inlineMarkdown(nodes []Node) string {
 			b.WriteString("\\\n")
 			continue
 		}
-		if n.Type == TypeStatus || n.Type == TypeDate {
+		if n.Type == TypeStatus || n.Type == TypeDate || n.Type == TypeMention {
 			b.WriteString(escapeInline(wordsOf(n)))
 			continue
 		}

@@ -101,6 +101,33 @@ func (q *Queue) Publish(ctx context.Context, subject string, data []byte, msgID 
 	return err
 }
 
+// consumeWait is how long a handler gets for one event before it is sent again.
+const consumeWait = time.Minute
+
+// Consume hands every event to handle, until ctx is cancelled. A durable consumer keeps
+// its place across restarts, and shared by several workers each event goes to one of
+// them. An event that fails is sent again, so a handler must be safe to run twice.
+func (q *Queue) Consume(ctx context.Context, durable string, handle func(context.Context, []byte) error) error {
+	consumer, err := q.js.CreateOrUpdateConsumer(ctx, StreamEvents, jetstream.ConsumerConfig{
+		Durable: durable, AckPolicy: jetstream.AckExplicitPolicy, AckWait: consumeWait})
+	if err != nil {
+		return fmt.Errorf("queue: create consumer: %w", err)
+	}
+	running, err := consumer.Consume(func(m jetstream.Msg) {
+		if err := handle(ctx, m.Data()); err != nil {
+			_ = m.Nak()
+			return
+		}
+		_ = m.Ack()
+	})
+	if err != nil {
+		return fmt.Errorf("queue: consume: %w", err)
+	}
+	<-ctx.Done()
+	running.Stop()
+	return nil
+}
+
 // JetStream exposes the JetStream API for consumers.
 func (q *Queue) JetStream() jetstream.JetStream { return q.js }
 

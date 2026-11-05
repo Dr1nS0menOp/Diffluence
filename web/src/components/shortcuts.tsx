@@ -9,7 +9,18 @@ import { Dialog } from './ui';
 const SEQUENCE_MS = 1000;
 const TYPING_ROLES = ['textbox', 'combobox', 'searchbox'];
 
-export type ShortcutAction = 'create' | 'edit' | 'favourite' | 'sidebar' | 'reader' | 'details';
+export type ShortcutAction =
+  | 'create'
+  | 'edit'
+  | 'favourite'
+  | 'sidebar'
+  | 'reader'
+  | 'details'
+  | 'watch'
+  | 'comment'
+  | 'nextComment'
+  | 'previousComment'
+  | 'notifications';
 
 interface Shortcut {
   keys: string[];
@@ -24,12 +35,17 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ['g', 's'], label: 'spaces', group: 'global' },
   { keys: ['g', 'r'], label: 'recent', group: 'global' },
   { keys: ['g', 'f'], label: 'favourites', group: 'global' },
+  { keys: ['g', 'n'], label: 'notifications', group: 'global' },
   { keys: ['c'], label: 'create', group: 'global' },
   { keys: ['['], label: 'sidebar', group: 'page' },
   { keys: ['e'], label: 'edit', group: 'page' },
   { keys: ['s'], label: 'favourite', group: 'page' },
   { keys: ['i'], label: 'details', group: 'page' },
   { keys: ['r'], label: 'reader', group: 'page' },
+  { keys: ['w'], label: 'watch', group: 'page' },
+  { keys: ['m'], label: 'comment', group: 'page' },
+  { keys: ['n'], label: 'nextComment', group: 'page' },
+  { keys: ['p'], label: 'previousComment', group: 'page' },
 ];
 
 const SINGLE_KEYS: Record<string, ShortcutAction> = {
@@ -39,6 +55,10 @@ const SINGLE_KEYS: Record<string, ShortcutAction> = {
   '[': 'sidebar',
   r: 'reader',
   i: 'details',
+  w: 'watch',
+  m: 'comment',
+  n: 'nextComment',
+  p: 'previousComment',
 };
 
 const AFTER_G: Record<string, string> = { h: '/', s: '/spaces', r: '/recent', f: '/favourites' };
@@ -89,6 +109,9 @@ export function ShortcutsProvider({ enabled, children }: { enabled: boolean; chi
       if (place) {
         e.preventDefault();
         navigate(place);
+      } else if (inSequence && e.key === 'n') {
+        e.preventDefault();
+        handlers.get('notifications')?.();
       } else if (e.key === 'g') {
         waitingSince = Date.now();
       } else if (e.key === '/') {

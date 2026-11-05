@@ -201,6 +201,9 @@ export function AccountMenu({ me, onLogout }: { me: Me; onLogout: () => void }) 
         <MenuSeparator />
         <MenuLink href="/me">{t('nav.profile')}</MenuLink>
         <MenuLink href="/me/preferences">{t('nav.preferences')}</MenuLink>
+        <MenuLink href="/me/notifications">{t('nav.notificationSettings')}</MenuLink>
+        <MenuLink href="/me/watching">{t('nav.watching')}</MenuLink>
+        <MenuLink href="/tasks">{t('nav.tasks')}</MenuLink>
         {isAdmin && <MenuLink href="/admin/users">{t('nav.admin')}</MenuLink>}
         <MenuSeparator />
         <MenuItem onClick={onLogout}>{t('nav.logout')}</MenuItem>

@@ -1,6 +1,6 @@
 # 010: Wave C, working together
 
-Status: planned in detail, not built yet
+Status: built. What is still open is in the status lines of chapter 7 and in `docs/handoff/2026-11-05-wave-c.md`
 Phase: wave C of `docs/blueprint/03-functional-requirements.md`. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave, and tests it when all waves are done.
 
 ## Problem
@@ -48,26 +48,31 @@ A page can now be written and read well, but it is a monologue. Nobody can answe
 | D3 | Prefix and suffix hold 32 characters each, and `exact` at most 1,000 | The model gives no length. 32 tells repeated phrases apart and stays small |
 | D4 | A comment is a small document through the same gate, with a smaller allow-list | One gate, one rule. A second sanitiser would drift |
 | D5 | Replies form one level. A reply to a reply joins the same thread | COL-003 asks for it, and long trees are hard to read and to hear |
-| D6 | A mention is our own node on `@tiptap/suggestion`, holding an id and the name at the time. The name is filled in fresh when a document is read | The mention follows a rename, a stored version stays unchanged, and the browser needs no extra lookup |
+| D6 | A mention is our own node on `@tiptap/suggestion`. It stores an id, and never a name, in documents, comments and search text. The name is filled in when a document is read, and search takes it from `page_mentions` | The mention follows a rename. A version cannot change, so a stored name could never be anonymised (GAP-004) |
 | D7 | A task's person is the first mention in its own line, and its date the first date. `taskItem` only gains an `id` | People already expect this, wave A has the date, and the document stays the one truth. `page_tasks` is an index |
 | D8 | Ticking a task from a list publishes a silent version | The document is the truth, so a tick must change it, and a tick is not news |
 | D9 | Notifications fan out in the worker from the outbox events, and the handler can run twice without harm | Blueprint 04 says so. A slow fan-out never slows publishing |
 | D10 | A notification row holds ids, a type and a group key. Titles are read when it is shown | A renamed page reads right, and a hidden page cannot leak through old text |
 | D11 | Access is checked three times: at fan-out, when shown, and when mailed | COL-060 and COL-072. A person can lose access between any two of these |
 | D12 | The count polls every 30 seconds, only in a visible tab. No WebSocket in this wave | Blueprint 04 plans a WebSocket for live updates. That belongs with editing together. One small indexed count at this rate is cheap, and it satisfies COL-070 |
-| D13 | Mail goes through `net/smtp`, driven by hand: TLS is required unless the operator turns it off for a local relay | No dependency, and no quiet fall back to plain text |
+| D13 | Mail goes through `net/smtp`, driven by hand: TLS is required unless the operator turns it off for a local relay, and the certificate of the server is checked against the system's trust store and the host name | No dependency, no quiet fall back to plain text, and no mail to whoever answers (SEC-416) |
 | D14 | DKIM is left to the mail server | The standard library has no signing, and a key would be one more secret to run. The plain link in every mail works either way |
-| D15 | An unsubscribe token is sealed with the keyring, and does not expire. GET never changes anything. Only POST does | Mail scanners follow links. The token only carries a person and what to stop, and the worst abuse is less mail |
+| D15 | An unsubscribe token is sealed with the keyring, and does not expire. GET never changes anything. Only POST does. The request log writes the route, not the token | Mail scanners follow links. The token only carries a person and what to stop, and the worst abuse is less mail. A log is read by more people than a mail (SEC-422) |
 | D16 | By default mail holds titles and no excerpt. An administrator can allow excerpts | COL-076, for instances with sensitive content |
 | D17 | The feed is worked out from versions and comments. No activity table | No backfill, no lag and no second copy. Phase 3 measures it under load |
-| D18 | Allowing access adds the person to the restriction that blocks them. If the space is what blocks them, only a space administrator can allow it, and the dialog says it gives Editor in the whole space | A restriction can only narrow, so a page cannot grant more than the space does. Saying so prevents a quiet widening |
+| D18 | Allowing access adds the person to every restriction that blocks them. The dialog lists each level and what it opens, and it is refused for someone who cannot manage them all. If the space is what blocks them, only a space administrator can allow it, and the dialog says it gives Editor in the whole space | A restriction can only narrow, so a page cannot grant more than the space does. A restriction above opens a whole branch, and saying so prevents a quiet widening (GAP-007) |
 | D19 | Sharing only notifies. A person without access gets no notification, and the dialog names them | COL-043. A notification would reveal the title |
 | D20 | Group mentions are off by default, and stop at 50 members | COL-034 |
 | D21 | Comments and reactions can be turned off per space in `spaces.features`. The full screen of SPC-047 waits for wave D | COL-009 and COL-027 need it now, and the column fits the later screen |
 | D22 | The comments panel uses the place and pattern of the Details panel. Only one of the two is open at a time | One panel on the far side, no second way |
 | D23 | Versions gain `silent`, written when they are made | Feed and notifications must leave them out, and a version cannot be changed later |
-| D24 | Comment drafts stay in the browser | COL-011 says so, and a half-written comment is private |
+| D24 | Comment drafts stay in the browser, under the id of the person, for seven days, and logging out removes them | COL-011 says so, and a half-written comment is private. It is also text of a page on a device (SEC-266) |
 | D25 | The default per type: mentions, tasks, shares and access requests in the app and by mail at once. All else in the app and the digest | COL-073 and COL-074 |
+| D27 | Publishing opens a thread made while editing only when its quote is in the published text. Otherwise it stays with the editors | A sentence that was never published must not reach readers through a comment (GAP-006) |
+| D28 | A reaction is its own action, `reaction.set`, in `Evaluate`: it needs view, and it stops in an archived space | It changes what others see, so it is not reading. Wave D adds archived pages to the same rule (GAP-021) |
+| D30 | Removing a version blanks the quotes that hold its words, through `comments.BlankQuotes`. The thread stays. Wave D calls it from the removal of a version | An anchor copies text, so a secret would live on in it (SEC-407) |
+| D29 | Following a person needs *view profiles*. Without it, every id gets the answer of an id that does not exist. Stopping always works | Nobody can test who is here (GAP-030, PRM-083) |
+| D26 | For testing, Mailpit (MIT, image `axllent/mailpit`, pinned) is an optional service with its own profile in `compose.dev.yaml`. It shows all mail in a web screen, and nothing leaves the machine. Production takes any SMTP server | The product owner has no mail server and asked for an open-source one. It is a tool beside the product, so it adds no code dependency |
 
 ## Scope
 
@@ -104,7 +109,7 @@ The box sits below the page, after reactions, and is the end of the page.
 - **Order:** oldest or newest first, a preference. Replies always run oldest first.
 - **Loading:** 30 threads at a time, with Show more.
 - **Turned off:** per space and per page. Existing comments stay readable, and the box says it is closed. Archived spaces and pages have no box.
-- **Draft:** kept in the browser per page and per reply, and offered back. Posting clears it.
+- **Draft:** kept in the browser per person, page and reply, and offered back. Posting clears it, logging out removes it, and after seven days it goes by itself.
 - **Watching:** posting starts watching the page, unless turned off.
 - **Keyboard:** `m` moves to the box. Tab reaches every action. The thread is a list, and each comment an `article` with the author and time as its name.
 - **Limits:** 100 KiB per comment, 30 comments a minute per person.
@@ -119,7 +124,7 @@ The box sits below the page, after reactions, and is the end of the page.
 - **Thread:** opens in the comments panel, with the quoted words on top, then replies.
 - **Resolve and Reopen:** anyone with *edit*. Reopening brings back the highlight if the text is still there.
 - **Text gone:** the thread stays in the list with the old words and a note "No longer in the page".
-- **While editing:** selecting text in the editor offers Comment too. Such a thread is `editors_only`, and only people with *edit* see it. Publishing the page makes it visible to all. Its quote is found against the published text from then on, and if the text changed before publishing it becomes "no longer in the page".
+- **While editing:** selecting text in the editor offers Comment too. Such a thread is `editors_only`, and only people with *edit* see it. Publishing the page makes it visible to all when its quote is in the published text. Otherwise it stays with the editors, and it opens at the first publish that holds the words.
 - **Narrow screens:** the panel is a sheet from the bottom, so the text stays above it.
 - **Keyboard:** `n` and `p` go to the next and previous unread comment, or to the next highlight when nothing is unread. They wrap. Without shortcuts, Tab reaches each highlight, and the panel lists them all.
 - **Edge cases:** a quote that spans a block that later moved is "no longer in the page". Overlapping highlights both work, and the inner one gets the click. A selection inside the title or the byline offers nothing. A person without *add comment* sees only Copy link.
@@ -140,7 +145,7 @@ A panel on the far side, opened by a count in the byline, or by a highlight.
 - **Counters:** a small `button` with the emoji and number, `aria-pressed` for your own. Selecting it adds or removes yours.
 - **Who:** hover or focus shows up to 20 names and "and 4 more".
 - **Limits:** 20 different emoji per item. An unknown value is refused.
-- **Turned off:** per space and for the instance. Existing reactions stop showing, and are not deleted.
+- **Turned off:** per space and for the instance. Existing reactions stop showing, and are not deleted. In an archived space they stay, and cannot change.
 - **Notification:** to the author, grouped, by digest by default. Never for your own reaction.
 
 ### C5. Mentions
@@ -148,12 +153,12 @@ A panel on the far side, opened by a count in the byline, or by a highlight.
 - **Writing:** `@` opens the same list as `/`, in the editor and in comments. Typing narrows it. Up, Down, Enter and Tab pick, Escape closes and keeps the text.
 - **Order:** people who can see the page first. Those who cannot are marked in words. Groups only when allowed, with their size.
 - **Who is offered:** with *view profiles*, the directory. Without it, only people with a grant in this space (NAV-059).
-- **Node:** `mention` with `id`, `kind` and `label`. In text it reads `@Anna Visser`. Markdown gets that text.
+- **Node:** `mention` with `id` and `kind`. The gate drops anything else. `label` only exists on the way out, filled in when a document is read. In text it reads `@Anna Visser`. An export writes the name of that moment.
 - **Reading:** a soft box. It is a plain name in this wave, and the card comes with wave F. A disabled person stays named, marked as no longer active.
 - **Writing someone without access:** a toast says so, with a Share button. The page is not shared by itself.
 - **Notified:** once per version, for mentions that are new in that version (COL-031). A person without access gets nothing (COL-033). Mentions in a comment notify when it is posted, and an edit only notifies new ones. A silent update still notifies a new mention: a mention is addressed to a person.
 - **Groups:** `@group` notifies each member, when allowed, up to 50. Above that the list does not offer it, and the server ignores it.
-- **Edge cases:** a pasted mention from another page stays a mention. A deleted account keeps the stored name. `@` after a letter, as in an address, does not open the list. Inside code it does not open.
+- **Edge cases:** a pasted mention from another page stays a mention. An account that is gone reads as "@someone". `@` after a letter, as in an address, does not open the list. Inside code it does not open.
 
 ### C6. Tasks
 
@@ -181,7 +186,7 @@ A panel on the far side, opened by a count in the byline, or by a highlight.
 - **Not found:** a page a person may not see stays "not found". Only when a space turns on `access_requests` does the answer also offer Ask for access. The status stays 404.
 - **Who is asked:** the creator until wave D adds an owner, then the last editor, then the space administrators. The first one who may grant it gets the request, and all space administrators can see it.
 - **Answering:** Allow or Refuse, from the notification and in Share. A note can go along.
-- **Allowing:** see D18. The dialog says what will change, before it happens.
+- **Allowing:** see D18. The dialog lists each restriction and how many pages it opens, before it happens. Of a restriction the person cannot manage, they learn only that it is there.
 - **Limits:** one open request per person, page and kind. Refused requests can be repeated after seven days.
 - **Audit:** every step, with who and what.
 
@@ -220,7 +225,7 @@ Types: `mention`, `task_assigned`, `task_due`, `share`, `comment`, `reply`, `rea
 - **Content:** title and link by default. With the instance setting on, a short excerpt.
 - **At once:** the types with that choice, in a batch per minute, so five mentions are one mail.
 - **Digest:** daily or weekly, grouped by space, with comments, reactions, new and changed pages. Left out when there is nothing new, and things already read are left out too.
-- **Footer:** a link to stop this kind of mail, a link to the preferences, and when it is about a watch, a link to stop watching.
+- **Footer:** a link to stop this kind of mail and a link to the preferences. A line that a watch brought has its own link to stop watching, which ends every watch that brings that page: on the page, a branch above it, and the space.
 - **Admin:** a queue view with time, kind and status, and no content and no addresses. Send test mails the administrator.
 - **Off:** an administrator can turn e-mail off for the instance, and set the defaults for new users.
 - **Secrets:** the password is only read from the environment or a file, is never shown, and never reaches a log. Mail errors are logged without addresses.
@@ -257,7 +262,7 @@ Types: `mention`, `task_assigned`, `task_due`, `share`, `comment`, `reply`, `rea
 
 ### C15. Following
 
-A Follow button beside a name in Contributors, in the Details panel. It only feeds For you. The lists on a profile wait for wave F.
+A Follow button beside a name in Contributors, in the Details panel, for those with *view profiles*. It only feeds For you. The lists on a profile wait for wave F.
 
 ### C16. Keyboard shortcuts
 
@@ -372,29 +377,29 @@ Parts in one step touch different files, so they can be built side by side.
 
 ## Acceptance criteria
 
-- [ ] AC-1 A person comments, replies, edits and deletes, and a deleted comment with replies leaves a line and comes back from the trash.
-- [ ] AC-2 A selected sentence gets a thread with a highlight that survives edits elsewhere in the page.
-- [ ] AC-3 When the text is gone or no longer unique, the thread stays in the list with its quote, and no wrong text is marked.
-- [ ] AC-4 Resolve and Reopen work, and only for those with *edit*.
-- [ ] AC-5 A thread made while editing is hidden from readers until the page is published.
-- [ ] AC-6 Everything about comments works without a mouse.
-- [ ] AC-7 Reactions can be added and removed on pages and comments, show who reacted, and can be turned off.
-- [ ] AC-8 `@` works in pages and comments, the name follows a rename, and someone without access is marked and gets nothing.
-- [ ] AC-9 A task with a person and a date shows in My tasks, can be ticked there, and warns on the due date.
-- [ ] AC-10 Share notifies only people with access, names the others, and never grants anything by itself.
-- [ ] AC-11 A request for access reaches someone who may grant it, every step is audited, and the dialog says what will change.
-- [ ] AC-12 A page, a branch and a space can be watched, and the list can stop each.
-- [ ] AC-13 The bell counts, groups and links to the exact spot, and updates without a reload.
-- [ ] AC-14 A person who loses access stops hearing at once, in the app and by mail.
-- [ ] AC-15 Nobody gets a notification about their own action, unless they asked.
-- [ ] AC-16 A silent update reaches nobody, and the history shows it.
-- [ ] AC-17 Mails go out over TLS with the right headers, and a broken mail server slows nothing.
-- [ ] AC-18 A digest groups by space, and does not come when there is nothing new.
-- [ ] AC-19 One-click unsubscribe works without a session, and a GET changes nothing.
-- [ ] AC-20 Preferences per type, quiet hours and pause are obeyed.
-- [ ] AC-21 The start screen has For you, Recent activity and Popular, loads more by itself, and shows nothing a person may not see.
-- [ ] AC-22 All new shortcuts work, are listed, and turn off with the rest.
-- [ ] AC-23 Everything passes axe, and the new pictures have been looked at.
+- [x] AC-1 A person comments, replies, edits and deletes, and a deleted comment with replies leaves a line and comes back from the trash.
+- [x] AC-2 A selected sentence gets a thread with a highlight that survives edits elsewhere in the page.
+- [x] AC-3 When the text is gone or no longer unique, the thread stays in the list with its quote, and no wrong text is marked.
+- [x] AC-4 Resolve and Reopen work, and only for those with *edit*.
+- [x] AC-5 A thread made while editing is hidden from readers until the page is published.
+- [x] AC-6 Everything about comments works without a mouse.
+- [x] AC-7 Reactions can be added and removed on pages and comments, show who reacted, and can be turned off.
+- [x] AC-8 `@` works in pages and comments, the name follows a rename, and someone without access is marked and gets nothing.
+- [x] AC-9 A task with a person and a date shows in My tasks, can be ticked there, and warns on the due date.
+- [x] AC-10 Share notifies only people with access, names the others, and never grants anything by itself.
+- [x] AC-11 A request for access reaches someone who may grant it, every step is audited, and the dialog says what will change.
+- [x] AC-12 A page, a branch and a space can be watched, and the list can stop each.
+- [x] AC-13 The bell counts, groups and links to the exact spot, and updates without a reload.
+- [x] AC-14 A person who loses access stops hearing at once, in the app and by mail.
+- [x] AC-15 Nobody gets a notification about their own action, unless they asked.
+- [x] AC-16 A silent update reaches nobody, and the history shows it.
+- [x] AC-17 Mails go out over TLS with the right headers, and a broken mail server slows nothing.
+- [x] AC-18 A digest groups by space, and does not come when there is nothing new.
+- [x] AC-19 One-click unsubscribe works without a session, and a GET changes nothing.
+- [x] AC-20 Preferences per type, quiet hours and pause are obeyed.
+- [x] AC-21 The start screen has For you, Recent activity and Popular, loads more by itself, and shows nothing a person may not see.
+- [x] AC-22 All new shortcuts work, are listed, and turn off with the rest.
+- [x] AC-23 Everything passes axe, and the new pictures have been looked at.
 
 ## Risks
 
@@ -414,7 +419,7 @@ Parts in one step touch different files, so they can be built side by side.
 
 ## For the product owner to decide
 
-- **Which mail server to test with.** Everything works without one, and mail then waits in the queue. To receive real mail, the values in C11 must be set. This blocks nothing.
+- **Which mail server to test with.** Decided: Mailpit (D26). `docs/development.md` says how to start it. Everything works without one, and mail then waits in the queue.
 
 No new dependency is needed.
 
@@ -443,5 +448,6 @@ Own text from these public sources, read for behaviour only, plus the study behi
 - W3C WCAG 2.2 Understanding 4.1.3 Status Messages and 2.1.4 Character Key Shortcuts.
 - RFC 8058 (one-click unsubscribe) and RFC 3834 (automatic responses).
 - Go documentation of `net/smtp`.
+- Mailpit: release page and licence file.
 - MediaWiki Help:Watchlist, and GitHub's documentation on configuring notifications.
 - Summaries: inline comment help of Plane, Document360 and a commercial wiki. Task help of a commercial wiki, Loomio and Kinopio. Guidance on batching and digests from SuprSend, Courier and ServiceNow documentation.

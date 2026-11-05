@@ -51,6 +51,8 @@ const (
 	ActionPageView         = "page.view"
 	ActionPageDelete       = "page.delete"       // own or any
 	ActionAttachmentDelete = "attachment.delete" // own or any
+	ActionCommentDelete    = "comment.delete"    // own or any
+	ActionReact            = "reaction.set"      // needs view, and changes what others see
 )
 
 // Subject types.
@@ -192,6 +194,8 @@ func actionAllowedBySpace(in Input) (string, bool) {
 		return PageDeleteAny, holds(in, PageDeleteAny) || (in.Owner == in.User.ID && holds(in, PageDeleteOwn))
 	case ActionAttachmentDelete:
 		return AttachmentDeleteAny, holds(in, AttachmentDeleteAny) || (in.Owner == in.User.ID && holds(in, AttachmentDeleteOwn))
+	case ActionCommentDelete:
+		return CommentDeleteAny, holds(in, CommentDeleteAny) || (in.Owner == in.User.ID && holds(in, CommentDeleteOwn))
 	}
 	return in.Action, holds(in, in.Action)
 }
@@ -214,7 +218,7 @@ func Evaluate(in Input) Decision {
 	check(LayerGlobal, globalUseProduct, slices.Contains(in.User.Global, globalUseProduct), true)
 	check(LayerSpace, "space_not_trashed", in.Space.Status != "trashed", true)
 	check(LayerSpace, SpaceView, holds(in, SpaceView), true)
-	if in.Action != SpaceView && in.Action != ActionPageView {
+	if in.Action != SpaceView && in.Action != ActionPageView && in.Action != ActionReact {
 		perm, ok := actionAllowedBySpace(in)
 		check(LayerSpace, perm, ok, false)
 	}

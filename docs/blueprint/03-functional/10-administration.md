@@ -41,8 +41,8 @@
 
 ## 10.5 E-mail
 
-- **ADM-028** · new · An administrator sets the mail server, sender and reply-to address, with a Send test button. The password comes from a file or the environment, never from the screen.
-- **ADM-029** · new · A queue view shows sent and failed mails, with no content.
+- **ADM-028** · partly · An administrator sets the mail server, sender and reply-to address, with a Send test button. The password comes from a file or the environment, never from the screen. Built: settings from the environment, and Send test. New: a screen for the rest (wave F).
+- **ADM-029** · built · A queue view shows sent and failed mails, with no content.
 
 ## 10.6 Spaces
 

@@ -4,10 +4,30 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: working together (wave C)
+- Comments under a page, with replies, edits, removal with Undo, and a link to each comment. A draft stays in your browser
+- Comments on chosen words or on an image. The words stay marked while the page changes around them, and a thread says so when they are gone. Threads can be resolved and reopened, and a panel beside the page lists them all
+- Reactions on pages and comments, with who reacted
+- `@` mentions in pages and comments, with a warning for someone who cannot see the page
+- Tasks can have a person and a date, and Your tasks lists them, grouped by date. Ticking a task there also ticks it on the page
+- Share tells people about a page and says who can see it. It never gives access
+- Asking for access, and asking to edit. The answer says what will change. A space chooses whether hidden pages offer it
+- Watching a page, a branch or a space, with a list to stop each. Publish without notifying for a small fix
+- The bell and a notifications screen, which group, link to the exact spot, and follow what you may see at that moment
+- Mail through any SMTP server: at once or as a digest, quiet hours, a pause, and one-click stop. A mail about something you watch has a link to stop watching. For testing, `docs/development.md` explains Mailpit
+- The start screen has For you, Recent activity and Popular. You can follow someone from the Details panel
+- New keys: `g` `n`, `w`, `m`, `n` and `p`
+
+Upgrade impact: migration 0007 adds tables and columns. Expand only, so the previous release keeps working. Mail stays off until `DIFFLUENCE_SMTP_HOST` is set.
+
+### Fixed: what stays behind
+- Recent searches and the state of the tree are kept per person, and logging out removes them. Older ones without a person are removed once
+- A token in an address no longer reaches the request log
+
 ### Added: the home of a space, and an example space
 - The home page is no longer a row of the tree. It has a fixed Home row above it, which is marked while you are there, and the breadcrumbs say Home
 - A strip at the top of the sidebar moves you between spaces. It scrolls on its own, and marks where you are
-- A new instance starts with an example space that shows everything a page can do. An administrator can add it later in Administration, Settings
+- A new instance starts with an example space that shows everything a page can do, also comments, reactions, mentions and tasks. An administrator can add it later in Administration, Settings
 
 Upgrade impact: no database change. An instance that already has spaces gets no example by itself. To start a new instance empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`.
 

@@ -13,6 +13,7 @@ export interface EditorActions {
   openBlockMenu: () => void;
   publish: () => void;
   save: () => void;
+  mentionNoAccess: (name: string) => void;
 }
 
 export const noActions: EditorActions = {
@@ -22,6 +23,7 @@ export const noActions: EditorActions = {
   openBlockMenu: () => undefined,
   publish: () => undefined,
   save: () => undefined,
+  mentionNoAccess: () => undefined,
 };
 
 /** Moves to the row of tools. It has one Tab stop, the tool that had focus last. */
@@ -38,7 +40,7 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
   },
   addKeyboardShortcuts() {
     const editor = () => this.editor;
-    const run = (action: keyof EditorActions) => () => {
+    const run = (action: Exclude<keyof EditorActions, 'mentionNoAccess'>) => () => {
       this.options.actions()[action]();
       return true;
     };

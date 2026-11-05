@@ -21,6 +21,31 @@ scripts/dev bash scripts/upgrade-test.sh <old binary> <new binary>
 docker build -t diffluence:local . && bash scripts/idp-test/run.sh  # real Authentik
 ```
 
+## Mail while developing
+
+[Mailpit](https://mailpit.axllent.org) (MIT) catches all mail in a web screen, so nothing leaves the machine. It is optional and only starts with its own profile:
+
+```sh
+docker compose -f compose.dev.yaml --profile mail up -d mailpit
+```
+
+The screen is at <http://localhost:18025>. Set `DEV_MAIL_PORT` to use another port.
+
+To send to it from a Diffluence started with `compose.yaml`, put it on the same network, and set these in `.env`. Recreate the container with `docker compose up -d` afterwards:
+
+```sh
+docker network connect diffluence_default diffluence-dev-mailpit-1
+```
+
+```sh
+DIFFLUENCE_SMTP_HOST=diffluence-dev-mailpit-1
+DIFFLUENCE_SMTP_PORT=1025
+DIFFLUENCE_SMTP_TLS=none
+DIFFLUENCE_SMTP_FROM=diffluence@example.test
+```
+
+Then Administration, Mail, Send test should show up in Mailpit. `none` means no encryption, which is only fine because this mail never leaves the machine. Automated tests use a fake server of their own, and need none of this.
+
 ## Conventions that tests enforce
 
 - Every route has an access rule. `docs/api/routes.txt` lists them all, and a test fails when it differs from the code: regenerate with `UPDATE_ROUTES=1 go test ./internal/app/ -run RouteTable` and review the diff.

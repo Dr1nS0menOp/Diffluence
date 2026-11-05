@@ -38,6 +38,13 @@ internal/document/     document format: allow-list gate, Markdown, comparison
 internal/spaces/       spaces
 internal/pages/        pages, tree, versions, drafts
 internal/attachments/  files on pages
+internal/comments/     comments, threads and reactions
+internal/tasks/        the index of tasks in documents
+internal/watches/      who watches what
+internal/notify/       notifications: fan-out from the outbox, the list, preferences, mail text
+internal/mail/         the mail queue and the SMTP sender
+internal/sharing/      sharing a page, and asking for access
+internal/feed/         the feed of the start screen
 internal/storage/      where files live (disk; S3 in phase 3)
 internal/search/       PostgreSQL full-text search
 internal/trash/        the trash; owners restore and purge through a Handler

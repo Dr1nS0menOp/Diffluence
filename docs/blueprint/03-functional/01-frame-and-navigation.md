@@ -27,7 +27,7 @@ How to read this chapter: see `../03-functional-requirements.md`. Every line has
 - **NAV-018** · built · **Create** is the one primary button of the top bar. Inside a space it adds a page below the page being read, if the person may. Outside a space it starts a new space.
 - **NAV-019** · partly · Create offers a small menu when there is more than one thing to make: page, page from a template, blog post, space. The most used choice stays one click away. Still open: page from a template and blog post (wave D).
 - **NAV-020** · built · The search box sits on the far side.
-- **NAV-021** · new · A bell shows how many unread notifications there are, and opens the notification panel (chapter 7).
+- **NAV-021** · built · A bell shows how many unread notifications there are, and opens the notification panel (chapter 7).
 - **NAV-022** · built · A help menu offers the keyboard shortcuts, the documentation and the version number.
 - **NAV-023** · built · The account menu shows the person, a link to their account, Administration when they are an administrator, and Log out.
 - **NAV-024** · partly · The account menu also offers their personal space, their profile and their preferences. Still open: the personal space (wave F).
@@ -40,13 +40,13 @@ The first screen after login. Its job is to answer "where was I, and what change
 - **NAV-026** · built · A greeting with the person's full display name. The first word of a name is never guessed to be a first name.
 - **NAV-027** · built · A grid of spaces as cards with a badge, name and description.
 - **NAV-028** · built · Their recent pages and favourite pages.
-- **NAV-029** · new · The tabs **For you**, **Recent activity** and **Popular** sit above the content.
-- **NAV-030** · new · **For you** lists new and changed pages from spaces and pages the person watches, and from people they follow, newest first, in one feed with the author, the action and the time.
-- **NAV-031** · new · **Recent activity** lists what happened across all spaces the person can see. A filter narrows it to a space.
-- **NAV-032** · new · **Popular** lists pages that got the most reactions and comments in the last 7 days. It counts only what the person may see.
-- **NAV-033** · new · Each feed item shows the title, the space, a short excerpt, the author and the time. A reaction and the comment count show when they exist.
-- **NAV-034** · new · The feed loads more when the person reaches its end. It never loads everything at once.
-- **NAV-035** · new · A side column shows up to six favourite or recently visited spaces and the person's open tasks.
+- **NAV-029** · built · The tabs **For you**, **Recent activity** and **Popular** sit above the content.
+- **NAV-030** · built · **For you** lists new and changed pages from spaces and pages the person watches, and from people they follow, newest first, in one feed with the author, the action and the time.
+- **NAV-031** · built · **Recent activity** lists what happened across all spaces the person can see. A filter narrows it to a space.
+- **NAV-032** · built · **Popular** lists pages that got the most reactions and comments in the last 7 days. It counts only what the person may see.
+- **NAV-033** · built · Each feed item shows the title, the space, a short excerpt, the author and the time. A reaction and the comment count show when they exist.
+- **NAV-034** · built · The feed loads more when the person reaches its end. It never loads everything at once.
+- **NAV-035** · built · A side column shows up to six favourite or recently visited spaces and the person's open tasks.
 - **NAV-036** · new · A person can dismiss a getting-started card, which explains spaces and pages to a first-time user.
 - **NAV-037** · built · A new installation with no spaces shows one clear sentence and the way to create the first space.
 - **NAV-038** · new · An administrator can pick a page as the instance's welcome message. It shows above the feed for everyone who can see it.
@@ -58,9 +58,9 @@ The first screen after login. Its job is to answer "where was I, and what change
 - **NAV-041** · built · A full **Favourites** screen lists pages and spaces, can be filtered by title, and lets a person remove several at once.
 - **NAV-042** · built · Recent pages: the last pages a person viewed are remembered per person. This is a convenience list, not statistics.
 - **NAV-043** · built · A full **Recent** screen with the tabs Visited, Worked on and Drafts, and a filter on the title. The filter looks at titles only, and says so.
-- **NAV-044** · partly · **Worked on** lists pages the person created, published or commented on, newest first. Still open: comments count from wave C.
+- **NAV-044** · built · **Worked on** lists pages the person created, published or commented on, newest first.
 - **NAV-045** · built · **Drafts** lists the person's unpublished pages and pages with unsaved changes.
-- **NAV-046** · phase 4 · **Tasks** lists tasks assigned to the person from every page they may see, with a filter on open or done, and on due date (chapter 7).
+- **NAV-046** · built · **Tasks** lists tasks assigned to the person from every page they may see, with a filter on open or done, and on due date (chapter 7).
 - **NAV-047** · built · A person can reorder their favourites by dragging.
 
 ## 1.5 The spaces directory
@@ -87,10 +87,10 @@ The first screen after login. Its job is to answer "where was I, and what change
 Shortcuts are single keys, only when the focus is not in a text field. A person can turn them off in their preferences, because they can conflict with assistive technology (WCAG 2.1.4).
 
 - **NAV-061** · built · `/` moves to the search box. `?` shows all shortcuts.
-- **NAV-062** · partly · `g` then `h` goes home, `g` then `s` opens the spaces directory, `g` then `n` opens notifications. Still open: `g` then `n`, with notifications (wave C).
-- **NAV-063** · partly · `c` creates a page, `e` edits the current page, `s` toggles the favourite, `w` toggles watching. Still open: `w`, with watching (wave C).
+- **NAV-062** · built · `g` then `h` goes home, `g` then `s` opens the spaces directory, `g` then `n` opens notifications.
+- **NAV-063** · built · `c` creates a page, `e` edits the current page, `s` toggles the favourite, `w` toggles watching.
 - **NAV-064** · built · `[` shows or hides the sidebar.
-- **NAV-065** · new · `m` jumps to the comment box, `n` and `p` go to the next and previous unread comment.
+- **NAV-065** · built · `m` jumps to the comment box, `n` and `p` go to the next and previous unread comment.
 - **NAV-066** · built · In the page tree, the arrow keys move between rows, right opens a branch, left closes it, and Enter opens the page.
 - **NAV-067** · built · The shortcuts overview lists all shortcuts by group, is searchable, and shows the keys for the person's system.
 

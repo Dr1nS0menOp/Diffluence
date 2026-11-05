@@ -18,7 +18,6 @@ import (
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/search"
-	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/spaces"
 )
 
@@ -355,10 +354,30 @@ func (s *Server) handlePageGet(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := s.deps.Pages.Get(r.Context(), s.caller(r), id)
 	if err != nil {
-		s.fail(w, r, err)
+		s.failPage(w, r, id, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, d)
+}
+
+// failPage answers like fail, and adds an offer to ask for access when the space of
+// the page chose that. The status stays 404: a page stays "not found" (COL-049).
+func (s *Server) failPage(w http.ResponseWriter, r *http.Request, id uuid.UUID, err error) {
+	e, known := apperr.As(err)
+	if !known || e.Kind != apperr.KindNotFound {
+		s.fail(w, r, err)
+		return
+	}
+	offer, askErr := s.deps.Sharing.MayAsk(r.Context(), s.caller(r), id)
+	if askErr != nil {
+		s.internalError(w, r, askErr)
+		return
+	}
+	if !offer {
+		s.fail(w, r, err)
+		return
+	}
+	writeError(w, http.StatusNotFound, "not_found_ask", e.Message)
 }
 
 func (s *Server) handlePageRename(w http.ResponseWriter, r *http.Request) {
@@ -396,13 +415,14 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 		BaseVersion int             `json:"base_version"`
 		Summary     string          `json:"summary"`
 		Overwrite   bool            `json:"overwrite"`
+		Silent      bool            `json:"silent"`
 	}
 	if decodeJSON(w, r, maxDocumentBody, &in) != nil {
 		badBody(w)
 		return
 	}
 	p, err := s.deps.Pages.Publish(r.Context(), s.caller(r), id, pages.PublishInput{Title: in.Title, Document: in.Document,
-		BaseVersion: in.BaseVersion, Summary: in.Summary, Overwrite: in.Overwrite})
+		BaseVersion: in.BaseVersion, Summary: in.Summary, Overwrite: in.Overwrite, Silent: in.Silent})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -859,7 +879,12 @@ func (s *Server) handleSettingsGet(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSettingsSet(w http.ResponseWriter, r *http.Request) {
-	var in settings.Values
+	// What the request leaves out stays as it is.
+	in, err := s.deps.Settings.Get(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return

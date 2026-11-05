@@ -10,6 +10,41 @@ work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 survived=0
 
+# apply <file> <expression on s>: changes a file, and fails when nothing changed.
+apply() {
+  node -e '
+    const fs = require("fs");
+    const [file, expr] = process.argv.slice(1);
+    const s = fs.readFileSync(file, "utf8");
+    const out = eval(expr);
+    if (out === s) { console.error("mutation did not change the file"); process.exit(3); }
+    fs.writeFileSync(file, out);
+  ' "$1" "$2"
+}
+
+# mutate_web <name> <file below web> <expression on s> <test file>: the same for the frontend.
+mutate_web() {
+  local name=$1 file=$2 expr=$3 test=$4
+  rm -rf "$work/web"
+  mkdir -p "$work/web"
+  tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$work/web" -xf -
+  ln -s "$src/web/node_modules" "$work/web/node_modules"
+  if ! apply "$work/web/$file" "$expr"; then
+    echo "BROKEN  $name (the mutation no longer applies; update this script)"
+    survived=$((survived + 1))
+    return
+  fi
+  if (cd "$work/web" && npx vitest run "$test" >"$work/out.txt" 2>&1); then
+    echo "MISSED  $name"
+    survived=$((survived + 1))
+  elif grep -a -q -E 'Tests .*failed' "$work/out.txt"; then
+    echo "caught  $name"
+  else
+    echo "BROKEN  $name (no test failed: $(grep -a -m1 . "$work/out.txt"))"
+    survived=$((survived + 1))
+  fi
+}
+
 # mutate <name> <file> <python expression on s> <go test args...>
 mutate() {
   local name=$1 file=$2 expr=$3
@@ -17,14 +52,7 @@ mutate() {
   rm -rf "$work/repo"
   mkdir -p "$work/repo"
   tar -C "$src" --exclude=./web --exclude=./bin --exclude=./.git -cf - . | tar -C "$work/repo" -xf -
-  if ! node -e '
-    const fs = require("fs");
-    const [file, expr] = process.argv.slice(1);
-    const s = fs.readFileSync(file, "utf8");
-    const out = eval(expr);
-    if (out === s) { console.error("mutation did not change the file"); process.exit(3); }
-    fs.writeFileSync(file, out);
-  ' "$work/repo/$file" "$expr"; then
+  if ! apply "$work/repo/$file" "$expr"; then
     echo "BROKEN  $name (the mutation no longer applies; update this script)"
     survived=$((survived + 1))
     return
@@ -147,6 +175,57 @@ mutate "quick search shows hidden files" internal/attachments/attachments.go \
   's.replace("JOIN perm_visible_pages($1) v ON v.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestQuickSearch
 mutate "a row menu counts as a visit" internal/pages/details.go \
   's.replace("out.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, id)\n\tout.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err")' $app -run TestOpeningARowMenu
+
+mutate "a notification reaches someone who cannot see the page" internal/notify/notify.go \
+  's.replace("if err != nil || !allowed {\n\t\treturn err\n\t}\n\tdata, err :=", "if err != nil || (!allowed && len(r.Type) < 0) {\n\t\treturn err\n\t}\n\tdata, err :=")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+mutate "the bell shows a page you lost" internal/notify/list.go \
+  's.replaceAll("JOIN perm_visible_pages($1) v ON v.page_id = n.page_id", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+mutate "mail about a page you lost still goes out" internal/notify/render.go \
+  's.replace("s.pool.Query(ctx, visibleRows+", "s.pool.Query(ctx, strings.Replace(visibleRows, \"JOIN perm_visible_pages($1) v ON v.page_id = n.page_id\", \"JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id\", 1)+")' $app -run TestMailIsWrittenWhenSentAndChecksAccessAgain
+mutate "people hear about their own actions" internal/notify/notify.go \
+  's.replace("(r.UserID == r.ActorID && !choices.NotifyOwn)", "(len(r.Type) < 0 && !choices.NotifyOwn)")' $app -run TestOwnActionsOnlyWhenAskedFor
+mutate "a forged unsubscribe token works" internal/notify/unsubscribe.go \
+  's.replace("raw, err := s.options.Keyring.Open(sealed, tokenContext)\n\tif err != nil {\n\t\treturn apperr.NotFound()\n\t}", "raw, err := s.options.Keyring.Open(sealed, tokenContext)\n\tif err != nil {\n\t\traw = sealed\n\t}")' $app -run TestUnsubscribeNeedsNoSessionAndCannotBeForged
+mutate "mail goes out without TLS" internal/mail/smtp.go \
+  's.replace("return errors.New(\"mail: the server does not offer STARTTLS\")", "return errors.Join()")' ./internal/mail/
+mutate "sharing gives access" internal/sharing/sharing.go \
+  's.replace("missing = append(missing, person)\n\t\t\t\tcontinue\n", "if err := s.perms.GrantEditor(ctx, tx, c, space.ID, person); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t\tcontinue\n")' $app -run TestSharingOnlyNotifies
+mutate "a page manager can widen a whole space" internal/sharing/sharing.go \
+  's.replace("if effect == EffectSpaceGrant {\n\t\treturn permissions.SpaceAdminister", "if len(effect) < 0 {\n\t\treturn permissions.SpaceAdminister")' $app -run TestAllowingOpensTheSpaceAndEveryRestriction
+mutate "a comment for editors reaches everyone" internal/comments/list.go \
+  's.replace("if v.EditorsOnly && !a.canEdit {", "if v.EditorsOnly && !a.canEdit && len(v.Status) < 0 {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
+mutate "a mention reaches a group of any size" internal/notify/fanout.go \
+  's.replace("if len(members) <= maxGroupMembers {", "if len(members) >= 0 {")' $app -run TestGroupMentionsAreOffAndHaveALimit
+mutate "a silent update reaches watchers" internal/notify/fanout.go \
+  's.replace("if p.Silent {\n\t\treturn nil\n\t}\n\twatchers", "if p.Silent && len(p.Mentions) < 0 {\n\t\treturn nil\n\t}\n\twatchers")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+
+mutate "a stored mention keeps the name" internal/document/attrs.go \
+  's.replace("out[\"kind\"] = MentionUser\n\t}\n\treturn nil", "out[\"kind\"] = MentionUser\n\t}\n\tout[\"label\"] = in[\"label\"]\n\treturn nil")' $app -run TestAMentionStoresTheIdAndNeverTheName
+mutate "search does not find a mentioned person" internal/search/search.go \
+  's.replace("WHERE (d.tsv || n.tsv) @@ q.query)", "WHERE d.tsv @@ q.query)")' $app -run TestAMentionStoresTheIdAndNeverTheName
+mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
+  's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
+mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
+  's.replace("case SpaceView, ActionPageView, SpaceExport, SpaceAdminister:", "case SpaceView, ActionPageView, SpaceExport, SpaceAdminister, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
+mutate "following tells who exists" internal/watches/watches.go \
+  's.replace("if !known || !slices.Contains(facts.Global, identity.PermViewProfiles) {", "if !known || (len(facts.Global) < 0 && !slices.Contains(facts.Global, identity.PermViewProfiles)) {")' $app -run TestFollowingGoesByTheRuleForSeeingPeople
+mutate "allowing skips a level out of reach" internal/sharing/sharing.go \
+  's.replace("if !canOpenAll(levels) {", "if len(levels) < 0 {")' $app -run TestAllowingAccessNamesEveryLevelAndNeedsThemAll
+mutate "a level out of reach shows its title" internal/sharing/sharing.go \
+  's.replace("level := Level{Kind: b.Kind, CanManage: d.Allowed}\n\t\tif d.Allowed {", "level := Level{Kind: b.Kind, CanManage: d.Allowed}\n\t\tif len(b.Kind) > 0 {")' $app -run TestAllowingAccessNamesEveryLevelAndNeedsThemAll
+
+mutate "mail ignores the certificate of the server" internal/mail/smtp.go \
+  's.replace("return &tls.Config{ServerName: s.Config.Host, MinVersion: tls.VersionTLS12}", "return &tls.Config{ServerName: s.Config.Host, MinVersion: tls.VersionTLS12, InsecureSkipVerify: true}")' ./internal/mail/
+mutate "an unsubscribe token reaches the request log" internal/httpapi/middleware.go \
+  's.replace("\"path\", loggedPath(r.URL.Path),", "\"path\", r.URL.Path,")' ./internal/httpapi/
+mutate "the words of a removed version live on in a quote" internal/comments/comments.go \
+  's.replace("anchor = anchor - \x27exact\x27 - \x27prefix\x27 - \x27suffix\x27 - \x27offset\x27", "anchor = anchor - \x27offset\x27")' $app -run TestRemovingAVersionBlanksTheQuotesOfItsWords
+mutate_web "people share what the browser keeps" src/personal.ts \
+  's.replace("`${PERSONAL_PREFIX}${person}.${name}`", "`${PERSONAL_PREFIX}${name}`")' src/personal.test.ts
+mutate_web "logging out leaves personal data" src/personal.ts \
+  's.replace(".filter((key) => key.startsWith(PERSONAL_PREFIX))\n    .forEach((key) => localStorage.removeItem(key));\n  sessionStorage.clear();", ".filter((key) => key.startsWith(\"nothing\"))\n    .forEach((key) => localStorage.removeItem(key));")' src/personal.test.ts
+mutate_web "a comment draft stays for ever" src/personal.ts \
+  's.replace("draft !== null && now - draft.saved < DRAFT_KEEP_MS", "draft !== null")' src/personal.test.ts
 
 mutate "the example space ignores its setting" internal/app/app.go \
   's.replace("if a.cfg.ExampleSpace {", "if a.example != nil {")' $app -run TestTheSettingTurnsTheExampleOff

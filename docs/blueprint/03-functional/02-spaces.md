@@ -30,7 +30,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-018** · built · The overview shows the space name, description, owners and the number of pages.
 - **SPC-019** · partly · It shows recent changes in the space and the most viewed pages, each of which can be turned off. Still open: most viewed pages (wave H), and turning parts off.
 - **SPC-020** · new · It shows the space's newest blog posts when the space has a blog.
-- **SPC-021** · partly · A person can favourite and watch the space from here. Still open: watching (wave C).
+- **SPC-021** · built · A person can favourite and watch the space from here.
 
 ## 2.4 The sidebar of a space
 
@@ -40,7 +40,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-025** · partly · A section **Shortcuts** holds links chosen by space administrators: to pages, other spaces or outside addresses, each with its own label and an order that can be changed by dragging. Still open: dragging: Move up and Move down do the job.
 - **SPC-026** · partly · Fixed entries sit above the tree: **Overview**, **Blog** when turned on, **Calendar** later, and **Files** (FIL-043). Still open: Blog (wave D), Files (wave E), Calendar.
 - **SPC-027** · built · Space administrators see links to Space settings and Trash at the bottom.
-- **SPC-028** · partly · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings. Still open: Watch (wave C).
+- **SPC-028** · built · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings.
 - **SPC-029** · built · The sidebar has a filter on page titles. Typing narrows the tree to matching rows with their parents, and matching words are marked.
 - **SPC-030** · built · A view switch offers **Tree**, **Last visited by me**, **Last updated** and **A to Z**. The chosen view stays. Only the tree can be rearranged, and the other views say so.
 - **SPC-031** · new · A long tree loads branches as they open, so a space with 50,000 pages still opens at once.
@@ -58,7 +58,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-035** · built · Going to a page reveals it, also inside a collapsed branch.
 - **SPC-036** · built · The current page has a tint and shows the add button. Other rows show it on hover or focus.
 - **SPC-037** · built · A person who may move pages can drag a row onto another page to make it a child, or between rows to reorder it.
-- **SPC-038** · partly · A **More** button on each row offers: Open in new tab, Copy link, Rename, Move, Copy, Favourite, Watch, Archive, Delete. Each is shown only to those who may. Still open: Watch (wave C), Archive (wave D).
+- **SPC-038** · partly · A **More** button on each row offers: Open in new tab, Copy link, Rename, Move, Copy, Favourite, Watch, Archive, Delete. Each is shown only to those who may. Still open: Archive (wave D).
 - **SPC-039** · partly · Hovering over or focusing a row shows a small card with the owner, the last change and the status. It can be turned off in the preferences. Still open: the owner and the status (wave D).
 - **SPC-040** · built · The row shows the page's emoji (PAG-123), a lock when it has a restriction, and a draft mark when the person has an unpublished change.
 - **SPC-041** · built · The current person's unpublished pages appear in the tree in a muted style, only for them.

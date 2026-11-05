@@ -3,9 +3,12 @@
 package httpapi
 
 import (
+	"bytes"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"strings"
 	"testing"
 	"time"
 )
@@ -51,6 +54,22 @@ func TestClientIPTrustsOnlyConfiguredProxies(t *testing.T) {
 		if got != c.want {
 			t.Errorf("remote=%s xff=%q: got %s, want %s", c.remote, c.xff, got, c.want)
 		}
+	}
+}
+
+func TestATokenInAPathStaysOutOfTheRequestLog(t *testing.T) {
+	var written bytes.Buffer
+	handler := withLogAndRecover(slog.New(slog.NewJSONHandler(&written, nil)))(http.NotFoundHandler())
+	for _, path := range []string{"/api/v1/mail/unsubscribe/sealed-token", "/unsubscribe/sealed-token", "/hooks/sealed-token"} {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, path, nil))
+		if line := written.String(); strings.Contains(line, "sealed-token") || !strings.Contains(line, strings.TrimSuffix(path, "sealed-token")) {
+			t.Fatalf("%s logged as: %s", path, line)
+		}
+		written.Reset()
+	}
+	handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/api/v1/pages/some-page", nil))
+	if !strings.Contains(written.String(), "/api/v1/pages/some-page") {
+		t.Fatalf("other paths stay readable: %s", written.String())
 	}
 }
 

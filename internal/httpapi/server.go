@@ -14,19 +14,26 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
+	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/spaces"
 	"github.com/diffluence/diffluence/internal/sso"
+	"github.com/diffluence/diffluence/internal/tasks"
 	"github.com/diffluence/diffluence/internal/trash"
+	"github.com/diffluence/diffluence/internal/watches"
 )
 
 // Deps are what the API needs from the rest of the application.
@@ -47,6 +54,13 @@ type Deps struct {
 	Example     *example.Service
 	SCIM        *scim.Service
 	SSO         *sso.Provider // nil when no OIDC provider is configured
+	Comments    *comments.Service
+	Watches     *watches.Service
+	Tasks       *tasks.Service
+	Notify      *notify.Service
+	Mail        *mail.Service
+	Sharing     *sharing.Service
+	Feed        *feed.Service
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)

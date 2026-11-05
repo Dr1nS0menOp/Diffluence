@@ -4,12 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me } from './api';
 import { useImportedFont } from './appearance';
+import { forgetPersonalData, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
 import { NewPageDialog, NewSpaceDialog } from './components/create';
 import { SpaceShell, useCreateTarget, useCurrentSpace } from './components/frame';
 import { IconChevronDown, IconPlus, Logo } from './components/icons';
 import { Menu, MenuItem } from './components/menu';
+import { NotificationBell } from './components/notifications';
 import { QuickSearch } from './components/quick-search';
 import { ShortcutsProvider, useShortcut } from './components/shortcuts';
 import { ToastProvider } from './components/toast';
@@ -20,6 +22,7 @@ import { DirectoryView } from './views/directory';
 import { HomeView } from './views/home';
 import { FavouritesView, RecentView } from './views/lists';
 import { LoginView } from './views/login';
+import { NotificationSettingsView, NotificationsView, WatchingView } from './views/notifications';
 import { EditView } from './views/edit';
 import { CompareView, HistoryView } from './views/history';
 import { SpaceOverviewView } from './views/overview';
@@ -28,6 +31,8 @@ import { PreferencesView } from './views/preferences';
 import { ProfileView } from './views/profile';
 import { SearchView } from './views/search';
 import { SpaceHome, SpaceSettingsView, TrashView } from './views/space';
+import { TasksView } from './views/tasks';
+import { UnsubscribeView } from './views/unsubscribe';
 
 type Creating = 'page' | 'space' | null;
 
@@ -69,6 +74,7 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
   const [creating, setCreating] = useState<Creating>(null);
   const logout = async () => {
     await api.post('/auth/logout');
+    forgetPersonalData();
     client.clear();
     navigate('/login');
   };
@@ -91,6 +97,7 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
           <CreateButton me={me} onCreate={setCreating} />
         </nav>
         <QuickSearch space={space} />
+        <NotificationBell />
         <HelpMenu />
         <AccountMenu me={me} onLogout={() => void logout()} />
       </header>
@@ -140,6 +147,34 @@ function Routes({ me }: { me: Me }) {
     return (
       <Plain width="reading">
         <PreferencesView />
+      </Plain>
+    );
+  }
+  if ((m = match('/notifications', pathname))) {
+    return (
+      <Plain width="reading">
+        <NotificationsView />
+      </Plain>
+    );
+  }
+  if ((m = match('/me/notifications', pathname))) {
+    return (
+      <Plain width="reading">
+        <NotificationSettingsView />
+      </Plain>
+    );
+  }
+  if ((m = match('/me/watching', pathname))) {
+    return (
+      <Plain width="reading">
+        <WatchingView />
+      </Plain>
+    );
+  }
+  if ((m = match('/tasks', pathname))) {
+    return (
+      <Plain width="reading">
+        <TasksView />
       </Plain>
     );
   }
@@ -214,6 +249,9 @@ export function App() {
   }, [theme]);
 
   if (pathname === '/login') return <LoginView />;
+  // Mail links reach people who are not signed in, so this comes before the login check.
+  const unsubscribe = match('/unsubscribe/:token', pathname);
+  if (unsubscribe) return <UnsubscribeView token={unsubscribe.token ?? ''} />;
   if (me.isPending) return <Loading />;
   if (me.error) {
     if (me.error instanceof ApiError && me.error.status === 401) {
@@ -225,9 +263,11 @@ export function App() {
   return (
     <ToastProvider>
       <ShortcutsProvider enabled={me.data.preferences.shortcuts}>
-        <Shell me={me.data}>
-          <Routes me={me.data} />
-        </Shell>
+        <PersonProvider value={me.data.user.id}>
+          <Shell me={me.data}>
+            <Routes me={me.data} />
+          </Shell>
+        </PersonProvider>
       </ShortcutsProvider>
     </ToastProvider>
   );

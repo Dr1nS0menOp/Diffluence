@@ -222,11 +222,12 @@ func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 		return Page{}, err
 	}
 	document.RemapAttachments(&doc, mapping)
+	// A copy is a new page: its tasks are its own, and nobody is told about them twice.
 	if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
 		SELECT $2::uuid, kind, subject_type, subject_id FROM page_restrictions WHERE page_id = $1`, p.ID, n.ID); err != nil {
 		return Page{}, err
 	}
-	if n, err = s.appendVersion(ctx, tx, c, n, title, doc, c.UserID, "", nil); err != nil {
+	if n, err = s.appendVersion(ctx, tx, c, n, newVersion{Title: title, Doc: doc, Author: c.UserID, Silent: true}); err != nil {
 		return Page{}, err
 	}
 	return n, record(ctx, tx, c, "page.copied", n, map[string]any{"copied_from": p.ID})

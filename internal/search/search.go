@@ -116,12 +116,27 @@ func optID(id uuid.UUID) *uuid.UUID {
 	return &id
 }
 
-const searchSQL = `SELECT p.id, p.space_id, s.key, s.name, p.title,
+// searchSQL finds a page by its own words, and by the names of those it mentions. The
+// names come from page_mentions at search time: the index holds no names, so it follows
+// a rename and a person can be anonymised (spec 010, D6).
+const searchSQL = `WITH q AS (SELECT to_tsquery('simple', $2) AS query),
+	named AS (
+		SELECT m.page_id, to_tsvector('simple', string_agg(COALESCE(u.display_name, g.name, ''), ' ')) AS tsv
+		FROM page_mentions m
+		LEFT JOIN users u ON u.id = m.user_id
+		LEFT JOIN groups g ON g.id = m.user_id
+		GROUP BY m.page_id),
+	hits AS (
+		SELECT d.page_id FROM search_documents d, q WHERE d.tsv @@ q.query
+		UNION
+		SELECT d.page_id FROM named n JOIN search_documents d ON d.page_id = n.page_id, q WHERE (d.tsv || n.tsv) @@ q.query)
+	SELECT p.id, p.space_id, s.key, s.name, p.title,
 		ts_headline('simple', d.body, q.query,
 			'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'),
 		p.updated_at, p.updated_by
-	FROM to_tsquery('simple', $2) AS q(query)
-	JOIN search_documents d ON d.tsv @@ q.query
+	FROM q
+	JOIN hits h ON true
+	JOIN search_documents d ON d.page_id = h.page_id
 	JOIN pages p ON p.id = d.page_id AND p.status = 'published'
 	JOIN perm_visible_pages($1) v ON v.page_id = p.id
 	JOIN spaces s ON s.id = p.space_id

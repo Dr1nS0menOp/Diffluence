@@ -93,6 +93,29 @@ func TestANewInstanceGetsTheExampleSpaceOnceItHasAnAdministrator(t *testing.T) {
 		t.Fatal("the example goes through the services, so it is audited")
 	}
 
+	var together string
+	for _, p := range pages {
+		if row := p.(map[string]any); row["title"] == "Working together" {
+			together = row["id"].(string)
+		}
+	}
+	if together == "" {
+		t.Fatal("the example needs a page about working together")
+	}
+	list := member.ok("GET", "/api/v1/pages/"+together+"/comments", nil)
+	if len(threads(list, "threads")) != 1 || len(threads(list, "inline")) != 1 {
+		t.Fatalf("the example shows a comment under the page and one on words: %v", list)
+	}
+	if len(member.ok("GET", "/api/v1/pages/"+together+"/reactions", nil)["reactions"].([]any)) != 1 {
+		t.Fatal("the example shows a reaction")
+	}
+	if len(admin.ok("GET", "/api/v1/me/tasks?tab=assigned&status=open", nil)["tasks"].([]any)) != 1 {
+		t.Fatal("the example gives its owner a task")
+	}
+	if body := member.want(200, "GET", "/api/v1/pages/"+together, nil); !strings.Contains(body, `"label":"Test admin@example.com"`) {
+		t.Fatalf("the example mentions its owner by name: %s", body)
+	}
+
 	e.tickAgain()
 	if e.spaceCount() != 1 {
 		t.Fatal("it must be made once")

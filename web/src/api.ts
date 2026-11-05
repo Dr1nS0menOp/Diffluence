@@ -89,6 +89,7 @@ export interface Space {
   home_page_id: string | null;
   favourite?: boolean;
   can?: Record<string, boolean>;
+  features?: Features;
 }
 
 export interface DirectorySpace extends Space {
@@ -133,6 +134,7 @@ export interface PageLook {
 }
 
 export interface Page extends PageLook {
+  comments_closed: boolean;
   id: string;
   space_id: string;
   parent_id: string | null;
@@ -149,7 +151,14 @@ export interface PageSummary extends Page {
   can: Record<string, boolean>;
 }
 
+export interface Features {
+  comments: boolean;
+  reactions: boolean;
+  access_requests: boolean;
+}
+
 export interface PageDetail extends PageSummary {
+  features: Features;
   document: Json;
   breadcrumbs: { id: string; title: string; emoji: string }[];
   created_by_name: string;
@@ -266,6 +275,167 @@ export interface PageFacts {
   incoming: PageRef[];
   outgoing: PageRef[];
   children: PageRef[];
+}
+
+export interface CommentAnchor {
+  kind: 'text' | 'image';
+  exact?: string;
+  prefix?: string;
+  suffix?: string;
+  offset?: number;
+  version?: number;
+  attachment_id?: string;
+}
+
+export interface Reaction {
+  emoji: string;
+  count: number;
+  mine: boolean;
+}
+
+export interface Reactor {
+  emoji: string;
+  names: string[];
+  more: number;
+}
+
+export interface Comment {
+  id: string;
+  page_id: string;
+  parent_id: string | null;
+  author_id: string;
+  author_name: string;
+  author_active: boolean;
+  body: Json | null;
+  anchor: CommentAnchor | null;
+  status: 'open' | 'resolved';
+  editors_only: boolean;
+  removed: boolean;
+  unread: boolean;
+  created_at: string;
+  edited_at: string | null;
+  resolved_at: string | null;
+  resolved_by: string;
+  reactions: Reaction[];
+  can: { edit: boolean; delete: boolean; resolve: boolean };
+  replies: Comment[];
+}
+
+export interface CommentPage {
+  threads: Comment[];
+  inline: Comment[];
+  total: number;
+  unread: number;
+  closed: boolean;
+  seen_at: string;
+}
+
+export interface MentionCandidate {
+  kind: 'user' | 'group';
+  id: string;
+  name: string;
+  members?: number;
+  can_view: boolean;
+}
+
+export interface TaskItem {
+  id: string;
+  text: string;
+  done: boolean;
+  due: string | null;
+  page_id: string;
+  page_title: string;
+  space_name: string;
+  assignee_name: string;
+}
+
+export interface Notification {
+  id: string;
+  type: string;
+  reason: string;
+  actors: string[];
+  count: number;
+  page_id: string;
+  page_title: string;
+  space_id: string;
+  space_name: string;
+  comment_id: string | null;
+  read: boolean;
+  at: string;
+  data: { message?: string; request_id?: string };
+}
+
+export interface NotificationSettings {
+  channels: Record<string, string>;
+  digest_frequency: string;
+  digest_day: number;
+  digest_hour: number;
+  time_zone: string;
+  quiet_start: string;
+  quiet_end: string;
+  paused_until: string;
+  auto_watch_create: boolean;
+  auto_watch_edit: boolean;
+  auto_watch_comment: boolean;
+  notify_own: boolean;
+  comment_order: string;
+}
+
+export interface WatchEntry {
+  type: 'page' | 'branch' | 'space';
+  id: string;
+  title: string;
+  space_name: string;
+  since: string;
+}
+
+export interface FeedItem {
+  page_id: string;
+  title: string;
+  emoji: string;
+  space_key: string;
+  space_name: string;
+  excerpt: string;
+  author_name: string;
+  kind: string;
+  at: string;
+  reactions: number;
+  comments: number;
+}
+
+export interface AccessEntry {
+  type: string;
+  id: string;
+  name: string;
+}
+
+export interface AccessLevel {
+  title: string;
+  kind: string;
+  pages: number;
+  can_manage: boolean;
+}
+
+export interface AccessRequest {
+  id: string;
+  page_id: string;
+  requester_name: string;
+  kind: string;
+  status: string;
+  effect: string;
+  levels: AccessLevel[];
+  can_allow: boolean;
+  created_at: string;
+}
+
+export interface MailEntry {
+  id: string;
+  kind: string;
+  status: string;
+  attempts: number;
+  last_error: string;
+  created_at: string;
+  sent_at: string | null;
 }
 
 export interface DeleteImpact {

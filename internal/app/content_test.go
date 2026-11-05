@@ -1049,10 +1049,18 @@ func objectRoute(pattern string, ids map[string]string) (method, path string) {
 		id = ids["job"]
 	case strings.Contains(path, "/trash/"):
 		id = ids["trash"]
+	case strings.Contains(path, "/comments/{id}"):
+		id = ids["comment"]
+	case strings.Contains(path, "/tasks/"):
+		id = ids["task"]
+	case strings.Contains(path, "/access-requests/{id}"):
+		id = ids["request"]
 	}
 	path = strings.ReplaceAll(path, "{id}", id)
 	path = strings.ReplaceAll(path, "{key}", "ENG")
 	path = strings.ReplaceAll(path, "{number}", "1")
+	path = strings.ReplaceAll(path, "{emoji}", url.PathEscape("👍"))
+	path = strings.ReplaceAll(path, "{user}", ids["owner"])
 	return method, path
 }
 
@@ -1080,6 +1088,8 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 		return path, `{"title":"x"}`
 	case pattern == "PATCH /api/v1/spaces/{id}":
 		return path, `{"name":"x"}`
+	case pattern == "POST /api/v1/pages/{id}/comments" || pattern == "PATCH /api/v1/comments/{id}":
+		return path, `{"body":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"x"}]}]}}`
 	case strings.HasSuffix(pattern, "/look"):
 		return path, `{"title_align":"start","header_position":50}`
 	case strings.HasSuffix(pattern, "/shortcuts") && strings.HasPrefix(pattern, "PUT"):
@@ -1124,13 +1134,24 @@ func TestEveryObjectRouteIsProtected(t *testing.T) {
 	trash := owner.ok("GET", "/api/v1/spaces/"+space+"/trash", nil)["items"].([]any)[0].(map[string]any)["id"].(string)
 	job := owner.importFile(space, "a.md", []byte("x"))
 
-	ids := map[string]string{"space": space, "page": page, "attachment": att["id"].(string), "job": job["id"].(string), "trash": trash, "owner": owner.id}
+	comment := owner.comment(page, "x")
+	tasked := owner.ok("POST", "/api/v1/pages", map[string]any{"space_id": space, "title": "Tasks"})["id"].(string)
+	owner.publish(tasked, "Tasks", 0, taskDoc(map[string]any{"checked": false}, "Do it"))
+	task := tasksOf(owner, "tab=created")[0]["id"].(string)
+	viewer.ok("POST", "/api/v1/pages/"+page+"/access-requests", map[string]any{"kind": "edit"})
+	var request string
+	if err := e.app.Pool().QueryRow(context.Background(), "SELECT id FROM access_requests").Scan(&request); err != nil {
+		t.Fatal(err)
+	}
+
+	ids := map[string]string{"space": space, "page": page, "attachment": att["id"].(string), "job": job["id"].(string), "trash": trash, "owner": owner.id,
+		"comment": comment, "task": task, "request": request}
 
 	// Routes that are personal or list only what the caller may see.
 	listOnly := map[string]bool{"GET /api/v1/spaces": true, "GET /api/v1/search": true}
 	// A viewer can do these by design.
 	viewerMay := map[string]bool{
-		"space.view": true, "page.view": true, "space.export": true,
+		"space.view": true, "page.view": true, "space.export": true, "comment.add": true,
 	}
 	checked := 0
 	for _, r := range e.app.Routes() {

@@ -44,6 +44,7 @@ var (
 	imageAligns   = choices("start", "center", "end")
 	imageSizes    = choices("small", "medium", "large")
 	columnLayouts = choices("wide-start", "wide-end")
+	mentionKinds  = choices(MentionUser, MentionGroup)
 )
 
 func (c choice) names() []string {
@@ -141,6 +142,27 @@ func cleanOrderedList(in, out map[string]any) error {
 func cleanTaskItem(in, out map[string]any) error {
 	checked, _ := in["checked"].(bool)
 	out["checked"] = checked
+	if id, ok := in["id"].(string); ok {
+		if parsed, err := uuid.Parse(id); err == nil {
+			out["id"] = parsed.String()
+		}
+	}
+	return nil
+}
+
+// cleanMention keeps the id alone. Versions cannot change, so a name stored here could
+// never be anonymised: reading fills it in (spec 010, D6).
+func cleanMention(in, out map[string]any) error {
+	id, _ := in["id"].(string)
+	parsed, err := uuid.Parse(id)
+	if err != nil {
+		return errors.New("a mention must point to a person or a group")
+	}
+	out["id"] = parsed.String()
+	mentionKinds.keep(in, out, "kind")
+	if out["kind"] == nil {
+		out["kind"] = MentionUser
+	}
 	return nil
 }
 
@@ -266,6 +288,7 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeColumns:     cleanColumns,
 	TypeStatus:      cleanStatus,
 	TypeDate:        cleanDate,
+	TypeMention:     cleanMention,
 }
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.

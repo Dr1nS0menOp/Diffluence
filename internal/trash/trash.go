@@ -28,6 +28,7 @@ const (
 	TypePage       = "page"
 	TypeAttachment = "attachment"
 	TypeSpace      = "space"
+	TypeComment    = "comment"
 )
 
 // Item is one deleted object.
@@ -165,13 +166,13 @@ func (s *Service) Restore(ctx context.Context, c identity.Caller, id uuid.UUID) 
 // connection. Anything older belongs to the trash and its administrators.
 const undoWindow = 60 * time.Second
 
-// UndoDelete lets the person who just deleted a page take it back, also without
-// administer (PAG-085). Nobody else can, and it does not work for long.
-func (s *Service) UndoDelete(ctx context.Context, c identity.Caller, pageID uuid.UUID) error {
+// UndoDelete lets the person who just deleted a page or a comment take it back, also
+// without administer (PAG-085). Nobody else can, and it does not work for long.
+func (s *Service) UndoDelete(ctx context.Context, c identity.Caller, objectType string, objectID uuid.UUID) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		it, err := scan(tx.QueryRow(ctx, "SELECT "+columns+` FROM trash_items
-			WHERE object_id = $1 AND object_type = 'page' AND deleted_by = $2
-			  AND deleted_at > now() - make_interval(secs => $3) FOR UPDATE`, pageID, c.UserID, undoWindow.Seconds()))
+			WHERE object_id = $1 AND object_type = $4 AND deleted_by = $2
+			  AND deleted_at > now() - make_interval(secs => $3) FOR UPDATE`, objectID, c.UserID, undoWindow.Seconds(), objectType))
 		if errors.Is(err, pgx.ErrNoRows) {
 			return apperr.NotFound()
 		}
