@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/url"
 	"path"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -88,6 +89,9 @@ func (c *converter) block(n ast.Node) []Node {
 		return append([]Node{{Type: TypeParagraph, Content: inline}}, hoisted...)
 	case *ast.Blockquote:
 		content := c.blocks(v)
+		if kind, rest, ok := panelOf(content); ok {
+			return []Node{{Type: TypePanel, Attrs: map[string]any{"kind": kind}, Content: rest}}
+		}
 		if len(content) == 0 {
 			content = []Node{{Type: TypeParagraph}}
 		}
@@ -116,6 +120,45 @@ func (c *converter) block(n ast.Node) []Node {
 		return []Node{c.table(v)}
 	}
 	return c.blocks(n)
+}
+
+// alertNames maps a panel kind to the name of the widely used Markdown alert.
+var alertNames = map[string]string{"info": "NOTE", "note": "IMPORTANT", "success": "TIP", "warning": "WARNING", "error": "CAUTION"}
+
+var alertPattern = regexp.MustCompile(`^\[!(NOTE|IMPORTANT|TIP|WARNING|CAUTION)\]\s*`)
+
+func panelKind(alert string) string {
+	for kind, name := range alertNames {
+		if name == alert {
+			return kind
+		}
+	}
+	return ""
+}
+
+// panelOf recognises a quote that starts with an alert such as [!NOTE], and
+// returns the panel's kind and its content without that marker.
+func panelOf(content []Node) (string, []Node, bool) {
+	if len(content) == 0 || content[0].Type != TypeParagraph || len(content[0].Content) == 0 {
+		return "", nil, false
+	}
+	lead := content[0].Content
+	match := alertPattern.FindStringSubmatch(lead[0].Text)
+	if lead[0].Type != TypeText || match == nil {
+		return "", nil, false
+	}
+	lead[0].Text = lead[0].Text[len(match[0]):]
+	if lead[0].Text == "" {
+		lead = lead[1:]
+	}
+	rest := content[1:]
+	if len(lead) > 0 {
+		rest = append([]Node{{Type: TypeParagraph, Content: lead}}, rest...)
+	}
+	if len(rest) == 0 {
+		rest = []Node{{Type: TypeParagraph}}
+	}
+	return panelKind(match[1]), rest, true
 }
 
 func isTaskList(l *ast.List) bool {
@@ -313,7 +356,7 @@ func (c *converter) image(v *ast.Image, marks []Mark, hoisted *[]Node) []Node {
 				attrs["alt"] = truncate(alt.String(), 1000)
 			}
 			if len(v.Title) > 0 {
-				attrs["title"] = truncate(string(v.Title), 1000)
+				attrs["caption"] = truncate(strings.ReplaceAll(string(v.Title), `\"`, `"`), maxCaptionBytes)
 			}
 			*hoisted = append(*hoisted, Node{Type: TypeImage, Attrs: attrs})
 			return nil
@@ -437,10 +480,26 @@ func (w *mdWriter) block(n Node, prefix string) {
 		}
 	case TypeImage:
 		alt, _ := n.Attrs["alt"].(string)
-		w.line(prefix, "!["+escapeInline(alt)+"]("+w.destination(n)+")")
+		title := ""
+		if caption := wordsOf(n); caption != "" {
+			title = ` "` + strings.ReplaceAll(caption, `"`, `\"`) + `"`
+		}
+		w.line(prefix, "!["+escapeInline(alt)+"]("+w.destination(n)+title+")")
 	case TypeFile:
 		name, _ := n.Attrs["filename"].(string)
 		w.line(prefix, "["+escapeInline(name)+"]("+w.destination(n)+")")
+	case TypePanel:
+		kind, _ := n.Attrs["kind"].(string)
+		w.line(prefix+"> ", "[!"+alertNames[kind]+"]")
+		w.blocks(n.Content, prefix+"> ")
+	case TypeExpand:
+		if title := wordsOf(n); title != "" {
+			w.line(prefix, "**"+escapeInline(title)+"**")
+			w.line(prefix, "")
+		}
+		w.blocks(n.Content, prefix)
+	case TypeDecision:
+		w.line(prefix, "**Decision:** "+inlineMarkdown(n.Content))
 	case TypeTable:
 		w.table(n, prefix)
 	default:
@@ -500,6 +559,10 @@ func inlineMarkdown(nodes []Node) string {
 	for _, n := range nodes {
 		if n.Type == TypeHardBreak {
 			b.WriteString("\\\n")
+			continue
+		}
+		if n.Type == TypeStatus || n.Type == TypeDate {
+			b.WriteString(escapeInline(wordsOf(n)))
 			continue
 		}
 		if n.Type != TypeText {

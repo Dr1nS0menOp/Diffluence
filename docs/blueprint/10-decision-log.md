@@ -73,6 +73,9 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 **ADR-023: Blueprint 03 is the full functional description**
 *Accepted by the product owner, 2026-11-05.* the product owner asked for a description of many pages with every detail. After a clean-room study of public help pages, 03 became 13 chapters with numbered requirements and a status each. Consequence: a build session finds the intended behaviour there, a status changes in the same pull request as the code, and numbers are never reused. Sources are in `03-functional/sources.md`. The proposed order of work in 03 does not change the roadmap until the product owner decides.
 
+**ADR-024: Four product waves before phase 3, and a study before every phase**
+*Accepted by the product owner, 2026-11-05.* Most of what makes a wiki feel complete sits in the editor and on the page, so waves A to D of `03-functional-requirements.md` come before production hardening. The product owner also decided that every phase starts like blueprint 03: a large study, then every detail planned, because that is how the product gets as complete as possible. Consequence: `09-way-of-working.md` holds the steps, and a phase has no code before its plan exists. `@tiptap/suggestion` is approved for wave A. Supersedes the order of phases in 08.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

@@ -204,6 +204,10 @@ fieldset.matrix label {
   user-select: none;
 }
 
+.avatar::before {
+  content: attr(data-initials);
+}
+
 .avatar {
   inline-size: var(--size-avatar);
   block-size: var(--size-avatar);
@@ -280,7 +284,7 @@ fieldset.matrix label {
   inset-inline-end: 0;
 }
 
-.menu-list [role='menuitem'] {
+.menu-list [role^='menuitem'] {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -296,13 +300,18 @@ fieldset.matrix label {
   white-space: nowrap;
 }
 
-.menu-list [role='menuitem']:hover,
-.menu-list [role='menuitem']:focus {
+.menu-list [role^='menuitem']:hover,
+.menu-list [role^='menuitem']:focus {
   background: var(--color-accent-tint);
   color: var(--color-accent);
 }
 
-.menu-list [role='menuitem'].danger {
+.menu-list [aria-checked='true'] {
+  color: var(--color-accent);
+  font-weight: var(--weight-strong);
+}
+
+.menu-list [role^='menuitem'].danger {
   color: var(--color-danger);
 }
 

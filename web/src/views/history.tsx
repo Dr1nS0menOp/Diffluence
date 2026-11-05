@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type DiffBlock, type PageDetail, type Version } from '../api';
 import { Link, navigate, useLocation } from '../router';
-import { DocumentView } from '../components/editor';
+import { DocumentView } from '../components/editor/editor';
 import { ConfirmButton, Dialog, ErrorNote, formatDate, Loading } from '../components/ui';
 
 export function HistoryView({ pageId }: { pageId: string }) {

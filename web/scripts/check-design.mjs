@@ -53,6 +53,11 @@ export const CONTRAST_PAIRS = [
   ['syntax-title', 'code', NORMAL_TEXT],
   ['field', 'surface', LARGE_OR_CONTROL],
   ['accent', 'subtle', LARGE_OR_CONTROL],
+  ...['grey', 'slate', 'red', 'orange', 'amber', 'green', 'teal', 'blue', 'indigo', 'purple', 'pink', 'brown'].map(
+    (name) => [`text-${name}`, 'surface', NORMAL_TEXT],
+  ),
+  ...['grey', 'yellow', 'green', 'blue', 'purple', 'red'].map((name) => ['ink', `mark-${name}`, NORMAL_TEXT]),
+  ['text-green', 'code', NORMAL_TEXT],
 ];
 
 const NAMED_COLOURS = /(?<![\w-])(white|black|red|green|blue|gray|grey|yellow|orange|purple|pink|brown|silver|navy|teal)(?![\w-])/i;

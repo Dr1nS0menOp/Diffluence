@@ -68,6 +68,11 @@
   --size-editor: 50rem;
   --size-wide: 70rem;
   --size-card: 17.5rem;
+  --size-image-small: 12rem;
+  --size-image-medium: 24rem;
+  --size-image-large: 36rem;
+  --size-swatch: 1.25rem;
+  --size-suggestions: 22rem;
 
   /* The branches of the page tree. */
   --tree-indent: 13px;
@@ -117,6 +122,26 @@
   --color-syntax-string: #24702d;
   --color-syntax-number: #8f4f0a;
   --color-syntax-title: #1c5fa8;
+
+  /* What a writer can choose. Documents store the names, never the values. */
+  --color-text-grey: #5b6472;
+  --color-text-slate: #475569;
+  --color-text-red: #b3261e;
+  --color-text-orange: #a84300;
+  --color-text-amber: #855400;
+  --color-text-green: #1b7a3d;
+  --color-text-teal: #0b7570;
+  --color-text-blue: #1d5fbf;
+  --color-text-indigo: #4338ca;
+  --color-text-purple: #7e22ce;
+  --color-text-pink: #be185d;
+  --color-text-brown: #7c4a21;
+  --color-mark-grey: #e8ebf0;
+  --color-mark-yellow: #fdf0c4;
+  --color-mark-green: #d9f2e3;
+  --color-mark-blue: #dbe8fb;
+  --color-mark-purple: #eadffb;
+  --color-mark-red: #fbe0dd;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -151,5 +176,24 @@
     --color-syntax-string: #8fd896;
     --color-syntax-number: #e8b56a;
     --color-syntax-title: #8cc0f5;
+
+    --color-text-grey: #a3afc2;
+    --color-text-slate: #b6c2d4;
+    --color-text-red: #ff9d94;
+    --color-text-orange: #ffb37a;
+    --color-text-amber: #f0c36a;
+    --color-text-green: #7fd69a;
+    --color-text-teal: #6fd6cf;
+    --color-text-blue: #8cc0f5;
+    --color-text-indigo: #b0b4fb;
+    --color-text-purple: #d3a6f7;
+    --color-text-pink: #f7a3c8;
+    --color-text-brown: #d9b08c;
+    --color-mark-grey: #2b3442;
+    --color-mark-yellow: #4a3a13;
+    --color-mark-green: #17402c;
+    --color-mark-blue: #1e3558;
+    --color-mark-purple: #37295a;
+    --color-mark-red: #4c231e;
   }
 }

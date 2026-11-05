@@ -75,6 +75,46 @@ export const IconLink = line(
 export const IconAttach = line(
   'M20 11.5l-8.2 8.2a5 5 0 0 1-7.1-7.1l8.7-8.7a3.3 3.3 0 0 1 4.700 4.700l-8.700 8.700a1.700 1.700 0 0 1-2.400-2.400l8-8',
 );
+export const IconPicture = line('M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15.5 9h.01');
+export const IconChevronUp = line('M6 15l6-6 6 6');
+export const IconTextColor = line('M6 17l6-13 6 13M8.3 12h7.4M4 21h16');
+export const IconHighlight = line('M14 5l5 5-8 8H7v-4zM4 21h16');
+export const IconClear = line('M6 5h13M12 5l-3 14M4 4l16 16');
+export const IconSubscript = line('M4 6l7 10M11 6L4 16M15 15h5l-5 5h5');
+export const IconSuperscript = line('M4 8l7 10M11 8L4 18M15 4h5l-5 5h5');
+export const IconAlignStart = line('M4 6h16M4 11h10M4 16h16M4 21h10');
+export const IconAlignCenter = line('M4 6h16M7 11h10M4 16h16M7 21h10');
+export const IconAlignEnd = line('M4 6h16M10 11h10M4 16h16M10 21h10');
+export const IconIndent = line('M4 5h16M11 10h9M11 15h9M4 20h16M4 9l3 3-3 3');
+export const IconOutdent = line('M4 5h16M11 10h9M11 15h9M4 20h16M7 9l-3 3 3 3');
+export const IconHeading = line('M6 5v14M18 5v14M6 12h12');
+export const IconText = line('M5 7V5h14v2M12 5v14M9 19h6');
+export const IconPanelInfo = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 11v5M12 8h.01');
+export const IconPanelNote = line('M5 4h14v12l-4 4H5zM15 20v-4h4');
+export const IconPanelSuccess = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM8 12l3 3 5-6');
+export const IconPanelWarning = line('M12 4l9 16H3zM12 10v4M12 17h.01');
+export const IconPanelError = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 9l6 6M15 9l-6 6');
+export const IconExpand = line('M4 6l4 4 4-4M15 8h5M4 14h16M4 19h16');
+export const IconColumns = line('M4 5h7v14H4zM13 5h7v14h-7z');
+export const IconDecision = line('M12 3v6M12 9l-6 5v7M12 9l6 5v7');
+export const IconStatus = line('M7 8h10a4 4 0 0 1 0 8H7a4 4 0 0 1 0-8z');
+export const IconDate = line('M5 6h14v14H5zM5 10h14M9 4v4M15 4v4');
+export const IconEmoji = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9 10h.01M15 10h.01M8 14c2 3 6 3 8 0');
+export const IconGrip = line('M9 6h.01M15 6h.01M9 12h.01M15 12h.01M9 18h.01M15 18h.01');
+export const IconMoveUp = line('M12 19V5M6 11l6-6 6 6');
+export const IconMoveDown = line('M12 5v14M6 13l6 6 6-6');
+export const IconUnwrap = line('M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4M9 12h6');
+export const IconHeaderRow = line('M4 5h16v14H4zM4 10h16M6 7.500h12');
+export const IconHeaderColumn = line('M4 5h16v14H4zM10 5v14M7 7v10');
+export const IconMerge = line('M4 5h16v14H4zM9 12H4M20 12h-5M9 9l3 3-3 3M15 9l-3 3 3 3');
+export const IconEqual = line('M4 5h16v14H4zM9.300 5v14M14.700 5v14');
+export const IconFill = line(
+  'M5 12l7-7 7 7-7 7zM5 12h14M20 16c1 2 1.500 3 1.500 4a1.500 1.500 0 0 1-3 0c0-1 .5-2 1.500-4',
+);
+export const IconSortUp = line('M6 18V6M3 9l3-3 3 3M13 6h8M13 11h6M13 16h4');
+export const IconSortDown = line('M6 6v12M3 15l3 3 3-3M13 6h4M13 11h6M13 16h8');
+export const IconLineNumbers = line('M9 6h11M9 12h11M9 18h11M4 5v3M4 11h2l-2 3h2M4 17h2v3H4');
+export const IconWrap = line('M4 6h16M4 12h13a3 3 0 0 1 0 6h-4M15 16l-2 2 2 2M4 18h5');
 export const IconTable = line('M4 5h16v14H4zM4 10h16M4 15h16M10 5v14');
 export const IconRowAdd = line('M4 5h16v6H4zM12 15v6M9 18h6');
 export const IconColumnAdd = line('M4 4h6v16H4zM15 12h6M18 9v6');

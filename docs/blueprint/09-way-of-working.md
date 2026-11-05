@@ -35,6 +35,19 @@ Because the product owner does not read code, **the automated checks are the cod
 | Load | k6 smoke test per pull request, full 5,000-user test nightly |
 | API contract | The OpenAPI spec matches the code, and every endpoint has a permission annotation |
 
+## Every phase starts with a study (product owner,2026-11-05)
+
+The product owner: this is one of the most important ways to make the product as complete as possible. No phase or wave is built from a short list. Before the first line of code:
+
+1. **Read widely.** Public help pages of other products, for behaviour only (`02`). W3C, MDN and library documentation for how it should work. Not one source: several, and in detail.
+2. **Write what was found.** What people expect, what accessibility demands, what the libraries allow, what is risky.
+3. **Plan every feature in detail** in `docs/specs/`: behaviour, mouse, keyboard, accessibility, document format, export, search, edge cases and limits.
+4. **Decide and write it down:** a table of decisions with reasons, what is in and what waits.
+5. **Plan the build:** an order of work, a test plan per level, acceptance criteria, risks, and how the product owner tests it.
+6. **Log the sources** in the spec, and update `03-functional` when the study finds something new.
+
+Only then does building start. If a build has started without this, stop and do the study first. Spec 008 is the example to follow.
+
 ## How a build session works
 
 1. **One issue, one branch, one pull request.** Keep it small: one feature or fix.

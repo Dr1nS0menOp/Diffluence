@@ -1,6 +1,6 @@
 # 08: Roadmap
 
-> A proposal to change the order is open: `03-functional-requirements.md` suggests four waves of product work around phase 3. This roadmap stays as it is until the product owner decides.
+> The order changed on 2026-11-05 (ADR-024): The product owner chose to build the whole of `03-functional-requirements.md` first, in waves, with one commit per wave. Phase 3 follows that work. The phases below still say what each theme contains.
 
 Every phase ends with an **exit check**: all its tests are green in CI, the product owner has done an acceptance session on the staging environment, and there are no open high or critical security findings. Durations are rough and depend on usage limits and review time.
 

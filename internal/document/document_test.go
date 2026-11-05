@@ -28,6 +28,16 @@ func TestNormalizeRefusesDangerousContent(t *testing.T) {
 		"external file":     `{"type":"file","attrs":{"href":"https://evil.example/a.exe","filename":"a.exe"}}`,
 		"file with bad id":  `{"type":"file","attrs":{"attachment_id":"../../etc/passwd","filename":"a.pdf"}}`,
 		"file without name": `{"type":"file","attrs":{"attachment_id":"018f0000-0000-7000-8000-000000000000"}}`,
+		"free text colour":  `{"type":"paragraph","content":[{"type":"text","text":"x","marks":[{"type":"textColor","attrs":{"color":"#ff0000"}}]}]}`,
+		"free highlight":    `{"type":"paragraph","content":[{"type":"text","text":"x","marks":[{"type":"highlight","attrs":{"color":"url(evil)"}}]}]}`,
+		"unknown panel":     `{"type":"panel","attrs":{"kind":"javascript"},"content":[{"type":"paragraph"}]}`,
+		"one column":        `{"type":"columns","content":[{"type":"column","content":[{"type":"paragraph"}]}]}`,
+		"six columns":       `{"type":"columns","content":[` + strings.Repeat(`{"type":"column","content":[{"type":"paragraph"}]},`, 5) + `{"type":"column","content":[{"type":"paragraph"}]}]}`,
+		"bare column":       `{"type":"column","content":[{"type":"paragraph"}]}`,
+		"bad date":          `{"type":"paragraph","content":[{"type":"date","attrs":{"value":"2026-13-45"}}]}`,
+		"date as text":      `{"type":"paragraph","content":[{"type":"date","attrs":{"value":"<b>x</b>"}}]}`,
+		"unknown status":    `{"type":"paragraph","content":[{"type":"status","attrs":{"text":"x","color":"#000"}}]}`,
+		"empty status":      `{"type":"paragraph","content":[{"type":"status","attrs":{"text":"","color":"blue"}}]}`,
 		"heading no level":  `{"type":"heading","content":[{"type":"text","text":"x"}]}`,
 		"heading level 7":   `{"type":"heading","attrs":{"level":7}}`,
 		"text at top":       `{"type":"text","text":"x"}`,
@@ -100,6 +110,154 @@ func TestNormalizeKeepsEverythingTheEditorProduces(t *testing.T) {
 	third, _ := Marshal(n2)
 	if string(again) != string(third) {
 		t.Fatal("Normalize is not idempotent")
+	}
+}
+
+func TestNormalizeKeepsTheBlocksOfTheEditor(t *testing.T) {
+	id := ids.New()
+	in := doc(`{"type":"paragraph","attrs":{"align":"center","indent":2},"content":[
+			{"type":"text","text":"coloured","marks":[{"type":"textColor","attrs":{"color":"red"}},{"type":"highlight","attrs":{"color":"yellow"}}]},
+			{"type":"text","text":"low","marks":[{"type":"subscript"}]},
+			{"type":"text","text":"high","marks":[{"type":"superscript"}]},
+			{"type":"status","attrs":{"text":"Ready","color":"green"}},
+			{"type":"date","attrs":{"value":"2026-11-05"}}]},
+		{"type":"heading","attrs":{"level":2,"align":"end"},"content":[{"type":"text","text":"Title"}]},
+		{"type":"panel","attrs":{"kind":"warning"},"content":[{"type":"paragraph"}]},
+		{"type":"expand","attrs":{"title":"More","open":true},"content":[{"type":"paragraph"}]},
+		{"type":"columns","attrs":{"layout":"wide-start"},"content":[{"type":"column","content":[{"type":"paragraph"}]},{"type":"column","content":[{"type":"paragraph"}]}]},
+		{"type":"decision","content":[{"type":"text","text":"We go"}]},
+		{"type":"image","attrs":{"attachment_id":"` + id.String() + `","size":"medium","align":"center","caption":"A view"}},
+		{"type":"codeBlock","attrs":{"language":"go","title":"main.go","line_numbers":true,"wrap":true},"content":[{"type":"text","text":"x"}]},
+		{"type":"table","content":[{"type":"tableRow","content":[{"type":"tableCell","attrs":{"background":"blue"},"content":[{"type":"paragraph"}]}]}]}`)
+	n, err := Normalize(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first := n.Content[0]
+	if first.Attrs["align"] != "center" || first.Attrs["indent"] != 2 {
+		t.Fatalf("paragraph attributes: %v", first.Attrs)
+	}
+	if got := first.Content[0].Marks; len(got) != 2 || got[0].Attrs["color"] != "red" || got[1].Attrs["color"] != "yellow" {
+		t.Fatalf("colour marks: %+v", got)
+	}
+	if got := first.Content[3].Attrs; got["text"] != "Ready" || got["color"] != "green" {
+		t.Fatalf("status: %v", got)
+	}
+	if got := n.Content[2].Attrs["kind"]; got != "warning" {
+		t.Fatalf("panel kind: %v", got)
+	}
+	if got := n.Content[3].Attrs; got["title"] != "More" || got["open"] != true {
+		t.Fatalf("section: %v", got)
+	}
+	if got := n.Content[4].Attrs["layout"]; got != "wide-start" {
+		t.Fatalf("columns: %v", got)
+	}
+	if got := n.Content[6].Attrs; got["size"] != "medium" || got["align"] != "center" || got["caption"] != "A view" {
+		t.Fatalf("image: %v", got)
+	}
+	if got := n.Content[7].Attrs; got["title"] != "main.go" || got["line_numbers"] != true || got["wrap"] != true {
+		t.Fatalf("code: %v", got)
+	}
+	if got := n.Content[8].Content[0].Content[0].Attrs["background"]; got != "blue" {
+		t.Fatalf("cell: %v", got)
+	}
+	again, _ := Marshal(n)
+	if _, err := Normalize(again); err != nil {
+		t.Fatalf("Normalize refused its own result: %v", err)
+	}
+}
+
+func TestNormalizeDropsValuesOutsideTheLists(t *testing.T) {
+	n, err := Normalize(doc(`{"type":"paragraph","attrs":{"align":"justify;color:red","indent":99}},
+		{"type":"image","attrs":{"attachment_id":"018f0000-0000-7000-8000-000000000000","size":"99999px","align":"left;position:fixed"}},
+		{"type":"table","content":[{"type":"tableRow","content":[{"type":"tableCell","attrs":{"background":"#000"},"content":[{"type":"paragraph"}]}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n.Content[0].Attrs != nil {
+		t.Fatalf("paragraph kept: %v", n.Content[0].Attrs)
+	}
+	if got := n.Content[1].Attrs; got["size"] != nil || got["align"] != nil {
+		t.Fatalf("image kept: %v", got)
+	}
+	if got := n.Content[2].Content[0].Content[0].Attrs; got != nil {
+		t.Fatalf("cell kept: %v", got)
+	}
+}
+
+func TestTextOfBlocksIsSearchableAndKeepsWordsApart(t *testing.T) {
+	n, err := Normalize(doc(`{"type":"bulletList","content":[
+			{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"first"}]}]},
+			{"type":"listItem","content":[{"type":"paragraph","content":[{"type":"text","text":"second"}]}]}]},
+		{"type":"panel","attrs":{"kind":"info"},"content":[{"type":"paragraph","content":[{"type":"text","text":"inpanel"}]}]},
+		{"type":"expand","attrs":{"title":"sectiontitle"},"content":[{"type":"paragraph","content":[{"type":"text","text":"insection"}]}]},
+		{"type":"columns","content":[{"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"left"}]}]},{"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"right"}]}]}]},
+		{"type":"decision","content":[{"type":"text","text":"decided"}]},
+		{"type":"paragraph","content":[{"type":"status","attrs":{"text":"statusword","color":"blue"}},{"type":"date","attrs":{"value":"2026-11-05"}}]},
+		{"type":"image","attrs":{"attachment_id":"018f0000-0000-7000-8000-000000000000","caption":"imagecaption"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := Text(n)
+	for _, want := range []string{"inpanel", "sectiontitle", "insection", "left", "right", "decided", "statusword", "2026-11-05", "imagecaption"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("%q is not searchable: %q", want, text)
+		}
+	}
+	if got := BlockText(n.Content[0]); got != "first second" {
+		t.Fatalf("list items must stay apart in a comparison: %q", got)
+	}
+	if got := BlockText(n.Content[3]); got != "left right" {
+		t.Fatalf("columns must stay apart in a comparison: %q", got)
+	}
+}
+
+func TestPanelSurvivesMarkdown(t *testing.T) {
+	n, err := Normalize(doc(`{"type":"panel","attrs":{"kind":"warning"},"content":[{"type":"paragraph","content":[{"type":"text","text":"Mind the gap"}]}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := ToMarkdown(n, nil)
+	if !strings.Contains(out, "> [!WARNING]") || !strings.Contains(out, "> Mind the gap") {
+		t.Fatalf("export: %q", out)
+	}
+	back, _ := FromMarkdown([]byte(out), nil)
+	raw, _ := Marshal(back)
+	again, err := Normalize(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := again.Content[0]; got.Type != TypePanel || got.Attrs["kind"] != "warning" || BlockText(got) != "Mind the gap" {
+		t.Fatalf("import: %+v", got)
+	}
+}
+
+func TestImageCaptionSurvivesMarkdown(t *testing.T) {
+	id := ids.New()
+	n, err := Normalize(doc(`{"type":"image","attrs":{"attachment_id":"` + id.String() + `","alt":"Lake","caption":"The \"big\" lake"}}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := ToMarkdown(n, func(uuid.UUID) string { return "lake.png" })
+	back, _ := FromMarkdown([]byte(out), func(string) (uuid.UUID, bool) { return id, true })
+	if got := back.Content[0].Attrs["caption"]; got != `The "big" lake` {
+		t.Fatalf("caption %q from %q", got, out)
+	}
+}
+
+func TestBlocksWithoutMarkdownKeepTheirWords(t *testing.T) {
+	n, err := Normalize(doc(`{"type":"expand","attrs":{"title":"Details"},"content":[{"type":"paragraph","content":[{"type":"text","text":"hidden"}]}]},
+		{"type":"decision","content":[{"type":"text","text":"We go"}]},
+		{"type":"columns","content":[{"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"left"}]}]},{"type":"column","content":[{"type":"paragraph","content":[{"type":"text","text":"right"}]}]}]},
+		{"type":"paragraph","content":[{"type":"status","attrs":{"text":"Ready","color":"green"}},{"type":"text","text":" on "},{"type":"date","attrs":{"value":"2026-11-05"}}]}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	out := ToMarkdown(n, nil)
+	for _, want := range []string{"**Details**", "hidden", "**Decision:** We go", "left", "right", "Ready on 2026-11-05"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("%q missing from export:\n%s", want, out)
+		}
 	}
 }
 

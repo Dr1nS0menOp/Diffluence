@@ -11,7 +11,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"math"
 	"net/url"
 	"regexp"
 	"strings"
@@ -25,10 +24,12 @@ import (
 // SchemaVersion is the current document schema. Old documents are upgraded on read.
 const SchemaVersion = 1
 
-// Limits (spec 001).
+// Limits (spec 001, spec 008).
 const (
-	MaxBytes = 5 << 20
-	MaxDepth = 100
+	MaxBytes   = 5 << 20
+	MaxDepth   = 100
+	minColumns = 2
+	maxColumns = 5
 )
 
 // Node is one element of a document.
@@ -62,6 +63,13 @@ const (
 	TypeHardBreak      = "hardBreak"
 	TypeImage          = "image"
 	TypeFile           = "file"
+	TypePanel          = "panel"
+	TypeExpand         = "expand"
+	TypeColumns        = "columns"
+	TypeColumn         = "column"
+	TypeDecision       = "decision"
+	TypeStatus         = "status"
+	TypeDate           = "date"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
 	TypeTableCell      = "tableCell"
@@ -71,17 +79,21 @@ const (
 
 // Mark types.
 const (
-	MarkBold      = "bold"
-	MarkItalic    = "italic"
-	MarkUnderline = "underline"
-	MarkStrike    = "strike"
-	MarkCode      = "code"
-	MarkLink      = "link"
+	MarkBold        = "bold"
+	MarkItalic      = "italic"
+	MarkUnderline   = "underline"
+	MarkStrike      = "strike"
+	MarkCode        = "code"
+	MarkLink        = "link"
+	MarkSubscript   = "subscript"
+	MarkSuperscript = "superscript"
+	MarkTextColor   = "textColor"
+	MarkHighlight   = "highlight"
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable}
-	inlineTypes = []string{TypeText, TypeHardBreak}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate}
 )
 
 // children says which node types may appear inside each node type.
@@ -100,6 +112,13 @@ var children = map[string][]string{
 	TypeHardBreak:      {},
 	TypeImage:          {},
 	TypeFile:           {},
+	TypePanel:          blockTypes,
+	TypeExpand:         blockTypes,
+	TypeColumns:        {TypeColumn},
+	TypeColumn:         blockTypes,
+	TypeDecision:       inlineTypes,
+	TypeStatus:         {},
+	TypeDate:           {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},
 	TypeTableCell:      blockTypes,
@@ -108,9 +127,6 @@ var children = map[string][]string{
 }
 
 var languagePattern = regexp.MustCompile(`^[a-zA-Z0-9_+#.-]{1,32}$`)
-
-// maxFilenameBytes matches the limit on attachment names.
-const maxFilenameBytes = 255
 
 // Empty returns a document with one empty paragraph.
 func Empty() Node {
@@ -158,6 +174,9 @@ func clean(n *Node, depth int) error {
 	if err := cleanAttrs(n); err != nil {
 		return err
 	}
+	if n.Type == TypeColumns && (len(n.Content) < minColumns || len(n.Content) > maxColumns) {
+		return fmt.Errorf("columns need %d to %d columns", minColumns, maxColumns)
+	}
 	if n.Type == TypeText {
 		n.Content = nil
 		marks, err := cleanMarks(n.Marks)
@@ -195,125 +214,6 @@ func contains(list []string, s string) bool {
 		}
 	}
 	return false
-}
-
-func intAttr(v any) (int, bool) {
-	f, ok := v.(float64)
-	if !ok {
-		i, isInt := v.(int)
-		return i, isInt
-	}
-	if f != math.Trunc(f) || math.Abs(f) > 1e9 {
-		return 0, false
-	}
-	return int(f), true
-}
-
-func stringAttr(attrs map[string]any, key string, limit int) (string, bool) {
-	s, ok := attrs[key].(string)
-	if !ok || !utf8.ValidString(s) {
-		return "", false
-	}
-	return truncate(s, limit), true
-}
-
-// cleanAttrs rebuilds the attributes from scratch, keeping only known ones.
-func cleanAttrs(n *Node) error {
-	in := n.Attrs
-	out := map[string]any{}
-	switch n.Type {
-	case TypeHeading:
-		level, ok := intAttr(in["level"])
-		if !ok || level < 1 || level > 6 {
-			return errors.New("a heading needs a level from 1 to 6")
-		}
-		out["level"] = level
-	case TypeOrderedList:
-		if start, ok := intAttr(in["start"]); ok && start > 0 && start != 1 {
-			out["start"] = start
-		}
-	case TypeTaskItem:
-		checked, _ := in["checked"].(bool)
-		out["checked"] = checked
-	case TypeCodeBlock:
-		if lang, ok := in["language"].(string); ok && languagePattern.MatchString(lang) {
-			out["language"] = lang
-		}
-	case TypeImage:
-		s, _ := in["attachment_id"].(string)
-		id, err := uuid.Parse(s)
-		if err != nil {
-			return errors.New("images must point to an attachment; external images are not allowed")
-		}
-		out["attachment_id"] = id.String()
-		if alt, ok := stringAttr(in, "alt", 1000); ok && alt != "" {
-			out["alt"] = alt
-		}
-		if title, ok := stringAttr(in, "title", 1000); ok && title != "" {
-			out["title"] = title
-		}
-	case TypeFile:
-		s, _ := in["attachment_id"].(string)
-		id, err := uuid.Parse(s)
-		if err != nil {
-			return errors.New("files must point to an attachment")
-		}
-		name, ok := stringAttr(in, "filename", maxFilenameBytes)
-		if !ok || name == "" {
-			return errors.New("a file needs a name")
-		}
-		out["attachment_id"] = id.String()
-		out["filename"] = name
-	case TypeTableCell, TypeTableHeader:
-		for _, key := range []string{"colspan", "rowspan"} {
-			if v, ok := intAttr(in[key]); ok && v > 1 && v <= 1000 {
-				out[key] = v
-			}
-		}
-		if widths, ok := in["colwidth"].([]any); ok {
-			var clean []any
-			for _, w := range widths {
-				if v, ok := intAttr(w); ok && v > 0 && v <= 10000 {
-					clean = append(clean, v)
-				} else {
-					clean = nil
-					break
-				}
-			}
-			if len(clean) > 0 && len(clean) <= 1000 {
-				out["colwidth"] = clean
-			}
-		}
-	}
-	n.Attrs = nil
-	if len(out) > 0 {
-		n.Attrs = out
-	}
-	return nil
-}
-
-func cleanMarks(in []Mark) ([]Mark, error) {
-	var out []Mark
-	for _, m := range in {
-		switch m.Type {
-		case MarkBold, MarkItalic, MarkUnderline, MarkStrike, MarkCode:
-			out = append(out, Mark{Type: m.Type})
-		case MarkLink:
-			href, _ := m.Attrs["href"].(string)
-			safe, err := SafeHref(href)
-			if err != nil {
-				return nil, err
-			}
-			attrs := map[string]any{"href": safe}
-			if title, ok := stringAttr(m.Attrs, "title", 1000); ok && title != "" {
-				attrs["title"] = title
-			}
-			out = append(out, Mark{Type: MarkLink, Attrs: attrs})
-		default:
-			return nil, fmt.Errorf("unknown mark %q", truncate(m.Type, 40))
-		}
-	}
-	return out, nil
 }
 
 // SafeHref allows http, https and mailto links and relative paths. Everything
@@ -380,18 +280,27 @@ func Walk(n Node, visit func(Node)) {
 	}
 }
 
-func inlineText(n Node, b *strings.Builder) {
+// wordsOf returns what a node itself says, apart from its children.
+func wordsOf(n Node) string {
+	key := map[string]string{TypeFile: "filename", TypeStatus: "text", TypeDate: "value", TypeImage: "caption", TypeExpand: "title"}[n.Type]
 	if n.Type == TypeText {
-		b.WriteString(n.Text)
+		return n.Text
 	}
 	if n.Type == TypeHardBreak {
-		b.WriteByte(' ')
+		return " "
 	}
-	if n.Type == TypeFile {
-		name, _ := n.Attrs["filename"].(string)
-		b.WriteString(name)
-	}
-	for _, c := range n.Content {
+	s, _ := n.Attrs[key].(string)
+	return s
+}
+
+func inlineText(n Node, b *strings.Builder) {
+	b.WriteString(wordsOf(n))
+	for i, c := range n.Content {
+		// Blocks are separate things: without a space, two list items become one word.
+		startsBlock := !contains(inlineTypes, c.Type) && (i > 0 || b.Len() > 0)
+		if startsBlock && !strings.HasSuffix(b.String(), " ") {
+			b.WriteByte(' ')
+		}
 		inlineText(c, b)
 	}
 }
@@ -408,14 +317,20 @@ func Text(n Node) string {
 	var b strings.Builder
 	Walk(n, func(c Node) {
 		switch c.Type {
-		case TypeParagraph, TypeHeading, TypeCodeBlock, TypeFile:
+		case TypeParagraph, TypeHeading, TypeCodeBlock, TypeFile, TypeDecision:
 			if t := BlockText(c); t != "" {
 				b.WriteString(t)
 				b.WriteByte('\n')
 			}
 		case TypeImage:
-			if alt, ok := c.Attrs["alt"].(string); ok && alt != "" {
-				b.WriteString(alt)
+			alt, _ := c.Attrs["alt"].(string)
+			if t := strings.TrimSpace(alt + " " + wordsOf(c)); t != "" {
+				b.WriteString(t)
+				b.WriteByte('\n')
+			}
+		case TypeExpand:
+			if t := wordsOf(c); t != "" {
+				b.WriteString(t)
 				b.WriteByte('\n')
 			}
 		}

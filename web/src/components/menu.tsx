@@ -10,7 +10,20 @@ import {
 } from 'react';
 import { Link } from '../router';
 
-/** A dropdown menu with keyboard support: arrows move, Escape and Tab close. */
+const ENABLED_ITEMS = '[role^=menuitem]:not(:disabled)';
+
+/** The item a key leads to: arrows, Home, End, or the next item that starts with a letter. */
+function itemForKey(key: string, items: HTMLElement[], at: number): HTMLElement | undefined {
+  if (key === 'ArrowDown') return items[(at + 1) % items.length];
+  if (key === 'ArrowUp') return items[(at - 1 + items.length) % items.length];
+  if (key === 'Home') return items[0];
+  if (key === 'End') return items[items.length - 1];
+  if (key.length !== 1) return undefined;
+  const after = [...items.slice(at + 1), ...items.slice(0, at + 1)];
+  return after.find((item) => item.textContent?.trim().toLowerCase().startsWith(key.toLowerCase()));
+}
+
+/** A dropdown menu with keyboard support: arrows, Home, End and letters move, Escape and Tab close. */
 export function Menu({
   label,
   trigger,
@@ -30,7 +43,7 @@ export function Menu({
 
   useEffect(() => {
     if (!open) return;
-    root.current?.querySelector<HTMLElement>('[role=menuitem]')?.focus();
+    root.current?.querySelector<HTMLElement>(ENABLED_ITEMS)?.focus();
     const outside = (e: MouseEvent) => {
       if (!root.current?.contains(e.target as Node)) setOpen(false);
     };
@@ -48,12 +61,11 @@ export function Menu({
       button.current?.focus();
       return;
     }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    const items = Array.from(root.current?.querySelectorAll<HTMLElement>(ENABLED_ITEMS) ?? []);
+    const target = itemForKey(e.key, items, items.indexOf(document.activeElement as HTMLElement));
+    if (!target) return;
     e.preventDefault();
-    const items = Array.from(root.current?.querySelectorAll<HTMLElement>('[role=menuitem]') ?? []);
-    const at = items.indexOf(document.activeElement as HTMLElement);
-    const next = e.key === 'ArrowDown' ? at + 1 : at - 1;
-    items[(next + items.length) % items.length]?.focus();
+    target.focus();
   };
 
   return (

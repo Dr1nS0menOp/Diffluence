@@ -278,6 +278,7 @@ a.file-tile:hover {
 }
 
 .editor-sheet {
+  position: relative;
   max-inline-size: var(--size-editor);
   margin-inline: auto;
   padding: var(--space-8) var(--space-6) var(--space-12);

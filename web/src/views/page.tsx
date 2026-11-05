@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type PageDetail, type Space } from '../api';
 import { Link, navigate } from '../router';
-import { DocumentView } from '../components/editor';
+import { DocumentView } from '../components/editor/editor';
 import {
   IconAttach,
   IconClock,

@@ -27,6 +27,9 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | Version comparison | Own code | A small longest-common-subsequence routine, not security critical. |
 | Encryption | Standard library | AES-GCM, Ed25519 and HKDF all come from Go itself. `internal/keys` only arranges them. |
 | Rate limiter, migration runner | Own code | Small, and the blueprint allows our own migration runner. |
+| TipTap colour, highlight and alignment packages | Own marks | They store free values, and our documents only allow names from a list (spec 008). Each mark is a few lines. |
+| TipTap drag handle | Own code | It needs the whole collaboration stack, including Yjs. Ours moves top-level blocks and is small. Revisit when real-time editing arrives. |
+| Emoji data | Own list | About 150 common emoji with our own keywords in `emoji.json`. The characters come from the system font, so nothing else ships. |
 | Message bus for jobs | PostgreSQL | Imports and periodic tasks use a table with `SKIP LOCKED`. One moving part fewer than a second NATS consumer. Events still go through the outbox and NATS. |
 
 ## Frontend (npm)
@@ -39,6 +42,7 @@ See `web/package.json`. The list and its reasons are below, and `scripts/check-l
 | `@tanstack/react-query` | MIT | Server state and caching | Blueprint 04 |
 | `@tanstack/react-router` | MIT | Routing | Blueprint 04 |
 | `@tiptap/*` | MIT | Editor, on ProseMirror (MIT) | Blueprint 04 |
+| `@tiptap/suggestion` | MIT | The menus at the cursor for `/` and `:`. Its helper for placing a popup, `@floating-ui/dom`, was already there through `@tiptap/react`. | The product owner, 2026-11-05 |
 | `i18next`, `react-i18next` | MIT | Translation framework | Blueprint 04 |
 | `lowlight`, `highlight.js` | MIT, BSD-3 | Colours in code blocks | The product owner, 2026-11-04 |
 

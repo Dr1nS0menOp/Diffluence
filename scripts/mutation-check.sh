@@ -93,8 +93,16 @@ mutate "publish loses its audit event" internal/pages/pages.go \
   's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
   's.replace("default:\n\t\treturn \"\", bad\n\t}\n\treturn href, nil", "default:\n\t}\n\treturn href, nil")' ./internal/document/
-mutate "a file may point anywhere" internal/document/document.go \
-  's.replace("return errors.New(\"files must point to an attachment\")", "id = uuid.Nil")' ./internal/document/
+mutate "a file may point anywhere" internal/document/attrs.go \
+  's.replace("return errors.New(\"files must point to an attachment\")", "id = \"\"")' ./internal/document/
+mutate "free colours accepted" internal/document/attrs.go \
+  's.replace("if !allowed[color] {", "if color == \"\" {")' ./internal/document/
+mutate "any date accepted" internal/document/attrs.go \
+  's.replace("if _, err := time.Parse(time.DateOnly, value); err != nil {", "if _, err := time.Parse(time.DateOnly, \"2026-01-01\"); err != nil {")' ./internal/document/
+mutate "any number of columns accepted" internal/document/document.go \
+  's.replace("if n.Type == TypeColumns && (len(n.Content) < minColumns || len(n.Content) > maxColumns) {", "if n.Type == TypeColumns && len(n.Content) < 0 {")' ./internal/document/
+mutate "unknown panels accepted" internal/document/attrs.go \
+  's.replace("panelKinds.keep(in, out, \"kind\")\n\tif out[\"kind\"] == nil {", "out[\"kind\"] = in[\"kind\"]\n\tif out[\"kind\"] == nil {")' ./internal/document/
 
 mutate "a TOTP code can be replayed" internal/identity/factors.go \
   's.replace("WHERE user_id = $1 AND last_step < $2", "WHERE user_id = $1 AND last_step <= $2 + 100")' $app -run TestTOTP

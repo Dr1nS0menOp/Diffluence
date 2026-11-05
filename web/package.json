@@ -25,6 +25,7 @@
     "@tiptap/pm": "^3.32.2",
     "@tiptap/react": "^3.32.2",
     "@tiptap/starter-kit": "^3.32.2",
+    "@tiptap/suggestion": "^3.32.2",
     "i18next": "^26.7.1",
     "lowlight": "^3.3.0",
     "react": "^19.3.1",

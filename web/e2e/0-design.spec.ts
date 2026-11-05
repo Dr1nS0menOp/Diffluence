@@ -8,6 +8,7 @@
 import type { Browser, Locator, Page } from '@playwright/test';
 import {
   ADMIN,
+  checkAccessibility,
   createNamedUser,
   EDITOR,
   expect,
@@ -57,6 +58,95 @@ const documentWithEverything = (fileId: string) => ({
   ],
 });
 
+const words = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+const coloured = (color: string) => ({
+  type: 'text',
+  marks: [{ type: 'textColor', attrs: { color } }],
+  text: `${color} `,
+});
+const cell = (text: string, background?: string) => ({
+  type: 'tableCell',
+  attrs: { background },
+  content: [words(text)],
+});
+
+/** One of everything a writer can add, to see them together in both themes. */
+const documentWithBlocks = {
+  type: 'doc',
+  content: [
+    {
+      type: 'paragraph',
+      content: [
+        ...['grey', 'slate', 'red', 'orange', 'amber', 'green'].map(coloured),
+        ...['teal', 'blue', 'indigo', 'purple', 'pink', 'brown'].map(coloured),
+      ],
+    },
+    {
+      type: 'paragraph',
+      content: ['grey', 'yellow', 'green', 'blue', 'purple', 'red'].flatMap((color) => [
+        { type: 'text', marks: [{ type: 'highlight', attrs: { color } }], text: color },
+        { type: 'text', text: ' ' },
+        { type: 'status', attrs: { text: 'Status', color } },
+        { type: 'text', text: ' ' },
+      ]),
+    },
+    {
+      type: 'paragraph',
+      content: [
+        { type: 'text', text: 'Agreed on ' },
+        { type: 'date', attrs: { value: '2026-11-05' } },
+        { type: 'text', text: ' with H' },
+        { type: 'text', marks: [{ type: 'subscript' }], text: '2' },
+        { type: 'text', text: 'O and E=mc' },
+        { type: 'text', marks: [{ type: 'superscript' }], text: '2' },
+      ],
+    },
+    { type: 'paragraph', attrs: { align: 'center' }, content: [{ type: 'text', text: 'In the centre' }] },
+    { type: 'paragraph', attrs: { indent: 1 }, content: [{ type: 'text', text: 'One step in' }] },
+    ...['info', 'note', 'success', 'warning', 'error'].map((kind) => ({
+      type: 'panel',
+      attrs: { kind },
+      content: [words(`A panel of the kind ${kind}.`)],
+    })),
+    {
+      type: 'expand',
+      attrs: { title: 'A section that starts open', open: true },
+      content: [
+        words('Words inside the section.'),
+        { type: 'expand', attrs: { title: 'A section inside it' }, content: [words('Hidden.')] },
+      ],
+    },
+    {
+      type: 'columns',
+      attrs: { layout: 'wide-start' },
+      content: [
+        { type: 'column', content: [words('The wide first column holds the main text of this part.')] },
+        { type: 'column', content: [words('A narrow second column.')] },
+      ],
+    },
+    { type: 'decision', content: [{ type: 'text', text: 'We go ahead with the new editor.' }] },
+    {
+      type: 'codeBlock',
+      attrs: { language: 'js', title: 'greeting.js', line_numbers: true },
+      content: [{ type: 'text', text: "const greeting = 'hello';\nconsole.log(greeting);" }],
+    },
+    {
+      type: 'table',
+      content: [
+        {
+          type: 'tableRow',
+          content: [
+            { type: 'tableHeader', content: [words('Name')] },
+            { type: 'tableHeader', content: [words('State')] },
+          ],
+        },
+        { type: 'tableRow', content: [cell('Editor', 'green'), cell('Done')] },
+        { type: 'tableRow', content: [cell('Reading', 'yellow'), cell('Next')] },
+      ],
+    },
+  ],
+};
+
 /**
  * Pictures must not depend on which font the test image calls its system font,
  * so they use one font on purpose. The app itself keeps the system font.
@@ -84,6 +174,7 @@ test.describe('the look of every kind of screen', () => {
   // One set-up for all pictures: a failure must not run it a second time.
   test.describe.configure({ mode: 'serial' });
   let pageId = '';
+  let blocksPageId = '';
 
   test.beforeAll(async ({ browser }) => {
     const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
@@ -119,6 +210,11 @@ test.describe('the look of every kind of screen', () => {
       },
     });
     expect(published.ok(), await published.text()).toBeTruthy();
+    blocksPageId = await publishedPage(setup, space.id, 'Every block', 'x', onboarding);
+    const blocks = await setup.request.post(`/api/v1/pages/${blocksPageId}/publish`, {
+      data: { title: 'Every block', document: documentWithBlocks, base_version: 1 },
+    });
+    expect(blocks.ok(), await blocks.text()).toBeTruthy();
     await setup.context().close();
   });
 
@@ -187,6 +283,49 @@ test.describe('the look of every kind of screen', () => {
       await page.context().close();
     });
   }
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`every block a writer can add, ${colorScheme}`, async ({ browser }) => {
+      const page = await newReaderPage(browser, colorScheme);
+      await page.setViewportSize({ width: 1280, height: 1500 });
+      await page.goto(`/pages/${blocksPageId}`);
+      await expect(page.locator('.prose .decision')).toBeVisible();
+      await expect(page.locator('.prose details details')).toHaveCount(1);
+      await picture(page, `blocks-${colorScheme}`, [page.getByTestId('last-updated')]);
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+  }
+
+  test('the blocks on a narrow screen', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { ...NARROW_SCREEN, height: 1900 },
+    });
+    const page = await context.newPage();
+    await login(page, READER.email, PASSWORD);
+    await page.goto(`/pages/${blocksPageId}`);
+    await expect(page.locator('.prose .decision')).toBeVisible();
+    await picture(page, 'blocks-narrow', [page.getByTestId('last-updated')]);
+    await context.close();
+  });
+
+  test('the editor with its handle and the slash menu', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}/edit`);
+    const body = page.locator('.prose.editing');
+    await body.locator('h2').click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Enter');
+    await page.keyboard.type('/');
+    await expect(page.getByRole('listbox', { name: 'Insert' })).toBeVisible();
+    await body.locator('h2').hover();
+    await expect(page.locator('.block-grip')).toBeVisible();
+    await picture(page, 'editor-slash');
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Control+z');
+    await page.context().close();
+  });
 
   test('a confirmation', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');

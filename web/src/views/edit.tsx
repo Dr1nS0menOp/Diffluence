@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Draft, type Json, type PageDetail } from '../api';
 import { Link, navigate } from '../router';
-import { DocumentEditor } from '../components/editor';
+import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack } from '../components/icons';
 import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 
@@ -140,6 +140,11 @@ function Form({ data }: { data: Loaded }) {
         onChange={(d) => {
           doc.current = d;
           schedule();
+        }}
+        onPublish={() => void publish(false)}
+        onSave={() => {
+          dirty.current = true;
+          void save();
         }}
         header={
           <input

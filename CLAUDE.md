@@ -9,6 +9,7 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 4. For anything visible: `docs/design/README.md`
 
 ## Hard rules
+- **Study first (product owner,2026-11-05):** every phase or wave starts with a large study and a detailed plan, as blueprint 03 did, before any code. See "Every phase starts with a study" in `docs/blueprint/09-way-of-working.md`. Spec 008 is the example.
 - **Clean-room:** never fetch, read or reproduce source code of Confluence, Docmost, Plane, OpenProject, Huly or similar products. Never ask "how does X implement this". Build from our specs and ADRs. See `docs/blueprint/02-clean-room-and-licensing.md`.
 - **Licences:** dependencies must be MIT, BSD, Apache-2.0 or ISC. No GPL, AGPL or LGPL. Ask before adding any dependency.
 - **Dependencies (product owner,2026-11-04):** keep the total as low as possible, to avoid constant security advisories and abandoned code. But never hand-write an important or security-critical part when a widely used, maintained module does the job, unless it lacks a feature we need. Small non-critical code: write it, add no dependency. Every dependency is listed with its reason in `docs/dependencies.md`.

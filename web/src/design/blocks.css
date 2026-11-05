@@ -1,0 +1,532 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* The blocks a writer can add, the colours they can choose, and the tools around them. */
+.text-grey {
+  color: var(--color-text-grey);
+}
+
+.text-slate {
+  color: var(--color-text-slate);
+}
+
+.text-red {
+  color: var(--color-text-red);
+}
+
+.text-orange {
+  color: var(--color-text-orange);
+}
+
+.text-amber {
+  color: var(--color-text-amber);
+}
+
+.text-green {
+  color: var(--color-text-green);
+}
+
+.text-teal {
+  color: var(--color-text-teal);
+}
+
+.text-blue {
+  color: var(--color-text-blue);
+}
+
+.text-indigo {
+  color: var(--color-text-indigo);
+}
+
+.text-purple {
+  color: var(--color-text-purple);
+}
+
+.text-pink {
+  color: var(--color-text-pink);
+}
+
+.text-brown {
+  color: var(--color-text-brown);
+}
+
+.mark-grey {
+  background: var(--color-mark-grey);
+}
+
+.mark-yellow {
+  background: var(--color-mark-yellow);
+}
+
+.mark-green {
+  background: var(--color-mark-green);
+}
+
+.mark-blue {
+  background: var(--color-mark-blue);
+}
+
+.mark-purple {
+  background: var(--color-mark-purple);
+}
+
+.mark-red {
+  background: var(--color-mark-red);
+}
+
+.prose mark {
+  padding-inline: var(--space-0-5);
+  border-radius: var(--radius);
+  color: var(--color-ink);
+}
+
+.prose [data-align='center'] {
+  text-align: center;
+}
+
+.prose [data-align='end'] {
+  text-align: end;
+}
+
+.prose [data-indent='1'] {
+  margin-inline-start: var(--space-8);
+}
+
+.prose [data-indent='2'] {
+  margin-inline-start: calc(2 * var(--space-8));
+}
+
+.prose [data-indent='3'] {
+  margin-inline-start: calc(3 * var(--space-8));
+}
+
+.prose [data-indent='4'] {
+  margin-inline-start: calc(4 * var(--space-8));
+}
+
+.prose [data-indent='5'] {
+  margin-inline-start: calc(5 * var(--space-8));
+}
+
+.prose [data-indent='6'] {
+  margin-inline-start: calc(6 * var(--space-8));
+}
+
+/* A panel. The icon and its name carry the meaning, the tint only supports them. */
+.panel {
+  display: flex;
+  gap: var(--space-3);
+  margin-block: 0 var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+}
+
+.panel-icon {
+  flex: none;
+  line-height: var(--leading-title);
+}
+
+.panel-body {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+/* The library puts one more element around the content of a block. */
+.panel-body > div > :last-child {
+  margin-block-end: 0;
+}
+
+/* A collapsible section. */
+.expand {
+  margin-block: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.expand summary {
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.expand-body {
+  margin-block-start: var(--space-2);
+}
+
+.expand-body > div > :last-child {
+  margin-block-end: 0;
+}
+
+.expand-title {
+  inline-size: 100%;
+  padding: var(--space-1) 0;
+  border: 0;
+  background: none;
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+/* Columns stack in reading order on a narrow screen. */
+.doc-columns {
+  display: flex;
+  gap: var(--space-5);
+  margin-block: 0 var(--space-3);
+}
+
+.doc-column {
+  flex: 1 1 0;
+  min-inline-size: 0;
+}
+
+.doc-column > :last-child {
+  margin-block-end: 0;
+}
+
+.doc-columns[data-layout='wide-start'] > .doc-column:first-child,
+.doc-columns[data-layout='wide-end'] > .doc-column:last-child {
+  flex-grow: 2;
+}
+
+.prose.editing .doc-column {
+  padding: var(--space-1) var(--space-2);
+  outline: 1px dashed var(--color-line);
+}
+
+.decision {
+  display: flex;
+  gap: var(--space-2);
+  margin-block: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--color-text-green);
+  border-radius: var(--radius);
+  background: var(--color-code);
+}
+
+.decision-icon {
+  flex: none;
+  color: var(--color-text-green);
+}
+
+.decision-text {
+  flex: 1;
+  min-inline-size: 0;
+}
+
+.status-mark {
+  display: inline-block;
+  padding-inline: var(--space-1-5);
+  border-radius: var(--radius);
+  color: var(--color-ink);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+.date-mark {
+  padding-inline: var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-mark-grey);
+}
+
+.ProseMirror-selectednode.status-mark,
+.ProseMirror-selectednode.date-mark,
+.ProseMirror-selectednode.doc-image img {
+  outline: 2px solid var(--color-accent);
+}
+
+/* Images. */
+.doc-image {
+  margin: 0 0 var(--space-3);
+}
+
+.doc-image img {
+  display: block;
+  max-inline-size: 100%;
+}
+
+.doc-image[data-size='small'] img {
+  inline-size: var(--size-image-small);
+}
+
+.doc-image[data-size='medium'] img {
+  inline-size: var(--size-image-medium);
+}
+
+.doc-image[data-size='large'] img {
+  inline-size: var(--size-image-large);
+}
+
+.doc-image[data-align='center'] {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.doc-image[data-align='end'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.doc-image figcaption {
+  margin-block-start: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+/* Code. */
+.code-frame {
+  margin-block: 0 var(--space-3);
+  overflow: hidden;
+  border-radius: var(--radius);
+  background: var(--color-code);
+  direction: ltr;
+}
+
+.code-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-3);
+  border-block-end: 1px solid var(--color-line);
+  font-size: var(--text-small);
+}
+
+.code-head[hidden] {
+  display: none;
+}
+
+.code-title {
+  flex: 1;
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+.code-message {
+  font-size: var(--text-small);
+}
+
+.code-body {
+  display: flex;
+}
+
+.code-body pre {
+  flex: 1;
+  min-inline-size: 0;
+  margin: 0;
+  background: none;
+}
+
+.prose .code-lines {
+  margin: 0;
+  padding: var(--space-3) var(--space-2);
+  border-inline-end: 1px solid var(--color-line);
+  color: var(--color-muted);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+  list-style: none;
+  text-align: end;
+  user-select: none;
+}
+
+.code-lines[hidden] {
+  display: none;
+}
+
+.code-frame.wrap pre {
+  white-space: pre-wrap;
+}
+
+/* Find. Matches also have an outline, so colour is not the only sign. */
+.find-bar {
+  position: sticky;
+  inset-block-start: calc(var(--size-topbar) + var(--size-editbar));
+  z-index: var(--layer-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1-5) var(--space-5);
+  border-block-end: 1px solid var(--color-line);
+  background: var(--color-side);
+}
+
+.find-input {
+  inline-size: var(--size-image-small);
+}
+
+.find-count {
+  min-inline-size: var(--space-12);
+  font-size: var(--text-small);
+}
+
+.find-option {
+  font-size: var(--text-small);
+}
+
+.find-match {
+  background: var(--color-mark-yellow);
+  outline: 1px solid var(--color-text-amber);
+}
+
+.find-current {
+  background: var(--color-accent-tint);
+  outline: 2px solid var(--color-accent);
+}
+
+/* The list at the cursor, and the same list in the Insert dialog. */
+.suggestion-popup {
+  z-index: var(--layer-menu);
+}
+
+.suggestions {
+  inline-size: var(--size-suggestions);
+  max-inline-size: 90vw;
+  max-block-size: 16rem;
+  margin: 0;
+  padding: var(--space-1);
+  overflow-y: auto;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+  list-style: none;
+}
+
+.suggestion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  inline-size: 100%;
+  padding: var(--space-1-5) var(--space-2);
+  border-radius: var(--radius);
+  background: none;
+  color: var(--color-ink);
+  font-weight: var(--weight-regular);
+  text-align: start;
+  cursor: pointer;
+}
+
+.suggestion svg {
+  flex: none;
+  color: var(--color-muted);
+}
+
+.suggestion.active,
+.suggestion:hover {
+  background: var(--color-accent-tint);
+  color: var(--color-ink);
+}
+
+.suggestion-name {
+  flex: none;
+}
+
+.suggestion-hint {
+  min-inline-size: 0;
+  overflow: hidden;
+  font-size: var(--text-small);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.insert-list {
+  max-block-size: 50vh;
+  margin-block-start: var(--space-2);
+  overflow-y: auto;
+}
+
+/* The handle beside a block. Touch screens use the keyboard shortcut or the tools. */
+.block-handle {
+  position: absolute;
+  inset-inline-start: calc(var(--space-6) - 2 * var(--size-twist) - var(--space-1));
+  z-index: var(--layer-sticky);
+  display: flex;
+  align-items: center;
+}
+
+.block-grip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-twist);
+  block-size: var(--size-twist);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+.block-grip:hover {
+  background: var(--color-subtle);
+}
+
+.block-menu {
+  inline-size: var(--size-twist);
+  min-block-size: var(--size-twist);
+  padding: 0;
+  background: none;
+  color: var(--color-muted);
+}
+
+@media (hover: none) {
+  .block-handle {
+    display: none;
+  }
+}
+
+.swatch {
+  display: inline-block;
+  flex: none;
+  inline-size: var(--size-swatch);
+  block-size: var(--size-swatch);
+  border: 1px solid var(--color-field);
+  border-radius: var(--radius);
+}
+
+.tool-input {
+  inline-size: var(--size-image-small);
+  min-block-size: var(--size-tool);
+  margin-inline-start: var(--space-1);
+}
+
+.tool-check {
+  margin-inline: var(--space-1);
+  font-size: var(--text-small);
+}
+
+.ProseMirror-gapcursor::after {
+  position: absolute;
+  inset-block-start: 0;
+  display: block;
+  inline-size: var(--size-swatch);
+  content: '';
+  border-block-start: 1px solid var(--color-ink);
+}
+
+/* Table columns that can be dragged. */
+.prose .column-resize-handle {
+  position: absolute;
+  inset-block: 0;
+  inset-inline-end: 0;
+  inline-size: 3px;
+  background: var(--color-accent);
+  pointer-events: none;
+}
+
+.prose.resize-cursor {
+  cursor: col-resize;
+}
+
+.prose table td,
+.prose table th {
+  position: relative;
+}
+
+@media (max-width: 50rem) {
+  .doc-columns {
+    flex-direction: column;
+  }
+
+  .block-handle {
+    inset-inline-start: 0;
+  }
+}

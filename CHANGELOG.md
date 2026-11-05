@@ -4,6 +4,24 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the editor grows up (wave A)
+- Type `/` to add anything at the cursor, or use Insert in the tools
+- Every block has a grip to drag it and a menu: move, duplicate, delete, turn into another block. Alt with the arrows moves it
+- Headings 1 to 6, subscript, superscript, 12 text colours, 6 highlights, clear formatting, alignment and indent
+- Panels in five kinds, collapsible sections, 2 to 5 columns, decisions
+- Status marks, dates and emoji in a line of text. Type `//` for today, and `:` and a word for an emoji
+- The link dialog finds pages, and such a link survives a rename
+- Images get a size, alignment, a caption and alt text
+- Tables get merged cells, header rows and columns, cell colours, column widths by dragging, and sorting
+- Code blocks get a language list, line numbers, wrapping and a title, and readers get a Copy button
+- Find and replace with Ctrl F
+- The row of tools is now one Tab stop, with arrow keys. Menus follow Home, End and letters
+
+### Fixed
+- Comparing versions no longer glues list items together
+
+Upgrade impact: no database change. Documents gain new blocks, so while two versions run side by side, a node on the older version refuses them.
+
 ### Changed: files live in the text
 - Drag files into the editor, anywhere on or beside the page, or use Add image or file. Several at once land in order
 - A file shows in the text as a tile that downloads it. A page has no Upload button or Attachments block any more

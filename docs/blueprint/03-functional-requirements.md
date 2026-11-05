@@ -36,7 +36,7 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 | [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules, API, AI, linked instances | 50 |
 | [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 21 |
 
-In total 986 requirements: 212 built, 14 partly, 104 on the roadmap, 625 new and 31 for later.
+In total 986 requirements: 239 built, 35 partly, 104 on the roadmap, 577 new and 31 for later.
 
 ## Words we use
 
@@ -76,9 +76,9 @@ Behaviour can be familiar, but these points were decided differently, for good r
 10. **Colours in documents are names, not values,** so every page works in dark mode and passes contrast (chapter 4).
 11. **Everything can leave.** Every format that goes in can come out, and a bundle moves a space to another instance with its history (chapter 11).
 
-## Proposed order
+## The order
 
-**This is a proposal. The product owner decides.** The roadmap (08) puts production hardening next, and rich collaboration after it. The study shows that most of what makes a wiki feel complete sits in the editor and on the page. The advice is to build that first, in four waves, and to run phase 3 after wave 2 or alongside it.
+The product owner decided on 2026-11-05 (ADR-024). The study shows that most of what makes a wiki feel complete sits in the editor and on the page, so that comes first, in waves, before phase 3. Each wave starts with its own study and plan, and ends with its own commit.
 
 | Wave | Theme | Main content | Needs |
 |---|---|---|---|

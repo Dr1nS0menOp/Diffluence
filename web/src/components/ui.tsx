@@ -187,9 +187,13 @@ function firstCharacter(text: string): string {
 
 export function Avatar({ name, size }: { name: string; size?: 'small' }) {
   return (
-    <span className={`avatar tint-${tintIndex(name)} ${size ?? ''}`} aria-hidden="true">
-      {initials(name)}
-    </span>
+    // From the style sheet: these letters are decoration, and the name of a button holding
+    // this picture would otherwise have to contain them (WCAG 2.5.3).
+    <span
+      className={`avatar tint-${tintIndex(name)} ${size ?? ''}`}
+      aria-hidden="true"
+      data-initials={initials(name)}
+    />
   );
 }
 

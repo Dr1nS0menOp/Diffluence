@@ -67,6 +67,8 @@ The colours that carry the look:
 | `--color-line` | `#DDE2EA` | Dividers |
 | `--color-guide` | `#B9C6D8` | Branches of the tree |
 | `--color-lozenge` | `#FBEFD5` | Status marks such as Restricted |
+| `--color-text-*` | 12 names | What a writer can choose for text. Each passes 4.5:1 on the page, in both themes |
+| `--color-mark-*` | 6 names | Highlights, panels, status marks and table cells. Normal text on each passes 4.5:1 |
 
 Need a value that is not there? Use the nearest token. If none fits, add one to `tokens.css` for both themes, and add a contrast pair if it carries text.
 
@@ -123,11 +125,28 @@ Use these. Reuse beats a new variant.
 ## The editor
 
 - Top strip: Close on the left with the save status beside it; on the right the summary, Discard draft and Publish.
-- Below it one row of tools: text style, marks, lists and blocks, then link, image or file, and table, then undo and redo. Table tools appear only inside a table.
+- Below it one row of tools: text style, marks, More formatting, colour, highlight; alignment and indent; lists and blocks; link, image or file, table, Insert, Find; undo and redo. It is one Tab stop: arrow keys move inside it, Escape returns to the text.
+- The tools for what is selected appear at the end of the same row: image, panel, section, columns, status mark, date, code block, table. There are no floating bars. Text fields come last, because they need the arrow keys themselves.
+- `/` opens a list at the cursor, and Insert opens the same list in a dialog.
+- A block has a grip and a menu in the margin, outside the text. Everything the grip does is also in the menu and on the keyboard.
 - A file can be dropped anywhere below the strip. The sheet shows a dashed outline while it is above the editor.
 - An active tool is solid accent, so its state is clear without reading it.
 - The sheet has no border. The title is a large plain input, the body follows at most 800px wide.
 - Both bars stay visible while scrolling, except on narrow screens.
+
+## The blocks of a document
+
+`web/src/design/blocks.css` holds them. A writer picks names, never values: a document can only say `red`, and each name has a light and a dark value in the tokens. Meaning never rests on colour alone: a panel has an icon and a name, a status mark has words, a match in Find has an outline.
+
+| Block | Look |
+|---|---|
+| Panel | A tinted box with an icon: info blue, note purple, success green, warning yellow, error red |
+| Collapsible section | A thin frame. Readers get the browser's own `details`. Writers see it open, with its title as a field |
+| Columns | No frame for readers, a dashed outline for writers. They stack on narrow screens |
+| Decision | A green line on the start side, with an icon |
+| Status mark, date | A soft box in the line of text |
+| Code block | A header with title, language and Copy for readers. Always left-to-right |
+| Image | A `figure` with a caption, in three sizes or its own |
 
 ## States
 
