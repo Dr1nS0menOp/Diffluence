@@ -14,7 +14,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   retries: 0,
-  reporter: [['list']],
+  // On GitHub a failure also becomes an annotation, which can be read without logging in.
+  reporter: process.env.GITHUB_ACTIONS ? [['list'], ['github']] : [['list']],
   use: {
     baseURL: process.env.BASE_URL ?? 'http://localhost:8080',
     trace: 'retain-on-failure',

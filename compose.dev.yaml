@@ -51,6 +51,7 @@ services:
     working_dir: /work/web
     environment:
       CI: "1"
+      GITHUB_ACTIONS: ${GITHUB_ACTIONS:-}
     volumes:
       - .:/work
       - web_modules:/work/web/node_modules
