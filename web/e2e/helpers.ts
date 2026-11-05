@@ -35,6 +35,17 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
 }
 
+/**
+ * Waits until the editor really has the focus. TipTap gives it back in the next
+ * frame, and ProseMirror puts the cursor back 20 ms after focus. No person can type
+ * that fast, but a test can: on a slow machine its keys then land somewhere else.
+ * This timer starts after that one and lasts longer, so it always ends later.
+ */
+export async function editorSettled(page: Page) {
+  await expect(page.locator('.prose.editing')).toBeFocused();
+  await page.evaluate(() => new Promise((done) => requestAnimationFrame(() => setTimeout(done, 40))));
+}
+
 let counter = 0;
 export const unique = (prefix: string) => `${prefix}${Date.now().toString(36)}${counter++}`;
 

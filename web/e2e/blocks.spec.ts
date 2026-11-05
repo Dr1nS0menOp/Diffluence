@@ -1,7 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // Spec 008: everything wave A adds to the editor, as a writer and as a reader.
 import type { Page } from '@playwright/test';
-import { ADMIN, checkAccessibility, expect, login, newSpace, publishedPage, test } from './helpers';
+import {
+  ADMIN,
+  checkAccessibility,
+  editorSettled,
+  expect,
+  login,
+  newSpace,
+  publishedPage,
+  test,
+} from './helpers';
 
 const PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
@@ -18,6 +27,7 @@ async function editing(page: Page, title: string, text = 'start') {
   const id = await publishedPage(page, space.id, title, text);
   await page.goto(`/pages/${id}/edit`);
   await page.locator('.prose.editing').click();
+  await editorSettled(page);
   await page.keyboard.press('Control+End');
   return { id, space };
 }

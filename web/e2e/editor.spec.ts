@@ -4,6 +4,7 @@ import {
   ADMIN,
   checkAccessibility,
   createUser,
+  editorSettled,
   expect,
   grant,
   login,
@@ -46,6 +47,7 @@ test('writing a page with Markdown shortcuts and publishing it', async ({ page }
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
 
   await page.getByRole('textbox', { name: 'Page content' }).click();
+  await editorSettled(page);
   await page.keyboard.type('# Big heading');
   await page.keyboard.press('Enter');
   await page.keyboard.type('Some **bold** text and `code`.');
@@ -80,6 +82,7 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
   const id = await publishedPage(page, space.id, 'Tables', 'start');
   await page.goto(`/pages/${id}/edit`);
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await editorSettled(page);
   await page.keyboard.type('Name');
   await page.getByRole('button', { name: 'Add row' }).click();
   await page.getByRole('button', { name: 'Publish' }).click();
@@ -90,6 +93,7 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
   await page.getByRole('link', { name: 'Edit', exact: true }).click();
   const body = page.locator('.prose.editing');
   await body.click();
+  await editorSettled(page);
   await page.keyboard.press('Control+End');
   await page.keyboard.press('Enter');
   await page.keyboard.type('<img src=x onerror=alert(1)>');
@@ -111,6 +115,7 @@ test('drafts survive a reload, and history compares and restores', async ({ page
   await page.goto(`/pages/${id}/edit`);
   const body = page.locator('.prose.editing');
   await body.click();
+  await editorSettled(page);
   await page.keyboard.press('Control+End');
   await page.keyboard.type(' and more');
   await expect(page.getByText('Draft saved')).toBeVisible();
@@ -148,6 +153,7 @@ test('publishing over someone else warns first', async ({ page, browser }) => {
   const id = await publishedPage(page, space.id, 'Shared', 'base');
   await page.goto(`/pages/${id}/edit`);
   await page.locator('.prose.editing').click();
+  await editorSettled(page);
   await page.keyboard.type('mine ');
 
   const other = await browser.newContext({ baseURL: 'http://localhost:8080' });
@@ -188,6 +194,7 @@ test('images go in through the toolbar and show on the page', async ({ page }) =
   const id = await publishedPage(page, space.id, 'Images', 'text');
   await page.goto(`/pages/${id}/edit`);
   await page.locator('.prose.editing').click();
+  await editorSettled(page);
   await page.locator(`input[type=file][aria-label="${ADD_FILE}"]`).setInputFiles({
     name: 'dot.png',
     mimeType: 'image/png',
@@ -351,6 +358,7 @@ test('Create adds a page below the one you are reading', async ({ page }) => {
   await dialog.getByLabel('Title').fill('Below');
   await dialog.getByRole('button', { name: 'Create' }).click();
   await page.getByRole('textbox', { name: 'Page content' }).click();
+  await editorSettled(page);
   await page.keyboard.type('text');
   await page.getByRole('button', { name: 'Publish' }).click();
   await expect(page.getByRole('heading', { name: 'Below', level: 1 })).toBeVisible();
@@ -385,6 +393,7 @@ test('a link is added through our own dialog, and no browser dialog ever opens',
   });
   await page.goto(`/pages/${id}/edit`);
   await page.locator('.prose.editing').click();
+  await editorSettled(page);
   await page.keyboard.press('Control+A');
   await page.getByRole('button', { name: 'Link', exact: true }).click();
   await page.getByRole('dialog', { name: 'Link' }).getByLabel('Link address').fill('https://example.com/');

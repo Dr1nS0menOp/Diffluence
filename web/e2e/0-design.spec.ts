@@ -11,6 +11,7 @@ import {
   checkAccessibility,
   createNamedUser,
   EDITOR,
+  editorSettled,
   expect,
   grant,
   login,
@@ -315,6 +316,7 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/pages/${pageId}/edit`);
     const body = page.locator('.prose.editing');
     await body.locator('h2').click();
+    await editorSettled(page);
     await page.keyboard.press('End');
     await page.keyboard.press('Enter');
     await page.keyboard.type('/');
