@@ -68,6 +68,11 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 | 10 | **Mobile apps** (nice to have) |
 | 11 | **Migration between products:** from Confluence to Diffluence, from Diffluence to Confluence and other apps, and from other large tools to Diffluence. A very large job, so it comes very late, when the product is far along (ADR-028) |
 
+## Wanted, later
+
+- **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
+- **S3 storage.** It needs a client module, chosen when the time comes.
+
 ## Kinds of item
 
 Create offers four kinds of item, made the same way, each with its own job (ADR-028):

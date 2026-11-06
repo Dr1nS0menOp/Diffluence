@@ -122,6 +122,9 @@ Status: decided by the product owner (2026-11-05). Context: after his first test
 **ADR-032: Our own writers for Word and OpenDocument, no Pandoc**
 *Accepted.* Blueprint 04 named Pandoc for this, as a sidecar. Our blocks are a short fixed list, and writing that subset takes only `archive/zip` and `encoding/xml`. Consequences: one process less to run and patch, and our reader is limited and fuzzed. Files stay plain, so the product owner checks one in Word. See spec 014, D2.
 
+**ADR-033: Who may invite, and what waits**
+Status: decided by the product owner (2026-11-06). Decision: inviting someone without an account needs a role that allows it, and an administrator approves every invitation. Searching inside attachments and S3 storage wait for later. PdfCraft stays at 18.7 MiB packed and 52.6 MiB unpacked, and databases are an own grid. Consequences: an ordinary member can never bring in an outsider alone.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

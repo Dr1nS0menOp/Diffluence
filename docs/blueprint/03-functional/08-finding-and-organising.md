@@ -29,7 +29,7 @@
 - **ORG-022** · built · Results load in pages, with a total count.
 - **ORG-023** · built · A search with no results suggests removing filters, and shows a similar spelling when there is one.
 - **ORG-024** · built · Comments are searchable, and a result links to the comment.
-- **ORG-025** · new · The text inside attachments (PDF, Word, text) is searchable when extraction is turned on. It runs in the background, in a separate process, with limits.
+- **ORG-025** · later · The text inside attachments (PDF, Word, text) is searchable when extraction is turned on. It runs in the background, in a separate process, with limits.
 - **ORG-026** · built · **Search people and spaces:** results also list people and spaces, in their own tabs.
 - **ORG-027** · built · An administrator sees which searches found nothing (PLT-014), with no names attached.
 

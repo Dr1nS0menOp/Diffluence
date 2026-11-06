@@ -65,7 +65,7 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 - **COL-044** · built · **Copy link** is one click, beside Share, with a confirmation. It copies the stable address.
 - **COL-045** · built · The dialog has a checkbox to send a notification or not.
 - **COL-046** · built · Share also shows the page's restrictions and lets those who may change them, so one place covers "who can see this".
-- **COL-047** · new · A person can share by e-mail to someone with no account, only when an administrator allows invitations. The recipient gets an invitation, not the content.
+- **COL-047** · new · A person with the right role can share by e-mail to someone with no account. An administrator approves every invitation before it is sent. Nobody else can invite. The recipient gets an invitation, not the content.
 - **COL-048** · later · Sharing to a chat system goes through webhooks or an app (chapter 12).
 
 ## 7.7 Asking for access
