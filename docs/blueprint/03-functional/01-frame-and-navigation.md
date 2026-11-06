@@ -15,7 +15,7 @@ How to read this chapter: see `../03-functional-requirements.md`. Every line has
 - **NAV-009** · built · The back and forward buttons work, and every screen has its own address that can be shared or reloaded.
 - **NAV-010** · built · After a reload, a person returns to the same scroll position in a long page.
 - **NAV-011** · built · The browser tab shows the page title and the instance name, so many open tabs stay readable.
-- **NAV-012** · new · A failed action never loses typed text. The form stays open with the message beside it.
+- **NAV-012** · built · A failed action never loses typed text. The form stays open with the message beside it.
 
 ## 1.2 The top bar
 
@@ -117,6 +117,6 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 - **NAV-077** · built · A person picks their language, time zone, date format and first day of the week. Dates and times everywhere follow these.
 - **NAV-078** · built · Long dates show as relative time ("3 hours ago") with the exact time on hover or focus.
 - **NAV-079** · built · WCAG 2.2 AA is the goal, checked by automated tests on screens in the browser tests.
-- **NAV-080** · new · Screen reader users hear new notifications and save states through live regions, without being interrupted.
+- **NAV-080** · built · Screen reader users hear new notifications and save states through live regions, without being interrupted.
 - **NAV-081** · built · Motion stops when the system asks for reduced motion. The tree and panels still work.
 - **NAV-082** · built · A sensible browser print of any page: no bars, sidebars or buttons, and every collapsible section open.

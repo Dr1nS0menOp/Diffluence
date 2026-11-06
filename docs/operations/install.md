@@ -98,3 +98,26 @@ Editing together is optional. Without it, every page keeps private drafts. With 
 3. Start it with `docker compose --profile collab up -d`.
 
 Diffluence passes `/collab` on to the service, so your reverse proxy must allow WebSocket upgrades on that path. The service needs Node.js security updates from then on. One service node serves an instance: more than one needs sticky routing by page, which is not built yet.
+
+## Watching it
+
+- `/livez` says the process runs. `/readyz` says this node may get traffic: it checks the database, migrations and storage. A node with role `worker` or `all` also needs the queue. A node with role `api` does not, because events wait in the database, so people can go on working through a queue outage.
+- `/metrics` gives numbers for Prometheus: requests by method and class of status, how long they took, the database pool, and what waits in the outbox, jobs and mail. It is off until you set `DIFFLUENCE_METRICS_TOKEN` to a long random token. Prometheus sends it as `authorization: { credentials_file: ... }`. Numbers about the queues are for the whole instance, so scrape one node for those. Request numbers are per node.
+- Logs are JSON with a `request_id`. A proxy that sends a W3C `traceparent` header also gets its `trace_id` in the log line, so one request can be followed through both. Diffluence does not export spans.
+- The pool opens at most 20 database connections per node. Add `pool_max_conns` to the database address to change that, and keep the total of all nodes below `max_connections`.
+
+## Kubernetes
+
+`deploy/helm/diffluence` is a chart for an existing PostgreSQL. It holds no secret values: make a Secret with the keys listed in `values.yaml`, then:
+
+```sh
+helm install wiki deploy/helm/diffluence --set publicUrl=https://wiki.example.com
+```
+
+`mode: single` is one pod with the embedded queue. `mode: split` gives API and worker pods, and needs an external NATS, an odd number of servers with three replicas per stream, and a volume all pods can write to, because files stay on a volume until an S3 store exists.
+
+The chart has been checked with `helm lint` and `helm template`, not yet on a cluster. PostgreSQL scales up, not out, and reads stay on the primary, because a person who was just restricted must not read from a stale copy. If you use PgBouncer in transaction mode, it must be 1.21 or newer, and migrations must use a direct connection, because they hold a session lock. Put a limit per address in your proxy: the limits inside Diffluence count per node.
+
+## Load test
+
+`scripts/load/reading.js` is a [k6](https://k6.io) script with the pattern of a real reader, including the polling. Its header says how to run it. Run it against a copy, not against your live instance.

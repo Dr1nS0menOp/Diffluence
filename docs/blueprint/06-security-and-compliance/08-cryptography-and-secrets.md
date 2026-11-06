@@ -34,7 +34,7 @@ ASVS 11.1.2 asks for an inventory. Primitives come from the Go standard library 
 **What can go wrong:** the key lies next to the data, a key leaks and cannot be replaced, one key does too many jobs.
 
 - **SEC-710** · built · The KEK is a 32-byte file with mode 0600, outside the database. When several nodes run, `DIFFLUENCE_MASTER_KEY_FILE` is required, and the same key is shared.
-- **SEC-711** · partly · By default `master.key` sits in the data directory, next to the stored files. The guide says to back it up apart. See SEC-636.
+- **SEC-711** · built · By default `master.key` sits in the data directory, next to the stored files. The guide says to back it up apart. See SEC-636. A backup now keeps `master.key` encrypted, with the key apart.
 - **SEC-712** · phase 3 · A KMS can hold the KEK: OpenBao or Vault Transit, or an HSM (ADR-011, ASVS 13.3.3).
 - **SEC-713** · new · **Medium.** The KEK cannot be rotated. `format` allows it, but there is no key id in a sealed value, and no job to re-wrap values. After a leak the only way out is new TOTP for everyone. Add a key id, and a background job that re-wraps (ASVS 13.3.4). Belongs in phase 3, with the KMS.
 - **SEC-714** · new · The signing key for audit checkpoints is derived from the KEK. It is one secret doing two jobs. Whoever has the KEK can forge checkpoints as well as read seeds, so rotating the KEK also changes that key. `VerifyCheckpoints` checks against the current key only, although each row stores its public key. Verify each checkpoint against a list of known keys. Belongs in phase 3.

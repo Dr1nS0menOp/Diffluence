@@ -5,6 +5,7 @@ package notify
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
@@ -39,20 +40,23 @@ type payload struct {
 	UserID          uuid.UUID   `json:"user_id"`
 	ExportID        uuid.UUID   `json:"export_id"`
 	Filename        string      `json:"filename"`
+	ObjectID        string      `json:"object_id"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
 // than once for the same event: a row is unique per person and event.
 func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 	handlers := map[string]func(context.Context, uuid.UUID, payload) error{
-		"page.published":   s.onPublished,
-		"comment.created":  s.onComment,
-		"comment.edited":   s.onCommentEdited,
-		"reaction.added":   s.onReaction,
-		"access.requested": s.onAccessRequested,
-		"access.allowed":   s.onAccessAnswered,
-		"access.refused":   s.onAccessAnswered,
-		"export.finished":  s.onExportFinished,
+		"page.published":      s.onPublished,
+		"comment.created":     s.onComment,
+		"comment.edited":      s.onCommentEdited,
+		"reaction.added":      s.onReaction,
+		"access.requested":    s.onAccessRequested,
+		"access.allowed":      s.onAccessAnswered,
+		"access.refused":      s.onAccessAnswered,
+		"export.finished":     s.onExportFinished,
+		"access.recovered":    s.onAccessRecovered,
+		"page.draft_expiring": s.onDraftExpiring,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -214,6 +218,40 @@ func (s *Service) onAccessRequested(ctx context.Context, event uuid.UUID, p payl
 func (s *Service) onAccessAnswered(ctx context.Context, event uuid.UUID, p payload) error {
 	return s.Deliver(ctx, s.pool, Row{UserID: p.RequesterID, Type: TypeAccessAnswer, Reason: ReasonAsked, ActorID: p.ActorID,
 		PageID: p.PageID, SpaceID: p.SpaceID, Event: event})
+}
+
+// onAccessRecovered tells the owner of a page that an administrator took access to
+// it, because that is the one person a restriction was meant to answer to (ACC-071).
+// The event also covers spaces, which have no such owner.
+func (s *Service) onAccessRecovered(ctx context.Context, event uuid.UUID, p payload) error {
+	pageID, err := uuid.Parse(p.ObjectID)
+	if err != nil {
+		return fmt.Errorf("notify: read access.recovered: %w", err)
+	}
+	var owner *uuid.UUID
+	var spaceID uuid.UUID
+	err = s.pool.QueryRow(ctx, "SELECT owner_id, space_id FROM pages WHERE id = $1", pageID).Scan(&owner, &spaceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil || owner == nil {
+		return err
+	}
+	return s.Deliver(ctx, s.pool, Row{UserID: *owner, Type: TypeAccessRecovered, Reason: ReasonAuthor, ActorID: p.ActorID,
+		PageID: pageID, SpaceID: spaceID, Event: event})
+}
+
+// onDraftExpiring warns the person whose draft is about to go (PAG-019).
+func (s *Service) onDraftExpiring(ctx context.Context, event uuid.UUID, p payload) error {
+	var spaceID uuid.UUID
+	err := s.pool.QueryRow(ctx, "SELECT space_id FROM pages WHERE id = $1", p.PageID).Scan(&spaceID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return s.Deliver(ctx, s.pool, Row{UserID: p.UserID, Type: TypeDraftExpiring, Reason: ReasonAuthor, PageID: p.PageID, SpaceID: spaceID, Event: event})
 }
 
 // RemindDue tells people about tasks that reached their date, once.

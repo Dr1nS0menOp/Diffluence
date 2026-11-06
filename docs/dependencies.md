@@ -86,4 +86,11 @@ See `web/package.json`. The list and its reasons are below, and `scripts/check-l
 
 Development only: `vite`, `typescript`, `vitest`, `eslint`, `prettier`, `@playwright/test`, `@axe-core/playwright`, all named in blueprint 09.
 
+## Wanted, waiting for the product owner
+
+| What | For | Why it is not here |
+|---|---|---|
+| An S3 client, such as `minio-go` (Apache-2.0) | ARC-192, ARC-193 | A new module, and the choice for phase 3 is the product owner's |
+| A text extractor as a separate program | ORG-025, ARC-126 | A new program to run and to keep up to date |
+
 No Radix or other component library: native HTML elements plus our own CSS were enough, and accessibility is checked with axe.

@@ -159,6 +159,88 @@ function PersonPages({ id }: { id: string }) {
   );
 }
 
+function PersonMentions({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['person-mentions', id],
+    queryFn: () => api.get<{ pages: ListedPage[] }>(`/people/${id}/mentions`),
+  });
+  if ((q.data?.pages.length ?? 0) === 0) return <ErrorNote error={q.error} />;
+  return (
+    <section>
+      <h2>{t('people.mentionedOn')}</h2>
+      <ul className="page-list">
+        {q.data?.pages.map((p) => (
+          <li key={p.id}>
+            <PageMark page={p} />
+            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <span className="muted">{p.space_name}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+/** The spaces of the pages above, which the viewer may already see. */
+function PersonSpaces({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['person-pages', id],
+    queryFn: () => api.get<{ pages: ListedPage[] }>(`/people/${id}/pages`),
+  });
+  const spaces = new Map((q.data?.pages ?? []).map((p) => [p.space_key, p.space_name]));
+  if (spaces.size === 0) return null;
+  return (
+    <section>
+      <h2>{t('people.activeIn')}</h2>
+      <ul className="page-list">
+        {[...spaces].map(([key, name]) => (
+          <li key={key}>
+            <Link href={`/spaces/${key}`}>{name}</Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+interface FollowEntry {
+  id: string;
+  name: string;
+}
+
+function FollowList({ title, people }: { title: string; people: FollowEntry[] }) {
+  if (people.length === 0) return null;
+  return (
+    <section>
+      <h2>{title}</h2>
+      <ul className="page-list">
+        {people.map((person) => (
+          <li key={person.id}>
+            <Link href={`/people/${person.id}`}>{person.name}</Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function PersonFollows({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['person-follows', id],
+    queryFn: () => api.get<{ followers: FollowEntry[]; following: FollowEntry[] }>(`/people/${id}/follows`),
+  });
+  if (!q.data) return <ErrorNote error={q.error} />;
+  return (
+    <>
+      <FollowList title={t('people.followers')} people={q.data.followers} />
+      <FollowList title={t('people.following')} people={q.data.following} />
+    </>
+  );
+}
+
 export function PersonView({ id }: { id: string }) {
   const { t } = useTranslation();
   const dates = useDates();
@@ -194,6 +276,9 @@ export function PersonView({ id }: { id: string }) {
         <Fact name={t('common.email')} value={p.email} />
       </dl>
       <PersonPages id={id} />
+      <PersonSpaces id={id} />
+      <PersonMentions id={id} />
+      <PersonFollows id={id} />
     </>
   );
 }

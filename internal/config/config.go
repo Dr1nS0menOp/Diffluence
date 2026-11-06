@@ -59,6 +59,8 @@ type Config struct {
 	// means it is not installed, and pages keep private drafts.
 	CollabURL   string
 	CollabToken string
+	// MetricsToken is the secret a scraper sends. Empty means no /metrics at all.
+	MetricsToken string
 	// PDFURL is the helper process that makes PDF files. Empty = no PDF.
 	PDFURL string
 	// CollaboraURL is an office service. It opens office files as a PDF, in place of the
@@ -152,6 +154,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		OutwardAllowPrivate:   l.boolean("OUTWARD_ALLOW_PRIVATE", false),
 		CollabURL:             l.str("COLLAB_URL", ""),
 		CollabToken:           l.str("COLLAB_TOKEN", ""),
+		MetricsToken:          l.str("METRICS_TOKEN", ""),
 		PDFURL:                l.str("PDF_URL", ""),
 		CollaboraURL:          l.str("COLLABORA_URL", ""),
 		PublishDir:            l.str("PUBLISH_DIR", ""),

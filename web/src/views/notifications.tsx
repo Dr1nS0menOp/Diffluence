@@ -19,6 +19,8 @@ const TYPES = [
   'page_changed',
   'access_request',
   'access_answer',
+  'access_recovered',
+  'draft_expiring',
   'rule',
 ];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];

@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -67,13 +68,46 @@ type Item struct {
 	Count int    `json:"count"`
 }
 
+// orphanedRestrictions selects the pages whose view restriction only names people who
+// are gone. Nobody can open such a page until an administrator recovers it (ACC-073).
+// A group counts as someone: its members can change.
+const orphanedRestrictions = `SELECT DISTINCT r.page_id, p.space_id FROM page_restrictions r
+	JOIN pages p ON p.id = r.page_id
+	WHERE r.kind = 'view' AND p.status <> 'deleted' AND NOT EXISTS (
+		SELECT 1 FROM page_restrictions other
+		LEFT JOIN users u ON other.subject_type = 'user' AND u.id = other.subject_id
+		WHERE other.page_id = r.page_id AND other.kind = 'view'
+			AND (other.subject_type <> 'user' OR u.status = 'active'))`
+
+// OrphanedPage is a restricted page nobody can open. The title stays out: an
+// administrator has not recovered it yet.
+type OrphanedPage struct {
+	ID        uuid.UUID `json:"id"`
+	SpaceName string    `json:"space_name"`
+}
+
+// OrphanedPages lists what an administrator can recover. The route requires
+// administrator.
+func (s *Service) OrphanedPages(ctx context.Context) ([]OrphanedPage, error) {
+	rows, err := s.pool.Query(ctx, `SELECT o.page_id, sp.name FROM (`+orphanedRestrictions+`) o
+		JOIN spaces sp ON sp.id = o.space_id ORDER BY sp.name, o.page_id LIMIT 100`)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[OrphanedPage])
+	if out == nil {
+		out = []OrphanedPage{}
+	}
+	return out, err
+}
+
 // Attention lists what needs a look. An empty list is good news.
 func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error) {
 	out := []Item{}
 	if !mailReady {
 		out = append(out, Item{Kind: "mail_not_set"})
 	}
-	var failed, expiring, removal, oldNodes, tokens int
+	var failed, expiring, removal, oldNodes, tokens, gaveUp, waiting, orphaned int
 	var damaged bool
 	err := s.pool.QueryRow(ctx, `SELECT
 			(SELECT count(*) FROM jobs WHERE status = 'failed'),
@@ -85,9 +119,12 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 			(SELECT count(*) FROM scim_tokens WHERE revoked_at IS NULL AND expires_at > now() AND expires_at <= now() + $3::interval)
 				+ (SELECT count(*) FROM api_tokens t JOIN users u ON u.id = t.user_id
 					WHERE u.type = 'service' AND t.revoked_at IS NULL AND t.expires_at > now() AND t.expires_at <= now() + $3::interval),
+			(SELECT count(*) FROM event_failures WHERE replayed_at IS NULL),
+			(SELECT count(*) FROM (`+orphanedRestrictions+`) orphaned),
+			(SELECT count(*) FROM outbox_events WHERE published_at IS NULL AND created_at < now() - interval '1 day'),
 			COALESCE((SELECT a.result <> 'success' FROM audit_events a
 				WHERE a.action = 'audit.verified' AND a.actor_id = 'worker' ORDER BY a.seq DESC LIMIT 1), false)`,
-		expiryWarning, staleNodeMinute, tokenWarning).Scan(&failed, &expiring, &removal, &oldNodes, &tokens, &damaged)
+		expiryWarning, staleNodeMinute, tokenWarning).Scan(&failed, &expiring, &removal, &oldNodes, &tokens, &gaveUp, &orphaned, &waiting, &damaged)
 	if err != nil {
 		return nil, err
 	}
@@ -101,6 +138,10 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	add("removal_requests", removal)
 	add("nodes_differ", oldNodes)
 	add("tokens_expiring", tokens)
+	add("events_failed", gaveUp)
+	add("restrictions_orphaned", orphaned)
+	// The stream forgets after 7 days, so this warns while there is time (ARC-053).
+	add("events_waiting", waiting)
 	// The result of the daily job: pressing Verify cannot take this away (SEC-814).
 	if damaged {
 		out = append(out, Item{Kind: "audit_damaged"})
@@ -118,6 +159,7 @@ type Sized struct {
 type Report struct {
 	Spaces []Sized `json:"spaces"`
 	Files  []Sized `json:"files"`
+	Pages  []Sized `json:"pages"`
 }
 
 func collectSized(rows pgx.Rows, err error) ([]Sized, error) {
@@ -148,7 +190,42 @@ func (s *Service) Largest(ctx context.Context) (Report, error) {
 	rows, err = s.pool.Query(ctx, `SELECT sp.key, v.size FROM attachment_versions v
 		JOIN attachments a ON a.id = v.attachment_id JOIN spaces sp ON sp.id = a.space_id
 		ORDER BY v.size DESC LIMIT $1`, largestRows)
-	out.Files, err = collectSized(rows, err)
+	if out.Files, err = collectSized(rows, err); err != nil {
+		return out, err
+	}
+	// The key of the space and the id of the page: a title is content.
+	rows, err = s.pool.Query(ctx, `SELECT sp.key || '/' || p.id, pg_column_size(v.document)::bigint FROM pages p
+		JOIN page_versions v ON v.page_id = p.id AND v.number = p.current_version
+		JOIN spaces sp ON sp.id = p.space_id
+		WHERE p.status = 'published' ORDER BY 2 DESC LIMIT $1`, largestRows)
+	out.Pages, err = collectSized(rows, err)
+	return out, err
+}
+
+// SpaceTotal is what the list of spaces shows beside a name (ADM-033).
+type SpaceTotal struct {
+	ID           uuid.UUID  `json:"id"`
+	Pages        int        `json:"pages"`
+	Bytes        int64      `json:"bytes"`
+	LastActivity *time.Time `json:"last_activity"`
+}
+
+// SpaceTotals counts pages, stored bytes and the last change of every space. The route
+// requires administrator.
+func (s *Service) SpaceTotals(ctx context.Context) ([]SpaceTotal, error) {
+	rows, err := s.pool.Query(ctx, `SELECT sp.id,
+			(SELECT count(*) FROM pages p WHERE p.space_id = sp.id AND p.status = 'published'),
+			(SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
+				JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = sp.id),
+			(SELECT max(p.updated_at) FROM pages p WHERE p.space_id = sp.id)
+		FROM spaces sp WHERE sp.status <> 'trashed'`)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[SpaceTotal])
+	if out == nil {
+		out = []SpaceTotal{}
+	}
 	return out, err
 }
 

@@ -283,6 +283,46 @@ func (s *Service) maySee(ctx context.Context, c identity.Caller, person uuid.UUI
 	return nil
 }
 
+// FollowEntry is a person in a list of followers.
+type FollowEntry struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// Follows are the two lists on a profile (COL-087).
+type Follows struct {
+	Followers []FollowEntry `json:"followers"`
+	Following []FollowEntry `json:"following"`
+}
+
+// maxFollowsListed keeps a profile short.
+const maxFollowsListed = 100
+
+func (s *Service) followList(ctx context.Context, query string, person uuid.UUID) ([]FollowEntry, error) {
+	rows, err := s.pool.Query(ctx, query, person, maxFollowsListed)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[FollowEntry])
+	if out == nil {
+		out = []FollowEntry{}
+	}
+	return out, err
+}
+
+// FollowsOf lists who follows a person and whom they follow, with the people the
+// directory shows: active accounts only. The caller decides who may ask.
+func (s *Service) FollowsOf(ctx context.Context, person uuid.UUID) (Follows, error) {
+	followers, err := s.followList(ctx, `SELECT u.id, u.display_name FROM follows f JOIN users u ON u.id = f.user_id
+		WHERE f.followed_id = $1 AND u.status = 'active' AND u.type <> 'service' ORDER BY lower(u.display_name), u.id LIMIT $2`, person)
+	if err != nil {
+		return Follows{}, err
+	}
+	following, err := s.followList(ctx, `SELECT u.id, u.display_name FROM follows f JOIN users u ON u.id = f.followed_id
+		WHERE f.user_id = $1 AND u.status = 'active' AND u.type <> 'service' ORDER BY lower(u.display_name), u.id LIMIT $2`, person)
+	return Follows{Followers: followers, Following: following}, err
+}
+
 // Following lists who a person follows.
 func (s *Service) Following(ctx context.Context, c identity.Caller) ([]uuid.UUID, error) {
 	rows, err := s.pool.Query(ctx, "SELECT followed_id FROM follows WHERE user_id = $1", c.UserID)

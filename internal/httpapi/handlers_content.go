@@ -884,7 +884,10 @@ func serveFile(w http.ResponseWriter, r *http.Request, a attachments.Attachment,
 	h := w.Header()
 	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
-	h.Set("Cache-Control", "private, no-store")
+	// The browser may keep a copy, but asks each time, so the check before this
+	// still runs on every view, and a 304 only saves the bytes (ARC-167).
+	h.Set("Cache-Control", "private, no-cache")
+	h.Set("ETag", `"`+a.SHA256+`"`)
 	if !download && (attachments.IsInline(a.ContentType) || attachments.IsMedia(a.ContentType)) {
 		h.Set("Content-Type", a.ContentType)
 		h.Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": a.Filename}))
@@ -937,7 +940,12 @@ func (s *Server) handleAdminSpaces(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"spaces": list})
+	totals, err := s.deps.Console.SpaceTotals(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"spaces": list, "totals": totals})
 }
 
 func (s *Server) handleAdminTrashedSpaces(w http.ResponseWriter, r *http.Request) {

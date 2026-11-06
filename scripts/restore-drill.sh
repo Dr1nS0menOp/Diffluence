@@ -1,6 +1,6 @@
 #!/bin/bash
 # SPDX-License-Identifier: Apache-2.0
-# The restore drill (blueprint 07): install, add content, back up, wipe everything,
+# The restore drill (blueprint 07): install, add content, make an encrypted backup, wipe everything,
 # restore on a clean installation, and prove that all of it came back. Uses its own
 # compose projects and port, and removes them afterwards.
 set -euo pipefail
@@ -16,7 +16,7 @@ fresh() { # a clean copy of the installation files
 }
 cleanup() {
   for p in first second; do
-    [ -d "$work/$p" ] && (cd "$work/$p" && COMPOSE_PROJECT_NAME=dfldrill$p docker compose down -v >/dev/null 2>&1 || true)
+    [ -d "$work/$p" ] && (cd "$work/$p" && COMPOSE_PROJECT_NAME=dfldrill$p docker compose down -v --rmi local >/dev/null 2>&1 || true)
   done
   docker run --rm -v "$work:/w" busybox rm -rf /w/backups >/dev/null 2>&1 || true
   rm -rf "$work"
@@ -45,14 +45,35 @@ before=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence 
 
 echo "2. back up, then destroy the whole installation"
 start=$(date +%s)
-sh scripts/backup.sh "$work/backups" >/dev/null
+head -c 32 /dev/urandom | base64 >"$work/backup.key"
+if bash scripts/backup.sh "$work/backups" "$work/no-such.key" >/dev/null 2>&1; then
+  echo "a backup was made without a key"
+  exit 1
+fi
+mkdir -p "$work/backups"
+cp "$work/backup.key" "$work/backups/backup.key"
+if bash scripts/backup.sh "$work/backups" "$work/backups/backup.key" >/dev/null 2>&1; then
+  echo "a backup was made with its key beside it"
+  exit 1
+fi
+rm "$work/backups/backup.key"
+bash scripts/backup.sh "$work/backups" "$work/backup.key" >/dev/null
+if ls "$work"/backups/diffluence-*/ | grep -qv -e '\.gpg$' -e '^SHA256SUMS$'; then
+  echo "something in the backup is not encrypted"
+  exit 1
+fi
 docker compose down -v >/dev/null 2>&1
 
 echo "3. restore on a clean installation"
 fresh second
 cd "$work/second"
 export COMPOSE_PROJECT_NAME=dfldrillsecond
-sh scripts/restore.sh "$work"/backups/diffluence-* | tail -2
+head -c 32 /dev/urandom | base64 >"$work/wrong.key"
+if bash scripts/restore.sh "$work"/backups/diffluence-* "$work/wrong.key" >/dev/null 2>&1; then
+  echo "a wrong key opened the backup"
+  exit 1
+fi
+bash scripts/restore.sh "$work"/backups/diffluence-* "$work/backup.key" | tail -2
 took=$(($(date +%s) - start))
 
 echo "4. everything came back"

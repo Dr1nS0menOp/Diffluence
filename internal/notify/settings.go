@@ -32,6 +32,10 @@ const (
 	TypeAccessRequest = "access_request"
 	TypeAccessAnswer  = "access_answer"
 	TypeRule          = "rule"
+	// TypeAccessRecovered tells an owner that an administrator took access to a page.
+	TypeAccessRecovered = "access_recovered"
+	// TypeDraftExpiring warns before a draft nobody touched is removed.
+	TypeDraftExpiring = "draft_expiring"
 	// TypeExportReady is the answer to something a person asked for, so it has no choice.
 	TypeExportReady = "export_ready"
 )
@@ -54,7 +58,7 @@ const defaultDigestHour = 8
 
 // Types lists every type a person can choose a channel for.
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
-	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule}
+	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -81,6 +85,7 @@ func defaultChannels() map[string]string {
 	return map[string]string{
 		TypeMention: ChannelMail, TypeTaskAssigned: ChannelMail, TypeTaskDue: ChannelMail, TypeShare: ChannelMail,
 		TypeAccessRequest: ChannelMail, TypeAccessAnswer: ChannelMail, TypeRule: ChannelApp,
+		TypeAccessRecovered: ChannelMail, TypeDraftExpiring: ChannelMail,
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
 	}
 }

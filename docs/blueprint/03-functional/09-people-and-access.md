@@ -25,7 +25,7 @@
 ## 9.2 Profile and preferences
 
 - **ACC-020** · built · A profile screen shows the picture, name, job title, department, location, local time, e-mail and a short text, within what the viewer may see.
-- **ACC-021** · partly · It lists recent pages, spaces and blog posts by the person, filtered for the viewer. Built: recent pages. Still open: spaces and blog posts.
+- **ACC-021** · built · It lists recent pages, spaces and blog posts by the person, filtered for the viewer.
 - **ACC-022** · built · A person uploads and crops a profile picture. Without one, the initials show on a tint chosen from the name.
 - **ACC-023** · built · A person chooses which fields are visible to others. An identity provider can fill and lock some fields.
 - **ACC-024** · partly · **Your account** holds security, sessions and passkeys. Built: profile, preferences, security, tokens, data. Still open: notifications and watches (wave C).
@@ -86,13 +86,13 @@
 - **ACC-064** · built · Three clear states at the top of the dialog: **Open** (everyone in the space can view and edit), **View only for most** (everyone can view, chosen people can edit), and **Private** (only chosen people).
 - **ACC-065** · built · A person setting a restriction is added to it, so nobody locks themselves out by accident.
 - **ACC-066** · partly · The lock icon shows the state: open or closed. Everyone who can see the page can see that it is restricted. Built: the word Restricted for everyone who can see the page. Still open: an open and a closed lock.
-- **ACC-067** · new · A list in space settings shows all restricted pages (SPC-065).
+- **ACC-067** · built · A list in space settings shows all restricted pages (SPC-065). It is the flag `restricted` on the Content screen of a space (SPC-065).
 - **ACC-068** · built · The dialog says how many pages below are affected.
 
 ## 9.8 When something is off
 
 - **ACC-069** · built · **Why can or can't I?** Space administrators and administrators ask, for any person and action on a page, for the result and the layer that decided it. It uses the same evaluation as the real check.
 - **ACC-070** · built · **Recover access:** an administrator gives themselves access to a space or page, with a reason. It is always audited.
-- **ACC-071** · new · The author of a page is notified when an administrator recovers access to it.
+- **ACC-071** · built · The author of a page is notified when an administrator recovers access to it.
 - **ACC-072** · new · Share has an **inspect** entry that opens the same explanation for a person who asked for access.
-- **ACC-073** · new · When the last person on a restriction is disabled, a space administrator is told, and can recover the page.
+- **ACC-073** · partly · When the last person on a restriction is disabled, a space administrator is told, and can recover the page. Built: the console lists such a page without its title, and an administrator can recover it. Still open: a notification to the space administrator, because a notification about a page they cannot see does not show.

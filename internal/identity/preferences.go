@@ -54,6 +54,8 @@ type Preferences struct {
 	StartScreen string `json:"start_screen"`
 	// ShowPresence lets others see this person on a page.
 	ShowPresence bool `json:"show_presence"`
+	// HideFollows keeps followers and who this person follows off their profile.
+	HideFollows bool `json:"hide_follows"`
 	// TypingHelp turns what people type, such as :) and ->, into the real character.
 	TypingHelp bool `json:"typing_help"`
 }

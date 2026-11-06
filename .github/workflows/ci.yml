@@ -8,7 +8,7 @@ on:
   push:
     branches: [main]
   schedule:
-    - cron: "17 3 * * *" # nightly: fuzzing and mutation check
+    - cron: "17 3 * * *" # nightly: fuzzing, mutation check and restore drill
 
 permissions:
   contents: read
@@ -137,3 +137,5 @@ jobs:
         run: make fuzz
       - name: do the tests catch injected bugs?
         run: make mutation
+      - name: can an encrypted backup be restored on a clean installation?
+        run: bash scripts/restore-drill.sh

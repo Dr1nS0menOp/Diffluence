@@ -9,18 +9,18 @@
 - **ARC-131** · built · Publishing uses `base_version`, so two people cannot overwrite each other without being told.
 - **ARC-132** · built · A toggle is `PUT` and `DELETE` on a sub-resource, such as `/favourite`, so repeating it is harmless.
 - **ARC-133** · partly · Lists use `limit` and `offset`. That is fine for a directory. A list that grows and moves, such as the feed, notifications or the audit log, uses a cursor: `before=<time and id>`. Still open: the rule is new, and only the feed follows it so far (wave C).
-- **ARC-134** · wave D · A total is capped when counting costs more than it tells: search stops at "1,000 or more" (spec 011 D21).
-- **ARC-135** · wave H · `/api/v1` only grows. A removal needs a new version, and a `Sunset` header for at least 12 months (spec 015 D21).
-- **ARC-136** · wave H · `docs/api/openapi.json` is written from a table next to the routes, and a test fails on any difference (spec 015 D19). "Spec-first with a generated client", the old plan, did not happen, and a generator would be a dependency.
+- **ARC-134** · built · A total is capped when counting costs more than it tells: search stops at "1,000 or more" (spec 011 D21).
+- **ARC-135** · built · `/api/v1` only grows. A removal needs a new version, and a `Sunset` header for at least 12 months (spec 015 D21).
+- **ARC-136** · built · `docs/api/openapi.json` is written from a table next to the routes, and a test fails on any difference (spec 015 D19). "Spec-first with a generated client", the old plan, did not happen, and a generator would be a dependency.
 
 ## 5.2 Access rules
 
 - **ARC-137** · built · Every route is registered with an `Access` value, and a route without one panics at start. Public routes carry a comment that says why.
 - **ARC-138** · built · The kinds are `Public`, `Authenticated`, `Permission`, `Object` and `ScimToken`. All routes and rules are listed in `docs/api/routes.txt`, and a test fails on a difference.
 - **ARC-139** · built · `TestEveryObjectRouteIsProtected` walks the real route table: a stranger gets 404, a viewer gets 403, so a new route is covered from its first line.
-- **ARC-140** · wave F · `Sensitive` asks for a fresh login after 10 minutes, and `SessionOnly` keeps tokens away from passwords, tokens and the console (spec 013).
-- **ARC-141** · wave F · Maintenance mode is a check in the middleware, because it concerns every write, also from SCIM and jobs (spec 013 D17).
-- **ARC-142** · wave H · Tokens have scopes: `read`, `write`, `export`, `admin`. A token never exceeds its owner, because the module's checks still run.
+- **ARC-140** · built · `Sensitive` asks for a fresh login after 10 minutes, and `SessionOnly` keeps tokens away from passwords, tokens and the console (spec 013).
+- **ARC-141** · built · Maintenance mode is a check in the middleware, because it concerns every write, also from SCIM and jobs (spec 013 D17).
+- **ARC-142** · built · Tokens have scopes: `read`, `write`, `export`, `admin`. A token never exceeds its owner, because the module's checks still run.
 - **ARC-143** · phase 7 · OAuth for the API waits for the platform phase (ADR-026). Tokens with scopes cover what is needed until then.
 
 **Public routes, all of them, now and planned:** the app itself, login with its steps and providers, the OIDC start and callback, the look of the login page (`/appearance` and its font), `/livez`, `/readyz`, `POST /mail/unsubscribe/{token}` (wave C) and `POST /hooks/{token}` (wave H). In each of the last two the token is the permission. Nothing else may be added without a stated reason.
@@ -36,19 +36,19 @@ request id → client address → log and recover → security headers
 - **ARC-145** · built · Go's `CrossOriginProtection` stops cross-site writes through `Sec-Fetch-Site` and `Origin`, with our public origin as the trusted one. GET, HEAD and OPTIONS pass, so a GET must never change anything. That is why unsubscribe uses POST (spec 010 D15).
 - **ARC-146** · built · A request without those headers counts as not from a browser, and passes. Tokens and SCIM rely on this. Cookies are the only thing a browser sends by itself, and the session cookie is `SameSite=Strict`, with `__Host-` where TLS is on.
 - **ARC-147** · built · A panic becomes a 500 and a log line with a stack. One bad request cannot stop a node.
-- **ARC-148** · wave F · Polling is marked as background, so it does not count as activity for the idle timeout. Otherwise an open tab keeps a session alive for ever (spec 013 D8).
+- **ARC-148** · built · Polling is marked as background, so it does not count as activity for the idle timeout. Otherwise an open tab keeps a session alive for ever (spec 013 D8).
 
 ## 5.4 Headers
 
 - **ARC-149** · built · The API answers with a content policy that forbids everything, `nosniff`, `X-Frame-Options: DENY`, `no-referrer`, `Cross-Origin-Opener-Policy` and `Cross-Origin-Resource-Policy: same-origin`, `no-store`, and HSTS with TLS.
 - **ARC-150** · built · The app has its own policy: everything from our origin, no inline script, and Trusted Types with one allowed policy for the editor's clipboard.
 - **ARC-151** · built · A stored file is served with `default-src 'none'; sandbox`, and only known image types show inline. All else is a download, so a file can never run in our origin.
-- **ARC-152** · wave E · Video and audio join from a short list of detected types, with the same headers (spec 012 D16). PDF stays out of that list, because it is scriptable, and goes through ARC-097.
+- **ARC-152** · built · Video and audio join from a short list of detected types, with the same headers (spec 012 D16). PDF stays out of that list, because it is scriptable, and goes through ARC-097.
 - **ARC-153** · built · Time limits per request: 10 seconds for headers, 60 for reading, 120 for writing. Uploads and exports extend their own with `ResponseController`. Such an extension must happen before the old deadline passes, because a passed deadline cannot be extended.
 
 ## 5.5 Limits
 
 - **ARC-154** · built · Logins are limited per address and per account.
-- **ARC-155** · wave H · Tokens are limited per minute. A public hook has its own limit.
-- **ARC-156** · phase 3 · The reverse proxy limits requests per address, so a flood stops before the application. The application's own limits are for abuse by someone logged in.
+- **ARC-155** · built · Tokens are limited per minute. A public hook has its own limit.
+- **ARC-156** · built · The reverse proxy limits requests per address, so a flood stops before the application. The application's own limits are for abuse by someone logged in. Built as advice in `docs/operations/install.md`.
 - **ARC-157** · built · Sizes are limited at each door: document 5 MiB, depth 100, title 255, upload by setting.

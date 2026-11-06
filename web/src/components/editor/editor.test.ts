@@ -17,6 +17,20 @@ const row = (type: string, ...texts: string[]) =>
   schema.nodeFromJSON({ type: 'tableRow', content: texts.map((text) => cell(type, text)) });
 const firstCells = (rows: ReturnType<typeof row>[]) => rows.map((r) => r.child(0).textContent);
 
+// Changes from another browser pass the service without the server's gate (SEC-546), so
+// the editor's own schema and link rules are what stands between them and this page.
+describe('a hostile change from another editor', () => {
+  it('shows no link that is not allowed', () => {
+    const link = schema.marks.link;
+    const shown = link?.spec.toDOM?.(link.create({ href: 'javascript:alert(1)' }), true);
+    expect(JSON.stringify(shown)).not.toContain('javascript:');
+  });
+
+  it('has no place for a node the schema does not know', () => {
+    expect(() => schema.nodeFromJSON({ type: 'script' })).toThrow();
+  });
+});
+
 describe('the insert list', () => {
   it('finds an entry by its name and by a word people might try', () => {
     expect(matchingItems('warning').map((i) => i.id)).toContain('panelWarning');

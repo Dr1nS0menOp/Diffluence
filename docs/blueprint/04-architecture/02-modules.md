@@ -10,7 +10,7 @@ The binary stays simple only if its inside stays strict. This chapter says who o
 - **ARC-026** · built · Imports only go one way. The order is in 2.3, and a cycle does not compile.
 - **ARC-027** · partly · Modules do not write each other's tables. Reading is looser than `CLAUDE.md` says: lists join `spaces` and `users` for a name, and `perm_*` functions are shared on purpose. One exception writes: `spaces.Purge` queues file deletions itself. Still open: that exception moves behind `attachments`.
 - **ARC-028** · built · Where two modules must react to each other in one transaction, the lower one offers a hook. `trash` holds a `Handler` per object type, so it needs no import of `pages`.
-- **ARC-029** · wave C · A module that only reacts to something listens to an event, and is not called by the sender. Publishing a page does not know that notifications exist.
+- **ARC-029** · built · A module that only reacts to something listens to an event, and is not called by the sender. Publishing a page does not know that notifications exist.
 - **ARC-030** · built · Wiring lives in one place, `internal/app`. Nothing else builds a service.
 
 **The looser reading rule, in words.** A list needs a space name or a person's name next to each row. One join is one query, and a call per row would be hundreds. So a list may read display columns of another module's table. It may never decide from them, and it may never write them. Decisions go through `permissions`.
@@ -52,10 +52,10 @@ The binary stays simple only if its inside stays strict. This chapter says who o
 | `automation` | Rules and runs | wave H |
 | `webhooks` | Endpoints and deliveries | wave H |
 
-- **ARC-031** · wave D · Labels, blog posts, folders and links are kinds of page (`pages.kind`, spec 011 D1), so they inherit versions, drafts, restrictions, comments and search. No second table copies those rules.
-- **ARC-032** · wave G · `exchange` grows importers and exporters around one `Plan` (spec 014 D8), and keeps its rule of only reading through the module APIs.
-- **ARC-033** · wave G · `document.ToHTML` is the one renderer for export, PDF and public sites. It lives in `document`, built on the allow-list.
-- **ARC-034** · wave H · One CSV writer holds the guard against spreadsheet formulas, and the audit export moves to it (spec 015 D8). It starts in wave F, whose console has CSV too, so wave H reuses it.
+- **ARC-031** · built · Labels, blog posts, folders and links are kinds of page (`pages.kind`, spec 011 D1), so they inherit versions, drafts, restrictions, comments and search. No second table copies those rules.
+- **ARC-032** · built · `exchange` grows importers and exporters around one `Plan` (spec 014 D8), and keeps its rule of only reading through the module APIs.
+- **ARC-033** · built · `document.ToHTML` is the one renderer for export, PDF and public sites. It lives in `document`, built on the allow-list.
+- **ARC-034** · built · One CSV writer holds the guard against spreadsheet formulas, and the audit export moves to it (spec 015 D8). It starts in wave F, whose console has CSV too, so wave H reuses it.
 
 ## 2.3 The direction of imports
 
@@ -83,8 +83,8 @@ httpapi
 app
 ```
 
-- **ARC-035** · wave D · `features` sits low, below `pages`, because pages, comments and spaces all ask it (spec 011 D25).
-- **ARC-036** · wave C · A new feature module sits above `pages` and uses its exported API. If `pages` must call it, an event is the answer, or a hook as in ARC-028.
+- **ARC-035** · built · `features` sits low, below `pages`, because pages, comments and spaces all ask it (spec 011 D25).
+- **ARC-036** · built · A new feature module sits above `pages` and uses its exported API. If `pages` must call it, an event is the answer, or a hook as in ARC-028.
 
 ## 2.4 The frontend
 
@@ -101,5 +101,5 @@ app
 - **ARC-037** · built · Server state lives in TanStack Query. There is no other global store.
 - **ARC-038** · built · Personal state that follows a person lives on the server (preferences). State of one device lives in `localStorage` (collapsed branches, recent searches).
 - **ARC-039** · built · A document is only ever drawn by the editor, in read-only mode for readers, so no HTML from a document reaches the browser.
-- **ARC-040** · wave H · `api.ts` stays hand-written. The OpenAPI file is written from the routes and tested against them (spec 015 D19). The old plan of a generated client is dropped.
+- **ARC-040** · built · `api.ts` stays hand-written. The OpenAPI file is written from the routes and tested against them (spec 015 D19). The old plan of a generated client is dropped.
 - **ARC-041** · later · When the bundle gets too large, screens load on demand. The editor is the first candidate, because readers need a smaller part of it. Measure first.

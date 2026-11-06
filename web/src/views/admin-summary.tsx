@@ -6,8 +6,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
-import { Dialog, ErrorNote, formatSize, Loading } from '../components/ui';
+import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { findSettings, SETTINGS_INDEX } from './admin-search';
+
+interface OrphanedPage {
+  id: string;
+  space_name: string;
+}
 
 interface Summary {
   users: number;
@@ -33,6 +38,7 @@ interface UnmanagedSpace {
 interface Attention {
   items: AttentionItem[];
   unmanaged_spaces: UnmanagedSpace[];
+  orphaned_pages: OrphanedPage[];
 }
 
 /** Where to go to act on what needs attention. */
@@ -43,6 +49,8 @@ const ATTENTION_LINKS: Record<string, string> = {
   nodes_differ: '/admin/system',
   no_passkey: '/me/security',
   tokens_expiring: '/admin/scim',
+  events_failed: '/admin/care',
+  events_waiting: '/admin/care',
   audit_damaged: '/admin/audit',
 };
 
@@ -91,16 +99,48 @@ function HandoverDialog({ space, onClose }: { space: UnmanagedSpace; onClose: ()
   );
 }
 
+function RecoverPageDialog({ page, onClose }: { page: OrphanedPage; onClose: () => void }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [reason, setReason] = useState('');
+  const recover = useMutation({
+    mutationFn: () => api.post(`/admin/pages/${page.id}/recover`, { reason }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['admin-attention'] });
+      onClose();
+    },
+  });
+  return (
+    <Dialog title={t('summary.orphanedPage', { space: page.space_name })} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          recover.mutate();
+        }}
+      >
+        <ErrorNote error={recover.error} />
+        <Field label={t('summary.orphanedReason')}>
+          <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={500} required />
+        </Field>
+        <button type="submit" className="primary">
+          {t('summary.recoverPage')}
+        </button>
+      </form>
+    </Dialog>
+  );
+}
+
 function AttentionList() {
   const { t } = useTranslation();
   const [handing, setHanding] = useState<UnmanagedSpace | null>(null);
+  const [recovering, setRecovering] = useState<OrphanedPage | null>(null);
   const q = useQuery({
     queryKey: ['admin-attention'],
     queryFn: () => api.get<Attention>('/admin/attention'),
   });
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
-  const { items, unmanaged_spaces: unmanaged } = q.data;
+  const { items, unmanaged_spaces: unmanaged, orphaned_pages: orphaned } = q.data;
   return (
     <section>
       <h2>{t('summary.attention')}</h2>
@@ -132,7 +172,23 @@ function AttentionList() {
           </ul>
         </>
       )}
+      {orphaned.length > 0 && (
+        <>
+          <h3>{t('summary.orphaned')}</h3>
+          <ul className="plain-list">
+            {orphaned.map((page) => (
+              <li key={page.id} className="row">
+                <span className="grow">{t('summary.orphanedPage', { space: page.space_name })}</span>
+                <button type="button" className="ghost" onClick={() => setRecovering(page)}>
+                  {t('summary.recoverPage')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       {handing && <HandoverDialog space={handing} onClose={() => setHanding(null)} />}
+      {recovering && <RecoverPageDialog page={recovering} onClose={() => setRecovering(null)} />}
     </section>
   );
 }

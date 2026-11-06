@@ -68,7 +68,7 @@
 
 **What can go wrong:** the next person on a shared computer sees what the last one searched for.
 
-- **SEC-265** · new · **High.** ASVS 14.3.1 (Level 1) asks to clear authenticated data from the browser when a session ends, and 14.3.3 asks to keep sensitive data out of browser storage. Wave B keeps recent searches in `localStorage` under `diffluence.searches`, and the tree keeps page ids per space. Logout only clears the query cache, so the next person sees the last person's searches. Store these per person, and remove them at logout. Belongs before wave C lands.
+- **SEC-265** · built · **High.** ASVS 14.3.1 (Level 1) asks to clear authenticated data from the browser when a session ends, and 14.3.3 asks to keep sensitive data out of browser storage. Wave B keeps recent searches in `localStorage` under `diffluence.searches`, and the tree keeps page ids per space. Logout only clears the query cache, so the next person sees the last person's searches. Store these per person, and remove them at logout. Belongs before wave C lands.
 - **SEC-266** · new · Wave C keeps comment drafts in the browser (COL-011), and PAG-016 keeps page text there when saving fails. That is Content in storage on a device. Key it per person, remove it at logout, and keep it for a short time. Spec 010 should say so.
 - **SEC-267** · built · The theme, the sidebar state and the scroll position hold no content.
 - **SEC-268** · built · The query cache is cleared at logout.

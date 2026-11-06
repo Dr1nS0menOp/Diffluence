@@ -18,8 +18,8 @@
 
 - **ARC-214** · built · A failed read of the session answers 503, and never treats a person as logged out.
 - **ARC-215** · built · NATS being down does not stop changes: the outbox is in PostgreSQL. `/readyz` still reports it, so a node with a broken connection leaves the pool.
-- **ARC-216** · phase 3 · That last point makes a NATS outage take down all API nodes, although they could serve people. An API node only needs NATS for health, so `/readyz` on role `api` should warn, and not fail. Only a worker needs it.
-- **ARC-217** · wave D · A failed save keeps text in the browser until it can be saved (PAG-016).
+- **ARC-216** · built · That last point makes a NATS outage take down all API nodes, although they could serve people. An API node only needs NATS for health, so `/readyz` on role `api` should warn, and not fail. Only a worker needs it.
+- **ARC-217** · built · A failed save keeps text in the browser until it can be saved (PAG-016).
 - **ARC-218** · phase 3 · Every row above is drilled at least once, and the kill test of phase 3 covers the first four.
 
 ## 9.2 Upgrades
@@ -28,11 +28,11 @@ Blueprint 07 holds the rules. What the architecture adds:
 
 - **ARC-219** · built · Two versions run side by side, so a migration only adds. CI starts the old version with traffic, and upgrades under it.
 - **ARC-220** · built · A new document block is refused by a node that does not know it yet, so a person may see a save fail during a rolling upgrade of a few minutes. The draft stays in the browser.
-- **ARC-221** · wave C · A consumer ignores an event type or a field it does not know. Old and new workers then share a stream safely.
-- **ARC-222** · wave C · A handler that changes meaning gets a new event type. Old types stay until the stream has aged out, which is 7 days.
+- **ARC-221** · built · A consumer ignores an event type or a field it does not know. Old and new workers then share a stream safely.
+- **ARC-222** · built · A handler that changes meaning gets a new event type. Old types stay until the stream has aged out, which is 7 days.
 - **ARC-223** · built · `index.html` is never cached, and assets have a hash, so people get a new frontend on their next load. An open tab keeps its old code and talks to a new API, which only grows.
-- **ARC-224** · wave E · An open tab can meet a node that lacks a new route during a rolling upgrade. A screen treats that as a failed action, and the capability list keeps new features hidden until all nodes know them.
-- **ARC-225** · wave H · The service for editing together is upgraded with the release. Its clients reconnect, and a client with old code is asked to reload.
+- **ARC-224** · built · An open tab can meet a node that lacks a new route during a rolling upgrade. A screen treats that as a failed action, and the capability list keeps new features hidden until all nodes know them.
+- **ARC-225** · built · The service for editing together is upgraded with the release. Its clients reconnect, and a client with old code is asked to reload.
 
 ## 9.3 Who holds which secret
 
@@ -46,7 +46,7 @@ Blueprint 07 holds the rules. What the architecture adds:
 | The database | Sealed: TOTP keys, webhook secrets. Hashed: sessions, tokens | `internal/keys` |
 
 - **ARC-226** · built · A secret never reaches a log, an error or an audit detail. `_FILE` variables keep them out of the process list.
-- **ARC-227** · wave H · The editing service holds no database password and no master key. If it is taken over, it can see the documents people have open, and nothing else.
+- **ARC-227** · built · The editing service holds no database password and no master key. If it is taken over, it can see the documents people have open, and nothing else.
 
 ## 9.4 The trade-offs
 

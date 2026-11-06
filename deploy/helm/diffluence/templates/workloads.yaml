@@ -1,0 +1,53 @@
+{{- /* SPDX-License-Identifier: Apache-2.0 */ -}}
+{{- if not (has .Values.mode (list "single" "split")) }}
+{{- fail "mode must be single or split" }}
+{{- end }}
+{{- if eq .Values.mode "single" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}
+  labels:
+    {{- include "diffluence.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  # The embedded queue keeps its files on the volume, so two pods may never overlap.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api
+  template:
+    {{- include "diffluence.pod" (dict "root" . "role" "all" "name" "api") | nindent 4 }}
+{{- else }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-api
+  labels:
+    {{- include "diffluence.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: api
+  template:
+    {{- include "diffluence.pod" (dict "root" . "role" "api" "name" "api") | nindent 4 }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-worker
+  labels:
+    {{- include "diffluence.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.worker.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: worker
+  template:
+    {{- include "diffluence.pod" (dict "root" . "role" "worker" "name" "worker") | nindent 4 }}
+{{- end }}

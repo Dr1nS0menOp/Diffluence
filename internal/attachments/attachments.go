@@ -47,6 +47,8 @@ type Attachment struct {
 	Office      bool      `json:"office"`
 	CreatedBy   uuid.UUID `json:"created_by"`
 	UpdatedAt   time.Time `json:"updated_at"`
+	// SHA256 is the hash of the current version, in hex. It is the file's ETag.
+	SHA256 string `json:"-"`
 }
 
 // Service manages attachments.
@@ -260,12 +262,12 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 	return a, nil
 }
 
-const selectSQL = `SELECT a.id, a.page_id, a.space_id, a.filename, a.current_version, v.size, v.content_type, a.created_by, a.updated_at
+const selectSQL = `SELECT a.id, a.page_id, a.space_id, a.filename, a.current_version, v.size, v.content_type, a.created_by, a.updated_at, encode(v.sha256, 'hex')
 	FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version`
 
 func scan(r pgx.Row) (Attachment, error) {
 	var a Attachment
-	err := r.Scan(&a.ID, &a.PageID, &a.SpaceID, &a.Filename, &a.Version, &a.Size, &a.ContentType, &a.CreatedBy, &a.UpdatedAt)
+	err := r.Scan(&a.ID, &a.PageID, &a.SpaceID, &a.Filename, &a.Version, &a.Size, &a.ContentType, &a.CreatedBy, &a.UpdatedAt, &a.SHA256)
 	a.Inline = IsInline(a.ContentType)
 	a.Office = IsOffice(a.Filename)
 	return a, err

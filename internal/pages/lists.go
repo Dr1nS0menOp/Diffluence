@@ -187,6 +187,19 @@ func (s *Service) ByPerson(ctx context.Context, c identity.Caller, personID uuid
 	return collectList(rows, err)
 }
 
+// MentionsOf lists the pages that mention a person, as far as the viewer may see them
+// (COL-035).
+func (s *Service) MentionsOf(ctx context.Context, c identity.Caller, personID uuid.UUID) ([]ListItem, error) {
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, p.space_id, s.key, s.name, p.updated_at, false
+		FROM page_mentions m
+		JOIN perm_visible_pages($1) v ON v.page_id = m.page_id
+		JOIN pages p ON p.id = m.page_id
+		JOIN spaces s ON s.id = p.space_id
+		WHERE m.user_id = $2
+		ORDER BY p.updated_at DESC LIMIT $3`, c.UserID, personID, recentChangeCount)
+	return collectList(rows, err)
+}
+
 // OwnTitles lists the titles of pages a person made and can still see, for the
 // download of their own data.
 func (s *Service) OwnTitles(ctx context.Context, c identity.Caller) ([]string, error) {

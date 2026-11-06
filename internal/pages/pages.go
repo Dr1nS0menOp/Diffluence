@@ -606,9 +606,22 @@ func (s *Service) capabilities(ctx context.Context, c identity.Caller, p Page) (
 // touchRecent is a convenience list, so a failure must never fail the read.
 func (s *Service) touchRecent(ctx context.Context, userID uuid.UUID, p Page) {
 	_, _ = s.pool.Exec(ctx, `INSERT INTO recent_pages (user_id, page_id, seen_version) VALUES ($1, $2, $3)
-		ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at = now(), seen_version = EXCLUDED.seen_version`, userID, p.ID, p.CurrentVersion)
-	_, _ = s.pool.Exec(ctx, `DELETE FROM recent_pages WHERE user_id = $1 AND page_id NOT IN
-		(SELECT page_id FROM recent_pages WHERE user_id = $1 ORDER BY viewed_at DESC LIMIT 50)`, userID)
+		ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at = now(), seen_version = EXCLUDED.seen_version
+		WHERE recent_pages.viewed_at < now() - interval '1 minute'
+			OR recent_pages.seen_version IS DISTINCT FROM EXCLUDED.seen_version
+			OR EXISTS (SELECT 1 FROM recent_pages newer WHERE newer.user_id = $1 AND newer.viewed_at > recent_pages.viewed_at)`, userID, p.ID, p.CurrentVersion)
+}
+
+// recentPagesKept is how long a person's recent list may get.
+const recentPagesKept = 50
+
+// TrimRecent keeps each person's recent list short. It is a task, so a view of a
+// page costs one small write at most (ARC-198).
+func (s *Service) TrimRecent(ctx context.Context) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM recent_pages r USING
+		(SELECT user_id, page_id, row_number() OVER (PARTITION BY user_id ORDER BY viewed_at DESC) AS position FROM recent_pages) ranked
+		WHERE r.user_id = ranked.user_id AND r.page_id = ranked.page_id AND ranked.position > $1`, recentPagesKept)
+	return err
 }
 
 // treeKinds are the kinds that have a place in the tree.

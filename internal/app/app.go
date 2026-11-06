@@ -31,6 +31,7 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/failures"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/httpapi"
@@ -102,6 +103,7 @@ type App struct {
 	comments   *comments.Service
 	watches    *watches.Service
 	tasks      *tasks.Service
+	failures   *failures.Service
 	notify     *notify.Service
 	mail       *mail.Service
 	sharing    *sharing.Service
@@ -184,6 +186,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.trash.Register(trash.TypeComment, a.comments)
 	a.watches = watches.NewService(a.pool, a.perms)
 	a.tasks = tasks.NewService(a.pool)
+	a.failures = failures.NewService(a.pool, log)
 	a.feed = feed.NewService(a.pool)
 	a.notify = notify.NewService(a.pool, a.perms, a.settings, a.watches, notify.Options{
 		InstanceName: cfg.InstanceName, PublicOrigin: cfg.PublicOrigin(), Keyring: a.keyring})
@@ -222,7 +225,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
-			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit,
+			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
 			InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
@@ -322,6 +325,11 @@ func (a *App) Handler() http.Handler {
 }
 
 // Ready reports whether this node should receive traffic.
+// needsQueueToBeReady says whether a queue outage takes this node out of service.
+// An API node only writes to the outbox, which waits in the database, so it can go
+// on serving people (ARC-216).
+func needsQueueToBeReady(role config.Role) bool { return role.RunsWorker() }
+
 func (a *App) Ready(ctx context.Context) error {
 	if a.draining.Load() {
 		return httpapi.ReadyError("draining")
@@ -336,7 +344,7 @@ func (a *App) Ready(ctx context.Context) error {
 	if err != nil || n > 0 {
 		return httpapi.ReadyError("migrations")
 	}
-	if !a.queue.Healthy() {
+	if needsQueueToBeReady(a.cfg.Role) && !a.queue.Healthy() {
 		return httpapi.ReadyError("queue")
 	}
 	if err := a.store.Healthy(ctx); err != nil {
@@ -364,22 +372,17 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 
 	if a.cfg.Role.RunsWorker() {
 		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log}
-		wg.Add(5)
+		wg.Add(4)
 		go func() { defer wg.Done(); relay.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.RunPeriodic(workCtx, a.PeriodicTasks()) }()
 		go func() { defer wg.Done(); a.mail.Run(workCtx) }()
-		go func() {
-			defer wg.Done()
-			if err := a.queue.Consume(workCtx, notificationConsumer, a.handleEvent); err != nil {
-				a.log.Error("notifications stopped", "error", err)
-			}
-		}()
-		for durable, handle := range map[string]func(context.Context, []byte) error{automationConsumer: a.automation.Handle, webhookConsumer: a.webhooks.Handle, collabConsumer: a.collab.Handle} {
+		for durable, handle := range a.eventListeners() {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				if err := a.queue.Consume(workCtx, durable, handle); err != nil {
+				listener := queue.Listener{Durable: durable, Handle: handle, GiveUp: a.failures.Record}
+				if err := a.queue.Consume(workCtx, listener); err != nil {
 					a.log.Error("event consumer stopped", "consumer", durable, "error", err)
 				}
 			}()
@@ -517,11 +520,30 @@ func (a *App) Webhooks() *webhooks.Service { return a.webhooks }
 // CloseAnalyticsDays runs the daily closing now, for tests and for operators.
 func (a *App) CloseAnalyticsDays(ctx context.Context) error { return a.analytics.CloseDays(ctx) }
 
+// eventListeners are the durable consumers, by name.
+func (a *App) eventListeners() map[string]failures.Handler {
+	return map[string]failures.Handler{
+		notificationConsumer: a.handleEvent, automationConsumer: a.automation.Handle,
+		webhookConsumer: a.webhooks.Handle, collabConsumer: a.collab.Handle,
+	}
+}
+
+// Failures exposes the events listeners gave up on (used by tests).
+func (a *App) Failures() *failures.Service { return a.failures }
+
+// ReplayEvents runs the replays that were asked for.
+func (a *App) ReplayEvents(ctx context.Context) error {
+	return a.failures.RunReplays(ctx, a.eventListeners())
+}
+
 // PeriodicTasks is the work the worker does on a schedule.
 func (a *App) PeriodicTasks() []jobs.Task {
 	tasks := []jobs.Task{
 		{Name: "close-analytics-days", Every: time.Hour, Run: a.analytics.CloseDays},
 		{Name: "forget-presence", Every: time.Minute, Run: a.presence.Forget},
+		{Name: "trim-recent-pages", Every: time.Hour, Run: a.pages.TrimRecent},
+		{Name: "replay-events", Every: time.Minute, Run: a.ReplayEvents},
+		{Name: "purge-event-failures", Every: 24 * time.Hour, Run: a.failures.Purge},
 		{Name: "run-schedules", Every: time.Minute, Run: a.automation.RunSchedules},
 		{Name: "purge-rule-runs", Every: 24 * time.Hour, Run: a.automation.PurgeRuns},
 		{Name: "deliver-webhooks", Every: time.Minute, Run: a.webhooks.DeliverDue},

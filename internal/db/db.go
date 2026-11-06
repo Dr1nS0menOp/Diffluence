@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,6 +25,11 @@ type Querier interface {
 // Open creates a connection pool and checks that the database answers.
 // Pool size can be tuned in the URL (pool_max_conns=...); in HA setups put
 // PgBouncer in front of PostgreSQL.
+// defaultMaxConns replaces the driver's default of the larger of four and the
+// number of CPUs, which is too small for a node that serves people (ARC-175).
+const defaultMaxConns = 20
+
+// Open creates a connection pool and checks that the database answers.
 func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	cfg, err := pgxpool.ParseConfig(url)
 	if err != nil {
@@ -34,6 +40,9 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.HealthCheckPeriod = 30 * time.Second
+	if !strings.Contains(url, "pool_max_conns") {
+		cfg.MaxConns = defaultMaxConns
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {

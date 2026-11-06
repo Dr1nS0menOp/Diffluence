@@ -16,6 +16,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/metrics"
 	"github.com/diffluence/diffluence/internal/settings"
 )
 
@@ -24,6 +25,7 @@ type ctxKey int
 const (
 	ctxPrincipal ctxKey = iota
 	ctxRequestID
+	ctxTraceID
 	ctxClientIP
 	ctxSCIMCaller
 )
@@ -57,8 +59,57 @@ func withRequestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		id := ids.New().String()
 		w.Header().Set("X-Request-Id", id)
-		next.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), ctxRequestID, id)))
+		ctx := context.WithValue(r.Context(), ctxRequestID, id)
+		ctx = context.WithValue(ctx, ctxTraceID, traceIDFrom(r.Header.Get("traceparent")))
+		next.ServeHTTP(w, r.WithContext(ctx))
 	})
+}
+
+// isLowerHex reports whether s is lower-case hex with at least one digit that is
+// not zero, which is what W3C Trace Context asks of an id.
+func isLowerHex(s string) bool {
+	hasValue := false
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+		hasValue = hasValue || c != '0'
+	}
+	return hasValue
+}
+
+// traceIDFrom reads the trace id of a W3C traceparent header. The header comes from
+// outside, so anything that does not fit gives no id and no error (spec 021 D5).
+func traceIDFrom(header string) string {
+	parts := strings.Split(header, "-")
+	if len(parts) < 4 {
+		return ""
+	}
+	version, traceID, parentID, flags := parts[0], parts[1], parts[2], parts[3]
+	validVersion := len(version) == 2 && version != "ff" && (isLowerHex(version) || version == "00")
+	if !validVersion || (version == "00" && len(parts) != 4) {
+		return ""
+	}
+	if len(traceID) != 32 || !isLowerHex(traceID) || len(parentID) != 16 || !isLowerHex(parentID) {
+		return ""
+	}
+	if len(flags) != 2 || (!isLowerHex(flags) && flags != "00") {
+		return ""
+	}
+	return traceID
+}
+
+// withMetrics counts every request, by method and class of status only: a path
+// would give a label without limit, and holds ids (spec 021 D3).
+func withMetrics(requests *metrics.Requests) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := time.Now()
+			rec := &statusRecorder{ResponseWriter: w}
+			defer func() { requests.Observe(r.Method, rec.finalStatus(), time.Since(start)) }()
+			next.ServeHTTP(rec, r)
+		})
+	}
 }
 
 // withClientIP takes the client address from X-Forwarded-For only when the
@@ -128,6 +179,14 @@ func (s *statusRecorder) Write(b []byte) (int, error) {
 
 func (s *statusRecorder) Unwrap() http.ResponseWriter { return s.ResponseWriter }
 
+// finalStatus is the status sent. A handler that wrote nothing sent a 200.
+func (s *statusRecorder) finalStatus() int {
+	if !s.wrote {
+		return http.StatusOK
+	}
+	return s.status
+}
+
 // tokenPaths are paths that end in a secret. A proxy or a log server must not get it.
 var tokenPaths = []string{"/api/v1/mail/unsubscribe/", "/unsubscribe/", "/hooks/"}
 
@@ -159,12 +218,16 @@ func withLogAndRecover(log *slog.Logger) func(http.Handler) http.Handler {
 					}
 				}
 				level := slog.LevelInfo
-				if r.URL.Path == "/livez" || r.URL.Path == "/readyz" {
+				if r.URL.Path == "/livez" || r.URL.Path == "/readyz" || r.URL.Path == "/metrics" {
 					level = slog.LevelDebug
 				}
-				log.Log(r.Context(), level, "http request", "method", r.Method, "path", loggedPath(r.URL.Path),
+				attrs := []any{"method", r.Method, "path", loggedPath(r.URL.Path),
 					"status", rec.status, "duration_ms", time.Since(start).Milliseconds(),
-					"ip", ClientIPFrom(r.Context()), "request_id", RequestIDFrom(r.Context()))
+					"ip", ClientIPFrom(r.Context()), "request_id", RequestIDFrom(r.Context())}
+				if traceID, _ := r.Context().Value(ctxTraceID).(string); traceID != "" {
+					attrs = append(attrs, "trace_id", traceID)
+				}
+				log.Log(r.Context(), level, "http request", attrs...)
 			}()
 			next.ServeHTTP(rec, r)
 		})

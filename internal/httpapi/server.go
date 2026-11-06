@@ -27,11 +27,13 @@ import (
 	"github.com/diffluence/diffluence/internal/console"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/failures"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/metrics"
 	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/outward"
 	"github.com/diffluence/diffluence/internal/pages"
@@ -92,9 +94,12 @@ type Deps struct {
 	Automation  *automation.Service
 	Webhooks    *webhooks.Service
 	Collab      *collab.Service
+	Failures    *failures.Service
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)
+	// Gauges reads the numbers that /metrics shows beside the request counters.
+	Gauges func(ctx context.Context) []metrics.Gauge
 	// CheckAudit verifies the audit chain and the signed checkpoints.
 	CheckAudit func(ctx context.Context) (audit.VerifyResult, error)
 
@@ -114,6 +119,7 @@ type Server struct {
 	loginByIP  *limiter
 	loginByAcc *limiter
 	tokenCalls *limiter
+	requests   *metrics.Requests
 }
 
 // New builds the API.
@@ -127,6 +133,7 @@ func New(d Deps) (*Server, error) {
 		loginByIP:  newLimiter(50, loginWindow),
 		loginByAcc: newLimiter(10, loginWindow),
 		tokenCalls: newLimiter(tokenCallsPerMinute, time.Minute),
+		requests:   metrics.NewRequests(),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
@@ -146,6 +153,7 @@ func New(d Deps) (*Server, error) {
 
 	s.handler = chain(s.router,
 		withRequestID,
+		withMetrics(s.requests),
 		withClientIP(d.Config.TrustedProxies),
 		withLogAndRecover(d.Log),
 		withSecurityHeaders(d.Config.SecureCookies()),

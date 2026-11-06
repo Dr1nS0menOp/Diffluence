@@ -2,6 +2,7 @@
 import { useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
+import { spreadPoll } from './polling';
 
 const IMPORTED_FAMILY = 'Diffluence Imported';
 const NOTES_POLL_MS = 30_000;
@@ -40,7 +41,7 @@ export const appearanceQuery = {
 };
 
 /** The same answer, kept fresh, so maintenance mode reaches an open screen. */
-export const liveAppearanceQuery = { ...appearanceQuery, refetchInterval: NOTES_POLL_MS };
+export const liveAppearanceQuery = { ...appearanceQuery, refetchInterval: spreadPoll(NOTES_POLL_MS) };
 
 /**
  * Applies the font an administrator imported, here and only here. The stack

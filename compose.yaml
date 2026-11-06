@@ -40,6 +40,8 @@ services:
       DIFFLUENCE_ROLE: all
       DIFFLUENCE_COLLAB_URL: ${DIFFLUENCE_COLLAB_URL:-}
       DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
+      # Empty = no /metrics.
+      DIFFLUENCE_METRICS_TOKEN: ${DIFFLUENCE_METRICS_TOKEN:-}
       DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-http://localhost:8080}
       # The application connects as a role that does not own the tables, so it
       # cannot disable the audit log's protection. Migrations use the owner.

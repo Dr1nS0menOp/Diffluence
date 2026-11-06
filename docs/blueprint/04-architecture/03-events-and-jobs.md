@@ -27,14 +27,14 @@ durable consumers             (one per listener, shared by all workers)
 - **ARC-043** · built · The relay claims rows with `FOR UPDATE SKIP LOCKED`, which PostgreSQL describes as fit for queue-like tables, so several relays can run.
 - **ARC-044** · built · Each message carries the event id as `Nats-Msg-Id`. JetStream drops a repeat within its duplicates window of two minutes, so a crash between publish and commit normally stores one copy.
 - **ARC-045** · built · Published rows are removed after 7 days, the same as the stream.
-- **ARC-046** · wave C · Delivery is **at least once and unordered**. Several relays and redeliveries can swap or repeat events. Every listener must allow for both, and must load current facts instead of trusting the order.
-- **ARC-047** · wave C · An event holds ids, a type and a few flags, never titles or text. A listener reads what it needs at that moment, through permissions.
-- **ARC-048** · wave C · Each listener is a durable pull consumer with explicit acknowledgement. Workers share one consumer, and the server spreads messages between them. A message is acknowledged only after the listener's transaction committed.
-- **ARC-049** · wave C · Each listener is safe to run twice: a unique key on its own table, such as `(user, source_event)` for notifications and `(rule, event)` for rule runs.
-- **ARC-050** · wave C · A consumer sets `MaxDeliver` and `BackOff`. By default JetStream redelivers for ever (`MaxDeliver` is -1), so one bad event would come back without end. After the last try the event is written to `event_failures`, shown in the console, and can be replayed.
-- **ARC-051** · wave C · `MaxAckPending` defaults to 1000 for all workers together. A slow listener stops itself there, which is the right kind of back pressure. It does not hold up other consumers.
+- **ARC-046** · built · Delivery is **at least once and unordered**. Several relays and redeliveries can swap or repeat events. Every listener must allow for both, and must load current facts instead of trusting the order.
+- **ARC-047** · built · An event holds ids, a type and a few flags, never titles or text. A listener reads what it needs at that moment, through permissions.
+- **ARC-048** · built · Each listener is a durable pull consumer with explicit acknowledgement. Workers share one consumer, and the server spreads messages between them. A message is acknowledged only after the listener's transaction committed.
+- **ARC-049** · built · Each listener is safe to run twice: a unique key on its own table, such as `(user, source_event)` for notifications and `(rule, event)` for rule runs.
+- **ARC-050** · built · A consumer sets `MaxDeliver` and `BackOff`. By default JetStream redelivers for ever (`MaxDeliver` is -1), so one bad event would come back without end. After the last try the event is written to `event_failures`, shown in the console, and can be replayed.
+- **ARC-051** · built · `MaxAckPending` defaults to 1000 for all workers together. A slow listener stops itself there, which is the right kind of back pressure. It does not hold up other consumers.
 - **ARC-052** · phase 3 · In a cluster the stream and its consumers have three replicas. One copy loses the stream with its server, and a consumer with one copy is a single point of failure for its position. Two lost servers of three stop new messages, and the outbox simply waits.
-- **ARC-053** · phase 3 · A stream with a limit of 7 days means a worker that is down longer loses events. The console warns from one day of lag, and the outbox keeps them for the same 7 days.
+- **ARC-053** · built · A stream with a limit of 7 days means a worker that is down longer loses events. The console warns from one day of lag, and the outbox keeps them for the same 7 days. Built: the console warns from one day, and the outbox keeps events (spec 021).
 
 **What events are not for.** Audit and the search index are written in the same transaction as the change, not from events. The old text of this blueprint said otherwise. In-transaction is stricter: ORG-013 demands that a page is never found with stale content or permissions, and an audit gap would defeat the audit log.
 
@@ -81,25 +81,25 @@ Who listens: **N** notifications, **A** automation rules, **W** webhooks, **S** 
 | `site.created`, `site.changed`, `site.published`, `site.withdrawn` | `exchange` | W | G |
 | Rule runs and webhook failures | `automation`, `webhooks` | N | H |
 
-- **ARC-054** · wave C · `pages` adds `actor_id`, `version` and `silent` to its events (spec 010). A silent update reaches listeners, and notifications leave it out.
-- **ARC-055** · wave H · The chain of rules travels with the event, so a rule cannot trigger itself, and a chain stops at five (spec 015 D12). This field belongs in the envelope from the first rule on.
-- **ARC-056** · wave H · A webhook sends ids, the type and the time, and gets a title only if it opted in. The event table above is the public list of what can be subscribed to, so renaming an event becomes a breaking change at that moment.
-- **ARC-057** · wave G · A page that gets a view restriction or is deleted leaves a public site in a build that starts at once (spec 014 D18). This is the one listener where delay matters for safety, so it gets its own consumer. It must not queue behind notifications.
+- **ARC-054** · built · `pages` adds `actor_id`, `version` and `silent` to its events (spec 010). A silent update reaches listeners, and notifications leave it out.
+- **ARC-055** · built · The chain of rules travels with the event, so a rule cannot trigger itself, and a chain stops at five (spec 015 D12). This field belongs in the envelope from the first rule on.
+- **ARC-056** · built · A webhook sends ids, the type and the time, and gets a title only if it opted in. The event table above is the public list of what can be subscribed to, so renaming an event becomes a breaking change at that moment.
+- **ARC-057** · built · A page that gets a view restriction or is deleted leaves a public site in a build that starts at once (spec 014 D18). This is the one listener where delay matters for safety, so it gets its own consumer. It must not queue behind notifications.
 
 ## 3.3 Fan-out at scale
 
-- **ARC-058** · wave C · One event can mean thousands of people: a space with 5,000 watchers. Fan-out asks the database once who may see the page, and writes all rows in one statement. It does not check people one by one in Go.
-- **ARC-059** · wave C · That needs the opposite of `perm_visible_pages`, which answers "what may this person see". A new SQL function `perm_page_viewers(page)` answers "who may see this page", joins the matrix test, and is compared with `Evaluate` as the others are.
-- **ARC-060** · wave C · Access is checked at fan-out, when shown and when mailed (spec 010 D11). The first check keeps the table small. The others keep the promise.
+- **ARC-058** · built · One event can mean thousands of people: a space with 5,000 watchers. Fan-out asks the database once who may see the page, and writes all rows in one statement. It does not check people one by one in Go.
+- **ARC-059** · built · That needs the opposite of `perm_visible_pages`, which answers "what may this person see". A new SQL function `perm_page_viewers(page)` answers "who may see this page", joins the matrix test, and is compared with `Evaluate` as the others are.
+- **ARC-060** · built · Access is checked at fan-out, when shown and when mailed (spec 010 D11). The first check keeps the table small. The others keep the promise.
 
 ## 3.4 Jobs
 
 - **ARC-061** · built · A job is a row in `jobs`, claimed with `SKIP LOCKED`, and its result stays for the person who started it (ADR-018). Earlier text said jobs ran through NATS. That was changed on purpose: one moving part fewer.
 - **ARC-062** · built · A job has a limit of one hour. A job left running by a dead worker is failed by a periodic task, so nothing hangs for ever.
-- **ARC-063** · wave D · **A worker runs one job at a time today.** One large import blocks every other job on that worker. Bulk actions, exports and site builds need several slots: a small pool per worker, with a separate slot for short jobs, so a large export cannot delay a small copy. This must land before wave D's bulk actions.
-- **ARC-064** · wave D · A job that touches many pages uses one transaction per page (spec 011 D29). It never holds the audit lock or the tree lock for a whole run (ARC-201).
-- **ARC-065** · wave F · The console can retry and cancel jobs that are queued or failed. A running job cannot be cancelled yet (spec 013).
-- **ARC-066** · wave G · A job reports progress, in rows of its own kind, so the screen can show it.
+- **ARC-063** · built · **A worker runs one job at a time today.** One large import blocks every other job on that worker. Bulk actions, exports and site builds need several slots: a small pool per worker, with a separate slot for short jobs, so a large export cannot delay a small copy. This must land before wave D's bulk actions.
+- **ARC-064** · built · A job that touches many pages uses one transaction per page (spec 011 D29). It never holds the audit lock or the tree lock for a whole run (ARC-201).
+- **ARC-065** · built · The console can retry and cancel jobs that are queued or failed. A running job cannot be cancelled yet (spec 013).
+- **ARC-066** · built · A job reports progress, in rows of its own kind, so the screen can show it.
 
 | Job | Why it is a job | Wave |
 |---|---|---|
@@ -114,7 +114,7 @@ Who listens: **N** notifications, **A** automation rules, **W** webhooks, **S** 
 ## 3.5 Periodic tasks
 
 - **ARC-067** · built · A task has a name and an interval. A lease row in PostgreSQL makes it run once in the cluster, also through PgBouncer.
-- **ARC-068** · wave C · **All tasks run in one loop today**, one after the other. A task that takes minutes holds up the others, and `audit-verify` reads the whole chain. Digests and reminders must not wait for that. Long tasks move to their own goroutine, or become jobs.
+- **ARC-068** · built · **All tasks run in one loop today**, one after the other. A task that takes minutes holds up the others, and `audit-verify` reads the whole chain. Digests and reminders must not wait for that. Long tasks move to their own goroutine, or become jobs.
 
 | Task | Interval | Status |
 |---|---|---|

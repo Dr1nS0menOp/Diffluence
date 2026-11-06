@@ -94,7 +94,7 @@ type Service struct {
 func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, att *attachments.Service,
 	ex *exchange.Service, jb *jobs.Service, o Options) *Service {
 	s := &Service{pool: pool, perms: perms, pages: pg, attachments: att, exchange: ex, jobs: jb, options: o}
-	jb.Register(JobKindBuild, s.runBuild)
+	jb.RegisterLong(JobKindBuild, s.runBuild)
 	return s
 }
 

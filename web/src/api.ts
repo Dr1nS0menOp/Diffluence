@@ -105,6 +105,7 @@ export interface Preferences {
   shortcuts: boolean;
   contents: boolean;
   hover_cards: boolean;
+  hide_follows: boolean;
   show_presence: boolean;
   typing_help: boolean;
   sidebar_width: number;

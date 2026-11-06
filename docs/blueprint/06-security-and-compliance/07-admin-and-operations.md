@@ -39,10 +39,10 @@
 **What can go wrong:** a backup is a full copy of everything, outside all our rules, and it often holds the key as well.
 
 - **SEC-635** · built · `scripts/backup.sh` runs with `umask 077`, writes checksums, and a restore drill exists. Restore verifies the audit chain.
-- **SEC-636** · new · **High.** Backups are not encrypted, while this blueprint promised AES-256 before they leave the host. The script also copies `master.key` into the same folder as the database and files, and only prints a reminder. Whoever gets that folder gets everything, including TOTP seeds. Encrypt the backup with a key the operator holds, and write the key file somewhere else by default. Belongs in phase 3, and earlier for the script.
+- **SEC-636** · built · **High.** Backups are not encrypted, while this blueprint promised AES-256 before they leave the host. The script also copies `master.key` into the same folder as the database and files, and only prints a reminder. Whoever gets that folder gets everything, including TOTP seeds. Encrypt the backup with a key the operator holds, and write the key file somewhere else by default. Belongs in phase 3, and earlier for the script. Built: all of a backup is encrypted with AES-256 through `gpg`, plain data never reaches the disk, the script refuses to run without a key or with the key in the backup folder, and the drill proves it (spec 021).
 - **SEC-637** · built · The guide says to keep `master.key` and the secrets apart from the rest.
 - **SEC-638** · wave F · After a restore, anonymising must be done again, which the operations guide will say.
-- **SEC-639** · phase 3 · An automatic restore test, and RPO and RTO of at most 4 hours.
+- **SEC-639** · partly · An automatic restore test, and RPO and RTO of at most 4 hours. Built: the restore drill runs every night in CI. Still open: RPO and RTO measured on real data.
 
 ## 7.4 Upgrades and availability
 

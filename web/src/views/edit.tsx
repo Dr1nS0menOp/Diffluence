@@ -362,6 +362,12 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
       });
       localStorage.removeItem(backupKey);
       await finish();
+      if (page.status !== 'published') {
+        toast({
+          message: t('editor.publishedShare'),
+          action: { label: t('share.button'), run: () => navigate(`/pages/${page.id}?share=1`) },
+        });
+      }
     } catch (e) {
       if (e instanceof ApiError && e.code === 'version_conflict') {
         dirty.current = true;

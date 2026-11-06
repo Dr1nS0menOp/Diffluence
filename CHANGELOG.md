@@ -4,6 +4,25 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Changed: backups are encrypted (wave K)
+- `scripts/backup.sh` and `scripts/restore.sh` now take a key file, and all of a backup is encrypted with AES-256. The script refuses to run without a key, or with the key inside the backup folder
+- Upgrade impact: make a key as `docs/operations/backup-restore.md` says, and change your cron line. A backup is run with `bash`, and needs `gpg`. Older backups are restored with the older script
+
+### Added: the rest of the chapters (wave K)
+- A profile lists where a person was mentioned, their spaces, and their followers, which they can hide in Preferences
+- The owner of a page hears when an administrator recovers it, and a draft gets a notification two weeks before it goes
+- The console lists restricted pages nobody can open, totals per space, the largest pages, and events that could not be handled, with Try again
+- After a first publish, a message offers to share the page
+- Upgrade impact: one migration. Presence restarts empty, which nobody notices
+
+### Added: watching an instance (wave K)
+- `/metrics` for Prometheus, behind `DIFFLUENCE_METRICS_TOKEN`. `trace_id` in the logs from a W3C `traceparent` header
+- A node with role `api` stays ready when the queue is down
+- An event that keeps failing stops after six tries instead of coming back for ever
+- A worker runs several jobs at once, so a large export no longer holds up a small copy
+- Pictures and files are no longer downloaded again on each view, while access is still checked each time
+- Reading a page writes less to the database. The pool holds up to 20 connections unless the address says otherwise
+- Upgrade impact: nothing to do. Check that all nodes together stay below `max_connections`
 ### Added: the rest of daily writing, reader tables and moving files (wave J)
 
 - A new page starts in the title. Enter moves to the text, and Backspace at the very start moves back.

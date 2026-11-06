@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Notification } from '../api';
+import { spreadPoll } from '../polling';
 import { Link } from '../router';
 import { IconBell } from './icons';
 import { useShortcut } from './shortcuts';
@@ -130,7 +131,7 @@ export function NotificationBell() {
   const count = useQuery({
     queryKey: ['notification-count'],
     queryFn: () => api.poll<{ unread: number }>('/me/notifications/count'),
-    refetchInterval: POLL_MS,
+    refetchInterval: spreadPoll(POLL_MS),
     refetchIntervalInBackground: false,
   });
   const unread = count.data?.unread ?? 0;

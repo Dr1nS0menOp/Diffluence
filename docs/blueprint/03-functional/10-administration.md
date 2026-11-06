@@ -36,8 +36,8 @@
 - **ADM-023** · built · The default set of permissions for new spaces.
 - **ADM-024** · built · Allowed outside addresses for link cards and embeds (EDT-067), empty by default.
 - **ADM-025** · built · Audit retention: at least one year by default, adjustable by a system administrator.
-- **ADM-026** · partly · Draft retention (PAG-019). Built: the setting. Still open: the job that uses it.
-- **ADM-027** · new · Whether notifications may contain text from pages (COL-076).
+- **ADM-026** · built · Draft retention (PAG-019).
+- **ADM-027** · built · Whether notifications may contain text from pages (COL-076). It is the setting `mail_excerpts`.
 
 ## 10.5 E-mail
 
@@ -49,7 +49,7 @@
 - **ADM-030** · built · An administrator lists all spaces, also ones they cannot read, with key, name, status and owners.
 - **ADM-031** · built · An administrator recovers access to a space.
 - **ADM-032** · built · An administrator restores or purges spaces from the trash.
-- **ADM-033** · partly · The list shows the number of pages, storage used and last activity, and can be filtered by them. Still open: pages, storage and last activity in the list.
+- **ADM-033** · partly · The list shows the number of pages, storage used and last activity, and can be filtered by them. Built: pages, storage and last activity in the list. Still open: filtering by them.
 - **ADM-034** · built · A list shows spaces with no active administrator.
 
 ## 10.7 Templates and content defaults
@@ -83,7 +83,7 @@
 
 ## 10.10 Data care
 
-- **ADM-055** · partly · A report shows the largest spaces, pages and files. Built: spaces and files. Still open: pages.
+- **ADM-055** · built · A report shows the largest spaces, pages and files. Pages are named by space key and id, because a title is content.
 - **ADM-056** · built · A job finds stored files that no attachment uses, and reports them before removal.
 - **ADM-057** · built · Backup and restore follow the guide in `docs/operations/backup-restore.md`.
 - **ADM-058** · phase 3 · An automatic restore test proves that a backup works.

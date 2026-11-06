@@ -1,0 +1,7 @@
+# SPDX-License-Identifier: Apache-2.0
+apiVersion: v2
+name: diffluence
+description: Diffluence, a self-hosted wiki. Needs an existing PostgreSQL.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

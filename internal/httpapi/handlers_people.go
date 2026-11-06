@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/watches"
 )
 
 // forgotAnswerTime makes every answer on the forgot-password route take as long,
@@ -47,6 +48,8 @@ func (s *Server) registerPeopleRoutes() {
 	r.HandleFunc("GET /api/v1/people/{id}", me, s.handlePerson)
 	r.HandleFunc("GET /api/v1/people/{id}/picture", me, s.handlePersonPicture)
 	r.HandleFunc("GET /api/v1/people/{id}/pages", me, s.handlePersonPages)
+	r.HandleFunc("GET /api/v1/people/{id}/mentions", me, s.handlePersonMentions)
+	r.HandleFunc("GET /api/v1/people/{id}/follows", me, s.handlePersonFollows)
 
 	r.HandleFunc("PUT /api/v1/me/profile", SessionOnly(me), s.handleProfileSet)
 	r.HandleFunc("PUT /api/v1/me/picture", SessionOnly(me), s.handlePictureSet)
@@ -337,6 +340,52 @@ func (s *Server) handlePersonPages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"pages": list})
+}
+
+func (s *Server) handlePersonMentions(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	if _, err := s.deps.People.Get(r.Context(), s.caller(r), id); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	list, err := s.deps.Pages.MentionsOf(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pages": list})
+}
+
+// handlePersonFollows answers with empty lists when the person hid them, so a screen
+// has nothing to treat apart. They still see their own.
+func (s *Server) handlePersonFollows(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	profile, err := s.deps.People.Get(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	choices, err := s.deps.Identity.Preferences(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if choices.HideFollows && !profile.IsSelf {
+		writeJSON(w, http.StatusOK, watches.Follows{Followers: []watches.FollowEntry{}, Following: []watches.FollowEntry{}})
+		return
+	}
+	follows, err := s.deps.Watches.FollowsOf(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, follows)
 }
 
 func (s *Server) handlePersonPicture(w http.ResponseWriter, r *http.Request) {

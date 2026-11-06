@@ -121,6 +121,11 @@ export function PreferencesView() {
         onChange={(hover_cards) => update({ hover_cards })}
       />
       <PreferenceSwitch
+        label={t('preferences.hideFollows')}
+        value={preferences.hide_follows}
+        onChange={(hide_follows) => update({ hide_follows })}
+      />
+      <PreferenceSwitch
         label={t('preferences.showPresence')}
         value={preferences.show_presence}
         onChange={(show_presence) => update({ show_presence })}

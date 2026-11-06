@@ -11,6 +11,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   shortcuts: true,
   contents: true,
   hover_cards: true,
+  hide_follows: false,
   show_presence: true,
   typing_help: true,
   sidebar_width: 18,

@@ -425,6 +425,51 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/event-failures": {
+      "get": {
+        "operationId": "get /api/v1/admin/event-failures",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/event-failures/{id}/replay": {
+      "post": {
+        "operationId": "post /api/v1/admin/event-failures/{id}/replay",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/example-space": {
       "post": {
         "operationId": "post /api/v1/admin/example-space",
@@ -6659,6 +6704,60 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/people/{id}/follows": {
+      "get": {
+        "operationId": "get /api/v1/people/{id}/follows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "people"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/people/{id}/mentions": {
+      "get": {
+        "operationId": "get /api/v1/people/{id}/mentions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "people"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/people/{id}/pages": {
       "get": {
         "operationId": "get /api/v1/people/{id}/pages",
@@ -9934,6 +10033,24 @@
     "/livez": {
       "get": {
         "operationId": "get /livez",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          ""
+        ],
+        "x-access": "public"
+      }
+    },
+    "/metrics": {
+      "get": {
+        "operationId": "get /metrics",
         "parameters": [],
         "responses": {
           "200": {

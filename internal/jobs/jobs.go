@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -61,6 +62,8 @@ type Service struct {
 	handlers map[string]Handler
 	timeout  time.Duration
 	held     func(context.Context) (bool, error)
+	// longKinds are the kinds the slot for short jobs leaves alone.
+	longKinds []string
 }
 
 // NewService creates the service.
@@ -70,6 +73,13 @@ func NewService(pool *pgxpool.Pool, log *slog.Logger) *Service {
 
 // Register sets the handler for a job kind.
 func (s *Service) Register(kind string, h Handler) { s.handlers[kind] = h }
+
+// RegisterLong adds a kind of job that can take minutes. It never gets the slot kept
+// for short jobs, so a large export cannot delay a small copy (ARC-063).
+func (s *Service) RegisterLong(kind string, h Handler) {
+	s.handlers[kind] = h
+	s.longKinds = append(s.longKinds, kind)
+}
 
 // Enqueue adds a job.
 func (s *Service) Enqueue(ctx context.Context, tx pgx.Tx, kind string, payload any, createdBy uuid.UUID) (uuid.UUID, error) {
@@ -149,7 +159,10 @@ func (s *Service) Cancel(ctx context.Context, c identity.Caller, id uuid.UUID) e
 func (s *Service) HoldWhile(check func(context.Context) (bool, error)) { s.held = check }
 
 // RunOnce claims and runs one queued job. It reports whether there was one.
-func (s *Service) RunOnce(ctx context.Context) (bool, error) {
+func (s *Service) RunOnce(ctx context.Context) (bool, error) { return s.runNext(ctx, nil) }
+
+// runNext runs the oldest queued job that is not of a skipped kind.
+func (s *Service) runNext(ctx context.Context, skippedKinds []string) (bool, error) {
 	if s.held != nil {
 		held, err := s.held(ctx)
 		if err != nil {
@@ -162,7 +175,7 @@ func (s *Service) RunOnce(ctx context.Context) (bool, error) {
 	var j Job
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `SELECT id, kind, status, payload, created_by, created_at FROM jobs
-			WHERE status = 'queued' ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`).
+			WHERE status = 'queued' AND NOT kind = ANY($1) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`, append([]string{}, skippedKinds...)).
 			Scan(&j.ID, &j.Kind, &j.Status, &j.Payload, &j.CreatedBy, &j.CreatedAt)
 		if err != nil {
 			return err
@@ -214,10 +227,23 @@ func (s *Service) run(ctx context.Context, j Job) (result any, err error) {
 	return h(ctx, j)
 }
 
+// generalSlots is how many jobs of any kind one worker runs at once. One more slot
+// takes short jobs only.
+const generalSlots = 3
+
 // Run works off queued jobs until ctx is cancelled.
 func (s *Service) Run(ctx context.Context) {
+	var slots sync.WaitGroup
+	for range generalSlots {
+		slots.Go(func() { s.workSlot(ctx, nil) })
+	}
+	slots.Go(func() { s.workSlot(ctx, s.longKinds) })
+	slots.Wait()
+}
+
+func (s *Service) workSlot(ctx context.Context, skippedKinds []string) {
 	for ctx.Err() == nil {
-		more, err := s.RunOnce(ctx)
+		more, err := s.runNext(ctx, skippedKinds)
 		if err != nil && ctx.Err() == nil {
 			s.log.Error("job runner failed", "error", err)
 		}
@@ -253,39 +279,49 @@ func (s *Service) claim(ctx context.Context, t Task, lease time.Duration) (bool,
 
 // Tick runs every task that is due. Tests call it directly.
 func (s *Service) Tick(ctx context.Context, tasks []Task) {
-	const lease = 30 * time.Minute
 	for _, t := range tasks {
-		ok, err := s.claim(ctx, t, lease)
-		if err != nil {
-			if ctx.Err() == nil {
-				s.log.Error("periodic task: claim failed", "task", t.Name, "error", err)
-			}
-			continue
-		}
-		if !ok {
-			continue
-		}
-		taskCtx, cancel := context.WithTimeout(ctx, lease)
-		if err := t.Run(taskCtx); err != nil && ctx.Err() == nil {
-			s.log.Error("periodic task failed", "task", t.Name, "error", err)
-		}
-		cancel()
-		release, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
-		if _, err := s.pool.Exec(release, "UPDATE job_leases SET lease_until = 'epoch' WHERE name = $1", t.Name); err != nil {
-			s.log.Error("periodic task: release failed", "task", t.Name, "error", err)
-		}
-		stop()
+		s.runIfDue(ctx, t)
 	}
 }
 
-// RunPeriodic runs tasks until ctx is cancelled.
-func (s *Service) RunPeriodic(ctx context.Context, tasks []Task) {
-	for {
-		s.Tick(ctx, tasks)
-		select {
-		case <-ctx.Done():
-			return
-		case <-time.After(5 * time.Second):
+func (s *Service) runIfDue(ctx context.Context, t Task) {
+	const lease = 30 * time.Minute
+	ok, err := s.claim(ctx, t, lease)
+	if err != nil {
+		if ctx.Err() == nil {
+			s.log.Error("periodic task: claim failed", "task", t.Name, "error", err)
 		}
+		return
 	}
+	if !ok {
+		return
+	}
+	taskCtx, cancel := context.WithTimeout(ctx, lease)
+	defer cancel()
+	if err := t.Run(taskCtx); err != nil && ctx.Err() == nil {
+		s.log.Error("periodic task failed", "task", t.Name, "error", err)
+	}
+	release, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer stop()
+	if _, err := s.pool.Exec(release, "UPDATE job_leases SET lease_until = 'epoch' WHERE name = $1", t.Name); err != nil {
+		s.log.Error("periodic task: release failed", "task", t.Name, "error", err)
+	}
+}
+
+// RunPeriodic runs tasks until ctx is cancelled. Each task has a loop of its own, so
+// one that takes minutes, such as the audit check, holds up nothing else (ARC-068).
+func (s *Service) RunPeriodic(ctx context.Context, tasks []Task) {
+	var loops sync.WaitGroup
+	for _, t := range tasks {
+		loops.Go(func() {
+			for ctx.Err() == nil {
+				s.runIfDue(ctx, t)
+				select {
+				case <-ctx.Done():
+				case <-time.After(5 * time.Second):
+				}
+			}
+		})
+	}
+	loops.Wait()
 }

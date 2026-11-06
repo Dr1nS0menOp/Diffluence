@@ -19,9 +19,9 @@ That is more than twice the old figure, and still not much: one node handles ove
 **A page view is about 20 queries.** The session, the person and their groups, the page, its space with all grants, its restrictions, the version, breadcrumbs, marks, names, then the same permission facts again for the buttons, and two writes for the recent list. At 85 views-related requests a second that is well over 1,000 small queries a second on one primary. PostgreSQL does that, on indexes, with a warm cache. It is also the first thing to trim.
 
 - **ARC-197** · phase 3 · `Get` loads permission facts once and reuses them for the buttons, which removes a third of its queries.
-- **ARC-198** · phase 3 · The recent list writes at most once a minute per person and page, and trims in a task instead of on each view.
-- **ARC-199** · phase 3 · The k6 test uses the real pattern of the frontend, with polling, and real spaces of 50,000 pages, not one small page in a loop.
-- **ARC-200** · phase 3 · Targets per query go in the test: tree, search, feed, directory.
+- **ARC-198** · built · The recent list writes at most once a minute per person and page, and trims in a task instead of on each view. Going back to another page still writes at once, so the order stays right (spec 021 D8).
+- **ARC-199** · partly · The k6 test uses the real pattern of the frontend, with polling, and real spaces of 50,000 pages, not one small page in a loop. Built: `scripts/load/reading.js` with the real pattern. Still open: a run with 50,000 pages.
+- **ARC-200** · partly · Targets per query go in the test: tree, search, feed, directory. Built: targets per query in the script. Still open: a run at full size.
 
 ## 8.2 What will hurt first
 
@@ -44,7 +44,7 @@ In order of how much it worries this study.
 
 With a commit of a few milliseconds that door passes a few hundred changes a second, and we expect five. So normal use is fine. The danger is a **long transaction that audits early**: until it commits, nobody can log in, publish or be refused. A copy of a large branch does this today: it records per page, in one transaction.
 
-- **ARC-201** · wave D · Rule: in a transaction, audit comes last, and long work runs as one transaction per page (ARC-064). `pages.Copy` of a large branch moves to a job in wave D, which also removes today's worst case.
+- **ARC-201** · built · Rule: in a transaction, audit comes last, and long work runs as one transaction per page (ARC-064). `pages.Copy` of a large branch moves to a job in wave D, which also removes today's worst case.
 - **ARC-202** · phase 3 · A test holds a long transaction and measures what waits, and the load test watches the wait on this lock.
 - **ARC-203** · later · If the lock ever limits real use, events can be written without a hash in the transaction, and a single worker chains them seconds later. The log stays complete and tamper-evident, with a short tail that is not chained yet. That changes ADR-013, so it only happens with a measurement and the product owner's agreement.
 
@@ -62,13 +62,13 @@ With a commit of a few milliseconds that door passes a few hundred changes a sec
 | Thousands | 2 or more `api`, 2 `worker` | Primary and standbys, PgBouncer | NATS, 3 servers | S3 |
 | More | Add `api` first, `worker` with job load | Larger primary, before anything clever | Same | Same |
 
-- **ARC-207** · phase 3 · An odd number of NATS servers, normally three. An even number costs more and survives no more.
-- **ARC-208** · phase 3 · API nodes scale by adding more, as they hold nothing. Workers scale by adding more, as they claim work through the database.
-- **ARC-209** · phase 3 · PostgreSQL scales up, not out. One instance serves one organisation (ADR-008), so a single primary is the design, and sharding is not.
+- **ARC-207** · built · An odd number of NATS servers, normally three. An even number costs more and survives no more. Built as advice in `docs/operations/install.md`.
+- **ARC-208** · built · API nodes scale by adding more, as they hold nothing. Workers scale by adding more, as they claim work through the database. Built: `deploy/helm/diffluence`, with API and worker pods.
+- **ARC-209** · built · PostgreSQL scales up, not out. One instance serves one organisation (ADR-008), so a single primary is the design, and sharding is not. Built as advice in `docs/operations/install.md`.
 - **ARC-210** · phase 3 · The login limiter counts per node, so an attacker gets as many tries as there are nodes. With three nodes that is still slow, and Argon2 makes each try expensive. A shared counter in PostgreSQL is the next step if a test shows a need.
 
 ## 8.4 What memory and CPU go to
 
 - **ARC-211** · built · Password hashing with Argon2id is the heaviest thing a request does, by design, and is limited per login.
 - **ARC-212** · built · Exports and imports stream, so memory does not grow with the size of a space. Keep that for every new format.
-- **ARC-213** · wave G · A worker that builds a PDF or a site must not hold a whole space in memory. Build per page, and write to a file.
+- **ARC-213** · built · A worker that builds a PDF or a site must not hold a whole space in memory. Build per page, and write to a file.

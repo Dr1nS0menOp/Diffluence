@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+image:
+  repository: diffluence
+  tag: ""   # empty = the chart's appVersion
+  pullPolicy: IfNotPresent
+
+# The address people use. Required.
+publicUrl: ""
+
+# single: one pod with role "all" and the embedded queue.
+# split: API pods and worker pods, which need an external NATS at natsUrl, and a
+# data volume they can all write to.
+mode: single
+natsUrl: ""
+
+api:
+  replicas: 2
+worker:
+  replicas: 1
+
+# The chart holds no secret values. This Secret must exist, with these keys:
+#   database-url          the application role
+#   migrate-database-url  the owner role, used for migrations
+#   master-key            the contents of master.key
+#   metrics-token         optional: turns on /metrics
+existingSecret: diffluence
+
+# Files live on this volume until an S3 store exists. With mode split it must be
+# ReadWriteMany.
+persistence:
+  size: 20Gi
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  existingClaim: ""
+
+# Addresses of proxies to trust for X-Forwarded-For, comma-separated.
+trustedProxies: ""
+
+service:
+  port: 8080
+
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecret: ""
+
+# Extra environment for all pods, as name and value pairs or valueFrom.
+extraEnv: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi

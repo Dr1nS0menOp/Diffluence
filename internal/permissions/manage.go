@@ -141,7 +141,7 @@ func recordChange(ctx context.Context, tx pgx.Tx, c identity.Caller, action, obj
 	if _, err := audit.Record(ctx, tx, c.Event(action, objType, objID, spaceID, details)); err != nil {
 		return err
 	}
-	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"object_id": objID, "space_id": spaceID})
+	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"object_id": objID, "space_id": spaceID, "actor_id": c.UserID})
 	return err
 }
 

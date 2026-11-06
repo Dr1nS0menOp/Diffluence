@@ -57,6 +57,8 @@ func (s *Server) registerConsoleRoutes() {
 	r.HandleFunc("POST /api/v1/admin/jobs/{id}/retry", SessionOnly(admin), s.handleJobRetry)
 	r.HandleFunc("POST /api/v1/admin/jobs/{id}/cancel", SessionOnly(admin), s.handleJobCancel)
 	r.HandleFunc("GET /api/v1/admin/jobs", SessionOnly(admin), s.handleJobs)
+	r.HandleFunc("GET /api/v1/admin/event-failures", SessionOnly(admin), s.handleEventFailures)
+	r.HandleFunc("POST /api/v1/admin/event-failures/{id}/replay", SessionOnly(admin), s.handleEventReplay)
 	r.HandleFunc("GET /api/v1/admin/reports/largest", SessionOnly(admin), s.handleLargest)
 	r.HandleFunc("GET /api/v1/admin/storage/unused", SessionOnly(admin), s.handleUnused)
 	r.HandleFunc("POST /api/v1/admin/storage/unused", SessionOnly(admin), s.handleUnusedRemove)
@@ -95,7 +97,12 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"items": list, "unmanaged_spaces": unmanaged})
+	orphaned, err := s.deps.Console.OrphanedPages(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"items": list, "unmanaged_spaces": unmanaged, "orphaned_pages": orphaned})
 }
 
 func (s *Server) handleInvitations(w http.ResponseWriter, r *http.Request) {
@@ -491,6 +498,21 @@ func (s *Server) handleJobs(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleJobRetry(w http.ResponseWriter, r *http.Request) {
 	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error { return s.deps.Jobs.Retry(r.Context(), c, id) })
+}
+
+func (s *Server) handleEventFailures(w http.ResponseWriter, r *http.Request) {
+	list, err := s.deps.Failures.List(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"failures": list})
+}
+
+func (s *Server) handleEventReplay(w http.ResponseWriter, r *http.Request) {
+	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error {
+		return s.deps.Failures.RequestReplay(r.Context(), c, id)
+	})
 }
 
 func (s *Server) handleJobCancel(w http.ResponseWriter, r *http.Request) {

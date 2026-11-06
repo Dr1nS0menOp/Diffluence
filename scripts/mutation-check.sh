@@ -523,6 +523,16 @@ mutate "a socket comes from another site" internal/httpapi/handlers_collab.go \
   's.replace("if r.Header.Get(\"Origin\") != origin {", "if r.Header.Get(\"Origin\") != origin && len(origin) < 0 {")' $app -run TestASocketFromAnotherSiteIsRefused
 mutate "the service is not told of a change of rights" internal/collab/collab.go \
   's.replace("|| strings.HasPrefix(eventType, \"restriction.\")", "")' $app -run TestAChangeOfRightsMakesTheServiceCheckAgain
+mutate "a failed event comes back for ever" internal/queue/queue.go \
+  's.replace("if tries <= len(q.retryWaits) {", "if tries > 0 {").replace("q.retryWaits[tries-1]", "q.retryWaits[0]")' ./internal/queue/ -run TestABadEventStopsComingBackAndIsHandedOver
+mutate "a replay needs no administrator" internal/httpapi/handlers_console.go \
+  's.replace("\"POST /api/v1/admin/event-failures/{id}/replay\", SessionOnly(admin)", "\"POST /api/v1/admin/event-failures/{id}/replay\", Authenticated()")' $app -run TestAnEventGivenUpOnIsShownAndCanBeReplayed
+mutate "metrics take any token" internal/httpapi/handlers_metrics.go \
+  's.replace("if !found || !sameSecret(token, configured) {", "if !found && !sameSecret(token, configured) {")' $app -run TestMetricsNeedTheRightToken
+mutate "metrics exist without a token" internal/httpapi/handlers_metrics.go \
+  's.replace("if configured == \"\" {", "if configured == \"never\" {")' $app -run TestMetricsDoNotExistWithoutAToken
+mutate "a file is shared with other caches" internal/httpapi/handlers_content.go \
+  's.replace("\"private, no-cache\"", "\"public, max-age=3600\"")' $app -run TestAFileAnswersNotModifiedButStillChecksAccess
 mutate_web "offline text stays after logout" src/personal.ts \
   's.replace("localStorage.getItem(unsavedMarkOf(name)) === null &&", "localStorage.getItem(unsavedMarkOf(name)) === \"never\" &&")' src/personal.test.ts
 mutate_web "unsaved work goes at logout" src/personal.ts \

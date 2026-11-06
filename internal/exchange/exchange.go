@@ -76,10 +76,10 @@ func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Servic
 	store storage.Store, jb *jobs.Service, st *settings.Service, o Options) *Service {
 	s := &Service{pool: pool, perms: perms, pages: pg, attachments: att, store: store, jobs: jb, settings: st,
 		log: o.Log, tempDir: o.TempDir, pdfURL: o.PDFURL, collaboraURL: o.CollaboraURL, keyring: o.Keyring, instanceID: o.InstanceID}
-	jb.Register(JobKindImport, s.runImport)
-	jb.Register(JobKindImportRead, s.readImport)
-	jb.Register(JobKindExport, s.runExport)
-	jb.Register(JobKindBundle, s.runBundle)
+	jb.RegisterLong(JobKindImport, s.runImport)
+	jb.RegisterLong(JobKindImportRead, s.readImport)
+	jb.RegisterLong(JobKindExport, s.runExport)
+	jb.RegisterLong(JobKindBundle, s.runBundle)
 	return s
 }
 

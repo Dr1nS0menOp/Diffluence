@@ -25,12 +25,15 @@ type Queue struct {
 	nc       *nats.Conn
 	js       jetstream.JetStream
 	embedded *server.Server
+	log      *slog.Logger
+	// retryWaits holds one pause per try after the first.
+	retryWaits []time.Duration
 }
 
 // Open connects to natsURL, or starts an embedded server (no network listener)
 // storing its data under dataDir when natsURL is empty.
 func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queue, error) {
-	q := &Queue{}
+	q := &Queue{log: log, retryWaits: defaultRetryWaits}
 	opts := []nats.Option{
 		nats.Name("diffluence"),
 		nats.MaxReconnects(-1),
@@ -95,31 +98,82 @@ func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queu
 	return q, nil
 }
 
+// deliver runs the listener on one event, and tells the server what became of it.
+func (q *Queue) deliver(ctx context.Context, l Listener, m jetstream.Msg) {
+	cause := l.Handle(ctx, m.Data())
+	if cause == nil {
+		q.settle(m.Ack(), l.Durable)
+		return
+	}
+	tries := q.triesOf(m)
+	if tries <= len(q.retryWaits) {
+		q.settle(m.NakWithDelay(q.retryWaits[tries-1]), l.Durable)
+		return
+	}
+	if err := l.GiveUp(ctx, l.Durable, m.Data(), cause); err != nil {
+		q.log.Error("queue: a failed event could not be stored", "consumer", l.Durable, "error", err)
+		q.settle(m.NakWithDelay(q.retryWaits[len(q.retryWaits)-1]), l.Durable)
+		return
+	}
+	q.log.Warn("queue: gave up on an event", "consumer", l.Durable, "tries", tries, "error", cause)
+	q.settle(m.Term(), l.Durable)
+}
+
+// triesOf says how often the event has been delivered, this time included.
+func (q *Queue) triesOf(m jetstream.Msg) int {
+	meta, err := m.Metadata()
+	if err != nil {
+		q.log.Warn("queue: an event has no metadata", "error", err)
+		return 1
+	}
+	return int(meta.NumDelivered)
+}
+
+// settle logs an answer that did not reach the server. The event then simply comes
+// back after its wait, so a listener runs twice, which it must be able to.
+func (q *Queue) settle(err error, durable string) {
+	if err != nil {
+		q.log.Warn("queue: could not answer the server", "consumer", durable, "error", err)
+	}
+}
+
 // Publish sends data with a de-duplication id (satisfies outbox.Publisher).
 func (q *Queue) Publish(ctx context.Context, subject string, data []byte, msgID string) error {
 	_, err := q.js.Publish(ctx, subject, data, jetstream.WithMsgID(msgID))
 	return err
 }
 
-// consumeWait is how long a handler gets for one event before it is sent again.
-const consumeWait = time.Minute
+const (
+	// consumeWait is how long a handler gets for one event before it is sent again.
+	consumeWait = time.Minute
+	// giveUpRoom is how many more deliveries a failure gets to reach the database,
+	// because a listener mostly fails when the database is down.
+	giveUpRoom = 20
+)
 
-// Consume hands every event to handle, until ctx is cancelled. A durable consumer keeps
-// its place across restarts, and shared by several workers each event goes to one of
-// them. An event that fails is sent again, so a handler must be safe to run twice.
-func (q *Queue) Consume(ctx context.Context, durable string, handle func(context.Context, []byte) error) error {
+// defaultRetryWaits are the pauses between the tries of one event. By default
+// JetStream sends an event again for ever, so one bad event would never leave (ARC-050).
+var defaultRetryWaits = []time.Duration{10 * time.Second, time.Minute, 5 * time.Minute, 15 * time.Minute, time.Hour}
+
+// Listener is what a durable consumer does with events.
+type Listener struct {
+	Durable string
+	Handle  func(ctx context.Context, data []byte) error
+	// GiveUp stores an event after its last try. Only then does the queue drop it.
+	GiveUp func(ctx context.Context, durable string, data []byte, cause error) error
+}
+
+// Consume hands every event to the listener, until ctx is cancelled. A durable consumer
+// keeps its place across restarts, and shared by several workers each event goes to one
+// of them. An event that fails is sent again, so a handler must be safe to run twice.
+func (q *Queue) Consume(ctx context.Context, l Listener) error {
 	consumer, err := q.js.CreateOrUpdateConsumer(ctx, StreamEvents, jetstream.ConsumerConfig{
-		Durable: durable, AckPolicy: jetstream.AckExplicitPolicy, AckWait: consumeWait})
+		Durable: l.Durable, AckPolicy: jetstream.AckExplicitPolicy, AckWait: consumeWait,
+		MaxDeliver: len(q.retryWaits) + 1 + giveUpRoom})
 	if err != nil {
 		return fmt.Errorf("queue: create consumer: %w", err)
 	}
-	running, err := consumer.Consume(func(m jetstream.Msg) {
-		if err := handle(ctx, m.Data()); err != nil {
-			_ = m.Nak()
-			return
-		}
-		_ = m.Ack()
-	})
+	running, err := consumer.Consume(func(m jetstream.Msg) { q.deliver(ctx, l, m) })
 	if err != nil {
 		return fmt.Errorf("queue: consume: %w", err)
 	}

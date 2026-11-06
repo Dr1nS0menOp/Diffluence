@@ -119,6 +119,65 @@ function Jobs() {
   );
 }
 
+interface EventFailure {
+  id: string;
+  consumer: string;
+  error: string;
+  failed_at: string;
+  replay_requested_at: string | null;
+}
+
+function EventFailures() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const dates = useDates();
+  const q = useQuery({
+    queryKey: ['admin-event-failures'],
+    queryFn: () => api.get<{ failures: EventFailure[] }>('/admin/event-failures'),
+  });
+  const replay = useMutation({
+    mutationFn: (id: string) => api.post(`/admin/event-failures/${id}/replay`),
+    onSettled: () => client.invalidateQueries({ queryKey: ['admin-event-failures'] }),
+  });
+  return (
+    <section>
+      <h2>{t('care.events')}</h2>
+      <ErrorNote error={q.error ?? replay.error} />
+      {q.data?.failures.length === 0 && <p className="muted">{t('care.noEvents')}</p>}
+      {(q.data?.failures.length ?? 0) > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>{t('care.listener')}</th>
+              <th>{t('care.reason')}</th>
+              <th>{t('admin.when')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {q.data?.failures.map((f) => (
+              <tr key={f.id}>
+                <td>{f.consumer}</td>
+                <td>{f.error}</td>
+                <td>{dates.moment(f.failed_at)}</td>
+                <td>
+                  {f.replay_requested_at ? (
+                    t('care.replayWaits')
+                  ) : (
+                    <button type="button" className="ghost" onClick={() => replay.mutate(f.id)}>
+                      {t('care.replay')}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </section>
+  );
+}
+
 function SizedList({ title, rows }: { title: string; rows: Sized[] }) {
   return (
     <>
@@ -139,7 +198,7 @@ function Largest() {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['admin-largest'],
-    queryFn: () => api.get<{ spaces: Sized[]; files: Sized[] }>('/admin/reports/largest'),
+    queryFn: () => api.get<{ spaces: Sized[]; files: Sized[]; pages: Sized[] }>('/admin/reports/largest'),
   });
   return (
     <section>
@@ -147,6 +206,7 @@ function Largest() {
       <ErrorNote error={q.error} />
       {q.data && <SizedList title={t('admin.spaces')} rows={q.data.spaces} />}
       {q.data && <SizedList title={t('summary.files')} rows={q.data.files} />}
+      {q.data && <SizedList title={t('care.largestPages')} rows={q.data.pages} />}
     </section>
   );
 }
@@ -200,6 +260,7 @@ export function CareTab({ me }: { me: Me }) {
     <>
       <Maintenance me={me} />
       <Jobs />
+      <EventFailures />
       <Largest />
       <UnusedFiles />
     </>

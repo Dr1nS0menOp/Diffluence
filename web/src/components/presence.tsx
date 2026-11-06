@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
+import { spreadPoll } from '../polling';
 import { Avatar } from './ui';
 
 const BEAT_MS = 20_000;
@@ -30,7 +31,7 @@ export function usePresence(pageId: string, mode: 'reading' | 'editing'): Presen
   const q = useQuery({
     queryKey: ['presence', pageId, mode],
     queryFn: () => api.put<Beat>(`/pages/${pageId}/presence`, { mode }),
-    refetchInterval: BEAT_MS,
+    refetchInterval: spreadPoll(BEAT_MS),
     refetchOnWindowFocus: false,
     retry: false,
   });

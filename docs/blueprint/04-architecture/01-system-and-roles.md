@@ -16,7 +16,7 @@ How to read this chapter: see `../04-architecture.md`. Every line has a number a
 - **ARC-010** · built · Stopping is graceful. A node first reports "not ready", waits `SHUTDOWN_DELAY`, finishes open requests within 30 seconds, then stops its background work.
 - **ARC-011** · built · Configuration comes from `DIFFLUENCE_*` variables. Each can be read from a file with `_FILE`, for secrets. All mistakes are reported at once, not one at a time.
 - **ARC-012** · built · The command line offers `serve`, `migrate`, `user`, `audit` and `version`.
-- **ARC-013** · wave H · The command line gains `client`, which only uses the public API with a token (PLT-040, D22 of spec 015).
+- **ARC-013** · built · The command line gains `client`, which only uses the public API with a token (PLT-040, D22 of spec 015).
 
 ## 1.2 What runs where
 
@@ -31,7 +31,7 @@ How to read this chapter: see `../04-architecture.md`. Every line has a number a
 | Embedded NATS | never | never | when no address is set |
 
 - **ARC-014** · built · Requests never do slow work. Imports, purges and anything that can take long go to the worker.
-- **ARC-015** · wave C · Event consumers run in the worker role only. An API node stays a pure request handler.
+- **ARC-015** · built · Event consumers run in the worker role only. An API node stays a pure request handler.
 - **ARC-016** · built · Several workers can run at once. Relay rows, jobs and periodic tasks are claimed through PostgreSQL, so each piece of work runs once (ADR-018).
 
 ## 1.3 The three shapes of an installation

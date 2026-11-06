@@ -42,12 +42,12 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 ## 7.4 Mentions
 
 - **COL-029** · built · `@` in a page, comment or task opens a list of people. Typing narrows it. Arrow keys and Enter pick one.
-- **COL-030** · partly · The person shows as a highlighted name. Selecting it opens their card. If the name changes later, the mention follows. Still open: the card (wave F).
+- **COL-030** · built · The person shows as a highlighted name. Selecting it opens their card. If the name changes later, the mention follows.
 - **COL-031** · built · A person who is mentioned is notified once per version, not on every later edit.
 - **COL-032** · built · The list shows people who can see the page first, and marks people who cannot. Writing a mention of someone who cannot see the page warns the writer, and offers to share it.
 - **COL-033** · built · A person cannot find out about a page through a mention unless they may see it: a mention never leaks a title or text in a notification.
 - **COL-034** · built · Groups can be mentioned when an administrator allows that, up to a limit of 50 members, to prevent mass messages.
-- **COL-035** · new · A person's profile lists pages where they were mentioned.
+- **COL-035** · built · A person's profile lists pages where they were mentioned.
 
 ## 7.5 Tasks
 
@@ -86,7 +86,7 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 - **COL-059** · built · A space administrator can see who watches a page, and add or remove people. A person who was removed may watch again.
 - **COL-060** · built · A person who loses access stops getting notifications at once, also when they are still listed.
 - **COL-061** · built · **Silent update** (PAG-025) sends no notification, and the history still shows the version.
-- **COL-062** · new · Changes made by a dynamic block do not count as a change.
+- **COL-062** · built · Changes made by a dynamic block do not count as a change. A dynamic block is worked out when a page is read, and is never stored, so it cannot make a version.
 
 ## 7.9 Notifications in the app
 
@@ -123,7 +123,7 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 ## 7.12 Following people
 
 - **COL-086** · built · A person can follow another person. Their pages and blog posts then appear in the For you feed.
-- **COL-087** · new · A profile lists followers and who a person follows, and a person can turn this off for themselves.
+- **COL-087** · built · A profile lists followers and who a person follows, and a person can turn this off for themselves.
 
 ## 7.13 Editing at the same time
 

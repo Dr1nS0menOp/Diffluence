@@ -17,7 +17,7 @@ import {
 import { Link, navigate, useLocation } from '../router';
 import { PersonName } from '../components/person';
 import { SubjectPicker } from '../components/picker';
-import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
+import { ConfirmButton, Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { AppearanceSection } from './admin-appearance';
 import { AnalyticsTab, InsightsTab, OutgoingTab } from './admin-platform';
@@ -644,13 +644,20 @@ function GroupsTab() {
   );
 }
 
+interface SpaceTotal {
+  id: string;
+  pages: number;
+  bytes: number;
+  last_activity: string | null;
+}
+
 function SpacesTab() {
   const { t } = useTranslation();
   const dates = useDates();
   const client = useQueryClient();
   const q = useQuery({
     queryKey: ['admin-spaces'],
-    queryFn: () => api.get<{ spaces: Space[] }>('/admin/spaces'),
+    queryFn: () => api.get<{ spaces: Space[]; totals: SpaceTotal[] }>('/admin/spaces'),
   });
   const trashed = useQuery({
     queryKey: ['admin-trash'],
@@ -684,24 +691,33 @@ function SpacesTab() {
             <th>{t('common.name')}</th>
             <th>{t('space.key')}</th>
             <th>{t('common.status')}</th>
+            <th>{t('admin.spacePages')}</th>
+            <th>{t('admin.spaceStorage')}</th>
+            <th>{t('admin.spaceActivity')}</th>
             <th>{t('common.actions')}</th>
           </tr>
         </thead>
         <tbody>
-          {q.data?.spaces.map((s) => (
-            <tr key={s.id}>
-              <td>
-                <Link href={`/spaces/${s.key}`}>{s.name}</Link>
-              </td>
-              <td>{s.key}</td>
-              <td>{s.status}</td>
-              <td>
-                <button type="button" className="ghost" onClick={() => setRecovering(s)}>
-                  {t('admin.recover')}
-                </button>
-              </td>
-            </tr>
-          ))}
+          {q.data?.spaces.map((s) => {
+            const total = q.data.totals.find((row) => row.id === s.id);
+            return (
+              <tr key={s.id}>
+                <td>
+                  <Link href={`/spaces/${s.key}`}>{s.name}</Link>
+                </td>
+                <td>{s.key}</td>
+                <td>{s.status}</td>
+                <td>{total?.pages ?? 0}</td>
+                <td>{formatSize(total?.bytes ?? 0)}</td>
+                <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
+                <td>
+                  <button type="button" className="ghost" onClick={() => setRecovering(s)}>
+                    {t('admin.recover')}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {(trashed.data?.items.length ?? 0) > 0 && (

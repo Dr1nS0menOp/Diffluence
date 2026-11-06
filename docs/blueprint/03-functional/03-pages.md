@@ -38,7 +38,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-027** · built · **Publish location:** a person can pick another parent or space at publishing time, with the same rules as a move.
 - **PAG-028** · built · A page can be previewed before publishing, in the reading layout, without leaving the editor.
 - **PAG-029** · built · Space settings can require approval before publishing (PAG-062).
-- **PAG-030** · new · After publishing, a short message offers to share the page, with a link that undoes nothing but opens the share dialog.
+- **PAG-030** · built · After publishing, a short message offers to share the page, with a link that undoes nothing but opens the share dialog. Built for the first publish, so a later edit stays quiet.
 
 ## 3.4 Editing a published page
 
@@ -152,7 +152,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-116** · built · A **Details** panel opens beside the page, from a small button at the far edge, with labels, attachments, status and information on one screen. It replaces the need for many menu items.
 - **PAG-117** · built · **Incoming links** lists all pages the person may see that link to this page.
 - **PAG-118** · built · The page lists its child pages at the bottom when the document does not do so already, and this can be turned off per page.
-- **PAG-119** · partly · At the bottom of a page: labels, then reactions, then comments (chapter 7). Still open: labels (wave D).
+- **PAG-119** · built · At the bottom of a page: labels, then reactions, then comments (chapter 7).
 - **PAG-120** · built · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
 - **PAG-121** · built · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
 - **PAG-122** · built · Stored documents are only ever rendered by the editor, so no HTML from a document reaches the browser.

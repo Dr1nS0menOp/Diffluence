@@ -246,6 +246,16 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
               {t('content.anyOwner')}
             </button>
           )}
+          <SubjectPicker
+            label={t('content.contributor')}
+            usersOnly
+            onPick={(person) => set('contributor_id', person.id)}
+          />
+          {params.get('contributor_id') && (
+            <button type="button" className="ghost" onClick={() => set('contributor_id', '')}>
+              {t('content.anyContributor')}
+            </button>
+          )}
           {FLAGS.map((flag) => (
             <label key={flag} className="check">
               <input

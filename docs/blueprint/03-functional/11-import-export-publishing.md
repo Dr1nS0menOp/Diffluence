@@ -22,7 +22,7 @@ Nobody should feel locked in. Everything that goes in can come out.
 - **EXC-016** · built · A failing page names itself in the result, and the rest continues.
 - **EXC-017** · built · An administrator can turn off export formats, or limit them to certain groups.
 - **EXC-018** · built · **Download all attachments** of a page (FIL-035) and of a space.
-- **EXC-019** · new · A page can be printed from the browser with a print style (NAV-082).
+- **EXC-019** · built · A page can be printed from the browser with a print style (NAV-082).
 
 ## 11.2 Import
 

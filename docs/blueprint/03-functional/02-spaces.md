@@ -38,7 +38,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-023** · built · The sidebar can be hidden and comes back at the same state after a reload.
 - **SPC-024** · built · The sidebar can be made wider or narrower by dragging its edge. The width is remembered per person.
 - **SPC-025** · partly · A section **Shortcuts** holds links chosen by space administrators: to pages, other spaces or outside addresses, each with its own label and an order that can be changed by dragging. Still open: dragging: Move up and Move down do the job.
-- **SPC-026** · partly · Fixed entries sit above the tree: **Overview**, **Blog** when turned on, **Calendar** later, and **Files** (FIL-043). Still open: Files (wave E), Calendar.
+- **SPC-026** · partly · Fixed entries sit above the tree: **Overview**, **Blog** when turned on, **Calendar** later, and **Files** (FIL-043). Still open: Calendar.
 - **SPC-027** · built · Space administrators see links to Space settings and Trash at the bottom.
 - **SPC-028** · built · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings.
 - **SPC-029** · built · The sidebar has a filter on page titles. Typing narrows the tree to matching rows with their parents, and matching words are marked.
@@ -93,7 +93,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 Space administrators need a way to keep a growing space clean.
 
 - **SPC-060** · partly · A **Content** screen in space settings lists all published pages in a table with title, owner, status, labels, created, last changed and last viewed. Still open: last viewed (wave H).
-- **SPC-061** · partly · It filters by owner (including disabled people), status, label, contributor, last changed, created, and "not active for 1, 3, 6 or 12 months". Pages with children are left out of the "not active" filter by default, so a parent is not removed by mistake. Still open: filters on contributor, last changed and created on the screen.
+- **SPC-061** · partly · It filters by owner (including disabled people), status, label, contributor, last changed, created, and "not active for 1, 3, 6 or 12 months". Pages with children are left out of the "not active" filter by default, so a parent is not removed by mistake. Built: filter on owner, status, label, contributor and inactivity. Still open: last changed and created.
 - **SPC-062** · built · Rows are selected with checkboxes. Selecting a parent selects its children, and they can be deselected one by one.
 - **SPC-063** · built · Actions on a selection: archive, delete, change owner, change status, add or remove a label, move.
 - **SPC-064** · built · Each action shows what it will do, including how many pages, before it runs. Bulk actions run in the background and report what succeeded and what did not.

@@ -52,6 +52,7 @@ GET /api/v1/admin/audit-events/export                          session-only perm
 GET /api/v1/admin/audit-events/verify                          session-only permission:administrator
 GET /api/v1/admin/automation                                   permission:administrator
 GET /api/v1/admin/bundles/key                                  permission:administrator
+GET /api/v1/admin/event-failures                               session-only permission:administrator
 GET /api/v1/admin/export-policy                                permission:administrator
 GET /api/v1/admin/features                                     permission:administrator
 GET /api/v1/admin/global-permissions                           session-only permission:administrator
@@ -160,6 +161,8 @@ GET /api/v1/pages/{id}/watch                                   object:page.view
 GET /api/v1/pages/{id}/watchers                                object:space.administer
 GET /api/v1/people                                             authenticated
 GET /api/v1/people/{id}                                        authenticated
+GET /api/v1/people/{id}/follows                                authenticated
+GET /api/v1/people/{id}/mentions                               authenticated
 GET /api/v1/people/{id}/pages                                  authenticated
 GET /api/v1/people/{id}/picture                                authenticated
 GET /api/v1/posts                                              authenticated
@@ -220,6 +223,7 @@ GET /api/v1/webhooks/{id}/deliveries                           object:space.admi
 GET /collab                                                    public
 GET /collab/documents/{id}                                     public
 GET /livez                                                     public
+GET /metrics                                                   public
 GET /readyz                                                    public
 GET /scim/v2/Groups                                            scim-token
 GET /scim/v2/Groups/{id}                                       scim-token
@@ -247,6 +251,7 @@ POST /api/v1/access-requests/{id}/refuse                       object:restrictio
 POST /api/v1/admin/appearance/reset                            session-only permission:administrator
 POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
+POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator
 POST /api/v1/admin/example-space                               permission:administrator
 POST /api/v1/admin/groups                                      session-only permission:administrator
 POST /api/v1/admin/invitations                                 session-only permission:administrator
