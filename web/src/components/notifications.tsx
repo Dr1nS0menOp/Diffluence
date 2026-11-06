@@ -22,6 +22,7 @@ export function bellNumber(count: number): string {
 /** Where a notification goes: the exact spot. */
 export function notificationLink(n: Notification): string {
   if (n.type === 'access_request') return `/pages/${n.page_id}?share=1`;
+  if (n.type === 'export_ready') return `/exports/${n.data.export_id}`;
   return n.comment_id ? `/pages/${n.page_id}#comment-${n.comment_id}` : `/pages/${n.page_id}`;
 }
 
@@ -33,7 +34,7 @@ export function useNotificationSentence() {
       n.actors.length > 1
         ? t('notifications.people', { count: n.actors.length })
         : (first ?? t('notifications.someone'));
-    return t(`notifications.type_${n.type}`, { name, page: n.page_title });
+    return t(`notifications.type_${n.type}`, { name, page: n.page_title, file: n.data.filename });
   };
 }
 

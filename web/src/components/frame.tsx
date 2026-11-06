@@ -45,12 +45,13 @@ import {
   IconTable2,
   IconTrash,
 } from './icons';
-import { Menu, MenuDownload, MenuItem, MenuLink } from './menu';
+import { Menu, MenuItem, MenuLink } from './menu';
 import { useShortcut } from './shortcuts';
 import { SpaceStrip } from './space-strip';
 import { useCopy } from './toast';
 import { PagesSection, type RowDialog } from './tree';
 import { ErrorNote, Loading, SpaceBadge } from './ui';
+import { ExportDialog } from '../views/exchange';
 
 const SIDEBAR_KEY = 'diffluence.sidebar';
 const SIDEBAR_HIDDEN = 'hidden';
@@ -139,6 +140,7 @@ export function useSpaceWatch(space: Space) {
 }
 
 function SpaceMenu({ space }: { space: Space }) {
+  const [exporting, setExporting] = useState(false);
   const { t } = useTranslation();
   const client = useQueryClient();
   const copy = useCopy();
@@ -153,30 +155,33 @@ function SpaceMenu({ space }: { space: Space }) {
     },
   });
   return (
-    <Menu label={t('space.more')} trigger={<IconMore size={MENU_ICON_SIZE} />} floating>
-      <MenuItem onClick={() => favourite.mutate(!space.favourite)}>
-        <IconStar size={MENU_ICON_SIZE} /> {space.favourite ? t('space.unfavourite') : t('space.favourite')}
-      </MenuItem>
-      <MenuItem onClick={() => watch.set(!watch.watching)}>
-        <IconEye size={MENU_ICON_SIZE} />{' '}
-        {watch.watching ? t('watching.stopSpace') : t('watching.watchSpace')}
-      </MenuItem>
-      <MenuItem
-        onClick={() => void copy(`${window.location.origin}/spaces/${space.key}`, t('tree.linkCopied'))}
-      >
-        <IconLink size={MENU_ICON_SIZE} /> {t('tree.copyLink')}
-      </MenuItem>
-      {space.can?.['space.export'] && (
-        <MenuDownload href={`/api/v1/spaces/${space.id}/export.zip`}>
-          <IconDownload size={MENU_ICON_SIZE} /> {t('space.export')}
-        </MenuDownload>
-      )}
-      {space.can?.['space.administer'] && (
-        <MenuLink href={`/spaces/${space.key}/settings`}>
-          <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
-        </MenuLink>
-      )}
-    </Menu>
+    <>
+      <Menu label={t('space.more')} trigger={<IconMore size={MENU_ICON_SIZE} />} floating>
+        <MenuItem onClick={() => favourite.mutate(!space.favourite)}>
+          <IconStar size={MENU_ICON_SIZE} /> {space.favourite ? t('space.unfavourite') : t('space.favourite')}
+        </MenuItem>
+        <MenuItem onClick={() => watch.set(!watch.watching)}>
+          <IconEye size={MENU_ICON_SIZE} />{' '}
+          {watch.watching ? t('watching.stopSpace') : t('watching.watchSpace')}
+        </MenuItem>
+        <MenuItem
+          onClick={() => void copy(`${window.location.origin}/spaces/${space.key}`, t('tree.linkCopied'))}
+        >
+          <IconLink size={MENU_ICON_SIZE} /> {t('tree.copyLink')}
+        </MenuItem>
+        {space.can?.['space.export'] && (
+          <MenuItem onClick={() => setExporting(true)}>
+            <IconDownload size={MENU_ICON_SIZE} /> {t('exchange.export')}
+          </MenuItem>
+        )}
+        {space.can?.['space.administer'] && (
+          <MenuLink href={`/spaces/${space.key}/settings`}>
+            <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
+          </MenuLink>
+        )}
+      </Menu>
+      {exporting && <ExportDialog spaceId={space.id} onClose={() => setExporting(false)} />}
+    </>
   );
 }
 

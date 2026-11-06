@@ -1043,6 +1043,8 @@ func objectRoute(pattern string, ids map[string]string) (method, path string) {
 	switch {
 	case strings.Contains(path, "/spaces/"):
 		id = ids["space"]
+	case strings.Contains(path, "/sites/"):
+		id = ids["site"]
 	case strings.Contains(path, "/attachments/"):
 		id = ids["attachment"]
 	case strings.Contains(path, "/jobs/"):
@@ -1072,6 +1074,10 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 	doc := `{"type":"doc","content":[{"type":"paragraph"}]}`
 	subject := `{"type":"user","id":"` + ids["owner"] + `"}`
 	switch {
+	case strings.HasPrefix(pattern, "POST /api/v1/sites/"):
+		return path, "{}"
+	case pattern == "POST /api/v1/exports":
+		return path, `{"space_id":"` + ids["space"] + `","format":"text"}`
 	case strings.HasSuffix(pattern, "/compare"):
 		return path + "?from=1&to=1", ""
 	case strings.HasSuffix(pattern, "/explain"):
@@ -1174,8 +1180,13 @@ func TestEveryObjectRouteIsProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Sites are off here, and the route must refuse before it says so.
+	site := "018f0000-0000-7000-8000-00000000abcd"
+	if _, err := e.app.Pool().Exec(context.Background(), `INSERT INTO public_sites (id, space_id, name, target, created_by) VALUES ($1, $2, 'x', 'x', $3)`, site, space, owner.id); err != nil {
+		t.Fatal(err)
+	}
 	ids := map[string]string{"space": space, "page": page, "attachment": att["id"].(string), "job": job["id"].(string), "trash": trash, "owner": owner.id,
-		"comment": comment, "task": task, "request": request}
+		"comment": comment, "task": task, "request": request, "site": site}
 
 	// Routes that are personal or list only what the caller may see.
 	listOnly := map[string]bool{"GET /api/v1/spaces": true, "GET /api/v1/search": true}

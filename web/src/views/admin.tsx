@@ -22,6 +22,7 @@ import { useDates } from '../dates';
 import { AppearanceSection } from './admin-appearance';
 import { OrganisingTab, TemplatesTab } from './admin-organising';
 import { CareTab } from './admin-care';
+import { ExportTab } from './exchange';
 import { LookTab } from './admin-look';
 import {
   AnonymiseButton,
@@ -42,6 +43,7 @@ const TABS = [
   'spaces',
   'templates',
   'organising',
+  'export',
   'audit',
   'permissions',
   'rules',
@@ -1320,6 +1322,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
           {tab === 'spaces' && <SpacesTab />}
           {tab === 'templates' && <TemplatesTab />}
           {tab === 'organising' && <OrganisingTab />}
+          {tab === 'export' && <ExportTab />}
           {tab === 'audit' && <AuditTab />}
           {tab === 'settings' && <SettingsTab />}
           {tab === 'mail' && <MailTab />}

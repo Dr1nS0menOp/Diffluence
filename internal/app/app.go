@@ -5,6 +5,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -45,6 +46,7 @@ import (
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/sharing"
+	"github.com/diffluence/diffluence/internal/sites"
 	"github.com/diffluence/diffluence/internal/spaces"
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/storage"
@@ -80,6 +82,7 @@ type App struct {
 	trash      *trash.Service
 	jobs       *jobs.Service
 	exchange   *exchange.Service
+	sites      *sites.Service
 	example    *example.Service
 	search     *search.Service
 	scim       *scim.Service
@@ -180,7 +183,10 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	}
 	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
-	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, cfg.DataDir)
+	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, a.settings,
+		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
+	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,
+		sites.Options{PublishDir: cfg.PublishDir, Origin: cfg.PublicOrigin(), Log: log})
 	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments, a.templates)
 	a.scim = scim.NewService(a.pool, a.identity, cfg.PublicOrigin(), log)
 	if cfg.OIDC.Issuer != "" {
@@ -192,7 +198,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	if cfg.Role.RunsAPI() {
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Blocks: blocks.NewService(a.pool), People: a.people, Console: a.console, Search: a.search,
-			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
+			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Sites: a.sites, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
 			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit,
@@ -395,7 +401,23 @@ const notificationConsumer = "notifications"
 
 // handleEvent turns one event from the stream into notifications.
 func (a *App) handleEvent(ctx context.Context, data []byte) error {
-	return a.notify.Publish(ctx, "", data, "")
+	var m outbox.Message
+	if err := json.Unmarshal(data, &m); err != nil {
+		return err
+	}
+	if err := a.notify.Handle(ctx, m); err != nil {
+		return err
+	}
+	return a.sites.Handle(ctx, m)
+}
+
+// eventHandler lets the outbox relay hand events straight to handleEvent, which tests
+// use instead of the queue.
+type eventHandler struct{ a *App }
+
+// Publish implements outbox.Publisher.
+func (h eventHandler) Publish(ctx context.Context, _ string, data []byte, _ string) error {
+	return h.a.handleEvent(ctx, data)
 }
 
 // Notify exposes notifications (used by tests).
@@ -410,7 +432,7 @@ func (a *App) Logger() *slog.Logger { return a.log }
 // DeliverEvents hands every waiting event straight to the notifications, as the
 // worker does through the queue. Tests use it to stay in step.
 func (a *App) DeliverEvents(ctx context.Context) error {
-	relay := &outbox.Relay{Pool: a.pool, Publisher: a.notify, Log: a.log}
+	relay := &outbox.Relay{Pool: a.pool, Publisher: eventHandler{a}, Log: a.log}
 	for {
 		n, err := relay.RunOnce(ctx)
 		if err != nil || n == 0 {
@@ -427,6 +449,12 @@ func (a *App) Trash() *trash.Service { return a.trash }
 
 // Pages exposes pages (used by tests).
 func (a *App) Pages() *pages.Service { return a.pages }
+
+// Exchange exposes import and export (used by tests).
+func (a *App) Exchange() *exchange.Service { return a.exchange }
+
+// Sites exposes public sites (used by tests).
+func (a *App) Sites() *sites.Service { return a.sites }
 
 // Attachments exposes attachments (used by tests).
 func (a *App) Attachments() *attachments.Service { return a.attach }
@@ -464,6 +492,10 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "task-reminders", Every: time.Hour, Run: a.notify.RemindDue},
 		{Name: "notification-digests", Every: time.Hour, Run: a.notify.SendDigests},
 		{Name: "purge-notifications", Every: 24 * time.Hour, Run: a.notify.Purge},
+		{Name: "purge-exports", Every: 10 * time.Minute, Run: a.exchange.PurgeExports},
+		{Name: "purge-imports", Every: time.Hour, Run: a.exchange.PurgeImports},
+		{Name: "build-sites", Every: time.Minute, Run: a.sites.RunDue},
+		{Name: "build-sites-daily", Every: 24 * time.Hour, Run: a.sites.RunDaily},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

@@ -406,6 +406,48 @@ mutate "a removed version lives on in a quote" internal/pages/versions.go \
 mutate "nodes hand out rights at the same time" internal/db/db.go \
   's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 
+mutate "an export holds a hidden page" internal/pages/export.go \
+  's.replace("JOIN perm_visible_pages($1) vis ON vis.page_id = p.id", "JOIN (SELECT id AS page_id FROM pages WHERE $1::uuid IS NOT NULL) vis ON vis.page_id = p.id")' $app -run TestExportLeavesOutWhatThePersonCannotSee
+mutate "anyone can fetch an export" internal/exchange/export.go \
+  's.replace("FROM export_runs WHERE id = $1 AND created_by = $2`, id, c.UserID", "FROM export_runs WHERE id = $1 AND $2::uuid IS NOT NULL`, id, c.UserID")' $app -run TestOnlyTheOwnerDownloadsAnExport
+mutate "a file stays open after a page is hidden" internal/exchange/export.go \
+  's.replace("if hidden > 0 {", "if hidden < 0 {")' $app -run TestAFileIsRefusedOnceAPageInItIsHidden
+mutate "restricted pages go along unasked" internal/exchange/export.go \
+  's.replace("if restricted[p.ID] {", "if restricted[p.ID] && false {")' $app -run TestRestrictedPagesStayOutUntilChosen
+mutate "a format that is off still works" internal/exchange/policy.go \
+  's.replace("if err != nil || !r.Enabled {", "if err != nil {")' $app -run TestAFormatCanBeTurnedOffOrLimitedToAGroup
+mutate "a bundle with a wrong signature is accepted" internal/exchange/bundlein.go \
+  's.replace("|| !ed25519.Verify(public, raw, sig)", "|| len(sig) == 0")' $app -run TestOneChangedByteStopsABundle
+mutate "a changed file in a bundle is accepted" internal/exchange/bundlein.go \
+  's.replace("hex.EncodeToString(sum.Sum(nil)) != e.SHA256", "hex.EncodeToString(sum.Sum(nil)) == \"\"")' $app -run TestOneChangedByteStopsABundle
+mutate "an unknown signer is trusted" internal/exchange/bundlein.go \
+  's.replace("return apperr.Conflict(\"unknown_signer\", \"Enter the fingerprint of the instance this bundle comes from.\")", "return nil")' $app -run TestAnUnknownSignerNeedsAFingerprint
+mutate "an unmatched restriction opens a page" internal/exchange/bundlein.go \
+  's.replace("subjectType, subject = permissions.SubjectUser, in.c.UserID\n", "if !ok {\n\t\t\t\tcontinue\n\t\t\t}\n")' $app -run TestAnUnmatchedRestrictionStaysClosed
+mutate "a bundle skips a page it cannot see" internal/exchange/bundle.go \
+  's.replace("if hidden > 0 {", "if hidden < 0 {")' $app -run TestABundleStopsOnAPageThePersonCannotSee
+mutate "undo removes an edited page" internal/exchange/import.go \
+  's.replace("p.current_version <> i.version\n", "false\n")' $app -run TestUndoNeverRemovesSomeonesEdit
+mutate "anyone can see an import" internal/exchange/import.go \
+  's.replace("FROM import_runs WHERE id = $1 AND created_by = $2`, id, c.UserID", "FROM import_runs WHERE id = $1 AND $2::uuid IS NOT NULL`, id, c.UserID")' $app -run TestOnlyTheOwnerSeesAnImport
+mutate "a script in imported HTML survives" internal/exchange/htmlimport.go \
+  's.replace("atom.Script: true, ", "")' $app -run TestHTMLThroughTheAllowListKeepsNoScript
+mutate "an external relationship is followed" internal/office/read.go \
+  's.replace("if !ok || rel.external {", "if !ok {")' ./internal/office/ -run TestReadDOCXNeverFollowsAnExternalImage
+mutate "a restricted page can be public" internal/sites/rule.go \
+  's.replace("AND NOT EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id AND r.kind = '"'"'view'"'"'\n\t\t\tWHERE t.descendant_id = p.id)", "")' $app -run TestARestrictedPageCannotBeChosen
+mutate "an event does not reach the public rule" internal/sites/rule.go \
+  's.replace("if slices.Contains(eventsThatCanHide, m.Type) {", "if slices.Contains(eventsThatCanHide, m.Type+\"x\") {")' $app -run TestEveryEventThatCanHideAPageTakesItOffTheSite
+mutate "a removed version stays public" internal/sites/rule.go \
+  's.replace("if len(allowed) == len(shown) && !gone {", "if len(allowed) == len(shown) && (!gone || true) {")' $app -run TestRemovingTheShownVersionTakesItOffTheSite
+mutate "a photo keeps its metadata" internal/sites/build.go \
+  's.replace("cleaned, ok := withoutMetadata(data, ext)", "cleaned, ok := data, true")' $app -run TestOnlyShownFilesGoAlongAndPhotosLoseTheirMetadata
+mutate "the scrub is off" internal/sites/build.go \
+  's.replace("if err := s.scrub(ctx, dir); err != nil {\n\t\t_ = os.RemoveAll(dir)", "if err := error(nil); err != nil {\n\t\t_ = os.RemoveAll(dir)")' $app -run TestTheScrubStopsABuildAndKeepsTheOldSite
+mutate "a mention prints a name on a site" internal/sites/build.go \
+  's.replace("if !b.v.ShowNames {\n\t\toptions.Mention", "if false {\n\t\toptions.Mention")' $app -run TestAMentionIsNeutralUnlessTheSiteShowsNames
+mutate "a public link survives a restriction" internal/sites/links.go \
+  's.replace("if allowed[l.page] && !gone {", "if true || (allowed[l.page] && !gone) {")' $app -run TestARestrictionWithdrawsAPublicLinkAtOnce
 mutate "a block shows a hidden page" internal/blocks/lists.go \
   's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t")' $app -run TestNoBlockShowsAHiddenPage
 mutate "an include skips the check at a level" internal/blocks/reuse.go \

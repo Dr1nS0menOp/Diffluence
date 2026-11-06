@@ -49,6 +49,9 @@ mutation:
 
 fuzz:
 	go test ./internal/document/ -run '^$$' -fuzz FuzzFromMarkdown -fuzztime 60s
+	go test ./internal/office/ -run '^$$' -fuzz FuzzReadDOCX -fuzztime 60s
+	go test ./internal/exchange/ -run '^$$' -fuzz FuzzFrontMatter -fuzztime 30s
+	go test ./internal/exchange/ -run '^$$' -fuzz FuzzVerifyBundle -fuzztime 60s
 	go test ./internal/document/ -run '^$$' -fuzz FuzzNormalize -fuzztime 60s
 
 check: fmt-check vet staticcheck vuln licenses web-check test-race

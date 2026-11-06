@@ -29,7 +29,15 @@ type AttachmentResolver func(destination string) (uuid.UUID, bool)
 // that has no safe equivalent becomes plain text or a link, with a warning.
 // The result passes Normalize.
 func FromMarkdown(source []byte, attachments AttachmentResolver) (Node, []string) {
-	c := &converter{src: source, attachments: attachments}
+	return FromMarkdownLinked(source, attachments, nil)
+}
+
+// LinkResolver turns a destination from Markdown into the address of a page.
+type LinkResolver func(destination string) (href string, ok bool)
+
+// FromMarkdownLinked is FromMarkdown for a set of files, whose links lead to each other.
+func FromMarkdownLinked(source []byte, attachments AttachmentResolver, links LinkResolver) (Node, []string) {
+	c := &converter{src: source, attachments: attachments, links: links}
 	root := markdownParser.Parse(text.NewReader(source))
 	doc := Node{Type: TypeDoc, Content: c.blocks(root)}
 	if len(doc.Content) == 0 {
@@ -41,6 +49,7 @@ func FromMarkdown(source []byte, attachments AttachmentResolver) (Node, []string
 type converter struct {
 	src         []byte
 	attachments AttachmentResolver
+	links       LinkResolver
 	warnings    []string
 }
 
@@ -327,6 +336,11 @@ func (c *converter) link(dest, title string, n ast.Node, marks []Mark, hoisted *
 				return nil // the file was the whole line
 			}
 			return c.inline(n, marks, hoisted) // a sentence keeps its words
+		}
+	}
+	if c.links != nil {
+		if page, ok := c.links(dest); ok {
+			dest = page
 		}
 	}
 	href, err := SafeHref(dest)

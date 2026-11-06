@@ -52,6 +52,11 @@ type Config struct {
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
 	ExampleSpace          bool // make the example space on a new instance
+	// PDFURL is the helper process that makes PDF files. Empty = no PDF.
+	PDFURL string
+	// PublishDir is where public sites go. It is configuration and not a setting,
+	// because a person must not be able to write anywhere on the server. Empty = no sites.
+	PublishDir string
 	// DrawingURL is the optional draw.io service. Nil = off, and nothing is framed.
 	DrawingURL *url.URL
 	OIDC       OIDC
@@ -134,6 +139,8 @@ func Load(lookup LookupFunc) (Config, error) {
 		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
 		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
 		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
+		PDFURL:                l.str("PDF_URL", ""),
+		PublishDir:            l.str("PUBLISH_DIR", ""),
 		OIDC: OIDC{
 			Issuer:       l.str("OIDC_ISSUER", ""),
 			ClientID:     l.str("OIDC_CLIENT_ID", ""),

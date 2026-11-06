@@ -1,6 +1,6 @@
 # 014: Wave G, everything can leave and come in
 
-Status: planned in detail, not built
+Status: built on branch `wave-g`, except what the handoff note lists
 Phase: wave G of `docs/blueprint/03-functional-requirements.md`, covering chapter 11. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave. It comes after waves C to F, because a bundle carries their comments, labels and files.
 
 ## Problem
@@ -285,7 +285,7 @@ More, Public link, when the instance and the space allow it. It builds that one 
 
 ## Data
 
-Migration 0011, expand only:
+Migration 0017, expand only (`page_versions` also gains `imported`, and `export_run_pages` holds what a file holds):
 
 - `export_runs`: job, space, format, options, object key, file name, size, created by, expiry.
 - `export_policy`: format, enabled, group ids.

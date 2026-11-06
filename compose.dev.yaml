@@ -58,6 +58,11 @@ services:
 
   # Catches all mail in a web screen, so nothing leaves the machine. Optional: it only
   # starts with this profile. See "Mail while developing" in docs/development.md.
+  # The helper for PDF files (spec 014). Optional: start it with --profile pdf.
+  pdf:
+    image: gotenberg/gotenberg:8
+    profiles: [pdf]
+
   mailpit:
     image: axllent/mailpit:v1.33.0
     profiles: [mail]

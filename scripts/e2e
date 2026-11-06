@@ -15,7 +15,7 @@ cd /work && CGO_ENABLED=0 go build -o /tmp/diffluence ./cmd/diffluence
 [ -f /tmp/e2e.pid ] && kill "$(cat /tmp/e2e.pid)" 2>/dev/null || true
 export PGPASSWORD=diffluence
 psql -q -h db -U diffluence -d diffluence -c 'DROP DATABASE IF EXISTS diffluence_e2e WITH (FORCE)' -c 'CREATE DATABASE diffluence_e2e'
-rm -rf /tmp/dfl-e2e
+rm -rf /tmp/dfl-e2e /tmp/dfl-e2e-sites
 cat >/tmp/e2e-env <<ENV
 export DIFFLUENCE_DATABASE_URL='postgres://diffluence:diffluence@db:5432/diffluence_e2e?sslmode=disable'
 export DIFFLUENCE_PUBLIC_URL=http://localhost:8080
@@ -23,6 +23,7 @@ export DIFFLUENCE_DATA_DIR=/tmp/dfl-e2e
 export DIFFLUENCE_SHUTDOWN_DELAY=0s
 export DIFFLUENCE_EXAMPLE_SPACE=false
 export DIFFLUENCE_LOG_LEVEL=warn
+export DIFFLUENCE_PUBLISH_DIR=/tmp/dfl-e2e-sites
 ENV
 . /tmp/e2e-env
 echo 'correct horse battery staple' | /tmp/diffluence user create-admin --email admin@example.com --name Admin >/dev/null

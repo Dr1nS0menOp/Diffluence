@@ -36,6 +36,7 @@ import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
 import { TableFrame, useTableTracking } from './table-frame';
 import { Toolbar } from './toolbar';
+import { pickWordFile } from './word';
 
 function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: ShownImage }[] {
   return Array.from(root.querySelectorAll<HTMLImageElement>('figure.doc-image img')).map((element) => ({
@@ -317,6 +318,7 @@ export function DocumentEditor({
 
   actions.current = {
     pickFiles: () => fileInput.current?.click(),
+    pickWord: () => pickWordFile(editor, pageId, (message) => toast({ message })),
     openLink: () => setLinking(true),
     openFind: () => setFinding(true),
     openDrawing: () => setDrawing(true),

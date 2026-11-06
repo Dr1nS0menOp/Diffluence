@@ -109,6 +109,7 @@ export const INSERT_ITEMS: InsertItem[] = [
     run: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
   { id: 'attach', icon: IconAttach, run: (_editor, actions) => actions.pickFiles() },
+  { id: 'importWord', icon: IconAttach, run: (_editor, actions) => actions.pickWord() },
   { id: 'link', icon: IconLink, run: (_editor, actions) => actions.openLink() },
   {
     id: 'status',

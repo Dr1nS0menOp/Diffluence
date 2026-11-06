@@ -173,6 +173,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
                   <span className="muted"> · {t('history.restoredFrom', { number: v.restored_from })}</span>
                 )}
                 {v.removed && <span className="lozenge">{t('history.removed')}</span>}
+                {v.imported && <span className="muted"> · {t('history.imported')}</span>}
                 {v.summary && <div>{v.summary}</div>}
               </td>
               <td className="row">

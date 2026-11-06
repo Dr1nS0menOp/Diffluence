@@ -8,6 +8,7 @@ const LINK_SHORTHAND = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:|\/)[^\s)]+)\)$/;
 /** What the editor asks of the screen around it. */
 export interface EditorActions {
   pickFiles: () => void;
+  pickWord: () => void;
   openLink: () => void;
   openFind: () => void;
   openDrawing: () => void;
@@ -21,6 +22,7 @@ export interface EditorActions {
 
 export const noActions: EditorActions = {
   pickFiles: () => undefined,
+  pickWord: () => undefined,
   openLink: () => undefined,
   openFind: () => undefined,
   openDrawing: () => undefined,

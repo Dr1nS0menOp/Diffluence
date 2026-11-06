@@ -2,14 +2,15 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Category, type Job, type Shortcut, type Space, type TrashItem } from '../api';
+import { api, type Category, type Shortcut, type Space, type TrashItem } from '../api';
 import { Link, navigate } from '../router';
 import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp } from '../components/icons';
-import { ConfirmButton, ErrorNote, Field, FilePicker, Loading } from '../components/ui';
+import { ConfirmButton, ErrorNote, Field, Loading } from '../components/ui';
 import { useDates } from '../dates';
+import { ExportSection, ImportSection, PDFDesignSection } from './exchange';
 import { moved } from './lists';
 import {
   DeleteSpaceButton,
@@ -21,8 +22,6 @@ import {
   SpaceLinksSection,
   StatusesSection,
 } from './space-organise';
-
-const JOB_POLL_MS = 1000;
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
@@ -42,55 +41,6 @@ export function SpaceHome({ spaceKey }: { spaceKey: string }) {
     );
   }
   return <Loading />;
-}
-
-function ImportBox({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const [job, setJob] = useState<string | null>(null);
-  const start = useMutation({
-    mutationFn: (f: File) =>
-      api.upload<{ job_id: string }>(`/spaces/${space.id}/imports?filename=${encodeURIComponent(f.name)}`, f),
-    onSuccess: (r) => setJob(r.job_id),
-  });
-  const status = useQuery({
-    queryKey: ['job', job],
-    queryFn: () => api.poll<Job>(`/jobs/${job}`),
-    enabled: !!job,
-    refetchInterval: (q) => (['done', 'failed'].includes(q.state.data?.status ?? '') ? false : JOB_POLL_MS),
-  });
-  useEffect(() => {
-    if (status.data?.status === 'done') void client.invalidateQueries({ queryKey: ['tree', space.id] });
-  }, [status.data?.status, client, space.id]);
-  const r = status.data?.result;
-  return (
-    <section>
-      <h2>{t('space.import')}</h2>
-      <p className="muted">{t('space.importHelp')}</p>
-      <FilePicker label={t('space.import')} accept=".md,.markdown,.zip" onPick={(f) => start.mutate(f)} />
-      <ErrorNote error={start.error} />
-      {job && status.data?.status !== 'done' && status.data?.status !== 'failed' && (
-        <p role="status">{t('space.importing')}</p>
-      )}
-      {status.data?.status === 'done' && (
-        <p role="status" className="note">
-          {t('space.importDone', { pages: r?.pages ?? 0, files: r?.files ?? 0 })}
-        </p>
-      )}
-      {status.data?.status === 'failed' && (
-        <p role="alert" className="note note-error">
-          {t('space.importFailed', { error: r?.error ?? '' })}
-        </p>
-      )}
-      {(r?.warnings?.length ?? 0) > 0 && (
-        <ul className="muted">
-          {r?.warnings?.map((w) => (
-            <li key={w}>{w}</li>
-          ))}
-        </ul>
-      )}
-    </section>
-  );
 }
 
 function ShortcutsSection({ space }: { space: Space }) {
@@ -305,14 +255,19 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
         </p>
       </section>
       <CategoriesSection space={space} />
-      <ImportBox space={space} />
+      <ImportSection space={space} />
+      <ExportSection space={space} />
+      <PDFDesignSection space={space} />
+      <section>
+        <h2>{t('sites.title')}</h2>
+        <p>
+          <Link href={`/spaces/${space.key}/sites`}>{t('sites.open')}</Link>
+        </p>
+      </section>
       <section>
         <h2>{t('common.actions')}</h2>
         <ErrorNote error={archive.error ?? remove.error} />
         <div className="row">
-          <a className="button" href={`/api/v1/spaces/${space.id}/export.zip`}>
-            {t('space.export')}
-          </a>
           {space.status === 'archived' ? (
             <button type="button" onClick={() => archive.mutate('unarchive')}>
               {t('space.unarchive')}

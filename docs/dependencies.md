@@ -16,6 +16,7 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | `go-webauthn/webauthn` | BSD-3 | Passkeys. Far too intricate to write ourselves. | Blueprint 04 |
 | `pquerna/otp` | Apache-2.0 | TOTP codes and the QR code for enrolment. Replaced the planned hand-written TOTP and the frontend QR library. | The product owner, 2026-11-04 |
 | `yuin/goldmark` | MIT | Markdown parser, no dependencies of its own | The product owner, 2026-11-04 |
+| `golang.org/x/net/html` | BSD-3 | HTML import. Parsing hostile HTML must not be hand-written. | The product owner, ADR-026 |
 
 ## Data
 

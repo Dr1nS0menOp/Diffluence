@@ -450,6 +450,7 @@ export interface Version {
   author_name: string;
   summary: string;
   restored_from: number | null;
+  imported?: boolean;
   created_at: string;
   document?: Json;
   removed?: boolean;
@@ -656,7 +657,7 @@ export interface Notification {
   comment_id: string | null;
   read: boolean;
   at: string;
-  data: { message?: string; request_id?: string };
+  data: { message?: string; request_id?: string; export_id?: string; filename?: string };
 }
 
 export interface NotificationSettings {
@@ -794,6 +795,115 @@ export interface AuditEvent {
   result: string;
   ip?: string;
   details?: Json;
+}
+
+export interface ExportOptions {
+  comments: boolean;
+  versions: boolean;
+  attachments: boolean;
+  restricted: boolean;
+  paper: string;
+  orientation: string;
+  contents: boolean;
+}
+
+export interface ExportRun {
+  id: string;
+  format: string;
+  state: string;
+  filename: string;
+  size: number;
+  report: {
+    pages: number;
+    skipped: number;
+    restricted: number;
+    drafts?: string[];
+    failed?: string[];
+    explanation?: string;
+  };
+}
+
+export interface ExportPolicy {
+  rules: { format: string; enabled: boolean; group_ids: string[] }[];
+  limits: {
+    max_export_mib: number;
+    max_import_mib: number;
+    public_sites_enabled: boolean;
+    public_links_enabled: boolean;
+  };
+  pdf_available: boolean;
+}
+
+export interface ImportTarget {
+  people: Record<string, string>;
+  fingerprint: string;
+  space_key: string;
+}
+
+export interface ImportRun {
+  id: string;
+  kind: string;
+  state: string;
+  filename: string;
+  touched: string[] | null;
+  report: {
+    pages: number;
+    files: number;
+    comments: number;
+    versions: number;
+    tree: { title: string; depth: number }[];
+    warnings: string[];
+    people?: { id: string; name: string; email: string; matched?: string }[];
+    signer?: string;
+    reason?: string;
+  };
+}
+
+export interface PublicLink {
+  id: string;
+  page_id: string;
+  page_title: string;
+  version: number;
+  path: string;
+  created_by: string;
+}
+
+export interface PublicSite {
+  id: string;
+  space_id: string;
+  name: string;
+  address: string;
+  language: string;
+  accent: string;
+  show_names: boolean;
+  search_engines: boolean;
+  update_mode: string;
+  live_build: number;
+}
+
+export interface SiteChoice {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  chosen: boolean;
+  blocked: boolean;
+}
+
+export interface SiteReport {
+  added: string[];
+  changed: string[];
+  removed: string[];
+  left_out: string[];
+  dead_links: string[];
+  no_alt: string[];
+  metadata: string[];
+  stopped?: string;
+}
+
+export interface SiteBuild {
+  number: number;
+  state: string;
+  report: SiteReport;
 }
 
 export const NIL_ID = '00000000-0000-0000-0000-000000000000';

@@ -28,6 +28,7 @@ import {
   IconComment,
   IconCopy,
   IconDownload,
+  IconLink,
   IconEye,
   IconFolder,
   IconInfo,
@@ -43,7 +44,7 @@ import {
   IconStar,
   IconTrash,
 } from '../components/icons';
-import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
+import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
 import { LabelBar } from '../components/page-labels';
 import {
   ApprovalBanner,
@@ -61,12 +62,15 @@ import { useToast } from '../components/toast';
 import { Avatar, ErrorNote, Loading } from '../components/ui';
 import { Lightbox, Presentation, type ShownImage } from '../components/viewers';
 import { useDocumentTitle, useScrollMemory } from '../page-title';
+import { ExportDialog, PublicLinkDialog, PublicMark } from './exchange';
 import { CopyDialog, MoveDialog } from './move-dialogs';
 import { ArchiveDialog, KindDialog, SaveTemplateDialog } from './page-actions';
 import { AttachmentsDialog, DeleteDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
 
 type PageDialog =
   | 'attachments'
+  | 'export'
+  | 'public-link'
   | 'restrictions'
   | 'move'
   | 'rename'
@@ -188,6 +192,7 @@ function Byline({
         </>
       )}
       {page.restricted && <span className="lozenge">{t('page.restricted')}</span>}
+      <PublicMark pageId={page.id} />
       <StageControl page={page} />
       <VerifiedMark page={page} />
     </div>
@@ -350,12 +355,14 @@ function PageMenu({
       {page.can['space.export'] && published && (
         <>
           <MenuSeparator />
-          <MenuDownload href={`/api/v1/pages/${page.id}/export.md`}>
-            <IconDownload size={MENU_ICON_SIZE} /> {t('page.exportMd')}
-          </MenuDownload>
-          <MenuDownload href={`/api/v1/pages/${page.id}/export.zip`}>
-            <IconDownload size={MENU_ICON_SIZE} /> {t('page.exportZip')}
-          </MenuDownload>
+          <MenuEntry icon={<IconDownload size={MENU_ICON_SIZE} />} onClick={() => onOpen('export')}>
+            {t('exchange.export')}
+          </MenuEntry>
+          {page.can['space.administer'] && (
+            <MenuEntry icon={<IconLink size={MENU_ICON_SIZE} />} onClick={() => onOpen('public-link')}>
+              {t('exchange.publicLink')}
+            </MenuEntry>
+          )}
         </>
       )}
       {page.can['page.delete'] && (
@@ -729,6 +736,8 @@ export function PageView({ pageId }: { pageId: string }) {
         <ShareDialog page={page} onClose={close} onRestrictions={() => setDialog('restrictions')} />
       )}
       {dialog === 'attachments' && <AttachmentsDialog page={page} onClose={close} />}
+      {dialog === 'export' && <ExportDialog spaceId={page.space_id} page={page} onClose={close} />}
+      {dialog === 'public-link' && <PublicLinkDialog page={page} onClose={close} />}
       {dialog === 'restrictions' && <RestrictionsDialog page={page} onClose={close} />}
       {dialog === 'move' && <MoveDialog page={page} onClose={close} />}
       {dialog === 'rename' && <RenameDialog page={page} onClose={close} />}

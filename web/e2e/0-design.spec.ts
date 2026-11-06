@@ -8,6 +8,7 @@
 import type { Browser, Locator, Page } from '@playwright/test';
 import {
   ADMIN,
+  adminRequest,
   checkAccessibility,
   createNamedUser,
   EDITOR,
@@ -231,6 +232,7 @@ test.describe('the look of every kind of screen', () => {
       'page.delete_any',
       'page.archive',
       'space.administer',
+      'space.export',
     ]);
 
     const onboarding = await publishedPage(setup, space.id, 'Onboarding', 'x', space.home_page_id);
@@ -459,6 +461,32 @@ test.describe('the look of every kind of screen', () => {
     await page.goto('/spaces/HANDBOOK/settings');
     await expect(page.getByRole('heading', { name: 'Permissions' })).toBeVisible();
     await picture(page, 'space-settings');
+    await page.context().close();
+  });
+
+  test('SitesView: a public site of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const { api, close } = await adminRequest(browser);
+    const on = await api.put('/api/v1/admin/export-policy', {
+      data: {
+        rules: [],
+        limits: {
+          max_export_mib: 100,
+          max_import_mib: 100,
+          public_sites_enabled: true,
+          public_links_enabled: true,
+        },
+      },
+    });
+    expect(on.status()).toBe(204);
+    await close();
+    const made = await page.request.post(`/api/v1/spaces/${spaceId}/sites`, {
+      data: { name: 'Handbook online' },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    await page.goto('/spaces/HANDBOOK/sites');
+    await expect(page.getByRole('heading', { name: 'Handbook online' })).toBeVisible();
+    await picture(page, 'sites');
     await page.context().close();
   });
 
@@ -1187,5 +1215,23 @@ test.describe('the look of every kind of screen', () => {
       await expect(page.getByRole('heading', { name: 'Stop this mail' })).toBeVisible();
       await picture(page, 'unsubscribe');
     });
+  });
+
+  test('ExportView: a finished export, and the dialog', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Export' }).click();
+    await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();
+    await picture(page, 'export-dialog');
+    const run = await page.request.post('/api/v1/exports', {
+      data: { space_id: spaceId, format: 'text', page_ids: [pageId] },
+    });
+    const { id } = (await run.json()) as { id: string };
+    await page.goto(`/exports/${id}`);
+    await expect(page.getByRole('link', { name: 'Download' })).toBeVisible();
+    // The notification of this very export can come in at any moment.
+    await picture(page, 'export-view', [page.locator('.bell-number')]);
+    await page.context().close();
   });
 });

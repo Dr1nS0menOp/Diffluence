@@ -37,6 +37,7 @@ import (
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/sharing"
+	"github.com/diffluence/diffluence/internal/sites"
 	"github.com/diffluence/diffluence/internal/spaces"
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/tasks"
@@ -65,6 +66,7 @@ type Deps struct {
 	Templates   *templates.Service
 	Jobs        *jobs.Service
 	Exchange    *exchange.Service
+	Sites       *sites.Service
 	Example     *example.Service
 	SCIM        *scim.Service
 	SSO         *sso.Provider // nil when no OIDC provider is configured

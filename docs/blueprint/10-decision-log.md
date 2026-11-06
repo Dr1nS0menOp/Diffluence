@@ -119,6 +119,9 @@ Status: decided by the product owner (2026-11-05), after his first test. Context
 **ADR-031: Spaces have animals, and a comparison is the page itself**
 Status: decided by the product owner (2026-11-05). Context: after his first test the product owner asked for a fun animal per space, with character and no standard emoji, and for changes in green and red. Decision: `SpaceBadge` shows a cartoon animal from Kenney's Animal Pack Remastered (CC0), picked from the key until someone chooses. A character stays possible. A comparison renders the real blocks with marks on top, and opening a version shows its changes. Consequences: every picture with a badge changed. The look of a badge follows from this ADR, not from the four tints. Word marks work in paragraphs and headings, and other blocks show as removed and added. See spec 018.
 
+**ADR-032: Our own writers for Word and OpenDocument, no Pandoc**
+*Accepted.* Blueprint 04 named Pandoc for this, as a sidecar. Our blocks are a short fixed list, and writing that subset takes only `archive/zip` and `encoding/xml`. Consequences: one process less to run and patch, and our reader is limited and fuzzed. Files stay plain, so the product owner checks one in Word. See spec 014, D2.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

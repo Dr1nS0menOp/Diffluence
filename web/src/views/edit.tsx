@@ -27,6 +27,7 @@ import { TemplateGallery } from '../components/template-gallery';
 import { useToast } from '../components/toast';
 import { ConfirmButton, Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
 import { MoveDialog } from './move-dialogs';
+import { PublicMark } from './exchange';
 
 const AUTOSAVE_MS = 1500;
 const EDITORS_CHECK_MS = 60_000;
@@ -323,6 +324,7 @@ function Form({ data }: { data: Loaded }) {
           <IconArrowBack size={18} /> {t('editor.close')}
         </Link>
         {changed && <span className="lozenge">{t('editor.unpublishedChanges')}</span>}
+        <PublicMark pageId={page.id} />
         <span role="status" className="muted edit-status">
           {state === 'saving' && t('editor.saving')}
           {state === 'saved' && t('editor.saved')}

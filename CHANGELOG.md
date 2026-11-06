@@ -4,6 +4,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: everything can leave and come in (wave G)
+- One Export dialog on pages and spaces: PDF (with the optional Gotenberg helper), Word, OpenDocument, an HTML website that works offline, Markdown and plain text. Choose pages by hand. Files are made in the background, you get a notification, and only you can fetch the file for 24 hours
+- An administrator can turn formats off, set sizes, and see what a helper needs
+- Every import from the screen starts with a report and changes nothing until you say so. It can be undone in one action, and never removes someone's edit
+- Markdown links, wiki links and front matter now carry over. Word files become pages, several at once wait under a restricted page, and one can go into a draft. HTML comes in through the allow-list
+- A signed bundle moves a space to another instance with its history, comments, labels and permissions. One changed byte stops it, and a restriction that cannot be matched keeps a page closed
+- Public sites and public links, as plain files for your own web server, off until an administrator turns them on. A preview comes first, and a page the world may no longer see leaves at once
+
+**Upgrade impact:** migration 0017 adds tables and one column, with no downtime. To use PDF, start the `pdf` profile and set `DIFFLUENCE_PDF_URL`. To use public sites, set `DIFFLUENCE_PUBLISH_DIR` and turn them on under Administration, Export and publishing.
+
 ### Added: blocks and files (wave E)
 - Blocks that fill themselves: contents, child pages, page tree, page index, spaces, recent changes, your favourites, drafts and tasks, page lists and reports, labels, facts, decisions, tasks, contributors, history, files, blog posts, link cards and a search box. Each reader gets their own answer
 - Page facts with a report that sorts by real value, excerpts, showing text or a whole page from elsewhere, and anchors. A page that shows itself stops with a message, and text goes at most five levels deep. Details and Delete name the pages that show a page's text

@@ -23,11 +23,13 @@ DELETE /api/v1/pages/{id}                                      object:page.delet
 DELETE /api/v1/pages/{id}/draft                                object:page.view
 DELETE /api/v1/pages/{id}/favourite                            object:page.view
 DELETE /api/v1/pages/{id}/labels/{label}                       object:page.edit
+DELETE /api/v1/pages/{id}/public-link                          object:space.administer
 DELETE /api/v1/pages/{id}/reactions/{emoji}                    object:page.view
 DELETE /api/v1/pages/{id}/schedule                             object:page.edit
 DELETE /api/v1/pages/{id}/verification                         object:page.edit
 DELETE /api/v1/pages/{id}/watch                                object:page.view
 DELETE /api/v1/pages/{id}/watchers/{user}                      object:space.administer
+DELETE /api/v1/sites/{id}                                      object:space.administer
 DELETE /api/v1/spaces/{id}                                     object:space.administer
 DELETE /api/v1/spaces/{id}/favourite                           object:space.view
 DELETE /api/v1/spaces/{id}/icon                                object:space.administer
@@ -44,6 +46,8 @@ GET /api/v1/admin/attention                                    session-only perm
 GET /api/v1/admin/audit-events                                 session-only permission:administrator
 GET /api/v1/admin/audit-events/export                          session-only permission:administrator
 GET /api/v1/admin/audit-events/verify                          session-only permission:administrator
+GET /api/v1/admin/bundles/key                                  permission:administrator
+GET /api/v1/admin/export-policy                                permission:administrator
 GET /api/v1/admin/features                                     permission:administrator
 GET /api/v1/admin/global-permissions                           session-only permission:administrator
 GET /api/v1/admin/groups                                       session-only permission:administrator
@@ -55,6 +59,7 @@ GET /api/v1/admin/mail                                         permission:admini
 GET /api/v1/admin/organising                                   permission:administrator
 GET /api/v1/admin/pages/{id}                                   session-only permission:administrator
 GET /api/v1/admin/permission-sets                              session-only permission:administrator
+GET /api/v1/admin/public-links                                 permission:administrator
 GET /api/v1/admin/reports/largest                              session-only permission:administrator
 GET /api/v1/admin/scim-tokens                                  session-only permission:administrator
 GET /api/v1/admin/settings                                     session-only permission:administrator
@@ -82,8 +87,12 @@ GET /api/v1/auth/providers                                     public
 GET /api/v1/categories                                         authenticated
 GET /api/v1/comments/{id}/reactions                            object:page.view
 GET /api/v1/directory                                          permission:view_profiles
+GET /api/v1/export-formats                                     authenticated
+GET /api/v1/exports/{id}                                       authenticated
+GET /api/v1/exports/{id}/file                                  authenticated
 GET /api/v1/feed                                               authenticated
 GET /api/v1/groups/{id}                                        object:group.manage_members
+GET /api/v1/imports/{id}                                       authenticated
 GET /api/v1/jobs/{id}                                          object:job.owner
 GET /api/v1/labels                                             authenticated
 GET /api/v1/labels/{label}/pages                               authenticated
@@ -123,6 +132,8 @@ GET /api/v1/pages/{id}/impact                                  object:page.delet
 GET /api/v1/pages/{id}/labels                                  object:page.view
 GET /api/v1/pages/{id}/mention-candidates                      object:page.view
 GET /api/v1/pages/{id}/move-impact                             object:page.edit
+GET /api/v1/pages/{id}/public-link                             object:space.administer
+GET /api/v1/pages/{id}/public-state                            object:page.view
 GET /api/v1/pages/{id}/reactions                               object:page.view
 GET /api/v1/pages/{id}/restrictions                            object:page.view
 GET /api/v1/pages/{id}/summary                                 object:page.view
@@ -139,6 +150,10 @@ GET /api/v1/posts                                              authenticated
 GET /api/v1/same-title                                         authenticated
 GET /api/v1/search                                             object:page.view
 GET /api/v1/search/quick                                       authenticated
+GET /api/v1/sites/{id}                                         object:space.administer
+GET /api/v1/sites/{id}/builds                                  object:space.administer
+GET /api/v1/sites/{id}/download                                object:space.administer
+GET /api/v1/sites/{id}/pages                                   object:space.administer
 GET /api/v1/space-directory                                    authenticated
 GET /api/v1/space-key-check                                    permission:create_space
 GET /api/v1/space-keys/{key}                                   object:space.view
@@ -161,9 +176,11 @@ GET /api/v1/spaces/{id}/labels                                 object:space.view
 GET /api/v1/spaces/{id}/manage-templates                       object:space.administer
 GET /api/v1/spaces/{id}/old-keys                               object:space.administer
 GET /api/v1/spaces/{id}/overview                               object:space.view
+GET /api/v1/spaces/{id}/pdf-design                             object:space.administer
 GET /api/v1/spaces/{id}/people                                 object:space.view
 GET /api/v1/spaces/{id}/posts                                  object:space.view
 GET /api/v1/spaces/{id}/shortcuts                              object:space.view
+GET /api/v1/spaces/{id}/sites                                  object:space.administer
 GET /api/v1/spaces/{id}/statuses                               object:space.view
 GET /api/v1/spaces/{id}/templates                              object:page.create
 GET /api/v1/spaces/{id}/trash                                  object:space.administer
@@ -190,6 +207,7 @@ PATCH /api/v1/comments/{id}                                    object:comment.ad
 PATCH /api/v1/pages/{id}                                       object:page.edit
 PATCH /api/v1/pages/{id}/comments-closed                       object:page.edit
 PATCH /api/v1/pages/{id}/look                                  object:page.edit
+PATCH /api/v1/sites/{id}                                       object:space.administer
 PATCH /api/v1/spaces/{id}                                      object:space.administer
 PATCH /api/v1/templates/{id}                                   authenticated
 PATCH /scim/v2/Groups/{id}                                     scim-token
@@ -197,6 +215,7 @@ PATCH /scim/v2/Users/{id}                                      scim-token
 POST /api/v1/access-requests/{id}/allow                        object:restriction.manage
 POST /api/v1/access-requests/{id}/refuse                       object:restriction.manage
 POST /api/v1/admin/appearance/reset                            session-only permission:administrator
+POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/example-space                               permission:administrator
 POST /api/v1/admin/groups                                      session-only permission:administrator
@@ -243,6 +262,9 @@ POST /api/v1/blocks/{kind}                                     authenticated
 POST /api/v1/comments/{id}/reopen                              object:page.edit
 POST /api/v1/comments/{id}/resolve                             object:page.edit
 POST /api/v1/comments/{id}/undo-delete                         authenticated
+POST /api/v1/exports                                           object:space.export
+POST /api/v1/imports/{id}/run                                  authenticated
+POST /api/v1/imports/{id}/undo                                 authenticated
 POST /api/v1/mail/unsubscribe/{token}                          public
 POST /api/v1/me/export                                         session-only authenticated
 POST /api/v1/me/notifications/read-all                         authenticated
@@ -265,6 +287,7 @@ POST /api/v1/pages/{id}/archive                                object:page.archi
 POST /api/v1/pages/{id}/attachments                            object:attachment.add
 POST /api/v1/pages/{id}/comments                               object:comment.add
 POST /api/v1/pages/{id}/copy                                   object:page.create
+POST /api/v1/pages/{id}/import-word                            object:page.edit
 POST /api/v1/pages/{id}/kind                                   object:page.edit
 POST /api/v1/pages/{id}/labels                                 object:page.edit
 POST /api/v1/pages/{id}/move                                   object:page.edit
@@ -275,8 +298,13 @@ POST /api/v1/pages/{id}/sort-children                          object:page.edit
 POST /api/v1/pages/{id}/unarchive                              object:page.archive
 POST /api/v1/pages/{id}/undo-delete                            authenticated
 POST /api/v1/pages/{id}/versions/{number}/restore              object:page.edit
+POST /api/v1/sites/{id}/preview                                object:space.administer
+POST /api/v1/sites/{id}/publish                                object:space.administer
+POST /api/v1/sites/{id}/rollback                               object:space.administer
+POST /api/v1/sites/{id}/withdraw                               object:space.administer
 POST /api/v1/spaces                                            permission:create_space
 POST /api/v1/spaces/{id}/archive                               object:space.administer
+POST /api/v1/spaces/{id}/bundles                               object:space.administer
 POST /api/v1/spaces/{id}/content/preview                       object:space.administer
 POST /api/v1/spaces/{id}/content/run                           object:space.administer
 POST /api/v1/spaces/{id}/grants/preview                        object:space.manage_access
@@ -285,6 +313,7 @@ POST /api/v1/spaces/{id}/icon                                  object:space.admi
 POST /api/v1/spaces/{id}/imports                               object:page.create
 POST /api/v1/spaces/{id}/labels/rename                         object:space.administer
 POST /api/v1/spaces/{id}/preset                                object:space.administer
+POST /api/v1/spaces/{id}/sites                                 object:space.administer
 POST /api/v1/spaces/{id}/templates                             object:space.administer
 POST /api/v1/spaces/{id}/templates/import                      object:space.administer
 POST /api/v1/spaces/{id}/trash/bulk                            object:space.administer
@@ -296,6 +325,7 @@ POST /scim/v2/Groups                                           scim-token
 POST /scim/v2/Users                                            scim-token
 PUT /api/v1/admin/appearance/font                              session-only permission:administrator
 PUT /api/v1/admin/appearance/logo                              session-only permission:administrator
+PUT /api/v1/admin/export-policy                                permission:administrator
 PUT /api/v1/admin/features                                     permission:administrator
 PUT /api/v1/admin/groups/{id}/members/{user}                   session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/owners                           session-only permission:administrator
@@ -310,6 +340,7 @@ PUT /api/v1/admin/users/{id}/permissions                       sensitive permiss
 PUT /api/v1/approvals/{id}/answer                              authenticated
 PUT /api/v1/comments/{id}/reactions/{emoji}                    object:page.view
 PUT /api/v1/groups/{id}/members/{user}                         object:group.manage_members
+PUT /api/v1/imports/{id}/mapping                               authenticated
 PUT /api/v1/me/favourites/order                                authenticated
 PUT /api/v1/me/notification-settings                           authenticated
 PUT /api/v1/me/notifications/{id}/read                         authenticated
@@ -321,6 +352,7 @@ PUT /api/v1/pages/{id}/comments/seen                           object:page.view
 PUT /api/v1/pages/{id}/draft                                   object:page.edit
 PUT /api/v1/pages/{id}/favourite                               object:page.view
 PUT /api/v1/pages/{id}/owner                                   object:page.edit
+PUT /api/v1/pages/{id}/public-link                             object:space.administer
 PUT /api/v1/pages/{id}/reactions/{emoji}                       object:page.view
 PUT /api/v1/pages/{id}/restrictions                            object:restriction.manage
 PUT /api/v1/pages/{id}/review                                  object:page.edit
@@ -329,6 +361,7 @@ PUT /api/v1/pages/{id}/stage                                   object:page.edit
 PUT /api/v1/pages/{id}/verification                            object:page.edit
 PUT /api/v1/pages/{id}/watch                                   object:page.view
 PUT /api/v1/pages/{id}/watchers/{user}                         object:space.administer
+PUT /api/v1/sites/{id}/pages                                   object:space.administer
 PUT /api/v1/spaces/{id}/approvals                              object:space.administer
 PUT /api/v1/spaces/{id}/categories                             object:space.administer
 PUT /api/v1/spaces/{id}/favourite                              object:space.view
@@ -338,6 +371,7 @@ PUT /api/v1/spaces/{id}/home                                   object:space.admi
 PUT /api/v1/spaces/{id}/key                                    object:space.administer
 PUT /api/v1/spaces/{id}/labels                                 object:space.administer
 PUT /api/v1/spaces/{id}/owners                                 object:space.administer
+PUT /api/v1/spaces/{id}/pdf-design                             object:space.administer
 PUT /api/v1/spaces/{id}/review                                 object:space.administer
 PUT /api/v1/spaces/{id}/shortcuts                              object:space.administer
 PUT /api/v1/spaces/{id}/statuses                               object:space.administer

@@ -31,6 +31,8 @@ const (
 	TypePageChanged   = "page_changed"
 	TypeAccessRequest = "access_request"
 	TypeAccessAnswer  = "access_answer"
+	// TypeExportReady is the answer to something a person asked for, so it has no choice.
+	TypeExportReady = "export_ready"
 )
 
 // Where a type of notification goes.
@@ -125,6 +127,9 @@ func (v Settings) validate() error {
 }
 
 func (v Settings) channel(kind string) string {
+	if kind == TypeExportReady {
+		return ChannelApp
+	}
 	if c, ok := v.Channels[kind]; ok {
 		return c
 	}

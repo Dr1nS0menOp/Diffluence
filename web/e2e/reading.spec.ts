@@ -567,6 +567,8 @@ test('printing shows only the page, with every section open', async ({ page }) =
     { type: 'expand', attrs: { title: 'Closed section' }, content: [words('Inside the section')] },
   ]);
   await page.goto(`/pages/${id}`);
+  // Hidden is also true before the page is there, and then nothing hears beforeprint.
+  await expect(page.getByText('Closed section')).toBeVisible();
   await expect(page.getByText('Inside the section')).toBeHidden();
 
   await page.emulateMedia({ media: 'print' });

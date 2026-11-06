@@ -36,7 +36,7 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 | [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules, API, AI, linked instances | 50 |
 | [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 24 |
 
-In total 1003 requirements: 642 built, 82 partly, 56 on the roadmap, 196 new and 27 for later.
+In total 1003 requirements: 675 built, 83 partly, 42 on the roadmap, 176 new and 27 for later.
 
 ## Words we use
 

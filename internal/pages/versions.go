@@ -224,19 +224,21 @@ func (s *Service) Rename(ctx context.Context, c identity.Caller, id uuid.UUID, t
 
 // Version is one entry of the history.
 type Version struct {
-	Number       int             `json:"number"`
-	Title        string          `json:"title"`
-	AuthorID     uuid.UUID       `json:"author_id"`
-	AuthorName   string          `json:"author_name"`
-	Summary      string          `json:"summary"`
-	RestoredFrom *int            `json:"restored_from"`
-	CreatedAt    time.Time       `json:"created_at"`
-	Document     json.RawMessage `json:"document,omitempty"`
+	Number       int       `json:"number"`
+	Title        string    `json:"title"`
+	AuthorID     uuid.UUID `json:"author_id"`
+	AuthorName   string    `json:"author_name"`
+	Summary      string    `json:"summary"`
+	RestoredFrom *int      `json:"restored_from"`
+	CreatedAt    time.Time `json:"created_at"`
+	// Imported says the author and date came from elsewhere, so nobody here vouches for them.
+	Imported bool            `json:"imported"`
+	Document json.RawMessage `json:"document,omitempty"`
 	// Removed marks a version an administrator took out, whose number stays.
 	Removed bool `json:"removed"`
 }
 
-const versionColumns = `v.number, v.title, v.author_id, COALESCE(u.display_name, ''), v.summary, v.restored_from, v.created_at`
+const versionColumns = `v.number, v.title, v.author_id, COALESCE(u.display_name, ''), v.summary, v.restored_from, v.created_at, v.imported`
 
 // Versions lists the history of a page, newest first.
 func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID) ([]Version, error) {
@@ -250,7 +252,7 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Version, error) {
 		var v Version
-		err := r.Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt)
+		err := r.Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt, &v.Imported)
 		return v, err
 	})
 	if err != nil {
@@ -280,7 +282,7 @@ func (s *Service) version(ctx context.Context, id uuid.UUID, number int) (Versio
 	var v Version
 	err := s.pool.QueryRow(ctx, "SELECT "+versionColumns+`, v.document FROM page_versions v
 		LEFT JOIN users u ON u.id = v.author_id WHERE v.page_id = $1 AND v.number = $2`, id, number).
-		Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt, &v.Document)
+		Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt, &v.Imported, &v.Document)
 	if errors.Is(err, pgx.ErrNoRows) {
 		var removed bool
 		if err := s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM removed_versions WHERE page_id = $1 AND number = $2)", id, number).Scan(&removed); err != nil {

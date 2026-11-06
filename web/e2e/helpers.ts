@@ -51,7 +51,7 @@ export async function editorSettled(page: Page) {
 let counter = 0;
 export const unique = (prefix: string) => `${prefix}${Date.now().toString(36)}${counter++}`;
 
-async function adminRequest(
+export async function adminRequest(
   browser: Browser,
 ): Promise<{ api: APIRequestContext; close: () => Promise<void> }> {
   const context = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:8080' });

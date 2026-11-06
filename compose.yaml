@@ -44,12 +44,24 @@ services:
       DIFFLUENCE_SMTP_REPLY_TO: ${DIFFLUENCE_SMTP_REPLY_TO:-}
       DIFFLUENCE_DRAWING_URL: ${DIFFLUENCE_DRAWING_URL:-}
       DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-starttls}
+      # PDF files need the helper below. Empty = no PDF, and browser print remains.
+      DIFFLUENCE_PDF_URL: ${DIFFLUENCE_PDF_URL:-}
+      # Public sites are written below this folder. Empty = no sites.
+      DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
     secrets: [database_url, migrate_database_url]
     ports: ["${DIFFLUENCE_PORT:-8080}:8080"]
     volumes: [data:/var/lib/diffluence]
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
+
+  # The helper for PDF files. It only gets HTML we made, and needs no outside network.
+  # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000.
+  pdf:
+    image: gotenberg/gotenberg:8
+    profiles: [pdf]
+    restart: unless-stopped
+    security_opt: ["no-new-privileges:true"]
 
 secrets:
   db_owner_password:

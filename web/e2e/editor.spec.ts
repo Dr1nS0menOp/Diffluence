@@ -449,12 +449,13 @@ test('search finds a page and marks the word', async ({ page }) => {
 test('export and import through the settings page', async ({ page }) => {
   const space = await newSpace(page, 'Import space');
   await page.goto(`/spaces/${space.key}/settings`);
-  await page.getByLabel('Import Markdown').setInputFiles({
+  await page.getByLabel('Import a file').setInputFiles({
     name: 'Imported note.md',
     mimeType: 'text/markdown',
     buffer: Buffer.from('# Hello\n\n- [x] done\n\n| a | b |\n| --- | --- |\n| 1 | 2 |\n'),
   });
-  await expect(page.getByText('Imported 1 pages and 0 files.')).toBeVisible({ timeout: 20_000 });
+  await page.getByRole('button', { name: 'Import', exact: true }).click({ timeout: 20_000 });
+  await expect(page.getByText('The import is done.')).toBeVisible({ timeout: 20_000 });
   await expect(
     page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Imported note' }),
   ).toBeVisible();

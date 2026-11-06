@@ -788,12 +788,13 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 		parentID = &parent
 	}
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadDeadline))
-	job, err := s.deps.Exchange.StartImport(r.Context(), s.caller(r), id, parentID, r.URL.Query().Get("filename"), r.Body)
+	report := r.URL.Query().Get("report") == "1"
+	run, err := s.deps.Exchange.StartImport(r.Context(), s.caller(r), id, parentID, r.URL.Query().Get("filename"), report, r.Body)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusAccepted, map[string]any{"job_id": job})
+	writeJSON(w, http.StatusAccepted, map[string]any{"job_id": run.JobID, "import_id": run.ID})
 }
 
 func (s *Server) handleJob(w http.ResponseWriter, r *http.Request) {

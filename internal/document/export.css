@@ -1,0 +1,216 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/* The look of exported HTML, a public site and PDF. It stands alone: a file has no
+   access to the design tokens of the app, so these are copies of their values. */
+:root {
+  color-scheme: light dark;
+  --ink: light-dark(#1e2a3b, #dce3ee);
+  --muted: light-dark(#566278, #a3afc2);
+  --surface: light-dark(#ffffff, #11161f);
+  --side: light-dark(#f5f7fa, #171d27);
+  --line: light-dark(#dde2ea, #2e3848);
+  --accent: light-dark(#1d5fbf, #7fb0f5);
+  --code: light-dark(#f1f3f7, #1c2330);
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--ink);
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  line-height: 1.65;
+}
+
+.skip {
+  position: absolute;
+  inset-inline-start: -999rem;
+}
+
+.skip:focus {
+  inset-inline-start: 0.5rem;
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: minmax(12rem, 18rem) minmax(0, 1fr);
+  min-block-size: 100vh;
+}
+
+.site-nav {
+  padding: 1rem;
+  border-inline-end: 1px solid var(--line);
+  background: var(--side);
+}
+
+.site-nav ul {
+  padding-inline-start: 1rem;
+  list-style: none;
+}
+
+main {
+  max-inline-size: 47.5rem;
+  margin-inline: auto;
+  padding: 1.5rem 2rem 3rem;
+  inline-size: 100%;
+  box-sizing: border-box;
+}
+
+a {
+  color: var(--accent);
+}
+
+img {
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+figure {
+  margin-inline: 0;
+}
+
+figcaption,
+.muted {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+pre {
+  padding: 0.75rem;
+  overflow-x: auto;
+  background: var(--code);
+}
+
+code {
+  font-family: ui-monospace, Menlo, Consolas, 'Liberation Mono', monospace;
+}
+
+blockquote {
+  margin-inline: 0;
+  padding-inline-start: 1rem;
+  border-inline-start: 3px solid var(--line);
+  color: var(--muted);
+}
+
+.table {
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 0.4rem 0.7rem;
+  border: 1px solid var(--line);
+  text-align: start;
+  vertical-align: top;
+}
+
+th {
+  background: var(--code);
+}
+
+.panel,
+.decision {
+  margin-block: 1rem;
+  padding: 0.5rem 1rem;
+  border-inline-start: 4px solid var(--accent);
+  background: var(--side);
+}
+
+.panel-kind {
+  margin-block: 0;
+  font-weight: 700;
+}
+
+.columns {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+}
+
+.column {
+  flex: 1 1 12rem;
+}
+
+.tasks {
+  padding-inline-start: 0;
+  list-style: none;
+}
+
+.tasks p {
+  display: inline;
+}
+
+.status {
+  padding-inline: 0.35rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.align-center {
+  text-align: center;
+}
+
+.align-end {
+  text-align: end;
+}
+
+.indent-1 { margin-inline-start: 2rem; }
+.indent-2 { margin-inline-start: 4rem; }
+.indent-3 { margin-inline-start: 6rem; }
+.indent-4 { margin-inline-start: 8rem; }
+.indent-5 { margin-inline-start: 10rem; }
+.indent-6 { margin-inline-start: 12rem; }
+
+.text-grey { color: light-dark(#5b6472, #a3afc2); }
+.text-slate { color: light-dark(#475569, #b6c2d4); }
+.text-red { color: light-dark(#b3261e, #ff9d94); }
+.text-orange { color: light-dark(#a84300, #ffb37a); }
+.text-amber { color: light-dark(#855400, #f0c36a); }
+.text-green { color: light-dark(#1b7a3d, #7fd69a); }
+.text-teal { color: light-dark(#0b7570, #6fd6cf); }
+.text-blue { color: light-dark(#1d5fbf, #8cc0f5); }
+.text-indigo { color: light-dark(#4338ca, #b0b4fb); }
+.text-purple { color: light-dark(#7e22ce, #d3a6f7); }
+.text-pink { color: light-dark(#be185d, #f7a3c8); }
+.text-brown { color: light-dark(#7c4a21, #d9b08c); }
+
+.mark-grey { background: light-dark(#e8ebf0, #2b3442); }
+.mark-yellow { background: light-dark(#fdf0c4, #4a3a13); }
+.mark-green { background: light-dark(#d9f2e3, #17402c); }
+.mark-blue { background: light-dark(#dbe8fb, #1e3558); }
+.mark-purple { background: light-dark(#eadffb, #37295a); }
+.mark-red { background: light-dark(#fbe0dd, #4c231e); }
+
+mark {
+  color: inherit;
+}
+
+@media (max-width: 50rem) {
+  .layout {
+    display: block;
+  }
+
+  .site-nav {
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--line);
+  }
+}
+
+@media print {
+  :root {
+    color-scheme: light;
+  }
+
+  .site-nav,
+  .skip {
+    display: none;
+  }
+
+  main {
+    max-inline-size: none;
+    padding: 0;
+  }
+}

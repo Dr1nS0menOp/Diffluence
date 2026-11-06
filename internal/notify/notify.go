@@ -35,6 +35,7 @@ const (
 	ReasonAssigned  = "assigned"
 	ReasonWatching  = "watching"
 	ReasonShared    = "shared"
+	ReasonExport    = "export"
 	ReasonAuthor    = "author"
 	ReasonThread    = "thread"
 	ReasonAsked     = "asked"

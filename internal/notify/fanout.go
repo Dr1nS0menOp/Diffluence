@@ -36,6 +36,9 @@ type payload struct {
 	AskedID         uuid.UUID   `json:"asked_id"`
 	RequesterID     uuid.UUID   `json:"requester_id"`
 	Version         int         `json:"version"`
+	UserID          uuid.UUID   `json:"user_id"`
+	ExportID        uuid.UUID   `json:"export_id"`
+	Filename        string      `json:"filename"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
@@ -49,6 +52,7 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"access.requested": s.onAccessRequested,
 		"access.allowed":   s.onAccessAnswered,
 		"access.refused":   s.onAccessAnswered,
+		"export.finished":  s.onExportFinished,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -69,6 +73,13 @@ func (s *Service) Publish(ctx context.Context, _ string, data []byte, _ string) 
 		return err
 	}
 	return s.Handle(ctx, m)
+}
+
+// onExportFinished tells the person who asked for a file that it is there. The row
+// hangs on a page in the file: when they lose that page, the row goes with it.
+func (s *Service) onExportFinished(ctx context.Context, event uuid.UUID, p payload) error {
+	return s.Deliver(ctx, s.pool, Row{UserID: p.UserID, Type: TypeExportReady, Reason: ReasonExport, PageID: p.PageID, SpaceID: p.SpaceID, Event: event,
+		Data: map[string]any{"export_id": p.ExportID, "filename": p.Filename}})
 }
 
 func (s *Service) autoWatch(ctx context.Context, user, pageID uuid.UUID, want func(Settings) bool) error {
