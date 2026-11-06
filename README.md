@@ -55,6 +55,8 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md). Every commit needs a DCO sign-off (`git
 
 ## Security
 
+Diffluence comes without guarantee, and security updates are not guaranteed. Read [the security risks](docs/security/risks.md) before you use it.
+
 Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## Contact

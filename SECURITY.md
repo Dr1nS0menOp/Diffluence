@@ -12,6 +12,8 @@ Please include the affected version or commit, the steps to reproduce, and the i
 
 ## What to expect
 
+These are aims, not promises. Diffluence comes without guarantee, and security updates are not guaranteed. See [the security risks](docs/security/risks.md).
+
 - Acknowledgement within 3 working days
 - A first assessment within 7 days
 - Critical issues fixed in a release within 7 days of confirmation
