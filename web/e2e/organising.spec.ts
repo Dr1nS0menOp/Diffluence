@@ -133,6 +133,7 @@ test('writing a template with a field and instruction text', async ({ page }) =>
   await field.getByLabel('Name').fill('Topic');
   await field.getByRole('button', { name: 'Add' }).click();
   await expect(page.locator('.template-field')).toHaveText('Topic');
+  await editorSettled(page);
   await page.keyboard.type(' /instruction');
   await page.keyboard.press('Enter');
   const help = page.getByRole('dialog', { name: 'Instruction text' });

@@ -224,9 +224,14 @@ test('a table stretches from the menu and by keys, and readers see the same', as
   await edge(page).focus();
   await page.keyboard.press('Home');
   await expect(edge(page)).toHaveAttribute('aria-valuenow', '0');
+  // A change redraws the table, and the edge takes the focus back a moment later.
+  await expect(edge(page)).toBeFocused();
   await page.keyboard.press('ArrowRight');
+  await expect(edge(page)).toHaveAttribute('aria-valuenow', '5');
+  await expect(edge(page)).toBeFocused();
   await page.keyboard.press('ArrowRight');
   await expect(edge(page)).toHaveAttribute('aria-valuenow', '10');
+  await expect(edge(page)).toBeFocused();
   await page.keyboard.press('End');
   await expect(edge(page)).toHaveAttribute('aria-valuenow', '100');
   await publish(page);
