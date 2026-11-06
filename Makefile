@@ -20,7 +20,8 @@ test:
 	go test ./...
 
 test-race:
-	go test -race -count=1 ./...
+	# internal/app alone nears Go's default of 10 minutes on a slow runner. A real hang still ends here.
+	go test -race -count=1 -timeout=20m ./...
 
 fmt:
 	gofmt -w .
