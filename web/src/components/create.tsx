@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Page, type Space, type TemplateSummary } from '../api';
@@ -15,6 +15,20 @@ const VALID_KEY = /^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$/;
 export function suggestKey(name: string): string {
   const letters = name.normalize('NFKD').replace(/[^A-Za-z0-9]/g, '');
   return letters.slice(0, SUGGESTED_KEY_LENGTH).toUpperCase();
+}
+
+/** Starts a mutation once: the second click of a double click comes before its button is disabled. */
+function useOneAtATime<V>(mutate: (value: V, options: { onSettled: () => void }) => void) {
+  const isRunning = useRef(false);
+  return (value: V) => {
+    if (isRunning.current) return;
+    isRunning.current = true;
+    mutate(value, {
+      onSettled: () => {
+        isRunning.current = false;
+      },
+    });
+  };
 }
 
 /** Where the Create button in the top bar puts a new page. */
@@ -43,13 +57,14 @@ export function NewPageDialog({
       navigate(`/pages/${p.id}/edit`);
     },
   });
+  const start = useOneAtATime(create.mutate);
   if (gallery) return <TemplateGallery space={space} parent={parent} onClose={onClose} />;
   return (
     <Dialog title={t('space.newPage')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
-          create.mutate(false);
+          start(false);
         }}
       >
         <ErrorNote error={create.error} />
@@ -60,7 +75,7 @@ export function NewPageDialog({
           <button type="button" className="quiet" onClick={() => setGallery(true)}>
             {t('organise.fromTemplate')}
           </button>
-          <button type="button" className="quiet" onClick={() => create.mutate(true)}>
+          <button type="button" className="quiet" onClick={() => start(true)}>
             {t('organise.noTitleYet')}
           </button>
           <button type="submit" className="primary" disabled={create.isPending}>
@@ -82,12 +97,13 @@ export function NewPostDialog({ space, onClose }: { space: Space; onClose: () =>
       navigate(`/pages/${p.id}/edit`);
     },
   });
+  const start = useOneAtATime(create.mutate);
   return (
     <Dialog title={t('blog.newPost')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
-          create.mutate();
+          start();
         }}
       >
         <ErrorNote error={create.error} />
@@ -126,12 +142,13 @@ export function NewDatabaseDialog({
       navigate(`/pages/${p.id}/edit`);
     },
   });
+  const start = useOneAtATime(create.mutate);
   return (
     <Dialog title={t('sheet.new')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
-          create.mutate();
+          start();
         }}
       >
         <ErrorNote error={create.error} />
@@ -170,12 +187,13 @@ export function NewLinkDialog({
       onClose();
     },
   });
+  const start = useOneAtATime(create.mutate);
   return (
     <Dialog title={t('tree.addLink')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
-          create.mutate();
+          start();
         }}
       >
         <ErrorNote error={create.error} />
@@ -237,12 +255,13 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
       navigate(`/spaces/${s.key}`);
     },
   });
+  const start = useOneAtATime(create.mutate);
   return (
     <Dialog title={t('home.newSpace')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
-          create.mutate();
+          start();
         }}
       >
         <ErrorNote error={create.error} />

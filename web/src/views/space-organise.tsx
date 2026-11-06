@@ -266,7 +266,7 @@ export function StatusesSection({ space }: { space: Space }) {
         >
           {MARK_COLOURS.map((c) => (
             <option key={c} value={c}>
-              {t(`editor.color_${c}`)}
+              {t(`editor.colors.${c}`)}
             </option>
           ))}
         </select>

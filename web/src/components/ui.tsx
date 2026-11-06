@@ -35,11 +35,14 @@ export function Dialog({
   onClose,
   children,
   wide,
+  full,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  /** Fills the window, for something a person works in, such as a viewer. */
+  full?: boolean;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
@@ -48,12 +51,23 @@ export function Dialog({
     if (d && !d.open) d.showModal();
   }, []);
   return (
-    <dialog ref={ref} onClose={onClose} aria-label={title} className={wide ? 'wide' : undefined}>
+    <dialog
+      ref={ref}
+      onClose={onClose}
+      aria-label={title}
+      className={full ? 'full' : wide ? 'wide' : undefined}
+    >
       <header className="dialog-head">
         <h2>{title}</h2>
-        <button type="button" className="icon" aria-label={t('common.close')} onClick={onClose}>
-          <IconClose />
-        </button>
+        {full ? (
+          <button type="button" onClick={onClose}>
+            <IconClose size={16} /> {t('common.close')}
+          </button>
+        ) : (
+          <button type="button" className="icon" aria-label={t('common.close')} onClick={onClose}>
+            <IconClose />
+          </button>
+        )}
       </header>
       {children}
     </dialog>

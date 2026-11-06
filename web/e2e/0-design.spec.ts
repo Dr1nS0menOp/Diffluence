@@ -452,7 +452,7 @@ test.describe('the look of every kind of screen', () => {
   test('FilesView: every file of a space', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/files');
-    await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeVisible();
     await picture(page, 'files');
     await page.context().close();
   });

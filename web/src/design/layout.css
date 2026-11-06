@@ -446,6 +446,11 @@
   margin-inline: auto;
 }
 
+/* A flex column stretches what it holds, and a button keeps the size of its words. */
+.column > button {
+  align-self: flex-start;
+}
+
 .column.wide {
   max-inline-size: var(--size-wide);
 }
@@ -772,6 +777,7 @@ span.twist {
 }
 
 .tabs [role='tab'] {
+  flex: none;
   border-block-end: 2px solid transparent;
   border-radius: 0;
   background: none;

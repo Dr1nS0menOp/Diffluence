@@ -619,6 +619,27 @@ function onePagePdf(): Buffer {
   return Buffer.from(body, 'latin1');
 }
 
+test('on a phone the viewer keeps its way back in one piece', async ({ page }) => {
+  await editing(page, 'A PDF on a phone');
+  await page.locator('input[type=file][aria-label="Add image or file"]').setInputFiles({
+    name: 'a long name for a report that goes on for a while.pdf',
+    mimeType: 'application/pdf',
+    buffer: onePagePdf(),
+  });
+  await expect(body(page).locator('.file-tile')).toContainText('a long name');
+  await publish(page);
+  await page.setViewportSize({ width: 390, height: 800 });
+  await page.reload();
+  await page.getByRole('button', { name: 'Open in PdfCraft' }).click();
+  const close = page.getByRole('dialog').getByRole('button', { name: 'Close' });
+  await expect(close).toBeVisible();
+  const lineHeight = await close.evaluate((node) => parseFloat(getComputedStyle(node).lineHeight));
+  const box = await close.boundingBox();
+  expect(box?.height ?? 0).toBeLessThan(lineHeight * 2);
+  const sideways = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+  expect(sideways).toBe(false);
+});
+
 test('a PDF opens in a sandboxed viewer that cannot reach the session', async ({ page }) => {
   await editing(page, 'A PDF');
   await page.locator('input[type=file][aria-label="Add image or file"]').setInputFiles({
@@ -632,6 +653,11 @@ test('a PDF opens in a sandboxed viewer that cannot reach the session', async ({
   const dialog = page.getByRole('dialog', { name: 'hello.pdf' });
   await expect(dialog.getByRole('status')).toHaveCount(0, { timeout: 60_000 });
   await expect(dialog.getByRole('link', { name: 'Download the file' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Close' })).toContainText('Close');
+  const window = page.viewportSize();
+  const box = await dialog.locator('iframe.craft-frame').boundingBox();
+  expect(box?.width ?? 0).toBeGreaterThan((window?.width ?? 0) * 0.95);
+  expect(box?.height ?? 0).toBeGreaterThan((window?.height ?? 0) * 0.8);
   const viewer = page.frames().find((frame) => frame.url().includes('/vendor/pdfcraft/'));
   if (!viewer) throw new Error('the viewer has no frame');
   const seen = await viewer.evaluate(async () => {

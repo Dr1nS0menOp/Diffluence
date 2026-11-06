@@ -70,6 +70,12 @@ function Row({ space, onStar }: { space: DirectorySpace; onStar: (space: Directo
   );
 }
 
+/** Why the list is empty: only someone who filtered is told about the filter. */
+function emptyMessage(kind: string, isFiltered: boolean): string {
+  if (kind === 'archived') return 'directory.noneArchived';
+  return isFiltered || kind !== 'all' ? 'directory.none' : 'home.noSpaces';
+}
+
 export function DirectoryView({ me }: { me: Me }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -170,7 +176,7 @@ export function DirectoryView({ me }: { me: Me }) {
       {q.isPending && <Loading />}
       <ErrorNote error={q.error ?? star.error} />
       {q.data && rows.length === 0 && (
-        <p className="muted">{kind === 'archived' ? t('directory.noneArchived') : t('directory.none')}</p>
+        <p className="muted">{t(emptyMessage(kind, text !== '' || !!category))}</p>
       )}
       {rows.length > 0 && (
         <>

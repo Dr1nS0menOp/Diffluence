@@ -230,9 +230,12 @@ a.file-tile:hover {
   margin: 0;
 }
 
+/* A table has its own scrolling, so a word stays whole in it. */
 .prose table th,
 .prose table td {
   min-inline-size: 3rem;
+  overflow-wrap: normal;
+  word-break: normal;
 }
 
 .prose table p {
@@ -347,6 +350,15 @@ a.file-tile:hover {
   flex: 1;
   max-inline-size: var(--size-summary);
   margin-inline-start: auto;
+}
+
+/* A long note goes last, so it wraps alone and the buttons keep their line. */
+.edit-note {
+  order: 1;
+}
+
+.edit-hint {
+  padding-inline: var(--space-3);
 }
 
 .toolbar {

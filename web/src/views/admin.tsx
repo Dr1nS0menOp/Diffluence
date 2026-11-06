@@ -617,28 +617,32 @@ function GroupsTab() {
         </button>
       </form>
       <ErrorNote error={q.error ?? create.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('admin.members')}</th>
-            <th>{t('admin.source')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.groups.map((g) => (
-            <tr key={g.id}>
-              <td>
-                <button type="button" className="ghost" onClick={() => setOpen(g.id)}>
-                  {g.name}
-                </button>
-              </td>
-              <td>{g.members}</td>
-              <td>{g.source}</td>
+      {q.data?.groups.length === 0 ? (
+        <p className="muted">{t('admin.noGroups')}</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('admin.members')}</th>
+              <th>{t('admin.source')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.groups.map((g) => (
+              <tr key={g.id}>
+                <td>
+                  <button type="button" className="ghost" onClick={() => setOpen(g.id)}>
+                    {g.name}
+                  </button>
+                </td>
+                <td>{g.members}</td>
+                <td>{g.source}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {selected && <GroupDialog group={selected} onClose={() => setOpen(null)} />}
     </>
   );
@@ -1192,41 +1196,45 @@ function ScimTab() {
       </form>
       <p className="muted">{t('admin.tokenEndsHelp')}</p>
       <ErrorNote error={q.error ?? create.error ?? revoke.error ?? rotate.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('admin.created')}</th>
-            <th>{t('admin.tokenEnds')}</th>
-            <th>{t('admin.lastUsed')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.tokens.map((k) => (
-            <tr key={k.id}>
-              <td>{k.name}</td>
-              <td>{dates.moment(k.created_at)}</td>
-              <td>{dates.day(k.expires_at)}</td>
-              <td>{dates.moment(k.last_used_at)}</td>
-              <td className="row">
-                {k.revoked_at ? (
-                  t('admin.revoked')
-                ) : (
-                  <>
-                    <button type="button" className="ghost" onClick={() => rotate.mutate(k.id)}>
-                      {t('admin.rotate')}
-                    </button>
-                    <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
-                      {t('admin.revoke')}
-                    </button>
-                  </>
-                )}
-              </td>
+      {q.data?.tokens.length === 0 ? (
+        <p className="muted">{t('admin.noTokens')}</p>
+      ) : (
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('admin.created')}</th>
+              <th>{t('admin.tokenEnds')}</th>
+              <th>{t('admin.lastUsed')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.tokens.map((k) => (
+              <tr key={k.id}>
+                <td>{k.name}</td>
+                <td>{dates.moment(k.created_at)}</td>
+                <td>{dates.day(k.expires_at)}</td>
+                <td>{dates.moment(k.last_used_at)}</td>
+                <td className="row">
+                  {k.revoked_at ? (
+                    t('admin.revoked')
+                  ) : (
+                    <>
+                      <button type="button" className="ghost" onClick={() => rotate.mutate(k.id)}>
+                        {t('admin.rotate')}
+                      </button>
+                      <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
+                        {t('admin.revoke')}
+                      </button>
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
       {secret && (
         <Dialog title={t('admin.newToken')} onClose={() => setSecret(null)}>
           <p>{t('admin.tokenHelp')}</p>
@@ -1315,7 +1323,8 @@ function SystemTab() {
 
 export function AdminView({ tab, me }: { tab: string; me: Me }) {
   const { t } = useTranslation();
-  if (!me.global_permissions.includes('administrator')) {
+  const isKnownTab = TABS.some((name) => name === tab);
+  if (!me.global_permissions.includes('administrator') || !isKnownTab) {
     return (
       <main id="main" className="plain reading">
         <p role="alert">{t('app.notFound')}</p>

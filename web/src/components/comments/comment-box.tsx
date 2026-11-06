@@ -147,6 +147,7 @@ export function CommentBox({
   const toast = useToast();
   const person = usePerson();
   const submit = useRef<() => void>(() => undefined);
+  const isSending = useRef(false);
   const [empty, setEmpty] = useState(true);
   const [failed, setFailed] = useState<unknown>(null);
   // Sharing happens on the page itself, so from an editor the warning stands alone.
@@ -209,8 +210,14 @@ export function CommentBox({
     }
   };
   submit.current = () => {
-    if (!editor.isEmpty && !busy) onSubmit(editor.getJSON() as Json, clear);
+    if (editor.isEmpty || busy || isSending.current) return;
+    isSending.current = true;
+    onSubmit(editor.getJSON() as Json, clear);
   };
+  // The second click of a double click comes before busy reaches this box.
+  useEffect(() => {
+    if (!busy) isSending.current = false;
+  }, [busy]);
 
   // `m` moves here, by the id of the box under the page.
   useEffect(() => {

@@ -250,6 +250,15 @@ function MenuEntry({
   );
 }
 
+/** Sits in the open menu: the server starts a watch a moment after a publish. */
+function FreshWatch({ pageId }: { pageId: string }) {
+  const client = useQueryClient();
+  useEffect(() => {
+    void client.invalidateQueries({ queryKey: ['watch', pageId] });
+  }, [client, pageId]);
+  return null;
+}
+
 function PageMenu({
   page,
   watching,
@@ -289,6 +298,7 @@ function PageMenu({
   });
   return (
     <Menu label={t('page.moreActions')} trigger={<IconMore />}>
+      <FreshWatch pageId={page.id} />
       <ManualRules pageId={page.id} />
       <MenuLink href={`/pages/${page.id}/history`}>
         <IconClock size={MENU_ICON_SIZE} /> {t('page.history')}

@@ -323,7 +323,7 @@ fieldset.matrix label {
   inset-block-start: calc(100% + var(--space-1));
   z-index: var(--layer-menu);
   min-inline-size: var(--size-menu);
-  max-block-size: 70vh;
+  max-block-size: calc(100vh - 8rem);
   padding: var(--space-1-5);
   overflow-y: auto;
   border: 1px solid var(--color-line);
@@ -682,10 +682,48 @@ dialog.wide {
   padding-inline: var(--space-4);
 }
 
+dialog.full {
+  inline-size: 100vw;
+  max-inline-size: none;
+  block-size: 100vh;
+  max-block-size: none;
+  padding: var(--space-2) var(--space-3);
+  border-radius: 0;
+}
+
+dialog.full[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.full .dialog-head {
+  flex: none;
+  margin-block-end: var(--space-1);
+}
+
+dialog.full .dialog-head button {
+  flex: none;
+  white-space: nowrap;
+}
+
+dialog.full .dialog-head h2 {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.craft-note {
+  flex: none;
+  margin-block: 0 var(--space-1);
+  font-size: var(--text-small);
+}
+
 .craft-frame {
   display: block;
+  flex: 1;
   inline-size: 100%;
-  block-size: calc(100vh - 16rem);
+  min-block-size: 0;
   border: 1px solid var(--color-line);
 }
 
@@ -712,6 +750,27 @@ dialog::backdrop {
   justify-content: flex-end;
   gap: var(--space-2);
   margin-block-start: var(--space-4);
+}
+
+/* A tall dialog scrolls, and its buttons stay in reach. */
+dialog .dialog-actions {
+  position: sticky;
+  inset-block-end: 0;
+  background: var(--color-surface);
+}
+
+/* Sticky stops at the padding of the dialog, so that strip is covered too. */
+dialog .dialog-actions::after {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: 100%;
+  block-size: var(--space-6);
+  background: var(--color-surface);
+  content: '';
+}
+
+table a {
+  overflow-wrap: anywhere;
 }
 
 table {

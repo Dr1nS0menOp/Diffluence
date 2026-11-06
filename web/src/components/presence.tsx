@@ -75,7 +75,7 @@ export function EditingTogether({ pageId }: { pageId: string }) {
   return (
     <span
       role="status"
-      className="lozenge"
+      className="lozenge edit-note"
       title={t('presence.editing', { names: editors.map((p) => p.name).join(', ') })}
     >
       {t('presence.editing', { names: editors.map((p) => p.name).join(', ') })}

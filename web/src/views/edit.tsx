@@ -181,7 +181,7 @@ function TemplateOffer({ page }: { page: PageDetail }) {
     queryFn: () => api.get<Space>(`/spaces/${page.space_id}`),
   });
   return (
-    <p className="muted">
+    <p className="muted edit-hint">
       {t('editor.emptyPage')}{' '}
       <button type="button" className="ghost" onClick={() => setOpen(true)}>
         {t('organise.fromTemplate')}

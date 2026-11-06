@@ -122,7 +122,7 @@ test('writing a template with a field and instruction text', async ({ page }) =>
   const space = await newSpace(page, 'Writing templates');
   await page.goto(`/spaces/${space.key}/templates`);
   const name = unique('Template');
-  await page.getByLabel('Name of the new template').fill(name);
+  await page.getByLabel('New template name').fill(name);
   await page.getByRole('button', { name: 'New template' }).click();
   await expect(page.locator('.prose.editing')).toBeVisible();
   await page.locator('.prose.editing').click();

@@ -72,10 +72,10 @@ export function CraftDialog({
   }, [file, onClose]);
 
   return (
-    <Dialog title={file.name} onClose={onClose} wide>
+    <Dialog title={file.name} onClose={onClose} full>
       <ErrorNote error={error} />
       {state === 'starting' && !error && <Loading />}
-      <p className="muted">
+      <p className="muted craft-note">
         {t('craft.note')} {download && <a href={download}>{t('craft.download')}</a>}
       </p>
       <iframe
