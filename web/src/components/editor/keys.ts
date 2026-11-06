@@ -25,6 +25,7 @@ export interface EditorActions {
   openPageFiles: () => void;
   openBlockMenu: () => void;
   openTableMenu: () => void;
+  openTableSize: () => void;
   openTemplateItem: (what: 'field' | 'instruction') => void;
   publish: () => void;
   save: () => void;
@@ -42,6 +43,7 @@ export const noActions: EditorActions = {
   openPageFiles: () => undefined,
   openBlockMenu: () => undefined,
   openTableMenu: () => undefined,
+  openTableSize: () => undefined,
   openTemplateItem: () => undefined,
   publish: () => undefined,
   save: () => undefined,
@@ -73,7 +75,7 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
       (
         action: Exclude<
           keyof EditorActions,
-          'mentionNoAccess' | 'openTemplateItem' | 'focusTitle' | 'openDrawing'
+          'mentionNoAccess' | 'openTemplateItem' | 'focusTitle' | 'openDrawing' | 'openTableSize'
         >,
       ) =>
       () => {

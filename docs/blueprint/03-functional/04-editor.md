@@ -123,19 +123,19 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-053** · built · Links can use http, https, mailto or a relative path. Other schemes are refused, in any spelling.
 - **EDT-054** · built · A link is added through our own dialog with the address. Removing a link is in the same dialog.
 - **EDT-055** · built · The dialog also has a text field, for the words that show.
-- **EDT-056** · partly · The dialog searches pages while typing, shows recent pages first and offers them as links. The link then points to the page id, so it survives a rename or move. Built: searching, and links that hold the id. New: recent pages first.
-- **EDT-057** · new · A link to a page shows the current title automatically, unless the writer typed their own words.
-- **EDT-058** · new · A link can point to a heading or a block in the same or another page.
+- **EDT-056** · built · The dialog searches pages while typing, shows recent pages first and offers them as links. The link then points to the page id, so it survives a rename or move.
+- **EDT-057** · built · A link to a page shows the current title automatically, unless the writer typed their own words.
+- **EDT-058** · partly · A link can point to a heading or a block in the same or another page. Still open: any block without placing an anchor in it first
 - **EDT-059** · built · Links to pages the reader may not see stay as plain words with no title leak. The address shows nothing about the page.
 - **EDT-060** · built · Links to deleted pages show as struck through, with an explanation on hover.
 - **EDT-061** · built · Addresses that are typed or pasted become links on their own, and open in a new tab with `noopener`.
 - **EDT-062** · built · Pasting an address over selected text makes that text a link.
-- **EDT-063** · new · Selecting a link shows a small bar: open, copy, edit, unlink, and change display.
-- **EDT-064** · new · **Placeholder link:** a link to a page that does not exist yet shows in a distinct colour. A person who may create pages follows it, and a new page starts with that title and the right parent. Space settings list all placeholders.
-- **EDT-065** · new · **Link display:** a link to a page in this instance can show as plain text, as a short tag with an icon, or as a card with title, excerpt, space and date.
-- **EDT-066** · new · A card or tag for an internal page is rendered per reader, so nobody sees a title they may not see.
+- **EDT-063** · built · Selecting a link shows a small bar: open, copy, edit, unlink, and change display.
+- **EDT-064** · built · **Placeholder link:** a link to a page that does not exist yet shows in a distinct colour. A person who may create pages follows it, and a new page starts with that title and the right parent. Space settings list all placeholders.
+- **EDT-065** · built · **Link display:** a link to a page in this instance can show as plain text, as a short tag with an icon, or as a card with title, excerpt, space and date.
+- **EDT-066** · built · A card or tag for an internal page is rendered per reader, so nobody sees a title they may not see.
 - **EDT-067** · later · **Outside link cards:** the server never fetches outside addresses by default, because that leaks reading habits and invites request forgery. An administrator can allow a list of domains. Only those show a title and picture, fetched through a safe gateway.
-- **EDT-068** · new · **Anchors:** a named anchor can be placed anywhere, for links from other pages (BLK-016).
+- **EDT-068** · built · **Anchors:** a named anchor can be placed anywhere, for links from other pages (BLK-016).
 
 ## 4.8 Images
 
@@ -159,23 +159,23 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 
 - **EDT-084** · built · A table starts with three columns, three rows and a header row. Rows and columns are added and removed from the menu on the table.
 - **EDT-085** · built · Cells can hold any block, and can be merged in the document format.
-- **EDT-086** · new · A size picker chooses rows and columns when adding a table.
-- **EDT-087** · new · **Handles:** a handle on each row and column selects it, and opens its menu.
-- **EDT-088** · new · **Insert:** a small plus between rows or columns inserts one exactly there.
+- **EDT-086** · built · A size picker chooses rows and columns when adding a table.
+- **EDT-087** · built · **Handles:** a handle on each row and column selects it, and opens its menu.
+- **EDT-088** · built · **Insert:** a small plus between rows or columns inserts one exactly there.
 - **EDT-089** · built · Tab moves to the next cell, and in the last cell adds a row.
 - **EDT-090** · built · **Merge and split** cells from the cell menu.
-- **EDT-091** · new · **Drag rows and columns** by their handle to reorder them. Shift selects several.
+- **EDT-091** · built · **Drag rows and columns** by their handle to reorder them. Shift selects several.
 - **EDT-092** · built · **Header row and header column** can each be turned on or off.
-- **EDT-093** · new · **Numbered column:** a first column that counts the rows automatically.
+- **EDT-093** · built · **Numbered column:** a first column that counts the rows automatically.
 - **EDT-094** · built · **Sort** by a column, ascending or descending. In the editor this changes the table. Readers can sort a table for themselves without changing it.
 - **EDT-095** · built · **Cell colour:** from the same palette, with light and dark versions.
 - **EDT-096** · built · **Column width:** drag the border between columns. A button makes selected columns equal.
 - **EDT-097** · built · **Table width:** from the width of the text up to the full width of the window, by dragging its end edge, from the menu, or with the arrow keys on that edge. It stays centred on the text.
-- **EDT-098** · new · **Fixed or flexible columns:** fixed tables keep their layout and scroll on narrow screens, flexible tables scale.
+- **EDT-098** · built · **Fixed or flexible columns:** fixed tables keep their layout and scroll on narrow screens, flexible tables scale.
 - **EDT-099** · built · **Sticky header:** the header row of a long table stays visible while scrolling.
-- **EDT-100** · new · **Copy and paste** of rows and columns, and of cells from a spreadsheet, which land as cells.
-- **EDT-101** · new · A table cannot hold another table, and the tools say so.
-- **EDT-102** · new · **Caption:** a line above or below the table.
+- **EDT-100** · built · **Copy and paste** of rows and columns, and of cells from a spreadsheet, which land as cells.
+- **EDT-101** · built · A table cannot hold another table, and the tools say so.
+- **EDT-102** · built · **Caption:** a line above or below the table.
 - **EDT-103** · built · **Filter for readers:** a table with a header row can get a filter box that hides rows without changing the page.
 
 ## 4.10 Code
@@ -211,7 +211,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-126** · phase 4 · **Mention:** `@` opens a list of people and groups the person may see (COL-029).
 - **EDT-127** · partly · **Emoji:** `:` opens a list with search, and a toolbar button shows a picker with groups and recent emoji. Emoji are standard Unicode characters, so no images are needed. Built: `:` with a list, and search. New: a picker with groups and recent emoji.
 - **EDT-128** · later · **Own emoji:** administrators upload small pictures that everyone can use. They are served only to people who are logged in.
-- **EDT-129** · new · **Page link tag:** the inline form of EDT-065.
+- **EDT-129** · built · **Page link tag:** the inline form of EDT-065.
 
 ## 4.13 Charts
 

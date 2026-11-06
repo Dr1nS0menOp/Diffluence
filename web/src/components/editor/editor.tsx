@@ -46,7 +46,10 @@ import { TemplateItemDialog } from './template-item';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
 import { ReaderTables } from './reader-tables';
+import { tableAround } from './table';
 import { TableFrame, useTableTracking } from './table-frame';
+import { TableRules } from './table-rules';
+import { TableSizeDialog } from './table-size';
 import { Toolbar } from './toolbar';
 import { TypingHelp } from './typing';
 import { pickWordFile } from './word';
@@ -116,6 +119,7 @@ export function DocumentView({
   onTask,
   onView,
   checkLinks,
+  pageId,
 }: {
   document: Json;
   plain?: boolean;
@@ -128,6 +132,8 @@ export function DocumentView({
   onView?: (view: EditorView) => void;
   /** Marks links to what this reader cannot reach. Needs someone who is logged in. */
   checkLinks?: boolean;
+  /** The published page shown, so that a link to a page that does not exist yet can start it. */
+  pageId?: string;
 }) {
   const { t } = useTranslation();
   const copy = useCopy();
@@ -149,6 +155,7 @@ export function DocumentView({
       extensions: [
         ...documentExtensions({
           fileAddress,
+          sourcePage: pageId,
           onTask: onTask ? (id, done) => tick.current?.(id, done) : undefined,
         }),
         TaskDates.configure({ overdueWord: t('tasks.overdue') }),
@@ -204,8 +211,15 @@ export function DocumentView({
       );
       return;
     }
-    const link = target.closest<HTMLAnchorElement>('a[href^="/"]');
     const plainClick = e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey;
+    const here = target.closest<HTMLAnchorElement>('a[href^="#"]');
+    if (here && plainClick) {
+      // Links open in a new tab, which makes no sense for a place on this very page.
+      e.preventDefault();
+      window.location.hash = here.getAttribute('href') ?? '';
+      return;
+    }
+    const link = target.closest<HTMLAnchorElement>('a[href^="/"]');
     if (!link || !plainClick || link.hasAttribute('download')) return;
     e.preventDefault();
     navigate(link.getAttribute('href') ?? '/');
@@ -286,6 +300,7 @@ export function DocumentEditor({
   const [dropping, setDropping] = useState(false);
   const [linking, setLinking] = useState(false);
   const [inserting, setInserting] = useState(false);
+  const [sizingTable, setSizingTable] = useState(false);
   const [finding, setFinding] = useState(false);
   const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -325,6 +340,7 @@ export function DocumentEditor({
 
   // Extensions are made once, so they reach the latest functions through this ref.
   const actions = useRef<EditorActions>(noActions);
+  const nestedTable = useRef(() => toast({ message: t('table.noNested') }));
 
   const editor = useEditor({
     extensions: [
@@ -351,6 +367,7 @@ export function DocumentEditor({
       MentionSuggestions.configure({ pageId, onNoAccess: (name) => actions.current.mentionNoAccess(name) }),
       FindReplace.configure({ onOpen: () => actions.current.openFind() }),
       EditorKeys.configure({ actions: () => actions.current }),
+      TableRules.configure({ onNested: () => nestedTable.current() }),
     ],
     // A document even when empty: a string would be parsed as HTML, which our policy blocks.
     content: together ? { type: 'doc', content: [{ type: 'paragraph' }] } : initial,
@@ -410,6 +427,10 @@ export function DocumentEditor({
     openPageFiles: () => setPickingFile(true),
     openBlockMenu: tracker.openAtCursor,
     openTableMenu: tables.open,
+    openTableSize: () => {
+      if (tableAround(editor)) nestedTable.current();
+      else setSizingTable(true);
+    },
     openTemplateItem: setTemplateItem,
     publish: onPublish,
     save: onSave,
@@ -521,6 +542,7 @@ export function DocumentEditor({
         {footer}
       </div>
       {linking && <LinkDialog editor={editor} onClose={() => setLinking(false)} />}
+      {sizingTable && <TableSizeDialog editor={editor} onClose={() => setSizingTable(false)} />}
       {pickingFile && (
         <PageFilesDialog
           pageId={pageId}

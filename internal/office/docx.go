@@ -205,7 +205,14 @@ func (d *wordWriter) block(n document.Node, level int) {
 	case document.TypeDecision:
 		d.paragraph("", d.runs(n), `<w:pBdr><w:left w:val="single" w:sz="18" w:space="6" w:color="1B7A3D"/></w:pBdr>`)
 	case document.TypeTable:
+		caption, below := document.TableCaption(n)
+		if caption != "" && !below {
+			d.paragraph("", textRun(caption, "<w:i/>"), "")
+		}
 		d.table(n)
+		if caption != "" && below {
+			d.paragraph("", textRun(caption, "<w:i/>"), "")
+		}
 	default:
 		if words := inlineWords(n); words != "" {
 			d.paragraph("", textRun(words, ""), "")

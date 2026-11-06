@@ -24,6 +24,8 @@ import {
   IconHeaderColumn,
   IconHeaderRow,
   IconMerge,
+  IconNumbered,
+  IconRename,
   IconRowAdd,
   IconRowDelete,
   IconSortDown,
@@ -32,10 +34,12 @@ import {
   IconTrash,
 } from '../icons';
 import { FIXED_BARS, Menu, MenuItem } from '../menu';
+import { Dialog, Field } from '../ui';
 import { duplicateBlock } from './block-commands';
 import { MARK_COLORS } from './palette';
 import {
   canSortTable,
+  cellOfPosition,
   enterTable,
   equalColumns,
   FULL_STRETCH,
@@ -44,6 +48,7 @@ import {
   isTopLevel,
   paintLine,
   setStretch,
+  setTableSettings,
   sortTable,
   STRETCH_STEP,
   stretchAt,
@@ -51,9 +56,12 @@ import {
   tableAround,
   tableAt,
   WIDE_STRETCH,
+  type TableCell,
 } from './table';
+import { TableLines } from './table-lines';
 
 const MENU_ICON_SIZE = 18;
+const MAX_CAPTION = 500;
 
 interface Box {
   pos: number;
@@ -100,11 +108,17 @@ function tableOf(editor: Editor, element: Element): number | null {
   return after?.type.name === 'table' ? inside : null;
 }
 
+function cellUnder(editor: Editor, table: number, element: Element): TableCell | null {
+  const cell = element.closest('td,th');
+  return cell ? cellOfPosition(editor, table, editor.view.posAtDOM(cell, 0)) : null;
+}
+
 /** Which table has the frame: the one with the cursor, or else the one under the pointer. */
 export function useTableTracking(editor: Editor, sheet: RefObject<HTMLDivElement | null>) {
   const root = useRef<HTMLDivElement>(null);
   const [hovered, setHovered] = useState<number | null>(null);
   const [box, setBox] = useState<Box | null>(null);
+  const [hoveredCell, setHoveredCell] = useState<TableCell | null>(null);
   const inTable = useEditorState({ editor, selector: (s) => tableAround(s.editor)?.pos ?? null });
   const pos = inTable ?? hovered;
 
@@ -120,27 +134,39 @@ export function useTableTracking(editor: Editor, sheet: RefObject<HTMLDivElement
     // Putting the sidebar away changes the room, and so the bars, without resizing the window.
     const bars = new ResizeObserver(measure);
     document.querySelectorAll(FIXED_BARS).forEach((bar) => bars.observe(bar));
+    // A wide table scrolls in its own frame, and the handles go along with their line.
+    document.addEventListener('scroll', measure, { capture: true, passive: true });
     return () => {
       editor.off('transaction', measure);
       window.removeEventListener('resize', measure);
+      document.removeEventListener('scroll', measure, { capture: true });
       bars.disconnect();
     };
   }, [editor, measure]);
 
   const isInUse = () => root.current?.contains(document.activeElement) ?? false;
+  // An open menu keeps its line, or reaching for it would change what it acts on.
+  const hasOpenMenu = () => root.current?.querySelector('[aria-expanded="true"]') != null;
   return {
     root,
     box,
+    hoveredCell,
     active: inTable !== null,
     measure,
     track: (e: MouseEvent<HTMLElement>) => {
       const target = e.target as Element;
-      if (root.current?.contains(target) || isInUse()) return;
-      setHovered(tableOf(editor, target));
+      if (root.current?.contains(target) || hasOpenMenu()) return;
+      const table = tableOf(editor, target);
+      const next = table === null ? null : cellUnder(editor, table, target);
+      setHoveredCell((now) => (now?.row === next?.row && now?.column === next?.column ? now : next));
+      if (!isInUse()) setHovered(table);
     },
     leave: () => {
-      if (!isInUse()) setHovered(null);
+      if (isInUse()) return;
+      setHovered(null);
+      setHoveredCell(null);
     },
+    forgetCell: () => setHoveredCell(null),
     open: () => {
       root.current?.querySelector<HTMLElement>('[aria-haspopup]')?.click();
     },
@@ -218,6 +244,42 @@ function commitStretch(editor: Editor, pos: number, next: number) {
   setStretch(editor, pos, next, factor);
 }
 
+function CaptionDialog({ editor, pos, onClose }: { editor: Editor; pos: number; onClose: () => void }) {
+  const { t } = useTranslation();
+  const attrs = tableAt(editor, pos)?.attrs as { caption: string | null; caption_below: boolean } | undefined;
+  const [caption, setCaption] = useState(attrs?.caption ?? '');
+  const [below, setBelow] = useState(attrs?.caption_below ?? false);
+  return (
+    <Dialog title={t('table.caption')} onClose={onClose}>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          onClose();
+          setTableSettings(editor, pos, { caption: caption.trim() || null, caption_below: below });
+        }}
+      >
+        <Field label={t('table.captionText')}>
+          <input
+            autoFocus
+            value={caption}
+            maxLength={MAX_CAPTION}
+            onChange={(e) => setCaption(e.target.value)}
+          />
+        </Field>
+        <label className="check">
+          <input type="checkbox" checked={below} onChange={(e) => setBelow(e.target.checked)} />
+          {t('table.captionBelow')}
+        </label>
+        <div className="dialog-actions">
+          <button type="submit" className="primary">
+            {t('common.save')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
   const { t } = useTranslation();
   const state = useEditorState({
@@ -230,6 +292,8 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
         headerRow: table ? hasHeaderRow(table) : false,
         headerColumn: table ? hasHeaderColumn(table) : false,
         stretch: (table?.attrs.stretch as number | null) ?? 0,
+        numbered: (table?.attrs.numbered as boolean | undefined) ?? false,
+        flexible: (table?.attrs.flexible as boolean | undefined) ?? false,
         background:
           (s.editor.getAttributes('tableHeader').background as string | null | undefined) ??
           (s.editor.getAttributes('tableCell').background as string | null | undefined) ??
@@ -237,6 +301,7 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
       };
     },
   });
+  const [captioning, setCaptioning] = useState(false);
   // These leave the focus in the menu, which stays open for the next step.
   const chain = () => editor.chain();
   const widths = [
@@ -245,102 +310,122 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
     { value: FULL_STRETCH, label: t('table.widthFull') },
   ];
   return (
-    <Menu
-      label={t('table.menu')}
-      trigger={<IconTableMenu size={MENU_ICON_SIZE} />}
-      className="table-button"
-      keepOpen
-      onLeave={() => editor.commands.focus()}
-    >
-      <Group label={t('table.rows')}>
-        <MenuItem onClick={() => chain().addRowBefore().run()}>
-          <IconRowAdd size={MENU_ICON_SIZE} /> {t('table.rowAbove')}
-        </MenuItem>
-        <MenuItem onClick={() => chain().addRowAfter().run()}>
-          <IconRowAdd size={MENU_ICON_SIZE} /> {t('table.rowBelow')}
-        </MenuItem>
-        <MenuItem onClick={() => chain().deleteRow().run()}>
-          <IconRowDelete size={MENU_ICON_SIZE} /> {t('table.rowDelete')}
-        </MenuItem>
-        <MenuItem
-          role="menuitemcheckbox"
-          aria-checked={state.headerRow}
-          onClick={() => chain().toggleHeaderRow().run()}
-        >
-          <IconHeaderRow size={MENU_ICON_SIZE} /> {t('table.headerRow')}
-        </MenuItem>
-      </Group>
-      <Group label={t('table.columns')}>
-        <MenuItem onClick={() => chain().addColumnBefore().run()}>
-          <IconColumnAdd size={MENU_ICON_SIZE} /> {t('table.columnBefore')}
-        </MenuItem>
-        <MenuItem onClick={() => chain().addColumnAfter().run()}>
-          <IconColumnAdd size={MENU_ICON_SIZE} /> {t('table.columnAfter')}
-        </MenuItem>
-        <MenuItem onClick={() => chain().deleteColumn().run()}>
-          <IconColumnDelete size={MENU_ICON_SIZE} /> {t('table.columnDelete')}
-        </MenuItem>
-        <MenuItem
-          role="menuitemcheckbox"
-          aria-checked={state.headerColumn}
-          onClick={() => chain().toggleHeaderColumn().run()}
-        >
-          <IconHeaderColumn size={MENU_ICON_SIZE} /> {t('table.headerColumn')}
-        </MenuItem>
-        {state.canSort && (
-          <>
-            <MenuItem onClick={() => sortTable(editor, 'up')}>
-              <IconSortUp size={MENU_ICON_SIZE} /> {t('editor.sortUp')}
-            </MenuItem>
-            <MenuItem onClick={() => sortTable(editor, 'down')}>
-              <IconSortDown size={MENU_ICON_SIZE} /> {t('editor.sortDown')}
-            </MenuItem>
-          </>
-        )}
-      </Group>
-      <Group label={t('table.cells')}>
-        <MenuItem onClick={() => chain().mergeOrSplit().run()}>
-          <IconMerge size={MENU_ICON_SIZE} /> {t('table.merge')}
-        </MenuItem>
-      </Group>
-      <Group label={t('table.colour')}>
-        <Swatches
-          label={t('table.colourCell')}
-          current={state.background}
-          onPick={(color) => chain().setCellAttribute('background', color).run()}
-        />
-        <Swatches label={t('table.colourRow')} onPick={(color) => paintLine(editor, 'row', color)} />
-        <Swatches label={t('table.colourColumn')} onPick={(color) => paintLine(editor, 'column', color)} />
-      </Group>
-      <Group label={t('table.table')}>
-        {state.canStretch &&
-          widths.map((width) => (
-            <MenuItem
-              key={width.value}
-              role="menuitemradio"
-              aria-checked={state.stretch === width.value}
-              onClick={() => commitStretch(editor, pos, width.value)}
-            >
-              <IconFullWidth size={MENU_ICON_SIZE} /> {width.label}
-            </MenuItem>
-          ))}
-        <MenuItem onClick={() => equalColumns(editor)}>
-          <IconEqual size={MENU_ICON_SIZE} /> {t('editor.tableEqual')}
-        </MenuItem>
-        <MenuItem onClick={() => duplicateBlock(editor, pos)}>
-          <IconCopy size={MENU_ICON_SIZE} /> {t('table.duplicate')}
-        </MenuItem>
-        <MenuItem
-          className="danger"
-          onClick={() => {
-            chain().deleteTable().run();
-            editor.commands.focus();
-          }}
-        >
-          <IconTrash size={MENU_ICON_SIZE} /> {t('editor.tableDelete')}
-        </MenuItem>
-      </Group>
-    </Menu>
+    <>
+      {captioning && <CaptionDialog editor={editor} pos={pos} onClose={() => setCaptioning(false)} />}
+      <Menu
+        label={t('table.menu')}
+        trigger={<IconTableMenu size={MENU_ICON_SIZE} />}
+        className="table-button"
+        keepOpen
+        onLeave={() => editor.commands.focus()}
+      >
+        <Group label={t('table.rows')}>
+          <MenuItem onClick={() => chain().addRowBefore().run()}>
+            <IconRowAdd size={MENU_ICON_SIZE} /> {t('table.rowAbove')}
+          </MenuItem>
+          <MenuItem onClick={() => chain().addRowAfter().run()}>
+            <IconRowAdd size={MENU_ICON_SIZE} /> {t('table.rowBelow')}
+          </MenuItem>
+          <MenuItem onClick={() => chain().deleteRow().run()}>
+            <IconRowDelete size={MENU_ICON_SIZE} /> {t('table.rowDelete')}
+          </MenuItem>
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={state.headerRow}
+            onClick={() => chain().toggleHeaderRow().run()}
+          >
+            <IconHeaderRow size={MENU_ICON_SIZE} /> {t('table.headerRow')}
+          </MenuItem>
+        </Group>
+        <Group label={t('table.columns')}>
+          <MenuItem onClick={() => chain().addColumnBefore().run()}>
+            <IconColumnAdd size={MENU_ICON_SIZE} /> {t('table.columnBefore')}
+          </MenuItem>
+          <MenuItem onClick={() => chain().addColumnAfter().run()}>
+            <IconColumnAdd size={MENU_ICON_SIZE} /> {t('table.columnAfter')}
+          </MenuItem>
+          <MenuItem onClick={() => chain().deleteColumn().run()}>
+            <IconColumnDelete size={MENU_ICON_SIZE} /> {t('table.columnDelete')}
+          </MenuItem>
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={state.headerColumn}
+            onClick={() => chain().toggleHeaderColumn().run()}
+          >
+            <IconHeaderColumn size={MENU_ICON_SIZE} /> {t('table.headerColumn')}
+          </MenuItem>
+          {state.canSort && (
+            <>
+              <MenuItem onClick={() => sortTable(editor, 'up')}>
+                <IconSortUp size={MENU_ICON_SIZE} /> {t('editor.sortUp')}
+              </MenuItem>
+              <MenuItem onClick={() => sortTable(editor, 'down')}>
+                <IconSortDown size={MENU_ICON_SIZE} /> {t('editor.sortDown')}
+              </MenuItem>
+            </>
+          )}
+        </Group>
+        <Group label={t('table.cells')}>
+          <MenuItem onClick={() => chain().mergeOrSplit().run()}>
+            <IconMerge size={MENU_ICON_SIZE} /> {t('table.merge')}
+          </MenuItem>
+        </Group>
+        <Group label={t('table.colour')}>
+          <Swatches
+            label={t('table.colourCell')}
+            current={state.background}
+            onPick={(color) => chain().setCellAttribute('background', color).run()}
+          />
+          <Swatches label={t('table.colourRow')} onPick={(color) => paintLine(editor, 'row', color)} />
+          <Swatches label={t('table.colourColumn')} onPick={(color) => paintLine(editor, 'column', color)} />
+        </Group>
+        <Group label={t('table.table')}>
+          {state.canStretch &&
+            widths.map((width) => (
+              <MenuItem
+                key={width.value}
+                role="menuitemradio"
+                aria-checked={state.stretch === width.value}
+                onClick={() => commitStretch(editor, pos, width.value)}
+              >
+                <IconFullWidth size={MENU_ICON_SIZE} /> {width.label}
+              </MenuItem>
+            ))}
+          <MenuItem onClick={() => equalColumns(editor)}>
+            <IconEqual size={MENU_ICON_SIZE} /> {t('editor.tableEqual')}
+          </MenuItem>
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={state.flexible}
+            onClick={() => setTableSettings(editor, pos, { flexible: !state.flexible })}
+          >
+            <IconFullWidth size={MENU_ICON_SIZE} /> {t('table.flexible')}
+          </MenuItem>
+          <MenuItem
+            role="menuitemcheckbox"
+            aria-checked={state.numbered}
+            onClick={() => setTableSettings(editor, pos, { numbered: !state.numbered })}
+          >
+            <IconNumbered size={MENU_ICON_SIZE} /> {t('table.numbered')}
+          </MenuItem>
+          <MenuItem onClick={() => setCaptioning(true)}>
+            <IconRename size={MENU_ICON_SIZE} /> {t('table.caption')}
+          </MenuItem>
+          <MenuItem onClick={() => duplicateBlock(editor, pos)}>
+            <IconCopy size={MENU_ICON_SIZE} /> {t('table.duplicate')}
+          </MenuItem>
+          <MenuItem
+            className="danger"
+            onClick={() => {
+              chain().deleteTable().run();
+              editor.commands.focus();
+            }}
+          >
+            <IconTrash size={MENU_ICON_SIZE} /> {t('editor.tableDelete')}
+          </MenuItem>
+        </Group>
+      </Menu>
+    </>
   );
 }
 
@@ -408,7 +493,7 @@ function StretchEdge({ editor, pos, onMove }: { editor: Editor; pos: number; onM
 }
 
 export function TableFrame({ editor, tracker }: { editor: Editor; tracker: Tracker }) {
-  const { box, root, active, measure } = tracker;
+  const { box, root, active, measure, hoveredCell, forgetCell } = tracker;
   const canStretch = useEditorState({
     editor,
     selector: (s) => (box ? isTopLevel(s.editor, box.pos) : false),
@@ -432,6 +517,15 @@ export function TableFrame({ editor, tracker }: { editor: Editor; tracker: Track
     >
       <TableMenu editor={editor} pos={box.pos} />
       {canStretch && <StretchEdge editor={editor} pos={box.pos} onMove={measure} />}
+      {/* After the edge, so a plus on the edge stays within reach. */}
+      <TableLines
+        editor={editor}
+        pos={box.pos}
+        hovered={hoveredCell}
+        frame={root}
+        layout={box}
+        onMoved={forgetCell}
+      />
     </div>
   );
 }

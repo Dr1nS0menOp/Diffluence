@@ -189,7 +189,14 @@ func (d *odtWriter) block(n document.Node) {
 	case document.TypeDecision:
 		d.paragraph("Body", d.spans(n))
 	case document.TypeTable:
+		caption, below := document.TableCaption(n)
+		if caption != "" && !below {
+			d.paragraph("Body", escape(caption))
+		}
 		d.table(n)
+		if caption != "" && below {
+			d.paragraph("Body", escape(caption))
+		}
 	default:
 		if words := inlineWords(n); words != "" {
 			d.paragraph("Body", escape(words))

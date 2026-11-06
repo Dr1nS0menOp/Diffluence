@@ -135,7 +135,7 @@ func (s *Service) PageMarkdown(ctx context.Context, c identity.Caller, pageID uu
 		if p.ID != pageID {
 			continue
 		}
-		doc, err := document.Parse(p.Document)
+		doc, err := s.parseForExport(ctx, c, p.Document)
 		if err != nil {
 			return "", nil, err
 		}
@@ -184,7 +184,7 @@ func (s *Service) Archive(ctx context.Context, c identity.Caller, spaceID uuid.U
 	}
 
 	zw := zip.NewWriter(w)
-	if err := s.writeMarkdownTree(ctx, zw, list); err != nil {
+	if err := s.writeMarkdownTree(ctx, c, zw, list); err != nil {
 		return err
 	}
 	return zw.Close()
@@ -199,7 +199,7 @@ func exportPagesOf(items []exportItem) []pages.ExportPage {
 }
 
 // writeMarkdownTree adds pages to a zip. Parents must come first.
-func (s *Service) writeMarkdownTree(ctx context.Context, zw *zip.Writer, list []pages.ExportPage) error {
+func (s *Service) writeMarkdownTree(ctx context.Context, c identity.Caller, zw *zip.Writer, list []pages.ExportPage) error {
 	dirs := map[uuid.UUID]string{}         // page id -> folder for its children
 	usedIn := map[string]map[string]bool{} // folder -> names taken
 	for _, p := range list {
@@ -213,7 +213,7 @@ func (s *Service) writeMarkdownTree(ctx context.Context, zw *zip.Writer, list []
 		name := unique(usedIn[folder], safeName(p.Title))
 		dirs[p.ID] = path.Join(folder, name)
 
-		doc, err := document.Parse(p.Document)
+		doc, err := s.parseForExport(ctx, c, p.Document)
 		if err != nil {
 			return err
 		}

@@ -4,6 +4,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: links that follow their page, and tables with handles (wave M)
+- A link to a page without your own words shows the current title, as text, a tag or a card. The document holds only the id, so a reader who may not see the page gets neutral words
+- A link can lead to a heading or an anchor, here or on another page, and the link dialog starts with recent pages
+- A selected link has its tools in the row: open, copy, edit, remove, and how it shows
+- A link to a page that does not exist yet starts that page below it. Space settings list the ones nobody has started
+- A new table asks for its size. The row and column in use have a handle with a menu and a plus, and can be dragged or moved from the menu
+- Tables can number their rows, scale with the page, and have a caption. Text with tabs lands as cells
+- A table cannot hold another table any more. On saving, a table inside a table loses its inner grid and keeps its words
+- Upgrade impact: one migration
+
 ### Added: inviting someone without an account (COL-047)
 - A person with the new global permission `invite_people` can ask for an invitation from the Share dialog. An administrator approves or refuses each one under Invitations, with a reason, and the person who asked hears the answer
 - The recipient gets an invitation and never the content, and becomes a guest with view on that one space

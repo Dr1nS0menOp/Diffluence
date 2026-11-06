@@ -17,7 +17,7 @@ interface JsonNode {
   content?: JsonNode[];
 }
 
-const pageOfAddress = (href: unknown) =>
+export const pageOfAddress = (href: unknown) =>
   typeof href === 'string' ? PAGE_ADDRESS.exec(href)?.[1]?.toLowerCase() : undefined;
 
 /** The pages this document links to, each once. */

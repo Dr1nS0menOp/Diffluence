@@ -214,3 +214,14 @@ mark {
     padding: 0;
   }
 }
+
+caption {
+  padding-block: 0.25em;
+  color: #5b6472;
+  font-size: 0.9em;
+  text-align: start;
+}
+
+caption.below {
+  caption-side: bottom;
+}

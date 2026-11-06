@@ -587,6 +587,30 @@ mutate "the console shows the page title" internal/sharing/invitations.go \
   's.replace("SELECT r.id, r.email, u.display_name, r.space_id, sp.name, r.note, r.created_at\n\t\tFROM invitation_requests r\n\t\tJOIN users u ON u.id = r.requester_id", "SELECT r.id, r.email, u.display_name, r.space_id, sp.name, r.note || (SELECT title FROM pages WHERE id = r.page_id), r.created_at\n\t\tFROM invitation_requests r\n\t\tJOIN users u ON u.id = r.requester_id")' $app -run TestTheConsoleShowsTheSpaceAndNeverThePage
 mutate "two answers on a page share a line" internal/notify/notify.go \
   's.replace("if r.Type == TypeInvitationAnswer {", "if r.Type == \"\" {")' $app -run TestTheRequesterHearsTheAnswerAndTheReason
+mutate "link facts show a hidden page" internal/pages/links.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\t\tJOIN spaces sp", "JOIN perm_visible_pages($1) v ON true\n\t\tJOIN spaces sp")' $app -run TestLinkFactsLeaveOutWhatTheReaderMayNotSee
+mutate "a placeholder leads to a page the reader may not see" internal/pages/links.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = h.target_id", "JOIN perm_visible_pages($1) v ON true")' $app -run TestAPlaceholderOnlyLeadsToAPageTheReaderMaySee
+mutate "following a placeholder needs no right to create" internal/pages/links.go \
+  's.replace("if err := s.checkParent(ctx, tx, c, p.SpaceID, source); err != nil {", "if err := s.checkParent(ctx, tx, c, p.SpaceID, source); err != nil \x26\x26 title == \"\" {")' $app -run TestFollowingAPlaceholderNeedsTheRightToCreate
+mutate "following gives the id of a page someone may not see" internal/pages/links.go \
+  's.replace("return s.requireStarted(ctx, tx, c, *target)", "return nil")' $app -run TestSomeoneWhoCannotSeeTheStartedPageGetsAConflict
+mutate "any title on a page can be followed" internal/pages/links.go \
+  's.replace("if errors.Is(err, pgx.ErrNoRows) {\n\t\t\treturn apperr.NotFound()\n\t\t}\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif target != nil {", "if err != nil \x26\x26 !errors.Is(err, pgx.ErrNoRows) {\n\t\t\treturn err\n\t\t}\n\t\tif target != nil {")' $app -run TestOnlyAPlaceholderOnThePageCanBeFollowed
+mutate "the placeholder list shows a hidden page" internal/pages/links.go \
+  's.replace("JOIN pages p ON p.id = h.source_id `+refJoins+`", "JOIN pages p ON p.id = h.source_id JOIN spaces s ON s.id = p.space_id CROSS JOIN (SELECT $1::uuid) AS caller")' $app -run TestThePlaceholderListSkipsAPageTheAdministratorMayNotSee
+mutate "an export names a hidden page" internal/pages/links.go \
+  's.replace("facts, err := s.LinkFacts(ctx, c, document.LinkedPages(doc))", "facts, err := s.LinkFacts(ctx, identity.Caller{UserID: s.anyOwner(ctx, doc)}, document.LinkedPages(doc))\n\t_ = c").concat("\nfunc (s *Service) anyOwner(ctx context.Context, doc document.Node) uuid.UUID {\n\tvar id uuid.UUID\n\tfor _, p := range document.LinkedPages(doc) {\n\t\t_ = s.pool.QueryRow(ctx, \"SELECT created_by FROM pages WHERE id = $1\", p).Scan(\x26id)\n\t}\n\treturn id\n}\n")' $app -run TestAnExportNamesOnlyWhatTheExporterMaySee
+mutate "resolving keeps the id of a hidden page" internal/document/links.go \
+  's.replace("return Node{Type: TypeText, Text: LinkedPageWords}", "return Node{Type: TypeText, Text: id.String()}")' ./internal/document/
+mutate "a site names a page that is not on it" internal/sites/build.go \
+  's.replace("if _, ok := b.links[id]; !ok {\n\t\treturn \"\", false\n\t}\n\tfor _, p := range b.list {\n\t\tif p.page.ID == id {\n\t\t\treturn p.page.Title, true\n\t\t}\n\t}\n\treturn \"\", false", "var title string\n\t_ = b.s.pool.QueryRow(context.Background(), \"SELECT title FROM pages WHERE id = $1\", id).Scan(\x26title)\n\treturn title, true")' $app -run TestALinkThatFollowsItsPageNamesOnlyPagesOnTheSite
+mutate "a linked title is stored in the search index" internal/document/document.go \
+  's.replace("TypePlaceholderLink: \"title\"}[n.Type]", "TypePlaceholderLink: \"title\", TypePageLink: \"page_id\"}[n.Type]")' ./internal/document/
+mutate "a fragment may hold markup" internal/document/links.go \
+  's.replace("len(fragment) <= maxFragmentBytes \x26\x26 fragmentPattern.MatchString(fragment)", "fragment != \"\"")' ./internal/document/
+mutate "a table may stay inside a table" internal/document/document.go \
+  's.replace("\tliftNestedTables(\x26n, false)\n", "")' ./internal/document/
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

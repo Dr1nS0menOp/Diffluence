@@ -218,6 +218,10 @@ func cleanTable(in, out map[string]any) error {
 	if stretch, ok := intAttr(in["stretch"]); ok && stretch >= 1 && stretch <= maxTableStretch {
 		out["stretch"] = stretch
 	}
+	keepTrue(in, out, "numbered")
+	keepTrue(in, out, "flexible")
+	keepText(in, out, "caption", maxCaptionBytes)
+	keepTrue(in, out, "caption_below")
 	keepBlockID(in, out)
 	return nil
 }
@@ -312,31 +316,34 @@ func cleanInstruction(in, out map[string]any) error {
 // attrCleaners rebuild the attributes of a node from scratch. A type without an
 // entry keeps none, so an attribute nobody thought about never gets through.
 var attrCleaners = map[string]func(in, out map[string]any) error{
-	TypeParagraph:     cleanTextBlock,
-	TypeHeading:       cleanHeading,
-	TypeOrderedList:   cleanOrderedList,
-	TypeTaskItem:      cleanTaskItem,
-	TypeCodeBlock:     cleanCodeBlock,
-	TypeImage:         cleanImage,
-	TypeFile:          cleanFile,
-	TypeTable:         cleanTable,
-	TypeTableCell:     cleanCell,
-	TypeTableHeader:   cleanCell,
-	TypePanel:         cleanPanel,
-	TypeExpand:        cleanExpand,
-	TypeColumns:       cleanColumns,
-	TypeStatus:        cleanStatus,
-	TypeDate:          cleanDate,
-	TypeMention:       cleanMention,
-	TypeTemplateField: cleanTemplateField,
-	TypeInstruction:   cleanInstruction,
-	TypeDynamic:       cleanDynamic,
-	TypePageFacts:     cleanPageFacts,
-	TypeExcerpt:       cleanExcerpt,
-	TypeAnchor:        cleanAnchor,
-	TypeChart:         cleanChart,
-	TypeSheet:         cleanSheet,
-	TypeMedia:         cleanMedia}
+	TypeParagraph:       cleanTextBlock,
+	TypeHeading:         cleanHeading,
+	TypeOrderedList:     cleanOrderedList,
+	TypeTaskItem:        cleanTaskItem,
+	TypeCodeBlock:       cleanCodeBlock,
+	TypeImage:           cleanImage,
+	TypeFile:            cleanFile,
+	TypeTable:           cleanTable,
+	TypeTableCell:       cleanCell,
+	TypeTableHeader:     cleanCell,
+	TypePanel:           cleanPanel,
+	TypeExpand:          cleanExpand,
+	TypeColumns:         cleanColumns,
+	TypeStatus:          cleanStatus,
+	TypeDate:            cleanDate,
+	TypeMention:         cleanMention,
+	TypeTemplateField:   cleanTemplateField,
+	TypeInstruction:     cleanInstruction,
+	TypeDynamic:         cleanDynamic,
+	TypePageFacts:       cleanPageFacts,
+	TypeExcerpt:         cleanExcerpt,
+	TypeAnchor:          cleanAnchor,
+	TypeChart:           cleanChart,
+	TypeSheet:           cleanSheet,
+	TypeMedia:           cleanMedia,
+	TypePageLink:        cleanPageLink,
+	TypePageCard:        cleanPageCard,
+	TypePlaceholderLink: cleanPlaceholderLink}
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.
 func cleanAttrs(n *Node) error {

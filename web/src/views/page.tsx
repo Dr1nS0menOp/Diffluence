@@ -765,6 +765,7 @@ export function PageView({ pageId }: { pageId: string }) {
             onTask={page.can['page.edit'] ? (id, done) => tick.mutate({ id, done }) : undefined}
             onView={keepView}
             checkLinks
+            pageId={page.id}
           />
         )}
         <ErrorNote error={tick.error} />

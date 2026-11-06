@@ -5,8 +5,9 @@ import type { Editor } from '@tiptap/core';
 import { Table, TableCell, TableHeader, TableView } from '@tiptap/extension-table';
 import { Fragment, type Node as ProseNode } from '@tiptap/pm/model';
 import { TextSelection } from '@tiptap/pm/state';
-import { TableMap } from '@tiptap/pm/tables';
+import { CellSelection, moveTableColumn, moveTableRow, TableMap } from '@tiptap/pm/tables';
 import type { EditorView } from '@tiptap/pm/view';
+import { dataAttribute, switchAttribute } from './dynamic/nodes';
 
 export const STRETCH_STEP = 5;
 export const WIDE_STRETCH = 50;
@@ -17,11 +18,46 @@ const PERCENT = 100;
 class StretchedTableView extends TableView {
   constructor(node: ProseNode, cellMinWidth: number, view: EditorView, attrs?: Record<string, unknown>) {
     super(node, cellMinWidth, view, attrs);
-    const { stretch } = node.attrs as { stretch: number | null };
-    if (!stretch) return;
-    this.dom.dataset.stretch = String(stretch);
-    this.dom.style.setProperty('--table-stretch', String(stretch));
+    const { stretch, numbered, flexible, caption, caption_below: below } = node.attrs as TableSettings;
+    if (stretch) {
+      this.dom.dataset.stretch = String(stretch);
+      this.dom.style.setProperty('--table-stretch', String(stretch));
+    }
+    if (numbered) this.dom.dataset.numbered = '';
+    if (flexible) {
+      this.dom.dataset.flexible = '';
+      this.forgetWidth();
+    }
+    if (caption) this.addCaption(caption, below);
   }
+
+  update(node: ProseNode) {
+    const kept = super.update(node);
+    if (kept && (node.attrs as TableSettings).flexible) this.forgetWidth();
+    return kept;
+  }
+
+  /** The columns set a width in pixels. A flexible table follows the page instead. */
+  private forgetWidth() {
+    this.table.style.width = '';
+    this.table.style.minWidth = '';
+  }
+
+  private addCaption(words: string, below: boolean) {
+    const caption = document.createElement('caption');
+    caption.textContent = words;
+    caption.contentEditable = 'false';
+    if (below) caption.className = 'below';
+    this.table.prepend(caption);
+  }
+}
+
+interface TableSettings {
+  stretch: number | null;
+  numbered: boolean;
+  flexible: boolean;
+  caption: string | null;
+  caption_below: boolean;
 }
 
 export const DocumentTable = Table.extend({
@@ -40,6 +76,10 @@ export const DocumentTable = Table.extend({
         renderHTML: (attrs: { block_id?: string | null }) =>
           attrs.block_id ? { 'data-block': attrs.block_id } : {},
       },
+      numbered: switchAttribute('numbered'),
+      flexible: switchAttribute('flexible'),
+      caption: dataAttribute('caption'),
+      caption_below: switchAttribute('caption_below'),
     };
   },
 }).configure({ resizable: true, View: StretchedTableView });
@@ -222,4 +262,114 @@ export function equalColumns(editor: Editor) {
     return true;
   });
   editor.view.dispatch(tr);
+}
+
+/** Changes a setting of the table, as one Undo. */
+export function setTableSettings(editor: Editor, pos: number, settings: Partial<TableSettings>) {
+  const table = tableAt(editor, pos);
+  if (!table) return;
+  editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, { ...table.attrs, ...settings }));
+}
+
+export type LineKind = 'row' | 'column';
+
+/** A cell by its place in the grid. */
+export interface TableCell {
+  row: number;
+  column: number;
+}
+
+export interface LineRange {
+  first: number;
+  last: number;
+}
+
+/** Where a cell of the grid starts in the document. */
+export function lineCell(editor: Editor, pos: number, { row, column }: TableCell): number | null {
+  const table = tableAt(editor, pos);
+  if (!table) return null;
+  const map = TableMap.get(table);
+  const offset = map.map[Math.min(row, map.height - 1) * map.width + Math.min(column, map.width - 1)];
+  return offset === undefined ? null : pos + 1 + offset;
+}
+
+/** The grid place of a position inside a table. */
+export function cellOfPosition(editor: Editor, pos: number, inside: number): TableCell | null {
+  const table = tableAt(editor, pos);
+  if (!table) return null;
+  const $inside = editor.state.doc.resolve(inside);
+  for (let depth = $inside.depth; depth > 0; depth--) {
+    const role = $inside.node(depth).type.spec.tableRole as string | undefined;
+    if ((role === 'cell' || role === 'header_cell') && $inside.node(depth - 2) === table) {
+      const { left, top } = TableMap.get(table).findCell($inside.before(depth) - pos - 1);
+      return { row: top, column: left };
+    }
+  }
+  return null;
+}
+
+/** The row and column of the cursor, when the cursor is in this table. */
+export function linesInUse(editor: Editor, pos: number): TableCell | null {
+  const found = tableAround(editor);
+  if (found?.pos !== pos) return null;
+  return cellOfPosition(editor, pos, found.cell + 1);
+}
+
+/** Selects a whole row or column. With extend it reaches from the line selected before. */
+export function selectLine(editor: Editor, pos: number, kind: LineKind, line: TableCell, extend: boolean) {
+  const start = lineCell(
+    editor,
+    pos,
+    kind === 'row' ? { row: line.row, column: 0 } : { row: 0, column: line.column },
+  );
+  if (start === null) return;
+  const { doc, selection, tr } = editor.state;
+  const $head = doc.resolve(start);
+  const $anchor = extend && selection instanceof CellSelection ? selection.$anchorCell : $head;
+  const make = kind === 'row' ? CellSelection.rowSelection : CellSelection.colSelection;
+  editor.view.dispatch(tr.setSelection(make($anchor, $head)));
+}
+
+/** The whole lines that are selected, if any. */
+export function selectedLines(editor: Editor, pos: number, kind: LineKind): LineRange | null {
+  const { selection } = editor.state;
+  const table = tableAt(editor, pos);
+  if (!table || !(selection instanceof CellSelection)) return null;
+  const whole = kind === 'row' ? selection.isRowSelection() : selection.isColSelection();
+  if (!whole) return null;
+  const map = TableMap.get(table);
+  const start = pos + 1;
+  const { left, right, top, bottom } = map.rectBetween(
+    selection.$anchorCell.pos - start,
+    selection.$headCell.pos - start,
+  );
+  return kind === 'row' ? { first: top, last: bottom - 1 } : { first: left, last: right - 1 };
+}
+
+/** Moves whole lines so that they land on `to`. Says no when merged cells stand in the way. */
+export function moveLines(
+  editor: Editor,
+  pos: number,
+  kind: LineKind,
+  lines: LineRange,
+  to: number,
+): boolean {
+  const table = tableAt(editor, pos);
+  if (!table) return false;
+  const map = TableMap.get(table);
+  const end = (kind === 'row' ? map.height : map.width) - 1;
+  if (to < 0 || to > end || (to >= lines.first && to <= lines.last)) return true;
+  const move = kind === 'row' ? moveTableRow : moveTableColumn;
+  const count = lines.last - lines.first + 1;
+  const downwards = to > lines.last;
+  for (let step = 0; step < count; step++) {
+    const from = downwards ? lines.first : lines.first + step;
+    const target = downwards ? to : to + step;
+    const moved = move({ from, to: target, pos: pos + 1, select: false })(editor.state, editor.view.dispatch);
+    if (!moved) return false;
+  }
+  const landed = downwards ? to - count + 1 : to;
+  selectLine(editor, pos, kind, { row: landed, column: landed }, false);
+  if (count > 1) selectLine(editor, pos, kind, { row: landed + count - 1, column: landed + count - 1 }, true);
+  return true;
 }

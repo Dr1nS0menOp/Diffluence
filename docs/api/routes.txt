@@ -148,12 +148,14 @@ GET /api/v1/pages/{id}/insights                                object:analytics.
 GET /api/v1/pages/{id}/labels                                  object:page.view
 GET /api/v1/pages/{id}/mention-candidates                      object:page.view
 GET /api/v1/pages/{id}/move-impact                             object:page.edit
+GET /api/v1/pages/{id}/placeholders                            object:page.view
 GET /api/v1/pages/{id}/public-link                             object:space.administer
 GET /api/v1/pages/{id}/public-state                            object:page.view
 GET /api/v1/pages/{id}/reactions                               object:page.view
 GET /api/v1/pages/{id}/restrictions                            object:page.view
 GET /api/v1/pages/{id}/rules                                   object:page.view
 GET /api/v1/pages/{id}/summary                                 object:page.view
+GET /api/v1/pages/{id}/targets                                 object:page.view
 GET /api/v1/pages/{id}/used-by                                 object:page.view
 GET /api/v1/pages/{id}/version-authors                         object:page.view
 GET /api/v1/pages/{id}/versions                                object:page.view
@@ -203,6 +205,7 @@ GET /api/v1/spaces/{id}/old-keys                               object:space.admi
 GET /api/v1/spaces/{id}/overview                               object:space.view
 GET /api/v1/spaces/{id}/pdf-design                             object:space.administer
 GET /api/v1/spaces/{id}/people                                 object:space.view
+GET /api/v1/spaces/{id}/placeholders                           object:space.administer
 GET /api/v1/spaces/{id}/popular                                object:space.view
 GET /api/v1/spaces/{id}/posts                                  object:space.view
 GET /api/v1/spaces/{id}/rules                                  object:space.administer
@@ -324,6 +327,7 @@ POST /api/v1/me/totp/confirm                                   session-only auth
 POST /api/v1/me/totp/disable                                   sensitive authenticated
 POST /api/v1/pages                                             object:page.create
 POST /api/v1/pages/bulk-move                                   authenticated
+POST /api/v1/pages/link-facts                                  authenticated
 POST /api/v1/pages/reachable                                   authenticated
 POST /api/v1/pages/{id}/access-requests                        authenticated
 POST /api/v1/pages/{id}/approvals                              object:page.edit
@@ -336,6 +340,7 @@ POST /api/v1/pages/{id}/invitation-requests                    object:page.view
 POST /api/v1/pages/{id}/kind                                   object:page.edit
 POST /api/v1/pages/{id}/labels                                 object:page.edit
 POST /api/v1/pages/{id}/move                                   object:page.edit
+POST /api/v1/pages/{id}/placeholders                           object:page.view
 POST /api/v1/pages/{id}/publish                                object:page.edit
 POST /api/v1/pages/{id}/save-as-template                       object:space.administer
 POST /api/v1/pages/{id}/share                                  object:page.view

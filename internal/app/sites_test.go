@@ -228,6 +228,23 @@ func TestALinkToAPageOffTheSiteBecomesText(t *testing.T) {
 	}
 }
 
+func TestALinkThatFollowsItsPageNamesOnlyPagesOnTheSite(t *testing.T) {
+	s := siteSetup(t)
+	hidden := s.owner.page(s.space, nil, "Merger with Initech", "x")
+	shown := s.owner.page(s.space, nil, "Shown here", "x")
+	page := s.owner.ok("POST", "/api/v1/pages", map[string]any{"space_id": s.space, "title": "Linking"})["id"].(string)
+	s.owner.publish(page, "Linking", 0, inlineDoc(pageLink(hidden), map[string]any{"type": "text", "text": " and "}, pageLink(shown)))
+	s.choose(page, shown)
+	s.publish()
+	got := s.live("linking.html")
+	if strings.Contains(got, "Merger") || strings.Contains(got, hidden) {
+		t.Fatalf("a page off the site shows: %s", got)
+	}
+	if !strings.Contains(got, "Linked page") || !strings.Contains(got, "Shown here") {
+		t.Fatalf("%s", got)
+	}
+}
+
 func TestTheScrubStopsABuildAndKeepsTheOldSite(t *testing.T) {
 	cases := map[string]func(s *siteEnv) string{
 		"the instance address": func(*siteEnv) string { return "see http://localhost/x" },

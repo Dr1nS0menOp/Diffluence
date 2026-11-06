@@ -69,6 +69,9 @@ export const IconQuote = line('M9 7c-3 1-4 3-4 6v3h5v-5H6M19 7c-3 1-4 3-4 6v3h5v
 export const IconCode = line('M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14');
 export const IconCodeBlock = line('M4 5h16v14H4zM9 10l-2 2 2 2M15 10l2 2-2 2');
 export const IconRule = line('M4 12h16');
+export const IconUnlink = line(
+  'M9 15l-1.5 1.5a3.5 3.5 0 0 1-5-5L5 9M15 9l1.5-1.5a3.5 3.5 0 0 1 5 5L19 15M9 4v3M15 20v-3M4 9h0M20 15h0',
+);
 export const IconLink = line(
   'M10 14a4 4 0 0 0 6 0l3-3a4 4 0 0 0-6-6l-1 1M14 10a4 4 0 0 0-6 0l-3 3a4 4 0 0 0 6 6l1-1',
 );

@@ -28,6 +28,7 @@ import { useFileFacts } from './attachments';
 import { isDrawing } from './drawing';
 import type { EditorActions } from './keys';
 import { LanguageDialog } from './language-dialog';
+import { LinkTools } from './link-tools';
 import { IMAGE_SIZES, MARK_COLORS, PANEL_KINDS, PANEL_TINT } from './palette';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
 
@@ -355,12 +356,14 @@ function CodeTools({ editor }: { editor: Editor }) {
   );
 }
 
+const LINK_KINDS = ['link', 'pageLink', 'pageCard', 'placeholderLink'];
+
 /** The tools for what is selected. Only the innermost thing gets them, so the row stays short. */
 export function SelectionTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const active = useEditorState({
     editor,
     selector: (s) =>
-      ['status', 'date', 'image', 'codeBlock', 'panel', 'expand', 'columns'].find((name) =>
+      ['status', 'date', 'image', ...LINK_KINDS, 'codeBlock', 'panel', 'expand', 'columns'].find((name) =>
         s.editor.isActive(name),
       ),
   });
@@ -374,6 +377,9 @@ export function SelectionTools({ editor, actions }: { editor: Editor; actions: E
     panel: <PanelTools key="panel" editor={editor} />,
     expand: <ExpandTools key="expand" editor={editor} />,
     columns: <ColumnTools key="columns" editor={editor} />,
+    ...Object.fromEntries(
+      LINK_KINDS.map((kind) => [kind, <LinkTools key={kind} editor={editor} actions={actions} />]),
+    ),
   };
   if (!active) return null;
   return (

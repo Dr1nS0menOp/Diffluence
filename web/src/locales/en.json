@@ -529,7 +529,22 @@
     "widthText": "Width of the text",
     "widthWide": "Wide",
     "widthFull": "Full width",
-    "duplicate": "Duplicate table"
+    "duplicate": "Duplicate table",
+    "newTitle": "New table",
+    "insert": "Insert table",
+    "rowMenu": "Row options",
+    "columnMenu": "Column options",
+    "rowUp": "Move row up",
+    "rowDown": "Move row down",
+    "columnEarlier": "Move column back",
+    "columnLater": "Move column forward",
+    "cannotMove": "This line cannot move there. Split merged cells first.",
+    "noNested": "A table cannot hold another table.",
+    "flexible": "Scale with the page",
+    "numbered": "Number the rows",
+    "caption": "Caption",
+    "captionText": "Words of the caption",
+    "captionBelow": "Show it below the table"
   },
   "shortcutLinks": {
     "title": "Shortcuts",
@@ -622,7 +637,9 @@
     "emptyTree": "No pages yet.",
     "addChild": "Add a page under {{title}}",
     "hideSidebar": "Hide sidebar",
-    "showSidebar": "Show sidebar"
+    "showSidebar": "Show sidebar",
+    "placeholders": "Pages that do not exist yet",
+    "placeholdersHelp": "Links on these pages lead to a title nobody has started. Follow one to start it."
   },
   "permissions": {
     "subject": "Who",
@@ -702,7 +719,9 @@
     "untitled": "Untitled",
     "moreActions": "More actions",
     "byline": "By {{name}}",
-    "lastUpdated": "Last updated {{date}}"
+    "lastUpdated": "Last updated {{date}}",
+    "linkHidden": "A page you cannot open",
+    "placeholderHelp": "This page does not exist yet. Select it to start it here."
   },
   "editor": {
     "toolbar": "Formatting",
@@ -862,7 +881,23 @@
     "closeAnyway": "Close anyway",
     "unpublishedChanges": "Unpublished changes",
     "revert": "Revert to published",
-    "confirmRevert": "Throw away your changes and go back to the published version?"
+    "confirmRevert": "Throw away your changes and go back to the published version?",
+    "linkTarget": "Where on the page",
+    "linkTargetTop": "The top of the page",
+    "linkTargetAnchor": "Anchor: {{name}}",
+    "linkRecent": "Recent pages",
+    "linkPlaceholder": "Link to a new page: {{title}}",
+    "linkThisPage": "A place on this page",
+    "linkDisplay": "Show as",
+    "linkDisplay_words": "Your own words",
+    "linkDisplay_title": "Title",
+    "linkDisplay_tag": "Tag",
+    "linkDisplay_card": "Card",
+    "linkTextHelp": "Leave this empty to show the title of the page, which follows every rename.",
+    "linkOpen": "Open link",
+    "linkCopy": "Copy link",
+    "linkCopied": "Link copied",
+    "linkEdit": "Edit link"
   },
   "blocks": {
     "page": "Page",

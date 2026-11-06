@@ -82,6 +82,7 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
   const id = await publishedPage(page, space.id, 'Tables', 'start');
   await page.goto(`/pages/${id}/edit`);
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.getByRole('dialog', { name: 'New table' }).getByRole('button', { name: 'Insert table' }).click();
   await editorSettled(page);
   await page.keyboard.type('Name');
   await page.getByRole('button', { name: 'Table options' }).click();

@@ -251,6 +251,7 @@ test('a column gets wider by dragging its border, and Equal columns undoes that'
   await editing(page, 'Widths');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.getByRole('dialog', { name: 'New table' }).getByRole('button', { name: 'Insert table' }).click();
   const first = body(page).locator('th').first();
   const box = await first.boundingBox();
   if (!box) throw new Error('the table has no size');
@@ -354,7 +355,7 @@ test('a link to a page keeps working after a rename', async ({ page }) => {
   await dialog.getByLabel('Find a page').fill('Zebrapage');
   await dialog.getByRole('button', { name: 'Zebrapage target' }).click();
   await expect(dialog.getByLabel('Link address')).toHaveValue(`/pages/${target}`);
-  await expect(dialog.getByLabel('Text to show')).toHaveValue('Zebrapage target');
+  await dialog.getByLabel('Text to show').fill('Zebrapage target');
   await dialog.getByRole('button', { name: 'Save' }).click();
   await publish(page);
 
@@ -421,6 +422,7 @@ test('table tools: header, cell colour and sort survive publishing', async ({ pa
   await editing(page, 'Tables');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.getByRole('dialog', { name: 'New table' }).getByRole('button', { name: 'Insert table' }).click();
   await editorSettled(page);
   await page.keyboard.type('Name');
   await page.keyboard.press('Tab');
@@ -453,6 +455,7 @@ test('merged cells survive publishing, and take the sort tools away', async ({ p
   await editing(page, 'Merge');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await page.getByRole('dialog', { name: 'New table' }).getByRole('button', { name: 'Insert table' }).click();
   await editorSettled(page);
   await page.keyboard.press('Shift+ArrowRight');
   await page.keyboard.press('Shift+ArrowRight');

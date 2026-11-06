@@ -102,9 +102,11 @@ func syncLinks(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc document.No
 	if _, err := tx.Exec(ctx, "DELETE FROM page_links WHERE source_id = $1", pageID); err != nil {
 		return err
 	}
-	_, err := tx.Exec(ctx, `INSERT INTO page_links (source_id, target_id)
-		SELECT $1, target FROM unnest($2::uuid[]) AS target`, pageID, document.LinkedPages(doc))
-	return err
+	if _, err := tx.Exec(ctx, `INSERT INTO page_links (source_id, target_id)
+		SELECT $1, target FROM unnest($2::uuid[]) AS target`, pageID, document.LinkedPages(doc)); err != nil {
+		return err
+	}
+	return syncPlaceholders(ctx, tx, pageID, doc)
 }
 
 func incomingLinks(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) ([]PageRef, error) {

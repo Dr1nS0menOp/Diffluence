@@ -106,7 +106,7 @@ export const INSERT_ITEMS: InsertItem[] = [
   {
     id: 'table',
     icon: IconTable,
-    run: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+    run: (_editor, actions) => actions.openTableSize(),
   },
   { id: 'attach', icon: IconAttach, run: (_editor, actions) => actions.pickFiles() },
   { id: 'pageFile', icon: IconAttach, run: (_editor, actions) => actions.openPageFiles() },

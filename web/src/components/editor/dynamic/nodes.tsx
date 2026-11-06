@@ -11,14 +11,14 @@ import {
 } from '@tiptap/react';
 import { Chart, chartData } from '../../chart';
 
-const dataAttribute = (name: string) => ({
+export const dataAttribute = (name: string) => ({
   default: null,
   parseHTML: (el: HTMLElement) => el.getAttribute(`data-${name}`),
   renderHTML: (attrs: Record<string, string | null>) =>
     attrs[name] ? { [`data-${name}`]: attrs[name] } : {},
 });
 
-const switchAttribute = (name: string) => ({
+export const switchAttribute = (name: string) => ({
   default: false,
   parseHTML: (el: HTMLElement) => el.hasAttribute(`data-${name}`),
   renderHTML: (attrs: Record<string, boolean>) => (attrs[name] ? { [`data-${name}`]: '' } : {}),

@@ -183,6 +183,9 @@ func (w *htmlWriter) node(n Node) {
 		w.b.WriteString(esc(w.mention(n)))
 	case TypeTable:
 		w.b.WriteString(`<div class="table"><table>`)
+		if caption, below := TableCaption(n); caption != "" {
+			w.b.WriteString(captionTag(below) + esc(caption) + "</caption>")
+		}
 		w.children(n)
 		w.b.WriteString("</table></div>")
 	case TypeSheet:
@@ -217,6 +220,13 @@ func (w *htmlWriter) sheet(n Node) {
 		w.b.WriteString("</tr>")
 	}
 	w.b.WriteString("</table>")
+}
+
+func captionTag(below bool) string {
+	if below {
+		return `<caption class="below">`
+	}
+	return "<caption>"
 }
 
 func (w *htmlWriter) mention(n Node) string {

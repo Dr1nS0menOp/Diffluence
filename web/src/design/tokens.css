@@ -83,6 +83,8 @@
   --size-picture: 5rem;
   --size-tile: 10rem;
   --size-edge: 6px;
+  --size-table-numbers: 2.5rem;
+  --size-table-cell: 1.25rem;
   --size-space-chip: 7rem;
 
   /* A page and the editor scale with the room around them, inside these limits. */

@@ -533,6 +533,11 @@
   pointer-events: none;
 }
 
+/* The frame lets clicks through, and a dialog of the table would inherit that. */
+.table-frame dialog {
+  pointer-events: auto;
+}
+
 .table-frame.active {
   outline: 2px solid var(--color-accent);
 }
@@ -575,6 +580,95 @@
 
 .table-edge:hover,
 .table-edge:focus-visible {
+  background: var(--color-accent);
+}
+
+/* The handle and the plus of the row and column in use. Half on the edge, so a table that
+   fills the window keeps them. */
+.table-frame .table-line .menu {
+  position: static;
+  display: block;
+  margin: 0;
+}
+
+.table-lines {
+  display: contents;
+}
+
+.table-line,
+.table-plus {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.table-line,
+.table-plus {
+  translate: -50% -50%;
+}
+
+.table-line {
+  touch-action: none;
+}
+
+/* An open menu lies over the table, and the pluses would show through it. */
+.table-frame:has([aria-expanded='true']) .table-plus {
+  visibility: hidden;
+}
+
+.table-handle {
+  inline-size: var(--size-twist);
+  min-block-size: var(--size-twist);
+  padding: 0;
+  border-color: var(--color-guide);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  cursor: grab;
+}
+
+.table-plus {
+  inline-size: var(--size-twist);
+  min-block-size: var(--size-twist);
+  padding: 0;
+  border-color: var(--color-guide);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+  color: var(--color-accent);
+}
+
+.table-drop {
+  position: absolute;
+  background: var(--color-accent);
+}
+
+.table-drop.row {
+  inline-size: 100%;
+  block-size: 2px;
+}
+
+.table-drop.column {
+  inline-size: 2px;
+  block-size: 100%;
+}
+
+.size-grid {
+  display: grid;
+  grid-template-columns: repeat(8, var(--size-table-cell));
+  gap: var(--space-1);
+  margin-block-end: var(--space-3);
+}
+
+.size-cell {
+  inline-size: var(--size-table-cell);
+  min-block-size: var(--size-table-cell);
+  padding: 0;
+  border-color: var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.size-cell.on {
+  border-color: var(--color-accent);
   background: var(--color-accent);
 }
 

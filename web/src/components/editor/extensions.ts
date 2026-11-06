@@ -12,6 +12,7 @@ import { Anchor, ChartNode, Excerpt, Media, PageFacts } from './dynamic/nodes';
 import { DateMark, Instruction, Status, TemplateField } from './inline';
 import { BlockFormat, Highlight, Subscript, Superscript, TextColor } from './marks';
 import { Mention } from './people';
+import { PageCard, PageLink, PlaceholderLink } from './page-links';
 import { DocumentCell, DocumentHeaderCell, DocumentTable } from './table';
 
 /** A task has an id, so a tick in a list can find it in the document. */
@@ -51,12 +52,15 @@ export interface DocumentOptions {
   onTask?: TaskToggle;
   /** Editing together: undo comes from the shared document, per person. */
   shared?: boolean;
+  /** The published page being read. A link to a page that does not exist yet starts from it. */
+  sourcePage?: string;
 }
 
 export function documentExtensions({
   fileAddress = pageFileAddress,
   onTask,
   shared = false,
+  sourcePage,
 }: DocumentOptions = {}): AnyExtension[] {
   return [
     StarterKit.configure({
@@ -99,6 +103,9 @@ export function documentExtensions({
     ChartNode,
     SheetNode,
     Media,
+    PageLink,
+    PageCard,
+    PlaceholderLink.configure({ sourcePage }),
     Status,
     DateMark,
     Mention,

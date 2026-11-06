@@ -410,11 +410,7 @@ export function Toolbar({
           />
         </>
       )}
-      <Tool
-        editor={editor}
-        label={t('editor.table')}
-        run={() => chain().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()}
-      >
+      <Tool editor={editor} label={t('editor.table')} run={actions.openTableSize}>
         <IconTable size={TOOL_ICON_SIZE} />
       </Tool>
       <Tool editor={editor} label={t('editor.insert')} run={onInsert}>

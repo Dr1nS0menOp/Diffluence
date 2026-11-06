@@ -97,48 +97,51 @@ const (
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink}
 )
 
 // children says which node types may appear inside each node type.
 var children = map[string][]string{
-	TypeDoc:            append(slices.Clone(blockTypes), TypeSheet),
-	TypeParagraph:      inlineTypes,
-	TypeHeading:        inlineTypes,
-	TypeBulletList:     {TypeListItem},
-	TypeOrderedList:    {TypeListItem},
-	TypeListItem:       blockTypes,
-	TypeTaskList:       {TypeTaskItem},
-	TypeTaskItem:       blockTypes,
-	TypeBlockquote:     blockTypes,
-	TypeCodeBlock:      {TypeText},
-	TypeHorizontalRule: {},
-	TypeHardBreak:      {},
-	TypeImage:          {},
-	TypeFile:           {},
-	TypePanel:          blockTypes,
-	TypeExpand:         blockTypes,
-	TypeColumns:        {TypeColumn},
-	TypeColumn:         blockTypes,
-	TypeDecision:       inlineTypes,
-	TypeStatus:         {},
-	TypeDate:           {},
-	TypeTemplateField:  {},
-	TypeInstruction:    {},
-	TypeMention:        {},
-	TypeDynamic:        {},
-	TypePageFacts:      {TypeTable},
-	TypeExcerpt:        blockTypes,
-	TypeAnchor:         {},
-	TypeChart:          {},
-	TypeSheet:          {},
-	TypeMedia:          {},
-	TypeTable:          {TypeTableRow},
-	TypeTableRow:       {TypeTableCell, TypeTableHeader},
-	TypeTableCell:      blockTypes,
-	TypeTableHeader:    blockTypes,
-	TypeText:           {},
+	TypeDoc:             append(slices.Clone(blockTypes), TypeSheet),
+	TypeParagraph:       inlineTypes,
+	TypeHeading:         inlineTypes,
+	TypeBulletList:      {TypeListItem},
+	TypeOrderedList:     {TypeListItem},
+	TypeListItem:        blockTypes,
+	TypeTaskList:        {TypeTaskItem},
+	TypeTaskItem:        blockTypes,
+	TypeBlockquote:      blockTypes,
+	TypeCodeBlock:       {TypeText},
+	TypeHorizontalRule:  {},
+	TypeHardBreak:       {},
+	TypeImage:           {},
+	TypeFile:            {},
+	TypePanel:           blockTypes,
+	TypeExpand:          blockTypes,
+	TypeColumns:         {TypeColumn},
+	TypeColumn:          blockTypes,
+	TypeDecision:        inlineTypes,
+	TypeStatus:          {},
+	TypeDate:            {},
+	TypeTemplateField:   {},
+	TypeInstruction:     {},
+	TypeMention:         {},
+	TypeDynamic:         {},
+	TypePageFacts:       {TypeTable},
+	TypeExcerpt:         blockTypes,
+	TypeAnchor:          {},
+	TypeChart:           {},
+	TypeSheet:           {},
+	TypeMedia:           {},
+	TypePageLink:        {},
+	TypePageCard:        {},
+	TypePlaceholderLink: {},
+	TypeTable:           {TypeTableRow},
+	TypeTableRow:        {TypeTableCell, TypeTableHeader},
+	TypeTableCell:       blockTypes,
+	TypeTableHeader:     blockTypes,
+	TypeText:            {},
 }
 
 // NodeTypes lists every node a document can hold.
@@ -181,6 +184,7 @@ func Normalize(raw []byte) (Node, error) {
 	if err := clean(&n, 0); err != nil {
 		return Node{}, apperr.Invalid(err.Error())
 	}
+	liftNestedTables(&n, false)
 	if len(n.Content) == 0 {
 		n.Content = []Node{{Type: TypeParagraph}}
 	}
@@ -313,7 +317,7 @@ func Walk(n Node, visit func(Node)) {
 
 // wordsOf returns what a node itself says, apart from its children.
 func wordsOf(n Node) string {
-	key := map[string]string{TypeFile: "filename", TypeStatus: "text", TypeDate: "value", TypeImage: "caption", TypeExpand: "title"}[n.Type]
+	key := map[string]string{TypeFile: "filename", TypeStatus: "text", TypeDate: "value", TypeImage: "caption", TypeExpand: "title", TypePlaceholderLink: "title"}[n.Type]
 	if n.Type == TypeText {
 		return n.Text
 	}
@@ -383,16 +387,24 @@ var pageLink = regexp.MustCompile(`^/pages/([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-
 func LinkedPages(n Node) []uuid.UUID {
 	seen := map[uuid.UUID]bool{}
 	out := []uuid.UUID{}
+	add := func(id uuid.UUID) {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
 	Walk(n, func(c Node) {
+		if id, ok := linkedPageOf(c); ok {
+			add(id)
+		}
 		for _, m := range c.Marks {
 			href, _ := m.Attrs["href"].(string)
 			found := pageLink.FindStringSubmatch(href)
 			if m.Type != MarkLink || found == nil {
 				continue
 			}
-			if id, err := uuid.Parse(found[1]); err == nil && !seen[id] {
-				seen[id] = true
-				out = append(out, id)
+			if id, err := uuid.Parse(found[1]); err == nil {
+				add(id)
 			}
 		}
 	})

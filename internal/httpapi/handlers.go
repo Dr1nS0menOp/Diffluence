@@ -45,6 +45,7 @@ func (s *Server) registerRoutes() {
 	s.registerContentRoutes()
 	s.registerReadingRoutes()
 	s.registerBlockRoutes()
+	s.registerLinkRoutes()
 	s.registerFileRoutes()
 	s.registerOrganisingRoutes()
 	s.registerTemplateRoutes()

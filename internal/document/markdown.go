@@ -547,6 +547,11 @@ func (w *mdWriter) listItem(item Node, prefix, marker string) {
 }
 
 func (w *mdWriter) table(n Node, prefix string) {
+	caption, below := TableCaption(n)
+	if caption != "" && !below {
+		w.line(prefix, "*"+escapeInline(caption)+"*")
+		w.line(prefix, "")
+	}
 	for i, row := range n.Content {
 		cells := make([]string, 0, len(row.Content))
 		for _, cell := range row.Content {
@@ -560,6 +565,10 @@ func (w *mdWriter) table(n Node, prefix string) {
 		if i == 0 {
 			w.line(prefix, "|"+strings.Repeat(" --- |", max(len(cells), 1)))
 		}
+	}
+	if caption != "" && below {
+		w.line(prefix, "")
+		w.line(prefix, "*"+escapeInline(caption)+"*")
 	}
 }
 

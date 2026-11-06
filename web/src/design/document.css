@@ -140,6 +140,54 @@
   text-decoration: line-through;
 }
 
+/* A page that does not exist yet: its own colour, and a dashed line that needs no colour to read. */
+.link-placeholder {
+  min-block-size: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-danger);
+  font: inherit;
+  text-decoration: underline dashed;
+}
+
+button.link-placeholder {
+  cursor: pointer;
+}
+
+.page-tag {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-code);
+  text-decoration: none;
+}
+
+.page-card {
+  margin-block: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.page-card-title {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+  font-weight: var(--weight-strong);
+}
+
+.page-card-excerpt {
+  margin-block: var(--space-1);
+}
+
+.page-card-facts {
+  margin-block: 0;
+  font-size: var(--text-small);
+}
+
 .prose img {
   max-inline-size: 100%;
   block-size: auto;
@@ -600,6 +648,44 @@ a.file-tile:hover {
 .prose .tableWrapper table {
   margin-block: 0;
   border-style: hidden;
+}
+
+.prose .tableWrapper caption {
+  padding: var(--space-2) var(--space-3);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  text-align: start;
+}
+
+.prose .tableWrapper caption.below {
+  caption-side: bottom;
+}
+
+/* A flexible table follows the page. Any other table keeps its layout and scrolls. */
+.prose .tableWrapper[data-flexible] table {
+  inline-size: 100%;
+  table-layout: auto;
+}
+
+/* The numbers are no cells: they sit in a margin, and follow the row wherever it goes. */
+.prose .tableWrapper[data-numbered] table {
+  counter-reset: table-row;
+  margin-inline-start: var(--size-table-numbers);
+  inline-size: calc(100% - var(--size-table-numbers));
+}
+
+.prose .tableWrapper[data-numbered] tr:has(td) {
+  counter-increment: table-row;
+}
+
+.prose .tableWrapper[data-numbered] tr:has(td) > :first-child::before {
+  position: absolute;
+  inset-inline-start: calc(-1 * var(--size-table-numbers));
+  inline-size: var(--size-table-numbers);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  text-align: center;
+  content: counter(table-row);
 }
 
 /* Only at the top of the document, because there is nothing to stretch into elsewhere. */

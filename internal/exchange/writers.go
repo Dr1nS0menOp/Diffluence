@@ -232,7 +232,7 @@ func (w *exportWriter) text(ctx context.Context) error {
 
 func (w *exportWriter) markdown(ctx context.Context) error {
 	zw := zip.NewWriter(w.out)
-	if err := w.s.writeMarkdownTree(ctx, zw, exportPagesOf(w.items)); err != nil {
+	if err := w.s.writeMarkdownTree(ctx, w.c, zw, exportPagesOf(w.items)); err != nil {
 		return err
 	}
 	if err := addMissing(zw, w.report); err != nil {
@@ -373,6 +373,8 @@ func (w *exportWriter) htmlVersions(ctx context.Context, zw *zip.Writer, item ex
 		}
 		name := fmt.Sprintf("%s.v%d", item.name, v.number)
 		title := fmt.Sprintf("%s, version %d", item.page.Title, v.number)
+		// An old version gets neutral words: nobody asked who may see what it linked to then.
+		doc = document.ResolveLinks(doc, nil)
 		if err := addText(zw, htmlFileName(name), w.shell(title, document.ToHTML(doc, options), "")); err != nil {
 			return "", err
 		}

@@ -411,7 +411,7 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, list []pages.E
 			report.Skipped++
 			continue
 		}
-		doc, err := document.Parse(p.Document)
+		doc, err := s.parseForExport(ctx, c, p.Document)
 		if err != nil {
 			report.Failed = append(report.Failed, p.Title)
 			continue
@@ -436,6 +436,19 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, list []pages.E
 	}
 	report.Pages = len(items)
 	return items, nil
+}
+
+// parseForExport reads a document, with its links in words the exporter may see (spec 023, D4).
+func (s *Service) parseForExport(ctx context.Context, c identity.Caller, raw []byte) (document.Node, error) {
+	doc, err := document.Parse(raw)
+	if err != nil {
+		return document.Node{}, err
+	}
+	titles, err := s.pages.LinkTitles(ctx, c, doc)
+	if err != nil {
+		return document.Node{}, err
+	}
+	return document.ResolveLinks(doc, titles), nil
 }
 
 // limitedWriter stops a file at the size an administrator allows.

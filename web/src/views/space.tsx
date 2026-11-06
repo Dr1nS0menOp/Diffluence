@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Category, type Shortcut, type Space, type TrashItem } from '../api';
+import { api, type Category, type PageRef, type Shortcut, type Space, type TrashItem } from '../api';
 import { Link, navigate } from '../router';
 import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
@@ -25,6 +25,31 @@ import {
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
+}
+
+/** Links to pages nobody has started. Nothing shows until there is something to do. */
+function PlaceholdersSection({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['placeholders-of-space', space.id],
+    queryFn: () =>
+      api.get<{ placeholders: { title: string; source: PageRef }[] }>(`/spaces/${space.id}/placeholders`),
+  });
+  const list = q.data?.placeholders ?? [];
+  if (list.length === 0) return <ErrorNote error={q.error} />;
+  return (
+    <section aria-labelledby="placeholders-heading">
+      <h2 id="placeholders-heading">{t('space.placeholders')}</h2>
+      <p className="muted">{t('space.placeholdersHelp')}</p>
+      <ul className="plain-list">
+        {list.map((one) => (
+          <li key={`${one.source.id}-${one.title}`}>
+            {one.title} · <Link href={`/pages/${one.source.id}`}>{one.source.title}</Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 /** Opening a space goes to its home page. */
@@ -238,6 +263,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
         </form>
       </section>
       <SpaceLinksSection space={space} />
+      <PlaceholdersSection space={space} />
       <KeySection space={space} />
       <PeopleSection space={space} />
       <FeaturesSection space={space} />

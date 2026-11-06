@@ -915,6 +915,64 @@
      "text": "Typing an arrow, three dots, straight quotes or a smiley gives the real character. Backspace right after it brings back what you typed, and Preferences can turn it off. Text in Markdown turns into blocks when you paste it, and Undo brings back the plain text. Word count, at the foot of the sheet, also counts a selection."
     }
    ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Links that follow their page"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "A link without your own words shows the title, whatever it becomes: "
+    },
+    {
+     "type": "pageLink",
+     "attrs": {
+      "page_id": "@page:blocks"
+     }
+    },
+    {
+     "type": "text",
+     "text": ". It can also be a tag, such as "
+    },
+    {
+     "type": "pageLink",
+     "attrs": {
+      "page_id": "@page:tables",
+      "display": "tag"
+     }
+    },
+    {
+     "type": "text",
+     "text": ", or a card, as below. A link to "
+    },
+    {
+     "type": "placeholderLink",
+     "attrs": {
+      "title": "A page nobody wrote yet"
+     }
+    },
+    {
+     "type": "text",
+     "text": " starts that page when someone follows it."
+    }
+   ]
+  },
+  {
+   "type": "pageCard",
+   "attrs": {
+    "page_id": "@page:working-together"
+   }
   }
  ]
 }

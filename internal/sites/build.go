@@ -287,6 +287,7 @@ func (b *builder) page(ctx context.Context, p sitePage) error {
 	if !b.v.ShowNames {
 		options.Mention = func(document.Node) string { return neutralMention }
 	}
+	p.doc = document.ResolveLinks(p.doc, b.titleOnSite)
 	body := document.ToHTML(p.doc, options)
 	footer := "Updated " + p.updated
 	if b.v.ShowNames && p.author != "" {
@@ -299,6 +300,19 @@ func (b *builder) page(ctx context.Context, p sitePage) error {
 		nav = ""
 	}
 	return b.write(p.file, b.shell(p.page.Title, body, nav))
+}
+
+// titleOnSite names a page on this site. Anything else stays out of a public file (spec 023, D4).
+func (b *builder) titleOnSite(id uuid.UUID) (string, bool) {
+	if _, ok := b.links[id]; !ok {
+		return "", false
+	}
+	for _, p := range b.list {
+		if p.page.ID == id {
+			return p.page.Title, true
+		}
+	}
+	return "", false
 }
 
 // searchText is what the index may hold: only the words that are on the page itself,
