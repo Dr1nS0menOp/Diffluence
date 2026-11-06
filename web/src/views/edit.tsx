@@ -18,7 +18,8 @@ import { anchorOfSelection } from '../components/comments/anchor';
 import { NewThread } from '../components/comments/selection-bar';
 import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack, IconChevronDown } from '../components/icons';
-import { PageLookDialog } from '../components/page-look';
+import { PageHeader, usePageLook } from '../components/page-header';
+import { LabelBar } from '../components/page-labels';
 import { PreviewDialog, PublishOptionsDialog, type PublishChoices } from '../components/publish-options';
 import { useDelayed } from '../components/quick-search';
 import { ShareDialog } from '../components/share-dialog';
@@ -157,13 +158,13 @@ function Form({ data }: { data: Loaded }) {
   const client = useQueryClient();
   const toast = useToast();
   const { page } = data;
+  const look = usePageLook(page);
   const backupKey = `${BACKUP_KEY_PREFIX}${page.id}`;
   const [title, setTitle] = useState(data.title);
   const [summary, setSummary] = useState('');
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
   const [error, setError] = useState<unknown>(null);
   const [conflict, setConflict] = useState(false);
-  const [lookOpen, setLookOpen] = useState(false);
   const [optionsOpen, setOptionsOpen] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [moving, setMoving] = useState(false);
@@ -218,7 +219,25 @@ function Form({ data }: { data: Loaded }) {
     timer.current = setTimeout(() => void save(), AUTOSAVE_MS);
   }, [save]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  // Leaving is one click away in the tree, so what was typed last must not depend on a
+  // timer. If saving fails, the text stays in the browser and a message leads back to it.
+  const saveOnLeaving = useRef(() => undefined as void);
+  saveOnLeaving.current = () => {
+    clearTimeout(timer.current);
+    if (!dirty.current) return;
+    dirty.current = false;
+    keepInBrowser();
+    const draft = { title: titleRef.current, document: doc.current, base_version: data.base };
+    api.put(`/pages/${page.id}/draft`, draft).then(
+      () => localStorage.removeItem(backupKey),
+      () =>
+        toast({
+          message: t('editor.notSavedOnLeaving'),
+          action: { label: t('editor.backToEditor'), run: () => navigate(`/pages/${page.id}/edit`) },
+        }),
+    );
+  };
+  useEffect(() => () => saveOnLeaving.current(), []);
 
   useEffect(() => {
     const keep = () => {
@@ -327,9 +346,6 @@ function Form({ data }: { data: Loaded }) {
             {t('comments.comment')}
           </button>
         )}
-        <button type="button" className="quiet" onClick={() => setLookOpen(true)}>
-          {t('look.title')}
-        </button>
         <ConfirmButton
           label={published ? t('editor.revert') : t('editor.discard')}
           message={published ? t('editor.confirmRevert') : t('editor.confirmDiscard')}
@@ -369,6 +385,8 @@ function Form({ data }: { data: Loaded }) {
         pageId={page.id}
         initial={start.document}
         canAttach={page.can['attachment.add'] ?? false}
+        fullWidth={look.look.full_width}
+        onFullWidth={() => look.change({ full_width: !look.look.full_width })}
         onChange={(d) => {
           doc.current = d;
           schedule();
@@ -381,20 +399,26 @@ function Form({ data }: { data: Loaded }) {
           void save();
         }}
         header={
-          <input
-            className="title-input"
-            value={title}
-            aria-label={t('page.title')}
-            placeholder={t('editor.titlePlaceholder')}
-            onChange={(e) => {
-              setTitle(e.target.value);
-              schedule();
-            }}
-            required
+          <PageHeader
+            page={page}
+            look={look}
+            title={
+              <input
+                className="title-input"
+                value={title}
+                aria-label={t('page.title')}
+                placeholder={t('editor.titlePlaceholder')}
+                onChange={(e) => {
+                  setTitle(e.target.value);
+                  schedule();
+                }}
+                required
+              />
+            }
           />
         }
+        footer={<LabelBar page={page} />}
       />
-      {lookOpen && <PageLookDialog page={page} onClose={() => setLookOpen(false)} />}
       {optionsOpen && (
         <PublishOptionsDialog
           page={page}

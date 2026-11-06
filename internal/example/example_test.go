@@ -111,6 +111,19 @@ func TestTheExampleShowsEverythingTheFormatCanHold(t *testing.T) {
 	}
 }
 
+func TestTheExampleShowsAStretchedTableAndAnUncommonLanguage(t *testing.T) {
+	stretched, rust := false, false
+	for _, doc := range documents(t) {
+		document.Walk(doc, func(n document.Node) {
+			stretched = stretched || (n.Type == document.TypeTable && n.Attrs["stretch"] != nil)
+			rust = rust || (n.Type == document.TypeCodeBlock && n.Attrs["language"] == "rust")
+		})
+	}
+	if !stretched || !rust {
+		t.Fatalf("stretched table %v, rust %v", stretched, rust)
+	}
+}
+
 func TestEveryQuoteOfACommentIsInItsPage(t *testing.T) {
 	plan, err := loadPlan()
 	if err != nil {

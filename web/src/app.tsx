@@ -254,9 +254,9 @@ function Routes({ me }: { me: Me }) {
   if ((m = match('/spaces/:key/new', pathname))) return <MissingPage spaceKey={m.key ?? ''} />;
   if ((m = match('/pages/:id/edit', pathname))) {
     return (
-      <main id="main" className="focus">
+      <SpaceShell pageId={m.id ?? ''} focus>
         <EditView pageId={m.id ?? ''} />
-      </main>
+      </SpaceShell>
     );
   }
   if ((m = match('/pages/:id/history', pathname))) {

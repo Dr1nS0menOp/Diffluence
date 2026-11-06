@@ -84,7 +84,9 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
   await page.getByRole('button', { name: 'Table', exact: true }).click();
   await editorSettled(page);
   await page.keyboard.type('Name');
-  await page.getByRole('button', { name: 'Add row' }).click();
+  await page.getByRole('button', { name: 'Table options' }).click();
+  await page.getByRole('menuitem', { name: 'Add row below' }).click();
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('.prose table tr')).toHaveCount(4);
   await expect(page.locator('.prose th').first()).toHaveText('Name');

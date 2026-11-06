@@ -146,14 +146,16 @@ export function Field({ label, help, children }: { label: string; help?: string;
 export function FilePicker({
   label,
   accept,
+  className,
   onPick,
 }: {
   label: string;
   accept?: string;
+  className?: string;
   onPick: (file: File) => void;
 }) {
   return (
-    <label className="button file-picker">
+    <label className={`button file-picker ${className ?? ''}`}>
       <IconUpload size={16} /> {label}
       <input
         type="file"

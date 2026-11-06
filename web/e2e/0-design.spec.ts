@@ -370,6 +370,72 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  test('the table button and its menu', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${blocksPageId}/edit`);
+    await page.locator('.prose.editing td').first().click();
+    await editorSettled(page);
+    await page.getByRole('button', { name: 'Table options' }).click();
+    await expect(page.getByRole('menu', { name: 'Table options' })).toBeVisible();
+    await picture(page, 'table-menu');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the title area in the editor', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}/edit`);
+    await page.locator('.page-head').hover();
+    await expect(page.getByRole('button', { name: 'Add emoji' })).toBeVisible();
+    await picture(page, 'editor-title');
+    await page.context().close();
+  });
+
+  test('a stretched table and a large screen', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { width: 1920, height: 900 },
+    });
+    const page = await context.newPage();
+    await login(page, READER.email, PASSWORD);
+    const spaceId = (
+      (await (await page.request.get(`/api/v1/pages/${pageId}`)).json()) as { space_id: string }
+    ).space_id;
+    const made = await page.request.post('/api/v1/pages', {
+      data: { space_id: spaceId, title: 'Wide table' },
+    });
+    const id = ((await made.json()) as { id: string }).id;
+    const row = (cells: string[], type: string) => ({
+      type: 'tableRow',
+      content: cells.map((text) => ({ type, content: [words(text)] })),
+    });
+    const done = await page.request.post(`/api/v1/pages/${id}/publish`, {
+      data: {
+        title: 'Wide table',
+        base_version: 0,
+        document: {
+          type: 'doc',
+          content: [
+            words('The text keeps a comfortable width, and the table below reaches past it.'),
+            {
+              type: 'table',
+              attrs: { stretch: 100 },
+              content: [
+                row(['Team', 'Monday', 'Tuesday', 'Wednesday'], 'tableHeader'),
+                row(['Docs', 'Review', 'Write', 'Publish'], 'tableCell'),
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(done.ok(), await done.text()).toBeTruthy();
+    await page.goto(`/pages/${id}`);
+    await expect(page.locator('.prose table')).toBeVisible();
+    await picture(page, 'table-stretched', [page.getByTestId('last-updated')]);
+    await context.close();
+  });
+
   test('a confirmation', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);

@@ -21,6 +21,10 @@ const PNG = Buffer.from(
   'base64',
 );
 
+interface PageJson {
+  header_position: number;
+}
+
 const heading = (level: number, text: string) => ({
   type: 'heading',
   attrs: { level },
@@ -389,22 +393,33 @@ test('the look of a page: emoji, width, title and header image', async ({ page }
   const space = await newSpace(page, 'Look space');
   const id = await publishedPage(page, space.id, 'Looks', 'text');
   await page.goto(`/pages/${id}/edit`);
-  await page.getByRole('button', { name: 'Page look' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Page look' });
+  const head = page.locator('.page-head');
+  await head.hover();
+  await head.getByRole('button', { name: 'Add emoji' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Emoji' });
   await dialog
     .getByRole('button')
     .filter({ hasText: /\p{Extended_Pictographic}/u })
     .first()
     .click();
-  await dialog.getByLabel('Full width').check();
-  await dialog.getByLabel('Title').selectOption('center');
-  await dialog
+  await expect(head.getByRole('button', { name: /^Change emoji/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Full width' }).click();
+  await expect(page.getByRole('button', { name: 'Full width' })).toHaveAttribute('aria-pressed', 'true');
+  await head.hover();
+  await head.getByRole('button', { name: 'Page options' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Centre the title' }).click();
+  await head
     .locator('input[type=file]')
     .setInputFiles({ name: 'head.png', mimeType: 'image/png', buffer: PNG });
-  await expect(dialog.getByRole('button', { name: 'Remove header image' })).toBeVisible();
+  await expect(head.getByRole('button', { name: 'Remove image' })).toBeVisible();
   await checkAccessibility(page);
-  await dialog.getByLabel('Position').fill('20');
-  await dialog.getByRole('button', { name: 'Close' }).click();
+  await head.getByLabel('Position of the image').fill('20');
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get(`/api/v1/pages/${id}/summary`)).json()) as PageJson).header_position,
+    )
+    .toBe(20);
 
   await page.goto(`/pages/${id}`);
   await expect(page.locator('h1 .title-emoji')).toBeVisible();
@@ -653,7 +668,9 @@ test('shortcuts work, never fire while typing, and can be turned off', async ({ 
   await expect(page).toHaveURL(/\/edit$/);
   await expect(page.locator('.prose.editing')).toContainText('gh');
 
-  await page.getByRole('link', { name: 'Close' }).click();
+  await page.getByRole('link', { name: 'Close', exact: true }).click();
+  // Close waits for the save, and a shortcut must not fire in the editor.
+  await expect(page).not.toHaveURL(/\/edit$/);
   await page.keyboard.press('g');
   await page.keyboard.press('s');
   await expect(page).toHaveURL(/\/spaces$/);

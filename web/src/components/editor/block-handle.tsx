@@ -41,6 +41,12 @@ function isBlockStart(editor: Editor, pos: number): boolean {
   return pos <= doc.content.size && doc.resolve(pos).depth === 0 && doc.nodeAt(pos) !== null;
 }
 
+/** How far a block starts from the start of the sheet, whichever way the text runs. */
+function startOffset(box: DOMRect, sheet: HTMLElement): number {
+  const outer = sheet.getBoundingClientRect();
+  return getComputedStyle(sheet).direction === 'rtl' ? outer.right - box.right : box.left - outer.left;
+}
+
 /** Which block the handle belongs to. It stays put while its menu is open. */
 export function useBlockTracking(editor: Editor) {
   const [pos, setPos] = useState<number | null>(null);
@@ -97,7 +103,12 @@ export function BlockHandle({
     const block = editor.view.nodeDOM(pos);
     const sheet = handle.parentElement;
     if (!(block instanceof HTMLElement) || !sheet) return;
-    handle.style.insetBlockStart = `${block.getBoundingClientRect().top - sheet.getBoundingClientRect().top}px`;
+    const box = block.getBoundingClientRect();
+    handle.style.insetBlockStart = `${box.top - sheet.getBoundingClientRect().top}px`;
+    // A stretched table reaches past the text, so beside the text the handle would sit on its cells.
+    const reachesPastText = box.width > editor.view.dom.getBoundingClientRect().width + 1;
+    handle.classList.toggle('on-corner', reachesPastText);
+    handle.style.insetInlineStart = reachesPastText ? `${startOffset(box, sheet)}px` : '';
   }, [editor, pos, root]);
 
   if (pos === null || !isBlockStart(editor, pos)) return null;

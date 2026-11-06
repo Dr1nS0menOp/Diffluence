@@ -468,7 +468,7 @@ test('text survives a failed save, and Close waits or asks', async ({ page }) =>
   await page.locator('.prose.editing').click();
   await page.route(`**/api/v1/pages/${id}/draft`, (route) => route.abort());
   await page.keyboard.type('Keep me ');
-  await page.getByRole('link', { name: 'Close' }).click();
+  await page.getByRole('link', { name: 'Close', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Your text is not saved' });
   await expect(dialog).toBeVisible();
   await dialog.getByRole('button', { name: 'Keep editing' }).click();

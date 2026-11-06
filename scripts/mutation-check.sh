@@ -129,6 +129,8 @@ mutate "any date accepted" internal/document/attrs.go \
   's.replace("if _, err := time.Parse(time.DateOnly, value); err != nil {", "if _, err := time.Parse(time.DateOnly, \"2026-01-01\"); err != nil {")' ./internal/document/
 mutate "any number of columns accepted" internal/document/document.go \
   's.replace("if n.Type == TypeColumns && (len(n.Content) < minColumns || len(n.Content) > maxColumns) {", "if n.Type == TypeColumns && len(n.Content) < 0 {")' ./internal/document/
+mutate "a table takes any width" internal/document/attrs.go \
+  's.replace("if stretch, ok := intAttr(in[\"stretch\"]); ok && stretch >= 1 && stretch <= maxTableStretch {", "if stretch, ok := intAttr(in[\"stretch\"]); ok && stretch != maxTableStretch-99 {")' ./internal/document/
 mutate "unknown panels accepted" internal/document/attrs.go \
   's.replace("panelKinds.keep(in, out, \"kind\")\n\tif out[\"kind\"] == nil {", "out[\"kind\"] = in[\"kind\"]\n\tif out[\"kind\"] == nil {")' ./internal/document/
 

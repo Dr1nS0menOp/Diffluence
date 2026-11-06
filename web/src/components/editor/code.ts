@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // Code blocks with a title, line numbers and a Copy button. This view is plain DOM
 // because React node views force a text wrapping style on their content.
-import type { NodeViewRendererProps } from '@tiptap/core';
+import { useEffect } from 'react';
+import type { Editor, NodeViewRendererProps } from '@tiptap/core';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import type { Node as ProseNode } from '@tiptap/pm/model';
 import { common, createLowlight } from 'lowlight';
@@ -11,8 +12,78 @@ const COPY_MESSAGE_MS = 2000;
 const TAB_AS_SPACES = '  ';
 
 const lowlight = createLowlight(common);
+const COMMON_LANGUAGES = lowlight.listLanguages();
 
-export const CODE_LANGUAGES = lowlight.listLanguages().sort();
+// Guessing tries every language it knows on each keystroke, so it stays with the
+// common ones, whatever else was loaded later (spec 017, D13).
+const highlighter = {
+  ...lowlight,
+  highlightAuto: (value: string) => lowlight.highlightAuto(value, { subset: COMMON_LANGUAGES }),
+};
+
+// A private cache: all languages are one large file, which loads once.
+let allLanguages: Promise<void> | undefined;
+
+/** Loads every language. They live in a file of their own, which most pages never need. */
+export function loadAllLanguages(): Promise<void> {
+  allLanguages ??= import('./code-languages').then(
+    ({ all }) => lowlight.register(all),
+    (error: unknown) => {
+      allLanguages = undefined;
+      throw error;
+    },
+  );
+  return allLanguages;
+}
+
+export const languageNames = (): string[] => lowlight.listLanguages();
+export const isLanguageName = (name: string): boolean => lowlight.registered(name);
+
+/** The languages a document uses, in order of first use. */
+export function languagesOf(doc: ProseNode): string[] {
+  const found = new Set<string>();
+  doc.descendants((node) => {
+    const { language } = node.attrs as { language?: string | null };
+    if (node.type.name === 'codeBlock' && language) found.add(language);
+    return true;
+  });
+  return [...found];
+}
+
+/** Colours come by decorations, which only look again when a block changes. */
+function recolour(editor: Editor) {
+  const { tr, doc } = editor.state;
+  doc.descendants((node, pos) => {
+    if (node.type.name === 'codeBlock') tr.setNodeMarkup(pos, undefined, node.attrs);
+  });
+  editor.view.dispatch(tr.setMeta('addToHistory', false).setMeta('preventUpdate', true));
+}
+
+/** A block in a language that is not loaded yet shows plain, then gets its colours. */
+export function useCodeColours(editor: Editor | null) {
+  useEffect(() => {
+    if (!editor) return;
+    let done = false;
+    const check = () => {
+      if (done || languagesOf(editor.state.doc).every(isLanguageName)) return;
+      done = true;
+      loadAllLanguages().then(
+        () => {
+          if (!editor.isDestroyed) recolour(editor);
+        },
+        () => {
+          // The text stays readable without colours, and the next edit tries again.
+          done = false;
+        },
+      );
+    };
+    check();
+    editor.on('update', check);
+    return () => {
+      editor.off('update', check);
+    };
+  }, [editor]);
+}
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = ''): HTMLElementTagNameMap[K] {
   const el = document.createElement(tag);
@@ -121,4 +192,4 @@ export const CodeBlock = CodeBlockLowlight.extend({
         this.editor.commands.insertContent({ type: 'text', text: TAB_AS_SPACES }),
     };
   },
-}).configure({ lowlight });
+}).configure({ lowlight: highlighter });

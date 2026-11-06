@@ -173,6 +173,8 @@ export const IconPresent = line('M3 5h18v11H3zM12 16v4M8 20h8');
 export const IconReader = line(
   'M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z',
 );
+export const IconFullWidth = line('M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-4 4M3 4v16M21 4v16');
+export const IconTableMenu = line('M4 5h16v14H4zM4 10h16M10 10v9M16 10v9');
 export const IconArrowUp = line('M12 19V5M6 11l6-6 6 6');
 export const IconArrowDown = line('M12 5v14M6 13l6 6 6-6');
 

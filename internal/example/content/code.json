@@ -25,6 +25,28 @@
    ]
   },
   {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Pick the language in the tools. There are about 190, so type a few letters to find one."
+    }
+   ]
+  },
+  {
+   "type": "codeBlock",
+   "attrs": {
+    "language": "rust",
+    "title": "hello.rs"
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "fn main() {\n    println!(\"hello\");\n}\n"
+    }
+   ]
+  },
+  {
    "type": "heading",
    "attrs": {
     "level": 2

@@ -258,6 +258,17 @@
   grid-template-columns: minmax(0, 1fr);
 }
 
+.split.collapsed.with-rail {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.sidebar-rail {
+  position: sticky;
+  inset-block-start: var(--size-topbar);
+  align-self: start;
+  padding: var(--space-2) var(--space-1);
+}
+
 .sidebar {
   position: sticky;
   inset-block-start: var(--size-topbar);
@@ -900,9 +911,13 @@ span.twist {
   container: content / inline-size;
 }
 
+.column:has(> .page-layout) {
+  max-inline-size: var(--size-page);
+}
+
 @container content (min-width: 68rem) {
   .column:has(> .page-layout.with-contents) {
-    max-inline-size: calc(var(--size-reading) + var(--size-contents) + var(--space-8));
+    max-inline-size: calc(var(--size-page) + var(--size-contents) + var(--space-8));
   }
 
   .page-layout.with-contents {
@@ -920,7 +935,16 @@ span.twist {
 }
 
 .column:has(> .page-layout.full) {
-  max-inline-size: var(--size-wide);
+  max-inline-size: none;
+}
+
+/* A stretched table needs that room, and would run over the list (spec 017, D7). */
+.page-layout.with-contents:has(.prose > .tableWrapper[data-stretch]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.with-contents:has(.prose > .tableWrapper[data-stretch]) .page-contents {
+  display: none;
 }
 
 .page-contents-title {

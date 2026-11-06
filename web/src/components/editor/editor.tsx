@@ -11,6 +11,7 @@ import { ErrorNote } from '../ui';
 import type { ShownImage } from '../viewers';
 import { attachmentNode, type FileAddress } from './attachments';
 import { BlockHandle, useBlockTracking } from './block-handle';
+import { useCodeColours } from './code';
 import { documentExtensions, type TaskToggle } from './extensions';
 import { FindBar, FindReplace } from './find';
 import {
@@ -26,6 +27,7 @@ import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog } from './template-item';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
+import { TableFrame, useTableTracking } from './table-frame';
 import { Toolbar } from './toolbar';
 
 function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: ShownImage }[] {
@@ -130,6 +132,7 @@ export function DocumentView({
     [document],
   );
   usePrintOpensSections();
+  useCodeColours(editor);
 
   useEffect(() => {
     if (!plain) editor.view.dispatch(editor.state.tr.setMeta(refreshHighlights, true));
@@ -184,6 +187,9 @@ export function DocumentEditor({
   inTemplate,
   fileAddress,
   header,
+  footer,
+  fullWidth,
+  onFullWidth,
   onChange,
   onPublish,
   onSave,
@@ -196,6 +202,9 @@ export function DocumentEditor({
   inTemplate?: boolean;
   fileAddress?: FileAddress;
   header: ReactNode;
+  footer?: ReactNode;
+  fullWidth?: boolean;
+  onFullWidth?: () => void;
   onChange: (doc: Json) => void;
   onPublish: () => void;
   onSave: () => void;
@@ -275,9 +284,16 @@ export function DocumentEditor({
         return true;
       },
     },
-    onUpdate: ({ editor: e }) => change.current(e.getJSON() as Json),
+    // The empty line after a last block is added by itself on the first click. Nobody typed it,
+    // so it must not count, or merely opening a page would leave a draft behind.
+    onUpdate: ({ editor: e, transaction }) => {
+      if (transaction.docChanged) change.current(e.getJSON() as Json);
+    },
   });
   const tracker = useBlockTracking(editor);
+  const sheet = useRef<HTMLDivElement>(null);
+  const tables = useTableTracking(editor, sheet);
+  useCodeColours(editor);
   useEffect(() => onView?.(editor.view), [editor, onView]);
 
   actions.current = {
@@ -285,6 +301,7 @@ export function DocumentEditor({
     openLink: () => setLinking(true),
     openFind: () => setFinding(true),
     openBlockMenu: tracker.openAtCursor,
+    openTableMenu: tables.open,
     openTemplateItem: setTemplateItem,
     publish: onPublish,
     save: onSave,
@@ -325,12 +342,26 @@ export function DocumentEditor({
         canAttach={canAttach}
         actions={actions.current}
         fileInput={fileInput}
+        fullWidth={fullWidth}
+        onFullWidth={onFullWidth}
         onInsert={() => setInserting(true)}
         onFiles={(files) => void addFiles(files)}
       />
       {finding && <FindBar editor={editor} onClose={() => setFinding(false)} />}
-      <div className="editor-sheet" onMouseMove={tracker.track} onMouseLeave={tracker.leave}>
+      <div
+        ref={sheet}
+        className={fullWidth ? 'editor-sheet full' : 'editor-sheet'}
+        onMouseMove={(e) => {
+          tracker.track(e);
+          tables.track(e);
+        }}
+        onMouseLeave={() => {
+          tracker.leave();
+          tables.leave();
+        }}
+      >
         <BlockHandle editor={editor} tracker={tracker} actions={actions.current} />
+        <TableFrame editor={editor} tracker={tables} />
         {uploading && (
           <p role="status" className="note">
             {t('editor.uploading', { name: uploading })}
@@ -339,6 +370,7 @@ export function DocumentEditor({
         <ErrorNote error={uploadError} />
         {header}
         <EditorContent editor={editor} />
+        {footer}
       </div>
       {linking && <LinkDialog editor={editor} onClose={() => setLinking(false)} />}
       {templateItem && (

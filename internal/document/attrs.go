@@ -21,6 +21,7 @@ const (
 	maxCaptionBytes  = 500
 	maxTitleBytes    = 500
 	maxCodeTitle     = 200
+	maxTableStretch  = 100 // the whole width of the frame around the page
 
 	maxFieldNameBytes   = 100
 	maxFieldOptionBytes = 2000
@@ -211,6 +212,15 @@ func cleanFile(in, out map[string]any) error {
 	return nil
 }
 
+// cleanTable keeps how far a table reaches beyond the text. It is a share and not
+// a length, so it means the same on every screen, and our own code makes it a style.
+func cleanTable(in, out map[string]any) error {
+	if stretch, ok := intAttr(in["stretch"]); ok && stretch >= 1 && stretch <= maxTableStretch {
+		out["stretch"] = stretch
+	}
+	return nil
+}
+
 func cleanCell(in, out map[string]any) error {
 	for _, key := range []string{"colspan", "rowspan"} {
 		if v, ok := intAttr(in[key]); ok && v > 1 && v <= 1000 {
@@ -308,6 +318,7 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeCodeBlock:     cleanCodeBlock,
 	TypeImage:         cleanImage,
 	TypeFile:          cleanFile,
+	TypeTable:         cleanTable,
 	TypeTableCell:     cleanCell,
 	TypeTableHeader:   cleanCell,
 	TypePanel:         cleanPanel,
@@ -317,8 +328,7 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeDate:          cleanDate,
 	TypeMention:       cleanMention,
 	TypeTemplateField: cleanTemplateField,
-	TypeInstruction:   cleanInstruction,
-}
+	TypeInstruction:   cleanInstruction}
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.
 func cleanAttrs(n *Node) error {

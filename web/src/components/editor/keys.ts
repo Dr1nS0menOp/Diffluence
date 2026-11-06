@@ -11,6 +11,7 @@ export interface EditorActions {
   openLink: () => void;
   openFind: () => void;
   openBlockMenu: () => void;
+  openTableMenu: () => void;
   openTemplateItem: (what: 'field' | 'instruction') => void;
   publish: () => void;
   save: () => void;
@@ -22,6 +23,7 @@ export const noActions: EditorActions = {
   openLink: () => undefined,
   openFind: () => undefined,
   openBlockMenu: () => undefined,
+  openTableMenu: () => undefined,
   openTemplateItem: () => undefined,
   publish: () => undefined,
   save: () => undefined,
@@ -56,7 +58,7 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
       'Mod-k': run('openLink'),
       'Mod-Enter': run('publish'),
       'Mod-s': run('save'),
-      'Mod-Shift-.': run('openBlockMenu'),
+      'Mod-Shift-.': () => run(editor().isActive('table') ? 'openTableMenu' : 'openBlockMenu')(),
       'Mod-\\': () => editor().chain().focus().unsetAllMarks().run(),
       'Mod-d': onBlock((pos) => duplicateBlock(editor(), pos)),
       'Mod-Shift-Backspace': onBlock((pos) => deleteBlock(editor(), pos)),

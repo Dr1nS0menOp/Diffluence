@@ -10,12 +10,12 @@ After ten designs, three iterations and a final choice, the product owner decide
 
 | Part | Decision |
 | --- | --- |
-| Style and layout | **Helder**: calm, white and blue, a clear top bar, a sidebar per space, one centred reading column. |
+| Style and layout | **Helder**: calm, white and blue, a clear top bar, a sidebar per space, one centred reading column that scales with the window (ADR-030). |
 | Editor | **Rail**: a strip with the page's fate at the top, the tools in a row below it, and an open sheet with no boxes. |
 | Page tree | **Branches**: guide lines that show the structure, and every branch can be collapsed. |
 | Font | The **system font**. A font can be imported in the settings. |
 
-Rail kept the global navigation visible while editing. In Helder that means: **the top bar stays, the sidebar goes**.
+Rail kept the global navigation visible while editing. In Helder that means: **the top bar stays**. After his first test the product owner asked to keep the pages in view as well, so **the sidebar stays too**, as far as there is room (ADR-030).
 
 The intuition of a familiar wiki is the aim, never a copy. The clean-room rules (`docs/blueprint/02`) apply to design as well: no logos, icons, copy or pixel-exact layouts from any other product. The logo and every icon are ours.
 
@@ -81,13 +81,13 @@ Every screen is one of these. Do not invent a fifth.
 | **Plain** | Start screen, search, your account | Top bar, `Plain` in `app.tsx` (wide, or `reading`) |
 | **Space** | Everything inside a space | Top bar, `Frame` or `SpaceShell` in `components/frame.tsx`: sidebar and a centred `.column` |
 | **Admin** | The admin console | Top bar, sidebar with `.side-link` items, `.column.wide` |
-| **Focus** | The editor | Top bar, `main.focus`: no sidebar |
+| **Focus** | The editor | Top bar, sidebar, `main.focus`: `SpaceShell` with `focus`, and no reading column around it |
 
 The login page stands alone: one card on the sidebar colour.
 
 **Top bar:** logo and name, Home, Spaces, Recent, Favourites, Create, then search, the bell, help and the account menu on the far side. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox with one panel below it, and a chip shows when it stays inside a space.
 
-**A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. Full width only widens the column up to the wide limit. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
+**A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. The column scales: `--size-page` is at least `--size-reading`, 64 percent of the room, and at most `--size-reading-max`. Full width takes all the room. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
 
 ## Components
 
@@ -145,7 +145,9 @@ Use these. Reuse beats a new variant.
 - A block has a grip and a menu in the margin, outside the text. Everything the grip does is also in the menu and on the keyboard.
 - A file can be dropped anywhere below the strip. The sheet shows a dashed outline while it is above the editor.
 - An active tool is solid accent, so its state is clear without reading it.
-- The sheet has no border. The title is a large plain input, the body follows at most 800px wide.
+- The sheet has no border, and scales like a page. The title is a large plain input.
+- Above the title: Add emoji, Add header image and Page options, quiet until hover or focus, and always there on touch screens.
+- A table has one button on its outline, with one menu for everything about tables, and nothing for tables appears in the row. It has an outline in `--color-guide` and a grid in `--color-line`, and the table with the cursor has an accent outline. Its end edge stretches it.
 - Both bars stay visible while scrolling, except on narrow screens.
 
 ## The blocks of a document

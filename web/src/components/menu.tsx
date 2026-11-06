@@ -13,6 +13,9 @@ import { Link } from '../router';
 
 const ENABLED_ITEMS = '[role^=menuitem]:not(:disabled)';
 const FLOATING_GAP_PX = 4;
+const ENOUGH_MENU_ROOM_PX = 320;
+/** The bars that stay in place while the page, and any menu in it, slides under them. */
+export const FIXED_BARS = '.top, .edit-bar, .toolbar, .find-bar';
 
 /** Places a list on the screen beside its button, flipped when it would not fit. */
 function placeBeside(list: HTMLElement, button: HTMLElement) {
@@ -22,6 +25,24 @@ function placeBeside(list: HTMLElement, button: HTMLElement) {
   const left = Math.min(anchor.left, window.innerWidth - list.offsetWidth - FLOATING_GAP_PX);
   list.style.top = `${Math.max(top, FLOATING_GAP_PX)}px`;
   list.style.left = `${Math.max(left, FLOATING_GAP_PX)}px`;
+}
+
+/** Where the free screen starts above a button. */
+function freeScreenTop(anchor: DOMRect) {
+  const bars = Array.from(document.querySelectorAll(FIXED_BARS), (bar) => bar.getBoundingClientRect().bottom);
+  return Math.max(0, ...bars.filter((bottom) => bottom <= anchor.top));
+}
+
+/** A long menu stays on the screen: shorter when that leaves enough, or else above its button. */
+function keepOnScreen(list: HTMLElement, button: HTMLElement) {
+  const box = list.getBoundingClientRect();
+  if (box.bottom <= window.innerHeight) return;
+  const anchor = button.getBoundingClientRect();
+  const below = window.innerHeight - box.top - FLOATING_GAP_PX;
+  const above = anchor.top - freeScreenTop(anchor) - 2 * FLOATING_GAP_PX;
+  const staysBelow = below >= ENOUGH_MENU_ROOM_PX || below >= above;
+  list.classList.toggle('above', !staysBelow);
+  list.style.maxBlockSize = `${staysBelow ? below : above}px`;
 }
 
 /** The item a key leads to: arrows, Home, End, or the next item that starts with a letter. */
@@ -45,6 +66,8 @@ export function Menu({
   floating,
   opensOnDrag,
   tabIndex,
+  keepOpen,
+  onLeave,
 }: {
   label: string;
   trigger: ReactNode;
@@ -57,6 +80,10 @@ export function Menu({
   opensOnDrag?: string;
   /** For a menu in a list with roving focus, where only one row is a Tab stop. */
   tabIndex?: number;
+  /** For a menu of actions that are often repeated, such as adding three rows. */
+  keepOpen?: boolean;
+  /** Runs when Escape leaves the menu, for what should get the focus back. */
+  onLeave?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -64,7 +91,9 @@ export function Menu({
   const button = useRef<HTMLButtonElement>(null);
 
   useLayoutEffect(() => {
-    if (open && floating && list.current && button.current) placeBeside(list.current, button.current);
+    if (!open || !list.current || !button.current) return;
+    if (floating) placeBeside(list.current, button.current);
+    else keepOnScreen(list.current, button.current);
   }, [open, floating]);
 
   useEffect(() => {
@@ -93,6 +122,7 @@ export function Menu({
     if (e.key === 'Escape') {
       setOpen(false);
       button.current?.focus();
+      onLeave?.();
       return;
     }
     const items = Array.from(root.current?.querySelectorAll<HTMLElement>(ENABLED_ITEMS) ?? []);
@@ -127,7 +157,7 @@ export function Menu({
           aria-label={label}
           className={floating ? 'menu-list floating' : `menu-list ${align}`}
           onKeyDown={keys}
-          onClick={() => setOpen(false)}
+          onClick={keepOpen ? undefined : () => setOpen(false)}
           onDrop={() => setOpen(false)}
         >
           {children}

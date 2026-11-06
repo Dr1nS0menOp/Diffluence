@@ -243,14 +243,17 @@
       }
      ]
     }
-   ]
+   ],
+   "attrs": {
+    "stretch": 40
+   }
   },
   {
    "type": "paragraph",
    "content": [
     {
      "type": "text",
-     "text": "In the editor, click in a table to see its tools. Readers can scroll a wide table inside its frame."
+     "text": "In the editor, click in a table and press the button at its corner. Everything is in that menu: rows, columns, colours and width. Drag the end edge to stretch a table, up to the full width of the window. The table above reaches a little past the text. Readers can scroll a wide table inside its frame."
     }
    ]
   },

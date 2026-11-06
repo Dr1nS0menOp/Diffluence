@@ -59,12 +59,14 @@
   --size-badge-large: 40px;
   --size-topbar: 56px;
   --size-editbar: 52px;
+  --size-bars: calc(var(--size-topbar) + var(--size-editbar) + var(--size-tool) + 2 * var(--space-1-5));
   --size-sidebar: 18rem;
   --size-search: 15rem;
   --size-summary: 26rem;
   --size-login: 24rem;
   --size-menu: 14rem;
   --size-reading: 47.5rem;
+  --size-reading-max: 64rem;
   --size-editor: 50rem;
   --size-wide: 70rem;
   --size-card: 17.5rem;
@@ -81,9 +83,17 @@
   --size-edge: 6px;
   --size-space-chip: 7rem;
 
-  /* Set per person or per page at run time. */
+  /* A page and the editor scale with the room around them, inside these limits. */
+  --size-page: clamp(var(--size-reading), 64cqi, var(--size-reading-max));
+
+  /* Set per person, per page or per table at run time. */
   --sidebar-width: var(--size-sidebar);
   --header-position: 50%;
+  --table-stretch: 0;
+
+  /* The room a stretched table may take, and its width. Rules on the table fill these in. */
+  --table-room: 100cqi;
+  --table-width: 100%;
 
   /* The branches of the page tree. */
   --tree-indent: 13px;
@@ -95,6 +105,7 @@
   --radius-round: 50%;
   --shadow-menu: 0 4px 16px var(--color-shadow-menu);
   --shadow-dialog: 0 12px 40px var(--color-shadow-dialog);
+  --layer-frame: 1;
   --layer-sticky: 2;
   --layer-bar: 3;
   --layer-menu: 10;

@@ -661,7 +661,8 @@ test('an administrator sees that no mail server is set', async ({ page }) => {
 test('a comment for editors stays with the editors', async ({ page, browser }) => {
   const { other, pageId, name } = await team(page, browser, COMMENTER);
   await page.goto(`/pages/${pageId}/edit`);
-  await page.locator('.prose.editing p').dblclick();
+  // On a word: the column is wider than this line, so its middle is empty.
+  await page.locator('.prose.editing p').dblclick({ position: { x: 60, y: 12 } });
   await page.getByRole('button', { name: 'Comment', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Comment on this text' });
   await page.getByRole('textbox', { name: 'Write a comment' }).focus();

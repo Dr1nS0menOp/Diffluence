@@ -13,6 +13,7 @@ import {
   IconClear,
   IconCode,
   IconCodeBlock,
+  IconFullWidth,
   IconHighlight,
   IconIndent,
   IconItalic,
@@ -23,7 +24,6 @@ import {
   IconPlus,
   IconQuote,
   IconRedo,
-  IconRule,
   IconSearch,
   IconStrike,
   IconSubscript,
@@ -335,9 +335,6 @@ function BlockTools({ editor }: { editor: Editor }) {
       >
         <IconCodeBlock size={TOOL_ICON_SIZE} />
       </Tool>
-      <Tool editor={editor} label={t('editor.rule')} run={() => chain().setHorizontalRule().run()}>
-        <IconRule size={TOOL_ICON_SIZE} />
-      </Tool>
     </>
   );
 }
@@ -347,6 +344,8 @@ export function Toolbar({
   canAttach,
   actions,
   fileInput,
+  fullWidth,
+  onFullWidth,
   onInsert,
   onFiles,
 }: {
@@ -354,6 +353,9 @@ export function Toolbar({
   canAttach: boolean;
   actions: EditorActions;
   fileInput: RefObject<HTMLInputElement | null>;
+  fullWidth?: boolean;
+  /** Left out where there is no page to widen, such as in a template. */
+  onFullWidth?: () => void;
   onInsert: () => void;
   onFiles: (files: File[]) => void;
 }) {
@@ -427,6 +429,14 @@ export function Toolbar({
       <Tool editor={editor} label={t('editor.redo')} run={() => chain().redo().run()}>
         <IconRedo size={TOOL_ICON_SIZE} />
       </Tool>
+      {onFullWidth && (
+        <>
+          <ToolSeparator />
+          <Tool editor={editor} label={t('editor.fullWidth')} pressed={fullWidth ?? false} run={onFullWidth}>
+            <IconFullWidth size={TOOL_ICON_SIZE} />
+          </Tool>
+        </>
+      )}
       <SelectionTools editor={editor} />
     </div>
   );

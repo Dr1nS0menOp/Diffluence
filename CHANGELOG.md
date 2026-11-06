@@ -4,6 +4,20 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Changed: the editor after the first test
+- A table has one button on its outline, with one menu for rows, columns, cells, colours and width. The row of tools no longer changes in a table
+- Tables have a clear outline and a soft grid
+- Tables stretch up to the full width of the window, by dragging their end edge, from the menu or with the arrow keys
+- A page scales with the window by itself, and Full width is a button in the row of tools
+- Add emoji, Add header image and Page options sit at the title. Page look is gone. The header image can be dragged into place
+- Code blocks know about 190 languages, with a search. They load when needed
+- The tree stays beside the editor
+- Leaving the editor saves first, and when that fails a message brings the text back
+- Opening a page and clicking in it no longer leaves a draft behind when nothing was typed
+- A long menu that opens upwards stops below the bars, so its first items can be reached
+
+Upgrade impact: no database change. Documents can hold a new table width, so while two versions run side by side, a node on the older version drops it.
+
 ### Changed: animals, and changes you can see
 - Every space has a cartoon animal, picked from its key. Pick another in Space settings, or use a character of your own
 - A comparison now looks like the page: added on green, removed on red and struck through, with the word beside it

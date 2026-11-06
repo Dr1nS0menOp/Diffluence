@@ -42,6 +42,11 @@ async function slash(page: Page, query: string) {
   await page.keyboard.press('Enter');
 }
 
+async function tableMenu(page: Page) {
+  await page.getByRole('button', { name: 'Table options' }).click();
+  return page.getByRole('menu', { name: 'Table options' });
+}
+
 async function publish(page: Page) {
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
@@ -255,7 +260,8 @@ test('a column gets wider by dragging its border, and Equal columns undoes that'
   await page.mouse.up();
   await expect(first).toHaveAttribute('colwidth', /\d+/);
 
-  await page.getByRole('button', { name: 'Equal columns' }).click();
+  const menu = await tableMenu(page);
+  await menu.getByRole('menuitem', { name: 'Equal columns' }).click();
   await expect(first).not.toHaveAttribute('colwidth', /\d+/);
 });
 
@@ -415,6 +421,7 @@ test('table tools: header, cell colour and sort survive publishing', async ({ pa
   await editing(page, 'Tables');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await editorSettled(page);
   await page.keyboard.type('Name');
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
@@ -424,15 +431,18 @@ test('table tools: header, cell colour and sort survive publishing', async ({ pa
   await page.keyboard.press('Tab');
   await page.keyboard.press('Tab');
   await page.keyboard.type('item 2');
-  await page.getByRole('button', { name: 'Sort ascending' }).click();
+  const menu = await tableMenu(page);
+  await menu.getByRole('menuitem', { name: 'Sort ascending' }).click();
   const cells = body(page).locator('tr td:first-child');
   await expect(cells).toHaveText(['item 2', 'item 10']);
   await expect(body(page).locator('th').first()).toHaveText('Name');
+  await page.keyboard.press('Escape');
 
   await body(page).locator('tr td').first().click();
-  await page.getByRole('button', { name: 'Cell colour' }).click();
-  await page.getByRole('menuitemradio', { name: 'Green' }).click();
-  await page.getByRole('button', { name: 'Header column' }).click();
+  const again = await tableMenu(page);
+  await again.getByRole('menuitemradio', { name: 'Cell: Green' }).click();
+  await again.getByRole('menuitemcheckbox', { name: 'Header column' }).click();
+  await page.keyboard.press('Escape');
   await publish(page);
   await page.reload();
   await expect(page.locator('.prose [data-background="green"]')).toHaveCount(1);
@@ -443,10 +453,13 @@ test('merged cells survive publishing, and take the sort tools away', async ({ p
   await editing(page, 'Merge');
   await page.keyboard.press('Enter');
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  await editorSettled(page);
   await page.keyboard.press('Shift+ArrowRight');
   await page.keyboard.press('Shift+ArrowRight');
-  await page.getByRole('button', { name: 'Merge or split cells' }).click();
-  await expect(page.getByRole('button', { name: 'Sort ascending' })).toHaveCount(0);
+  const menu = await tableMenu(page);
+  await menu.getByRole('menuitem', { name: 'Merge or split cells' }).click();
+  await expect(menu.getByRole('menuitem', { name: 'Sort ascending' })).toHaveCount(0);
+  await page.keyboard.press('Escape');
   await publish(page);
   await page.reload();
   await expect(page.locator('.prose [colspan]')).toHaveCount(1);
@@ -515,7 +528,11 @@ test('the code tools set the language, numbers and a title', async ({ page }) =>
   await editing(page, 'Code tools');
   await slash(page, 'code block');
   await page.keyboard.type('const a = 1;');
-  await page.getByLabel('Language').selectOption('javascript');
+  await page.getByRole('button', { name: /^Language:/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Language' });
+  await dialog.getByLabel('Find a language').fill('javascript');
+  await dialog.getByRole('button', { name: 'javascript', exact: true }).click();
+  await expect(dialog).toHaveCount(0);
   await page.getByRole('button', { name: 'Line numbers' }).click();
   await page.getByRole('button', { name: 'Wrap long lines' }).click();
   await expect(body(page).locator('.code-frame')).toHaveClass(/wrap/);
@@ -549,7 +566,7 @@ test('the tools are one Tab stop with arrow keys, and Escape returns to the text
   await page.keyboard.press('ArrowLeft');
   await expect(toolbar.getByRole('button', { name: 'Bold' })).toBeFocused();
   await page.keyboard.press('End');
-  await expect(toolbar.getByRole('button', { name: 'Redo' })).toBeFocused();
+  await expect(toolbar.getByRole('button', { name: 'Full width' })).toBeFocused();
   await page.keyboard.press('Home');
   await expect(toolbar.getByLabel('Text style')).toBeFocused();
   expect(await toolbar.locator('[tabindex="0"]').count()).toBe(1);

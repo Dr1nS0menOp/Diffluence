@@ -401,17 +401,53 @@ export function Frame({
   space,
   current,
   parent,
+  focus,
   children,
 }: {
   space: Space;
   current?: string;
   parent?: string | null;
+  /** The editor: no reading column, and the tools run the full width of what is left. */
+  focus?: boolean;
   children: ReactNode;
 }) {
   const { t } = useTranslation();
   const [sidebarVisible, setSidebarVisible] = useSidebar();
   const split = useRef<HTMLDivElement>(null);
   useShortcut('sidebar', () => setSidebarVisible(!sidebarVisible));
+  const showSidebar = (
+    <button
+      type="button"
+      className="icon sidebar-toggle"
+      aria-label={t('space.showSidebar')}
+      title={t('space.showSidebar')}
+      onClick={() => setSidebarVisible(true)}
+    >
+      <IconChevronRight size={MENU_ICON_SIZE} />
+    </button>
+  );
+  if (focus) {
+    return (
+      <div ref={split} className={sidebarVisible ? 'split' : 'split collapsed with-rail'}>
+        {sidebarVisible ? (
+          <div className="sidebar-frame">
+            <Sidebar
+              space={space}
+              current={current}
+              parent={parent ?? null}
+              onHide={() => setSidebarVisible(false)}
+            />
+            <SidebarEdge split={split} />
+          </div>
+        ) : (
+          <div className="sidebar-rail">{showSidebar}</div>
+        )}
+        <main id="main" className="focus">
+          {children}
+        </main>
+      </div>
+    );
+  }
   return (
     <div ref={split} className={sidebarVisible ? 'split' : 'split collapsed'}>
       {sidebarVisible && (
@@ -426,17 +462,7 @@ export function Frame({
         </div>
       )}
       <main id="main" className="content">
-        {!sidebarVisible && (
-          <button
-            type="button"
-            className="icon sidebar-toggle"
-            aria-label={t('space.showSidebar')}
-            title={t('space.showSidebar')}
-            onClick={() => setSidebarVisible(true)}
-          >
-            <IconChevronRight size={MENU_ICON_SIZE} />
-          </button>
-        )}
+        {!sidebarVisible && showSidebar}
         <div className="column">
           {space.status === 'archived' && (
             <p role="status" className="note">
@@ -476,7 +502,15 @@ function PageMissing({ pageId, error }: { pageId: string; error: unknown }) {
 }
 
 /** Frames a page with the sidebar of its space. */
-export function SpaceShell({ pageId, children }: { pageId: string; children: ReactNode }) {
+export function SpaceShell({
+  pageId,
+  focus,
+  children,
+}: {
+  pageId: string;
+  focus?: boolean;
+  children: ReactNode;
+}) {
   const page = useQuery({
     queryKey: ['page', pageId],
     queryFn: () => api.get<PageDetail>(`/pages/${pageId}`),
@@ -493,7 +527,12 @@ export function SpaceShell({ pageId, children }: { pageId: string; children: Rea
     return <PageMissing pageId={pageId} error={page.error ?? space.error} />;
   }
   return (
-    <Frame space={space.data} current={pageId} parent={page.data?.status === 'published' ? pageId : null}>
+    <Frame
+      space={space.data}
+      current={pageId}
+      parent={page.data?.status === 'published' ? pageId : null}
+      focus={focus}
+    >
       {children}
     </Frame>
   );

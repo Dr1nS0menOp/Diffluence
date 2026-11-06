@@ -81,7 +81,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 | Alt C | Code block |
 | Shift L, E, R | Align to the start, centre, end |
 | D | Duplicate the block |
-| Shift . | The block menu |
+| Shift . | The block menu; in a table, the table menu |
 | Shift Backspace | Delete the block |
 | F | Find |
 | S | Save the draft now |
@@ -157,7 +157,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 
 ## 4.9 Tables
 
-- **EDT-084** · built · A table starts with three columns, three rows and a header row. Rows and columns are added and removed from the tools.
+- **EDT-084** · built · A table starts with three columns, three rows and a header row. Rows and columns are added and removed from the menu on the table.
 - **EDT-085** · built · Cells can hold any block, and can be merged in the document format.
 - **EDT-086** · new · A size picker chooses rows and columns when adding a table.
 - **EDT-087** · new · **Handles:** a handle on each row and column selects it, and opens its menu.
@@ -170,7 +170,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-094** · partly · **Sort** by a column, ascending or descending. In the editor this changes the table. Readers can sort a table for themselves without changing it. Built: sorting in the editor. New: sorting for readers.
 - **EDT-095** · built · **Cell colour:** from the same palette, with light and dark versions.
 - **EDT-096** · built · **Column width:** drag the border between columns. A button makes selected columns equal.
-- **EDT-097** · new · **Table width:** normal, wide or full, and aligned left or centre.
+- **EDT-097** · built · **Table width:** from the width of the text up to the full width of the window, by dragging its end edge, from the menu, or with the arrow keys on that edge. It stays centred on the text.
 - **EDT-098** · new · **Fixed or flexible columns:** fixed tables keep their layout and scroll on narrow screens, flexible tables scale.
 - **EDT-099** · new · **Sticky header:** the header row of a long table stays visible while scrolling.
 - **EDT-100** · new · **Copy and paste** of rows and columns, and of cells from a spreadsheet, which land as cells.
@@ -181,7 +181,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 ## 4.10 Code
 
 - **EDT-104** · built · A code block has a language, syntax highlighting and always reads left-to-right.
-- **EDT-105** · partly · A language picker with search and recently used languages. **Plain text** is one of them. Built: a list of languages with Plain text. New: search and recently used.
+- **EDT-105** · built · A language picker with search, with the languages of this page first. **Plain text** is one of them. About 190 languages, which load when needed.
 - **EDT-106** · new · The language can be detected, and the writer can change it.
 - **EDT-107** · partly · **Line numbers** can be on or off, with a starting number. Built: on and off. New: a starting number.
 - **EDT-108** · built · **Wrap long lines** can be on or off.
@@ -253,3 +253,12 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-156** · built · Colours, sizes and alignment are stored as names from a short list, never as free values, so no document can carry styles.
 - **EDT-157** · new · An older document always opens in a newer release, upgraded on read.
 - **EDT-158** · new · Blocks that a release does not know, for example from a newer linked instance, show as a clear placeholder and are kept unchanged.
+
+## 4.x After the product owner's first test (spec 017)
+
+- **EDT-159** · built · A table has a clear outline and a soft grid, for readers and for writers, and the table with the cursor gets an accent outline.
+- **EDT-160** · built · One button on the table opens a menu with everything for tables: rows, columns, cells, colours and width. It stays open while it is used, and Ctrl Shift . opens it from the keyboard. The button stays in reach while a long table scrolls.
+- **EDT-161** · built · The row of tools does not change when the cursor enters a table.
+- **EDT-162** · built · A whole row or column gets a colour in one step.
+- **EDT-163** · built · Emoji, header image and page options sit at the title, quiet until hover or focus.
+- **EDT-164** · built · The row of tools has a Full width button, which applies at once.

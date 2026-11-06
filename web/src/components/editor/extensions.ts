@@ -9,7 +9,7 @@ import { CodeBlock } from './code';
 import { DateMark, Instruction, Status, TemplateField } from './inline';
 import { BlockFormat, Highlight, Subscript, Superscript, TextColor } from './marks';
 import { Mention } from './people';
-import { DocumentCell, DocumentHeaderCell } from './table';
+import { DocumentCell, DocumentHeaderCell, DocumentTable } from './table';
 
 /** A task has an id, so a tick in a list can find it in the document. */
 const DocumentTaskItem = TaskItem.extend({
@@ -73,7 +73,8 @@ export function documentExtensions({
           }
         : undefined,
     }),
-    TableKit.configure({ table: { resizable: true }, tableCell: false, tableHeader: false }),
+    TableKit.configure({ table: false, tableCell: false, tableHeader: false }),
+    DocumentTable,
     DocumentCell,
     DocumentHeaderCell,
     CodeBlock,

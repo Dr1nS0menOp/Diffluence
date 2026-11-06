@@ -4,6 +4,7 @@ package document
 
 import (
 	"encoding/json"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -76,6 +77,44 @@ func TestNormalizeDropsUnknownAttributes(t *testing.T) {
 	attrs := p.Content[0].Marks[0].Attrs
 	if len(attrs) != 1 || attrs["href"] != "https://example.com" {
 		t.Fatalf("link attributes: %v", attrs)
+	}
+}
+
+func tableWithStretch(value string) []byte {
+	return doc(`{"type":"table","attrs":{"stretch":` + value + `},"content":[{"type":"tableRow","content":[
+		{"type":"tableCell","content":[{"type":"paragraph"}]}]}]}`)
+}
+
+func TestATableKeepsAWidthFromOneToOneHundred(t *testing.T) {
+	for _, value := range []string{"1", "50", "100"} {
+		n, err := Normalize(tableWithStretch(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if got, want := n.Content[0].Attrs["stretch"], value; strconv.Itoa(got.(int)) != want {
+			t.Errorf("stretch %s became %v", value, got)
+		}
+	}
+	for _, value := range []string{"0", "-5", "101", "12.5", `"100"`, `"calc(100vw)"`, "null", "true"} {
+		n, err := Normalize(tableWithStretch(value))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if attrs := n.Content[0].Attrs; attrs != nil {
+			t.Errorf("stretch %s stayed: %v", value, attrs)
+		}
+	}
+}
+
+func TestEveryLanguageOfTheLibraryPassesTheGate(t *testing.T) {
+	for _, language := range []string{"1c", "c-like", "clojure-repl", "x86asm", "vbscript-html", "c++", "c#"} {
+		n, err := Normalize(doc(`{"type":"codeBlock","attrs":{"language":"` + language + `"}}`))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n.Content[0].Attrs["language"] != language {
+			t.Errorf("%s was dropped", language)
+		}
 	}
 }
 

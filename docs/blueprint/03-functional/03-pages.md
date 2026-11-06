@@ -22,9 +22,8 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-013** · built · Every person has at most one draft per page. It is private until the page is published.
 - **PAG-014** · built · A person who leaves with a draft sees a note on the page, with a link back to the draft.
 - **PAG-015** · built · Discarding a draft asks first, and cannot be undone.
-- **PAG-016** · built · If saving fails, the text stays in the browser until it can be saved, and is offered back after a crash or a closed tab.
-- **PAG-017** · built · Leaving the editor with unsaved changes never loses them. Close only leaves when the draft is safe, or asks.
-- **PAG-018** · new · A person can invite someone to look at their draft by sending a link. The invited person needs edit rights on the page and sees the same draft.
+- **PAG-016** Â· built Â· If saving fails, the text stays in the browser until it can be saved, and is offered back after a crash or a closed tab.
+- **PAG-017** Â· built Â· Leaving the editor with unsaved changes never loses them. Close only leaves when the draft is safe, or asks. Leaving any other way saves first, and when that fails a message leads back to the text.- **PAG-018** · new · A person can invite someone to look at their draft by sending a link. The invited person needs edit rights on the page and sees the same draft.
 - **PAG-019** · built · Drafts older than a configurable period (default: one year) are removed after a warning by notification.
 - **PAG-020** · built · Saving a draft is not audited, because it is private work and autosave would flood the log.
 
@@ -44,12 +43,11 @@ A page goes through a simple life: a private draft, a published page, new versio
 ## 3.4 Editing a published page
 
 - **PAG-031** · built · Edit opens the editor with the published text, or with the person's draft if there is one.
-- **PAG-032** · built · The sidebar goes and the top bar stays while editing.
-- **PAG-033** · built · An **Unpublished changes** mark sits by the title for the person who has a draft on the page.
-- **PAG-034** · partly · Several people can edit at once (COL-088). Until then, the editor warns when someone else is editing the same page. Still open: editing together. The warning is built.
-- **PAG-035** · partly · A person without edit rights sees no Edit button. If they have asked for access before, it says so. Still open: saying that access was asked for.
-- **PAG-036** · built · **Revert to published:** in the editor, a person can throw away all their changes since the last version.
-
+- **PAG-032** Â· built Â· The top bar and the sidebar with the pages of the space stay while editing, as far as there is room.
+- **PAG-033** Â· built Â· An **Unpublished changes** mark sits by the title for the person who has a draft on the page.
+- **PAG-034** Â· partly Â· Several people can edit at once (COL-088). Until then, the editor warns when someone else is editing the same page. Still open: editing together. The warning is built.
+- **PAG-035** Â· partly Â· A person without edit rights sees no Edit button. If they have asked for access before, it says so. Still open: saying that access was asked for.
+- **PAG-036** Â· built Â· **Revert to published:** in the editor, a person can throw away all their changes since the last version.
 ## 3.5 Renaming, moving, copying
 
 - **PAG-037** · built · Rename changes the title and creates a version.
@@ -142,7 +140,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-104** · built · **Read time** is estimated at 230 words per minute, with a minimum of one minute. It is left out for very short pages.
 - **PAG-105** · new · **View count** shows after the byline for those allowed to see analytics, and opens page insights (PLT-008).
 - **PAG-106** · built · **Contributors:** selecting the byline shows who worked on the page, with their share of versions.
-- **PAG-107** · built · **Page width:** each page is normal or full width. Full width is chosen in the editor and stays with the page. A very wide screen is still limited to a comfortable maximum.
+- **PAG-107** · built · **Page width:** a page scales with the window, between a comfortable minimum and maximum. Full width is chosen in the row of tools of the editor, stays with the page, and takes all the room.
 - **PAG-108** · built · **Contents beside the page:** on wide screens, a page with three or more headings shows a floating list of headings that follows the scroll position. It can be turned off per person.
 - **PAG-109** · built · Every heading has a link icon on hover or focus, which copies an address that jumps straight to that heading.
 - **PAG-110** · built · An address that jumps to a heading scrolls to it and marks it briefly.
@@ -162,6 +160,6 @@ A page goes through a simple life: a private draft, a published page, new versio
 ## 3.12 The page header
 
 - **PAG-123** · built · A page can have an emoji beside its title. It shows in the tree, breadcrumbs, cards, search results and the browser tab.
-- **PAG-124** · partly · A page can have a **header image** above the title. It is chosen by upload, repositioned by dragging up or down, and can be changed or removed. Still open: a number places the image, dragging it does not yet.
+- **PAG-124** · built · A page can have a **header image** above the title. It is chosen by upload, repositioned by dragging up or down or with a range field, and can be changed or removed.
 - **PAG-125** · built · The header image is an attachment of the page, and follows its rules. External image libraries are not used, because they would tell a third party who is reading.
 - **PAG-126** · built · The title can be left-aligned or centred, and a space administrator can set a default.

@@ -8,21 +8,9 @@ import {
   IconAlignCenter,
   IconAlignEnd,
   IconAlignStart,
-  IconColumnAdd,
-  IconColumnDelete,
-  IconEqual,
-  IconFill,
-  IconHeaderColumn,
-  IconHeaderRow,
   IconLineNumbers,
-  IconMerge,
   IconPicture,
   IconRename,
-  IconRowAdd,
-  IconRowDelete,
-  IconSortDown,
-  IconSortUp,
-  IconTrash,
   IconUnwrap,
   IconWrap,
 } from '../icons';
@@ -36,107 +24,12 @@ import {
   unwrapBlock,
   updateSelected,
 } from './block-commands';
-import { CODE_LANGUAGES } from './code';
+import { LanguageDialog } from './language-dialog';
 import { IMAGE_SIZES, MARK_COLORS, PANEL_KINDS, PANEL_TINT } from './palette';
-import { canSortTable, equalColumns, sortTable } from './table';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
 
 function Swatch({ color }: { color: string }) {
   return <span className={`swatch mark-${color}`} />;
-}
-
-function ColorChoice({
-  name,
-  checked,
-  label,
-  onPick,
-}: {
-  name: string | null;
-  checked: boolean;
-  label: string;
-  onPick: () => void;
-}) {
-  return (
-    <MenuItem role="menuitemradio" aria-checked={checked} onClick={onPick}>
-      {name ? <Swatch color={name} /> : <span className="swatch" />} {label}
-    </MenuItem>
-  );
-}
-
-function TableTools({ editor }: { editor: Editor }) {
-  const { t } = useTranslation();
-  const chain = () => editor.chain().focus();
-  const state = useEditorState({
-    editor,
-    selector: (s) => ({
-      canSort: canSortTable(s.editor),
-      background: s.editor.getAttributes('tableCell').background as string | null | undefined,
-    }),
-  });
-  const paint = (color: string | null) => chain().setCellAttribute('background', color).run();
-  return (
-    <>
-      <Tool editor={editor} label={t('editor.tableAddRow')} run={() => chain().addRowAfter().run()}>
-        <IconRowAdd size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableAddCol')} run={() => chain().addColumnAfter().run()}>
-        <IconColumnAdd size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableDeleteRow')} run={() => chain().deleteRow().run()}>
-        <IconRowDelete size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableDeleteCol')} run={() => chain().deleteColumn().run()}>
-        <IconColumnDelete size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableMerge')} run={() => chain().mergeOrSplit().run()}>
-        <IconMerge size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableHeaderRow')} run={() => chain().toggleHeaderRow().run()}>
-        <IconHeaderRow size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.tableHeaderCol')} run={() => chain().toggleHeaderColumn().run()}>
-        <IconHeaderColumn size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Menu
-        label={t('editor.tableCellColor')}
-        trigger={<IconFill size={TOOL_ICON_SIZE} />}
-        className="tool"
-        align="start"
-      >
-        <ColorChoice
-          name={null}
-          checked={!state.background}
-          label={t('editor.noColor')}
-          onPick={() => paint(null)}
-        />
-        {MARK_COLORS.map((color) => (
-          <ColorChoice
-            key={color}
-            name={color}
-            checked={state.background === color}
-            label={t(`editor.colors.${color}`)}
-            onPick={() => paint(color)}
-          />
-        ))}
-      </Menu>
-      <Tool editor={editor} label={t('editor.tableEqual')} run={() => equalColumns(editor)}>
-        <IconEqual size={TOOL_ICON_SIZE} />
-      </Tool>
-      {state.canSort && (
-        <>
-          <Tool editor={editor} label={t('editor.sortUp')} run={() => sortTable(editor, 'up')}>
-            <IconSortUp size={TOOL_ICON_SIZE} />
-          </Tool>
-          <Tool editor={editor} label={t('editor.sortDown')} run={() => sortTable(editor, 'down')}>
-            <IconSortDown size={TOOL_ICON_SIZE} />
-          </Tool>
-        </>
-      )}
-      <Tool editor={editor} label={t('editor.tableDelete')} run={() => chain().deleteTable().run()}>
-        <IconTrash size={TOOL_ICON_SIZE} />
-      </Tool>
-    </>
-  );
 }
 
 function DescribeDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
@@ -392,23 +285,33 @@ function CodeTools({ editor }: { editor: Editor }) {
         wrap: boolean;
       },
   });
+  const [choosing, setChoosing] = useState(false);
   const set = (values: Record<string, string | boolean | null>) =>
     editor.commands.updateAttributes('codeBlock', values);
+  const language = attrs.language ?? t('editor.plainText');
   return (
     <>
-      <select
-        className="tool-style"
-        aria-label={t('editor.codeLanguage')}
-        value={attrs.language ?? ''}
-        onChange={(e) => set({ language: e.target.value || null })}
+      <button
+        type="button"
+        className="tool-language"
+        aria-label={`${t('editor.codeLanguage')}: ${language}`}
+        title={t('editor.codeLanguage')}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => setChoosing(true)}
       >
-        <option value="">{t('editor.plainText')}</option>
-        {CODE_LANGUAGES.map((language) => (
-          <option key={language} value={language}>
-            {language}
-          </option>
-        ))}
-      </select>
+        {language}
+      </button>
+      {choosing && (
+        <LanguageDialog
+          editor={editor}
+          onPick={(picked) => {
+            setChoosing(false);
+            set({ language: picked });
+            editor.commands.focus();
+          }}
+          onClose={() => setChoosing(false)}
+        />
+      )}
       <Tool
         editor={editor}
         label={t('editor.lineNumbers')}
@@ -441,7 +344,7 @@ export function SelectionTools({ editor }: { editor: Editor }) {
   const active = useEditorState({
     editor,
     selector: (s) =>
-      ['status', 'date', 'image', 'codeBlock', 'table', 'panel', 'expand', 'columns'].find((name) =>
+      ['status', 'date', 'image', 'codeBlock', 'panel', 'expand', 'columns'].find((name) =>
         s.editor.isActive(name),
       ),
   });
@@ -451,7 +354,7 @@ export function SelectionTools({ editor }: { editor: Editor }) {
     date: <DateTools key="date" editor={editor} />,
     image: <ImageTools key="image" editor={editor} />,
     codeBlock: <CodeTools key="code" editor={editor} />,
-    table: <TableTools key="table" editor={editor} />,
+
     panel: <PanelTools key="panel" editor={editor} />,
     expand: <ExpandTools key="expand" editor={editor} />,
     columns: <ColumnTools key="columns" editor={editor} />,

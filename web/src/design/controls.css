@@ -332,9 +332,45 @@ fieldset.matrix label {
   box-shadow: var(--shadow-menu);
 }
 
+.menu-list.above {
+  inset-block: auto calc(100% + var(--space-1));
+}
+
 .menu-list.floating {
   position: fixed;
   inset-block-start: auto;
+}
+
+.menu-group + .menu-group {
+  margin-block-start: var(--space-1);
+  padding-block-start: var(--space-1);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.menu-group-title {
+  padding: var(--space-1) var(--space-2) 0;
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.menu-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-0-5);
+  padding-inline: var(--space-2);
+}
+
+.menu-swatches-label {
+  inline-size: var(--space-12);
+  font-size: var(--text-small);
+}
+
+.menu-list .menu-swatches [role^='menuitem'] {
+  inline-size: auto;
+  min-block-size: var(--size-twist);
+  padding: var(--space-0-5);
 }
 
 .menu-note {
