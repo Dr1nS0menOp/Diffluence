@@ -52,12 +52,14 @@ type Preferences struct {
 	TourSeen         bool `json:"tour_seen"`
 	// StartScreen is company or personal, for an instance with a company home.
 	StartScreen string `json:"start_screen"`
+	// ShowPresence lets others see this person on a page.
+	ShowPresence bool `json:"show_presence"`
 }
 
 // DefaultPreferences is what someone has who never chose anything.
 func DefaultPreferences() Preferences {
 	return Preferences{Theme: "system", Shortcuts: true, Contents: true, HoverCards: true,
-		SidebarWidth: defaultSidebarWidth, TreeView: "tree", Language: "en", TimeZone: "", DateFormat: "medium", FirstDay: 1, StartScreen: "company"}
+		SidebarWidth: defaultSidebarWidth, TreeView: "tree", Language: "en", TimeZone: "", DateFormat: "medium", FirstDay: 1, StartScreen: "company", ShowPresence: true}
 }
 
 func (p Preferences) validate() error {

@@ -20,8 +20,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/analytics"
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/automation"
 	"github.com/diffluence/diffluence/internal/blocks"
+	"github.com/diffluence/diffluence/internal/collab"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
@@ -38,9 +41,11 @@ import (
 	"github.com/diffluence/diffluence/internal/mail"
 	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/outward"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/presence"
 	"github.com/diffluence/diffluence/internal/queue"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
@@ -55,6 +60,7 @@ import (
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/version"
 	"github.com/diffluence/diffluence/internal/watches"
+	"github.com/diffluence/diffluence/internal/webhooks"
 )
 
 // NewLogger returns the JSON logger used everywhere.
@@ -74,6 +80,12 @@ type App struct {
 	perms      *permissions.Service
 	settings   *settings.Service
 	features   *features.Service
+	analytics  *analytics.Service
+	presence   *presence.Service
+	outward    *outward.Service
+	automation *automation.Service
+	webhooks   *webhooks.Service
+	collab     *collab.Service
 	templates  *templates.Service
 	store      storage.Store
 	attach     *attachments.Service
@@ -183,6 +195,14 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	}
 	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
+	a.analytics = analytics.NewService(a.pool, a.perms, a.features)
+	a.presence = presence.NewService(a.pool, a.perms, a.identity, a.settings)
+	a.outward = outward.NewService(a.pool, outward.Options{AllowPrivate: cfg.OutwardAllowPrivate})
+	a.automation = automation.NewService(automation.Deps{Pool: a.pool, Perms: a.perms, Identity: a.identity, Pages: a.pages,
+		Comments: a.comments, Watches: a.watches, Templates: a.templates, Notify: a.notify, Jobs: a.jobs, Features: a.features,
+		Outward: a.outward, Origin: cfg.PublicOrigin()})
+	a.webhooks = webhooks.NewService(a.pool, a.perms, a.identity, a.outward, a.keyring, a.notify)
+	a.collab = collab.NewService(a.pool, a.perms, a.identity, collab.Options{URL: cfg.CollabURL, Token: cfg.CollabToken})
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, a.settings,
 		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
 	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,
@@ -201,6 +221,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Sites: a.sites, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
+			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit,
 			InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
@@ -354,6 +375,15 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 				a.log.Error("notifications stopped", "error", err)
 			}
 		}()
+		for durable, handle := range map[string]func(context.Context, []byte) error{automationConsumer: a.automation.Handle, webhookConsumer: a.webhooks.Handle, collabConsumer: a.collab.Handle} {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				if err := a.queue.Consume(workCtx, durable, handle); err != nil {
+					a.log.Error("event consumer stopped", "consumer", durable, "error", err)
+				}
+			}()
+		}
 	}
 
 	wg.Add(1)
@@ -399,6 +429,13 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 // notificationConsumer is the durable name of the fan-out in the event stream.
 const notificationConsumer = "notifications"
 
+// The durable names of the consumers that match events to rules and to webhooks.
+const (
+	automationConsumer = "automation"
+	webhookConsumer    = "webhooks"
+	collabConsumer     = "collab"
+)
+
 // handleEvent turns one event from the stream into notifications.
 func (a *App) handleEvent(ctx context.Context, data []byte) error {
 	var m outbox.Message
@@ -411,15 +448,6 @@ func (a *App) handleEvent(ctx context.Context, data []byte) error {
 	return a.sites.Handle(ctx, m)
 }
 
-// eventHandler lets the outbox relay hand events straight to handleEvent, which tests
-// use instead of the queue.
-type eventHandler struct{ a *App }
-
-// Publish implements outbox.Publisher.
-func (h eventHandler) Publish(ctx context.Context, _ string, data []byte, _ string) error {
-	return h.a.handleEvent(ctx, data)
-}
-
 // Notify exposes notifications (used by tests).
 func (a *App) Notify() *notify.Service { return a.notify }
 
@@ -429,10 +457,27 @@ func (a *App) Mail() *mail.Service { return a.mail }
 // Logger exposes the logger (used by tests).
 func (a *App) Logger() *slog.Logger { return a.log }
 
+// everyConsumer hands an event to all consumers at once, as the stream does.
+type everyConsumer struct{ a *App }
+
+// Publish implements the publisher of the relay.
+func (e everyConsumer) Publish(ctx context.Context, _ string, data []byte, _ string) error {
+	if err := e.a.handleEvent(ctx, data); err != nil {
+		return err
+	}
+	if err := e.a.automation.Handle(ctx, data); err != nil {
+		return err
+	}
+	if err := e.a.webhooks.Handle(ctx, data); err != nil {
+		return err
+	}
+	return e.a.collab.Handle(ctx, data)
+}
+
 // DeliverEvents hands every waiting event straight to the notifications, as the
 // worker does through the queue. Tests use it to stay in step.
 func (a *App) DeliverEvents(ctx context.Context) error {
-	relay := &outbox.Relay{Pool: a.pool, Publisher: eventHandler{a}, Log: a.log}
+	relay := &outbox.Relay{Pool: a.pool, Publisher: everyConsumer{a}, Log: a.log}
 	for {
 		n, err := relay.RunOnce(ctx)
 		if err != nil || n == 0 {
@@ -463,9 +508,24 @@ func (a *App) Attachments() *attachments.Service { return a.attach }
 // creating the administrator. Once decided, a check only reads one setting.
 const exampleSpaceCheck = 10 * time.Second
 
+// Automation exposes rules (used by tests).
+func (a *App) Automation() *automation.Service { return a.automation }
+
+// Webhooks exposes webhooks (used by tests).
+func (a *App) Webhooks() *webhooks.Service { return a.webhooks }
+
+// CloseAnalyticsDays runs the daily closing now, for tests and for operators.
+func (a *App) CloseAnalyticsDays(ctx context.Context) error { return a.analytics.CloseDays(ctx) }
+
 // PeriodicTasks is the work the worker does on a schedule.
 func (a *App) PeriodicTasks() []jobs.Task {
 	tasks := []jobs.Task{
+		{Name: "close-analytics-days", Every: time.Hour, Run: a.analytics.CloseDays},
+		{Name: "forget-presence", Every: time.Minute, Run: a.presence.Forget},
+		{Name: "run-schedules", Every: time.Minute, Run: a.automation.RunSchedules},
+		{Name: "purge-rule-runs", Every: 24 * time.Hour, Run: a.automation.PurgeRuns},
+		{Name: "deliver-webhooks", Every: time.Minute, Run: a.webhooks.DeliverDue},
+		{Name: "purge-webhook-log", Every: 24 * time.Hour, Run: a.webhooks.PurgeLog},
 		{Name: "purge-trash", Every: time.Hour, Run: func(ctx context.Context) error {
 			n, err := a.trash.PurgeExpired(ctx)
 			if n > 0 {

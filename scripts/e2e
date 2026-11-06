@@ -4,15 +4,17 @@
 # Run from WSL or Linux after scripts/dev up.
 #   scripts/e2e                 all tests
 #   scripts/e2e -g "passkey"    a selection (Playwright arguments)
+#   E2E_COLLAB=1 scripts/e2e collab.spec.ts    with the service for editing together
 set -euo pipefail
 cd "$(dirname "$0")/.."
 compose=(docker compose -f compose.dev.yaml)
 
-"${compose[@]}" exec -T dev sh -s <<'EOF'
+"${compose[@]}" exec -T -e E2E_COLLAB="${E2E_COLLAB:-}" dev sh -s <<'EOF'
 set -e
 cd /work/web && npx vite build >/dev/null
 cd /work && CGO_ENABLED=0 go build -o /tmp/diffluence ./cmd/diffluence
 [ -f /tmp/e2e.pid ] && kill "$(cat /tmp/e2e.pid)" 2>/dev/null || true
+[ -f /tmp/collab.pid ] && kill "$(cat /tmp/collab.pid)" 2>/dev/null || true
 export PGPASSWORD=diffluence
 psql -q -h db -U diffluence -d diffluence -c 'DROP DATABASE IF EXISTS diffluence_e2e WITH (FORCE)' -c 'CREATE DATABASE diffluence_e2e'
 rm -rf /tmp/dfl-e2e /tmp/dfl-e2e-sites
@@ -25,10 +27,21 @@ export DIFFLUENCE_EXAMPLE_SPACE=false
 export DIFFLUENCE_LOG_LEVEL=warn
 export DIFFLUENCE_PUBLISH_DIR=/tmp/dfl-e2e-sites
 ENV
+if [ -n "$E2E_COLLAB" ]; then
+  cat >>/tmp/e2e-env <<ENV
+export DIFFLUENCE_COLLAB_URL=http://localhost:1234
+export DIFFLUENCE_COLLAB_TOKEN=e2e-collab-token
+ENV
+fi
 . /tmp/e2e-env
 echo 'correct horse battery staple' | /tmp/diffluence user create-admin --email admin@example.com --name Admin >/dev/null
 nohup /tmp/diffluence serve >/tmp/e2e.log 2>&1 &
 echo $! >/tmp/e2e.pid
+if [ -n "$E2E_COLLAB" ]; then
+  (cd /work/collab && { [ -d node_modules ] || npm ci --no-audit --no-fund; } \
+    && DIFFLUENCE_API_URL=http://localhost:8080 nohup node server.mjs >/tmp/collab.log 2>&1 &
+   echo $! >/tmp/collab.pid)
+fi
 for i in $(seq 1 50); do
   curl -sf http://localhost:8080/readyz >/dev/null && break
   sleep 0.2
@@ -38,5 +51,5 @@ EOF
 
 status=0
 "${compose[@]}" --profile e2e run --rm -T e2e npx playwright test "$@" || status=$?
-"${compose[@]}" exec -T dev sh -c 'kill "$(cat /tmp/e2e.pid)" 2>/dev/null; grep -iE "panic|\"level\":\"ERROR\"" /tmp/e2e.log | head -20; true' || true
+"${compose[@]}" exec -T dev sh -c 'kill "$(cat /tmp/e2e.pid)" 2>/dev/null; [ -f /tmp/collab.pid ] && kill "$(cat /tmp/collab.pid)" 2>/dev/null; rm -f /tmp/collab.pid; grep -iE "panic|\"level\":\"ERROR\"" /tmp/e2e.log | head -20; true' || true
 exit "$status"

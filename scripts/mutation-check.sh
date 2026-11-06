@@ -51,7 +51,7 @@ mutate() {
   shift 3
   rm -rf "$work/repo"
   mkdir -p "$work/repo"
-  tar -C "$src" --exclude=./web --exclude=./bin --exclude=./.git -cf - . | tar -C "$work/repo" -xf -
+  tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$work/repo" -xf -
   if ! apply "$work/repo/$file" "$expr"; then
     echo "BROKEN  $name (the mutation no longer applies; update this script)"
     survived=$((survived + 1))
@@ -239,15 +239,15 @@ mutate "a reset link works twice" internal/identity/factors.go \
 mutate "a reset says whether the address is known" internal/identity/lifecycle.go \
   's.replace("if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn nil\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"", "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn s.send(ctx, AccountMail{To: email, Kind: MailReset})\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"")' $app -run TestAResetLink
 mutate "a read token writes" internal/httpapi/server.go \
-  's.replace("case p.ViaToken && !p.CanWrite && !isRead(r):", "case p.ViaToken && !p.CanWrite && len(r.Method) < 0:")' $app -run TestTokens
+  's.replace("return identity.ScopeWrite\n", "return identity.ScopeRead\n")' $app -run TestTokens
 mutate "a token reaches account security" internal/httpapi/server.go \
   's.replace("case p.ViaToken && a.sessionOnly:", "case p.ViaToken && len(r.Method) < 0:")' $app -run TestTokens
 mutate "sensitive lets anything through" internal/httpapi/server.go \
   's.replace("case a.sensitive && time.Since(p.ConfirmedAt) > identity.ReauthWindow:", "case a.sensitive && time.Since(p.ConfirmedAt) < 0:")' $app -run TestEverySensitive
 mutate "a write passes during maintenance" internal/httpapi/middleware.go \
   's.replace("if state.On {", "if state.On && len(r.Method) < 0 {")' $app -run TestMaintenance
-mutate "a dangerous CSV cell passes" internal/permissions/access.go \
-  's.replace("return \"\x27\" + cell", "return cell")' $app -run TestWhoHasAccess
+mutate "a dangerous CSV cell passes" internal/csvout/csvout.go \
+  's.replace("return \"\x27\" + s", "return s")' $app -run TestWhoHasAccess
 mutate "a failing accent is accepted" internal/settings/sections.go \
   's.replace("if contrast(a, b) < normalTextRatio {", "if contrast(a, b) < 0 {")' $app -run TestAnAccent
 mutate "SVG passes as a logo" internal/settings/logo.go \
@@ -349,7 +349,7 @@ mutate "search does not find a mentioned person" internal/search/search.go \
 mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
   's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
-  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
+  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
 mutate "following tells who exists" internal/watches/watches.go \
   's.replace("if !known || !slices.Contains(facts.Global, identity.PermViewProfiles) {", "if !known || (len(facts.Global) < 0 && !slices.Contains(facts.Global, identity.PermViewProfiles)) {")' $app -run TestFollowingGoesByTheRuleForSeeingPeople
 mutate "allowing skips a level out of reach" internal/sharing/sharing.go \
@@ -366,7 +366,7 @@ mutate "the words of a removed version live on in a quote" internal/comments/com
 mutate_web "people share what the browser keeps" src/personal.ts \
   's.replace("`${PERSONAL_PREFIX}${person}.${name}`", "`${PERSONAL_PREFIX}${name}`")' src/personal.test.ts
 mutate_web "logging out leaves personal data" src/personal.ts \
-  's.replace(".filter((key) => key.startsWith(PERSONAL_PREFIX))\n    .forEach((key) => localStorage.removeItem(key));\n  sessionStorage.clear();", ".filter((key) => key.startsWith(\"nothing\"))\n    .forEach((key) => localStorage.removeItem(key));")' src/personal.test.ts
+  's.replace(".filter((key) => key.startsWith(PERSONAL_PREFIX) && !key.includes(UNSAVED_PART))\n    .forEach((key) => localStorage.removeItem(key));\n  sessionStorage.clear();", ".filter((key) => key.startsWith(\"nothing\") && !key.includes(UNSAVED_PART))\n    .forEach((key) => localStorage.removeItem(key));")' src/personal.test.ts
 mutate_web "a comment draft stays for ever" src/personal.ts \
   's.replace("draft !== null && now - draft.saved < DRAFT_KEEP_MS", "draft !== null")' src/personal.test.ts
 
@@ -400,7 +400,7 @@ mutate "search shows a comment in the trash" internal/db/migrations/0008_organis
 mutate "an edit restriction does not count for a thread" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
 mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
-  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
+  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
 mutate "a removed version lives on in a quote" internal/pages/versions.go \
   's.replace("if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {", "_ = removed\n\t\tif err := comments.BlankQuotes(ctx, tx, c, id, current, current); err != nil {")' $app -run TestRemovingAVersionBlanksTheQuotesThatHoldIt
 mutate "nodes hand out rights at the same time" internal/db/db.go \
@@ -469,6 +469,50 @@ mutate "any address may be framed" internal/webui/webui.go \
 mutate "the policy blocks video and audio" internal/webui/webui.go \
   's.replace("media-src \x27self\x27; ", "")' ./internal/webui/ -run TestVideoAndAudioFromOurOwnOriginMayPlay
 
+mutate "names survive a stricter mode" internal/analytics/analytics.go \
+  's.replace("if v.Mode != ModeNames {", "if len(v.Mode) < 0 {")' $app -run TestLeavingNameModeDeletesNamesForGoodAndIsAudited
+mutate "a report shows a hidden page" internal/analytics/reports.go \
+  's.replace("FROM pages pg JOIN perm_visible_pages($1) v ON v.page_id = pg.id\n\t\tWHERE pg.space_id = $2 AND pg.status = \x27published\x27\n\t\tORDER BY 8", "FROM pages pg, (SELECT $1::uuid) v\n\t\tWHERE pg.space_id = $2 AND pg.status = \x27published\x27\n\t\tORDER BY 8")' $app -run TestReportsLeaveOutHiddenPages
+mutate "own views are counted" internal/analytics/analytics.go \
+  's.replace("|| f.owner == c.UserID {", "{")' $app -run TestOwnPageIsNotCountedAndAPersonCountsOncePerHalfHour
+mutate "a rule skips the check of its account" internal/automation/run.go \
+  's.replace("identity.Caller{UserID: r.rule.AccountID,", "identity.Caller{UserID: r.rule.OwnerID,")' $app -run TestARuleCannotDoMoreThanItsAccount
+mutate "a rule triggers itself" internal/automation/match.go \
+  's.replace("case slices.Contains(rc.Chain, r.ID):", "case len(rc.Chain) < 0:")' $app -run TestARuleCannotTriggerItself
+mutate "a chain runs on" internal/automation/match.go \
+  's.replace("case len(rc.Chain) >= maxChain:", "case len(rc.Chain) < 0:")' $app -run TestAChainOfRulesStopsAtFive
+mutate "a redirect is followed" internal/outward/outward.go \
+  's.replace("CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse },", "")' ./internal/outward/ -run TestARedirectIsNotFollowed
+mutate "a private address is allowed" internal/outward/outward.go \
+  's.replace("if err != nil || (!o.AllowPrivate && !isPublic(a)) {", "if err != nil || (!o.AllowPrivate && len(a.String()) < 0) {")' ./internal/outward/ -run TestAConnectionToAPrivateAddressIsRefusedAtConnectTime
+mutate "a delivery goes unsigned" internal/webhooks/webhooks.go \
+  's.replace("\"webhook-signature\": signature", "\"webhook-signature\": \"\"+signature[:0]")' $app -run TestAWebhookIsSignedAndHoldsNoText
+mutate "a hook token is not checked" internal/automation/match.go \
+  's.replace("WHERE token_hash = $1\", hashToken(token)", "WHERE token_hash <> $1\", hashToken(token)")' $app -run TestAnIncomingHookNeedsItsToken
+mutate "a scope is not checked" internal/httpapi/server.go \
+  's.replace("if slices.Contains(p.Scopes, scope) {", "if len(p.Scopes) >= 0 {")' $app -run TestAScopeLimitsATokenAndATokenNeverExceedsItsOwner
+mutate "a CSV cell goes unguarded" internal/csvout/csvout.go \
+  's.replace("safe[i] = Cell(c)", "safe[i] = c")' ./internal/csvout/ -run TestRowsAreGuardedAndQuoted
+mutate "a message reaches someone who cannot see the page" internal/automation/actions.go \
+  's.replace("if !allowed {\n\t\t\tcontinue", "if !allowed && len(people) < 0 {\n\t\t\tcontinue")' $app -run TestAMessageReachesNobodyWhoCannotSeeEveryPageItRefersTo
+mutate "a call skips the list of hosts" internal/outward/outward.go \
+  's.replace("if !allowed {", "if !allowed && len(address) < 0 {")' $app -run TestARuleCallsOutThroughTheAllowedList
+mutate "an event about a lost page is sent" internal/webhooks/webhooks.go \
+  's.replace("if !allowed.Allowed {", "if !allowed.Allowed && len(data) < 0 {")' $app -run TestAPageTheOwnerLostIsNotSent
+mutate "a reader joins the shared document" internal/collab/collab.go \
+  's.replace("pageID, permissions.PageEdit, uuid.Nil)", "pageID, permissions.ActionPageView, uuid.Nil)")' $app -run TestOnlySomeoneWhoMayEditCanConnect
+mutate "a stored document skips the gate" internal/collab/collab.go \
+  's.replace("if _, err := document.Normalize(in.Document); err != nil {", "if _, err := document.Normalize(in.Document); err != nil && len(in.State) < 0 {")' $app -run TestAHostileDocumentIsNotStored
+mutate "the service token is not checked" internal/httpapi/handlers_collab.go \
+  's.replace("if !found || !s.deps.Collab.TrustsToken(token) {", "if !found && !s.deps.Collab.TrustsToken(token) {")' $app -run TestTheServiceRoutesNeedTheToken
+mutate "a socket comes from another site" internal/httpapi/handlers_collab.go \
+  's.replace("if r.Header.Get(\"Origin\") != origin {", "if r.Header.Get(\"Origin\") != origin && len(origin) < 0 {")' $app -run TestASocketFromAnotherSiteIsRefused
+mutate "the service is not told of a change of rights" internal/collab/collab.go \
+  's.replace("|| strings.HasPrefix(eventType, \"restriction.\")", "")' $app -run TestAChangeOfRightsMakesTheServiceCheckAgain
+mutate_web "offline text stays after logout" src/personal.ts \
+  's.replace("localStorage.getItem(unsavedMarkOf(name)) === null &&", "localStorage.getItem(unsavedMarkOf(name)) === \"never\" &&")' src/personal.test.ts
+mutate_web "unsaved work goes at logout" src/personal.ts \
+  's.replace(" && !key.includes(UNSAVED_PART))\n    .forEach", ")\n    .forEach")' src/personal.test.ts
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

@@ -6,8 +6,13 @@ import {
   dropUnkeyedData,
   forgetPersonalData,
   keepDraft,
+  markSharedSaved,
+  markSharedUnsaved,
   personalKey,
   readDraft,
+  sharedDocumentName,
+  sharedDocumentsToForget,
+  unsavedKey,
 } from './personal';
 
 const DAY_MS = 86_400_000;
@@ -75,6 +80,45 @@ describe('what a browser keeps for a person', () => {
 
     expect(localStorage.length).toBe(1);
     expect(localStorage.getItem('diffluence.theme')).toBe('dark');
+  });
+});
+
+describe('text kept for working offline', () => {
+  const saved = sharedDocumentName('anna', 'page-1');
+  const unsaved = sharedDocumentName('anna', 'page-2');
+
+  it('leaves at logout, unless it was never saved', () => {
+    markSharedUnsaved('anna', 'page-2', NOW);
+    expect(sharedDocumentsToForget([saved, unsaved, 'something-else'])).toEqual([saved]);
+  });
+
+  it('leaves once the service has it', () => {
+    markSharedUnsaved('anna', 'page-2', NOW);
+    markSharedSaved('anna', 'page-2');
+    expect(sharedDocumentsToForget([unsaved])).toEqual([unsaved]);
+  });
+
+  it('is keyed per person', () => {
+    expect(sharedDocumentName('anna', 'page')).not.toBe(sharedDocumentName('bob', 'page'));
+    expect(unsavedKey('anna', 'page')).not.toBe(unsavedKey('bob', 'page'));
+  });
+
+  it('survives logout as a mark and as a backup, under the person', () => {
+    markSharedUnsaved('anna', 'page-2', NOW);
+    localStorage.setItem(unsavedKey('anna', 'page-3'), JSON.stringify({ saved: NOW }));
+    forgetPersonalData();
+    expect(localStorage.length).toBe(2);
+  });
+
+  it('stays for a short time only, so the document goes with its mark', () => {
+    markSharedUnsaved('anna', 'page-2', NOW - 8 * DAY_MS);
+    dropOldDrafts(NOW);
+    expect(sharedDocumentsToForget([unsaved])).toEqual([unsaved]);
+  });
+
+  it('when the app starts, leaves the person logged in alone and clears the others', () => {
+    const other = sharedDocumentName('bob', 'page-1');
+    expect(sharedDocumentsToForget([saved, other], 'anna')).toEqual([other]);
   });
 });
 

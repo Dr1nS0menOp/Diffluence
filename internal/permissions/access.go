@@ -15,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/csvout"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
@@ -120,14 +121,6 @@ func (s *Service) AccessDetail(ctx context.Context, c identity.Caller, spaceID u
 	return out, nil
 }
 
-// neutralise keeps a spreadsheet from running a name as a formula.
-func neutralise(cell string) string {
-	if cell != "" && strings.ContainsRune("=+-@\t\r", rune(cell[0])) {
-		return "'" + cell
-	}
-	return cell
-}
-
 // WriteAccessCSV writes who has access, with formulas neutralised, and audits it.
 func (s *Service) WriteAccessCSV(ctx context.Context, c identity.Caller, spaceID uuid.UUID, w io.Writer) error {
 	list, err := s.AccessDetail(ctx, c, spaceID, "")
@@ -144,7 +137,7 @@ func (s *Service) WriteAccessCSV(ctx context.Context, c identity.Caller, spaceID
 		return err
 	}
 	for _, h := range list {
-		if err := out.Write([]string{neutralise(h.Name), h.Subject.Type, h.Role, h.Source, neutralise(h.Via)}); err != nil {
+		if err := out.Write([]string{csvout.Cell(h.Name), h.Subject.Type, h.Role, h.Source, csvout.Cell(h.Via)}); err != nil {
 			return err
 		}
 	}

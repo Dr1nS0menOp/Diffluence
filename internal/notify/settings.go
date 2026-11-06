@@ -31,6 +31,7 @@ const (
 	TypePageChanged   = "page_changed"
 	TypeAccessRequest = "access_request"
 	TypeAccessAnswer  = "access_answer"
+	TypeRule          = "rule"
 	// TypeExportReady is the answer to something a person asked for, so it has no choice.
 	TypeExportReady = "export_ready"
 )
@@ -53,7 +54,7 @@ const defaultDigestHour = 8
 
 // Types lists every type a person can choose a channel for.
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
-	TypePageChanged, TypeAccessRequest, TypeAccessAnswer}
+	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -79,7 +80,7 @@ type Settings struct {
 func defaultChannels() map[string]string {
 	return map[string]string{
 		TypeMention: ChannelMail, TypeTaskAssigned: ChannelMail, TypeTaskDue: ChannelMail, TypeShare: ChannelMail,
-		TypeAccessRequest: ChannelMail, TypeAccessAnswer: ChannelMail,
+		TypeAccessRequest: ChannelMail, TypeAccessAnswer: ChannelMail, TypeRule: ChannelApp,
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
 	}
 }

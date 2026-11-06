@@ -127,13 +127,13 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 
 ## 7.13 Editing at the same time
 
-- **COL-088** · phase 4 · Several people edit the same page at once, and see each other's changes and cursors with names.
-- **COL-089** · phase 4 · Each person sees the others' pictures in the strip. A person who left turns grey.
-- **COL-090** · phase 4 · Changes merge by themselves, with no conflicts and no lost text, also when two people type in the same line.
-- **COL-091** · phase 4 · A person who is offline for a moment keeps typing. Their changes merge when the connection returns.
-- **COL-092** · new · A draft is then shared by everyone who edits the page. Publishing publishes the shared draft, and the version names all who took part.
-- **COL-093** · new · Clicking a colleague's picture jumps to their cursor.
-- **COL-094** · new · The editor invites people from the strip, by sending a link or a notification.
-- **COL-095** · new · If the page was published by another person while someone was away, they see that when they return.
-- **COL-096** · new · At least 30 people can edit one page at once.
-- **COL-097** · phase 4 · Comments, labels and status also update live for everyone on the page.
+- **COL-088** · built · Several people edit the same page at once, and see each other's changes and cursors with names.
+- **COL-089** · built · Each person sees the others' pictures in the strip. A person who left turns grey.
+- **COL-090** · built · Changes merge by themselves, with no conflicts and no lost text, also when two people type in the same line.
+- **COL-091** · built · A person who is offline for a moment keeps typing. Their changes merge when the connection returns.
+- **COL-092** · built · A draft is then shared by everyone who edits the page. Publishing publishes the shared draft, and the version names all who took part.
+- **COL-093** · built · Clicking a colleague's picture jumps to their cursor.
+- **COL-094** · built · The editor invites people from the strip, by sending a link or a notification.
+- **COL-095** · built · If the page was published by another person while someone was away, they see that when they return.
+- **COL-096** · partly · At least 30 people can edit one page at once.
+- **COL-097** · built · Comments, labels and status also update live for everyone on the page.

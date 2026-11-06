@@ -17,6 +17,7 @@ const FEATURES = [
   'analytics',
   'automation',
   'tokens',
+  'presence',
 ] as const;
 const SECOND_FACTOR_RULES = ['administrators_after_grace', 'none', 'administrators', 'members'];
 

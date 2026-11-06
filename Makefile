@@ -3,7 +3,7 @@ LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
-.PHONY: all build web run test test-race fmt fmt-check vet staticcheck vuln licenses web-check mutation fuzz check clean
+.PHONY: all build web run test test-race fmt fmt-check vet staticcheck vuln licenses web-check collab-check mutation fuzz check clean
 
 all: web build
 
@@ -40,6 +40,9 @@ vuln:
 licenses:
 	node scripts/check-licenses.mjs
 
+collab-check:
+	cd collab && npm ci --no-fund --no-audit && node --test
+
 web-check:
 	cd web && npx tsc --noEmit && npx eslint src e2e && npx prettier --check src e2e && npm run -s strings && npm run -s design && npx vitest run
 
@@ -54,7 +57,7 @@ fuzz:
 	go test ./internal/exchange/ -run '^$$' -fuzz FuzzVerifyBundle -fuzztime 60s
 	go test ./internal/document/ -run '^$$' -fuzz FuzzNormalize -fuzztime 60s
 
-check: fmt-check vet staticcheck vuln licenses web-check test-race
+check: fmt-check vet staticcheck vuln licenses web-check collab-check test-race
 
 clean:
 	rm -rf bin dist

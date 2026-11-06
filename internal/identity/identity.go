@@ -78,6 +78,8 @@ type Principal struct {
 	// ViaToken says a personal access token was used. CanWrite is its scope.
 	ViaToken bool
 	CanWrite bool
+	TokenID  uuid.UUID
+	Scopes   []string
 	// ConfirmedAt is when the person last proved who they are in this session.
 	ConfirmedAt time.Time
 	// NeedsSecondFactor limits the session to setting up a second factor.

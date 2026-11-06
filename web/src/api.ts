@@ -105,6 +105,7 @@ export interface Preferences {
   shortcuts: boolean;
   contents: boolean;
   hover_cards: boolean;
+  show_presence: boolean;
   sidebar_width: number;
   tree_view: string;
   language: string;
@@ -152,6 +153,7 @@ export interface Token {
   id: string;
   name: string;
   can_write: boolean;
+  scopes: string[];
   expires_at: string;
   created_at: string;
   last_used_at: string | null;

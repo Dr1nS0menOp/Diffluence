@@ -21,6 +21,8 @@ Put a TLS reverse proxy in front (Traefik, nginx). If it sits on another machine
 
 A new instance gets an example space within seconds of its first administrator: it shows everything a page can do, and can be deleted like any other space. To start empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`. An administrator can add it later under Administration, Settings.
 
+Outgoing calls only reach public addresses over https, and only hosts an administrator allowed. If your outside systems live on your own network, set `DIFFLUENCE_OUTWARD_ALLOW_PRIVATE=true`: the list of hosts still applies, but private addresses and plain http then work, so only allow hosts you trust.
+
 Drawing is optional. Run the jgraph/drawio image on its own address, and set DIFFLUENCE_DRAWING_URL to it, such as https://draw.example.com. It must be another origin than DIFFLUENCE_PUBLIC_URL, and the app refuses to start otherwise. Only that address may be framed. Serve it over HTTPS from the same kind of network as the wiki: a browser can block a public page from framing a private address.
 
 What you get: the container runs as non-root on a read-only filesystem with no capabilities, and the application connects with a database role that does not own the tables, so it cannot change or delete audit events.
@@ -86,3 +88,13 @@ Anonymising does not reach backups. After a restore, anonymise the same people a
 ## New releases
 
 Diffluence never calls home. Follow the release feed of the project to hear about updates.
+
+## Editing together
+
+Editing together is optional. Without it, every page keeps private drafts. With it, each page has one shared draft, which everyone who can edit the page sees while it is typed.
+
+1. Choose a long random token, and set it as `DIFFLUENCE_COLLAB_TOKEN` for both containers.
+2. Set `DIFFLUENCE_COLLAB_URL=http://collab:1234` for Diffluence.
+3. Start it with `docker compose --profile collab up -d`.
+
+Diffluence passes `/collab` on to the service, so your reverse proxy must allow WebSocket upgrades on that path. The service needs Node.js security updates from then on. One service node serves an instance: more than one needs sticky routing by page, which is not built yet.

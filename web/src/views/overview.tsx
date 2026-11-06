@@ -36,6 +36,11 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
     queryFn: () => api.get<SpaceOverview>(`/spaces/${space?.id}/overview`),
     enabled: !!space,
   });
+  const popular = useQuery({
+    queryKey: ['popular', space?.id],
+    queryFn: () => api.get<{ pages: { id: string; title: string }[] }>(`/spaces/${space?.id}/popular`),
+    enabled: !!space,
+  });
   const star = useMutation({
     mutationFn: () =>
       space?.favourite ? api.del(`/spaces/${space.id}/favourite`) : api.put(`/spaces/${space?.id}/favourite`),
@@ -111,6 +116,18 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               ))}
             </ul>
           </section>
+          {(popular.data?.pages.length ?? 0) > 0 && (
+            <section>
+              <h2>{t('insights.popular')}</h2>
+              <ul className="page-list">
+                {popular.data?.pages.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
           {facts.posts.length > 0 && (
             <section>
               <h2>{t('blog.title')}</h2>

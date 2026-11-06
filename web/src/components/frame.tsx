@@ -352,6 +352,7 @@ function Sidebar({
           <Link href={`/spaces/${space.key}/access`} className="side-link">
             <IconLock size={MENU_ICON_SIZE} /> {t('access.title')}
           </Link>
+
           {space.can['space.administer'] && (
             <Link href={`/spaces/${space.key}/trash`} className="side-link">
               <IconTrash size={MENU_ICON_SIZE} /> {t('space.trash')}

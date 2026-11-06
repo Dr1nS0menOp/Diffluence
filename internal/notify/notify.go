@@ -76,6 +76,7 @@ type Row struct {
 	Data      map[string]any
 	NeedsEdit bool // a thread for editors only reaches editors
 	NoCheck   bool // the answer to someone who asked for access
+	ForceMail bool // a rule sends an e-mail: mail unless the person turned this type off
 }
 
 func groupKey(r Row) string { return fmt.Sprintf("%s:%s", r.Type, r.PageID) }
@@ -102,6 +103,9 @@ func (s *Service) Deliver(ctx context.Context, q db.Querier, r Row) error {
 	channel := choices.channel(r.Type)
 	if channel == ChannelOff || (r.UserID == r.ActorID && !choices.NotifyOwn) {
 		return nil
+	}
+	if r.ForceMail {
+		channel = ChannelMail
 	}
 	allowed, err := s.mayHear(ctx, q, r)
 	if err != nil || !allowed {

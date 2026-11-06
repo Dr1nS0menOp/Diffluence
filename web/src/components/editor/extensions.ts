@@ -48,15 +48,19 @@ export type TaskToggle = (id: string, done: boolean) => void;
 export interface DocumentOptions {
   fileAddress?: FileAddress;
   onTask?: TaskToggle;
+  /** Editing together: undo comes from the shared document, per person. */
+  shared?: boolean;
 }
 
 export function documentExtensions({
   fileAddress = pageFileAddress,
   onTask,
+  shared = false,
 }: DocumentOptions = {}): AnyExtension[] {
   return [
     StarterKit.configure({
       codeBlock: false,
+      ...(shared ? { undoRedo: false as const } : {}),
       link: {
         openOnClick: false,
         autolink: true,

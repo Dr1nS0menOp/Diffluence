@@ -205,6 +205,7 @@ func recordEvent(ctx context.Context, tx pgx.Tx, c identity.Caller, action strin
 			payload[key] = v
 		}
 	}
+	c.Stamp(payload)
 	_, err := outbox.Enqueue(ctx, tx, action, payload)
 	return err
 }

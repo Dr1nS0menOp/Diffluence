@@ -75,6 +75,7 @@ jobs:
         working-directory: web
       - name: types, lint, translation strings, unit tests
         run: make web-check
+      - run: make collab-check
       - name: known vulnerabilities in shipped packages
         run: npm audit --omit=dev --audit-level=high
         working-directory: web

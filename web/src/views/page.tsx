@@ -65,6 +65,7 @@ import { useDocumentTitle, useScrollMemory } from '../page-title';
 import { ExportDialog, PublicLinkDialog, PublicMark } from './exchange';
 import { CopyDialog, MoveDialog } from './move-dialogs';
 import { ArchiveDialog, KindDialog, SaveTemplateDialog } from './page-actions';
+import { PresencePeople, usePresence, useViewCount } from '../components/presence';
 import { AttachmentsDialog, DeleteDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
 
 type PageDialog =
@@ -150,11 +151,13 @@ function Breadcrumbs({ page }: { page: PageDetail }) {
 function Byline({
   page,
   comments,
+  views,
   onDetails,
   onComments,
 }: {
   page: PageDetail;
   comments: number;
+  views: number | null;
   onDetails: () => void;
   onComments: () => void;
 }) {
@@ -191,11 +194,40 @@ function Byline({
           </button>
         </>
       )}
+      {views !== null && (
+        <>
+          <span aria-hidden="true">·</span>
+          <Link href={`/pages/${page.id}/insights`}>{t('insights.viewCount', { count: views })}</Link>
+        </>
+      )}
       {page.restricted && <span className="lozenge">{t('page.restricted')}</span>}
       <PublicMark pageId={page.id} />
       <StageControl page={page} />
       <VerifiedMark page={page} />
     </div>
+  );
+}
+
+/** Rules someone can start by hand, with their names, in More. */
+function ManualRules({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const q = useQuery({
+    queryKey: ['page-rules', pageId],
+    queryFn: () => api.get<{ rules: { id: string; name: string }[] }>(`/pages/${pageId}/rules`),
+  });
+  const run = useMutation({
+    mutationFn: (id: string) => api.post(`/rules/${id}/run`, { page_id: pageId }),
+    onSuccess: () => toast({ message: t('rules2.started') }),
+  });
+  return (
+    <>
+      {q.data?.rules.map((rule) => (
+        <MenuItem key={rule.id} onClick={() => run.mutate(rule.id)}>
+          {t('rules2.runOne', { name: rule.name })}
+        </MenuItem>
+      ))}
+    </>
   );
 }
 
@@ -256,6 +288,7 @@ function PageMenu({
   });
   return (
     <Menu label={t('page.moreActions')} trigger={<IconMore />}>
+      <ManualRules pageId={page.id} />
       <MenuLink href={`/pages/${page.id}/history`}>
         <IconClock size={MENU_ICON_SIZE} /> {t('page.history')}
       </MenuLink>
@@ -575,6 +608,8 @@ export function PageView({ pageId }: { pageId: string }) {
   });
   const page = q.data;
   const { watching, watch } = usePageWatch(pageId);
+  const views = useViewCount(pageId, page?.status === 'published');
+  const present = usePresence(pageId, 'reading');
   const { openThread, closeThreads, inline, ...threads } = useThreads(pageId, page?.status === 'published');
   const closeDetails = useCallback(() => setDetails(false), []);
   // One panel at a time: both sit in the same place beside the page.
@@ -627,6 +662,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <div className="page-top">
           <Breadcrumbs page={page} />
           <div className="page-actions">
+            <PresencePeople people={present} />
             {page.can['page.edit'] && (
               <Link className="button" href={`/pages/${page.id}/edit`}>
                 <IconPencil size={16} /> {t('page.edit')}
@@ -677,6 +713,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <Byline
           page={page}
           comments={threads.count}
+          views={views}
           onDetails={openDetails}
           onComments={() => openComments(null)}
         />

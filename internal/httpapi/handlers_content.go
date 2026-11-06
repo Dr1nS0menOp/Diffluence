@@ -461,6 +461,9 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if !s.publishedTogether(w, r, id, p.CurrentVersion) {
+		return
+	}
 	writeJSON(w, http.StatusOK, p)
 }
 
@@ -1006,6 +1009,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.fail(w, r, err)
 		return
+	}
+	// Counting a term must never cost someone their search.
+	if err := s.deps.Analytics.RecordSearch(r.Context(), query.Text, results.Total); err != nil {
+		s.deps.Log.Error("counting a search failed", "error", err, "request_id", RequestIDFrom(r.Context()))
 	}
 	writeJSON(w, http.StatusOK, results)
 }

@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import type { Editor } from '@tiptap/core';
 import type { EditorView } from '@tiptap/pm/view';
 import {
   api,
@@ -14,9 +15,20 @@ import {
   type Space,
 } from '../api';
 import { Link, navigate } from '../router';
+import { unsavedKey, usePerson } from '../personal';
 import { anchorOfSelection } from '../components/comments/anchor';
 import { NewThread } from '../components/comments/selection-bar';
 import { DocumentEditor } from '../components/editor/editor';
+import {
+  seed,
+  TogetherPeople,
+  useSharedTitle,
+  useTogether,
+  writeSharedTitle,
+  type CollabInfo,
+  type LinkState,
+  type Together,
+} from '../components/editor/together';
 import { IconArrowBack, IconChevronDown } from '../components/icons';
 import { PageHeader, usePageLook } from '../components/page-header';
 import { LabelBar } from '../components/page-labels';
@@ -27,17 +39,21 @@ import { TemplateGallery } from '../components/template-gallery';
 import { useToast } from '../components/toast';
 import { ConfirmButton, Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
 import { MoveDialog } from './move-dialogs';
+import { EditingTogether } from '../components/presence';
 import { PublicMark } from './exchange';
 
 const AUTOSAVE_MS = 1500;
 const EDITORS_CHECK_MS = 60_000;
-const BACKUP_KEY_PREFIX = 'diffluence.backup.';
 
 interface Loaded {
   page: PageDetail;
   title: string;
   document: Json;
   base: number;
+  /** Set when this page is edited together. */
+  collab: CollabInfo | null;
+  /** A private draft from before, offered once when the shared one starts. */
+  privateDraft: Json | null;
 }
 
 interface Backup {
@@ -61,11 +77,37 @@ export function readBackup(stored: string | null): Backup | null {
 
 async function load(id: string): Promise<Loaded> {
   const page = await api.get<PageDetail>(`/pages/${id}`);
+  const info = await api.get<CollabInfo>(`/pages/${id}/collab`);
+  const collab = info.enabled ? info : null;
   if (page.has_draft) {
     const d = await api.get<Draft>(`/pages/${id}/draft`);
-    return { page, title: d.title || page.title, document: d.document, base: d.base_version };
+    if (collab) {
+      return {
+        page,
+        title: page.title,
+        document: page.document,
+        base: page.current_version,
+        collab,
+        privateDraft: d.document,
+      };
+    }
+    return {
+      page,
+      title: d.title || page.title,
+      document: d.document,
+      base: d.base_version,
+      collab,
+      privateDraft: null,
+    };
   }
-  return { page, title: page.title, document: page.document, base: page.current_version };
+  return {
+    page,
+    title: page.title,
+    document: page.document,
+    base: page.current_version,
+    collab,
+    privateDraft: null,
+  };
 }
 
 function isEmptyDocument(document: Json): boolean {
@@ -154,13 +196,43 @@ function TemplateOffer({ page }: { page: PageDetail }) {
   );
 }
 
-function Form({ data }: { data: Loaded }) {
+function EditModes({ data }: { data: Loaded }) {
+  const { t } = useTranslation();
+  const { together, link, ready } = useTogether(data.page.id, data.collab);
+  if (!data.collab) return <Form data={data} together={null} link="online" />;
+  if (link === 'ended') {
+    return (
+      <p role="alert" className="note note-error">
+        {t('together.ended')} <Link href={`/pages/${data.page.id}`}>{t('together.backToPage')}</Link>
+      </p>
+    );
+  }
+  if (!together || !ready) return <Loading />;
+  return <Form data={data} together={together} link={link} />;
+}
+
+function PrivateDraftOffer({ onUse, onDrop }: { onUse: () => void; onDrop: () => void }) {
+  const { t } = useTranslation();
+  return (
+    <p role="status" className="note">
+      {t('together.privateDraft')}{' '}
+      <button type="button" className="ghost" onClick={onUse}>
+        {t('together.useDraft')}
+      </button>
+      <button type="button" className="ghost" onClick={onDrop}>
+        {t('together.dropDraft')}
+      </button>
+    </p>
+  );
+}
+
+function Form({ data, together, link }: { data: Loaded; together: Together | null; link: LinkState }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const toast = useToast();
   const { page } = data;
   const look = usePageLook(page);
-  const backupKey = `${BACKUP_KEY_PREFIX}${page.id}`;
+  const backupKey = unsavedKey(usePerson(), page.id);
   const [title, setTitle] = useState(data.title);
   const [summary, setSummary] = useState('');
   const [state, setState] = useState<'idle' | 'saving' | 'saved' | 'failed'>('idle');
@@ -176,6 +248,9 @@ function Form({ data }: { data: Loaded }) {
   const [typing, setTyping] = useState(false);
   const [commenting, setCommenting] = useState<CommentAnchor | null>(null);
   const [sharing, setSharing] = useState(false);
+  const [offerDraft, setOfferDraft] = useState(!!data.privateDraft);
+  const sharedEditor = useRef<Editor | null>(null);
+  useSharedTitle(together, setTitle);
   const editorView = useRef<EditorView | null>(null);
   const keepView = useCallback((view: EditorView) => {
     editorView.current = view;
@@ -188,7 +263,7 @@ function Form({ data }: { data: Loaded }) {
 
   const keepInBrowser = useCallback(() => {
     const kept: Backup = { title: titleRef.current, document: doc.current, at: new Date().toISOString() };
-    localStorage.setItem(backupKey, JSON.stringify(kept));
+    localStorage.setItem(backupKey, JSON.stringify({ ...kept, saved: Date.now() }));
   }, [backupKey]);
 
   const save = useCallback(async () => {
@@ -214,11 +289,16 @@ function Form({ data }: { data: Loaded }) {
   }, [page.id, data.base, backupKey, keepInBrowser]);
 
   const schedule = useCallback(() => {
+    // The service keeps a shared document: there is no draft of this person to save.
+    if (together) {
+      setTyping(true);
+      return;
+    }
     dirty.current = true;
     setTyping(true);
     clearTimeout(timer.current);
     timer.current = setTimeout(() => void save(), AUTOSAVE_MS);
-  }, [save]);
+  }, [save, together]);
 
   // Leaving is one click away in the tree, so what was typed last must not depend on a
   // timer. If saving fails, the text stays in the browser and a message leads back to it.
@@ -272,7 +352,8 @@ function Form({ data }: { data: Loaded }) {
         document: doc.current,
         base_version: data.base,
         summary,
-        overwrite,
+        // Everyone typed in the same document, so there is nothing to compare.
+        overwrite: overwrite || !!together,
         silent: choices.silent,
         ...(choices.stage ? { stage: choices.stage } : {}),
       });
@@ -314,6 +395,22 @@ function Form({ data }: { data: Loaded }) {
     schedule();
   };
 
+  const editorReady = useCallback(
+    (editor: Editor) => {
+      if (together) seed(together, editor, data.document, data.title);
+      sharedEditor.current = editor;
+    },
+    [together, data.document, data.title],
+  );
+  const usePrivateDraft = () => {
+    if (data.privateDraft) sharedEditor.current?.commands.setContent(data.privateDraft);
+    dropPrivateDraft();
+  };
+  const dropPrivateDraft = () => {
+    setOfferDraft(false);
+    void api.del(`/pages/${page.id}/draft`);
+  };
+
   const published = page.status === 'published';
   const changed = published && (page.has_draft || state !== 'idle');
   const showOffer = !published && !typing && isEmptyDocument(data.document) && page.kind === 'page';
@@ -324,11 +421,13 @@ function Form({ data }: { data: Loaded }) {
           <IconArrowBack size={18} /> {t('editor.close')}
         </Link>
         {changed && <span className="lozenge">{t('editor.unpublishedChanges')}</span>}
+        {together ? <TogetherPeople together={together} /> : <EditingTogether pageId={page.id} />}
         <PublicMark pageId={page.id} />
         <span role="status" className="muted edit-status">
           {state === 'saving' && t('editor.saving')}
           {state === 'saved' && t('editor.saved')}
           {state === 'failed' && t('editor.saveFailed')}
+          {together && t(`together.link_${link}`)}
         </span>
         <input
           className="edit-summary"
@@ -348,12 +447,18 @@ function Form({ data }: { data: Loaded }) {
             {t('comments.comment')}
           </button>
         )}
-        <ConfirmButton
-          label={published ? t('editor.revert') : t('editor.discard')}
-          message={published ? t('editor.confirmRevert') : t('editor.confirmDiscard')}
-          className="quiet"
-          onConfirm={() => void discard()}
-        />
+        {together ? (
+          <button type="button" className="quiet" onClick={() => setSharing(true)}>
+            {t('together.invite')}
+          </button>
+        ) : (
+          <ConfirmButton
+            label={published ? t('editor.revert') : t('editor.discard')}
+            message={published ? t('editor.confirmRevert') : t('editor.confirmDiscard')}
+            className="quiet"
+            onConfirm={() => void discard()}
+          />
+        )}
         <span className="publish-group">
           <button type="button" className="primary" onClick={() => void publish(false)}>
             {t('editor.publish')}
@@ -370,6 +475,8 @@ function Form({ data }: { data: Loaded }) {
         </span>
       </div>
       <ErrorNote error={error} />
+      {together && <p className="note">{t('together.sharedDraft')}</p>}
+      {offerDraft && <PrivateDraftOffer onUse={usePrivateDraft} onDrop={dropPrivateDraft} />}
       {backup && (
         <BackupNote
           backup={backup}
@@ -394,6 +501,8 @@ function Form({ data }: { data: Loaded }) {
           schedule();
         }}
         onView={keepView}
+        together={together}
+        onReady={editorReady}
         onShare={() => setSharing(true)}
         onPublish={() => void publish(false)}
         onSave={() => {
@@ -412,6 +521,7 @@ function Form({ data }: { data: Loaded }) {
                 placeholder={t('editor.titlePlaceholder')}
                 onChange={(e) => {
                   setTitle(e.target.value);
+                  if (together) writeSharedTitle(together, e.target.value);
                   schedule();
                 }}
                 required
@@ -481,5 +591,5 @@ export function EditView({ pageId }: { pageId: string }) {
   });
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
-  return <Form key={pageId} data={q.data} />;
+  return <EditModes key={pageId} data={q.data} />;
 }

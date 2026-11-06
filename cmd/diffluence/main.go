@@ -39,6 +39,7 @@ Commands:
   audit verify              verify the audit log hash chain
   audit prune               remove audit rows past their retention, as the owner of the tables
   healthcheck               ask a running server on this machine whether it is ready
+  client <command>          use the API of a server with a token; see diffluence client
   version                   print the version
 `
 
@@ -57,6 +58,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "version":
 		fmt.Fprintln(stdout, version.Version)
 		return 0
+	case "client":
+		return cmdClient(ctx, args[1:], os.Getenv, stdout, stderr)
 	case "serve":
 		err = cmdServe(ctx)
 	case "migrate":

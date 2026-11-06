@@ -120,6 +120,11 @@ export function PreferencesView() {
         value={preferences.hover_cards}
         onChange={(hover_cards) => update({ hover_cards })}
       />
+      <PreferenceSwitch
+        label={t('preferences.showPresence')}
+        value={preferences.show_presence}
+        onChange={(show_presence) => update({ show_presence })}
+      />
     </>
   );
 }

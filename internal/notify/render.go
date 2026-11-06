@@ -36,6 +36,7 @@ var sentences = map[string]string{
 	TypePageChanged:   "%s changed %s",
 	TypeAccessRequest: "%s asks for access to %s",
 	TypeAccessAnswer:  "%s answered your request for %s",
+	TypeRule:          "%s sent a message about %s",
 }
 
 const (

@@ -5,6 +5,7 @@ package identity
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -31,6 +32,7 @@ type Token struct {
 	ID         uuid.UUID  `json:"id"`
 	Name       string     `json:"name"`
 	CanWrite   bool       `json:"can_write"`
+	Scopes     []string   `json:"scopes"`
 	ExpiresAt  time.Time  `json:"expires_at"`
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at"`
@@ -38,9 +40,41 @@ type Token struct {
 
 // NewToken is what a person asks for.
 type NewToken struct {
-	Name      string
-	CanWrite  bool
+	Name     string
+	CanWrite bool
+	// Scopes says what the token may do. Left out, CanWrite decides as it always did.
+	Scopes    []string
 	ExpiresAt time.Time
+}
+
+// The scopes of a token (spec 015, D20). A scope limits a token, and a token is
+// still only ever its owner.
+const (
+	ScopeRead   = "read"
+	ScopeWrite  = "write"
+	ScopeExport = "export"
+	ScopeAdmin  = "admin"
+)
+
+var allScopes = []string{ScopeRead, ScopeWrite, ScopeExport, ScopeAdmin}
+
+func (in NewToken) scopes() ([]string, error) {
+	if len(in.Scopes) == 0 {
+		if in.CanWrite {
+			return []string{ScopeRead, ScopeWrite, ScopeExport}, nil
+		}
+		return []string{ScopeRead}, nil
+	}
+	out := make([]string, 0, len(in.Scopes))
+	for _, scope := range allScopes {
+		if slices.Contains(in.Scopes, scope) {
+			out = append(out, scope)
+		}
+	}
+	if len(out) != len(slices.Compact(slices.Sorted(slices.Values(in.Scopes)))) {
+		return nil, apperr.Invalid("A scope is read, write, export or admin.")
+	}
+	return out, nil
 }
 
 func (s *Service) validToken(in NewToken) (NewToken, error) {
@@ -68,15 +102,19 @@ func (s *Service) createTokenFor(ctx context.Context, c Caller, userID uuid.UUID
 	if err != nil {
 		return Token{}, "", err
 	}
+	scopes, err := in.scopes()
+	if err != nil {
+		return Token{}, "", err
+	}
 	secret := tokenPrefix + randomToken()
-	t := Token{ID: ids.New(), Name: in.Name, CanWrite: in.CanWrite, ExpiresAt: in.ExpiresAt, CreatedAt: s.now()}
+	t := Token{ID: ids.New(), Name: in.Name, CanWrite: slices.Contains(scopes, ScopeWrite), Scopes: scopes, ExpiresAt: in.ExpiresAt, CreatedAt: s.now()}
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		_, err := tx.Exec(ctx, `INSERT INTO api_tokens (id, user_id, name, token_hash, can_write, expires_at, created_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)`, t.ID, userID, t.Name, hashToken(secret), t.CanWrite, t.ExpiresAt, t.CreatedAt)
+		_, err := tx.Exec(ctx, `INSERT INTO api_tokens (id, user_id, name, token_hash, can_write, scopes, expires_at, created_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, t.ID, userID, t.Name, hashToken(secret), t.CanWrite, t.Scopes, t.ExpiresAt, t.CreatedAt)
 		if err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "token.created", "user", userID.String(), map[string]any{"token_id": t.ID, "can_write": t.CanWrite})
+		return s.record(ctx, tx, c, "token.created", "user", userID.String(), map[string]any{"token_id": t.ID, "can_write": t.CanWrite, "scopes": t.Scopes})
 	})
 	if err != nil {
 		return Token{}, "", err
@@ -86,14 +124,14 @@ func (s *Service) createTokenFor(ctx context.Context, c Caller, userID uuid.UUID
 
 // Tokens lists a person's tokens that still work.
 func (s *Service) Tokens(ctx context.Context, userID uuid.UUID) ([]Token, error) {
-	rows, err := s.pool.Query(ctx, `SELECT id, name, can_write, expires_at, created_at, last_used_at FROM api_tokens
+	rows, err := s.pool.Query(ctx, `SELECT id, name, can_write, scopes, expires_at, created_at, last_used_at FROM api_tokens
 		WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > now() ORDER BY created_at DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Token, error) {
 		var t Token
-		err := r.Scan(&t.ID, &t.Name, &t.CanWrite, &t.ExpiresAt, &t.CreatedAt, &t.LastUsedAt)
+		err := r.Scan(&t.ID, &t.Name, &t.CanWrite, &t.Scopes, &t.ExpiresAt, &t.CreatedAt, &t.LastUsedAt)
 		return t, err
 	})
 	if out == nil {
@@ -130,23 +168,41 @@ func (s *Service) AuthenticateToken(ctx context.Context, secret string) (Princip
 	var p Principal
 	var id uuid.UUID
 	var lastUsed *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT t.id, t.can_write, t.last_used_at, u.id, u.type, u.status, u.email, u.display_name, u.created_at
+	err := s.pool.QueryRow(ctx, `SELECT t.id, t.can_write, t.scopes, t.last_used_at, u.id, u.type, u.status, u.email, u.display_name, u.created_at
 		FROM api_tokens t JOIN users u ON u.id = t.user_id
 		WHERE t.token_hash = $1 AND t.revoked_at IS NULL AND t.expires_at > now()
 		  AND u.status = 'active' AND (u.expires_at IS NULL OR u.expires_at > now())`, hashToken(secret)).
-		Scan(&id, &p.CanWrite, &lastUsed, &p.User.ID, &p.User.Type, &p.User.Status, &p.User.Email, &p.User.DisplayName, &p.User.CreatedAt)
+		Scan(&id, &p.CanWrite, &p.Scopes, &lastUsed, &p.User.ID, &p.User.Type, &p.User.Status, &p.User.Email, &p.User.DisplayName, &p.User.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Principal{}, ErrNoSession
 	}
 	if err != nil {
 		return Principal{}, err
 	}
-	p.ViaToken = true
-	// At most once a minute, like a session: a script must not write on each call.
+	p.ViaToken, p.TokenID = true, id
+	// At most once a minute, like a session: a script must not write on each call. The
+	// audit log shows when a token was in use (SEC-807), and a token that cannot be
+	// recorded does not get used.
 	if now := s.now(); lastUsed == nil || now.Sub(*lastUsed) > time.Minute {
-		_, _ = s.pool.Exec(ctx, "UPDATE api_tokens SET last_used_at = $2 WHERE id = $1", id, now)
+		c := Caller{UserID: p.User.ID}
+		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+			if _, err := tx.Exec(ctx, "UPDATE api_tokens SET last_used_at = $2 WHERE id = $1", id, now); err != nil {
+				return err
+			}
+			return s.record(ctx, tx, c, "token.used", "user", p.User.ID.String(), map[string]any{"token_id": id})
+		})
+		if err != nil {
+			return Principal{}, err
+		}
 	}
 	return p, nil
+}
+
+// RecordTokenRefused notes in the audit log that a token tried what it may not.
+func (s *Service) RecordTokenRefused(ctx context.Context, c Caller, tokenID uuid.UUID, scope string) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		return s.record(ctx, tx, c, "token.refused", "user", c.UserID.String(), map[string]any{"token_id": tokenID, "scope": scope})
+	})
 }
 
 // ReauthWindow is how long confirming who you are lasts for sensitive actions.

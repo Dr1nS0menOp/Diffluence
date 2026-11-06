@@ -20,6 +20,9 @@ import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { AppearanceSection } from './admin-appearance';
+import { AnalyticsTab, InsightsTab, OutgoingTab } from './admin-platform';
+import { RuleList } from './rules';
+import { WebhookList } from './webhooks';
 import { OrganisingTab, TemplatesTab } from './admin-organising';
 import { CareTab } from './admin-care';
 import { ExportTab } from './exchange';
@@ -53,6 +56,11 @@ const TABS = [
   'care',
   'scim',
   'system',
+  'insights',
+  'analytics',
+  'automation',
+  'outgoing',
+  'webhooks',
 ] as const;
 const USER_FILTERS = ['type', 'status', 'source', 'group_id', 'idle_days'] as const;
 const USER_TYPES = ['member', 'guest'];
@@ -1328,6 +1336,11 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
           {tab === 'mail' && <MailTab />}
           {tab === 'scim' && <ScimTab />}
           {tab === 'system' && <SystemTab />}
+          {tab === 'insights' && <InsightsTab />}
+          {tab === 'analytics' && <AnalyticsTab />}
+          {tab === 'automation' && <RuleList spaceId={null} />}
+          {tab === 'outgoing' && <OutgoingTab />}
+          {tab === 'webhooks' && <WebhookList path="/admin/webhooks" />}
         </div>
       </main>
     </div>

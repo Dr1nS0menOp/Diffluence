@@ -55,6 +55,15 @@ export function SpaceLinksSection({ space }: { space: Space }) {
         <li>
           <Link href={`/spaces/${space.key}/labels`}>{t('organise.labels')}</Link>
         </li>
+        <li>
+          <Link href={`/spaces/${space.key}/insights`}>{t('insights.spaceTitle')}</Link>
+        </li>
+        <li>
+          <Link href={`/spaces/${space.key}/settings/automation`}>{t('rules2.title')}</Link>
+        </li>
+        <li>
+          <Link href={`/spaces/${space.key}/settings/webhooks`}>{t('webhooks.title')}</Link>
+        </li>
       </ul>
     </section>
   );

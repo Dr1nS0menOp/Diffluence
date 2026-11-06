@@ -16,9 +16,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/analytics"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/automation"
 	"github.com/diffluence/diffluence/internal/blocks"
+	"github.com/diffluence/diffluence/internal/collab"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
@@ -30,9 +33,11 @@ import (
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/mail"
 	"github.com/diffluence/diffluence/internal/notify"
+	"github.com/diffluence/diffluence/internal/outward"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/presence"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
@@ -44,7 +49,11 @@ import (
 	"github.com/diffluence/diffluence/internal/templates"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/watches"
+	"github.com/diffluence/diffluence/internal/webhooks"
 )
+
+// tokenCallsPerMinute limits one token, so a runaway script cannot take the server.
+const tokenCallsPerMinute = 600
 
 // Deps are what the API needs from the rest of the application.
 type Deps struct {
@@ -77,6 +86,12 @@ type Deps struct {
 	Mail        *mail.Service
 	Sharing     *sharing.Service
 	Feed        *feed.Service
+	Analytics   *analytics.Service
+	Presence    *presence.Service
+	Outward     *outward.Service
+	Automation  *automation.Service
+	Webhooks    *webhooks.Service
+	Collab      *collab.Service
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)
@@ -98,6 +113,7 @@ type Server struct {
 	cookieName string
 	loginByIP  *limiter
 	loginByAcc *limiter
+	tokenCalls *limiter
 }
 
 // New builds the API.
@@ -110,6 +126,7 @@ func New(d Deps) (*Server, error) {
 		cookieName: "diffluence_session",
 		loginByIP:  newLimiter(50, loginWindow),
 		loginByAcc: newLimiter(10, loginWindow),
+		tokenCalls: newLimiter(tokenCallsPerMinute, time.Minute),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
@@ -168,8 +185,8 @@ func (s *Server) allowedByCredential(w http.ResponseWriter, r *http.Request, a A
 	switch {
 	case p.ViaToken && a.sessionOnly:
 		writeError(w, http.StatusForbidden, "session_only", "This needs a login in the browser, not a token.")
-	case p.ViaToken && !p.CanWrite && !isRead(r):
-		writeError(w, http.StatusForbidden, "token_read_only", "This token can only read.")
+	case p.ViaToken && !s.tokenMayGoOn(w, r, p):
+		return false
 	case p.NeedsSecondFactor && !slices.ContainsFunc(secondFactorRoutes, func(prefix string) bool { return strings.HasPrefix(r.URL.Path, prefix) }):
 		writeError(w, http.StatusForbidden, "second_factor_required", "Set up a second factor first.")
 	case a.sensitive && time.Since(p.ConfirmedAt) > identity.ReauthWindow:
@@ -177,6 +194,43 @@ func (s *Server) allowedByCredential(w http.ResponseWriter, r *http.Request, a A
 	default:
 		return true
 	}
+	return false
+}
+
+// scopeFor maps a request to the scope a token needs (spec 015, H9).
+func scopeFor(r *http.Request) string {
+	switch {
+	case strings.HasPrefix(r.URL.Path, "/api/v1/admin/"):
+		return identity.ScopeAdmin
+	case strings.Contains(r.URL.Path, "/export"):
+		return identity.ScopeExport
+	case isRead(r):
+		return identity.ScopeRead
+	}
+	return identity.ScopeWrite
+}
+
+// tokenMayGoOn applies the limit per minute and the scope of a token, and answers
+// the request when it refuses. A refusal is audited: a script has gone wrong, or
+// someone is trying a stolen token.
+func (s *Server) tokenMayGoOn(w http.ResponseWriter, r *http.Request, p *identity.Principal) bool {
+	if !s.tokenCalls.allow(p.TokenID.String()) {
+		writeError(w, http.StatusTooManyRequests, "too_many_requests", "This token made too many calls. Wait a minute.")
+		return false
+	}
+	scope := scopeFor(r)
+	if slices.Contains(p.Scopes, scope) {
+		return true
+	}
+	if err := s.deps.Identity.RecordTokenRefused(r.Context(), s.caller(r), p.TokenID, scope); err != nil {
+		s.fail(w, r, err)
+		return false
+	}
+	if scope == identity.ScopeWrite {
+		writeError(w, http.StatusForbidden, "token_read_only", "This token can only read.")
+		return false
+	}
+	writeError(w, http.StatusForbidden, "token_scope", "This token does not have the scope "+scope+".")
 	return false
 }
 

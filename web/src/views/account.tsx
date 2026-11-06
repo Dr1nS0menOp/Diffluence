@@ -238,18 +238,20 @@ export function ProfileView({ me }: { me: Me }) {
   );
 }
 
+const TOKEN_SCOPES = ['read', 'write', 'export', 'admin'];
+
 function NewTokenForm({ onCreated }: { onCreated: (secret: string) => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const dayAfter = (days: number) => new Date(Date.now() + days * DAY_MS).toISOString().slice(0, 10);
   const [name, setName] = useState('');
-  const [canWrite, setCanWrite] = useState(false);
+  const [scopes, setScopes] = useState<string[]>(['read']);
   const [until, setUntil] = useState(() => dayAfter(DEFAULT_TOKEN_DAYS));
   const create = useMutation({
     mutationFn: () =>
       api.post<{ secret: string }>('/me/tokens', {
         name,
-        can_write: canWrite,
+        scopes,
         expires_at: new Date(until).toISOString(),
       }),
     onSuccess: async (r) => {
@@ -279,12 +281,21 @@ function NewTokenForm({ onCreated }: { onCreated: (secret: string) => void }) {
           required
         />
       </Field>
-      <Field label={t('account.tokenScope')}>
-        <select value={canWrite ? 'write' : 'read'} onChange={(e) => setCanWrite(e.target.value === 'write')}>
-          <option value="read">{t('account.tokenRead')}</option>
-          <option value="write">{t('account.tokenWrite')}</option>
-        </select>
-      </Field>
+      <fieldset className="matrix">
+        <legend>{t('account.tokenScope')}</legend>
+        {TOKEN_SCOPES.map((scope) => (
+          <label key={scope}>
+            <input
+              type="checkbox"
+              checked={scopes.includes(scope)}
+              onChange={(e) =>
+                setScopes(e.target.checked ? [...scopes, scope] : scopes.filter((s) => s !== scope))
+              }
+            />
+            {t(`account.scope_${scope}`)}
+          </label>
+        ))}
+      </fieldset>
       <button type="submit" className="primary" disabled={create.isPending}>
         {t('account.tokenNew')}
       </button>
@@ -325,7 +336,7 @@ export function TokensView() {
             {q.data?.tokens.map((k) => (
               <tr key={k.id}>
                 <td>{k.name}</td>
-                <td>{k.can_write ? t('account.tokenWrite') : t('account.tokenRead')}</td>
+                <td>{k.scopes.map((scope) => t(`account.scope_${scope}`)).join(', ')}</td>
                 <td>{dates.day(k.expires_at)}</td>
                 <td>{dates.moment(k.last_used_at)}</td>
                 <td>

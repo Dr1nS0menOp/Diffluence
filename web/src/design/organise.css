@@ -209,6 +209,44 @@
   font-size: var(--text-small);
 }
 
+/* Who else is on a page, and the steps of a rule. */
+.presence {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.rule-step {
+  margin-block: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+/* The cursors of colleagues. A name in words, so colour never stands alone. */
+.collab-caret {
+  position: relative;
+  border-inline-start: 2px solid var(--color-accent);
+}
+
+.collab-caret-name {
+  position: absolute;
+  inset-block-end: 100%;
+  inset-inline-start: 0;
+  padding-inline: var(--space-1);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-small);
+  line-height: var(--leading-ui);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.collab-selection {
+  background: var(--color-accent-tint);
+}
+
 /* Pages to choose from: a nested list of native checkboxes (spec 014, G1). */
 .choose-list {
   margin-block: var(--space-2);

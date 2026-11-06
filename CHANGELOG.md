@@ -4,6 +4,21 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: insight, automation and the platform (wave H)
+- Analytics with their own switch, off by default. Counts mode keeps nothing that points at a person once a day has closed. Name mode says what it does, and leaving it deletes the names for good. Your own views do not count, and page views stay out of the audit log
+- A view count in the byline for those who may see it, insights for a page, a space and the instance, what people search for, most viewed pages on the overview, and sortable tables with a safe CSV
+- Rules per space and for the instance: when, if, then. They run as their account through the same checks as a person, with a test run, a run log, ready-made rules, export and import, limits, and every action in the audit log with the rule's name
+- Webhooks in the Standard Webhooks format, with a delivery log, five attempts over a day, and rotation with two signatures. Nothing leaves until an administrator allows a host
+- The API has an OpenAPI description and a stability policy. Tokens gain the scopes read, write, export and admin, and a limit per minute
+- `diffluence client` lists, exports, imports and backs up content with a token
+- Who else is on a page, and a line in the editor when someone else is editing. Both can be turned off, by a person and for the instance
+- Editing together, with the optional `collab` service: one shared draft per page, cursors with names, an undo per person, work kept offline, and versions that name everyone who took part. Without the service, every page keeps private drafts
+
+### Security
+- Outgoing calls go through one client: allowed hosts only, https, no private address at connect time, no redirects, 10 seconds and 64 KiB. Every CSV goes through one guard, which now also covers line feeds and full-width characters. The use of a token is in the audit log at most once a minute, and so is a refused scope
+
+Upgrade impact: migration 0018 adds tables and a column only, and gives View analytics to everyone who administers a space. A token that could write can still export, and now needs the admin scope for routes under `/api/v1/admin/`. New optional settings `DIFFLUENCE_OUTWARD_ALLOW_PRIVATE`, `DIFFLUENCE_COLLAB_URL` and `DIFFLUENCE_COLLAB_TOKEN`. Installing the service adds a Node.js container, and on those pages a draft is no longer private.
+
 ### Added: everything can leave and come in (wave G)
 - One Export dialog on pages and spaces: PDF (with the optional Gotenberg helper), Word, OpenDocument, an HTML website that works offline, Markdown and plain text. Choose pages by hand. Files are made in the background, you get a notification, and only you can fetch the file for 24 hours
 - An administrator can turn formats off, set sizes, and see what a helper needs

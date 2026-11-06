@@ -52,6 +52,13 @@ type Config struct {
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
 	ExampleSpace          bool // make the example space on a new instance
+	// OutwardAllowPrivate lets outgoing calls reach private addresses and plain http,
+	// for an instance whose outside systems live on its own network.
+	OutwardAllowPrivate bool
+	// CollabURL and CollabToken point at the service for editing together. Empty
+	// means it is not installed, and pages keep private drafts.
+	CollabURL   string
+	CollabToken string
 	// PDFURL is the helper process that makes PDF files. Empty = no PDF.
 	PDFURL string
 	// PublishDir is where public sites go. It is configuration and not a setting,
@@ -139,6 +146,9 @@ func Load(lookup LookupFunc) (Config, error) {
 		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
 		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
 		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
+		OutwardAllowPrivate:   l.boolean("OUTWARD_ALLOW_PRIVATE", false),
+		CollabURL:             l.str("COLLAB_URL", ""),
+		CollabToken:           l.str("COLLAB_TOKEN", ""),
 		PDFURL:                l.str("PDF_URL", ""),
 		PublishDir:            l.str("PUBLISH_DIR", ""),
 		OIDC: OIDC{

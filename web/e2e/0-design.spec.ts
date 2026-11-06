@@ -232,6 +232,7 @@ test.describe('the look of every kind of screen', () => {
       'page.delete_any',
       'page.archive',
       'space.administer',
+      'analytics.view',
       'space.export',
     ]);
 
@@ -1214,6 +1215,113 @@ test.describe('the look of every kind of screen', () => {
       await page.goto('/unsubscribe/token');
       await expect(page.getByRole('heading', { name: 'Stop this mail' })).toBeVisible();
       await picture(page, 'unsubscribe');
+    });
+
+    test.describe('insight, rules and webhooks', () => {
+      let reportedPage = '';
+      let ruleId = '';
+      let spaceKey = '';
+
+      test.beforeAll(async ({ browser }) => {
+        const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+        await login(setup, ADMIN.email, ADMIN.password);
+        const on = await setup.request.put('/api/v1/admin/analytics', {
+          data: { enabled: true, mode: 'names', retention_days: 365 },
+        });
+        expect(on.ok(), await on.text()).toBeTruthy();
+        const space = (await (await setup.request.get(`/api/v1/spaces/${spaceId}`)).json()) as {
+          key: string;
+        };
+        spaceKey = space.key;
+        reportedPage = await publishedPage(setup, spaceId, 'Coffee rota', 'x');
+        const reader = await newReaderPage(browser, 'light');
+        const viewed = await reader.request.post(`/api/v1/pages/${reportedPage}/views`, { data: {} });
+        expect(viewed.ok(), await viewed.text()).toBeTruthy();
+        await reader.context().close();
+        const made = await setup.request.post(`/api/v1/spaces/${spaceId}/rules`, {
+          data: {
+            name: 'Label new pages',
+            enabled: true,
+            definition: {
+              trigger: { kind: 'page.published' },
+              actions: [{ type: 'add_label', label: 'new' }],
+            },
+          },
+        });
+        expect(made.status(), await made.text()).toBe(201);
+        ruleId = ((await made.json()) as { id: string }).id;
+        await setup.context().close();
+      });
+
+      test('PageInsightsView: what a page did', async ({ browser }) => {
+        const page = await newReaderPage(browser, 'light');
+        await page.goto(`/pages/${reportedPage}/insights`);
+        await expect(page.getByRole('heading', { name: 'Page insights' })).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Readers', exact: true })).toBeVisible();
+        await picture(page, 'page-insights', [page.locator('.chart'), page.locator('table')]);
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+
+      test('SpaceInsightsView: what a space did', async ({ browser }) => {
+        const page = await newReaderPage(browser, 'light');
+        await page.goto(`/spaces/${spaceKey}/insights`);
+        await expect(page.getByRole('heading', { name: 'Most viewed' })).toBeVisible();
+        await expect(page.getByRole('columnheader', { name: 'Views' }).first()).toBeVisible();
+        await picture(page, 'space-insights', [page.locator('table')]);
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+
+      test('RulesView: the rules of a space', async ({ browser }) => {
+        const page = await newReaderPage(browser, 'light');
+        await page.goto(`/spaces/${spaceKey}/settings/automation`);
+        await expect(page.getByRole('link', { name: 'Label new pages' })).toBeVisible();
+        await picture(page, 'rules', [page.locator('table')]);
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+
+      test('RuleView: one rule', async ({ browser }) => {
+        const page = await newReaderPage(browser, 'light');
+        await page.goto(`/rules/${ruleId}`);
+        await expect(page.getByRole('heading', { name: 'When', exact: true })).toBeVisible();
+        await picture(page, 'rule', [page.locator('time')]);
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+
+      test('WebhooksView: the webhooks of a space', async ({ browser }) => {
+        const page = await newReaderPage(browser, 'light');
+        await page.goto(`/spaces/${spaceKey}/settings/webhooks`);
+        await expect(page.getByRole('heading', { name: 'New webhook' })).toBeVisible();
+        await picture(page, 'webhooks');
+        await checkAccessibility(page);
+        await page.context().close();
+      });
+
+      test('administration: analytics and outgoing calls', async ({ browser }) => {
+        const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
+        const page = await context.newPage();
+        await login(page, ADMIN.email, ADMIN.password);
+        await page.goto('/admin/analytics');
+        await expect(page.getByLabel('What is kept')).toBeVisible();
+        await picture(page, 'admin-analytics');
+        await checkAccessibility(page);
+        await page.goto('/admin/outgoing');
+        await expect(page.getByLabel('Host')).toBeVisible();
+        await picture(page, 'admin-outgoing');
+        await checkAccessibility(page);
+        await page.goto('/admin/insights');
+        await expect(page.getByRole('heading', { name: 'What people search for' })).toBeVisible();
+        await picture(page, 'admin-insights');
+        await checkAccessibility(page);
+        const off = await page.request.put('/api/v1/admin/analytics', {
+          data: { enabled: false, mode: 'counts', retention_days: 365 },
+        });
+        expect(off.ok(), await off.text()).toBeTruthy();
+        await context.close();
+      });
     });
   });
 

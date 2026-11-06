@@ -237,7 +237,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 		return sp, err
 	}
 	sp.Can = map[string]bool{}
-	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess} {
+	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess, permissions.AnalyticsView} {
 		d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, id, action)
 		if err != nil {
 			return sp, err

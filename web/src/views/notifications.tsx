@@ -19,6 +19,7 @@ const TYPES = [
   'page_changed',
   'access_request',
   'access_answer',
+  'rule',
 ];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);

@@ -2,13 +2,20 @@
 // Moving, copying and reshaping whole blocks. Every command here is one Undo.
 import type { Editor } from '@tiptap/core';
 import { closeHistory } from '@tiptap/pm/history';
+import { endUndoStep } from './together';
 import { Fragment, type Node as ProseNode } from '@tiptap/pm/model';
-import { NodeSelection, Selection, TextSelection } from '@tiptap/pm/state';
+import { NodeSelection, Selection, TextSelection, type Transaction } from '@tiptap/pm/state';
 
 export const MIN_COLUMNS = 2;
 export const MAX_COLUMNS = 5;
 
 /** The top-level block at the cursor, as its position in the document. */
+/** One step for undo, in the history of the page and on a shared document. */
+function dispatchStep(editor: Editor, tr: Transaction) {
+  endUndoStep(editor.state);
+  editor.view.dispatch(closeHistory(tr));
+}
+
 export function blockAtCursor(editor: Editor): number | null {
   const { $from } = editor.state.selection;
   if ($from.depth === 0) return editor.state.selection.from;
@@ -28,19 +35,19 @@ export function moveBlock(editor: Editor, pos: number, direction: 'up' | 'down')
   tr.setSelection(
     Selection.near(tr.doc.resolve(Math.min(landing + Math.max(offset, 1), tr.doc.content.size))),
   );
-  editor.view.dispatch(closeHistory(tr).scrollIntoView());
+  dispatchStep(editor, tr.scrollIntoView());
 }
 
 export function duplicateBlock(editor: Editor, pos: number) {
   const { doc, tr } = editor.state;
   const node = doc.nodeAt(pos);
-  if (node) editor.view.dispatch(closeHistory(tr.insert(pos + node.nodeSize, node)));
+  if (node) dispatchStep(editor, tr.insert(pos + node.nodeSize, node));
 }
 
 export function deleteBlock(editor: Editor, pos: number) {
   const { doc, tr } = editor.state;
   const node = doc.nodeAt(pos);
-  if (node) editor.view.dispatch(closeHistory(tr.delete(pos, pos + node.nodeSize)));
+  if (node) dispatchStep(editor, tr.delete(pos, pos + node.nodeSize));
 }
 
 /**
@@ -94,7 +101,7 @@ export function setColumnCount(editor: Editor, count: number) {
   const empty = () => column.createAndFill() as ProseNode;
   const updated = found.node.copy(Fragment.fromArray(resizeColumns(childrenOf(found.node), count, empty)));
   const { tr } = editor.state;
-  editor.view.dispatch(closeHistory(tr.replaceWith(found.pos, found.pos + found.node.nodeSize, updated)));
+  dispatchStep(editor, tr.replaceWith(found.pos, found.pos + found.node.nodeSize, updated));
 }
 
 export const columnCount = (editor: Editor) => ancestor(editor, 'columns')?.node.childCount ?? 0;
@@ -108,7 +115,7 @@ export function unwrapBlock(editor: Editor, name: 'panel' | 'expand' | 'columns'
       ? childrenOf(found.node).reduce((all, column) => all.append(column.content), Fragment.empty)
       : found.node.content;
   const { tr } = editor.state;
-  editor.view.dispatch(closeHistory(tr.replaceWith(found.pos, found.pos + found.node.nodeSize, content)));
+  dispatchStep(editor, tr.replaceWith(found.pos, found.pos + found.node.nodeSize, content));
 }
 
 /** Adds columns and puts the cursor in the first one. */

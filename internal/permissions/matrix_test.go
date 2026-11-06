@@ -125,7 +125,7 @@ var actions = []string{
 	permissions.ActionPageView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
 	permissions.ActionPageDelete, permissions.AttachmentAdd, permissions.ActionAttachmentDelete,
 	permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess,
-	permissions.CommentAdd, permissions.ActionCommentDelete, permissions.ActionReact,
+	permissions.CommentAdd, permissions.ActionCommentDelete, permissions.ActionReact, permissions.AnalyticsView,
 }
 
 // literalRule is the rule of spec 002, written out independently of Evaluate.
@@ -184,7 +184,8 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	}
 	// Archived spaces are read-only.
 	switch action {
-	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess:
+	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess,
+		permissions.AnalyticsView:
 	default:
 		if spaceStatus == "archived" {
 			return false
@@ -194,7 +195,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	// restricted. Nothing else.
 	switch action {
 	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister,
-		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage:
+		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage, permissions.AnalyticsView:
 	default:
 		if ps.archived {
 			return false

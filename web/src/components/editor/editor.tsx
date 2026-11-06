@@ -2,6 +2,9 @@
 import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
+import type { Editor } from '@tiptap/core';
+import Collaboration from '@tiptap/extension-collaboration';
+import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import type { EditorView } from '@tiptap/pm/view';
 import type { Json } from '../../api';
 import { navigate } from '../../router';
@@ -30,6 +33,7 @@ import {
   TEMPLATE_ITEMS,
 } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
+import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog } from './template-item';
 import { HeadingAnchors } from './outline';
@@ -203,6 +207,8 @@ export function DocumentEditor({
   onSave,
   onView,
   onShare,
+  together,
+  onReady,
 }: {
   pageId: string;
   initial: Json;
@@ -218,6 +224,9 @@ export function DocumentEditor({
   onSave: () => void;
   onView?: (view: EditorView) => void;
   onShare?: () => void;
+  /** Editing together: the shared document replaces the initial text. */
+  together?: Together | null;
+  onReady?: (editor: Editor) => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -274,7 +283,18 @@ export function DocumentEditor({
 
   const editor = useEditor({
     extensions: [
-      ...documentExtensions({ fileAddress }),
+      ...documentExtensions({ fileAddress, shared: !!together }),
+      ...(together
+        ? [
+            Collaboration.configure({ document: together.doc }),
+            CollaborationCaret.configure({
+              provider: together.provider,
+              user: { id: together.userId, name: together.name },
+              render: renderCaret,
+              selectionRender: () => ({ class: 'collab-selection' }),
+            }),
+          ]
+        : []),
       SlashCommands.configure({
         actions: () => actions.current,
         items: inTemplate ? [...INSERT_ITEMS, ...TEMPLATE_ITEMS] : INSERT_ITEMS,
@@ -284,7 +304,8 @@ export function DocumentEditor({
       FindReplace.configure({ onOpen: () => actions.current.openFind() }),
       EditorKeys.configure({ actions: () => actions.current }),
     ],
-    content: initial,
+    // A document even when empty: a string would be parsed as HTML, which our policy blocks.
+    content: together ? { type: 'doc', content: [{ type: 'paragraph' }] } : initial,
     injectCSS: false,
     editorProps: {
       attributes: {
@@ -315,6 +336,7 @@ export function DocumentEditor({
   const tables = useTableTracking(editor, sheet);
   useCodeColours(editor);
   useEffect(() => onView?.(editor.view), [editor, onView]);
+  useEffect(() => onReady?.(editor), [editor, onReady]);
 
   actions.current = {
     pickFiles: () => fileInput.current?.click(),

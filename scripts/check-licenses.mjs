@@ -58,6 +58,14 @@ for (const dir of everything) {
 console.log(`npm: ${production.size} shipped packages, ${everything.size - production.size} development tools`);
 for (const [name, licence] of tools) console.log(`  tool only, not shipped: ${name} (${licence})`);
 
+// The collab service ships in its own container. Its lock file names every package.
+const collabLock = JSON.parse(readFileSync('collab/package-lock.json', 'utf8'));
+const collabPackages = Object.entries(collabLock.packages).filter(([path]) => path.includes('node_modules/'));
+for (const [path, entry] of collabPackages) {
+  if (!allowed(entry.license ?? 'UNKNOWN', shipped)) fail(`collab package ${path} has licence ${entry.license}`);
+}
+console.log(`collab: ${collabPackages.length} shipped packages`);
+
 // Go: every module compiled into the binary.
 const list = execFileSync('go', ['list', '-deps', '-f', '{{with .Module}}{{.Path}} {{.Dir}}{{end}}', './cmd/diffluence'], {
   encoding: 'utf8',

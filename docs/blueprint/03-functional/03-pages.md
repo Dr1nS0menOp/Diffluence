@@ -138,7 +138,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-102** · built · A **Share** button joins them (COL-042), and a **Watch** toggle joins More.
 - **PAG-103** · built · The byline shows the owner, the date of the last update and the version.
 - **PAG-104** · built · **Read time** is estimated at 230 words per minute, with a minimum of one minute. It is left out for very short pages.
-- **PAG-105** · new · **View count** shows after the byline for those allowed to see analytics, and opens page insights (PLT-008).
+- **PAG-105** · built · **View count** shows after the byline for those allowed to see analytics, and opens page insights (PLT-008).
 - **PAG-106** · built · **Contributors:** selecting the byline shows who worked on the page, with their share of versions.
 - **PAG-107** · built · **Page width:** a page scales with the window, between a comfortable minimum and maximum. Full width is chosen in the row of tools of the editor, stays with the page, and takes all the room.
 - **PAG-108** · built · **Contents beside the page:** on wide screens, a page with three or more headings shows a floating list of headings that follows the scroll position. It can be turned off per person.
@@ -153,7 +153,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-117** · built · **Incoming links** lists all pages the person may see that link to this page.
 - **PAG-118** · built · The page lists its child pages at the bottom when the document does not do so already, and this can be turned off per page.
 - **PAG-119** · partly · At the bottom of a page: labels, then reactions, then comments (chapter 7). Still open: labels (wave D).
-- **PAG-120** · phase 4 · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
+- **PAG-120** · built · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
 - **PAG-121** · built · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
 - **PAG-122** · built · Stored documents are only ever rendered by the editor, so no HTML from a document reaches the browser.
 

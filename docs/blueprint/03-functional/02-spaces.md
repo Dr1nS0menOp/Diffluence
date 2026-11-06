@@ -28,7 +28,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 
 - **SPC-017** · built · Opening a space shows its home page.
 - **SPC-018** · built · The overview shows the space name, description, owners and the number of pages.
-- **SPC-019** · partly · It shows recent changes in the space and the most viewed pages, each of which can be turned off. Still open: most viewed pages (wave H), and turning parts off.
+- **SPC-019** · built · It shows recent changes in the space and the most viewed pages, each of which can be turned off. Still open: most viewed pages (wave H), and turning parts off.
 - **SPC-020** · built · It shows the space's newest blog posts when the space has a blog.
 - **SPC-021** · built · A person can favourite and watch the space from here.
 

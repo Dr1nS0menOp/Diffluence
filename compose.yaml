@@ -21,6 +21,14 @@ services:
       interval: 5s
       retries: 10
 
+  collab:
+    profiles: [collab]
+    build: ./collab
+    restart: unless-stopped
+    environment:
+      DIFFLUENCE_API_URL: http://diffluence:8080
+      DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
+
   diffluence:
     image: ${DIFFLUENCE_IMAGE:-diffluence:local}
     build: .
@@ -30,6 +38,8 @@ services:
         condition: service_healthy
     environment:
       DIFFLUENCE_ROLE: all
+      DIFFLUENCE_COLLAB_URL: ${DIFFLUENCE_COLLAB_URL:-}
+      DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
       DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-http://localhost:8080}
       # The application connects as a role that does not own the tables, so it
       # cannot disable the audit log's protection. Migrations use the owner.

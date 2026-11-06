@@ -14,6 +14,23 @@ type Caller struct {
 	UserID uuid.UUID
 	System string // set instead of UserID for background and CLI actions
 	Meta   RequestMeta
+	// Rule is set when an automation rule acts as this account.
+	Rule *RuleRef
+}
+
+// RuleRef says which rule acts, and which rules led here. The chain travels with the
+// events, so a rule never runs on its own chain (spec 015, D12).
+type RuleRef struct {
+	ID    uuid.UUID
+	Name  string
+	Chain []uuid.UUID
+}
+
+// Stamp passes the chain on with an event.
+func (c Caller) Stamp(payload map[string]any) {
+	if c.Rule != nil {
+		payload["rule_chain"] = c.Rule.Chain
+	}
 }
 
 // SystemCaller is a caller for background jobs.
@@ -33,6 +50,15 @@ func (c Caller) Actor() Actor {
 // Event builds a successful audit event for this caller.
 func (c Caller) Event(action, objectType, objectID, spaceID string, details map[string]any) audit.Event {
 	a := c.Actor()
+	if c.Rule != nil {
+		// A copy: callers keep using their map after this.
+		withRule := make(map[string]any, len(details)+1)
+		for key, value := range details {
+			withRule[key] = value
+		}
+		withRule["rule"] = c.Rule.Name
+		details = withRule
+	}
 	return audit.Event{ActorType: a.Type, ActorID: a.ID, Action: action, ObjectType: objectType, ObjectID: objectID,
 		SpaceID: spaceID, Result: audit.ResultSuccess, IP: c.Meta.IP, UserAgent: c.Meta.UserAgent,
 		RequestID: c.Meta.RequestID, Details: details}

@@ -20,13 +20,13 @@ import (
 	"regexp"
 	"slices"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/csvout"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/ids"
 )
@@ -444,7 +444,7 @@ func ExportCSV(ctx context.Context, q db.Querier, f Filter, maxRows int, w io.Wr
 			e.ActorType, e.ActorID, e.Action, e.ObjectType, e.ObjectID, e.SpaceID, e.Result, e.IP,
 			e.UserAgent, e.RequestID, details}
 		for i := range rec {
-			rec[i] = csvSafe(rec[i])
+			rec[i] = csvout.Cell(rec[i])
 		}
 		if err := cw.Write(rec); err != nil {
 			return n, err
@@ -456,13 +456,4 @@ func ExportCSV(ctx context.Context, q db.Querier, f Filter, maxRows int, w io.Wr
 		return n, err
 	}
 	return n, rows.Err()
-}
-
-// csvSafe prevents spreadsheet formula injection: a cell starting with
-// = + - @ or a control character is prefixed with a single quote.
-func csvSafe(s string) string {
-	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
-		return "'" + s
-	}
-	return s
 }

@@ -38,6 +38,9 @@ const (
 	AttachmentDeleteAny = "attachment.delete_any"
 
 	RestrictionManage = "restriction.manage"
+
+	// AnalyticsView shows what is read in a space (spec 015, D5).
+	AnalyticsView = "analytics.view"
 )
 
 // AllSpacePermissions lists every space permission.
@@ -46,7 +49,7 @@ var AllSpacePermissions = []string{
 	PageCreate, PageEdit, PageArchive, PageDeleteOwn, PageDeleteAny,
 	CommentAdd, CommentDeleteOwn, CommentDeleteAny,
 	AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
-	RestrictionManage,
+	RestrictionManage, AnalyticsView,
 }
 
 // Actions that are not permissions themselves.
@@ -168,7 +171,7 @@ const KindTemplate = "template"
 // export and delete, restoring it, and who may see it.
 func worksOnArchivedPage(action string) bool {
 	switch action {
-	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:
+	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:
 		return true
 	}
 	return false
@@ -177,7 +180,7 @@ func worksOnArchivedPage(action string) bool {
 // worksWhenArchived lists what still works in an archived (read-only) space.
 func worksWhenArchived(action string) bool {
 	switch action {
-	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess:
+	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView:
 		return true
 	}
 	return false

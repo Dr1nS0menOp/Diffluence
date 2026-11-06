@@ -41,7 +41,7 @@ The product owner moved this up on 2026-11-05 (ADR-028): a database is literally
 
 ## 13.5 Presentations
 
-- **OTH-018** · later · A page can be presented full screen (PAG-114). A separate slide format is not needed yet.
+- **OTH-018** · built · A page can be presented full screen (PAG-114). A separate slide format is not needed yet.
 
 ## 13.6 Issues and boards
 

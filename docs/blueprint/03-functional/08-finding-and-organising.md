@@ -31,7 +31,7 @@
 - **ORG-024** · built · Comments are searchable, and a result links to the comment.
 - **ORG-025** · new · The text inside attachments (PDF, Word, text) is searchable when extraction is turned on. It runs in the background, in a separate process, with limits.
 - **ORG-026** · built · **Search people and spaces:** results also list people and spaces, in their own tabs.
-- **ORG-027** · new · An administrator sees which searches found nothing (PLT-014), with no names attached.
+- **ORG-027** · built · An administrator sees which searches found nothing (PLT-014), with no names attached.
 
 ## 8.3 Search language
 

@@ -119,6 +119,9 @@ Use these. Reuse beats a new variant.
 | Tabs inside a screen | `Tabs`, with arrow keys |
 | Sections of Your account | `AccountNav`, which holds real addresses |
 | Numbers on a summary | `.tiles` |
+| A colleague in the same document | `TogetherPeople`, and a cursor with a name in words, from `renderCaret` |
+| A table people sort | `SortTable` in `components/sort-table.tsx`, which keeps `aria-sort` right |
+| Who else is on a page | `PresencePeople`: pictures up to five, then a number, and a quiet status line |
 | A block that fills itself | `.dynamic`, with `.dynamic-head` only while editing. Empty is one muted sentence |
 | A chart | `Chart` in `components/chart.tsx`. Series differ by shape as well as colour, and the numbers are one press away |
 | Something drawn | Only `components/icons.tsx`, `components/chart.tsx` and `components/drawing.tsx` may hold SVG (ADR-026) |
@@ -186,6 +189,10 @@ A comparison looks like the page. What was added sits on green, what was removed
 - **Fields and instruction text** in a template: a field has a dashed border, instruction text is muted and italic.
 - **Selected rows** have the accent tint and a real checkbox, so state never rests on colour.
 - A restricted item in the trash shows the words "A restricted page", with no title.
+
+## Insight and automation
+
+Every chart stands beside a sentence with its total and trend, and has one series, so nothing rests on colour. Empty says why: analytics off, or no reader yet. A rule is a form of native fields in When, If and Then, with each message beside its field, a summary at the top, and Move up and Move down instead of dragging.
 
 ## Working together
 

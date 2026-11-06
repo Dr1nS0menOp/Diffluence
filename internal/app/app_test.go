@@ -20,6 +20,7 @@ import (
 	"github.com/diffluence/diffluence/internal/app"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/httpapi"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/testutil"
 )
@@ -111,7 +112,7 @@ func TestEveryNonPublicRouteRequiresASession(t *testing.T) {
 		if !ok {
 			t.Fatalf("route %q has no method", r.Pattern)
 		}
-		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}", "{kind}"} {
+		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}", "{kind}", "{delivery}"} {
 			path = strings.ReplaceAll(path, wildcard, "00000000-0000-0000-0000-000000000001")
 		}
 		if strings.Contains(path, "{") {
@@ -131,6 +132,53 @@ func TestEveryNonPublicRouteRequiresASession(t *testing.T) {
 // TestRouteTableIsDocumented keeps docs/api/routes.txt equal to the real routes, so
 // every new route and every changed access rule shows up as a line in the diff.
 // Regenerate with: UPDATE_ROUTES=1 go test ./internal/app/ -run RouteTable
+func TestTheAPIDescriptionMatchesTheRoutes(t *testing.T) {
+	e := newEnv(t)
+	raw, err := httpapi.OpenAPI(e.app.Routes())
+	if err != nil {
+		t.Fatal(err)
+	}
+	const path = "../../docs/api/openapi.json"
+	if os.Getenv("UPDATE_ROUTES") != "" {
+		if err := os.WriteFile(path, raw, 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(want) != string(raw) {
+		t.Fatal("docs/api/openapi.json differs from the routes. Regenerate with: UPDATE_ROUTES=1 go test ./internal/app/ -run 'RouteTable|APIDescription'")
+	}
+	var doc struct {
+		Paths map[string]map[string]struct {
+			Access string `json:"x-access"`
+		} `json:"paths"`
+	}
+	if err := json.Unmarshal(raw, &doc); err != nil {
+		t.Fatal(err)
+	}
+	entries := 0
+	for _, methods := range doc.Paths {
+		entries += len(methods)
+	}
+	routes := 0
+	for _, r := range e.app.Routes() {
+		method, path, found := strings.Cut(r.Pattern, " ")
+		if !found {
+			continue
+		}
+		routes++
+		if doc.Paths[path][strings.ToLower(method)].Access != r.Access.String() {
+			t.Errorf("%s has no entry with its rule", r.Pattern)
+		}
+	}
+	if entries != routes {
+		t.Fatalf("%d entries for %d routes", entries, routes)
+	}
+}
+
 func TestRouteTableIsDocumented(t *testing.T) {
 	e := newEnv(t)
 	var b strings.Builder

@@ -157,6 +157,7 @@ func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, v 
 		payload = map[string]any{}
 	}
 	payload["comment_id"], payload["page_id"], payload["space_id"], payload["actor_id"] = v.ID, v.PageID, v.spaceID, c.UserID
+	c.Stamp(payload)
 	_, err := outbox.Enqueue(ctx, tx, action, payload)
 	return err
 }

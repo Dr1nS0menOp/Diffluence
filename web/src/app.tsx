@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me } from './api';
 import { appearanceQuery, useAccent, useImportedFont } from './appearance';
-import { forgetPersonalData, PersonProvider } from './personal';
+import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
 import { NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
@@ -47,6 +47,9 @@ import { SpaceAccessView, SpaceAuditView, SpacePeopleView } from './views/space-
 import { TasksView } from './views/tasks';
 import { TemplatesView, TemplateView } from './views/templates';
 import { UnsubscribeView } from './views/unsubscribe';
+import { PageInsightsView, SpaceInsightsView } from './views/insights';
+import { RulesView, RuleView } from './views/rules';
+import { WebhooksView } from './views/webhooks';
 
 type Creating = 'page' | 'template' | 'post' | 'space' | null;
 
@@ -100,9 +103,15 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
   const { space } = useCurrentSpace();
   const [creating, setCreating] = useState<Creating>(null);
   const appearance = useQuery(appearanceQuery).data;
+  // Someone can leave without logging out, so the next person clears what they left.
+  const person = me.user.id;
+  useEffect(() => {
+    void forgetSharedDocuments(person);
+  }, [person]);
   const logout = async () => {
     await api.post('/auth/logout');
     forgetPersonalData();
+    await forgetSharedDocuments();
     client.clear();
     navigate('/login');
   };
@@ -319,6 +328,10 @@ function Routes({ me }: { me: Me }) {
   if ((m = match('/spaces/:key/overview', pathname))) return <SpaceOverviewView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/files', pathname))) return <FilesView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings', pathname))) return <SpaceSettingsView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/settings/automation', pathname))) return <RulesView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/settings/webhooks', pathname))) return <WebhooksView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/insights', pathname))) return <SpaceInsightsView spaceKey={m.key ?? ''} />;
+  if ((m = match('/rules/:id', pathname))) return <RuleView ruleId={m.id ?? ''} />;
   if ((m = match('/spaces/:key/trash', pathname))) return <TrashView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/sites', pathname))) return <SitesView spaceKey={m.key ?? ''} />;
   if ((m = match('/exports/:id', pathname))) return <ExportView id={m.id ?? ''} />;
@@ -335,6 +348,13 @@ function Routes({ me }: { me: Me }) {
     return (
       <SpaceShell pageId={m.id ?? ''} focus>
         <EditView pageId={m.id ?? ''} />
+      </SpaceShell>
+    );
+  }
+  if ((m = match('/pages/:id/insights', pathname))) {
+    return (
+      <SpaceShell pageId={m.id ?? ''}>
+        <PageInsightsView pageId={m.id ?? ''} />
       </SpaceShell>
     );
   }

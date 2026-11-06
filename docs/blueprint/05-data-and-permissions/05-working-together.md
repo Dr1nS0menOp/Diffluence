@@ -28,3 +28,17 @@ Everything here is wave C (spec 010), unless a line says otherwise. Owners: `int
 
 - **DAT-118** · wave H, part 5 · `page_version_authors`: a version names everyone who took part.
 - **DAT-119** · wave H, part 5 · The state of a shared document lives in the collab service. Its table, retention and what happens at a version removal are not designed yet (GAP-027).
+
+## 5.9 The shared document of editing together
+
+Wave H, part 5. Owner: `internal/collab`. This is the sheet GAP-027 asked for.
+
+- **DAT-190** · wave H · `collab_documents`: `page_id`, `state`, `title`, `authors`, `updated_at`. One row per page in shared mode, and only when the service is installed.
+  - **What it holds:** the Yjs state of the page, with its editing history, and the ids of who typed since the last version.
+  - **Who writes it:** the service, through `PUT /collab/documents/{id}`, after the same gate as a published page. A refused state is not stored.
+  - **Retention:** as long as the page. It is not a version, and it is not in the history of the page.
+  - **Removal:** it goes with the page when the page is purged. Removing a version does not reach it, so text from that version can stay in the state until someone removes it from the shared document. A purge is the way to remove it for good.
+  - **Export:** not in a page or space export. Those hold versions. A person's export holds no shared state, because the text belongs to the page.
+  - **Personal data:** `authors` holds ids until the next version, and then moves to `page_version_authors`. Removing a person leaves the id there, as for `author_id`.
+- **DAT-191** · wave H · `page_version_authors`: `page_id`, `number`, `user_id`. Everyone who typed in a version, and whoever published it.
+- **Browser copies:** `y-indexeddb` keeps the shared document in the browser for offline work, in a database with the id of the person in its name. Logging out deletes it (SEC-265, SEC-266). Only typing the service never confirmed stays, for that person, for at most seven days, and so does page text that failed to save. When the app starts it clears what others left behind.

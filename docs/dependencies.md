@@ -30,6 +30,17 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 |---|---|---|
 | Kenney, Animal Pack Remastered: the 30 round PNGs in `web/public/animals/`, 115 KB, with its `LICENSE.txt` | CC0 1.0 | The animals of spaces (ADR-031). No code. Credit is not required, and it is given here with thanks |
 
+## The service for editing together (Node.js, optional)
+
+Only in the `collab` container, and only where an operator installs it. Pinned in `collab/package-lock.json`. Node.js security updates apply from then on.
+
+| Package | Licence | Why | Decided |
+|---|---|---|---|
+| `@hocuspocus/server` 4.8.0, `@hocuspocus/common` 4.8.0 | MIT, read from each package | The WebSocket server for Yjs | ADR-026 |
+| `yjs` 13.6.33, `y-protocols` 1.0.7, `lib0` 0.2.119 | MIT | The shared document | ADR-026 |
+| `crossws` 0.4.17, `async-mutex` 0.5.0, `isomorphic.js` 0.2.5, `kleur` 4.1.5 | MIT | Come with Hocuspocus | ADR-026 |
+| `tslib` 2.9.1 | 0BSD | Comes with `async-mutex` | ADR-026 |
+
 ## Deliberately not a dependency
 
 | Part | Decision | Why |
@@ -41,7 +52,7 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | Encryption | Standard library | AES-GCM, Ed25519 and HKDF all come from Go itself. `internal/keys` only arranges them. |
 | Rate limiter, migration runner | Own code | Small, and the blueprint allows our own migration runner. |
 | TipTap colour, highlight and alignment packages | Own marks | They store free values, and our documents only allow names from a list (spec 008). Each mark is a few lines. |
-| TipTap drag handle | Own code | It needs the whole collaboration stack, including Yjs. Ours moves top-level blocks and is small. Revisit when real-time editing arrives. |
+| TipTap drag handle | Own code | Ours moves top-level blocks and is small. Yjs is here now, so it could be looked at again. |
 | Emoji data | Own list | About 150 common emoji with our own keywords in `emoji.json`. The characters come from the system font, so nothing else ships. |
 | Message bus for jobs | PostgreSQL | Imports and periodic tasks use a table with `SKIP LOCKED`. One moving part fewer than a second NATS consumer. Events still go through the outbox and NATS. |
 
@@ -55,6 +66,11 @@ See `web/package.json`. The list and its reasons are below, and `scripts/check-l
 | `@tanstack/react-query` | MIT | Server state and caching | Blueprint 04 |
 | `@tanstack/react-router` | MIT | Routing | Blueprint 04 |
 | `@tiptap/*` | MIT | Editor, on ProseMirror (MIT) | Blueprint 04 |
+| `yjs` 13.6.33 | MIT | The shared document that merges by itself | ADR-026 |
+| `@tiptap/extension-collaboration` 3.32.2, `@tiptap/extension-collaboration-caret` 3.32.2, `@tiptap/y-tiptap` 3.2.0 | MIT, read from each package | Connect the editor to Yjs, with cursors and an undo per person. Pinned together with TipTap | ADR-026 |
+| `@hocuspocus/provider` 4.8.0 | MIT, read from the package | Talks to the service | ADR-026 |
+| `y-indexeddb` 9.0.12 | MIT | Keeps typing safe offline | ADR-026 |
+| `y-protocols` 1.0.7, `lib0` 0.2.119 | MIT | Come with Yjs | ADR-026 |
 | `@tiptap/suggestion` | MIT | The menus at the cursor for `/` and `:`. Its helper for placing a popup, `@floating-ui/dom`, was already there through `@tiptap/react`. | The product owner, 2026-11-05 |
 | `i18next`, `react-i18next` | MIT | Translation framework | Blueprint 04 |
 | `lowlight`, `highlight.js` | MIT, BSD-3 | Colours in code blocks | The product owner, 2026-11-04 |

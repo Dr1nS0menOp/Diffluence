@@ -44,7 +44,7 @@ Found by reading blueprint 03, specs 008 to 016 and the code on 2026-11-05. For 
 | **GAP-021** | Low | Wave C. `SetReaction` | The route needs view, which works in an archived space, so a reaction changes something others see | Refuse in an archived space and on an archived page |
 | **GAP-022** | Medium | Wave D. Templates | `Evaluate` refuses a template page, so `GET /attachments/{id}/content` refuses its files too. An image in a template cannot show in the gallery or the template editor, unless someone adds a bypass | A route of the `templates` module with its own rule, and a test |
 | **GAP-028** | Low | Wave D. `mayReadRound` | The exception finds its rule by the name `published_or_own_draft`. It fails closed when that name changes, which is safe, and quietly breaks approvals | A named variant of the rule (PRM-153) |
-| **GAP-027** | Medium | Wave H, part 5 | The collab service stores a shared document, with no table, retention, removal or export in the model. Removing a version cannot reach it. Private drafts end for those pages (ADR-026) | Its own sheet before building |
+| **GAP-027** | Medium | Wave H, part 5 | The collab service stores a shared document, with no table, retention, removal or export in the model. Removing a version cannot reach it. Private drafts end for those pages (ADR-026) | Closed by section 5.9 of `05-working-together.md` |
 | **GAP-029** | Low | Wave G, G8 | "Keep the name as a former author" has no place: `author_id` is an id, and `type` has no such person | A person row of a new type, or a text column. Decide in that wave |
 
 ## 12.4 Where the old text and the code differ

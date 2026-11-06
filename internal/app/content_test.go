@@ -16,6 +16,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
@@ -1043,6 +1045,10 @@ func objectRoute(pattern string, ids map[string]string) (method, path string) {
 	switch {
 	case strings.Contains(path, "/spaces/"):
 		id = ids["space"]
+	case strings.Contains(path, "/rules/"):
+		id = ids["rule"]
+	case strings.Contains(path, "/webhooks/"):
+		id = ids["webhook"]
 	case strings.Contains(path, "/sites/"):
 		id = ids["site"]
 	case strings.Contains(path, "/attachments/"):
@@ -1080,6 +1086,16 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 		return path, `{"space_id":"` + ids["space"] + `","format":"text"}`
 	case strings.HasSuffix(pattern, "/compare"):
 		return path + "?from=1&to=1", ""
+	case strings.HasSuffix(pattern, "/resend"):
+		return strings.Replace(path, "{delivery}", ids["owner"], 1), ""
+	case strings.HasSuffix(pattern, "/presence"):
+		return path, `{"mode":"reading"}`
+	case pattern == "POST /api/v1/rules/{id}/run":
+		return path, `{"page_id":"` + ids["page"] + `"}`
+	case pattern == "PUT /api/v1/rules/{id}":
+		return path, `{"name":"Walk","definition":{"trigger":{"kind":"incoming"},"actions":[{"type":"find_pages"}]}}`
+	case pattern == "POST /api/v1/spaces/{id}/rules":
+		return path, `{"name":"Walk","definition":{"trigger":{"kind":"incoming"},"actions":[{"type":"find_pages"}]}}`
 	case strings.HasSuffix(pattern, "/explain"):
 		return path + "?action=page.view&user_id=" + ids["owner"], ""
 	case strings.HasSuffix(pattern, "/imports"):
@@ -1180,13 +1196,18 @@ func TestEveryObjectRouteIsProtected(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	rule := owner.rule(space, "Walk", map[string]any{"trigger": map[string]any{"kind": "incoming"}, "actions": []map[string]any{{"type": "find_pages"}}})
+	webhook := uuid.NewString()
+	e.sql(`INSERT INTO webhook_endpoints (id, space_id, address, events, secret, owner_id) VALUES ($1, $2, $3, $4, $5, $6)`,
+		webhook, space, "https://hooks.example.com/x", []string{"page.created"}, []byte{1}, owner.id)
+
 	// Sites are off here, and the route must refuse before it says so.
 	site := "018f0000-0000-7000-8000-00000000abcd"
 	if _, err := e.app.Pool().Exec(context.Background(), `INSERT INTO public_sites (id, space_id, name, target, created_by) VALUES ($1, $2, 'x', 'x', $3)`, site, space, owner.id); err != nil {
 		t.Fatal(err)
 	}
 	ids := map[string]string{"space": space, "page": page, "attachment": att["id"].(string), "job": job["id"].(string), "trash": trash, "owner": owner.id,
-		"comment": comment, "task": task, "request": request, "site": site}
+		"comment": comment, "task": task, "request": request, "site": site, "rule": rule, "webhook": webhook}
 
 	// Routes that are personal or list only what the caller may see.
 	listOnly := map[string]bool{"GET /api/v1/spaces": true, "GET /api/v1/search": true}

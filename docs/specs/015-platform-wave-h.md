@@ -1,6 +1,6 @@
 # 015: Wave H, insight, automation, the platform, and what stays later
 
-Status: planned in detail, not built
+Status: built on branch `wave-h`, see `docs/handoff/2026-11-06-wave-h.md`
 Phase: wave H of `docs/blueprint/03-functional-requirements.md`, covering chapters 12 and 13 and editing together from chapter 7.13. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave. This is the last wave, and it depends on the events, notifications and mail of wave C.
 
 ## Problem

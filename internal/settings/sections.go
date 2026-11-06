@@ -87,6 +87,7 @@ type Features struct {
 	Analytics      bool `json:"analytics"`
 	Automation     bool `json:"automation"`
 	Tokens         bool `json:"tokens"`
+	Presence       bool `json:"presence"`
 }
 
 // Access holds the rules for accounts.
@@ -124,7 +125,7 @@ var (
 	DefaultGeneral = General{DefaultLanguage: "en", DefaultTimeZone: "UTC", EmbedHosts: []string{}}
 	// DefaultFeatures: self sign-up stays off until someone chooses it.
 	DefaultFeatures = Features{Comments: true, Reactions: true, Blogs: true, Invitations: true, PersonalSpaces: true,
-		Analytics: true, Automation: true, Tokens: true}
+		Analytics: true, Automation: true, Tokens: true, Presence: true}
 	DefaultAccess = Access{SecondFactor: FactorAfterGrace, IdleMinutes: 0, SignupDomains: []string{}, GuestInvites: true}
 	// DefaultRetention keeps the audit log for 12 months (ADR-029).
 	DefaultRetention = Retention{AuditDays: 365}
