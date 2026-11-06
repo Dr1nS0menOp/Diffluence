@@ -1,7 +1,7 @@
 # 018: Animals for spaces, changes in the page, and people in pickers
 
 Status: built, waiting for the product owner's acceptance session
-Phase: The product owner's feedback after his first test of waves A and B, 2026-11-05. The editor half of his list is spec 017.
+Phase: The product owner's feedback after their first test of waves A and B, 2026-11-05. The editor half of their list is spec 017.
 
 ## Problem
 

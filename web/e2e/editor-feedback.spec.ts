@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-// Spec 017: what the product owner asked for after his first test of the editor.
+// Spec 017: what the product owner asked for after their first test of the editor.
 import type { Page } from '@playwright/test';
 import {
   ADMIN,

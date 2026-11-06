@@ -35,7 +35,7 @@ Because the product owner does not read code, **the automated checks are the cod
 | Load | k6 smoke test per pull request, full 5,000-user test nightly |
 | API contract | The OpenAPI spec matches the code, and every endpoint has a permission annotation |
 
-## Every phase starts with a study (product owner,2026-11-05)
+## Every phase starts with a study (product owner, 2026-11-05)
 
 The product owner: this is one of the most important ways to make the product as complete as possible. No phase or wave is built from a short list. Before the first line of code:
 
@@ -61,7 +61,7 @@ Only then does building start. If a build has started without this, stop and do 
 
 - **When:** at least once per phase milestone, and for every pull request touching permissions, authentication, encryption or upgrades
 - **Where:** the staging environment, which is redeployed automatically from the pull request or `main`
-- **How:** Claude prepares a script of scenarios. The product owner performs them and reports what he sees. Claude fixes the deviations, and each deviation becomes a new automated test.
+- **How:** Claude prepares a script of scenarios. The product owner performs them and reports what they see. Claude fixes the deviations, and each deviation becomes a new automated test.
 - **The product owner's fixed checks per milestone:** upgrade while a colleague is editing, kill a node, restore from backup, try to reach a restricted page as a guest
 
 ## Definition of done

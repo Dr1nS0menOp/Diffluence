@@ -11,7 +11,7 @@ Chapters 12 and 13 also hold things that should not be built now. This spec says
 
 ## What this wave does not build
 
-Status **later** and the phases after 1.0 are in the blueprint for a reason. The product owner's words were "heel 03", so this list needs his eyes.
+Status **later** and the phases after 1.0 are in the blueprint for a reason. The request was "the whole of 03", so this list needs a second look.
 
 | Requirements | Roadmap | Why not now | What it would take |
 |---|---|---|---|

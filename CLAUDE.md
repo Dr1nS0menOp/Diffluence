@@ -9,10 +9,10 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 4. For anything visible: `docs/design/README.md`
 
 ## Hard rules
-- **Study first (product owner,2026-11-05):** every phase or wave starts with a large study and a detailed plan, as blueprint 03 did, before any code. See "Every phase starts with a study" in `docs/blueprint/09-way-of-working.md`. Spec 008 is the example.
+- **Study first (product owner, 2026-11-05):** every phase or wave starts with a large study and a detailed plan, as blueprint 03 did, before any code. See "Every phase starts with a study" in `docs/blueprint/09-way-of-working.md`. Spec 008 is the example.
 - **Clean-room:** never fetch, read or reproduce source code of Confluence, Docmost, Plane, OpenProject, Huly or similar products. Never ask "how does X implement this". Build from our specs and ADRs. See `docs/blueprint/02-clean-room-and-licensing.md`.
 - **Licences:** dependencies must be MIT, BSD, Apache-2.0 or ISC. No GPL, AGPL or LGPL. Ask before adding any dependency.
-- **Dependencies (product owner,2026-11-04):** keep the total as low as possible, to avoid constant security advisories and abandoned code. But never hand-write an important or security-critical part when a widely used, maintained module does the job, unless it lacks a feature we need. Small non-critical code: write it, add no dependency. Every dependency is listed with its reason in `docs/dependencies.md`.
+- **Dependencies (product owner, 2026-11-04):** keep the total as low as possible, to avoid constant security advisories and abandoned code. But never hand-write an important or security-critical part when a widely used, maintained module does the job, unless it lacks a feature we need. Small non-critical code: write it, add no dependency. Every dependency is listed with its reason in `docs/dependencies.md`.
 - **Every HTTP route** is registered through `httpapi.Router` with an explicit `Access` rule. Public routes are the exception and must be justified in a comment. Object routes use `Object(action)`, and the module behind them makes the decision.
 - **Permissions** are checked in the module, not the handler, through `permissions.Require...`, so no caller can skip them. Lists go through the `perm_*` SQL functions. A change to the rule changes `permissions.Evaluate`, the SQL and the literal rule in the matrix test.
 - **Every state change** writes an audit event (`audit.Record`) and, where other modules may care, an outbox event (`outbox.Enqueue`), in the **same database transaction** as the change.
@@ -22,6 +22,7 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 - **UI text** only through translation files.
 - **Design:** every screen follows `docs/design/README.md` (the product owner's decision, ADR-021). Values come only from `web/src/design/tokens.css`. Build from the listed frames and components, never a second way. A new screen gets a picture in `web/e2e/0-design.spec.ts`. Look at every new or changed picture before committing, and never update one just to get past a failure. Changing the look itself is the product owner's decision.
 - **IDs** are UUIDv7 (`ids.New()`).
+- **No personal details:** nothing in this repository names the product owner, or says anything personal about them, such as where they work or what they run at home. Write "the product owner", in code, docs, specs, handoffs and commit messages alike.
 
 ## Layout
 ```

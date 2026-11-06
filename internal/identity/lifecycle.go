@@ -195,7 +195,7 @@ func (s *Service) clearSecondFactorDemand(ctx context.Context, q db.Querier, use
 }
 
 // How long a person can put off the question about a stronger sign-in. An
-// administrator is asked again sooner (product owner,2026-11-05).
+// administrator is asked again sooner (product owner, 2026-11-05).
 const (
 	signInPromptDelay      = 7 * 24 * time.Hour
 	signInPromptAdminDelay = 24 * time.Hour

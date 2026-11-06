@@ -15,7 +15,7 @@ After ten designs, three iterations and a final choice, the product owner decide
 | Page tree | **Branches**: guide lines that show the structure, and every branch can be collapsed. |
 | Font | The **system font**. A font can be imported in the settings. |
 
-Rail kept the global navigation visible while editing. In Helder that means: **the top bar stays**. After his first test the product owner asked to keep the pages in view as well, so **the sidebar stays too**, as far as there is room (ADR-030).
+Rail kept the global navigation visible while editing. In Helder that means: **the top bar stays**. After their first test the product owner asked to keep the pages in view as well, so **the sidebar stays too**, as far as there is room (ADR-030).
 
 The intuition of a familiar wiki is the aim, never a copy. The clean-room rules (`docs/blueprint/02`) apply to design as well: no logos, icons, copy or pixel-exact layouts from any other product. The logo and every icon are ours.
 
@@ -255,4 +255,4 @@ Never update a picture just to get past a failure. A failing picture means the s
 
 ## Changing the standard
 
-The look is the product owner's decision. Changing a token value, a frame or a rule in this document needs his agreement and a new ADR. Ask him with the before and after pictures.
+The look is the product owner's decision. Changing a token value, a frame or a rule in this document needs their agreement and a new ADR. Ask them with the before and after pictures.

@@ -26,7 +26,7 @@ We want behaviour that users recognise from Confluence (proprietary) and Docmost
 
 ## The process
 
-1. **Spec sessions.** the product owner and Claude read allowed public sources and write **functional specs in our own words** in `docs/specs/`. Each spec lists the public sources it is based on (a provenance log).
+1. **Spec sessions.** The product owner and Claude read allowed public sources and write **functional specs in our own words** in `docs/specs/`. Each spec lists the public sources it is based on (a provenance log).
 2. **Build sessions.** Claude implements from specs and ADRs only. The session instructions forbid fetching competitor source code.
 3. **Checks in CI.** A licence scanner (for example ScanCode) on our code and dependencies, and an allow-list of licences for dependencies.
 4. **Honest limitation.** A language model has seen public code during training. We reduce the risk by designing from our own specs, by never asking for "how does X do this", and by the scanning above.

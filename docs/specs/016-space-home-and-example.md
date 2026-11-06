@@ -1,7 +1,7 @@
 # 016: The home of a space, and an example space
 
 Status: built, waiting for the product owner's acceptance session
-Phase: asked for by the product owner on 2026-11-05, between the waves. It changes a frame, which is his decision (ADR-027).
+Phase: asked for by the product owner on 2026-11-05, between the waves. It changes a frame, which is their decision (ADR-027).
 
 ## Problem
 
