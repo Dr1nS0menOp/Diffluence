@@ -1180,6 +1180,8 @@ func TestEveryObjectRouteIsProtected(t *testing.T) {
 	// A viewer can do these by design.
 	viewerMay := map[string]bool{
 		"space.view": true, "page.view": true, "space.export": true, "comment.add": true,
+		// Group owners are decided in the module: everyone else gets "not found".
+		"group.manage_members": true,
 	}
 	checked := 0
 	for _, r := range e.app.Routes() {

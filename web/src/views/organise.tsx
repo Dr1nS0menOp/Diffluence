@@ -15,7 +15,8 @@ import {
 import { Link, navigate, useLocation } from '../router';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { PageMark } from '../components/topbar';
-import { ErrorNote, formatDay, Loading, RelativeTime } from '../components/ui';
+import { ErrorNote, Loading, RelativeTime } from '../components/ui';
+import { useDates } from '../dates';
 
 const POSTS_PER_LOAD = 20;
 
@@ -123,6 +124,7 @@ function monthOf(value: string): string {
 
 function PostList({ path }: { path: string }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const q = useInfiniteQuery({
     queryKey: ['posts', path],
     initialPageParam: 0,
@@ -156,7 +158,7 @@ function PostList({ path }: { path: string }) {
                 <li key={p.id}>
                   <Link href={`/pages/${p.id}`}>{p.title}</Link>
                   <span className="muted">
-                    {t('page.byline', { name: p.author_name })} · {formatDay(p.published_at)} · {p.space_name}
+                    {t('page.byline', { name: p.author_name })} · {dates.day(p.published_at)} · {p.space_name}
                   </span>
                   {p.excerpt && <p>{p.excerpt}</p>}
                 </li>

@@ -2,23 +2,14 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  api,
-  NIL_ID,
-  type Grant,
-  type Job,
-  type Shortcut,
-  type Space,
-  type Subject,
-  type TrashItem,
-} from '../api';
-import { navigate } from '../router';
+import { api, type Category, type Job, type Shortcut, type Space, type TrashItem } from '../api';
+import { Link, navigate } from '../router';
 import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp } from '../components/icons';
-import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, formatDate, Loading } from '../components/ui';
-import { SubjectPicker } from '../components/picker';
+import { ConfirmButton, ErrorNote, Field, FilePicker, Loading } from '../components/ui';
+import { useDates } from '../dates';
 import { moved } from './lists';
 import {
   DeleteSpaceButton,
@@ -30,6 +21,8 @@ import {
   SpaceLinksSection,
   StatusesSection,
 } from './space-organise';
+
+const JOB_POLL_MS = 1000;
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
@@ -62,9 +55,9 @@ function ImportBox({ space }: { space: Space }) {
   });
   const status = useQuery({
     queryKey: ['job', job],
-    queryFn: () => api.get<Job>(`/jobs/${job}`),
+    queryFn: () => api.poll<Job>(`/jobs/${job}`),
     enabled: !!job,
-    refetchInterval: (q) => (['done', 'failed'].includes(q.state.data?.status ?? '') ? false : 1000),
+    refetchInterval: (q) => (['done', 'failed'].includes(q.state.data?.status ?? '') ? false : JOB_POLL_MS),
   });
   useEffect(() => {
     if (status.data?.status === 'done') void client.invalidateQueries({ queryKey: ['tree', space.id] });
@@ -95,152 +88,6 @@ function ImportBox({ space }: { space: Space }) {
             <li key={w}>{w}</li>
           ))}
         </ul>
-      )}
-    </section>
-  );
-}
-
-const TEMPLATES = ['viewer', 'editor', 'space_admin'];
-
-function templateOf(perms: string[], templates: Record<string, string[]>): string {
-  const sorted = [...perms].sort().join();
-  return TEMPLATES.find((n) => [...(templates[n] ?? [])].sort().join() === sorted) ?? 'custom';
-}
-
-function PermissionsSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const q = useQuery({
-    queryKey: ['grants', space.id],
-    queryFn: () =>
-      api.get<{ grants: Grant[]; all_permissions: string[]; templates: Record<string, string[]> }>(
-        `/spaces/${space.id}/grants`,
-      ),
-  });
-  const [detail, setDetail] = useState<Grant | null>(null);
-  const refresh = () => client.invalidateQueries({ queryKey: ['grants', space.id] });
-  const set = useMutation({
-    mutationFn: (v: { subject: Subject; permissions: string[] }) => api.put(`/spaces/${space.id}/grants`, v),
-    onSettled: refresh,
-  });
-  const preset = useMutation({
-    mutationFn: (name: string) => api.post(`/spaces/${space.id}/preset`, { preset: name }),
-    onSettled: refresh,
-  });
-  if (!q.data) return <Loading />;
-  const { grants, all_permissions: all, templates } = q.data;
-  const label = (g: Grant) =>
-    g.subject.type === 'all_members'
-      ? t('permissions.allMembers')
-      : g.subject.type === 'all_guests'
-        ? t('permissions.allGuests')
-        : g.name;
-  return (
-    <section>
-      <h2>{t('space.permissions')}</h2>
-      <ErrorNote error={set.error ?? preset.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('permissions.subject')}</th>
-            <th>{t('permissions.template')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {grants.map((g) => (
-            <tr key={g.subject.type + g.subject.id}>
-              <td>{label(g)}</td>
-              <td>
-                <select
-                  aria-label={t('permissions.template')}
-                  value={templateOf(g.permissions, templates)}
-                  onChange={(e) =>
-                    set.mutate({ subject: g.subject, permissions: templates[e.target.value] ?? [] })
-                  }
-                >
-                  {TEMPLATES.map((n) => (
-                    <option key={n} value={n}>
-                      {t(`permissions.${n}`)}
-                    </option>
-                  ))}
-                  <option value="custom" disabled>
-                    {t('permissions.custom')}
-                  </option>
-                </select>
-              </td>
-              <td className="row">
-                <button type="button" className="ghost" onClick={() => setDetail(g)}>
-                  {t('permissions.matrix')}
-                </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => set.mutate({ subject: g.subject, permissions: [] })}
-                >
-                  {t('permissions.removeAccess')}
-                </button>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-      <h3>{t('permissions.addSubject')}</h3>
-      <div className="row">
-        <SubjectPicker
-          label={t('permissions.addSubject')}
-          onPick={(e) =>
-            set.mutate({ subject: { type: e.type, id: e.id }, permissions: templates.viewer ?? [] })
-          }
-        />
-        <button
-          type="button"
-          onClick={() =>
-            set.mutate({ subject: { type: 'all_members', id: NIL_ID }, permissions: templates.viewer ?? [] })
-          }
-        >
-          {t('permissions.allMembers')}
-        </button>
-        <button
-          type="button"
-          onClick={() =>
-            set.mutate({ subject: { type: 'all_guests', id: NIL_ID }, permissions: templates.viewer ?? [] })
-          }
-        >
-          {t('permissions.allGuests')}
-        </button>
-      </div>
-      <h3>{t('permissions.preset')}</h3>
-      <div className="row">
-        <button type="button" onClick={() => preset.mutate('team_space')}>
-          {t('permissions.team_space')}
-        </button>
-        <button type="button" onClick={() => preset.mutate('read_only_kb')}>
-          {t('permissions.read_only_kb')}
-        </button>
-      </div>
-      {detail && (
-        <Dialog title={label(detail)} onClose={() => setDetail(null)}>
-          <fieldset className="matrix">
-            <legend>{t('permissions.matrix')}</legend>
-            {all.map((p) => (
-              <label key={p}>
-                <input
-                  type="checkbox"
-                  checked={detail.permissions.includes(p)}
-                  onChange={(e) => {
-                    const next = e.target.checked
-                      ? [...detail.permissions, p]
-                      : detail.permissions.filter((x) => x !== p);
-                    setDetail({ ...detail, permissions: next });
-                    set.mutate({ subject: detail.subject, permissions: next });
-                  }}
-                />
-                {t(`permissions.${p.replace('.', '_')}`)}
-              </label>
-            ))}
-          </fieldset>
-        </Dialog>
       )}
     </section>
   );
@@ -334,6 +181,44 @@ function ShortcutsSection({ space }: { space: Space }) {
   );
 }
 
+/** Categories are one list kept by administrators: here a space picks from it (D15). */
+function CategoriesSection({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const q = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<{ categories: Category[] }>('/categories'),
+  });
+  const chosen = useQuery({
+    queryKey: ['space-categories', space.id],
+    queryFn: () => api.get<{ categories: string[] }>(`/spaces/${space.id}/categories`),
+  });
+  const save = useMutation({
+    mutationFn: (categories: string[]) => api.put(`/spaces/${space.id}/categories`, { categories }),
+    onSettled: () => client.invalidateQueries({ queryKey: ['space-categories', space.id] }),
+  });
+  const picked = chosen.data?.categories ?? [];
+  if ((q.data?.categories.length ?? 0) === 0) return <ErrorNote error={q.error} />;
+  return (
+    <section>
+      <h2>{t('admin.categories')}</h2>
+      <ErrorNote error={save.error} />
+      {q.data?.categories.map((c) => (
+        <label key={c.id} className="check">
+          <input
+            type="checkbox"
+            checked={picked.includes(c.id)}
+            onChange={(e) => {
+              save.mutate(e.target.checked ? [...picked, c.id] : picked.filter((x) => x !== c.id));
+            }}
+          />
+          {c.name}
+        </label>
+      ))}
+    </section>
+  );
+}
+
 export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -410,7 +295,16 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       <LabelsSection space={space} />
       <RulesSection space={space} />
       <ShortcutsSection space={space} />
-      <PermissionsSection space={space} />
+      <section>
+        <h2>{t('space.permissions')}</h2>
+        <p>
+          <Link href={`/spaces/${space.key}/access`}>{t('access.open')}</Link>
+        </p>
+        <p>
+          <Link href={`/spaces/${space.key}/audit`}>{t('access.auditTitle')}</Link>
+        </p>
+      </section>
+      <CategoriesSection space={space} />
       <ImportBox space={space} />
       <section>
         <h2>{t('common.actions')}</h2>
@@ -437,6 +331,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
 
 export function TrashView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const client = useQueryClient();
   const q = useSpaceByKey(spaceKey);
   const space = q.data;
@@ -538,8 +433,8 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
                 <td>{i.hidden ? t('trash.restricted') : i.title}</td>
                 <td>{i.object_type}</td>
                 <td>{i.deleted_by_name || t('common.unknown')}</td>
-                <td>{formatDate(i.deleted_at)}</td>
-                <td>{formatDate(i.purge_after)}</td>
+                <td>{dates.moment(i.deleted_at)}</td>
+                <td>{dates.moment(i.purge_after)}</td>
                 <td className="row">
                   <button type="button" onClick={() => restore.mutate(i.id)}>
                     {t('trash.restore')}

@@ -187,6 +187,102 @@ func (s *Service) DeleteGroup(ctx context.Context, c Caller, id uuid.UUID) error
 	})
 }
 
+// MemberGroup is a group as its member sees it.
+type MemberGroup struct {
+	ID    uuid.UUID `json:"id"`
+	Name  string    `json:"name"`
+	Owner bool      `json:"owner"`
+}
+
+// GroupsOf lists the groups a person is in or owns, for their own profile.
+func (s *Service) GroupsOf(ctx context.Context, userID uuid.UUID) ([]MemberGroup, error) {
+	rows, err := s.pool.Query(ctx, `SELECT g.id, g.name, EXISTS (SELECT 1 FROM group_owners o WHERE o.group_id = g.id AND o.user_id = $1)
+		FROM groups g
+		WHERE EXISTS (SELECT 1 FROM group_members m WHERE m.group_id = g.id AND m.user_id = $1)
+		   OR EXISTS (SELECT 1 FROM group_owners o WHERE o.group_id = g.id AND o.user_id = $1)
+		ORDER BY lower(g.name)`, userID)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, pgx.RowToStructByPos[MemberGroup])
+	if out == nil {
+		out = []MemberGroup{}
+	}
+	return out, err
+}
+
+// SetGroupOwners chooses who may manage a group's members. The route requires
+// administrator.
+func (s *Service) SetGroupOwners(ctx context.Context, c Caller, id uuid.UUID, owners []uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := s.GetGroup(ctx, tx, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM group_owners WHERE group_id = $1", id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `INSERT INTO group_owners (group_id, user_id)
+			SELECT $1, u.id FROM users u WHERE u.id = ANY($2)`, id, owners); err != nil {
+			return err
+		}
+		return s.record(ctx, tx, c, "group.owners_changed", "group", id.String(), map[string]any{"owners": len(owners)})
+	})
+}
+
+// requireOwner answers "not found" for anyone who does not own the group, so the
+// route cannot be used to test which groups exist.
+func (s *Service) requireOwner(ctx context.Context, q db.Querier, c Caller, id uuid.UUID) error {
+	var ok bool
+	err := q.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM group_owners WHERE group_id = $1 AND user_id = $2)", id, c.UserID).Scan(&ok)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperr.NotFound()
+	}
+	return nil
+}
+
+// OwnedGroup is a group as its owner sees it.
+func (s *Service) OwnedGroup(ctx context.Context, c Caller, id uuid.UUID) (Group, []GroupMember, error) {
+	if err := s.requireOwner(ctx, s.pool, c, id); err != nil {
+		return Group{}, nil, err
+	}
+	g, err := s.GetGroup(ctx, s.pool, id)
+	if err != nil {
+		return g, nil, err
+	}
+	members, err := s.GroupMembers(ctx, id)
+	return g, members, err
+}
+
+// OwnerAddMember adds a member, as the owner of a group. A group from an identity
+// provider stays read-only for them too: the provider is the source of truth.
+func (s *Service) OwnerAddMember(ctx context.Context, c Caller, groupID, userID uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.requireOwner(ctx, tx, c, groupID); err != nil {
+			return err
+		}
+		if err := s.managedGuard(ctx, tx, c, groupID); err != nil {
+			return err
+		}
+		return s.addMember(ctx, tx, c, groupID, userID)
+	})
+}
+
+// OwnerRemoveMember removes a member, as the owner of a group.
+func (s *Service) OwnerRemoveMember(ctx context.Context, c Caller, groupID, userID uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.requireOwner(ctx, tx, c, groupID); err != nil {
+			return err
+		}
+		if err := s.managedGuard(ctx, tx, c, groupID); err != nil {
+			return err
+		}
+		return s.removeMember(ctx, tx, c, groupID, userID)
+	})
+}
+
 // GroupMember is a member of a group.
 type GroupMember struct {
 	ID          uuid.UUID `json:"id"`

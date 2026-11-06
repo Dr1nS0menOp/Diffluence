@@ -162,3 +162,9 @@ export function typeAheadRow(titles: string[], from: number, typed: string): num
   }
   return -1;
 }
+
+/** How many pages stand below a page, at any depth. */
+export function countBelow(nodes: { id: string; parent_id: string | null }[], id: string): number {
+  const children = nodes.filter((n) => n.parent_id === id);
+  return children.reduce((sum, child) => sum + 1 + countBelow(nodes, child.id), 0);
+}

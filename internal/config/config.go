@@ -11,6 +11,7 @@ import (
 	"net/netip"
 	"net/url"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -48,9 +49,11 @@ type Config struct {
 	TrustedProxies     []netip.Prefix
 	ShutdownDelay      time.Duration // time between "not ready" and closing connections
 	MasterKeyFile      string        // key-encryption key; empty = DATA_DIR/master.key
-	ExampleSpace       bool          // make the example space on a new instance
-	OIDC               OIDC
-	SMTP               SMTP
+	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
+	PasswordBlocklistFile string
+	ExampleSpace          bool // make the example space on a new instance
+	OIDC                  OIDC
+	SMTP                  SMTP
 }
 
 // The ways a connection to a mail server is encrypted.
@@ -84,6 +87,14 @@ type OIDC struct {
 // SecureCookies reports whether cookies must carry the Secure flag.
 func (c Config) SecureCookies() bool { return c.PublicURL.Scheme == "https" }
 
+// KeyFile is where the master key lives.
+func (c Config) KeyFile() string {
+	if c.MasterKeyFile != "" {
+		return c.MasterKeyFile
+	}
+	return filepath.Join(c.DataDir, "master.key")
+}
+
 // PublicOrigin returns scheme://host[:port] of the public URL.
 func (c Config) PublicOrigin() string { return c.PublicURL.Scheme + "://" + c.PublicURL.Host }
 
@@ -99,19 +110,20 @@ func FromEnvironment() (Config, error) { return Load(os.LookupEnv) }
 func Load(lookup LookupFunc) (Config, error) {
 	l := loader{lookup: lookup}
 	c := Config{
-		Role:               Role(l.str("ROLE", string(RoleAll))),
-		HTTPAddr:           l.str("HTTP_ADDR", ":8080"),
-		InstanceName:       l.str("INSTANCE_NAME", "Diffluence"),
-		DatabaseURL:        l.str("DATABASE_URL", ""),
-		MigrateDatabaseURL: l.str("MIGRATE_DATABASE_URL", ""),
-		NATSURL:            l.str("NATS_URL", ""),
-		DataDir:            l.str("DATA_DIR", "./data"),
-		MigrateOnStart:     l.boolean("MIGRATE_ON_START", true),
-		SessionIdleTimeout: l.duration("SESSION_IDLE_TIMEOUT", 8*time.Hour),
-		SessionMaxAge:      l.duration("SESSION_MAX_AGE", 7*24*time.Hour),
-		ShutdownDelay:      l.duration("SHUTDOWN_DELAY", 5*time.Second),
-		MasterKeyFile:      l.str("MASTER_KEY_FILE", ""),
-		ExampleSpace:       l.boolean("EXAMPLE_SPACE", true),
+		Role:                  Role(l.str("ROLE", string(RoleAll))),
+		HTTPAddr:              l.str("HTTP_ADDR", ":8080"),
+		InstanceName:          l.str("INSTANCE_NAME", "Diffluence"),
+		DatabaseURL:           l.str("DATABASE_URL", ""),
+		MigrateDatabaseURL:    l.str("MIGRATE_DATABASE_URL", ""),
+		NATSURL:               l.str("NATS_URL", ""),
+		DataDir:               l.str("DATA_DIR", "./data"),
+		MigrateOnStart:        l.boolean("MIGRATE_ON_START", true),
+		SessionIdleTimeout:    l.duration("SESSION_IDLE_TIMEOUT", 8*time.Hour),
+		SessionMaxAge:         l.duration("SESSION_MAX_AGE", 7*24*time.Hour),
+		ShutdownDelay:         l.duration("SHUTDOWN_DELAY", 5*time.Second),
+		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
+		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
+		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
 		OIDC: OIDC{
 			Issuer:       l.str("OIDC_ISSUER", ""),
 			ClientID:     l.str("OIDC_CLIENT_ID", ""),

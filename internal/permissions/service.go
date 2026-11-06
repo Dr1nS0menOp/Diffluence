@@ -25,15 +25,15 @@ func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 // LoadUser reads what evaluation needs to know about a user.
 func (s *Service) LoadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
 	u := UserFacts{ID: id}
-	var status string
-	err := q.QueryRow(ctx, "SELECT type, status FROM users WHERE id = $1", id).Scan(&u.Type, &status)
+	// An account past its end date is not active, from that moment on.
+	err := q.QueryRow(ctx, `SELECT type, status = 'active' AND (expires_at IS NULL OR expires_at > now())
+		FROM users WHERE id = $1`, id).Scan(&u.Type, &u.Active)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return u, nil // an unknown user is simply inactive
 	}
 	if err != nil {
 		return u, err
 	}
-	u.Active = status == "active"
 	rows, err := q.Query(ctx, "SELECT group_id FROM group_members WHERE user_id = $1", id)
 	if err != nil {
 		return u, err
@@ -179,6 +179,33 @@ func (s *Service) RequirePage(ctx context.Context, q db.Querier, userID, pageID 
 		return refusal(d, apperr.Denied{Action: action, ObjectType: "page", ObjectID: pageID.String()})
 	}
 	return nil
+}
+
+// CheckPerson decides whether a viewer may see a person. An unknown id is simply
+// someone they may not see.
+func (s *Service) CheckPerson(ctx context.Context, q db.Querier, viewerID, targetID uuid.UUID) (bool, error) {
+	viewer, err := s.LoadUser(ctx, q, viewerID)
+	if err != nil {
+		return false, err
+	}
+	target := PersonFacts{ID: targetID}
+	err = q.QueryRow(ctx, `SELECT t.type, EXISTS (
+			SELECT 1 FROM space_grants a
+			JOIN spaces sp ON sp.id = a.space_id AND sp.status <> 'trashed'
+			JOIN space_grants b ON b.space_id = a.space_id AND b.permission = 'space.view'
+			WHERE a.permission = 'space.view'
+			  AND ((a.subject_type = 'user' AND a.subject_id = $1)
+			    OR (a.subject_type = 'group' AND a.subject_id IN (SELECT group_id FROM group_members WHERE user_id = $1)))
+			  AND ((b.subject_type = 'user' AND b.subject_id = t.id)
+			    OR (b.subject_type = 'group' AND b.subject_id IN (SELECT group_id FROM group_members WHERE user_id = t.id))))
+		FROM users t WHERE t.id = $2`, viewerID, targetID).Scan(&target.Type, &target.SharedSpace)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return EvaluatePerson(viewer, target), nil
 }
 
 // Administrators names who holds administer in each space, directly or through a

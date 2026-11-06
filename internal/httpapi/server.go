@@ -9,13 +9,18 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/console"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
 	"github.com/diffluence/diffluence/internal/features"
@@ -25,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/mail"
 	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
@@ -48,6 +54,8 @@ type Deps struct {
 	Spaces      *spaces.Service
 	Pages       *pages.Service
 	Attachments *attachments.Service
+	People      *people.Service
+	Console     *console.Service
 	Search      *search.Service
 	Trash       *trash.Service
 	Settings    *settings.Service
@@ -68,6 +76,8 @@ type Deps struct {
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)
+	// CheckAudit verifies the audit chain and the signed checkpoints.
+	CheckAudit func(ctx context.Context) (audit.VerifyResult, error)
 
 	InstanceID uuid.UUID
 	Log        *slog.Logger
@@ -119,7 +129,8 @@ func New(d Deps) (*Server, error) {
 		withLogAndRecover(d.Log),
 		withSecurityHeaders(d.Config.SecureCookies()),
 		cop.Handler,
-		withSession(d.Identity, s.cookieName, d.Log),
+		s.withAuthentication,
+		s.withMaintenance,
 	)
 	return s, nil
 }
@@ -132,6 +143,44 @@ func (s *Server) Routes() []Route { return s.router.Routes() }
 
 // enforce wraps a handler with its access rule.
 func (s *Server) enforce(a Access, h http.Handler) http.Handler {
+	base := s.enforceKind(a, h)
+	if a.kind == accessPublic || a.kind == accessSCIM {
+		return base
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if p := PrincipalFrom(r.Context()); p != nil && !s.allowedByCredential(w, r, a, p) {
+			return
+		}
+		base.ServeHTTP(w, r)
+	})
+}
+
+// secondFactorRoutes stay open to a person who still has to set up a second factor.
+var secondFactorRoutes = []string{"/api/v1/me", "/api/v1/auth/"}
+
+// allowedByCredential checks what the kind of credential allows, before the rule
+// of the route. It answers the request when it refuses.
+func (s *Server) allowedByCredential(w http.ResponseWriter, r *http.Request, a Access, p *identity.Principal) bool {
+	switch {
+	case p.ViaToken && a.sessionOnly:
+		writeError(w, http.StatusForbidden, "session_only", "This needs a login in the browser, not a token.")
+	case p.ViaToken && !p.CanWrite && !isRead(r):
+		writeError(w, http.StatusForbidden, "token_read_only", "This token can only read.")
+	case p.NeedsSecondFactor && !slices.ContainsFunc(secondFactorRoutes, func(prefix string) bool { return strings.HasPrefix(r.URL.Path, prefix) }):
+		writeError(w, http.StatusForbidden, "second_factor_required", "Set up a second factor first.")
+	case a.sensitive && time.Since(p.ConfirmedAt) > identity.ReauthWindow:
+		writeError(w, http.StatusForbidden, "reauth_required", "Confirm who you are to do this.")
+	default:
+		return true
+	}
+	return false
+}
+
+func isRead(r *http.Request) bool {
+	return r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions
+}
+
+func (s *Server) enforceKind(a Access, h http.Handler) http.Handler {
 	switch a.kind {
 	case accessPublic:
 		return h

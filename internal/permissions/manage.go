@@ -22,6 +22,7 @@ import (
 const (
 	TemplateViewer     = "viewer"
 	TemplateEditor     = "editor"
+	TemplateManager    = "manager"
 	TemplateSpaceAdmin = "space_admin"
 )
 
@@ -30,6 +31,10 @@ var Templates = map[string][]string{
 	TemplateViewer: {SpaceView, SpaceExport, CommentAdd, CommentDeleteOwn},
 	TemplateEditor: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn,
 		CommentAdd, CommentDeleteOwn, AttachmentAdd, AttachmentDeleteOwn},
+	// Manager runs the people and the content of a space, but not the space itself.
+	TemplateManager: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn, PageDeleteAny,
+		CommentAdd, CommentDeleteOwn, CommentDeleteAny, AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
+		RestrictionManage, SpaceManageAccess},
 	TemplateSpaceAdmin: AllSpacePermissions,
 }
 
@@ -68,9 +73,9 @@ type GrantEntry struct {
 	Permissions []string `json:"permissions"`
 }
 
-// Grants lists who holds what in a space. Space admins only.
+// Grants lists who holds what in a space, for those who manage access.
 func (s *Service) Grants(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]GrantEntry, error) {
-	if err := s.RequireSpace(ctx, s.pool, c.UserID, spaceID, SpaceAdminister); err != nil {
+	if err := s.RequireSpace(ctx, s.pool, c.UserID, spaceID, SpaceManageAccess); err != nil {
 		return nil, err
 	}
 	return s.grants(ctx, s.pool, spaceID)
@@ -152,7 +157,7 @@ func (s *Service) SetGrants(ctx context.Context, c identity.Caller, spaceID uuid
 		}
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceAdminister); err != nil {
+		if err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceManageAccess); err != nil {
 			return err
 		}
 		if err := s.subjectExists(ctx, tx, sub); err != nil {
@@ -165,6 +170,9 @@ func (s *Service) SetGrants(ctx context.Context, c identity.Caller, spaceID uuid
 		}
 		before, err := pgx.CollectRows(rows, pgx.RowTo[string])
 		if err != nil {
+			return err
+		}
+		if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, perms); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM space_grants WHERE space_id = $1 AND subject_type = $2 AND subject_id = $3",
@@ -194,6 +202,31 @@ func (s *Service) SetGrants(ctx context.Context, c identity.Caller, spaceID uuid
 		}
 		return nil
 	})
+}
+
+// mayChangeSubject holds the limits of managing access. Someone who only manages
+// access cannot reach administer, or Manager would be administrator with one extra
+// step. The owner of a personal space keeps their direct grant.
+func (s *Service) mayChangeSubject(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, sub Subject, before, after []string) error {
+	d, err := s.CheckSpace(ctx, tx, c.UserID, spaceID, SpaceAdminister)
+	if err != nil {
+		return err
+	}
+	touchesAdminister := slices.Contains(before, SpaceAdminister) || slices.Contains(after, SpaceAdminister)
+	if !d.Allowed && touchesAdminister {
+		return apperr.Conflict("needs_administer", "Only a space administrator can change an administrator.")
+	}
+	var owner *uuid.UUID
+	if err := tx.QueryRow(ctx, "SELECT owner_id FROM spaces WHERE id = $1 AND kind = 'personal'", spaceID).Scan(&owner); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil
+		}
+		return err
+	}
+	if owner != nil && sub.Type == SubjectUser && sub.ID == *owner && !slices.Contains(after, SpaceAdminister) {
+		return apperr.Conflict("owner_grant", "The owner of a personal space keeps their access.")
+	}
+	return nil
 }
 
 // ApplyPreset sets up a space with one of the whole-space presets. It keeps
@@ -395,6 +428,9 @@ func (s *Service) SetRestrictions(ctx context.Context, c identity.Caller, pageID
 		if err != nil {
 			return err
 		}
+		if subjects, err = s.withCaller(ctx, tx, c, subjects); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, "DELETE FROM page_restrictions WHERE page_id = $1 AND kind = $2", pageID, kind); err != nil {
 			return err
 		}
@@ -419,6 +455,22 @@ func (s *Service) SetRestrictions(ctx context.Context, c identity.Caller, pageID
 		}
 		return recordChange(ctx, tx, c, action, "page", pageID.String(), spaceID, map[string]any{"kind": kind, "subjects": strings.Join(names, ",")})
 	})
+}
+
+// withCaller adds the person who sets a restriction, unless a group already covers
+// them, so nobody locks themselves out by forgetting their own name (ACC-065).
+func (s *Service) withCaller(ctx context.Context, q db.Querier, c identity.Caller, subjects []Subject) ([]Subject, error) {
+	if len(subjects) == 0 {
+		return subjects, nil
+	}
+	u, err := s.LoadUser(ctx, q, c.UserID)
+	if err != nil {
+		return nil, err
+	}
+	if u.matchesAny(subjects) {
+		return subjects, nil
+	}
+	return append(subjects, Subject{Type: SubjectUser, ID: c.UserID}), nil
 }
 
 // Explanation is the answer to "why can or can't this user?".

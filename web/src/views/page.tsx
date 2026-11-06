@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useDates } from '../dates';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EditorView } from '@tiptap/pm/view';
 import { api, type CommentAnchor, type NotificationSettings, type PageDetail, type Space } from '../api';
@@ -57,7 +58,7 @@ import { ChildPages, DetailsPanel } from '../components/page-details';
 import { ShareDialog } from '../components/share-dialog';
 import { useShortcut } from '../components/shortcuts';
 import { useToast } from '../components/toast';
-import { Avatar, ErrorNote, formatDay, Loading } from '../components/ui';
+import { Avatar, ErrorNote, Loading } from '../components/ui';
 import { Lightbox, Presentation, type ShownImage } from '../components/viewers';
 import { useDocumentTitle, useScrollMemory } from '../page-title';
 import { CopyDialog, MoveDialog } from './move-dialogs';
@@ -154,6 +155,7 @@ function Byline({
   onComments: () => void;
 }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const author = page.owner_name || page.created_by_name || t('common.unknown');
   const minutes = useMemo(() => readingMinutes(countWords(page.document)), [page.document]);
   return (
@@ -164,7 +166,7 @@ function Byline({
       </button>
       {page.owner_disabled && <span className="muted">{t('content.noLongerActive')}</span>}
       <span aria-hidden="true">·</span>
-      <span data-testid="last-updated">{t('page.lastUpdated', { date: formatDay(page.updated_at) })}</span>
+      <span data-testid="last-updated">{t('page.lastUpdated', { date: dates.day(page.updated_at) })}</span>
       {page.current_version > 0 && (
         <>
           <span aria-hidden="true">·</span>

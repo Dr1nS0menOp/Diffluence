@@ -6,6 +6,7 @@ import {
   api,
   GLOBAL_PERMISSIONS,
   type AuditEvent,
+  type DirectoryEntry,
   type Group,
   type MailEntry,
   type Me,
@@ -13,24 +14,61 @@ import {
   type TrashItem,
   type UserDetail,
 } from '../api';
-import { Link, navigate } from '../router';
+import { Link, navigate, useLocation } from '../router';
+import { PersonName } from '../components/person';
 import { SubjectPicker } from '../components/picker';
-import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
+import { useDates } from '../dates';
 import { AppearanceSection } from './admin-appearance';
 import { OrganisingTab, TemplatesTab } from './admin-organising';
+import { CareTab } from './admin-care';
+import { LookTab } from './admin-look';
+import {
+  AnonymiseButton,
+  BulkBar,
+  ExpiryField,
+  InvitationsTab,
+  ServiceAccounts,
+  TypeChange,
+} from './admin-people';
+import { PermissionsTab, RulesTab } from './admin-rules';
+import { SettingsSearch, SummaryTab } from './admin-summary';
 
 const TABS = [
+  'summary',
   'users',
+  'invitations',
   'groups',
   'spaces',
   'templates',
   'organising',
   'audit',
+  'permissions',
+  'rules',
+  'look',
   'settings',
   'mail',
+  'care',
   'scim',
   'system',
 ] as const;
+const USER_FILTERS = ['type', 'status', 'source', 'group_id', 'idle_days'] as const;
+const USER_TYPES = ['member', 'guest'];
+const USER_STATUSES = ['active', 'disabled'];
+const USER_SOURCES = ['local', 'oidc', 'scim'];
+const IDLE_DAYS = [30, 90, 365];
+const AUDIT_FILTERS = [
+  'actor_id',
+  'action',
+  'object_type',
+  'object_id',
+  'space_id',
+  'result',
+  'since',
+  'until',
+] as const;
+const SYSTEM_POLL_MS = 10_000;
+const DATE_LENGTH = 10;
 const MAIL_SWITCHES = ['mail_enabled', 'mail_excerpts', 'reactions_enabled', 'group_mentions'] as const;
 
 function GlobalPermissions({ current, onChange }: { current: string[]; onChange: (next: string[]) => void }) {
@@ -58,6 +96,10 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
   const [perms, setPerms] = useState(user.global_permissions);
   const [password, setPassword] = useState('');
   const refresh = () => client.invalidateQueries({ queryKey: ['admin-users'] });
+  const finish = async () => {
+    await refresh();
+    onClose();
+  };
   const act = useMutation({
     mutationFn: (path: string) => api.post(`/admin/users/${user.id}/${path}`),
     onSuccess: async () => {
@@ -101,7 +143,10 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
             {t('admin.resetMfa')}
           </button>
         )}
+        <TypeChange user={user} onDone={() => void finish()} />
+        <AnonymiseButton user={user} onDone={() => void finish()} />
       </div>
+      <ExpiryField user={user} onDone={() => void finish()} />
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
@@ -184,17 +229,174 @@ function NewUserDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
+/** Filters that live in the address, so a view can be shared and survives a reload. */
+function useAddressFilters<K extends string>(path: string, keys: readonly K[]) {
+  const { searchParams } = useLocation();
+  const values = Object.fromEntries(keys.map((k) => [k, searchParams.get(k) ?? ''])) as Record<K, string>;
+  const set = (key: K, value: string) => {
+    const next = new URLSearchParams();
+    for (const k of keys) {
+      const v = k === key ? value : values[k];
+      if (v) next.set(k, v);
+    }
+    const query = next.toString();
+    navigate(query ? `${path}?${query}` : path, true);
+  };
+  return { values, set };
+}
+
+function FilterSelect({
+  label,
+  value,
+  options,
+  name,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  options: (string | number)[];
+  name: (option: string | number) => string;
+  onChange: (next: string) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <select aria-label={label} value={value} onChange={(e) => onChange(e.target.value)}>
+      <option value="">{`${label}: ${t('admin.any')}`}</option>
+      {options.map((o) => (
+        <option key={o} value={o}>
+          {name(o)}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+function UserFilters({
+  values,
+  set,
+}: {
+  values: Record<(typeof USER_FILTERS)[number], string>;
+  set: (key: (typeof USER_FILTERS)[number], value: string) => void;
+}) {
+  const { t } = useTranslation();
+  const groups = useQuery({
+    queryKey: ['admin-groups'],
+    queryFn: () => api.get<{ groups: Group[] }>('/admin/groups'),
+  });
+  return (
+    <div className="row filters">
+      <FilterSelect
+        label={t('common.type')}
+        value={values.type}
+        options={USER_TYPES}
+        name={(o) => t(`admin.${o}`)}
+        onChange={(v) => set('type', v)}
+      />
+      <FilterSelect
+        label={t('common.status')}
+        value={values.status}
+        options={USER_STATUSES}
+        name={(o) => t(`admin.${o}`)}
+        onChange={(v) => set('status', v)}
+      />
+      <FilterSelect
+        label={t('admin.source')}
+        value={values.source}
+        options={USER_SOURCES}
+        name={String}
+        onChange={(v) => set('source', v)}
+      />
+      <FilterSelect
+        label={t('admin.groups')}
+        value={values.group_id}
+        options={groups.data?.groups.map((g) => g.id) ?? []}
+        name={(o) => groups.data?.groups.find((g) => g.id === o)?.name ?? ''}
+        onChange={(v) => set('group_id', v)}
+      />
+      <FilterSelect
+        label={t('admin.lastLogin')}
+        value={values.idle_days}
+        options={IDLE_DAYS}
+        name={(o) => t('admin.idleDays', { count: Number(o) })}
+        onChange={(v) => set('idle_days', v)}
+      />
+    </div>
+  );
+}
+
+function UserTable({
+  users,
+  picked,
+  onToggle,
+  onOpen,
+}: {
+  users: UserDetail[];
+  picked: string[];
+  onToggle: (id: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  return (
+    <table>
+      <thead>
+        <tr>
+          <th>
+            <span className="visually-hidden">{t('admin.select')}</span>
+          </th>
+          <th>{t('common.name')}</th>
+          <th>{t('common.email')}</th>
+          <th>{t('common.type')}</th>
+          <th>{t('admin.source')}</th>
+          <th>{t('common.status')}</th>
+          <th>{t('admin.lastLogin')}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {users.map((u) => (
+          <tr key={u.id}>
+            <td>
+              <input
+                type="checkbox"
+                aria-label={t('admin.selectUser', { name: u.display_name })}
+                checked={picked.includes(u.id)}
+                onChange={() => onToggle(u.id)}
+              />
+            </td>
+            <td>
+              <button type="button" className="ghost" onClick={() => onOpen(u.id)}>
+                {u.display_name}
+              </button>
+            </td>
+            <td>{u.email}</td>
+            <td>{u.type}</td>
+            <td>{u.source}</td>
+            <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
+            <td>{dates.moment(u.last_login_at)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function UsersTab() {
   const { t } = useTranslation();
+  const client = useQueryClient();
+  const { values, set } = useAddressFilters('/admin/users', USER_FILTERS);
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const [picked, setPicked] = useState<string[]>([]);
+  const query = new URLSearchParams({ q: text });
+  for (const key of USER_FILTERS) if (values[key]) query.set(key, values[key]);
   const q = useQuery({
-    queryKey: ['admin-users', text],
-    queryFn: () =>
-      api.get<{ users: UserDetail[]; total: number }>('/admin/users?q=' + encodeURIComponent(text)),
+    queryKey: ['admin-users', query.toString()],
+    queryFn: () => api.get<{ users: UserDetail[]; total: number }>(`/admin/users?${query.toString()}`),
   });
   const selected = q.data?.users.find((u) => u.id === open);
+  const toggle = (id: string) =>
+    setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
   return (
     <>
       <div className="row">
@@ -209,36 +411,69 @@ function UsersTab() {
           {t('admin.newUser')}
         </button>
       </div>
+      <UserFilters values={values} set={set} />
       <ErrorNote error={q.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('common.email')}</th>
-            <th>{t('common.type')}</th>
-            <th>{t('admin.source')}</th>
-            <th>{t('common.status')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.users.map((u) => (
-            <tr key={u.id}>
-              <td>
-                <button type="button" className="ghost" onClick={() => setOpen(u.id)}>
-                  {u.display_name}
-                </button>
-              </td>
-              <td>{u.email}</td>
-              <td>{u.type}</td>
-              <td>{u.source}</td>
-              <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {picked.length > 0 && (
+        <BulkBar
+          users={picked}
+          onDone={() => {
+            setPicked([]);
+            void client.invalidateQueries({ queryKey: ['admin-users'] });
+          }}
+        />
+      )}
+      <UserTable users={q.data?.users ?? []} picked={picked} onToggle={toggle} onOpen={setOpen} />
+      <ServiceAccounts />
       {adding && <NewUserDialog onClose={() => setAdding(false)} />}
       {selected && <UserDialog user={selected} onClose={() => setOpen(null)} />}
     </>
+  );
+}
+
+/** Says which spaces and restrictions use a group, before it goes (spec 013, F8). */
+function GroupDeleteDialog({
+  group,
+  onDelete,
+  onClose,
+}: {
+  group: Group;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['group-impact', group.id],
+    queryFn: () =>
+      api.get<{ spaces: string[]; restrictions: number; leaves_space_without_admin: boolean }>(
+        `/admin/groups/${group.id}/impact`,
+      ),
+  });
+  return (
+    <Dialog title={t('admin.groupDelete', { name: group.name })} onClose={onClose}>
+      <ErrorNote error={q.error} />
+      {q.data && (
+        <>
+          <p>{t('admin.groupSpaces', { list: q.data.spaces.join(', ') || '-' })}</p>
+          <p>{t('admin.groupRestrictions', { count: q.data.restrictions })}</p>
+          {q.data.leaves_space_without_admin && (
+            <p className="note note-error">{t('admin.groupLastAdmin')}</p>
+          )}
+        </>
+      )}
+      <div className="dialog-actions">
+        <button
+          type="button"
+          className="danger"
+          disabled={!q.data || q.data.leaves_space_without_admin}
+          onClick={() => {
+            onClose();
+            onDelete();
+          }}
+        >
+          {t('common.delete')}
+        </button>
+      </div>
+    </Dialog>
   );
 }
 
@@ -277,11 +512,22 @@ function GroupDialog({ group, onClose }: { group: Group; onClose: () => void }) 
       onClose();
     },
   });
+  const [owners, setOwners] = useState<DirectoryEntry[]>([]);
+  const saveOwners = useMutation({
+    mutationFn: (next: DirectoryEntry[]) =>
+      api.put(`/admin/groups/${group.id}/owners`, { owners: next.map((o) => o.id) }),
+  });
+  const pickOwner = (entry: DirectoryEntry) => {
+    const next = [...owners, entry];
+    setOwners(next);
+    saveOwners.mutate(next);
+  };
+  const [deleting, setDeleting] = useState(false);
   const managed = group.source !== 'local';
   return (
     <Dialog title={group.name} onClose={onClose}>
       {managed && <p className="note">{t('admin.managed')}</p>}
-      <ErrorNote error={add.error ?? remove.error ?? save.error ?? del.error} />
+      <ErrorNote error={add.error ?? remove.error ?? save.error ?? del.error ?? saveOwners.error} />
       <h3>{t('admin.members')}</h3>
       <ul className="plain-list">
         {q.data?.members.map((m) => (
@@ -296,6 +542,14 @@ function GroupDialog({ group, onClose }: { group: Group; onClose: () => void }) 
         ))}
       </ul>
       {!managed && <SubjectPicker label={t('admin.addMember')} usersOnly onPick={(e) => add.mutate(e.id)} />}
+      <h3>{t('admin.groupOwners')}</h3>
+      <p className="muted">{t('admin.groupOwnersHelp')}</p>
+      <ul className="plain-list">
+        {owners.map((o) => (
+          <li key={o.id}>{o.name}</li>
+        ))}
+      </ul>
+      <SubjectPicker label={t('admin.addOwner')} usersOnly onPick={pickOwner} />
       <GlobalPermissions
         current={perms}
         onChange={(next) => {
@@ -304,9 +558,12 @@ function GroupDialog({ group, onClose }: { group: Group; onClose: () => void }) 
         }}
       />
       {!managed && (
-        <button type="button" className="danger" onClick={() => del.mutate()}>
+        <button type="button" className="danger" onClick={() => setDeleting(true)}>
           {t('common.delete')}
         </button>
+      )}
+      {deleting && (
+        <GroupDeleteDialog group={group} onDelete={() => del.mutate()} onClose={() => setDeleting(false)} />
       )}
     </Dialog>
   );
@@ -379,6 +636,7 @@ function GroupsTab() {
 
 function SpacesTab() {
   const { t } = useTranslation();
+  const dates = useDates();
   const client = useQueryClient();
   const q = useQuery({
     queryKey: ['admin-spaces'],
@@ -442,7 +700,7 @@ function SpacesTab() {
           <ul className="plain-list">
             {trashed.data?.items.map((i) => (
               <li key={i.id} className="row">
-                {i.title} <span className="muted">{formatDate(i.purge_after)}</span>
+                {i.title} <span className="muted">{dates.moment(i.purge_after)}</span>
                 <button type="button" onClick={() => restore.mutate(i.id)}>
                   {t('trash.restore')}
                 </button>
@@ -482,15 +740,57 @@ function SpacesTab() {
   );
 }
 
+/** A page in the log, by its id. A title the reader may not see comes censored. */
+function auditObject(e: AuditEvent): string {
+  const title = e.details?.title;
+  return [e.object_id, typeof title === 'string' ? title : ''].filter(Boolean).join(' ');
+}
+
+interface PageNote {
+  id: string;
+  title: string;
+  space_key: string;
+  space_name: string;
+  status: string;
+  restricted: boolean;
+  readable: boolean;
+}
+
+/** What an administrator may know of a page from the log (ADR-029). */
+function PageNoteFacts({ id }: { id: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['page-note', id],
+    queryFn: () => api.get<PageNote>(`/admin/pages/${id}`),
+    retry: false,
+  });
+  if (q.error) return <p className="muted">{t('admin.pageGone')}</p>;
+  if (!q.data) return <Loading />;
+  const note = q.data;
+  return (
+    <dl className="facts">
+      <dt>{t('page.title')}</dt>
+      <dd>{note.readable ? <Link href={`/pages/${id}`}>{note.title}</Link> : note.title}</dd>
+      <dt>{t('admin.spaces')}</dt>
+      <dd>{note.space_name}</dd>
+      <dt>{t('common.status')}</dt>
+      <dd>{note.status}</dd>
+      <dt>{t('page.restrictions')}</dt>
+      <dd>{note.restricted ? t('common.yes') : t('common.no')}</dd>
+    </dl>
+  );
+}
+
 function AuditTab() {
   const { t } = useTranslation();
-  const [action, setAction] = useState('');
+  const dates = useDates();
+  const { values, set } = useAddressFilters('/admin/audit', AUDIT_FILTERS);
+  const [open, setOpen] = useState<AuditEvent | null>(null);
+  const query = new URLSearchParams({ limit: '100' });
+  for (const key of AUDIT_FILTERS) if (values[key]) query.set(key, values[key]);
   const q = useQuery({
-    queryKey: ['audit', action],
-    queryFn: () =>
-      api.get<{ events: AuditEvent[] }>(
-        '/admin/audit-events?limit=100' + (action ? '&action=' + encodeURIComponent(action) : ''),
-      ),
+    queryKey: ['audit', query.toString()],
+    queryFn: () => api.get<{ events: AuditEvent[] }>(`/admin/audit-events?${query.toString()}`),
   });
   const verify = useMutation({
     mutationFn: () =>
@@ -502,11 +802,56 @@ function AuditTab() {
     <>
       <div className="row">
         <input
-          value={action}
-          onChange={(e) => setAction(e.target.value)}
+          value={values.action}
+          onChange={(e) => set('action', e.target.value)}
           aria-label={t('admin.filterAction')}
           placeholder={t('admin.filterAction')}
         />
+        <input
+          value={values.object_type}
+          onChange={(e) => set('object_type', e.target.value)}
+          aria-label={t('admin.filterObject')}
+          placeholder={t('admin.filterObject')}
+        />
+        <input
+          value={values.object_id}
+          onChange={(e) => set('object_id', e.target.value)}
+          aria-label={t('admin.filterObjectId')}
+          placeholder={t('admin.filterObjectId')}
+        />
+        <input
+          value={values.actor_id}
+          onChange={(e) => set('actor_id', e.target.value)}
+          aria-label={t('admin.filterActor')}
+          placeholder={t('admin.filterActor')}
+        />
+        <input
+          value={values.space_id}
+          onChange={(e) => set('space_id', e.target.value)}
+          aria-label={t('admin.filterSpace')}
+          placeholder={t('admin.filterSpace')}
+        />
+        <FilterSelect
+          label={t('admin.result')}
+          value={values.result}
+          options={['success', 'denied', 'failure']}
+          name={String}
+          onChange={(v) => set('result', v)}
+        />
+        <Field label={t('admin.since')}>
+          <input
+            type="date"
+            value={values.since.slice(0, DATE_LENGTH)}
+            onChange={(e) => set('since', e.target.value ? new Date(e.target.value).toISOString() : '')}
+          />
+        </Field>
+        <Field label={t('admin.until')}>
+          <input
+            type="date"
+            value={values.until.slice(0, DATE_LENGTH)}
+            onChange={(e) => set('until', e.target.value ? new Date(e.target.value).toISOString() : '')}
+          />
+        </Field>
         <a className="button" href="/api/v1/admin/audit-events/export">
           {t('admin.exportCsv')}
         </a>
@@ -536,16 +881,31 @@ function AuditTab() {
         <tbody>
           {q.data?.events.map((e) => (
             <tr key={e.seq}>
-              <td>{formatDate(e.occurred_at)}</td>
-              <td>{e.actor_id || e.actor_type}</td>
+              <td>
+                <button type="button" className="ghost" onClick={() => setOpen(e)}>
+                  {dates.moment(e.occurred_at)}
+                </button>
+              </td>
+              <td>{e.actor_id ? <PersonName id={e.actor_id} name={e.actor_id} /> : e.actor_type}</td>
               <td>{e.action}</td>
-              <td>{e.object_type}</td>
+              <td>
+                {e.object_type} <span className="muted">{auditObject(e)}</span>
+              </td>
               <td>{e.result}</td>
               <td>{e.ip}</td>
             </tr>
           ))}
         </tbody>
       </table>
+      {open && (
+        <Dialog title={open.action} onClose={() => setOpen(null)}>
+          {open.object_type === 'page' && open.object_id && <PageNoteFacts id={open.object_id} />}
+          {/* Focusable, so the keyboard can scroll it (WCAG 2.1.1). */}
+          <pre className="audit-details" tabIndex={0}>
+            {JSON.stringify(open, null, 2)}
+          </pre>
+        </Dialog>
+      )}
     </>
   );
 }
@@ -644,6 +1004,7 @@ type MailSettings = Record<(typeof MAIL_SWITCHES)[number], boolean>;
 
 function MailQueue({ entries }: { entries: MailEntry[] }) {
   const { t } = useTranslation();
+  const dates = useDates();
   if (entries.length === 0) return <p className="muted">{t('admin.mailEmpty')}</p>;
   return (
     <table>
@@ -659,7 +1020,7 @@ function MailQueue({ entries }: { entries: MailEntry[] }) {
       <tbody>
         {entries.map((m) => (
           <tr key={m.id}>
-            <td>{formatDate(m.created_at)}</td>
+            <td>{dates.moment(m.created_at)}</td>
             <td>{m.kind}</td>
             <td>{m.status}</td>
             <td>{m.attempts}</td>
@@ -724,6 +1085,7 @@ function MailTab() {
 interface ScimToken {
   id: string;
   name: string;
+  expires_at: string;
   created_at: string;
   last_used_at: string | null;
   revoked_at: string | null;
@@ -731,8 +1093,10 @@ interface ScimToken {
 
 function ScimTab() {
   const { t } = useTranslation();
+  const dates = useDates();
   const client = useQueryClient();
   const [name, setName] = useState('');
+  const [until, setUntil] = useState('');
   const [secret, setSecret] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['scim-tokens'],
@@ -740,10 +1104,22 @@ function ScimTab() {
   });
   const refresh = () => client.invalidateQueries({ queryKey: ['scim-tokens'] });
   const create = useMutation({
-    mutationFn: () => api.post<{ secret: string }>('/admin/scim-tokens', { name }),
+    mutationFn: () =>
+      api.post<{ secret: string }>('/admin/scim-tokens', {
+        name,
+        expires_at: until ? new Date(until).toISOString() : undefined,
+      }),
     onSuccess: async (r) => {
       setSecret(r.secret);
       setName('');
+      setUntil('');
+      await refresh();
+    },
+  });
+  const rotate = useMutation({
+    mutationFn: (id: string) => api.post<{ secret: string }>(`/admin/scim-tokens/${id}/rotate`),
+    onSuccess: async (r) => {
+      setSecret(r.secret);
       await refresh();
     },
   });
@@ -770,16 +1146,25 @@ function ScimTab() {
           placeholder={t('admin.tokenName')}
           required
         />
+        <input
+          type="date"
+          value={until}
+          aria-label={t('admin.tokenEnds')}
+          title={t('admin.tokenEndsHelp')}
+          onChange={(e) => setUntil(e.target.value)}
+        />
         <button type="submit" className="primary">
           {t('admin.newToken')}
         </button>
       </form>
-      <ErrorNote error={q.error ?? create.error ?? revoke.error} />
+      <p className="muted">{t('admin.tokenEndsHelp')}</p>
+      <ErrorNote error={q.error ?? create.error ?? revoke.error ?? rotate.error} />
       <table>
         <thead>
           <tr>
             <th>{t('common.name')}</th>
             <th>{t('admin.created')}</th>
+            <th>{t('admin.tokenEnds')}</th>
             <th>{t('admin.lastUsed')}</th>
             <th>{t('common.actions')}</th>
           </tr>
@@ -788,15 +1173,21 @@ function ScimTab() {
           {q.data?.tokens.map((k) => (
             <tr key={k.id}>
               <td>{k.name}</td>
-              <td>{formatDate(k.created_at)}</td>
-              <td>{formatDate(k.last_used_at)}</td>
-              <td>
+              <td>{dates.moment(k.created_at)}</td>
+              <td>{dates.day(k.expires_at)}</td>
+              <td>{dates.moment(k.last_used_at)}</td>
+              <td className="row">
                 {k.revoked_at ? (
                   t('admin.revoked')
                 ) : (
-                  <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
-                    {t('admin.revoke')}
-                  </button>
+                  <>
+                    <button type="button" className="ghost" onClick={() => rotate.mutate(k.id)}>
+                      {t('admin.rotate')}
+                    </button>
+                    <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
+                      {t('admin.revoke')}
+                    </button>
+                  </>
                 )}
               </td>
             </tr>
@@ -806,6 +1197,7 @@ function ScimTab() {
       {secret && (
         <Dialog title={t('admin.newToken')} onClose={() => setSecret(null)}>
           <p>{t('admin.tokenHelp')}</p>
+          <p className="muted">{t('admin.rotateHelp')}</p>
           <code className="secret">{secret}</code>
         </Dialog>
       )}
@@ -829,10 +1221,11 @@ interface System {
 
 function SystemTab() {
   const { t } = useTranslation();
+  const dates = useDates();
   const q = useQuery({
     queryKey: ['system'],
-    queryFn: () => api.get<System>('/admin/system'),
-    refetchInterval: 10_000,
+    queryFn: () => api.poll<System>('/admin/system'),
+    refetchInterval: SYSTEM_POLL_MS,
   });
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
@@ -877,7 +1270,7 @@ function SystemTab() {
             <tr key={n.id}>
               <td>{n.role}</td>
               <td>{n.version}</td>
-              <td>{formatDate(n.last_seen_at)}</td>
+              <td>{dates.moment(n.last_seen_at)}</td>
               <td>{n.live ? t('admin.live') : t('admin.gone')}</td>
             </tr>
           ))}
@@ -899,6 +1292,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
   return (
     <div className="split">
       <aside className="sidebar">
+        <SettingsSearch />
         <nav aria-label={t('admin.title')}>
           {TABS.map((name) => (
             <Link
@@ -915,7 +1309,13 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       <main id="main" className="content">
         <div className="column wide">
           <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
+          {tab === 'summary' && <SummaryTab />}
           {tab === 'users' && <UsersTab />}
+          {tab === 'invitations' && <InvitationsTab />}
+          {tab === 'permissions' && <PermissionsTab />}
+          {tab === 'rules' && <RulesTab />}
+          {tab === 'look' && <LookTab />}
+          {tab === 'care' && <CareTab me={me} />}
           {tab === 'groups' && <GroupsTab />}
           {tab === 'spaces' && <SpacesTab />}
           {tab === 'templates' && <TemplatesTab />}

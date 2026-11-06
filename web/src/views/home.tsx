@@ -14,6 +14,7 @@ import {
 } from '../api';
 import { Link, useLocation } from '../router';
 import { NewSpaceDialog } from '../components/create';
+import { FirstUseCard, WelcomePage } from '../components/first-use';
 import { DocumentView } from '../components/editor/editor';
 import { IconPlus } from '../components/icons';
 import { PageMark } from '../components/topbar';
@@ -203,6 +204,8 @@ export function HomeView({ me }: { me: Me }) {
   return (
     <>
       <h1 className="greeting">{t('home.welcome', { name: me.user.display_name })}</h1>
+      <WelcomePage />
+      <FirstUseCard />
       <div className="section-head">
         <h2>{t('home.spaces')}</h2>
         {me.global_permissions.includes('create_space') && (

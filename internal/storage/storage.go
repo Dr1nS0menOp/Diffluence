@@ -10,10 +10,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 )
@@ -45,7 +47,16 @@ type Store interface {
 	Put(ctx context.Context, key string, r io.Reader, maxBytes int64) (Object, error)
 	Open(ctx context.Context, key string) (io.ReadSeekCloser, error)
 	Delete(ctx context.Context, key string) error
+	// List names every stored object, for finding what nothing points at.
+	List(ctx context.Context) ([]Listed, error)
 	Healthy(ctx context.Context) error
+}
+
+// Listed is one stored object.
+type Listed struct {
+	Key      string
+	Size     int64
+	Modified time.Time
 }
 
 var keyPattern = regexp.MustCompile(`^[a-z0-9-]+(/[a-z0-9-]+)*$`)
@@ -143,6 +154,33 @@ func (d *Disk) Delete(_ context.Context, key string) error {
 		return err
 	}
 	return nil
+}
+
+// List walks the root. Temporary files of uploads under way are left out.
+func (d *Disk) List(ctx context.Context) ([]Listed, error) {
+	out := []Listed{}
+	err := filepath.WalkDir(d.root, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+		if entry.IsDir() || strings.HasPrefix(entry.Name(), ".") {
+			return nil
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(d.root, path)
+		if err != nil {
+			return err
+		}
+		out = append(out, Listed{Key: filepath.ToSlash(rel), Size: info.Size(), Modified: info.ModTime()})
+		return nil
+	})
+	return out, err
 }
 
 // Healthy checks that the store accepts writes.

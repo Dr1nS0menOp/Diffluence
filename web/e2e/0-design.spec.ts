@@ -514,9 +514,181 @@ test.describe('the look of every kind of screen', () => {
   test('ProfileView: your account', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/me');
-    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible();
-    await picture(page, 'profile', [page.locator('table')]);
+    await expect(page.getByRole('heading', { name: 'About you' })).toBeVisible();
+    await picture(page, 'profile');
     await page.context().close();
+  });
+
+  test('SecurityView: how you sign in', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/me/security');
+    await expect(page.getByRole('heading', { name: 'Change password' })).toBeVisible();
+    await picture(page, 'security', [page.locator('table')]);
+    await page.context().close();
+  });
+
+  test('TokensView: personal tokens', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/me/tokens');
+    await expect(page.getByRole('heading', { name: 'New token' })).toBeVisible();
+    await picture(page, 'tokens', [page.getByLabel('Expires')]);
+    await page.context().close();
+  });
+
+  test('PersonalDataView: your data', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/me/data');
+    await expect(page.getByRole('heading', { name: 'Ask for removal' })).toBeVisible();
+    await picture(page, 'personal-data');
+    await page.context().close();
+  });
+
+  test('PeopleView: the directory', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/people');
+    await expect(page.getByRole('link', { name: READER.name })).toBeVisible();
+    await picture(page, 'people');
+    await page.context().close();
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`PersonView: a profile, ${colorScheme}`, async ({ browser }) => {
+      const page = await newReaderPage(browser, colorScheme);
+      const me = (await (await page.request.get('/api/v1/me')).json()) as { user: { id: string } };
+      await page.request.put('/api/v1/me/profile', {
+        data: {
+          job_title: 'Site reliability engineer',
+          department: 'Platform',
+          location: 'Utrecht',
+          about: 'Keeps the lights on, and writes things down.',
+          visibility: {},
+        },
+      });
+      await page.goto(`/people/${me.user.id}`);
+      await expect(page.getByRole('heading', { name: READER.name, level: 1 })).toBeVisible();
+      await picture(page, `person-${colorScheme}`);
+      await page.context().close();
+    });
+  }
+
+  test('GroupView: the screen of a group owner', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const me = (await (await page.request.get('/api/v1/me')).json()) as { user: { id: string } };
+    const admin = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(admin, ADMIN.email, ADMIN.password);
+    const made = await admin.request.post('/api/v1/admin/groups', { data: { name: 'Platform team' } });
+    expect(made.status(), await made.text()).toBe(201);
+    const group = (await made.json()) as { id: string };
+    await admin.request.put(`/api/v1/admin/groups/${group.id}/owners`, { data: { owners: [me.user.id] } });
+    await admin.context().close();
+    await page.goto(`/groups/${group.id}`);
+    await expect(page.getByRole('heading', { name: 'Platform team' })).toBeVisible();
+    await picture(page, 'group-owner');
+    await page.context().close();
+  });
+
+  test('SpaceAccessView: who has access', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/access');
+    await expect(page.getByRole('tab', { name: 'People' })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await picture(page, 'space-access');
+    await page.getByRole('tab', { name: 'People' }).click();
+    await expect(page.getByRole('link', { name: /CSV/ })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await picture(page, 'space-access-people');
+    await page.context().close();
+  });
+
+  test('SpacePeopleView: people in a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/people');
+    await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await picture(page, 'space-people');
+    await page.context().close();
+  });
+
+  test('SpaceAuditView: the audit of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/audit');
+    await expect(page.getByRole('heading', { name: 'Audit of this space' })).toBeVisible();
+    await expect(page.getByRole('table')).toBeVisible();
+    await picture(page, 'space-audit', [page.locator('table')]);
+    await page.context().close();
+  });
+
+  test('ForgotView: a link for a new password', async ({ page }) => {
+    await page.goto('/forgot');
+    await expect(page.getByRole('heading', { name: 'Forgot your password' })).toBeVisible();
+    await picture(page, 'forgot');
+  });
+
+  test('ResetView: a new password', async ({ page }) => {
+    await page.goto('/reset?token=x');
+    await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible();
+    await picture(page, 'reset');
+  });
+
+  test('InvitationView: accepting an invitation', async ({ browser, page }) => {
+    const admin = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(admin, ADMIN.email, ADMIN.password);
+    const made = await admin.request.post('/api/v1/admin/invitations', {
+      data: { email: 'new.colleague@example.com', type: 'member', groups: [] },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    const { link } = (await made.json()) as { link: string };
+    await admin.context().close();
+    await page.goto(link.replace(/^https?:\/\/[^/]+/, ''));
+    await expect(page.getByText('new.colleague@example.com')).toBeVisible();
+    await picture(page, 'invitation');
+  });
+
+  test('SignupView: signing up', async ({ page }) => {
+    await page.goto('/signup');
+    await expect(page.getByRole('heading', { name: 'Sign up' })).toBeVisible();
+    await picture(page, 'signup');
+  });
+
+  test('the console summary, and what asks for attention', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto('/admin/summary');
+    await expect(page.getByText('You have no passkey')).toBeVisible();
+    await expect(page.getByText('No identity provider is set up')).toBeVisible();
+    await picture(page, 'admin-summary', [page.locator('.tiles')]);
+  });
+
+  test('the rules and the look of an instance', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto('/admin/look');
+    await expect(page.getByRole('heading', { name: 'Look of this instance' })).toBeVisible();
+    await picture(page, 'admin-look');
+    await page.goto('/admin/rules');
+    await expect(page.getByRole('heading', { name: 'Features' })).toBeVisible();
+    await picture(page, 'admin-rules');
+  });
+
+  test('a person asked for a stronger sign-in, and a maintenance note', async ({ browser }) => {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
+    const page = await context.newPage();
+    await login(page, READER.email, PASSWORD);
+    await page.route('**/api/v1/me', async (route) => {
+      const res = await route.fetch();
+      const me = (await res.json()) as { sign_in: { weak: boolean; prompt: boolean } };
+      me.sign_in.prompt = true;
+      await route.fulfill({ response: res, json: me });
+    });
+    await page.route('**/api/v1/appearance', async (route) => {
+      const res = await route.fetch();
+      const look = (await res.json()) as { maintenance: { on: boolean; message: string } };
+      look.maintenance = { on: true, message: "Back at two o'clock." };
+      await route.fulfill({ response: res, json: look });
+    });
+    await page.goto('/people');
+    await expect(page.getByTestId('maintenance-note')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Later' })).toBeVisible();
+    await picture(page, 'site-notes');
+    await context.close();
   });
 
   test('TrashView: an empty trash', async ({ browser }) => {
@@ -556,7 +728,7 @@ test.describe('the look of every kind of screen', () => {
     await page.goto('/spaces/HANDBOOK/overview');
     await expect(page.getByRole('heading', { name: 'Latest changes' })).toBeVisible();
     // Pages changed in the same moment can swap places, so the names are masked as well.
-    await picture(page, 'overview', [page.locator('time'), page.locator('.page-list a')]);
+    await picture(page, 'overview', [page.locator('.page-list')]);
     await page.context().close();
   });
 
@@ -930,6 +1102,7 @@ test.describe('the look of every kind of screen', () => {
 
     test('the bell with its panel', async ({ browser }) => {
       const page = await newReaderPage(browser, 'light');
+      await page.goto('/');
       await page.getByRole('button', { name: /^Notifications, \d+ unread$/ }).click();
       const panel = page.getByRole('region', { name: 'Notifications' });
       await expect(panel.getByText('Please read this before Monday.')).toBeVisible();

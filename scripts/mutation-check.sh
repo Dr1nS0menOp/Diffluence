@@ -89,14 +89,14 @@ mutate "others can read unpublished pages" internal/permissions/evaluate.go \
   's.replace(`p.Status != "draft" || p.CreatedBy == in.User.ID, true)`, "true, true)")' $perms
 mutate "SQL: restrictions hide nothing" internal/db/migrations/0003_permission_functions.sql \
   's.replace("HAVING NOT bool_or(", "HAVING false AND NOT bool_or(")' $perms
-mutate "SQL: guests count as all members" internal/db/migrations/0003_permission_functions.sql \
+mutate "SQL: guests count as all members" internal/db/migrations/0010_people.sql \
   's.replace(`(g.subject_type = '"'"'all_members'"'"' AND x.type = '"'"'member'"'"')`, `(g.subject_type = '"'"'all_members'"'"')`)' $perms
 mutate "reading a page skips the check" internal/pages/pages.go \
   's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Detail{}, err\n\t}", "")' $app
 mutate "downloads skip the check" internal/attachments/attachments.go \
   's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app
 mutate "any member can import a font" internal/httpapi/handlers_appearance.go \
-  's.replace("admin := Permission(identity.PermAdministrator)", "admin := Permission(identity.PermUseProduct)")' $app
+  's.replace("admin := SessionOnly(Permission(identity.PermAdministrator))", "admin := SessionOnly(Permission(identity.PermUseProduct))")' $app
 mutate "any file passes as a font" internal/settings/font.go \
   's.replace(`return "", false`, `return "woff2", true`)' $app
 mutate "font changes are not audited" internal/settings/font.go \
@@ -222,6 +222,103 @@ mutate "the link filter tells hidden from gone" internal/pages/content.go \
 mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \
   's.replace("for _, level := range p.ViewChain {", "for _, level := range p.ViewChain {\n\t\tif in.Action == ActionApprovalRead {\n\t\t\tbreak\n\t\t}")' $perms -run TestApprovalReadIsViewWithoutTheDraftRule
 
+mutate "a manager reaches administer" internal/permissions/manage.go \
+  's.replace("if !d.Allowed && touchesAdminister {", "if !d.Allowed && touchesAdminister && len(after) < 0 {")' $app -run TestManager
+mutate "administer does not imply managing access" internal/permissions/evaluate.go \
+  's.replace("holds(in, SpaceManageAccess) || holds(in, SpaceAdminister)", "holds(in, SpaceManageAccess)")' $perms
+mutate "SQL: an expired account stays active" internal/db/migrations/0010_people.sql \
+  's.replaceAll("AND (x.expires_at IS NULL OR x.expires_at > now())", "")' $perms -run TestMatrixSQL
+mutate "LoadUser: an expired account stays active" internal/permissions/service.go \
+  's.replace("status = \x27active\x27 AND (expires_at IS NULL OR expires_at > now())", "status = \x27active\x27")' $perms -run TestMatrixSQL
+mutate "a guest sees everyone" internal/permissions/evaluate.go \
+  's.replace("return target.ID == viewer.ID || slices.Contains(viewer.Global, globalViewProfiles) || target.SharedSpace", "return true")' $perms -run TestMatrixPeople
+mutate "SQL: a guest sees everyone" internal/db/migrations/0010_people.sql \
+  's.replace("AND (t.id = u\n        OR perm_has_global(u, \x27view_profiles\x27)", "AND (true\n        OR perm_has_global(u, \x27view_profiles\x27)")' $perms -run TestMatrixPeople
+mutate "a reset link works twice" internal/identity/factors.go \
+  's.replace("\"DELETE FROM auth_challenges WHERE token_hash = $1 AND kind = $2 RETURNING user_id, data, expires_at\"", "\"SELECT user_id, data, expires_at FROM auth_challenges WHERE token_hash = $1 AND kind = $2\"")' $app -run TestAResetLink
+mutate "a reset says whether the address is known" internal/identity/lifecycle.go \
+  's.replace("if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn nil\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"", "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn s.send(ctx, AccountMail{To: email, Kind: MailReset})\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"")' $app -run TestAResetLink
+mutate "a read token writes" internal/httpapi/server.go \
+  's.replace("case p.ViaToken && !p.CanWrite && !isRead(r):", "case p.ViaToken && !p.CanWrite && len(r.Method) < 0:")' $app -run TestTokens
+mutate "a token reaches account security" internal/httpapi/server.go \
+  's.replace("case p.ViaToken && a.sessionOnly:", "case p.ViaToken && len(r.Method) < 0:")' $app -run TestTokens
+mutate "sensitive lets anything through" internal/httpapi/server.go \
+  's.replace("case a.sensitive && time.Since(p.ConfirmedAt) > identity.ReauthWindow:", "case a.sensitive && time.Since(p.ConfirmedAt) < 0:")' $app -run TestEverySensitive
+mutate "a write passes during maintenance" internal/httpapi/middleware.go \
+  's.replace("if state.On {", "if state.On && len(r.Method) < 0 {")' $app -run TestMaintenance
+mutate "a dangerous CSV cell passes" internal/permissions/access.go \
+  's.replace("return \"\x27\" + cell", "return cell")' $app -run TestWhoHasAccess
+mutate "a failing accent is accepted" internal/settings/sections.go \
+  's.replace("if contrast(a, b) < normalTextRatio {", "if contrast(a, b) < 0 {")' $app -run TestAnAccent
+mutate "SVG passes as a logo" internal/settings/logo.go \
+  's.replace("if !slices.Contains(logoTypes, contentType) {", "if len(contentType) < 0 && !slices.Contains(logoTypes, contentType) {")' $app -run TestALogo
+mutate "a space audit shows a hidden title" internal/pages/lists.go \
+  's.replace("row.ObjectID, row.Details = \"\", nil", "row.ObjectType = e.ObjectType")' $app -run TestASpaceAudit
+mutate "polling keeps a session alive" internal/httpapi/middleware.go \
+  's.replace("if r.Header.Get(backgroundHeader) != \"\" {", "if len(r.Method) < 0 {")' $app -run TestPolling
+mutate "a leaked password is accepted" internal/identity/lifecycle.go \
+  's.replace("if s.blocklist[lower] || filter.Contains(lower) {", "if s.blocklist[lower] || (len(lower) < 0 && filter.Contains(lower)) {")' $app -run TestANewPassword
+mutate "the sign-in question can be put off for ever" internal/identity/lifecycle.go \
+  's.replace("out.Prompt = out.Weak && (after == nil || !s.now().Before(*after))", "out.Prompt = out.Weak && after == nil")' $app -run TestPeopleAreAsked
+mutate "picture metadata survives" internal/people/picture.go \
+  's.replace("if err := png.Encode(&out, scaled(img, crop)); err != nil {\n\t\treturn nil, err\n\t}\n\treturn out.Bytes(), nil", "_ = png.Encode\n\t_ = scaled\n\t_ = img\n\t_ = &out\n\treturn data, nil")' $app -run TestAPicture
+mutate "anonymising leaves the profile" internal/httpapi/handlers_console.go \
+  's.replace("if err := s.deps.People.Forget(r.Context(), id); err != nil {", "if err := error(nil); err != nil {")' $app -run TestAnonymising
+
+mutate "a changed anchor passes" internal/audit/prune.go \
+  's.replace("ed25519.Verify(a.publicKey, anchorMessage(a.seq, a.prevHash), a.signature)", "len(a.signature) >= 0")' $app -run TestPruningLeaves
+mutate "a damaged chain is pruned" internal/audit/prune.go \
+  's.replace("if !check.OK {", "if !check.OK && len(check.Reason) < 0 {")' $app -run TestPruningADamaged
+mutate "jobs run during maintenance" internal/jobs/jobs.go \
+  's.replace("if held {", "if held && s == nil {")' $app -run TestMaintenanceHolds
+mutate "a passkey login needs no local check" internal/identity/passkeys.go \
+  's.replace("webauthn.WithUserVerification(protocol.VerificationRequired)", "webauthn.WithUserVerification(protocol.VerificationDiscouraged)")' $app -run TestPasskeysRequire
+mutate "a passkey is registered without a local check" internal/identity/passkeys.go \
+  's.replace("UserVerification:   protocol.VerificationRequired,", "UserVerification:   protocol.VerificationDiscouraged,")' $app -run TestPasskeysRequire
+mutate "adding a passkey needs no proof" internal/httpapi/handlers_identity.go \
+  's.replace("\"POST /api/v1/me/passkeys/begin\", Sensitive(me)", "\"POST /api/v1/me/passkeys/begin\", me")' $app -run TestFactorChanges
+mutate "removing a passkey needs no proof" internal/httpapi/handlers_identity.go \
+  's.replace("\"DELETE /api/v1/me/passkeys/{id}\", Sensitive(me)", "\"DELETE /api/v1/me/passkeys/{id}\", me")' $app -run TestFactorChanges
+mutate "turning off a factor needs no proof" internal/httpapi/handlers_identity.go \
+  's.replace("\"POST /api/v1/me/totp/disable\", Sensitive(me)", "\"POST /api/v1/me/totp/disable\", me")' $app -run TestFactorChanges
+mutate "a typed address reaches the audit log" internal/identity/identity.go \
+  's.replace("details[\"address_hash\"] = hex.EncodeToString(sum)", "details[\"address_hash\"] = hex.EncodeToString(sum) + f.email")' $app -run TestAFailedLogin
+mutate "checkpoints are not checked" internal/audit/checkpoint.go \
+  's.replace("res.Checkpoints, err = VerifyCheckpoints(ctx, q, public)", "res.Checkpoints, err = 1, nil")' $app -run TestABadCheckpoint
+mutate "a damaged log stays out of the console" internal/console/console.go \
+  's.replace("\tif damaged {", "\tif damaged && len(out) < 0 {")' $app -run TestABadCheckpoint
+mutate "recovery codes hold 80 bits" internal/identity/factors.go \
+  's.replace("recoveryCodeBytes = 16", "recoveryCodeBytes = 10")' ./internal/identity/ -run TestARecoveryCode
+mutate "an administrator's reset leaves sessions" internal/identity/factors.go \
+  's.replace("_, err := tx.Exec(ctx, \"DELETE FROM sessions WHERE user_id = $1\", id)\n\t\treturn err\n\t})\n}\n\nfunc (s *Service) removeTOTP", "return nil\n\t})\n}\n\nfunc (s *Service) removeTOTP")' $app -run TestAnAdministratorsReset
+mutate "an expired SCIM token works" internal/scim/scim.go \
+  's.replace(" AND expires_at > now()`, hash(token))", "`, hash(token))")' $app -run TestSCIMTokensEnd
+mutate "an administrator reads a hidden title on the screen" internal/pages/lists.go \
+  's.replace("if id := auditedContent(e); id != \"\" && !visible[id] {", "if id := auditedContent(e); id != \"\" && len(id) < 0 {")' $app -run TestAnAdministratorSeesACensored
+mutate "an export shows a hidden title" internal/audit/audit.go \
+  's.replace("\t\te, err := f.read(payload, part)", "\t\tuncensored := f\n\t\tuncensored.Censor = nil\n\t\te, err := uncensored.read(payload, part)")' $app -run TestAnAdministratorSeesACensored
+mutate "the note on a page shows its title" internal/pages/lists.go \
+  's.replace("if !note.Readable {", "if !note.Readable && len(note.Title) < 0 {")' $app -run TestAnAdministratorSeesACensored
+mutate "the grace period never ends" internal/app/app.go \
+  's.replace("if time.Since(created) < settings.SecondFactorGrace {", "if time.Since(created) > 0 {")' $app -run TestAdministratorsNeedASecondFactor
+mutate "a name goes into the chain" internal/audit/audit.go \
+  's.replace("if !slices.Contains(personalDetails, key) {", "if len(key) > 0 || !slices.Contains(personalDetails, key) {")' $app -run TestPersonalDataInTheAuditLog
+mutate "erasing leaves the personal part" internal/identity/lifecycle.go \
+  's.replace("if err := audit.ErasePersonal(ctx, tx, id.String()); err != nil {", "if err := error(nil); err != nil {")' $app -run TestPersonalDataInTheAuditLog
+mutate "a changed personal part is not noticed" internal/audit/audit.go \
+  's.replace("if part != nil && personalDigest(salt, *part) != e.PersonalDigest {", "if part != nil && len(salt) < 0 {")' $app -run TestChangingAPersonalPart
+mutate "the queue reads the link of an account mail" internal/app/account_mail.go \
+  's.replace("sealed, err := m.keyring.Seal(body, accountMailContext)", "sealed, err := body, error(nil)")' $app -run TestAResetMail
+mutate "a sent account mail stays sealed in the queue" internal/mail/queue.go \
+  's.replace("last_error = \x27\x27, sealed = NULL,", "last_error = \x27\x27,")' $app -run TestAResetMail
+mutate "mail goes out during maintenance" internal/mail/queue.go \
+  's.replace("if err != nil || held {", "if err != nil || (held && s == nil) {")' $app -run TestMailWaits
+mutate "the audit log stays for ever without a reason" internal/settings/sections.go \
+  's.replace("strings.TrimSpace(r.LongerBecause) == \"\"", "len(r.LongerBecause) < 0")' $app -run TestTheAuditLogStays
+mutate "anonymising leaves the watches" internal/identity/lifecycle.go \
+  's.replace("\"group_members\", \"follows\", \"watches\", \"comment_seen\",", "\"group_members\", \"follows\", \"comment_seen\",")' $app -run TestAnonymisingLeavesTheId
+mutate "a rotated token keeps its full life" internal/scim/scim.go \
+  's.replace("SET expires_at = LEAST(expires_at, $2)", "SET expires_at = GREATEST(expires_at, $2)")' $app -run TestSCIMTokensEnd
 mutate "a notification reaches someone who cannot see the page" internal/notify/notify.go \
   's.replace("if err != nil || !allowed {\n\t\treturn err\n\t}\n\tdata, err :=", "if err != nil || (!allowed && len(r.Type) < 0) {\n\t\treturn err\n\t}\n\tdata, err :=")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "the bell shows a page you lost" internal/notify/list.go \
@@ -252,7 +349,7 @@ mutate "search does not find a mentioned person" internal/search/search.go \
 mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
   's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
-  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
+  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
 mutate "following tells who exists" internal/watches/watches.go \
   's.replace("if !known || !slices.Contains(facts.Global, identity.PermViewProfiles) {", "if !known || (len(facts.Global) < 0 && !slices.Contains(facts.Global, identity.PermViewProfiles)) {")' $app -run TestFollowingGoesByTheRuleForSeeingPeople
 mutate "allowing skips a level out of reach" internal/sharing/sharing.go \

@@ -108,9 +108,10 @@ func tamper(t *testing.T, tdb testutil.TestDB, sql string) {
 
 func TestTamperingIsDetected(t *testing.T) {
 	cases := map[string]string{
-		"payload changed": "UPDATE audit_events SET payload = replace(payload, 'Hello', 'Bye') WHERE seq = 2",
-		"column changed":  "UPDATE audit_events SET actor_id = 'someone-else' WHERE seq = 2",
-		"row deleted":     "DELETE FROM audit_events WHERE seq = 2",
+		"payload changed":       `UPDATE audit_events SET payload = replace(payload, '"n":3', '"n":4') WHERE seq = 2`,
+		"personal part changed": "UPDATE audit_personal SET data = replace(data, 'Hello', 'Bye') WHERE seq = 2",
+		"column changed":        "UPDATE audit_events SET actor_id = 'someone-else' WHERE seq = 2",
+		"row deleted":           "DELETE FROM audit_events WHERE seq = 2",
 	}
 	for name, sql := range cases {
 		t.Run(name, func(t *testing.T) {

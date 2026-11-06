@@ -3,11 +3,13 @@
 // nothing on each page.
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
-import { api, type ListedPage, type Me, type SystemInfo } from '../api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, type ListedPage, type Me, type Space, type SystemInfo } from '../api';
+import { appearanceQuery } from '../appearance';
 import { navigate } from '../router';
 import { IconChevronDown, IconHelp, IconPage } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from './menu';
+import { personQuery, PersonPicture } from './person';
 import { ShortcutsDialog } from './shortcuts';
 import { useOrderedSpaces } from './space-strip';
 import { PAGE_DRAG_TYPE } from './tree-model';
@@ -184,11 +186,12 @@ export function HelpMenu() {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<'shortcuts' | 'about' | null>(null);
   const close = () => setDialog(null);
+  const helpAddress = useQuery(appearanceQuery).data?.help_url || DOCUMENTATION;
   return (
     <>
       <Menu label={t('help.menu')} trigger={<IconHelp />}>
         <MenuItem onClick={() => setDialog('shortcuts')}>{t('shortcuts.title')}</MenuItem>
-        <MenuDownload href={DOCUMENTATION} target="_blank" rel="noopener noreferrer">
+        <MenuDownload href={helpAddress} target="_blank" rel="noopener noreferrer">
           {t('help.documentation')}
         </MenuDownload>
         <MenuItem onClick={() => setDialog('about')}>{t('help.about')}</MenuItem>
@@ -199,15 +202,32 @@ export function HelpMenu() {
   );
 }
 
+/** My space, or the way to get one. Without the permission there is nothing to show. */
+function PersonalSpaceEntry({ me }: { me: Me }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const create = useMutation({
+    mutationFn: () => api.post<Space>('/me/personal-space'),
+    onSuccess: async (space) => {
+      await client.invalidateQueries({ queryKey: ['me'] });
+      navigate(`/spaces/${space.key}`);
+    },
+  });
+  if (me.personal_space) return <MenuLink href={`/spaces/${me.personal_space}`}>{t('nav.mySpace')}</MenuLink>;
+  if (!me.global_permissions.includes('create_personal_space')) return null;
+  return <MenuItem onClick={() => create.mutate()}>{t('nav.createMySpace')}</MenuItem>;
+}
+
 export function AccountMenu({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const { t } = useTranslation();
   const isAdmin = me.global_permissions.includes('administrator');
+  const person = useQuery(personQuery(me.user.id)).data;
   return (
     <div className="top-account">
       <Menu
         label={t('nav.accountMenu')}
         className="avatar-button"
-        trigger={<Avatar name={me.user.display_name} />}
+        trigger={person ? <PersonPicture person={person} /> : <Avatar name={me.user.display_name} />}
       >
         <div role="none" className="menu-heading">
           <strong>{me.user.display_name}</strong>
@@ -216,10 +236,11 @@ export function AccountMenu({ me, onLogout }: { me: Me; onLogout: () => void }) 
         <MenuSeparator />
         <MenuLink href="/me">{t('nav.profile')}</MenuLink>
         <MenuLink href="/me/preferences">{t('nav.preferences')}</MenuLink>
+        <PersonalSpaceEntry me={me} />
         <MenuLink href="/me/notifications">{t('nav.notificationSettings')}</MenuLink>
         <MenuLink href="/me/watching">{t('nav.watching')}</MenuLink>
         <MenuLink href="/tasks">{t('nav.tasks')}</MenuLink>
-        {isAdmin && <MenuLink href="/admin/users">{t('nav.admin')}</MenuLink>}
+        {isAdmin && <MenuLink href="/admin/summary">{t('nav.admin')}</MenuLink>}
         <MenuSeparator />
         <MenuItem onClick={onLogout}>{t('nav.logout')}</MenuItem>
       </Menu>

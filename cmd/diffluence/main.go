@@ -6,6 +6,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"crypto/ed25519"
 	"errors"
 	"flag"
 	"fmt"
@@ -24,6 +25,8 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
+	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/version"
 )
 
@@ -34,6 +37,7 @@ Commands:
   migrate [--contract]      apply pending migrations
   user create-admin         create a local administrator (password on stdin)
   audit verify              verify the audit log hash chain
+  audit prune               remove audit rows past their retention, as the owner of the tables
   healthcheck               ask a running server on this machine whether it is ready
   version                   print the version
 `
@@ -64,11 +68,15 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 		err = cmdCreateAdmin(ctx, args[2:], stdin, stdout)
 	case "audit":
-		if len(args) < 2 || args[1] != "verify" {
+		switch {
+		case len(args) >= 2 && args[1] == "verify":
+			err = cmdAuditVerify(ctx, stdout)
+		case len(args) >= 2 && args[1] == "prune":
+			err = cmdAuditPrune(ctx, stdout)
+		default:
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
-		err = cmdAuditVerify(ctx, stdout)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
 	case "help", "-h", "--help":
@@ -225,28 +233,85 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 	return nil
 }
 
+// signingKey loads the key of this installation, without starting anything else: this
+// runs beside a server, also in restore.sh.
+func signingKey(cfg config.Config) (ed25519.PrivateKey, error) {
+	keyring, err := keys.LoadOrCreate(cfg.KeyFile(), false)
+	if err != nil {
+		return nil, err
+	}
+	return keyring.SigningKey()
+}
+
+// cmdAuditPrune removes rows past the retention set in the console. It needs the owner
+// of the tables: the application role has no right to do this (spec 013, D11).
+func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	url := cfg.MigrateDatabaseURL
+	if url == "" {
+		url = cfg.DatabaseURL
+	}
+	pool, err := db.Open(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	days, err := settings.AuditDays(ctx, pool)
+	if err != nil {
+		return err
+	}
+	if days == 0 {
+		return errors.New("audit retention is not set in the console, so nothing may be removed")
+	}
+	key, err := signingKey(cfg)
+	if err != nil {
+		return err
+	}
+	res, err := audit.Prune(ctx, pool, time.Now().AddDate(0, 0, -days), key)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "removed %d audit rows, up to %d\n", res.Removed, res.AnchorSeq)
+	return nil
+}
+
 func cmdAuditVerify(ctx context.Context, stdout io.Writer) error {
 	cfg, err := config.FromEnvironment()
 	if err != nil {
 		return err
+	}
+	key, err := signingKey(cfg)
+	if err != nil {
+		return err
+	}
+	public, ok := key.Public().(ed25519.PublicKey)
+	if !ok {
+		return errors.New("unexpected key type")
 	}
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
-	res, err := audit.Verify(ctx, pool)
+	res, err := audit.Check(ctx, pool, public)
 	if err != nil {
 		return err
 	}
+	result := audit.ResultSuccess
+	if !res.OK {
+		result = audit.ResultFailure
+	}
 	if err := audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "cli",
-		Action: "audit.verified", ObjectType: "audit_log", Result: audit.ResultSuccess,
-		Details: map[string]any{"ok": res.OK, "checked": res.Checked}}); err != nil {
+		Action: "audit.verified", ObjectType: "audit_log", Result: result,
+		Details: map[string]any{"ok": res.OK, "checked": res.Checked, "checkpoints": res.Checkpoints}}); err != nil {
 		return err
 	}
 	if !res.OK {
 		return fmt.Errorf("audit chain BROKEN at seq %d: %s (checked %d events)", res.FirstBadSeq, res.Reason, res.Checked)
 	}
-	fmt.Fprintf(stdout, "audit chain OK (%d events checked)\n", res.Checked)
+	fmt.Fprintf(stdout, "audit chain OK (%d events and %d signed checkpoints checked)\n", res.Checked, res.Checkpoints)
 	return nil
 }

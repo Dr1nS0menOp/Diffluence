@@ -13,6 +13,12 @@ export const DEFAULT_PREFERENCES: Preferences = {
   hover_cards: true,
   sidebar_width: 18,
   tree_view: 'tree',
+  language: 'en',
+  time_zone: '',
+  date_format: 'medium',
+  first_day: 1,
+  welcome_dismissed: false,
+  tour_seen: false,
 };
 
 /** The browser keeps a copy, so the first paint is right before the person's data arrives. */

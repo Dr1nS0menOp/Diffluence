@@ -99,9 +99,23 @@ func (a *App) runContractMigrations(ctx context.Context) error {
 	return err
 }
 
-// verifyAudit walks the chain and raises the alarm when it is broken.
+// CheckAudit verifies the chain and the signatures on its checkpoints.
+func (a *App) CheckAudit(ctx context.Context) (audit.VerifyResult, error) {
+	key, err := a.keyring.SigningKey()
+	if err != nil {
+		return audit.VerifyResult{}, err
+	}
+	public, ok := key.Public().(ed25519.PublicKey)
+	if !ok {
+		return audit.VerifyResult{}, errors.New("app: unexpected key type")
+	}
+	return audit.Check(ctx, a.pool, public)
+}
+
+// verifyAudit raises the alarm when the audit log does not hold. The console shows the
+// result of this job, so a failure reaches a person and not only the log.
 func (a *App) verifyAudit(ctx context.Context) error {
-	res, err := audit.Verify(ctx, a.pool)
+	res, err := a.CheckAudit(ctx)
 	if err != nil {
 		return err
 	}
@@ -128,19 +142,6 @@ func (a *App) signCheckpoint(ctx context.Context) error {
 		return err
 	}
 	return audit.SignCheckpoint(ctx, a.pool, key)
-}
-
-// VerifyCheckpoints checks the signatures against this instance's key.
-func (a *App) VerifyCheckpoints(ctx context.Context) (int, error) {
-	key, err := a.keyring.SigningKey()
-	if err != nil {
-		return 0, err
-	}
-	public, ok := key.Public().(ed25519.PublicKey)
-	if !ok {
-		return 0, errors.New("app: unexpected key type")
-	}
-	return audit.VerifyCheckpoints(ctx, a.pool, public)
 }
 
 // NodeStatus is one row of the admin console's node list.

@@ -44,6 +44,12 @@ const (
 	contentType   = "application/scim+json"
 	maxBody       = 2 << 20
 	tokenPrefix   = "dfl_scim_"
+
+	// A token always ends: bearer tokens need a lifetime the provider can check.
+	tokenLife    = 365 * 24 * time.Hour
+	maxTokenLife = 366 * 24 * time.Hour
+	// How long a rotated token goes on beside its successor.
+	rotationOverlap = 7 * 24 * time.Hour
 )
 
 // Token is a bearer token, as the admin console shows it.
@@ -53,6 +59,7 @@ type Token struct {
 	CreatedAt  time.Time  `json:"created_at"`
 	LastUsedAt *time.Time `json:"last_used_at"`
 	RevokedAt  *time.Time `json:"revoked_at"`
+	ExpiresAt  time.Time  `json:"expires_at"`
 }
 
 // Service handles SCIM requests.
@@ -73,23 +80,64 @@ func hash(token string) []byte {
 	return h[:]
 }
 
-// CreateToken makes a new token. It is returned once and stored only as a hash.
-func (s *Service) CreateToken(ctx context.Context, c identity.Caller, name string) (Token, string, error) {
+func newSecret() string {
+	b := make([]byte, 32)
+	_, _ = rand.Read(b)
+	return tokenPrefix + base64.RawURLEncoding.EncodeToString(b)
+}
+
+// insertToken stores a token, of which only the hash is kept.
+func insertToken(ctx context.Context, tx pgx.Tx, c identity.Caller, t *Token, secret string) error {
+	return tx.QueryRow(ctx, `INSERT INTO scim_tokens (id, name, token_hash, created_by, expires_at)
+		VALUES ($1, $2, $3, $4, $5) RETURNING created_at`,
+		t.ID, t.Name, hash(secret), c.UserID, t.ExpiresAt).Scan(&t.CreatedAt)
+}
+
+// CreateToken makes a new token. It is returned once and stored only as a hash. A
+// token always ends: without a date it lasts a year (SEC-156).
+func (s *Service) CreateToken(ctx context.Context, c identity.Caller, name string, expiresAt time.Time) (Token, string, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len(name) > 200 {
 		return Token{}, "", apperr.Invalid("Give the token a name.")
 	}
-	b := make([]byte, 32)
-	_, _ = rand.Read(b)
-	secret := tokenPrefix + base64.RawURLEncoding.EncodeToString(b)
-	t := Token{ID: ids.New(), Name: name}
+	now := time.Now()
+	if expiresAt.IsZero() {
+		expiresAt = now.Add(tokenLife)
+	}
+	if !expiresAt.After(now) || expiresAt.After(now.Add(maxTokenLife)) {
+		return Token{}, "", apperr.Invalid("A token ends within a year.")
+	}
+	secret := newSecret()
+	t := Token{ID: ids.New(), Name: name, ExpiresAt: expiresAt}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, "INSERT INTO scim_tokens (id, name, token_hash, created_by) VALUES ($1, $2, $3, $4) RETURNING created_at",
-			t.ID, name, hash(secret), c.UserID).Scan(&t.CreatedAt)
+		if err := insertToken(ctx, tx, c, &t, secret); err != nil {
+			return err
+		}
+		_, err := audit.Record(ctx, tx, c.Event("scim.token_created", "scim_token", t.ID.String(), "", map[string]any{"name": name}))
+		return err
+	})
+	return t, secret, err
+}
+
+// RotateToken makes a successor, and lets the old token end soon. For that time both
+// work, so the identity provider can change over without an outage.
+func (s *Service) RotateToken(ctx context.Context, c identity.Caller, id uuid.UUID) (Token, string, error) {
+	secret := newSecret()
+	t := Token{ID: ids.New(), ExpiresAt: time.Now().Add(tokenLife)}
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `UPDATE scim_tokens SET expires_at = LEAST(expires_at, $2)
+			WHERE id = $1 AND revoked_at IS NULL AND expires_at > now() RETURNING name`,
+			id, time.Now().Add(rotationOverlap)).Scan(&t.Name)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound()
+		}
 		if err != nil {
 			return err
 		}
-		_, err = audit.Record(ctx, tx, c.Event("scim.token_created", "scim_token", t.ID.String(), "", map[string]any{"name": name}))
+		if err := insertToken(ctx, tx, c, &t, secret); err != nil {
+			return err
+		}
+		_, err = audit.Record(ctx, tx, c.Event("scim.token_rotated", "scim_token", id.String(), "", map[string]any{"successor": t.ID.String()}))
 		return err
 	})
 	return t, secret, err
@@ -97,13 +145,13 @@ func (s *Service) CreateToken(ctx context.Context, c identity.Caller, name strin
 
 // Tokens lists all tokens.
 func (s *Service) Tokens(ctx context.Context) ([]Token, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, name, created_at, last_used_at, revoked_at FROM scim_tokens ORDER BY created_at DESC")
+	rows, err := s.pool.Query(ctx, "SELECT id, name, created_at, last_used_at, revoked_at, expires_at FROM scim_tokens ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Token, error) {
 		var t Token
-		err := r.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.LastUsedAt, &t.RevokedAt)
+		err := r.Scan(&t.ID, &t.Name, &t.CreatedAt, &t.LastUsedAt, &t.RevokedAt, &t.ExpiresAt)
 		return t, err
 	})
 	if out == nil {
@@ -139,7 +187,8 @@ func (s *Service) Authenticate(r *http.Request) (identity.Caller, bool) {
 	}
 	var id uuid.UUID
 	var used *time.Time
-	err := s.pool.QueryRow(r.Context(), "SELECT id, last_used_at FROM scim_tokens WHERE token_hash = $1 AND revoked_at IS NULL", hash(token)).Scan(&id, &used)
+	err := s.pool.QueryRow(r.Context(), `SELECT id, last_used_at FROM scim_tokens
+		WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > now()`, hash(token)).Scan(&id, &used)
 	if err != nil {
 		return identity.Caller{}, false
 	}

@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError, type Space } from '../api';
+import { useDates } from '../dates';
 import { animalOf, animalPicture } from './animals';
 import { IconClose, IconUpload } from './icons';
 
@@ -188,7 +189,7 @@ function firstCharacter(text: string): string {
   return first?.segment ?? '';
 }
 
-export function Avatar({ name, size }: { name: string; size?: 'small' }) {
+export function Avatar({ name, size }: { name: string; size?: 'small' | 'large' }) {
   return (
     // From the style sheet: these letters are decoration, and the name of a button holding
     // this picture would otherwise have to contain them (WCAG 2.5.3).
@@ -222,32 +223,6 @@ export function SpaceBadge({
       )}
     </span>
   );
-}
-
-export function formatDate(value: string | null | undefined): string {
-  if (!value) return '';
-  return new Date(value).toLocaleString();
-}
-
-export function formatDay(value: string): string {
-  return new Date(value).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-const SECOND = 1000;
-const MINUTE = 60 * SECOND;
-const HOUR = 60 * MINUTE;
-const DAY = 24 * HOUR;
-const RELATIVE_DAYS = 30;
-
-/** "3 hours ago" in the person's language. Older than a month is a date. */
-export function relativeTime(value: string, now = Date.now(), locale?: string): string {
-  const past = now - new Date(value).getTime();
-  if (past >= RELATIVE_DAYS * DAY) return formatDay(value);
-  const format = new Intl.RelativeTimeFormat(locale, { numeric: 'auto' });
-  if (past >= DAY) return format.format(-Math.floor(past / DAY), 'day');
-  if (past >= HOUR) return format.format(-Math.floor(past / HOUR), 'hour');
-  if (past >= MINUTE) return format.format(-Math.floor(past / MINUTE), 'minute');
-  return format.format(0, 'second');
 }
 
 /** A time that reads easily, with the exact moment on hover and for screen readers. */
@@ -299,10 +274,42 @@ export function Tabs<Name extends string>({
 }
 
 export function RelativeTime({ value }: { value: string }) {
+  const dates = useDates();
   return (
-    <time dateTime={value} title={formatDate(value)}>
-      {relativeTime(value)}
+    <time dateTime={value} title={dates.moment(value)}>
+      {dates.relative(value)}
     </time>
+  );
+}
+
+/** A password a person chooses. They can see what they type, and paste always works (WCAG 3.3.8). */
+export function NewPasswordField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (next: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [shown, setShown] = useState(false);
+  return (
+    <>
+      <Field label={label} help={t('account.passwordHelp')}>
+        <input
+          type={shown ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          autoComplete="new-password"
+          required
+        />
+      </Field>
+      <label className="check">
+        <input type="checkbox" checked={shown} onChange={(e) => setShown(e.target.checked)} />
+        {t('account.showPassword')}
+      </label>
+    </>
   );
 }
 

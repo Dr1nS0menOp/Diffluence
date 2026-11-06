@@ -68,11 +68,11 @@ func TestValidatePassword(t *testing.T) {
 	if err := ValidatePassword(strings.Repeat("a", MaxPasswordBytes+1)); err != ErrPasswordTooLong {
 		t.Errorf("long: %v", err)
 	}
-	if err := ValidatePassword("twelve chars"); err != nil {
+	if err := ValidatePassword("fifteen letters"); err != nil {
 		t.Errorf("valid: %v", err)
 	}
-	// 12 characters but more bytes: counting must be in characters.
-	if err := ValidatePassword("ééééééééééé"); err != ErrPasswordTooShort {
-		t.Errorf("11 multibyte chars: %v", err)
+	// Too few characters but enough bytes: counting must be in characters.
+	if err := ValidatePassword("ééééééééééééé"); err != ErrPasswordTooShort {
+		t.Errorf("13 multibyte chars: %v", err)
 	}
 }

@@ -8,7 +8,7 @@ import { contentsOf, countWords, headingsOf, readingMinutes, slidesOf, slugify }
 import { addSearch, readSearches, rowsOf } from './quick-search';
 import { orderSpaces, withCurrent } from './space-strip';
 import { buildTree, collapseEverything, filterTree, flatPages, matchParts, typeAheadRow } from './tree-model';
-import { relativeTime } from './ui';
+import { dayText, isKnownTimeZone, localTimeIn, momentText, relativeText, type DateChoice } from '../dates';
 
 const heading = (level: number, text: string) => ({
   type: 'heading',
@@ -162,13 +162,13 @@ describe('quick search', () => {
       files: [{ id: 'f', filename: 'a.pdf', page_id: 'p', page_title: 'Page', space_name: 'Space' }],
       people: [{ id: 'u', name: 'Anna' }],
     };
-    const rows = rowsOf(results, labels);
+    const rows = rowsOf(results, labels, () => DAY_TEXT);
     expect(rows.map((r) => r.group)).toEqual(['Pages', 'Files', 'People']);
     expect(rows[1]?.target).toBe('/pages/p');
   });
 
   it('has no rows before an answer', () => {
-    expect(rowsOf(undefined, labels)).toEqual([]);
+    expect(rowsOf(undefined, labels, () => DAY_TEXT)).toEqual([]);
   });
 
   it('keeps each search once, newest first, and at most eight', () => {
@@ -184,6 +184,46 @@ describe('quick search', () => {
     expect(readSearches('{"a":1}')).toEqual([]);
     expect(readSearches('["a",1]')).toEqual(['a']);
     expect(readSearches(null)).toEqual([]);
+  });
+});
+
+const DAY_TEXT = '15 Jun 2026';
+const ENGLISH: DateChoice = { language: 'en', timeZone: 'UTC', format: 'medium' };
+
+describe('dates', () => {
+  const noon = '2026-06-15T12:00:00Z';
+
+  it('shows a moment in the time zone a person chose', () => {
+    expect(momentText(noon, { ...ENGLISH, timeZone: 'Asia/Tokyo' })).toContain('9:00');
+    expect(momentText(noon, { ...ENGLISH, timeZone: 'America/New_York' })).toContain('8:00');
+  });
+
+  it('crosses to the next day in a far time zone', () => {
+    expect(dayText('2026-06-15T20:00:00Z', { ...ENGLISH, timeZone: 'Asia/Tokyo' })).toContain('16');
+    expect(dayText('2026-06-15T20:00:00Z', ENGLISH)).toContain('15');
+  });
+
+  it('writes the format a person chose', () => {
+    expect(dayText(noon, { ...ENGLISH, format: 'iso' })).toBe('2026-06-15');
+    expect(momentText(noon, { ...ENGLISH, format: 'iso' })).toBe('2026-06-15 12:00');
+    expect(dayText(noon, { ...ENGLISH, format: 'long' })).toContain('June');
+    expect(dayText(noon, ENGLISH)).toContain('Jun');
+  });
+
+  it('shows nothing for a moment that is not there', () => {
+    expect(momentText(null, ENGLISH)).toBe('');
+    expect(momentText(undefined, ENGLISH)).toBe('');
+  });
+
+  it('falls back to this device for a zone the browser does not know', () => {
+    expect(isKnownTimeZone('Mars/Olympus')).toBe(false);
+    expect(momentText(noon, { ...ENGLISH, timeZone: 'Mars/Olympus' })).not.toBe('');
+  });
+
+  it('leaves out the local time of a person in an unknown zone', () => {
+    expect(localTimeIn('Mars/Olympus', 'en')).toBe('');
+    expect(localTimeIn('', 'en')).toBe('');
+    expect(localTimeIn('Asia/Tokyo', 'en', new Date(noon))).toContain('9:00');
   });
 });
 
@@ -219,11 +259,11 @@ describe('small helpers', () => {
   const before = (ms: number) => new Date(now - ms).toISOString();
 
   it('says how long ago something was, and gives a date for old things', () => {
-    expect(relativeTime(before(10_000), now, 'en')).toBe('now');
-    expect(relativeTime(before(5 * 60_000), now, 'en')).toBe('5 minutes ago');
-    expect(relativeTime(before(3 * 3_600_000), now, 'en')).toBe('3 hours ago');
-    expect(relativeTime(before(86_400_000), now, 'en')).toBe('yesterday');
-    expect(relativeTime(before(31 * 86_400_000), now, 'en')).not.toContain('ago');
+    expect(relativeText(before(10_000), now, ENGLISH)).toBe('now');
+    expect(relativeText(before(5 * 60_000), now, ENGLISH)).toBe('5 minutes ago');
+    expect(relativeText(before(3 * 3_600_000), now, ENGLISH)).toBe('3 hours ago');
+    expect(relativeText(before(86_400_000), now, ENGLISH)).toBe('yesterday');
+    expect(relativeText(before(31 * 86_400_000), now, ENGLISH)).not.toContain('ago');
   });
 
   it('suggests a key from the letters of a name', () => {

@@ -8,7 +8,7 @@ import { api, type ListedPage, type QuickResults, type Space } from '../api';
 import { personalKey, usePerson } from '../personal';
 import { navigate } from '../router';
 import { IconClose, IconSearch } from './icons';
-import { formatDay } from './ui';
+import { useDates } from '../dates';
 
 const MAX_SEARCHES = 8;
 const PAUSE_MS = 200;
@@ -43,6 +43,7 @@ export function addSearch(searches: string[], text: string): string[] {
 export function rowsOf(
   results: QuickResults | undefined,
   labels: { pages: string; posts: string; spaces: string; files: string; people: string },
+  day: (value: string) => string,
 ): QuickRow[] {
   if (!results) return [];
   return [
@@ -50,7 +51,7 @@ export function rowsOf(
       id: `page-${p.page_id}`,
       group: labels.pages,
       title: p.title,
-      detail: `${p.space_name} · ${formatDay(p.updated_at)}`,
+      detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
     })),
@@ -58,7 +59,7 @@ export function rowsOf(
       id: `post-${p.page_id}`,
       group: labels.posts,
       title: p.title,
-      detail: `${p.space_name} · ${formatDay(p.updated_at)}`,
+      detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
     })),
@@ -100,6 +101,7 @@ export function useDelayed(value: string): string {
 
 export function QuickSearch({ space }: { space: Space | null }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const searchesKey = personalKey(usePerson(), 'searches');
   const listId = useId();
   const root = useRef<HTMLFormElement>(null);
@@ -182,7 +184,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
     run: 'search',
     target: text.trim(),
   };
-  const rows = text.trim() === '' ? emptyRows : [...rowsOf(results.data, labels), allResults];
+  const rows = text.trim() === '' ? emptyRows : [...rowsOf(results.data, labels, dates.day), allResults];
   const groups = [...new Set(rows.map((r) => r.group))];
 
   const rememberAndSearch = (query: string) => {
@@ -263,7 +265,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
       <IconSearch size={18} />
       {within && (
         <span className="search-chip">
-          {within.name}
+          <span className="search-chip-name">{within.name}</span>
           <button
             type="button"
             className="search-chip-remove"

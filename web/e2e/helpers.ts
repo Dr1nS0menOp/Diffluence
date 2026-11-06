@@ -33,6 +33,8 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  // People with only a password are asked for more. Tests on other things put that off.
+  await page.request.post('/api/v1/me/sign-in-prompt/later');
 }
 
 /**

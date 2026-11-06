@@ -300,10 +300,14 @@ func TestRestrictionCannotLockYouOut(t *testing.T) {
 	other := e.user("other@example.com", identity.PermUseProduct)
 	space, _ := owner.space("ENG")
 	page := owner.page(space, nil, "Page", "x")
-	out := owner.want(409, "PUT", "/api/v1/pages/"+page+"/restrictions", map[string]any{"kind": "view",
+	owner.ok("PUT", "/api/v1/pages/"+page+"/restrictions", map[string]any{"kind": "view",
 		"subjects": []any{map[string]any{"type": "user", "id": other.id}}})
-	if !strings.Contains(out, "locks_you_out") {
-		t.Fatal(out)
+	// The person who sets a restriction is added to it, so the page stays theirs.
+	if status, out := owner.do("GET", "/api/v1/pages/"+page, nil); status != 200 {
+		t.Fatalf("locked out: %d %s", status, out)
+	}
+	if out := owner.want(200, "GET", "/api/v1/pages/"+page+"/restrictions", nil); !strings.Contains(out, owner.id) {
+		t.Fatalf("the person who set it is not on it: %s", out)
 	}
 }
 
@@ -889,8 +893,8 @@ func TestAuditCheckpointsAndDailyVerification(t *testing.T) {
 	if err := e.app.SignCheckpointForTest(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if n, err := e.app.VerifyCheckpoints(ctx); n != 1 || err != nil {
-		t.Fatalf("verify: %d %v", n, err)
+	if res, err := e.app.CheckAudit(ctx); res.Checkpoints != 1 || !res.OK || err != nil {
+		t.Fatalf("verify: %+v %v", res, err)
 	}
 	if e.auditActions("audit.checkpoint_signed") != 1 {
 		t.Fatal("the checkpoint must be audited")
@@ -898,8 +902,8 @@ func TestAuditCheckpointsAndDailyVerification(t *testing.T) {
 	if _, err := e.app.Pool().Exec(ctx, "UPDATE audit_checkpoints SET signature = decode(repeat('00', 64), 'hex')"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := e.app.VerifyCheckpoints(ctx); err == nil {
-		t.Fatal("a forged signature was accepted")
+	if res, err := e.app.CheckAudit(ctx); err != nil || res.OK {
+		t.Fatalf("a forged signature was accepted: %+v %v", res, err)
 	}
 
 	// Someone with database access tampers with a row: the daily job must notice.
@@ -964,6 +968,8 @@ func TestApplicationRoleCannotTamperWithTheAuditLog(t *testing.T) {
 	for table, privileges := range map[string][]string{
 		"audit_events":      {"UPDATE", "DELETE", "TRUNCATE"},
 		"audit_checkpoints": {"UPDATE", "DELETE", "TRUNCATE"},
+		"audit_anchors":     {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
+		"audit_personal":    {"UPDATE", "TRUNCATE"},
 		"schema_migrations": {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
 	} {
 		for _, privilege := range privileges {

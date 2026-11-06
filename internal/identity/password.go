@@ -29,7 +29,7 @@ var DefaultParams = Params{Memory: 19 * 1024, Time: 2, Threads: 1, SaltLen: 16, 
 
 // Password length limits. The upper bound stops hashing from becoming a DoS vector.
 const (
-	MinPasswordLength = 12   // characters
+	MinPasswordLength = 15   // characters; only new passwords must meet it
 	MaxPasswordBytes  = 1024 // bytes
 )
 

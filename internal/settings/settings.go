@@ -44,8 +44,9 @@ var Defaults = Values{TrashRetentionDays: 30, MaxUploadMiB: 100, MailEnabled: tr
 
 // Service reads and writes settings.
 type Service struct {
-	pool  *pgxpool.Pool
-	store storage.Store
+	pool        *pgxpool.Pool
+	store       storage.Store
+	maintenance maintenanceCache
 }
 
 // NewService creates the service.

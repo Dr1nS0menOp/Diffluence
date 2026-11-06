@@ -17,6 +17,12 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | `pquerna/otp` | Apache-2.0 | TOTP codes and the QR code for enrolment. Replaced the planned hand-written TOTP and the frontend QR library. | The product owner, 2026-11-04 |
 | `yuin/goldmark` | MIT | Markdown parser, no dependencies of its own | The product owner, 2026-11-04 |
 
+## Data
+
+| Data | Licence | Why | Approved |
+|---|---|---|---|
+| SecLists `xato-net-10-million-passwords.txt` (`internal/identity/leaked/passwords.bloom`) | MIT | The check of new passwords against leaked ones, which must work offline. Kept as a Bloom filter of 10 MB, never as text. `go run ./cmd/password-filter list.txt internal/identity/leaked/passwords.bloom` rebuilds it. Source: `github.com/danielmiessler/SecLists`, `Passwords/Common-Credentials/`, sha256 `c95989fe...72fe`, 5,054,227 unique entries in lower case | The product owner, 2026-11-05 |
+
 ## Pictures
 
 | What | Licence | Why |

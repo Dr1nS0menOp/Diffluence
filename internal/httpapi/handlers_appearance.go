@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 // fontCacheSeconds can be long: a replaced font gets a new versioned address.
@@ -20,7 +21,7 @@ func (s *Server) registerAppearanceRoutes() {
 	// Public: same reason; a font file holds no data of the installation.
 	r.HandleFunc("GET /api/v1/appearance/font", Public, s.handleAppearanceFont)
 
-	admin := Permission(identity.PermAdministrator)
+	admin := SessionOnly(Permission(identity.PermAdministrator))
 	r.HandleFunc("PUT /api/v1/admin/appearance/font", admin, s.handleFontImport)
 	r.HandleFunc("DELETE /api/v1/admin/appearance/font", admin, s.handleFontRemove)
 }
@@ -37,11 +38,50 @@ func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	if !found {
-		writeJSON(w, http.StatusOK, map[string]any{"font": nil})
+	var look settings.Look
+	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionLook, &look); err != nil {
+		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"font": fontJSON{Name: font.Name, Format: font.Format, Version: font.Version}})
+	logo, hasLogo, err := s.deps.Settings.CurrentLogo(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	maintenance, err := s.deps.Settings.Maintenance(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	general := settings.DefaultGeneral
+	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionGeneral, &general); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	features, err := s.features(r)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	out := map[string]any{"font": nil, "name": look.InstanceName, "accent": settings.DerivedAccent(look.AccentLight, look.AccentDark),
+		"login_welcome": look.LoginWelcome, "terms_url": look.TermsURL, "banner": activeBanner(look), "welcome_page": look.WelcomePage,
+		"help_url": general.HelpURL, "maintenance": maintenance, "logo": "", "mail_ready": s.deps.Identity.MailReady(),
+		"self_signup": features.SelfSignup}
+	if found {
+		out["font"] = fontJSON{Name: font.Name, Format: font.Format, Version: font.Version}
+	}
+	if hasLogo {
+		out["logo"] = "/api/v1/appearance/logo?v=" + logo.Version
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+// activeBanner leaves out a banner past its end date.
+func activeBanner(look settings.Look) any {
+	if look.BannerText == "" || (look.BannerEnds != nil && time.Now().After(*look.BannerEnds)) {
+		return nil
+	}
+	return map[string]string{"text": look.BannerText, "level": look.BannerLevel}
 }
 
 func (s *Server) handleAppearanceFont(w http.ResponseWriter, r *http.Request) {

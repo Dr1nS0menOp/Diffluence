@@ -5,6 +5,7 @@ package spaces
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"regexp"
 	"strings"
@@ -50,6 +51,8 @@ type Space struct {
 	CreatedAt   time.Time       `json:"created_at"`
 	UpdatedAt   time.Time       `json:"updated_at"`
 	Favourite   bool            `json:"favourite"`
+	Kind        string          `json:"kind"`
+	OwnerID     *uuid.UUID      `json:"owner_id"`
 	Can         map[string]bool `json:"can,omitempty"`
 	// The settings of a space.
 	HasIcon          bool            `json:"has_icon"`
@@ -65,6 +68,9 @@ type Input struct {
 	Name        string
 	Description string
 	Icon        string
+	// Document is the starter text of the home page, from the browser, so the words
+	// are in the person's language (spec 013, D16). It passes the usual gate.
+	Document json.RawMessage
 }
 
 // Service manages spaces.
@@ -104,12 +110,12 @@ func (in *Input) validate() error {
 }
 
 const columns = `id, key, name, description, icon, status, home_page_id, created_by, created_at, updated_at,
-	icon_object <> '', title_align, review_months, approval_required`
+	icon_object <> '', title_align, review_months, approval_required, kind, owner_id`
 
 func scan(r pgx.Row) (Space, error) {
 	var s Space
 	err := r.Scan(&s.ID, &s.Key, &s.Name, &s.Description, &s.Icon, &s.Status, &s.HomePageID, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt,
-		&s.HasIcon, &s.TitleAlign, &s.ReviewMonths, &s.ApprovalRequired)
+		&s.HasIcon, &s.TitleAlign, &s.ReviewMonths, &s.ApprovalRequired, &s.Kind, &s.OwnerID)
 	return s, err
 }
 
@@ -142,6 +148,13 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 	if err := in.validate(); err != nil {
 		return Space{}, err
 	}
+	home := document.Empty()
+	if len(in.Document) > 0 {
+		var err error
+		if home, err = document.Normalize(in.Document); err != nil {
+			return Space{}, err
+		}
+	}
 	var out Space
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		id := ids.New()
@@ -170,11 +183,11 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 		if err := record(ctx, tx, c, "space.created", out, map[string]any{"name": out.Name}); err != nil {
 			return err
 		}
-		home, err := s.pages.CreatePublished(ctx, tx, c, id, nil, in.Name, document.Empty(), c.UserID)
+		page, err := s.pages.CreatePublished(ctx, tx, c, id, nil, in.Name, home, c.UserID)
 		if err != nil {
 			return err
 		}
-		out, err = scan(tx.QueryRow(ctx, "UPDATE spaces SET home_page_id = $2 WHERE id = $1 RETURNING "+columns, id, home.ID))
+		out, err = scan(tx.QueryRow(ctx, "UPDATE spaces SET home_page_id = $2 WHERE id = $1 RETURNING "+columns, id, page.ID))
 		return err
 	})
 	return out, err
@@ -224,7 +237,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 		return sp, err
 	}
 	sp.Can = map[string]bool{}
-	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport} {
+	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess} {
 		d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, id, action)
 		if err != nil {
 			return sp, err

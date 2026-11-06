@@ -2,8 +2,10 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Me } from '../api';
-import { Dialog, ErrorNote, Field, formatDate } from '../components/ui';
+import { api, type LoginEntry, type Me } from '../api';
+import { Dialog, ErrorNote, Field, NewPasswordField } from '../components/ui';
+import { useDates } from '../dates';
+import { AccountNav } from './account';
 
 interface Security {
   has_password: boolean;
@@ -63,20 +65,38 @@ function PasswordSection() {
             required
           />
         </Field>
-        <Field label={t('profile.newPassword')}>
-          <input
-            type="password"
-            value={next}
-            onChange={(e) => setNext(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </Field>
+        <NewPasswordField label={t('profile.newPassword')} value={next} onChange={setNext} />
         <button type="submit" className="primary">
           {t('common.save')}
         </button>
       </form>
     </section>
+  );
+}
+
+/** A session someone stole survives the removal of a factor, so this is offered then. */
+function EndOtherSessionsOffer() {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const end = useMutation({
+    mutationFn: () => api.post('/me/sessions/end-others'),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['sessions'] }),
+  });
+  if (end.isSuccess) {
+    return (
+      <p role="status" className="note">
+        {t('account.otherSessionsEnded')}
+      </p>
+    );
+  }
+  return (
+    <div role="status" className="note">
+      <p>{t('account.endOtherSessionsHelp')}</p>
+      <ErrorNote error={end.error} />
+      <button type="button" onClick={() => end.mutate()}>
+        {t('account.endOtherSessions')}
+      </button>
+    </div>
   );
 }
 
@@ -87,7 +107,10 @@ function TOTPSection({ enabled }: { enabled: boolean }) {
   const [code, setCode] = useState('');
   const [setup, setSetup] = useState<{ secret: string; qr_code: string } | null>(null);
   const [recovery, setRecovery] = useState<string[] | null>(null);
-  const refresh = () => client.invalidateQueries({ queryKey: ['security'] });
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['security'] });
+    await client.invalidateQueries({ queryKey: ['me'] });
+  };
   const begin = useMutation({
     mutationFn: () => api.post<{ secret: string; qr_code: string }>('/me/totp/begin', { password }),
     onSuccess: (s) => {
@@ -111,11 +134,13 @@ function TOTPSection({ enabled }: { enabled: boolean }) {
       await refresh();
     },
   });
+  const removed = disable.isSuccess && !enabled;
   return (
     <section>
       <h2>{t('profile.twoFactor')}</h2>
       <p>{enabled ? t('profile.totpOn') : t('profile.totpOff')}</p>
       <ErrorNote error={begin.error ?? confirm.error ?? disable.error} />
+      {removed && <EndOtherSessionsOffer />}
       {!setup && (
         <form
           onSubmit={(e: FormEvent) => {
@@ -185,7 +210,11 @@ function PasskeySection() {
     queryFn: () => api.get<{ passkeys: Passkey[] }>('/me/passkeys'),
   });
   const [name, setName] = useState('');
-  const refresh = () => client.invalidateQueries({ queryKey: ['passkeys'] });
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['passkeys'] });
+    await client.invalidateQueries({ queryKey: ['security'] });
+    await client.invalidateQueries({ queryKey: ['me'] });
+  };
   const add = useMutation({
     mutationFn: async () => {
       const begin = await api.post<{
@@ -210,6 +239,7 @@ function PasskeySection() {
     <section>
       <h2>{t('profile.passkeys')}</h2>
       <ErrorNote error={add.error ?? remove.error} />
+      {remove.isSuccess && <EndOtherSessionsOffer />}
       {q.data?.passkeys.length === 0 && <p className="muted">{t('profile.passkeyNone')}</p>}
       <ul className="plain-list">
         {q.data?.passkeys.map((p) => (
@@ -238,6 +268,7 @@ function PasskeySection() {
 
 function SessionsSection() {
   const { t } = useTranslation();
+  const dates = useDates();
   const client = useQueryClient();
   const q = useQuery({
     queryKey: ['sessions'],
@@ -256,7 +287,7 @@ function SessionsSection() {
             <tr key={s.id}>
               <td>{s.user_agent}</td>
               <td>{s.ip}</td>
-              <td>{formatDate(s.last_seen_at)}</td>
+              <td>{dates.moment(s.last_seen_at)}</td>
               <td>
                 {s.current ? (
                   t('profile.thisSession')
@@ -274,23 +305,69 @@ function SessionsSection() {
   );
 }
 
-export function ProfileView({ me }: { me: Me }) {
+function LoginHistorySection() {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const q = useQuery({
+    queryKey: ['logins'],
+    queryFn: () => api.get<{ logins: LoginEntry[] }>('/me/logins'),
+  });
+  return (
+    <section>
+      <h2>{t('account.logins')}</h2>
+      <ErrorNote error={q.error} />
+      <table>
+        <thead>
+          <tr>
+            <th>{t('admin.when')}</th>
+            <th>{t('account.loginMethod')}</th>
+            <th>{t('admin.ip')}</th>
+            <th>{t('account.loginDevice')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {q.data?.logins.map((l) => (
+            <tr key={l.at}>
+              <td>{dates.moment(l.at)}</td>
+              <td>{l.method}</td>
+              <td>{l.ip}</td>
+              <td>{l.user_agent}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
+  );
+}
+
+/** Says why a stronger sign-in matters, for as long as a password is all there is. */
+function SignInNote({ me }: { me: Me }) {
+  const { t } = useTranslation();
+  if (me.needs_second_factor) {
+    return (
+      <p role="alert" className="note note-error">
+        {t('account.secondFactorRequired')}
+      </p>
+    );
+  }
+  if (!me.sign_in.weak) return null;
+  return <p className="note">{t('site.signInHelp')}</p>;
+}
+
+export function SecurityView({ me }: { me: Me }) {
   const { t } = useTranslation();
   const security = useQuery({ queryKey: ['security'], queryFn: () => api.get<Security>('/me/security') });
   return (
     <>
       <h1>{t('profile.title')}</h1>
-      <section>
-        <h2>{t('profile.details')}</h2>
-        <p>
-          {me.user.display_name} <span className="muted">{me.user.email}</span>
-        </p>
-      </section>
+      {!me.needs_second_factor && <AccountNav />}
+      <SignInNote me={me} />
       {security.data?.has_password === false && <p className="muted">{t('profile.noPassword')}</p>}
       {security.data?.has_password && <PasswordSection />}
       {security.data?.has_password && <TOTPSection enabled={security.data.totp_enabled} />}
       <PasskeySection />
-      <SessionsSection />
+      {!me.needs_second_factor && <SessionsSection />}
+      {!me.needs_second_factor && <LoginHistorySection />}
     </>
   );
 }

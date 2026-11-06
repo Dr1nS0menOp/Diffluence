@@ -68,3 +68,19 @@ With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MAST
 - `/livez`: the process is alive
 - `/readyz`: ready for traffic (database, migrations, queue, storage)
 - Admin console, System health: nodes, versions, queues, failed jobs
+
+## Passwords
+
+New passwords need 15 characters, and are checked against about 5 million leaked passwords that ship with Diffluence. To refuse more, set `DIFFLUENCE_PASSWORD_BLOCKLIST_FILE` to a text file with one password per line. It works on top of the built-in list, and Diffluence reads it at startup. Existing passwords stay valid.
+
+## Audit retention
+
+The console stores how many days audit rows stay: a year by default, and longer only with a stated reason. The application cannot delete them. To remove older rows, an operator runs `diffluence audit prune` with `DIFFLUENCE_MIGRATE_DATABASE_URL` set to the owner of the tables. It verifies the chain, leaves an anchor signed with the instance key, and removes the rows. Verification then starts at the anchor.
+
+## After restoring a backup
+
+Anonymising does not reach backups. After a restore, anonymise the same people again.
+
+## New releases
+
+Diffluence never calls home. Follow the release feed of the project to hear about updates.

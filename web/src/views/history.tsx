@@ -6,7 +6,8 @@ import { api, ApiError, type DiffBlock, type Me, type PageDetail, type Version }
 import { Link, navigate, useLocation } from '../router';
 import { DiffDocument } from '../components/editor/diff-view';
 import { DocumentView } from '../components/editor/editor';
-import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
+import { useDates } from '../dates';
 
 /** For a leaked secret. The number stays, and the audit log keeps who, when and why. */
 function RemoveVersionDialog({
@@ -61,6 +62,7 @@ const comparisonQuery = (pageId: string, from: string | number | null, to: strin
 /** Opens on what changed in this version, because that is why people come here. */
 function VersionDialog({ pageId, number, onClose }: { pageId: string; number: number; onClose: () => void }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const [clean, setClean] = useState(false);
   const version = useQuery({
     queryKey: ['version', pageId, number],
@@ -81,7 +83,7 @@ function VersionDialog({ pageId, number, onClose }: { pageId: string; number: nu
             {t('history.oldVersion', {
               number: shown.number,
               name: shown.author_name,
-              date: formatDate(shown.created_at),
+              date: dates.moment(shown.created_at),
             })}{' '}
             <Link href={`/pages/${pageId}`}>{t('history.toCurrent')}</Link>
           </p>
@@ -109,6 +111,7 @@ function VersionDialog({ pageId, number, onClose }: { pageId: string; number: nu
 
 export function HistoryView({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const client = useQueryClient();
   const page = useQuery({
     queryKey: ['page', pageId],
@@ -164,7 +167,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
               <td>
                 <strong>{t('history.version', { number: v.number })}</strong>{' '}
                 {t('history.by', { name: v.author_name })}{' '}
-                <span className="muted">{formatDate(v.created_at)}</span>{' '}
+                <span className="muted">{dates.moment(v.created_at)}</span>{' '}
                 {i === 0 && <span className="lozenge">{t('history.current')}</span>}
                 {v.restored_from !== null && (
                   <span className="muted"> · {t('history.restoredFrom', { number: v.restored_from })}</span>

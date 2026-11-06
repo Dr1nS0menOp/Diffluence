@@ -147,6 +147,7 @@ test('a picker shows people as soon as it has focus, and works by keyboard', asy
   await page.goto(`/pages/${id}`);
   await page.getByRole('button', { name: 'Restrictions' }).click();
   const dialog = page.getByRole('dialog', { name: 'Page restrictions' });
+  await dialog.getByRole('radio', { name: /Private/ }).check();
   const field = dialog.getByRole('combobox', { name: 'Add' }).first();
 
   await field.click();
@@ -185,6 +186,7 @@ test('a person without view profiles sees no people in a picker', async ({ page,
   await visitor.goto(`/pages/${id}`);
   await visitor.getByRole('button', { name: 'Restrictions' }).click();
   const dialog = visitor.getByRole('dialog', { name: 'Page restrictions' });
+  await dialog.getByRole('radio', { name: /Private/ }).check();
   const field = dialog.getByRole('combobox', { name: 'Add' }).first();
   await field.click();
   await expect(field).toHaveAttribute('aria-expanded', 'false');

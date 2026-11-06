@@ -151,6 +151,12 @@ export function NewLinkDialog({
   );
 }
 
+/** The text a new space starts with: in the person's language, so it comes from here (D16). */
+function starterDocument(words: { welcome: string; next: string }) {
+  const paragraph = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+  return { type: 'doc', content: [paragraph(words.welcome), paragraph(words.next)] };
+}
+
 export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -179,6 +185,7 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
         ...form,
         preset: chosenPreset,
         ...(templateId ? { template_id: templateId } : {}),
+        document: starterDocument({ welcome: t('space.starterWelcome'), next: t('space.starterNext') }),
       }),
     onSuccess: async (s) => {
       await client.invalidateQueries({ queryKey: ['spaces'] });

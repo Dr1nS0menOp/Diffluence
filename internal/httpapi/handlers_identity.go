@@ -7,6 +7,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -29,30 +30,31 @@ func (s *Server) registerIdentityRoutes() {
 	r.HandleFunc("POST /api/v1/auth/passkey/begin", Public, s.handlePasskeyLoginBegin)
 	r.HandleFunc("POST /api/v1/auth/passkey/finish", Public, s.handlePasskeyLoginFinish)
 
-	me := Authenticated()
+	me := SessionOnly(Authenticated())
 	r.HandleFunc("POST /api/v1/me/password", me, s.handlePasswordChange)
 	r.HandleFunc("GET /api/v1/me/security", me, s.handleSecurity)
 	r.HandleFunc("GET /api/v1/me/sessions", me, s.handleSessions)
 	r.HandleFunc("DELETE /api/v1/me/sessions/{id}", me, s.handleSessionRevoke)
+	r.HandleFunc("POST /api/v1/me/sessions/end-others", SessionOnly(me), s.handleEndOtherSessions)
 	r.HandleFunc("POST /api/v1/me/totp/begin", me, s.handleTOTPBegin)
 	r.HandleFunc("POST /api/v1/me/totp/confirm", me, s.handleTOTPConfirm)
-	r.HandleFunc("POST /api/v1/me/totp/disable", me, s.handleTOTPDisable)
+	r.HandleFunc("POST /api/v1/me/totp/disable", Sensitive(me), s.handleTOTPDisable)
 	r.HandleFunc("GET /api/v1/me/passkeys", me, s.handlePasskeys)
-	r.HandleFunc("POST /api/v1/me/passkeys/begin", me, s.handlePasskeyBegin)
-	r.HandleFunc("POST /api/v1/me/passkeys/finish", me, s.handlePasskeyFinish)
-	r.HandleFunc("DELETE /api/v1/me/passkeys/{id}", me, s.handlePasskeyRemove)
+	r.HandleFunc("POST /api/v1/me/passkeys/begin", Sensitive(me), s.handlePasskeyBegin)
+	r.HandleFunc("POST /api/v1/me/passkeys/finish", Sensitive(me), s.handlePasskeyFinish)
+	r.HandleFunc("DELETE /api/v1/me/passkeys/{id}", Sensitive(me), s.handlePasskeyRemove)
 	r.HandleFunc("GET /api/v1/directory", Permission(identity.PermViewProfiles), s.handleDirectory)
 
-	admin := Permission(identity.PermAdministrator)
+	admin := SessionOnly(Permission(identity.PermAdministrator))
 	r.HandleFunc("GET /api/v1/admin/users", admin, s.handleUsers)
 	r.HandleFunc("POST /api/v1/admin/users", admin, s.handleUserCreate)
 	r.HandleFunc("GET /api/v1/admin/users/{id}", admin, s.handleUser)
 	r.HandleFunc("PATCH /api/v1/admin/users/{id}", admin, s.handleUserUpdate)
 	r.HandleFunc("POST /api/v1/admin/users/{id}/disable", admin, s.handleUserDisable)
 	r.HandleFunc("POST /api/v1/admin/users/{id}/enable", admin, s.handleUserEnable)
-	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-password", admin, s.handleUserResetPassword)
-	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-mfa", admin, s.handleUserResetMFA)
-	r.HandleFunc("PUT /api/v1/admin/users/{id}/permissions", admin, s.handleUserPermissions)
+	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-password", Sensitive(admin), s.handleUserResetPassword)
+	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-mfa", Sensitive(admin), s.handleUserResetMFA)
+	r.HandleFunc("PUT /api/v1/admin/users/{id}/permissions", Sensitive(admin), s.handleUserPermissions)
 	r.HandleFunc("GET /api/v1/admin/groups", admin, s.handleGroups)
 	r.HandleFunc("POST /api/v1/admin/groups", admin, s.handleGroupCreate)
 	r.HandleFunc("PATCH /api/v1/admin/groups/{id}", admin, s.handleGroupUpdate)
@@ -62,7 +64,8 @@ func (s *Server) registerIdentityRoutes() {
 	r.HandleFunc("DELETE /api/v1/admin/groups/{id}/members/{user}", admin, s.handleGroupMemberRemove)
 	r.HandleFunc("PUT /api/v1/admin/groups/{id}/permissions", admin, s.handleGroupPermissions)
 	r.HandleFunc("GET /api/v1/admin/scim-tokens", admin, s.handleScimTokens)
-	r.HandleFunc("POST /api/v1/admin/scim-tokens", admin, s.handleScimTokenCreate)
+	r.HandleFunc("POST /api/v1/admin/scim-tokens", Sensitive(admin), s.handleScimTokenCreate)
+	r.HandleFunc("POST /api/v1/admin/scim-tokens/{id}/rotate", Sensitive(admin), s.handleScimTokenRotate)
 	r.HandleFunc("DELETE /api/v1/admin/scim-tokens/{id}", admin, s.handleScimTokenRevoke)
 	r.HandleFunc("GET /api/v1/admin/system", admin, s.handleSystem)
 
@@ -138,7 +141,11 @@ func (s *Server) handleOIDCStart(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Not found.")
 		return
 	}
-	url, binding, err := s.deps.SSO.Start(r.Context())
+	start := s.deps.SSO.Start
+	if r.URL.Query().Get("prompt") == "login" {
+		start = s.deps.SSO.StartFresh // step-up: the provider must ask again.
+	}
+	url, binding, err := start(r.Context())
 	if err != nil {
 		s.deps.Log.Error("oidc start failed", "error", err)
 		http.Redirect(w, r, "/login?error=oidc_unavailable", http.StatusFound)
@@ -370,7 +377,14 @@ func queryInt(r *http.Request, key string) int {
 }
 
 func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
-	list, total, err := s.deps.Identity.ListUsers(r.Context(), identity.UserFilter{Text: r.URL.Query().Get("q"),
+	q := r.URL.Query()
+	group, err := optionalID(q.Get("group_id"))
+	if err != nil {
+		badBody(w)
+		return
+	}
+	list, total, err := s.deps.Identity.ListUsers(r.Context(), identity.UserFilter{Text: q.Get("q"), Type: q.Get("type"),
+		Status: q.Get("status"), Source: q.Get("source"), GroupID: group, IdleDays: queryInt(r, "idle_days"),
 		Limit: queryInt(r, "limit"), Offset: queryInt(r, "offset")})
 	if err != nil {
 		s.fail(w, r, err)
@@ -428,6 +442,10 @@ func (s *Server) handleUserUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	u, err := s.deps.Identity.UpdateUserDetails(r.Context(), s.caller(r), id, identity.UpdateUser{DisplayName: in.DisplayName, Type: in.Type})
 	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	if err := s.deps.Spaces.FollowRename(r.Context(), id, u.DisplayName); err != nil {
 		s.fail(w, r, err)
 		return
 	}
@@ -596,18 +614,40 @@ func (s *Server) handleScimTokens(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleScimTokenCreate(w http.ResponseWriter, r *http.Request) {
 	var in struct {
-		Name string `json:"name"`
+		Name      string    `json:"name"`
+		ExpiresAt time.Time `json:"expires_at"`
 	}
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return
 	}
-	t, secret, err := s.deps.SCIM.CreateToken(r.Context(), s.caller(r), in.Name)
+	t, secret, err := s.deps.SCIM.CreateToken(r.Context(), s.caller(r), in.Name, in.ExpiresAt)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusCreated, map[string]any{"token": t, "secret": secret})
+}
+
+func (s *Server) handleScimTokenRotate(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	t, secret, err := s.deps.SCIM.RotateToken(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"token": t, "secret": secret})
+}
+
+func (s *Server) handleEndOtherSessions(w http.ResponseWriter, r *http.Request) {
+	if err := s.deps.Identity.EndOtherSessions(r.Context(), s.caller(r), PrincipalFrom(r.Context()).SessionID); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleScimTokenRevoke(w http.ResponseWriter, r *http.Request) {

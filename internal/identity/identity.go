@@ -9,6 +9,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/mail"
@@ -37,10 +38,11 @@ const (
 	PermViewProfiles        = "view_profiles"
 	PermAdministrator       = "administrator"
 	PermSystemAdministrator = "system_administrator"
+	PermPersonalSpace       = "create_personal_space"
 )
 
 // AllGlobalPermissions lists every global permission.
-var AllGlobalPermissions = []string{PermUseProduct, PermCreateSpace, PermViewProfiles, PermAdministrator, PermSystemAdministrator}
+var AllGlobalPermissions = []string{PermUseProduct, PermCreateSpace, PermViewProfiles, PermAdministrator, PermSystemAdministrator, PermPersonalSpace}
 
 // User types and statuses.
 const (
@@ -69,10 +71,17 @@ type User struct {
 	CreatedAt   time.Time
 }
 
-// Principal is an authenticated user plus the session used.
+// Principal is an authenticated user plus the session or token used.
 type Principal struct {
 	User      User
 	SessionID uuid.UUID
+	// ViaToken says a personal access token was used. CanWrite is its scope.
+	ViaToken bool
+	CanWrite bool
+	// ConfirmedAt is when the person last proved who they are in this session.
+	ConfirmedAt time.Time
+	// NeedsSecondFactor limits the session to setting up a second factor.
+	NeedsSecondFactor bool
 }
 
 // RequestMeta describes where a request came from, for the audit log.
@@ -100,6 +109,8 @@ type Options struct {
 	Keyring            *keys.Keyring
 	WebAuthn           *webauthn.WebAuthn
 	Issuer             string // name shown in authenticator apps
+	// PasswordBlocklist holds known bad passwords, in lower case.
+	PasswordBlocklist map[string]bool
 }
 
 // Service implements identity operations.
@@ -113,6 +124,12 @@ type Service struct {
 	keyring    *keys.Keyring
 	webauthn   *webauthn.WebAuthn
 	issuer     string
+
+	idleSetting      func(context.Context) time.Duration
+	secondFactorRule func(context.Context) string
+	mailer           Mailer
+	origin           string
+	blocklist        map[string]bool
 
 	dummyOnce sync.Once
 	dummy     string
@@ -131,7 +148,7 @@ func NewService(pool *pgxpool.Pool, instanceID uuid.UUID, opts Options) *Service
 	}
 	return &Service{pool: pool, instanceID: instanceID, params: opts.Params,
 		idle: opts.SessionIdleTimeout, maxAge: opts.SessionMaxAge, now: opts.Now,
-		keyring: opts.Keyring, webauthn: opts.WebAuthn, issuer: opts.Issuer}
+		keyring: opts.Keyring, webauthn: opts.WebAuthn, issuer: opts.Issuer, blocklist: opts.PasswordBlocklist}
 }
 
 // dummyHash is verified against when a user does not exist, so the response
@@ -188,7 +205,7 @@ func (s *Service) CreateLocalUser(ctx context.Context, in NewUser, actor Actor, 
 			return User{}, fmt.Errorf("%w: unknown permission %q", ErrInvalidInput, p)
 		}
 	}
-	if err := ValidatePassword(in.Password); err != nil {
+	if err := s.validateNewPassword(in.Password, in.Email, in.DisplayName); err != nil {
 		return User{}, err
 	}
 	hash, err := HashPassword(in.Password, s.params)
@@ -238,8 +255,11 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	email = normalizeEmail(email)
 	var u User
 	var hash string
-	err := s.pool.QueryRow(ctx, `SELECT u.id, u.type, u.status, u.email, u.display_name, u.created_at, c.password_hash
-		FROM users u JOIN local_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1`, email).
+	// An account past its end date is treated like a disabled one.
+	err := s.pool.QueryRow(ctx, `SELECT u.id, u.type,
+			CASE WHEN u.expires_at IS NOT NULL AND u.expires_at <= now() THEN 'disabled' ELSE u.status END,
+			u.email, u.display_name, u.created_at, c.password_hash
+		FROM users u JOIN local_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 AND u.type <> 'service'`, email).
 		Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.CreatedAt, &hash)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
@@ -262,15 +282,7 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		reason = "bad_password"
 	}
 	if reason != "" {
-		actor := Actor{Type: audit.ActorAnonymous}
-		objID := ""
-		if found {
-			objID = u.ID.String()
-		}
-		// Attempted email is recorded to detect credential-stuffing; never the password.
-		e := event(meta, actor, "auth.login", "user", objID, audit.ResultFailure,
-			map[string]any{"reason": reason, "email": truncate(email, 254), "method": "password"})
-		if err := audit.RecordStandalone(ctx, s.pool, e); err != nil {
+		if err := s.recordFailedLogin(ctx, failedLogin{reason: reason, email: email, account: u, known: found}, meta); err != nil {
 			return "", Principal{}, err
 		}
 		return "", Principal{}, ErrInvalidCredentials
@@ -285,7 +297,7 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
 		if !mfa {
-			token, p.SessionID, err = s.createSession(ctx, tx, u.ID, meta)
+			token, p.SessionID, err = s.createSession(ctx, tx, sessionStart{UserID: u.ID, Method: "password", Meta: meta})
 			if err != nil {
 				return err
 			}
@@ -321,52 +333,120 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	return token, p, nil
 }
 
+// failedLogin is what is known of a login that did not work.
+type failedLogin struct {
+	reason  string
+	email   string
+	account User
+	known   bool
+}
+
+// recordFailedLogin never stores what was typed. People sometimes type a password in
+// the address field, and an audit row cannot be changed afterwards (SEC-820). A known
+// account gets its id. An unknown address gets a keyed hash, which still shows
+// credential stuffing: many tries with one address.
+func (s *Service) recordFailedLogin(ctx context.Context, f failedLogin, meta RequestMeta) error {
+	details := map[string]any{"reason": f.reason, "method": "password"}
+	objectID := ""
+	if f.known {
+		objectID = f.account.ID.String()
+	} else if s.keyring != nil {
+		sum, err := s.keyring.Fingerprint("login address", []byte(strings.ToLower(strings.TrimSpace(f.email))))
+		if err != nil {
+			return err
+		}
+		details["address_hash"] = hex.EncodeToString(sum)
+	}
+	return audit.RecordStandalone(ctx, s.pool, event(meta, Actor{Type: audit.ActorAnonymous}, "auth.login", "user", objectID,
+		audit.ResultFailure, details))
+}
+
 func hashToken(token string) []byte {
 	h := sha256.Sum256([]byte(token))
 	return h[:]
 }
 
-func (s *Service) createSession(ctx context.Context, tx pgx.Tx, userID uuid.UUID, meta RequestMeta) (string, uuid.UUID, error) {
+func (s *Service) createSession(ctx context.Context, tx pgx.Tx, in sessionStart) (string, uuid.UUID, error) {
 	b := make([]byte, 32)
 	_, _ = rand.Read(b)
 	token := base64.RawURLEncoding.EncodeToString(b)
 	id := ids.New()
 	now := s.now()
-	_, err := tx.Exec(ctx, `INSERT INTO sessions (id, token_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent)
-		VALUES ($1, $2, $3, $4, $4, $5, $6, $7)`,
-		id, hashToken(token), userID, now, now.Add(s.maxAge), meta.IP, truncate(meta.UserAgent, 512))
-	return token, id, err
+	needsFactor, err := s.needsSecondFactor(ctx, tx, in.UserID)
+	if err != nil {
+		return "", id, err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO sessions (id, token_hash, user_id, created_at, last_seen_at, expires_at, ip, user_agent, needs_second_factor)
+		VALUES ($1, $2, $3, $4, $4, $5, $6, $7, $8)`,
+		id, hashToken(token), in.UserID, now, now.Add(s.maxAge), in.Meta.IP, truncate(in.Meta.UserAgent, 512), needsFactor)
+	if err != nil {
+		return "", id, err
+	}
+	return token, id, s.noteLogin(ctx, tx, in)
 }
 
-// AuthenticateSession resolves a session token. Expired sessions are removed.
-// Only a hash of the token is stored, so a database leak does not leak sessions.
-func (s *Service) AuthenticateSession(ctx context.Context, token string) (Principal, error) {
+// session resolves a session token and removes it when it has ended. Only a hash
+// of the token is stored, so a database leak does not leak sessions.
+func (s *Service) session(ctx context.Context, token string) (Principal, time.Time, error) {
 	if token == "" || len(token) > 128 {
-		return Principal{}, ErrNoSession
+		return Principal{}, time.Time{}, ErrNoSession
 	}
 	var p Principal
-	var lastSeen, expires time.Time
-	err := s.pool.QueryRow(ctx, `SELECT s.id, s.last_seen_at, s.expires_at,
-			u.id, u.type, u.status, u.email, u.display_name, u.created_at
+	var lastSeen, created, expires time.Time
+	var confirmed, accountEnds *time.Time
+	err := s.pool.QueryRow(ctx, `SELECT s.id, s.last_seen_at, s.created_at, s.expires_at, s.reauth_at, s.needs_second_factor,
+			u.id, u.type, u.status, u.email, u.display_name, u.created_at, u.expires_at
 		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`, hashToken(token)).
-		Scan(&p.SessionID, &lastSeen, &expires, &p.User.ID, &p.User.Type, &p.User.Status, &p.User.Email,
-			&p.User.DisplayName, &p.User.CreatedAt)
+		Scan(&p.SessionID, &lastSeen, &created, &expires, &confirmed, &p.NeedsSecondFactor,
+			&p.User.ID, &p.User.Type, &p.User.Status, &p.User.Email, &p.User.DisplayName, &p.User.CreatedAt, &accountEnds)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return Principal{}, ErrNoSession
+		return Principal{}, time.Time{}, ErrNoSession
 	}
 	if err != nil {
-		return Principal{}, err
+		return Principal{}, time.Time{}, err
 	}
 	now := s.now()
-	if p.User.Status != StatusActive || !now.Before(expires) || !now.Before(lastSeen.Add(s.idle)) {
+	accountEnded := accountEnds != nil && !now.Before(*accountEnds)
+	if p.User.Status != StatusActive || accountEnded || !now.Before(expires) || !now.Before(lastSeen.Add(s.idleLimit(ctx))) {
 		_, _ = s.pool.Exec(ctx, "DELETE FROM sessions WHERE id = $1", p.SessionID)
-		return Principal{}, ErrNoSession
+		return Principal{}, time.Time{}, ErrNoSession
+	}
+	p.CanWrite = true
+	p.ConfirmedAt = created
+	if confirmed != nil && confirmed.After(created) {
+		p.ConfirmedAt = *confirmed
+	}
+	return p, lastSeen, nil
+}
+
+// idleLimit is the idle time an administrator chose, or the configured one.
+func (s *Service) idleLimit(ctx context.Context) time.Duration {
+	if s.idleSetting != nil {
+		if d := s.idleSetting(ctx); d > 0 {
+			return d
+		}
+	}
+	return s.idle
+}
+
+// AuthenticateSession resolves a session token, and counts as activity.
+func (s *Service) AuthenticateSession(ctx context.Context, token string) (Principal, error) {
+	p, lastSeen, err := s.session(ctx, token)
+	if err != nil {
+		return p, err
 	}
 	// Refresh at most once a minute to avoid a write on every request.
-	if now.Sub(lastSeen) > time.Minute {
+	if now := s.now(); now.Sub(lastSeen) > time.Minute {
 		_, _ = s.pool.Exec(ctx, "UPDATE sessions SET last_seen_at = $2 WHERE id = $1", p.SessionID, now)
 	}
 	return p, nil
+}
+
+// PeekSession resolves a session token without counting as activity. Polling in an
+// open tab must not keep a session alive for ever (spec 013, D8).
+func (s *Service) PeekSession(ctx context.Context, token string) (Principal, error) {
+	p, _, err := s.session(ctx, token)
+	return p, err
 }
 
 // Logout ends the principal's current session.

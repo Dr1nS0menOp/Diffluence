@@ -29,15 +29,20 @@ type userCase struct {
 	active  bool
 	product bool // holds use_product
 	inGroup bool
+	// expires says when the account ends: "", "past" or "future".
+	expires string
 }
 
 var userCases = []userCase{
-	{"member", "member", true, true, false},
-	{"member-in-group", "member", true, true, true},
-	{"guest", "guest", true, true, false},
-	{"guest-in-group", "guest", true, true, true},
-	{"disabled-member", "member", false, true, true},
-	{"member-no-product", "member", true, false, true},
+	{name: "member", typ: "member", active: true, product: true},
+	{name: "member-in-group", typ: "member", active: true, product: true, inGroup: true},
+	{name: "guest", typ: "guest", active: true, product: true},
+	{name: "guest-in-group", typ: "guest", active: true, product: true, inGroup: true},
+	{name: "disabled-member", typ: "member", product: true, inGroup: true},
+	{name: "member-no-product", typ: "member", active: true, inGroup: true},
+	{name: "expired-guest", typ: "guest", active: true, product: true, expires: "past"},
+	{name: "expired-member", typ: "member", active: true, product: true, inGroup: true, expires: "past"},
+	{name: "guest-expiring-tomorrow", typ: "guest", active: true, product: true, expires: "future"},
 }
 
 // grantCase says which subject holds which permissions in the space.
@@ -52,12 +57,16 @@ var editorPerms = []string{permissions.SpaceView, permissions.PageCreate, permis
 	permissions.PageDeleteOwn, permissions.AttachmentAdd, permissions.AttachmentDeleteOwn,
 	permissions.CommentAdd, permissions.CommentDeleteOwn}
 var adminPerms = permissions.AllSpacePermissions
+var managerPerms = permissions.Templates[permissions.TemplateManager]
 
 var grantCases = []grantCase{
 	{"none", "none", nil},
 	{"user-viewer", "user", viewerPerms},
 	{"user-editor", "user", editorPerms},
 	{"user-admin", "user", adminPerms},
+	{"user-manager", "user", managerPerms},
+	{"group-manager", "group", managerPerms},
+	{"administer-only", "user", []string{permissions.SpaceView, permissions.SpaceAdminister}},
 	{"group-viewer", "group", viewerPerms},
 	{"group-editor", "group", editorPerms},
 	{"members-viewer", "all_members", viewerPerms},
@@ -115,7 +124,7 @@ var spaceStates = []string{"active", "archived", "trashed"}
 var actions = []string{
 	permissions.ActionPageView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
 	permissions.ActionPageDelete, permissions.AttachmentAdd, permissions.ActionAttachmentDelete,
-	permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
+	permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess,
 	permissions.CommentAdd, permissions.ActionCommentDelete, permissions.ActionReact,
 }
 
@@ -157,8 +166,8 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		return false // "other": someone else is listed
 	}
 
-	// Global layer and account.
-	if !u.active || !u.product {
+	// Global layer and account. Past its end date an account counts as not active.
+	if !u.active || u.expires == "past" || !u.product {
 		return false
 	}
 	// Space state, and every action needs view.
@@ -175,7 +184,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	}
 	// Archived spaces are read-only.
 	switch action {
-	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister:
+	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess:
 	default:
 		if spaceStatus == "archived" {
 			return false
@@ -200,6 +209,10 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		}
 	case permissions.ActionAttachmentDelete:
 		if !has(permissions.AttachmentDeleteAny) && !(ownPage && has(permissions.AttachmentDeleteOwn)) {
+			return false
+		}
+	case permissions.SpaceManageAccess:
+		if !has(permissions.SpaceManageAccess) && !has(permissions.SpaceAdminister) {
 			return false
 		}
 	case permissions.ActionCommentDelete:
@@ -241,7 +254,8 @@ func TestMatrixEvaluate(t *testing.T) {
 
 	n := 0
 	for _, u := range userCases {
-		facts := permissions.UserFacts{ID: me, Type: u.typ, Active: u.active}
+		// LoadUser turns the end date into Active. The SQL test covers that step.
+		facts := permissions.UserFacts{ID: me, Type: u.typ, Active: u.active && u.expires != "past"}
 		if u.inGroup {
 			facts.Groups = []uuid.UUID{grp}
 		}
@@ -336,6 +350,12 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 			status = "disabled"
 		}
 		id := mkUser(u.name, u.typ, status)
+		switch u.expires {
+		case "past":
+			exec("UPDATE users SET expires_at = now() - interval '1 hour' WHERE id = $1", id)
+		case "future":
+			exec("UPDATE users SET expires_at = now() + interval '1 day' WHERE id = $1", id)
+		}
 		if u.product {
 			exec("INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, 'use_product')", id)
 		}
@@ -464,6 +484,97 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 		}
 		all = all[:0]
 	}
+}
+
+// peopleCase is one viewer and one person, for the rule on who may see whom.
+type peopleCase struct {
+	viewerType   string
+	viewProfiles bool
+	viewerActive bool
+	shared       string // user, group, all_members, none
+	targetType   string
+	targetActive bool
+}
+
+// literalPeopleRule is the rule of spec 013, F4 and D5, written out by hand.
+func literalPeopleRule(c peopleCase) bool {
+	if !c.viewerActive || c.targetType == "service" {
+		return false
+	}
+	return c.viewProfiles || c.shared == "user" || c.shared == "group"
+}
+
+// TestMatrixPeople compares three answers on who may see whom: the literal rule,
+// EvaluatePerson through CheckPerson, and perm_visible_people.
+func TestMatrixPeople(t *testing.T) {
+	tdb := testutil.Database(t)
+	ctx := context.Background()
+	pool := tdb.Pool
+	svc := permissions.NewService(pool)
+	exec := func(sql string, args ...any) {
+		t.Helper()
+		if _, err := pool.Exec(ctx, sql, args...); err != nil {
+			t.Fatalf("%s: %v", sql, err)
+		}
+	}
+	inst := ids.New()
+	n := 0
+	for _, viewerType := range []string{"member", "guest"} {
+		for _, viewProfiles := range []bool{true, false} {
+			for _, viewerActive := range []bool{true, false} {
+				for _, shared := range []string{"user", "group", "all_members", "none"} {
+					for _, targetType := range []string{"member", "guest", "service"} {
+						for _, targetActive := range []bool{true, false} {
+							c := peopleCase{viewerType, viewProfiles, viewerActive, shared, targetType, targetActive}
+							n++
+							viewer, target, grp, space := ids.New(), ids.New(), ids.New(), ids.New()
+							status := map[bool]string{true: "active", false: "disabled"}
+							exec(`INSERT INTO users (id, origin_instance_id, type, status, email, display_name) VALUES ($1, $2, $3, $4, $5, 'v')`,
+								viewer, inst, viewerType, status[viewerActive], viewer.String()+"@example.com")
+							exec(`INSERT INTO users (id, origin_instance_id, type, status, email, display_name) VALUES ($1, $2, $3, $4, $5, 't')`,
+								target, inst, targetType, status[targetActive], target.String()+"@example.com")
+							exec("INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, 'use_product')", viewer)
+							if viewProfiles {
+								exec("INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, 'view_profiles')", viewer)
+							}
+							exec(`INSERT INTO spaces (id, origin_instance_id, key, name, status, created_by) VALUES ($1, $2, $3, 's', 'active', $4)`,
+								space, inst, space.String(), viewer)
+							grant := func(typ string, id uuid.UUID) {
+								exec("INSERT INTO space_grants (space_id, subject_type, subject_id, permission) VALUES ($1, $2, $3, 'space.view')", space, typ, id)
+							}
+							switch shared {
+							case "user":
+								grant("user", viewer)
+								grant("user", target)
+							case "group":
+								exec("INSERT INTO groups (id, origin_instance_id, name, source) VALUES ($1, $2, $3, 'local')", grp, inst, grp.String())
+								exec("INSERT INTO group_members (group_id, user_id) VALUES ($1, $2), ($1, $3)", grp, viewer, target)
+								grant("group", grp)
+							case "all_members":
+								grant("all_members", uuid.Nil)
+							}
+							want := literalPeopleRule(c)
+							got, err := svc.CheckPerson(ctx, pool, viewer, target)
+							if err != nil {
+								t.Fatal(err)
+							}
+							if got != want {
+								t.Fatalf("%+v: CheckPerson=%v, rule=%v", c, got, want)
+							}
+							var listed bool
+							if err := pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM perm_visible_people($1) WHERE user_id = $2)", viewer, target).Scan(&listed); err != nil {
+								t.Fatal(err)
+							}
+							if listed != want {
+								t.Fatalf("%+v: SQL=%v, rule=%v", c, listed, want)
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	t.Logf("%d cases compared", n)
 }
 
 // ActionApprovalRead is view without the rule on unpublished pages, and nothing else.

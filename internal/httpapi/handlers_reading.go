@@ -65,7 +65,7 @@ func (s *Server) handlePreferences(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePreferencesSet(w http.ResponseWriter, r *http.Request) {
-	var in identity.Preferences
+	in := identity.DefaultPreferences()
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return
@@ -103,8 +103,13 @@ func (s *Server) handleMySpaces(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSpaceDirectory(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
+	category, err := optionalID(q.Get("category"))
+	if err != nil {
+		badBody(w)
+		return
+	}
 	list, total, err := s.deps.Spaces.Directory(r.Context(), s.caller(r), spaces.DirectoryQuery{
-		Text: q.Get("q"), Kind: q.Get("kind"), Sort: q.Get("sort"),
+		Text: q.Get("q"), Kind: q.Get("kind"), Sort: q.Get("sort"), Category: category,
 		Limit: queryInt(r, "limit"), Offset: queryInt(r, "offset"),
 	})
 	if err != nil {

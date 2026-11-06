@@ -10,7 +10,8 @@ import { IconChevronDown, IconVerified } from './icons';
 import { Menu, MenuItem, MenuSeparator } from './menu';
 import { SubjectPicker } from './picker';
 import { useToast } from './toast';
-import { Dialog, ErrorNote, Field, formatDate, Loading, RelativeTime } from './ui';
+import { useDates } from '../dates';
+import { Dialog, ErrorNote, Field, Loading, RelativeTime } from './ui';
 
 const MARK_ICON_SIZE = 16;
 
@@ -313,6 +314,7 @@ function AnswerRound({ round, onDone }: { round: ApprovalRound; onDone: () => vo
 
 export function ApprovalsDialog({ page, onClose }: { page: PageDetail; onClose: () => void }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const refresh = useRefresh(page);
   const rounds = useQuery({
     queryKey: ['approvals', page.id],
@@ -355,7 +357,7 @@ export function ApprovalsDialog({ page, onClose }: { page: PageDetail; onClose: 
         .map((r) => (
           <section key={r.id}>
             <h3>
-              {t(`organise.round_${r.status}`)} <span className="muted">{formatDate(r.created_at)}</span>
+              {t(`organise.round_${r.status}`)} <span className="muted">{dates.moment(r.created_at)}</span>
             </h3>
             <ApprovalAnswers round={r} />
           </section>

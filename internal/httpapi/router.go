@@ -24,6 +24,11 @@ const (
 type Access struct {
 	kind       accessKind
 	permission string
+	// sessionOnly refuses personal access tokens: a leaked script token must not
+	// reach passwords, tokens or the console.
+	sessionOnly bool
+	// sensitive also asks for proof of who you are, at most 10 minutes old.
+	sensitive bool
 }
 
 // Public routes need no session. Every use must carry a comment explaining why.
@@ -51,11 +56,34 @@ func Object(action string) Access {
 	return Access{kind: accessObject, permission: action}
 }
 
+// SessionOnly refuses tokens on top of a rule.
+func SessionOnly(a Access) Access {
+	a.sessionOnly = true
+	return a
+}
+
+// Sensitive asks a person to prove who they are, on top of a rule. It implies
+// SessionOnly: a token cannot prove anything.
+func Sensitive(a Access) Access {
+	a.sessionOnly, a.sensitive = true, true
+	return a
+}
+
 // ScimToken requires a valid SCIM bearer token. There is no session: identity
 // providers call these routes.
 func ScimToken() Access { return Access{kind: accessSCIM} }
 
 func (a Access) String() string {
+	switch {
+	case a.sensitive:
+		return "sensitive " + a.base()
+	case a.sessionOnly:
+		return "session-only " + a.base()
+	}
+	return a.base()
+}
+
+func (a Access) base() string {
 	switch a.kind {
 	case accessPublic:
 		return "public"

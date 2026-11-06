@@ -22,6 +22,7 @@ import (
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/console"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
@@ -36,6 +37,7 @@ import (
 	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/queue"
 	"github.com/diffluence/diffluence/internal/scim"
@@ -64,6 +66,8 @@ type App struct {
 	pool       *pgxpool.Pool
 	queue      *queue.Queue
 	identity   *identity.Service
+	people     *people.Service
+	console    *console.Service
 	perms      *permissions.Service
 	settings   *settings.Service
 	features   *features.Service
@@ -118,11 +122,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		a.Close()
 		return nil, err
 	}
-	keyFile := cfg.MasterKeyFile
-	if keyFile == "" {
-		keyFile = filepath.Join(cfg.DataDir, "master.key")
-	}
-	if a.keyring, err = keys.LoadOrCreate(keyFile, cfg.MasterKeyFile == ""); err != nil {
+	if a.keyring, err = keys.LoadOrCreate(cfg.KeyFile(), cfg.MasterKeyFile == ""); err != nil {
 		a.Close()
 		return nil, err
 	}
@@ -131,12 +131,18 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		a.Close()
 		return nil, fmt.Errorf("app: passkeys: %w", err)
 	}
+	blocklist, err := identity.LoadBlocklist(cfg.PasswordBlocklistFile)
+	if err != nil {
+		a.Close()
+		return nil, err
+	}
 	a.identity = identity.NewService(a.pool, a.instanceID, identity.Options{
 		SessionIdleTimeout: cfg.SessionIdleTimeout,
 		SessionMaxAge:      cfg.SessionMaxAge,
 		Keyring:            a.keyring,
 		WebAuthn:           wa,
 		Issuer:             cfg.InstanceName,
+		PasswordBlocklist:  blocklist,
 	})
 	if a.store, err = storage.NewDisk(filepath.Join(cfg.DataDir, "objects")); err != nil {
 		a.Close()
@@ -144,8 +150,12 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	}
 	a.perms = permissions.NewService(a.pool)
 	a.settings = settings.NewService(a.pool, a.store)
+	a.identity.SetPolicy(a.accessPolicy())
+	a.people = people.NewService(a.pool, a.perms, a.store, a.identity)
+	a.console = console.NewService(a.pool, a.store)
 	a.features = features.NewService(a.pool, a.settings)
 	a.jobs = jobs.NewService(a.pool, log)
+	a.jobs.HoldWhile(a.inMaintenance)
 	a.attach = attachments.NewService(a.pool, a.perms, a.store, a.settings, a.instanceID)
 	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.features, a.jobs, a.instanceID)
 	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.features, a.store, a.instanceID)
@@ -162,7 +172,11 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.notify = notify.NewService(a.pool, a.perms, a.settings, a.watches, notify.Options{
 		InstanceName: cfg.InstanceName, PublicOrigin: cfg.PublicOrigin(), Keyring: a.keyring})
 	a.mail = mail.NewService(a.pool, mailSender(cfg), log)
-	a.mail.SetRenderer(a.notify.Render)
+	a.mail.SetRenderer(a.renderMail)
+	a.mail.HoldWhile(a.inMaintenance)
+	if a.mail.Configured() {
+		a.identity.SetMailer(accountMailer{pool: a.pool, keyring: a.keyring}, cfg.PublicOrigin())
+	}
 	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, cfg.DataDir)
@@ -176,18 +190,56 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 
 	if cfg.Role.RunsAPI() {
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
-			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Search: a.search,
+			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, People: a.people, Console: a.console, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
-			SystemStatus: a.SystemStatus,
-			InstanceID:   a.instanceID, Log: log, Ready: a.Ready})
+			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit,
+			InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
 			return nil, err
 		}
 	}
 	return a, nil
+}
+
+// accessPolicy hands the rules of the Access settings to identity. A failed read
+// falls back to the stricter of the two: the configured limit, and the rule on file.
+func (a *App) accessPolicy() identity.Policy {
+	read := func(ctx context.Context) settings.Access {
+		v := settings.DefaultAccess
+		if err := a.settings.ReadSection(ctx, settings.SectionAccess, &v); err != nil {
+			a.log.Error("reading access settings failed", "error", err)
+		}
+		return v
+	}
+	return identity.Policy{
+		IdleLimit:    func(ctx context.Context) time.Duration { return time.Duration(read(ctx).IdleMinutes) * time.Minute },
+		SecondFactor: func(ctx context.Context) string { return a.secondFactorRule(ctx, read(ctx).SecondFactor) },
+	}
+}
+
+// secondFactorRule gives the rule that holds now. A new instance gets time before its
+// administrators need a second factor. When its age cannot be read, the rule holds.
+func (a *App) secondFactorRule(ctx context.Context, rule string) string {
+	if rule != settings.FactorAfterGrace {
+		return rule
+	}
+	var created time.Time
+	if err := a.pool.QueryRow(ctx, "SELECT created_at FROM instance").Scan(&created); err != nil {
+		a.log.Error("reading the age of the instance failed", "error", err)
+		return settings.FactorAdministrators
+	}
+	if time.Since(created) < settings.SecondFactorGrace {
+		return settings.FactorNone
+	}
+	return settings.FactorAdministrators
+}
+
+func (a *App) inMaintenance(ctx context.Context) (bool, error) {
+	state, err := a.settings.Maintenance(ctx)
+	return state.On, err
 }
 
 // mailSender is the mail server, or nothing, and then mail waits in the queue.
@@ -398,6 +450,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		}},
 		{Name: "fail-stale-jobs", Every: 10 * time.Minute, Run: a.jobs.FailStale},
 		{Name: "purge-identity", Every: 10 * time.Minute, Run: a.identity.PurgeExpired},
+		{Name: "end-expired-accounts", Every: 10 * time.Minute, Run: a.identity.EndExpiredAccounts},
 		{Name: "purge-outbox", Every: time.Hour, Run: func(ctx context.Context) error {
 			return outbox.PurgePublished(ctx, a.pool, 7*24*time.Hour)
 		}},

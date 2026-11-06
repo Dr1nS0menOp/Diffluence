@@ -28,7 +28,7 @@ test('the login page is accessible and refuses a wrong password', async ({ page 
 
 test('anyone logged out is sent to the login page', async ({ page }) => {
   await page.goto('/admin/users');
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login(\?next=%2Fadmin%2Fusers)?$/);
 });
 
 test('a guest cannot find a restricted page by any route', async ({ page, browser }) => {
@@ -46,8 +46,7 @@ test('a guest cannot find a restricted page by any route', async ({ page, browse
   await page.goto(`/pages/${secret}`);
   await page.getByRole('button', { name: 'Restrictions' }).click();
   const dialog = page.getByRole('dialog', { name: 'Page restrictions' });
-  await dialog.getByPlaceholder('Add').first().fill('admin');
-  await dialog.getByRole('option', { name: /admin@example.com/ }).click();
+  await dialog.getByRole('radio', { name: /Private/ }).check();
   await expect(dialog.getByRole('listitem').filter({ hasText: 'admin' }).first()).toBeVisible();
   await expect(dialog).toHaveCount(1);
   await checkAccessibility(page);
@@ -122,10 +121,12 @@ test('a viewer sees no edit controls, and an editor does', async ({ page, browse
 test('space settings: details, roles, archive', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
   const space = await newSpace(page, 'Settings space');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/access`);
   await checkAccessibility(page);
   await page.getByRole('button', { name: /Team space/ }).click();
   await expect(page.getByRole('row', { name: /All members/ })).toBeVisible();
+  await page.goto(`/spaces/${space.key}/settings`);
+  await checkAccessibility(page);
   await page.getByRole('button', { name: 'Archive' }).click();
   await expect(page.getByText('This space is archived and read-only.')).toBeVisible();
   await page.goto(`/pages/${space.home_page_id}`);
@@ -139,7 +140,7 @@ test('an authenticator app protects the login', async ({ page, browser }) => {
   const email = `${unique('totp')}@example.com`;
   await createUser(browser, email);
   await login(page, email);
-  await page.goto('/me');
+  await page.goto('/me/security');
   await checkAccessibility(page);
 
   const section = page.getByRole('heading', { name: 'Authenticator app' }).locator('..');
@@ -184,14 +185,14 @@ test('a passkey logs in without a password', async ({ page, browser }) => {
   });
 
   await login(page, email);
-  await page.goto('/me');
+  await page.goto('/me/security');
   await page.getByLabel('Name for this passkey').fill('Test key');
   await page.getByRole('button', { name: 'Add a passkey' }).click();
   await expect(page.getByRole('listitem').filter({ hasText: 'Test key' })).toBeVisible();
 
   await page.getByRole('button', { name: 'Account' }).click();
   await page.getByRole('menuitem', { name: 'Log out' }).click();
-  await expect(page).toHaveURL(/\/login$/);
+  await expect(page).toHaveURL(/\/login(\?next=%2Fadmin%2Fusers)?$/);
   await page.getByRole('button', { name: 'Log in with a passkey' }).click();
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
   const me = await page.request.get('/api/v1/me');
@@ -231,7 +232,7 @@ test('an administrator can reach the admin console from the account menu', async
   await login(page, ADMIN.email, ADMIN.password);
   await page.getByRole('button', { name: 'Account' }).click();
   await page.getByRole('menuitem', { name: 'Administration' }).click();
-  await expect(page.getByRole('heading', { name: 'Users', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Summary', level: 1 })).toBeVisible();
 });
 
 test('an imported font is used everywhere, also before logging in, and can be removed', async ({

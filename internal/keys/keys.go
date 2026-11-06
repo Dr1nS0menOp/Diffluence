@@ -12,6 +12,7 @@ import (
 	"crypto/cipher"
 	"crypto/ed25519"
 	"crypto/hkdf"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
@@ -134,6 +135,18 @@ func (k *Keyring) Open(sealed []byte, context string) ([]byte, error) {
 		return nil, err
 	}
 	return open(dek, sealed[n:], []byte(context))
+}
+
+// Fingerprint gives a keyed hash of a value, for one purpose. It shows that two values
+// were the same, and without the key it cannot be reversed or tried against a list.
+func (k *Keyring) Fingerprint(purpose string, value []byte) ([]byte, error) {
+	key, err := hkdf.Key(sha256.New, k.kek, nil, "diffluence fingerprint v1 "+purpose, sha256.Size)
+	if err != nil {
+		return nil, err
+	}
+	mac := hmac.New(sha256.New, key)
+	mac.Write(value)
+	return mac.Sum(nil), nil
 }
 
 // SigningKey derives the Ed25519 key that signs audit checkpoints.

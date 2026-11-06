@@ -19,6 +19,9 @@ const (
 	SpaceView       = "space.view"
 	SpaceExport     = "space.export"
 	SpaceAdminister = "space.administer"
+	// SpaceManageAccess changes who has access. Administer implies it, and someone
+	// who only holds this cannot touch administer (spec 013, D3 and D4).
+	SpaceManageAccess = "space.manage_access"
 
 	PageCreate    = "page.create"
 	PageEdit      = "page.edit"
@@ -39,7 +42,7 @@ const (
 
 // AllSpacePermissions lists every space permission.
 var AllSpacePermissions = []string{
-	SpaceView, SpaceExport, SpaceAdminister,
+	SpaceView, SpaceExport, SpaceAdminister, SpaceManageAccess,
 	PageCreate, PageEdit, PageArchive, PageDeleteOwn, PageDeleteAny,
 	CommentAdd, CommentDeleteOwn, CommentDeleteAny,
 	AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
@@ -174,7 +177,7 @@ func worksOnArchivedPage(action string) bool {
 // worksWhenArchived lists what still works in an archived (read-only) space.
 func worksWhenArchived(action string) bool {
 	switch action {
-	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister:
+	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess:
 		return true
 	}
 	return false
@@ -213,6 +216,8 @@ func actionAllowedBySpace(in Input) (string, bool) {
 		return PageDeleteAny, holds(in, PageDeleteAny) || (in.Owner == in.User.ID && holds(in, PageDeleteOwn))
 	case ActionAttachmentDelete:
 		return AttachmentDeleteAny, holds(in, AttachmentDeleteAny) || (in.Owner == in.User.ID && holds(in, AttachmentDeleteOwn))
+	case SpaceManageAccess:
+		return SpaceManageAccess, holds(in, SpaceManageAccess) || holds(in, SpaceAdminister)
 	case ActionCommentDelete:
 		return CommentDeleteAny, holds(in, CommentDeleteAny) || (in.Owner == in.User.ID && holds(in, CommentDeleteOwn))
 	}
@@ -264,4 +269,25 @@ func Evaluate(in Input) Decision {
 		check(LayerRestriction, "edit:"+p.ID.String(), in.User.matchesAny(p.EditSubjects), false)
 	}
 	return d
+}
+
+// Global permissions that decide who may see a person.
+const globalViewProfiles = "view_profiles"
+
+// PersonFacts is what deciding about a person needs to know about them.
+type PersonFacts struct {
+	ID   uuid.UUID
+	Type string // member, guest, service
+	// SharedSpace says the viewer and this person both view a space through a
+	// direct or group grant. "All members" does not count (spec 013, D5).
+	SharedSpace bool
+}
+
+// EvaluatePerson says whether a viewer may see a person. perm_visible_people is
+// the same rule for lists, and the matrix test compares the two.
+func EvaluatePerson(viewer UserFacts, target PersonFacts) bool {
+	if !viewer.Active || !slices.Contains(viewer.Global, globalUseProduct) || target.Type == "service" {
+		return false
+	}
+	return target.ID == viewer.ID || slices.Contains(viewer.Global, globalViewProfiles) || target.SharedSpace
 }

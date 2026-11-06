@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"slices"
+	"time"
+	_ "time/tzdata" // the zones must be known, whatever the host has installed
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,8 +25,10 @@ const (
 )
 
 var (
-	themes    = []string{"system", "light", "dark"}
-	treeViews = []string{"tree", "visited", "updated", "alphabet"}
+	themes      = []string{"system", "light", "dark"}
+	treeViews   = []string{"tree", "visited", "updated", "alphabet"}
+	languages   = []string{"en"}
+	dateFormats = []string{"short", "medium", "long", "iso"}
 	// Empty is what a client sends that does not know this setting yet.
 	startScreens = []string{"", "company", "personal"}
 )
@@ -38,13 +42,22 @@ type Preferences struct {
 	HoverCards   bool   `json:"hover_cards"`
 	SidebarWidth int    `json:"sidebar_width"`
 	TreeView     string `json:"tree_view"`
+	Language     string `json:"language"`
+	TimeZone     string `json:"time_zone"`
+	DateFormat   string `json:"date_format"`
+	// FirstDay is 0 for Sunday and 1 for Monday. It is kept for a calendar, which
+	// is the first thing that can use it (spec 013, D20).
+	FirstDay         int  `json:"first_day"`
+	WelcomeDismissed bool `json:"welcome_dismissed"`
+	TourSeen         bool `json:"tour_seen"`
 	// StartScreen is company or personal, for an instance with a company home.
 	StartScreen string `json:"start_screen"`
 }
 
-func defaultPreferences() Preferences {
+// DefaultPreferences is what someone has who never chose anything.
+func DefaultPreferences() Preferences {
 	return Preferences{Theme: "system", Shortcuts: true, Contents: true, HoverCards: true,
-		SidebarWidth: defaultSidebarWidth, TreeView: "tree", StartScreen: "company"}
+		SidebarWidth: defaultSidebarWidth, TreeView: "tree", Language: "en", TimeZone: "", DateFormat: "medium", FirstDay: 1, StartScreen: "company"}
 }
 
 func (p Preferences) validate() error {
@@ -57,13 +70,25 @@ func (p Preferences) validate() error {
 		return apperr.Invalid("The sidebar is between 14 and 32 wide.")
 	case !slices.Contains(startScreens, p.StartScreen):
 		return apperr.Invalid("The start screen is company or personal.")
+	case !slices.Contains(languages, p.Language):
+		return apperr.Invalid("English is the only language so far.")
+	case !slices.Contains(dateFormats, p.DateFormat):
+		return apperr.Invalid("That is not a date format.")
+	case p.FirstDay != 0 && p.FirstDay != 1 && p.FirstDay != 6:
+		return apperr.Invalid("A week starts on Saturday, Sunday or Monday.")
+	}
+	if p.TimeZone == "" {
+		return nil // the time zone of the browser
+	}
+	if _, err := time.LoadLocation(p.TimeZone); err != nil {
+		return apperr.Invalid("That is not a time zone.")
 	}
 	return nil
 }
 
 // Preferences reads a person's preferences. What they never set has its default.
 func (s *Service) Preferences(ctx context.Context, userID uuid.UUID) (Preferences, error) {
-	out := defaultPreferences()
+	out := DefaultPreferences()
 	var raw []byte
 	err := s.pool.QueryRow(ctx, "SELECT preferences FROM user_preferences WHERE user_id = $1", userID).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {

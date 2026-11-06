@@ -9,11 +9,14 @@ import {
   type DirectoryEntry,
   type NamedSubject,
   type PageSummary,
+  type Me,
   type Restrictions,
+  type TreeNode,
 } from '../api';
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
 import { useToast } from '../components/toast';
+import { countBelow } from '../components/tree-model';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
@@ -152,6 +155,52 @@ function WhyPanel({ page }: { page: PageSummary }) {
   );
 }
 
+const RESTRICTION_STATES = ['open', 'view_only', 'private'] as const;
+type RestrictionState = (typeof RESTRICTION_STATES)[number];
+
+/** The three ways a page can stand, as a person thinks of them (ACC-064). */
+export function restrictionState(r: { view: unknown[]; edit: unknown[] }): RestrictionState {
+  if (r.view.length > 0) return 'private';
+  return r.edit.length > 0 ? 'view_only' : 'open';
+}
+
+function RestrictionChoice({
+  page,
+  current,
+  onChoose,
+}: {
+  page: PageSummary;
+  current: RestrictionState;
+  onChoose: (state: RestrictionState) => void;
+}) {
+  const { t } = useTranslation();
+  const tree = useQuery({
+    queryKey: ['tree', page.space_id],
+    queryFn: () => api.get<{ pages: TreeNode[] }>(`/spaces/${page.space_id}/tree`),
+  });
+  const below = countBelow(tree.data?.pages ?? [], page.id);
+  return (
+    <fieldset className="restriction-states">
+      <legend>{t('restrictions.state')}</legend>
+      {RESTRICTION_STATES.map((state) => (
+        <label key={state} className="check">
+          <input
+            type="radio"
+            name="restriction-state"
+            checked={current === state}
+            onChange={() => onChoose(state)}
+          />
+          <span>
+            {t(`restrictions.state_${state}`)}
+            <small className="muted"> {t(`restrictions.stateHelp_${state}`)}</small>
+          </span>
+        </label>
+      ))}
+      {below > 0 && <p className="muted">{t('restrictions.below', { count: below })}</p>}
+    </fieldset>
+  );
+}
+
 export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -160,24 +209,53 @@ export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClo
     queryKey: key,
     queryFn: () => api.get<Restrictions>(`/pages/${page.id}/restrictions`),
   });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') }).data;
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: key });
+    await client.invalidateQueries({ queryKey: ['page', page.id] });
+  };
+  const put = (kind: string, subjects: NamedSubject[]) =>
+    api.put(`/pages/${page.id}/restrictions`, {
+      kind,
+      subjects: subjects.map(({ type, id }) => ({ type, id })),
+    });
   const set = useMutation({
-    mutationFn: (v: { kind: string; subjects: NamedSubject[] }) =>
-      api.put(`/pages/${page.id}/restrictions`, {
-        kind: v.kind,
-        subjects: v.subjects.map(({ type, id }) => ({ type, id })),
-      }),
+    mutationFn: (v: { kind: string; subjects: NamedSubject[] }) => put(v.kind, v.subjects),
+    onSettled: refresh,
+  });
+  // The person choosing starts on the list: the server would add them anyway (ACC-065).
+  const startWith = (list: NamedSubject[]) =>
+    list.length > 0 || !me ? list : [{ type: 'user', id: me.user.id, name: me.user.display_name }];
+  const [chosen, setChosen] = useState<RestrictionState | null>(null);
+  const choose = useMutation({
+    mutationFn: async (state: RestrictionState) => {
+      await put('view', state === 'private' ? startWith(q.data?.view ?? []) : []);
+      await put('edit', state === 'view_only' ? startWith(q.data?.edit ?? []) : []);
+    },
     onSettled: async () => {
-      await client.invalidateQueries({ queryKey: key });
-      await client.invalidateQueries({ queryKey: ['page', page.id] });
+      await refresh();
+      setChosen(null);
     },
   });
   const editable = page.can['restriction.manage'] ?? false;
+  // A choice shows at once, while the server still has to answer.
+  const state = chosen ?? (q.data ? restrictionState(q.data) : 'open');
   return (
     <Dialog title={t('restrictions.title')} onClose={onClose} wide>
       <p className="muted">{t('restrictions.help')}</p>
-      <ErrorNote error={set.error ?? q.error} />
+      <ErrorNote error={set.error ?? choose.error ?? q.error} />
       {q.data && (
         <>
+          {editable && (
+            <RestrictionChoice
+              page={page}
+              current={state}
+              onChoose={(next) => {
+                setChosen(next);
+                choose.mutate(next);
+              }}
+            />
+          )}
           {q.data.inherited.length > 0 && (
             <>
               <p>{t('restrictions.inherited')}</p>
@@ -190,18 +268,22 @@ export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClo
               </ul>
             </>
           )}
-          <SubjectList
-            title={t('restrictions.view')}
-            subjects={q.data.view}
-            editable={editable}
-            onChange={(subjects) => set.mutate({ kind: 'view', subjects })}
-          />
-          <SubjectList
-            title={t('restrictions.edit')}
-            subjects={q.data.edit}
-            editable={editable}
-            onChange={(subjects) => set.mutate({ kind: 'edit', subjects })}
-          />
+          {(state === 'private' || !editable) && (
+            <SubjectList
+              title={t('restrictions.view')}
+              subjects={q.data.view}
+              editable={editable}
+              onChange={(subjects) => set.mutate({ kind: 'view', subjects })}
+            />
+          )}
+          {(state === 'view_only' || !editable) && (
+            <SubjectList
+              title={t('restrictions.edit')}
+              subjects={q.data.edit}
+              editable={editable}
+              onChange={(subjects) => set.mutate({ kind: 'edit', subjects })}
+            />
+          )}
         </>
       )}
       {page.can['space.administer'] && <WhyPanel page={page} />}

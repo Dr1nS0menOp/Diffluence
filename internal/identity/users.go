@@ -44,6 +44,9 @@ type UserDetail struct {
 	GlobalPermissions []string  `json:"global_permissions"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
+	// ExpiresAt is when the account ends, and LastLoginAt when it was last used.
+	ExpiresAt   *time.Time `json:"expires_at"`
+	LastLoginAt *time.Time `json:"last_login_at"`
 }
 
 const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u.username, u.external_id, u.source,
@@ -52,13 +55,13 @@ const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u
 		(SELECT count(*) FROM webauthn_credentials w WHERE w.user_id = u.id),
 		COALESCE((SELECT array_agg(g.permission ORDER BY g.permission) FROM global_grants g
 			WHERE g.subject_type = 'user' AND g.subject_id = u.id), '{}'),
-		u.created_at, u.updated_at
+		u.created_at, u.updated_at, u.expires_at, u.last_login_at
 	FROM users u`
 
 func scanUserDetail(r pgx.Row) (UserDetail, error) {
 	var u UserDetail
 	err := r.Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.Username, &u.ExternalID, &u.Source,
-		&u.HasPassword, &u.TOTPEnabled, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt)
+		&u.HasPassword, &u.TOTPEnabled, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.LastLoginAt)
 	return u, err
 }
 
@@ -68,8 +71,14 @@ type UserFilter struct {
 	Email      string // exact, ignoring case
 	Username   string // exact, ignoring case
 	ExternalID string // exact
-	Limit      int
-	Offset     int
+	Type       string
+	Status     string
+	Source     string
+	GroupID    uuid.UUID
+	// IdleDays keeps people who have not logged in for this many days.
+	IdleDays int
+	Limit    int
+	Offset   int
 }
 
 // ListUsers returns users, and how many match in total.
@@ -80,13 +89,23 @@ func (s *Service) ListUsers(ctx context.Context, f UserFilter) ([]UserDetail, in
 	const where = ` WHERE ($1 = '' OR position(lower($1) IN lower(u.email)) > 0 OR position(lower($1) IN lower(u.display_name)) > 0)
 		AND ($2 = '' OR lower(u.email) = lower($2))
 		AND ($3 = '' OR lower(u.username) = lower($3))
-		AND ($4 = '' OR u.external_id = $4)`
+		AND ($4 = '' OR u.external_id = $4)
+		AND ($5 = '' OR u.type = $5)
+		AND ($6 = '' OR u.status = $6)
+		AND ($7 = '' OR u.source = $7)
+		AND ($8::uuid IS NULL OR u.id IN (SELECT m.user_id FROM group_members m WHERE m.group_id = $8))
+		AND ($9 = 0 OR u.last_login_at IS NULL OR u.last_login_at < now() - make_interval(days => $9))`
+	var group *uuid.UUID
+	if f.GroupID != uuid.Nil {
+		group = &f.GroupID
+	}
+	args := []any{f.Text, f.Email, f.Username, f.ExternalID, f.Type, f.Status, f.Source, group, f.IdleDays}
 	var total int
-	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM users u"+where, f.Text, f.Email, f.Username, f.ExternalID).Scan(&total); err != nil {
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM users u"+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.pool.Query(ctx, userDetailSQL+where+" ORDER BY lower(u.display_name), u.id LIMIT $5 OFFSET $6",
-		f.Text, f.Email, f.Username, f.ExternalID, f.Limit, max(f.Offset, 0))
+	rows, err := s.pool.Query(ctx, userDetailSQL+where+" ORDER BY lower(u.display_name), u.id LIMIT $10 OFFSET $11",
+		append(args, f.Limit, max(f.Offset, 0))...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -141,7 +160,7 @@ func defaultPermissions(userType string) []string {
 	if userType == TypeGuest {
 		return []string{PermUseProduct}
 	}
-	return []string{PermUseProduct, PermViewProfiles}
+	return []string{PermUseProduct, PermViewProfiles, PermPersonalSpace}
 }
 
 // mayGrant keeps the highest permission in the hands of those who already hold it.
@@ -343,8 +362,12 @@ func (s *Service) checkPassword(ctx context.Context, q db.Querier, userID uuid.U
 
 // ChangePassword changes a user's own password and ends their other sessions.
 func (s *Service) ChangePassword(ctx context.Context, c Caller, sessionID uuid.UUID, current, next string) error {
-	if err := ValidatePassword(next); err != nil {
-		return toInvalid(err)
+	u, err := s.GetUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return err
+	}
+	if err := s.validateNewPassword(next, u.Email, u.DisplayName); err != nil {
+		return err
 	}
 	if err := s.checkPassword(ctx, s.pool, c.UserID, current); err != nil {
 		return err
@@ -363,11 +386,12 @@ func (s *Service) ChangePassword(ctx context.Context, c Caller, sessionID uuid.U
 // ResetPassword sets a new password for someone else and ends all their sessions.
 // The route requires administrator.
 func (s *Service) ResetPassword(ctx context.Context, c Caller, id uuid.UUID, next string) error {
-	if err := ValidatePassword(next); err != nil {
-		return toInvalid(err)
-	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := s.GetUser(ctx, tx, id); err != nil {
+		u, err := s.GetUser(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if err := s.validateNewPassword(next, u.Email, u.DisplayName); err != nil {
 			return err
 		}
 		if err := s.storePassword(ctx, tx, id, next); err != nil {
@@ -432,7 +456,7 @@ type DirectoryEntry struct {
 // "view profiles", which guests do not have by default.
 func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry, error) {
 	rows, err := s.pool.Query(ctx, `(SELECT 'user', id, display_name, email FROM users
-			WHERE status = 'active' AND type <> 'service'
+			WHERE status = 'active' AND type <> 'service' AND anonymised_at IS NULL
 			  AND ($1 = '' OR position(lower($1) IN lower(display_name)) > 0 OR position(lower($1) IN lower(email)) > 0)
 			ORDER BY lower(display_name) LIMIT 20)
 		UNION ALL

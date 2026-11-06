@@ -42,8 +42,8 @@ func (s *Server) registerContentRoutes() {
 	r.HandleFunc("POST "+spacesPath+"/{id}/unarchive", Object("space.administer"), s.handleSpaceUnarchive)
 	r.HandleFunc("DELETE "+spacesPath+"/{id}", Object("space.administer"), s.handleSpaceDelete)
 	r.HandleFunc("GET "+spacesPath+"/{id}/tree", Object("space.view"), s.handleTree)
-	r.HandleFunc("GET "+spacesPath+"/{id}/grants", Object("space.administer"), s.handleGrants)
-	r.HandleFunc("PUT "+spacesPath+"/{id}/grants", Object("space.administer"), s.handleGrantsSet)
+	r.HandleFunc("GET "+spacesPath+"/{id}/grants", Object("space.manage_access"), s.handleGrants)
+	r.HandleFunc("PUT "+spacesPath+"/{id}/grants", Object("space.manage_access"), s.handleGrantsSet)
 	r.HandleFunc("POST "+spacesPath+"/{id}/preset", Object("space.administer"), s.handlePreset)
 	r.HandleFunc("GET "+spacesPath+"/{id}/trash", Object("space.administer"), s.handleTrashList)
 	r.HandleFunc("GET "+spacesPath+"/{id}/export.zip", Object("space.export"), s.handleSpaceExport)
@@ -79,9 +79,9 @@ func (s *Server) registerContentRoutes() {
 	r.HandleFunc("GET /api/v1/attachments/{id}/content", Object("page.view"), s.handleAttachmentContent)
 	r.HandleFunc("DELETE /api/v1/attachments/{id}", Object("attachment.delete"), s.handleAttachmentDelete)
 
-	admin := Permission(identity.PermAdministrator)
-	r.HandleFunc("POST /api/v1/admin/spaces/{id}/recover", admin, s.handleRecoverSpace)
-	r.HandleFunc("POST /api/v1/admin/pages/{id}/recover", admin, s.handleRecoverPage)
+	admin := SessionOnly(Permission(identity.PermAdministrator))
+	r.HandleFunc("POST /api/v1/admin/spaces/{id}/recover", Sensitive(admin), s.handleRecoverSpace)
+	r.HandleFunc("POST /api/v1/admin/pages/{id}/recover", Sensitive(admin), s.handleRecoverPage)
 	r.HandleFunc("GET /api/v1/admin/spaces", admin, s.handleAdminSpaces)
 	r.HandleFunc("GET /api/v1/admin/trash/spaces", admin, s.handleAdminTrashedSpaces)
 	r.HandleFunc("GET /api/v1/admin/settings", admin, s.handleSettingsGet)
@@ -147,17 +147,18 @@ func optionalID(s string) (uuid.UUID, error) {
 }
 
 type spaceBody struct {
-	Key         string `json:"key"`
-	Name        string `json:"name"`
-	Description string `json:"description"`
-	Icon        string `json:"icon"`
+	Key         string          `json:"key"`
+	Name        string          `json:"name"`
+	Description string          `json:"description"`
+	Icon        string          `json:"icon"`
+	Document    json.RawMessage `json:"document"`
 	// When creating: which space template, and which permission set.
 	TemplateID *uuid.UUID `json:"template_id"`
 	Preset     string     `json:"preset"`
 }
 
 func (b spaceBody) input() spaces.Input {
-	return spaces.Input{Key: b.Key, Name: b.Name, Description: b.Description, Icon: b.Icon}
+	return spaces.Input{Key: b.Key, Name: b.Name, Description: b.Description, Icon: b.Icon, Document: b.Document}
 }
 
 func (s *Server) handleSpaceList(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +172,7 @@ func (s *Server) handleSpaceList(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 	var in spaceBody
-	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+	if decodeJSON(w, r, maxDocumentBody, &in) != nil {
 		badBody(w)
 		return
 	}
@@ -284,7 +285,12 @@ func (s *Server) handleGrants(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"grants": list, "all_permissions": permissions.AllSpacePermissions, "templates": permissions.Templates})
+	sets, err := s.deps.Permissions.PermissionSets(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"grants": list, "all_permissions": permissions.AllSpacePermissions, "templates": permissions.Templates, "sets": sets})
 }
 
 func (s *Server) handleGrantsSet(w http.ResponseWriter, r *http.Request) {

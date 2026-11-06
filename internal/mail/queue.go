@@ -20,6 +20,9 @@ const (
 	KindInstant = "instant"
 	KindDigest  = "digest"
 	KindTest    = "test"
+	// KindAccount is a reset, invitation or sign-up: its row holds a sealed message,
+	// and it can go to someone without an account.
+	KindAccount = "account"
 )
 
 const (
@@ -40,6 +43,8 @@ type Job struct {
 	UserID          uuid.UUID
 	Kind            string
 	NotificationIDs []uuid.UUID
+	// Sealed is the encrypted message of an account mail.
+	Sealed []byte
 }
 
 // Rendered is the outcome of writing a mail.
@@ -58,6 +63,7 @@ type Service struct {
 	sender Sender
 	render Renderer
 	log    *slog.Logger
+	held   func(context.Context) (bool, error)
 }
 
 // NewService creates the service. Without a sender, mail waits in the queue.
@@ -67,6 +73,9 @@ func NewService(pool *pgxpool.Pool, sender Sender, log *slog.Logger) *Service {
 
 // SetRenderer connects the module that knows what a mail says.
 func (s *Service) SetRenderer(r Renderer) { s.render = r }
+
+// HoldWhile makes mail wait for as long as the check says so: maintenance mode.
+func (s *Service) HoldWhile(check func(context.Context) (bool, error)) { s.held = check }
 
 // Configured reports whether a mail server is set.
 func (s *Service) Configured() bool { return s.sender != nil }
@@ -88,6 +97,12 @@ func EnqueueDigest(ctx context.Context, q db.Querier, user uuid.UUID, notificati
 	return err
 }
 
+// EnqueueAccount queues a sealed account mail.
+func EnqueueAccount(ctx context.Context, q db.Querier, sealed []byte) error {
+	_, err := q.Exec(ctx, "INSERT INTO mail_queue (id, kind, sealed) VALUES ($1, $2, $3)", ids.New(), KindAccount, sealed)
+	return err
+}
+
 // EnqueueTest queues a test mail to the person who asked for it.
 func (s *Service) EnqueueTest(ctx context.Context, user uuid.UUID) error {
 	_, err := s.pool.Exec(ctx, "INSERT INTO mail_queue (id, user_id, kind) VALUES ($1, $2, 'test')", ids.New(), user)
@@ -100,19 +115,21 @@ func (s *Service) claim(ctx context.Context) ([]Job, error) {
 	rows, err := s.pool.Query(ctx, `UPDATE mail_queue SET status = 'sending', attempts = attempts + 1, next_attempt_at = now()
 		WHERE id IN (SELECT id FROM mail_queue WHERE status = 'queued' AND next_attempt_at <= now()
 			ORDER BY next_attempt_at LIMIT $1 FOR UPDATE SKIP LOCKED)
-		RETURNING id, user_id, kind, notification_ids`, batchSize)
+		RETURNING id, user_id, kind, notification_ids, sealed`, batchSize)
 	if err != nil {
 		return nil, err
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Job, error) {
 		var j Job
-		err := r.Scan(&j.ID, &j.UserID, &j.Kind, &j.NotificationIDs)
+		var user uuid.NullUUID
+		err := r.Scan(&j.ID, &user, &j.Kind, &j.NotificationIDs, &j.Sealed)
+		j.UserID = user.UUID
 		return j, err
 	})
 }
 
 func (s *Service) finish(ctx context.Context, id uuid.UUID, status string) error {
-	_, err := s.pool.Exec(ctx, `UPDATE mail_queue SET status = $2, last_error = '',
+	_, err := s.pool.Exec(ctx, `UPDATE mail_queue SET status = $2, last_error = '', sealed = NULL,
 		sent_at = CASE WHEN $2 = 'sent' THEN now() END WHERE id = $1`, id, status)
 	return err
 }
@@ -135,7 +152,7 @@ func (s *Service) retry(ctx context.Context, id uuid.UUID, sendErr error) error 
 	message := safeError(sendErr)
 	s.log.Warn("sending a mail failed", "mail", id, "attempt", attempts, "reason", message)
 	if attempts >= maxAttempts {
-		_, err := s.pool.Exec(ctx, "UPDATE mail_queue SET status = 'failed', last_error = $2 WHERE id = $1", id, message)
+		_, err := s.pool.Exec(ctx, "UPDATE mail_queue SET status = 'failed', last_error = $2, sealed = NULL WHERE id = $1", id, message)
 		return err
 	}
 	_, err := s.pool.Exec(ctx, `UPDATE mail_queue SET status = 'queued', last_error = $2,
@@ -165,6 +182,12 @@ func (s *Service) deliver(ctx context.Context, j Job) error {
 func (s *Service) RunOnce(ctx context.Context) (int, error) {
 	if s.sender == nil || s.render == nil {
 		return 0, nil
+	}
+	if s.held != nil {
+		held, err := s.held(ctx)
+		if err != nil || held {
+			return 0, err
+		}
 	}
 	if _, err := s.pool.Exec(ctx, `UPDATE mail_queue SET status = 'queued'
 		WHERE status = 'sending' AND next_attempt_at < now() - make_interval(secs => $1)`, stuckAfter.Seconds()); err != nil {

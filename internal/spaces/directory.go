@@ -23,6 +23,8 @@ const (
 	KindAll        = "all"
 	KindFavourites = "favourites"
 	KindArchived   = "archived"
+	KindTeam       = "team"
+	KindPersonal   = "personal"
 
 	SortName    = "name"
 	SortChanged = "changed"
@@ -38,11 +40,12 @@ const (
 
 // DirectoryQuery asks the spaces directory for a part of the list.
 type DirectoryQuery struct {
-	Text   string
-	Kind   string
-	Sort   string
-	Limit  int
-	Offset int
+	Text     string
+	Kind     string
+	Sort     string
+	Category uuid.UUID
+	Limit    int
+	Offset   int
 }
 
 func (q DirectoryQuery) validated() (DirectoryQuery, error) {
@@ -52,7 +55,7 @@ func (q DirectoryQuery) validated() (DirectoryQuery, error) {
 	if q.Sort == "" {
 		q.Sort = SortName
 	}
-	if !slices.Contains([]string{KindAll, KindFavourites, KindArchived}, q.Kind) {
+	if !slices.Contains([]string{KindAll, KindFavourites, KindArchived, KindTeam, KindPersonal}, q.Kind) {
 		return q, apperr.Invalid("That is not a kind of space.")
 	}
 	if !slices.Contains([]string{SortName, SortChanged, SortPages}, q.Sort) {
@@ -83,7 +86,10 @@ const directorySQL = `WITH listed AS (
 		        WHEN 'archived' THEN sp.status = 'archived'
 		        WHEN 'favourites' THEN sp.status = 'active'
 		            AND sp.id IN (SELECT f.space_id FROM space_favourites f WHERE f.user_id = $1)
+		        WHEN 'team' THEN sp.status = 'active' AND sp.kind = 'team'
+		        WHEN 'personal' THEN sp.status = 'active' AND sp.kind = 'personal'
 		        ELSE sp.status = 'active' END
+		  AND ($7::uuid IS NULL OR sp.id IN (SELECT l.space_id FROM space_category_links l WHERE l.category_id = $7))
 	), counted AS (
 		SELECT p.space_id, count(*) AS pages, max(p.updated_at) AS changed
 		FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
@@ -92,7 +98,7 @@ const directorySQL = `WITH listed AS (
 	)
 	SELECT s.id, s.key, s.name, s.description, s.icon, s.status, s.home_page_id, s.created_by, s.created_at, s.updated_at,
 		s.icon_object <> '', s.title_align, s.review_months, s.approval_required,
-		f.user_id IS NOT NULL, COALESCE(c.pages, 0), COALESCE(c.changed, s.updated_at), count(*) OVER ()
+		s.kind, s.owner_id, f.user_id IS NOT NULL, COALESCE(c.pages, 0), COALESCE(c.changed, s.updated_at), count(*) OVER ()
 	FROM listed l
 	JOIN spaces s ON s.id = l.id
 	LEFT JOIN counted c ON c.space_id = s.id
@@ -109,7 +115,11 @@ func (s *Service) Directory(ctx context.Context, c identity.Caller, in Directory
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.pool.Query(ctx, directorySQL, c.UserID, q.Text, q.Kind, q.Sort, q.Limit, q.Offset)
+	var category *uuid.UUID
+	if q.Category != uuid.Nil {
+		category = &q.Category
+	}
+	rows, err := s.pool.Query(ctx, directorySQL, c.UserID, q.Text, q.Kind, q.Sort, q.Limit, q.Offset, category)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -118,7 +128,7 @@ func (s *Service) Directory(ctx context.Context, c identity.Caller, in Directory
 		var d DirectoryRow
 		err := r.Scan(&d.ID, &d.Key, &d.Name, &d.Description, &d.Icon, &d.Status, &d.HomePageID, &d.CreatedBy,
 			&d.CreatedAt, &d.UpdatedAt, &d.HasIcon, &d.TitleAlign, &d.ReviewMonths, &d.ApprovalRequired,
-			&d.Favourite, &d.PageCount, &d.LastChanged, &total)
+			&d.Kind, &d.OwnerID, &d.Favourite, &d.PageCount, &d.LastChanged, &total)
 		return d, err
 	})
 	if err != nil {

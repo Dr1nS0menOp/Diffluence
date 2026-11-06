@@ -32,6 +32,8 @@ const (
 	maxMFAAttempts   = 5
 	totpPeriod       = 30
 	recoveryCodeSize = 10
+	// Under 112 bits a plain hash is not enough (ASVS 6.5.2), and 128 keeps it simple.
+	recoveryCodeBytes = 16
 )
 
 // MFARequiredError means the password was right and a second factor is needed.
@@ -169,10 +171,11 @@ func (s *Service) totpSecret(ctx context.Context, q db.Querier, userID uuid.UUID
 }
 
 func newRecoveryCode() string {
-	b := make([]byte, 10)
+	b := make([]byte, recoveryCodeBytes)
 	_, _ = rand.Read(b)
 	s := strings.ToLower(base32.StdEncoding.WithPadding(base32.NoPadding).EncodeToString(b))
-	return s[:8] + "-" + s[8:]
+	half := len(s) / 2
+	return s[:half] + "-" + s[half:]
 }
 
 func normalizeRecoveryCode(code string) string {
@@ -209,6 +212,9 @@ func (s *Service) ConfirmTOTP(ctx context.Context, c Caller, code string) ([]str
 		if _, err := tx.Exec(ctx, "UPDATE totp_credentials SET confirmed_at = now(), last_step = $2 WHERE user_id = $1", c.UserID, step); err != nil {
 			return err
 		}
+		if err := s.clearSecondFactorDemand(ctx, tx, c.UserID); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, "DELETE FROM recovery_codes WHERE user_id = $1", c.UserID); err != nil {
 			return err
 		}
@@ -230,28 +236,47 @@ func (s *Service) DisableTOTP(ctx context.Context, c Caller, password string) er
 	if err := s.checkPassword(ctx, s.pool, c.UserID, password); err != nil {
 		return err
 	}
-	return s.removeTOTP(ctx, c, c.UserID, nil)
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		return s.removeTOTP(ctx, tx, c, c.UserID, nil)
+	})
 }
 
-// ResetMFA removes someone's authenticator, for a lost phone. The route requires
-// administrator.
+// EndOtherSessions logs a person out everywhere but here. The screen offers it after a
+// factor is removed, because a session someone stole survives that (SEC-126).
+func (s *Service) EndOtherSessions(ctx context.Context, c Caller, sessionID uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1 AND id <> $2", c.UserID, sessionID)
+		if err != nil {
+			return err
+		}
+		return s.record(ctx, tx, c, "auth.sessions_ended", "user", c.UserID.String(), map[string]any{"sessions": tag.RowsAffected()})
+	})
+}
+
+// ResetMFA removes someone's authenticator, for a lost phone, and ends their sessions:
+// an attacker with a session must not outlive the reset of the account (SEC-126). The
+// route requires administrator.
 func (s *Service) ResetMFA(ctx context.Context, c Caller, id uuid.UUID) error {
 	if _, err := s.GetUser(ctx, s.pool, id); err != nil {
 		return err
 	}
-	return s.removeTOTP(ctx, c, id, map[string]any{"by_administrator": true})
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.removeTOTP(ctx, tx, c, id, map[string]any{"by_administrator": true}); err != nil {
+			return err
+		}
+		_, err := tx.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1", id)
+		return err
+	})
 }
 
-func (s *Service) removeTOTP(ctx context.Context, c Caller, id uuid.UUID, details map[string]any) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, "DELETE FROM totp_credentials WHERE user_id = $1", id); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "DELETE FROM recovery_codes WHERE user_id = $1", id); err != nil {
-			return err
-		}
-		return s.record(ctx, tx, c, "auth.totp_disabled", "user", id.String(), details)
-	})
+func (s *Service) removeTOTP(ctx context.Context, tx pgx.Tx, c Caller, id uuid.UUID, details map[string]any) error {
+	if _, err := tx.Exec(ctx, "DELETE FROM totp_credentials WHERE user_id = $1", id); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM recovery_codes WHERE user_id = $1", id); err != nil {
+		return err
+	}
+	return s.record(ctx, tx, c, "auth.totp_disabled", "user", id.String(), details)
 }
 
 // useSecondFactor checks a TOTP or recovery code inside tx. It returns the method
@@ -325,7 +350,7 @@ func (s *Service) CompleteMFA(ctx context.Context, challenge, code string, meta 
 		if p, err = s.principalByID(ctx, tx, *userID); err != nil {
 			return err
 		}
-		token, p.SessionID, err = s.createSession(ctx, tx, *userID, meta)
+		token, p.SessionID, err = s.createSession(ctx, tx, sessionStart{UserID: *userID, Method: "password and code", Meta: meta})
 		if err != nil {
 			return err
 		}
@@ -379,7 +404,7 @@ func (s *Service) OpenSession(ctx context.Context, tx pgx.Tx, userID uuid.UUID, 
 	if err != nil {
 		return "", p, err
 	}
-	token, id, err := s.createSession(ctx, tx, userID, meta)
+	token, id, err := s.createSession(ctx, tx, sessionStart{UserID: userID, Method: method, Meta: meta})
 	if err != nil {
 		return "", p, err
 	}

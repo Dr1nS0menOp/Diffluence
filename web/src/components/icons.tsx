@@ -161,6 +161,9 @@ export const IconEye = line(
 export const IconComment = line('M4 5h16v11H9l-5 4z');
 export const IconApps = line('M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z');
 export const IconHome = line('M4 11l8-7 8 7M6 10v10h12V10M10 20v-6h4v6');
+export const IconPeople = line(
+  'M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M16 3.5a4 4 0 0 1 0 7M18 14a5 5 0 0 1 4 5v2',
+);
 export const IconHelp = line(
   'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM9.5 9.5a2.5 2.5 0 1 1 3.7 2.2c-.8.4-1.2 1-1.2 1.8M12 17h.01',
 );

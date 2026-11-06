@@ -30,8 +30,8 @@ How to read this chapter: see `../03-functional-requirements.md`. Every line has
 - **NAV-021** · built · A bell shows how many unread notifications there are, and opens the notification panel (chapter 7).
 - **NAV-022** · built · A help menu offers the keyboard shortcuts, the documentation and the version number.
 - **NAV-023** · built · The account menu shows the person, a link to their account, Administration when they are an administrator, and Log out.
-- **NAV-024** · partly · The account menu also offers their personal space, their profile and their preferences. Still open: the personal space (wave F).
-- **NAV-025** · new · An administrator can set the instance name and logo, and the logo replaces ours in the top bar (ADM-013).
+- **NAV-024** · built · The account menu also offers their personal space, their profile and their preferences.
+- **NAV-025** · built · An administrator can set the instance name and logo, and the logo replaces ours in the top bar (ADM-013).
 
 ## 1.3 The start screen
 
@@ -47,9 +47,9 @@ The first screen after login. Its job is to answer "where was I, and what change
 - **NAV-033** · built · Each feed item shows the title, the space, a short excerpt, the author and the time. A reaction and the comment count show when they exist.
 - **NAV-034** · built · The feed loads more when the person reaches its end. It never loads everything at once.
 - **NAV-035** · built · A side column shows up to six favourite or recently visited spaces and the person's open tasks.
-- **NAV-036** · new · A person can dismiss a getting-started card, which explains spaces and pages to a first-time user.
+- **NAV-036** · built · A person can dismiss a getting-started card, which explains spaces and pages to a first-time user.
 - **NAV-037** · built · A new installation with no spaces shows one clear sentence and the way to create the first space.
-- **NAV-038** · new · An administrator can pick a page as the instance's welcome message. It shows above the feed for everyone who can see it.
+- **NAV-038** · built · An administrator can pick a page as the instance's welcome message. It shows above the feed for everyone who can see it.
 
 ## 1.4 Personal lists
 
@@ -66,21 +66,21 @@ The first screen after login. Its job is to answer "where was I, and what change
 ## 1.5 The spaces directory
 
 - **NAV-048** · built · A screen lists all spaces the person may see.
-- **NAV-049** · partly · It can be filtered by title and by key, and by the kinds **All**, **Favourites**, **Team**, **Personal** and **Archived**. Still open: the kinds Team and Personal (wave F).
+- **NAV-049** · built · It can be filtered by title and by key, and by the kinds **All**, **Favourites**, **Team**, **Personal** and **Archived**.
 - **NAV-050** · built · It can be sorted by name, by last change and by number of pages.
 - **NAV-051** · built · Each row shows the badge, name, key, description, its administrators and the time of the last change.
-- **NAV-052** · new · Space categories: an administrator of a space adds one or more categories, and the directory can filter on them.
+- **NAV-052** · built · Space categories: an administrator of a space adds one or more categories, and the directory can filter on them.
 - **NAV-053** · built · A person with *create spaces* sees a button to create a space here.
 - **NAV-054** · built · Archived spaces only appear under the Archived filter.
 
 ## 1.6 The people directory
 
-- **NAV-055** · partly · People with *view profiles* can search for people by name. Built: a search that fills pickers. New: a screen of its own.
-- **NAV-056** · new · The directory lists people with their picture, name, job title and department, and can be filtered by group.
-- **NAV-057** · new · Selecting a person opens their profile (ACC-020).
-- **NAV-058** · new · Hovering over or focusing a name anywhere in the app shows a small card with picture, name, job title and links to their profile and pages. It can be turned off in the preferences.
-- **NAV-059** · new · Guests see only people they share a space with, unless they have *view profiles*.
-- **NAV-060** · new · Disabled people stay visible as authors of what they wrote, marked as no longer active. They do not appear in pickers.
+- **NAV-055** · built · People with *view profiles* can search for people by name.
+- **NAV-056** · built · The directory lists people with their picture, name, job title and department, and can be filtered by group.
+- **NAV-057** · built · Selecting a person opens their profile (ACC-020).
+- **NAV-058** · partly · Hovering over or focusing a name anywhere in the app shows a small card with picture, name, job title and links to their profile and pages. It can be turned off in the preferences. Still open: the card on the byline, in history and in comments, which have no id yet.
+- **NAV-059** · built · Guests see only people they share a space with, unless they have *view profiles*.
+- **NAV-060** · built · Disabled people stay visible as authors of what they wrote, marked as no longer active. They do not appear in pickers.
 
 ## 1.7 Keyboard shortcuts outside the editor
 
@@ -96,10 +96,10 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 
 ## 1.8 Help, about and first use
 
-- **NAV-068** · partly · The help menu links to documentation that the administrator can point to their own address. Still open: the address an administrator chooses (wave F).
+- **NAV-068** · built · The help menu links to documentation that the administrator can point to their own address.
 - **NAV-069** · built · An About dialog shows the version, the licence and a link to the third-party licences.
-- **NAV-070** · new · A new user sees a short tour of three steps at most, which can be skipped and never returns.
-- **NAV-071** · new · A new space starts with a useful home page, with sections to fill in, so it is never a blank screen.
+- **NAV-070** · built · A new user sees a short tour of three steps at most, which can be skipped and never returns.
+- **NAV-071** · built · A new space starts with a useful home page, with sections to fill in, so it is never a blank screen.
 - **NAV-083** · built · A new instance gets an example space shortly after its first administrator. It shows everything a page can hold, as a first introduction, and all members can edit it.
 - **NAV-084** · built · The example space is made once. An instance that already has spaces gets none by itself, and a deleted example does not come back.
 - **NAV-085** · built · An administrator can add the example space later, in Administration, Settings.
@@ -114,7 +114,7 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 - **NAV-074** · built · A person can choose light, dark or system in their preferences. The choice follows them to other devices.
 - **NAV-075** · built · All layout works right-to-left. No screen has a separate right-to-left style.
 - **NAV-076** · built · All words come from translation files. English ships first.
-- **NAV-077** · new · A person picks their language, time zone, date format and first day of the week. Dates and times everywhere follow these.
+- **NAV-077** · built · A person picks their language, time zone, date format and first day of the week. Dates and times everywhere follow these.
 - **NAV-078** · built · Long dates show as relative time ("3 hours ago") with the exact time on hover or focus.
 - **NAV-079** · built · WCAG 2.2 AA is the goal, checked by automated tests on screens in the browser tests.
 - **NAV-080** · new · Screen reader users hear new notifications and save states through live regions, without being interrupted.

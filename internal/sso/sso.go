@@ -100,6 +100,17 @@ type flow struct {
 // for a cookie that ties the flow to this browser. That stops an attacker from
 // slipping their own login into someone else's browser.
 func (p *Provider) Start(ctx context.Context) (redirect, binding string, err error) {
+	return p.start(ctx)
+}
+
+// StartFresh begins a login in which the provider must ask again, also when the
+// person is still logged in there. It is the step-up of an account without a
+// password in Diffluence (spec 013, F6).
+func (p *Provider) StartFresh(ctx context.Context) (redirect, binding string, err error) {
+	return p.start(ctx, oauth2.SetAuthURLParam("prompt", "login"))
+}
+
+func (p *Provider) start(ctx context.Context, extra ...oauth2.AuthCodeOption) (redirect, binding string, err error) {
 	_, config, err := p.discover(ctx)
 	if err != nil {
 		return "", "", err
@@ -109,8 +120,8 @@ func (p *Provider) Start(ctx context.Context) (redirect, binding string, err err
 	if err != nil {
 		return "", "", err
 	}
-	url := config.AuthCodeURL(state, oidc.Nonce(f.Nonce), oauth2.S256ChallengeOption(f.Verifier))
-	return url, f.Binding, nil
+	options := append([]oauth2.AuthCodeOption{oidc.Nonce(f.Nonce), oauth2.S256ChallengeOption(f.Verifier)}, extra...)
+	return config.AuthCodeURL(state, options...), f.Binding, nil
 }
 
 type claims struct {

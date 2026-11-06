@@ -20,7 +20,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-011** · built · An icon can be an uploaded image, cropped to a square.
 - **SPC-012** · built · The key of a space can be changed by a space administrator. Old addresses that contain the key keep working through a redirect.
 - **SPC-013** · built · A space has a list of owners shown to everyone, so people know who to ask.
-- **SPC-014** · new · Categories can be set on a space (NAV-052).
+- **SPC-014** · built · Categories can be set on a space (NAV-052).
 - **SPC-015** · built · A space administrator picks which page is the home page.
 - **SPC-016** · built · The home page cannot be deleted.
 
@@ -81,12 +81,12 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-051** · built · The permissions are: view, export, administer; create, edit, archive, delete own and delete any page; add, delete own and delete any comment; add, delete own and delete any attachment; manage restrictions.
 - **SPC-052** · built · Viewer, Editor and Space administrator are named sets that fill in the boxes.
 - **SPC-053** · built · A space always keeps at least one direct person or group with *administer*.
-- **SPC-054** · new · A fourth set, **Manager**, can manage people and content but not the settings of the space.
-- **SPC-055** · new · Administrators can define their own named sets for the whole instance.
-- **SPC-056** · new · The screen can be searched by name, and shows how each person gets their access: directly, or through which group.
-- **SPC-057** · new · A change shows a summary of who gains and who loses what before it is saved.
-- **SPC-058** · new · A person can see who has access to a space, without seeing the matrix, when they are allowed to view it.
-- **SPC-059** · new · A space administrator can export the list of who has access as CSV.
+- **SPC-054** · built · A fourth set, **Manager**, can manage people and content but not the settings of the space.
+- **SPC-055** · built · Administrators can define their own named sets for the whole instance.
+- **SPC-056** · built · The screen can be searched by name, and shows how each person gets their access: directly, or through which group.
+- **SPC-057** · built · A change shows a summary of who gains and who loses what before it is saved.
+- **SPC-058** · built · A person can see who has access to a space, without seeing the matrix, when they are allowed to view it.
+- **SPC-059** · built · A space administrator can export the list of who has access as CSV.
 
 ## 2.8 Clearing up a space
 
@@ -114,9 +114,9 @@ Space administrators need a way to keep a growing space clean.
 
 ## 2.10 Personal spaces
 
-- **SPC-076** · new · A person with *create personal space* has one personal space, created on request from the account menu.
-- **SPC-077** · new · Its key comes from the person and cannot clash with team spaces. It is listed under Personal in the directory.
-- **SPC-078** · new · The owner is its administrator, and it starts private. They choose whether others can see it.
-- **SPC-079** · new · A personal space is a safe place to prepare a page and later move it to a team space.
-- **SPC-080** · new · When a person is disabled, their personal space stays. An administrator can hand it over or archive it.
-- **SPC-081** · new · Space settings are the same as for team spaces, except that the owner can never be removed by a group change.
+- **SPC-076** · built · A person with *create personal space* has one personal space, created on request from the account menu.
+- **SPC-077** · built · Its key comes from the person and cannot clash with team spaces. It is listed under Personal in the directory.
+- **SPC-078** · built · The owner is its administrator, and it starts private. They choose whether others can see it.
+- **SPC-079** · partly · A personal space is a safe place to prepare a page and later move it to a team space. Still open: moving a page out, with move between spaces (wave D).
+- **SPC-080** · built · When a person is disabled, their personal space stays. An administrator can hand it over or archive it.
+- **SPC-081** · built · Space settings are the same as for team spaces, except that the owner can never be removed by a group change.

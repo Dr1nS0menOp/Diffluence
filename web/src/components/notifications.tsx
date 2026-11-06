@@ -128,7 +128,7 @@ export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const count = useQuery({
     queryKey: ['notification-count'],
-    queryFn: () => api.get<{ unread: number }>('/me/notifications/count'),
+    queryFn: () => api.poll<{ unread: number }>('/me/notifications/count'),
     refetchInterval: POLL_MS,
     refetchIntervalInBackground: false,
   });

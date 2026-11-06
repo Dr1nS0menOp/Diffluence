@@ -18,7 +18,10 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/outbox"
 )
 
 // Job statuses.
@@ -57,6 +60,7 @@ type Service struct {
 	log      *slog.Logger
 	handlers map[string]Handler
 	timeout  time.Duration
+	held     func(context.Context) (bool, error)
 }
 
 // NewService creates the service.
@@ -90,8 +94,71 @@ func (s *Service) Get(ctx context.Context, userID, id uuid.UUID) (Job, error) {
 	return j, err
 }
 
+// Recent lists the latest jobs for the console. Payloads stay out: they can hold
+// details of what someone was doing.
+func (s *Service) Recent(ctx context.Context) ([]Job, error) {
+	rows, err := s.pool.Query(ctx, `SELECT id, kind, status, result, created_by, created_at, finished_at FROM jobs
+		ORDER BY created_at DESC LIMIT 100`)
+	if err != nil {
+		return nil, err
+	}
+	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Job, error) {
+		var j Job
+		err := r.Scan(&j.ID, &j.Kind, &j.Status, &j.Result, &j.CreatedBy, &j.CreatedAt, &j.FinishedAt)
+		return j, err
+	})
+	if out == nil {
+		out = []Job{}
+	}
+	return out, err
+}
+
+func (s *Service) changeJob(ctx context.Context, c identity.Caller, id uuid.UUID, change jobChange) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, "UPDATE jobs SET status = $3, result = '{}', finished_at = NULL WHERE id = $1 AND status = $2", id, change.from, change.to)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return apperr.Conflict("wrong_status", "This job is not "+change.from+".")
+		}
+		if _, err := audit.Record(ctx, tx, c.Event(change.action, "job", id.String(), "", nil)); err != nil {
+			return err
+		}
+		_, err = outbox.Enqueue(ctx, tx, change.action, map[string]any{"job_id": id})
+		return err
+	})
+}
+
+type jobChange struct {
+	from, to, action string
+}
+
+// Retry puts a failed job back in the queue. The route requires administrator.
+func (s *Service) Retry(ctx context.Context, c identity.Caller, id uuid.UUID) error {
+	return s.changeJob(ctx, c, id, jobChange{from: StatusFailed, to: StatusQueued, action: "job.retried"})
+}
+
+// Cancel ends a job that has not started. A running job cannot be stopped yet.
+func (s *Service) Cancel(ctx context.Context, c identity.Caller, id uuid.UUID) error {
+	return s.changeJob(ctx, c, id, jobChange{from: StatusQueued, to: StatusFailed, action: "job.cancelled"})
+}
+
+// HoldWhile makes queued jobs wait for as long as the check says so. Maintenance mode
+// uses it: a job may change what an operator is backing up (spec 013, F11).
+func (s *Service) HoldWhile(check func(context.Context) (bool, error)) { s.held = check }
+
 // RunOnce claims and runs one queued job. It reports whether there was one.
 func (s *Service) RunOnce(ctx context.Context) (bool, error) {
+	if s.held != nil {
+		held, err := s.held(ctx)
+		if err != nil {
+			return false, err
+		}
+		if held {
+			return false, nil
+		}
+	}
 	var j Job
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		err := tx.QueryRow(ctx, `SELECT id, kind, status, payload, created_by, created_at FROM jobs

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, type DirectorySpace, type Me } from '../api';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, type Category, type DirectorySpace, type Me } from '../api';
 import { Link, navigate, useLocation } from '../router';
 import { NewSpaceDialog } from '../components/create';
 import { IconPlus, IconStar } from '../components/icons';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge } from '../components/ui';
 
 const ROWS_PER_LOAD = 50;
-const KINDS = ['all', 'favourites', 'archived'];
+const KINDS = ['all', 'team', 'personal', 'favourites', 'archived'];
 const SORTS = ['name', 'changed', 'pages'];
 
 interface DirectoryPage {
@@ -22,16 +22,18 @@ function useFilters() {
   const text = searchParams.get('q') ?? '';
   const kind = searchParams.get('kind') ?? 'all';
   const sort = searchParams.get('sort') ?? 'name';
-  const set = (change: { q?: string; kind?: string; sort?: string }) => {
+  const category = searchParams.get('category') ?? '';
+  const set = (change: { q?: string; kind?: string; sort?: string; category?: string }) => {
     const next = new URLSearchParams();
-    const merged = { q: text, kind, sort, ...change };
+    const merged = { q: text, kind, sort, category, ...change };
     if (merged.q) next.set('q', merged.q);
     if (merged.kind !== 'all') next.set('kind', merged.kind);
     if (merged.sort !== 'name') next.set('sort', merged.sort);
+    if (merged.category) next.set('category', merged.category);
     const query = next.toString();
     navigate(query ? `/spaces?${query}` : '/spaces', true);
   };
-  return { text, kind, sort, set };
+  return { text, kind, sort, category, set };
 }
 
 function Row({ space, onStar }: { space: DirectorySpace; onStar: (space: DirectorySpace) => void }) {
@@ -71,10 +73,14 @@ function Row({ space, onStar }: { space: DirectorySpace; onStar: (space: Directo
 export function DirectoryView({ me }: { me: Me }) {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const { text, kind, sort, set } = useFilters();
+  const { text, kind, sort, category, set } = useFilters();
+  const categories = useQuery({
+    queryKey: ['categories'],
+    queryFn: () => api.get<{ categories: Category[] }>('/categories'),
+  });
   const [input, setInput] = useState(text);
   const [adding, setAdding] = useState(false);
-  const key = ['directory', text, kind, sort];
+  const key = ['directory', text, kind, sort, category];
   const q = useInfiniteQuery({
     queryKey: key,
     initialPageParam: 0,
@@ -86,6 +92,7 @@ export function DirectoryView({ me }: { me: Me }) {
         limit: String(ROWS_PER_LOAD),
         offset: String(pageParam),
       });
+      if (category) params.set('category', category);
       return api.get<DirectoryPage>(`/space-directory?${params.toString()}`);
     },
     getNextPageParam: (last, all) => {
@@ -138,6 +145,20 @@ export function DirectoryView({ me }: { me: Me }) {
             </option>
           ))}
         </select>
+        {(categories.data?.categories.length ?? 0) > 0 && (
+          <select
+            aria-label={t('directory.category')}
+            value={category}
+            onChange={(e) => set({ category: e.target.value })}
+          >
+            <option value="">{t('directory.allCategories')}</option>
+            {categories.data?.categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+        )}
         <select aria-label={t('directory.sort')} value={sort} onChange={(e) => set({ sort: e.target.value })}>
           {SORTS.map((s) => (
             <option key={s} value={s}>

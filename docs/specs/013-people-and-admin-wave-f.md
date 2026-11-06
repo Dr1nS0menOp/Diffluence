@@ -1,6 +1,6 @@
 # 013: Wave F, people, access and administration
 
-Status: planned in detail, not built yet
+Status: built on branch `wave-f`, see "What differs from this plan" and `docs/handoff/2026-11-05-wave-f.md`
 Phase: wave F of `docs/blueprint/03-functional-requirements.md`. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave, and tests it when all waves are done.
 Comes after: wave C (mail queue, notifications, Share), wave D (owners, statuses, templates, per-space features) and wave E. Migration 0010.
 
@@ -27,7 +27,7 @@ A person is still only a name and an e-mail address. Colleagues cannot be found 
 
 **What the numbers say about one accent colour.** The blueprint says the app checks the colour in light and dark. On white (`#ffffff`) text needs a luminance of at most 0.183 for 4.5:1. On our dark surface (`#11161f`) it needs at least 0.21. No single colour passes both, so an accent must be a pair (D6).
 
-**Passwords.** NIST SP 800-63B drops rules about odd characters and forced changes. It asks for a check against known bad passwords, allows long passphrases, and allows paste. The sources read say 15 characters when a password stands alone, and 8 as part of several factors. We have a minimum of 12, in `MinPasswordLength`. The primary text must be read before this number changes, so it stays until the product owner decides.
+**Passwords.** NIST SP 800-63B drops rules about odd characters and forced changes. It asks for a check against known bad passwords, allows long passphrases, and allows paste. The sources read say 15 characters when a password stands alone, and 8 as part of several factors. The product owner chose 15 for new passwords (D21).
 
 **What our own code says.** These findings shape the plan:
 
@@ -60,14 +60,57 @@ A person is still only a name and an e-mail address. Colleagues cannot be found 
 | D10 | Anonymising cannot change audit rows. The screen says so, and the audit retention period is the limit | The chain must stay intact, and an audit trail has its own legal ground. Backups get the same note |
 | D11 | Audit retention is a setting, and pruning is a command run with the owner's database role, which leaves a signed anchor | The application still cannot delete audit rows |
 | D12 | Tokens work on normal routes within their scope, and never on routes marked `SessionOnly` | A leaked script token must not reach passwords, tokens or the console |
-| D13 | Names in answers become a `PersonRef` next to the old `*_name` fields | A lookup route would be a way to test ids. The old fields stay for one release |
+| D13 | Names stay `*_name` fields. A name with an id asks `GET /people/{id}`, which answers not found for someone the viewer may not see, so the route tells nothing | Changed while building: the rule that guards a profile already guards this, and a second shape of name in every answer adds nothing |
 | D14 | Group owners are checked in the module, and a group from SCIM stays read-only for them too | The identity provider stays the source of truth |
 | D15 | Space categories are one list kept by administrators, and space administrators pick from it | Free typing gives ten spellings of one word |
 | D16 | The starter text of a new space comes from the browser, through the normal document gate | UI words stay in the translation files, and the person's language applies |
 | D17 | Maintenance mode is a check in the middleware, not in `Evaluate` | It concerns every write, also from SCIM and jobs, and not a person's rights |
-| D18 | The release check is off by default, and goes to one fixed address | A check reveals an installation (ADM-050) |
+| D18 | Withdrawn by ADR-029: there is no release check, because operators follow a release feed and nothing calls home | A check reveals an installation |
 | D19 | Login history shows the address and device, not a place | A place needs a location database, see "For the product owner to decide" |
 | D20 | First day of the week is stored, and has no visible effect until a calendar exists | The browser's date field cannot be told. Saying so is better than a setting that seems broken |
+| D21 | The product owner, 2026-11-05: the minimum length of a new password is 15. Existing passwords stay valid | NIST's figure for a password that stands alone |
+| D22 | The product owner, 2026-11-05: the SecLists list of about 5 million leaked passwords is built in as a Bloom filter of 10 MB, never as text. `cmd/password-filter` rebuilds it, and an operator's own file works on top of it | A rare false positive only means choosing another password |
+| D23 | The product owner, 2026-11-05: the place stays out of the login history | A SIEM can work that out |
+| D24 | The product owner, 2026-11-05: a person with only a password is asked for a second factor or passkey after login and in their account. It can be put off for 7 days, a fixed time on the server, and never switched off. An administrator is asked again after a day | People should be pushed to a stronger sign-in |
+| D25 | The product owner, 2026-11-05: the console warns while no identity provider is set up, and while the administrator has no passkey. OAuth for the API stays in phase 7 | Their account reaches everything |
+
+| D26 | The tour starts from the card on the start screen, and never opens by itself | A dialog that opens on its own takes the focus from someone who came to read |
+| D27 | The prompt for a stronger sign-in is a static note under the top bar | It stays in view without taking the focus, and does not stand in the way of work |
+| D28 | The anchor of a prune is signed with the key of the audit checkpoints | That key is not in the database, so an anchor cannot be replaced unnoticed |
+| D29 | An import is a set of invitations, of at most 1000 lines, and runs in the request | People choose their own name and password, and the preview per line is what matters |
+
+## Security lines closed here
+
+Blueprint 06 found these, and they were closed on this branch, each with a test that failed first and a mutation line:
+
+| Line | What changed |
+|---|---|
+| SEC-134 | Passkeys require user verification at login, at step-up and at registration |
+| SEC-135 | `POST /me/passkeys/begin`, `/finish`, `DELETE /me/passkeys/{id}` and `POST /me/totp/disable` are `Sensitive` |
+| SEC-820 | A failed login stores a keyed hash for an unknown address, and the id for a known account. Rows already written cannot be changed, so they stay until their retention ends |
+| SEC-814 | `audit.Check` verifies the chain and the checkpoints. The daily job, the Verify button and `diffluence audit verify`, which `restore.sh` runs, all use it. The result of the daily job shows in the console. Telling administrators by notification waits for wave C (SEC-655) |
+| SEC-124 | New recovery codes hold 128 bits. Existing codes stay valid until a person sets up again, so nobody is locked out |
+| SEC-126 | After removing a factor the screen offers `POST /me/sessions/end-others`. An administrator's reset ends the sessions itself |
+| SEC-156 | SCIM tokens have `expires_at`, one year by default and at most. The console warns 30 days ahead, also for service tokens. Rotating gives a successor, and the old token ends within 7 days. A personal or service token without a date lasts a year |
+
+## Decided after this plan
+
+| Line | What changed |
+|---|---|
+| ADR-029 | An administrator sees a page they cannot read in the audit log by its id with "(Censored title)", on the screen and in exports. A page that is gone counts as one they cannot read. `GET /admin/pages/{id}` gives a note on the page without its title, and is audited. Events can be filtered by object id |
+| SEC-164 | `second_factor` starts as `administrators_after_grace`: administrators need one 14 days after the instance began. An operator can choose another rule |
+| SEC-821 | Address, user agent, and the details `email`, `name`, `display_name`, `title` and `filename` go to `audit_personal`. The event holds a salted digest of that part, so it can be erased while the chain holds, and a change is noticed. Readers get the event put together again. Events written before this stay as they are |
+| SEC-831 | The audit log stays 365 days by default. Longer, or for ever, needs `longer_because` |
+| GAP-018 | `Anonymise` also covers follows, watches, what was seen, notifications, mail, favourites, recent pages, drafts, group membership and open requests. The walk looks at every uuid column, and each id that stays has a stated reason in `idColumns` |
+| Wave D | The choice of access for a new space, its default and draft retention come from wave D's presets and settings. This wave keeps the starter text |
+| Mail | Account mail goes through wave C's queue as `kind = 'account'`, sealed, and the sealed part goes once the mail has left. The queue waits during maintenance |
+
+## What differs from this plan
+
+- Download of personal data is one JSON file, made in the request, and not a zip from a job.
+- Finding unused files runs in the request, not as a job.
+- `GET /people/{id}/card` is not there: the card uses `GET /people/{id}`. `GET /people/{id}/pages` and `GET /me/groups` were added.
+- Mail settings, the queue view, notifications and Share's inspect entry wait for wave C. Hand-over of pages, templates, statuses and the list of restricted pages wait for wave D.
 
 ## Scope
 
@@ -320,29 +363,29 @@ Migration 0010, expand only:
 
 ## Acceptance criteria
 
-- [ ] AC-1 The matrix passes with Manager, expired accounts and the people rule, in all three answers.
-- [ ] AC-2 A Manager manages people and content, and cannot reach settings or *administer*.
-- [ ] AC-3 A space shows who has access and how, a change shows who gains and loses, and the list can be exported safely.
-- [ ] AC-4 A person creates one personal space, which starts private, and it survives their disabling through a hand-over.
-- [ ] AC-5 People can be found, and a guest only finds who they share a space with.
-- [ ] AC-6 A profile shows what the viewer may see, a person chooses that, and locked fields stay locked.
-- [ ] AC-7 A picture can be cropped by keyboard, and leaves no metadata.
-- [ ] AC-8 Guests and former colleagues are marked on their names, and absent from pickers.
-- [ ] AC-9 Reset, invitation and sign-up work, reveal nothing, and work once.
-- [ ] AC-10 A second factor can be required, and the idle warning keeps a draft safe.
-- [ ] AC-11 An expired guest has no access from that moment, on every list.
-- [ ] AC-12 Tokens stay inside their scope, and never reach account security or the console.
-- [ ] AC-13 Sensitive actions ask again after 10 minutes.
-- [ ] AC-14 Dates follow a person's time zone and format everywhere.
-- [ ] AC-15 Group owners manage members, and deleting a group says what it touches.
-- [ ] AC-16 The restrictions dialog shows three states, and nobody locks themselves out.
-- [ ] AC-17 The console opens on a summary, finds settings, filters users and audit, and imports a CSV with a preview.
-- [ ] AC-18 A space administrator sees their audit, without titles of hidden pages.
-- [ ] AC-19 Name, logo, accent pair, login text, banner and reset work, and a failing colour is refused.
-- [ ] AC-20 Maintenance mode stops every write and shows why, and text in an open editor survives.
-- [ ] AC-21 Unused files are reported before anything is removed.
-- [ ] AC-22 A person downloads their data, and anonymising leaves their name in no table but the audit log.
-- [ ] AC-23 Everything passes axe, and the new pictures have been looked at.
+- [x] AC-1 The matrix passes with Manager, expired accounts and the people rule, in all three answers.
+- [x] AC-2 A Manager manages people and content, and cannot reach settings or *administer*.
+- [x] AC-3 A space shows who has access and how, a change shows who gains and loses, and the list can be exported safely.
+- [x] AC-4 A person creates one personal space, which starts private, and it survives their disabling through a hand-over.
+- [x] AC-5 People can be found, and a guest only finds who they share a space with.
+- [x] AC-6 A profile shows what the viewer may see, a person chooses that, and locked fields stay locked.
+- [x] AC-7 A picture can be cropped by keyboard, and leaves no metadata.
+- [x] AC-8 Guests and former colleagues are marked on their names, and absent from pickers.
+- [x] AC-9 Reset, invitation and sign-up work, reveal nothing, and work once.
+- [x] AC-10 A second factor can be required, and the idle warning keeps a draft safe.
+- [x] AC-11 An expired guest has no access from that moment, on every list.
+- [x] AC-12 Tokens stay inside their scope, and never reach account security or the console.
+- [x] AC-13 Sensitive actions ask again after 10 minutes.
+- [x] AC-14 Dates follow a person's time zone and format everywhere.
+- [x] AC-15 Group owners manage members, and deleting a group says what it touches.
+- [x] AC-16 The restrictions dialog shows three states, and nobody locks themselves out.
+- [x] AC-17 The console opens on a summary, finds settings, filters users and audit, and imports a CSV with a preview.
+- [x] AC-18 A space administrator sees their audit, without titles of hidden pages.
+- [x] AC-19 Name, logo, accent pair, login text, banner and reset work, and a failing colour is refused.
+- [x] AC-20 Maintenance mode stops every write and shows why, and text in an open editor survives.
+- [x] AC-21 Unused files are reported before anything is removed.
+- [x] AC-22 A person downloads their data, and anonymising leaves their name in no table but the audit log.
+- [x] AC-23 Everything passes axe, and the new pictures have been looked at.
 
 ## Risks
 
@@ -361,9 +404,7 @@ Migration 0010, expand only:
 
 ## For the product owner to decide
 
-1. **Blocklist of leaked passwords (ACC-014).** The offline check needs a list made by others. Advice: embed the top 100,000 of the SecLists project (MIT), stored as hashes, about 400 KB. It is data, not code, and goes in `docs/dependencies.md`. Without it, only an operator's own file works.
-2. **Minimum password length.** It stays at 12. NIST's revision, as summarised by the sources read, says 15 for a password alone. Changing it affects new passwords only.
-3. **Place in login history (ACC-017).** A place needs a location database with its own licence and updates. Advice: leave it out, and show the address and device. ACC-017 then stays partly.
+The product owner decided all three on 2026-11-05. See D21, D22 and D23.
 
 ## How the product owner tests it
 

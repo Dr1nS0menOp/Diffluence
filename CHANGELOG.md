@@ -4,6 +4,33 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: people, access and administration (wave F)
+- People and a profile for everyone, with a picture you crop by mouse or keyboard, and a choice of who sees what. Names lead to a small card. Guests and former colleagues are marked
+- A forgotten password, invitations and self sign-up, by a link that works once. New passwords need 15 characters and are checked against 5 million leaked ones. Existing passwords stay valid
+- A person with only a password is asked for a passkey or second factor. It can be put off, not switched off. An administrator can require a second factor, and an idle timeout with a warning
+- Personal tokens for scripts, which never reach account security or the console. Sensitive actions ask for proof again after 10 minutes
+- Personal spaces, a Manager role, who has access and how, a summary before someone loses access, and a safe CSV of it
+- Restrictions in three clear states. Group owners manage members outside the console
+- Dates follow your time zone and format. Your account has sections, and you can download your data or ask for removal
+- The console opens on a summary with what needs attention, and warns while no identity provider or passkey is set up. It finds settings by name, filters users and audit through the address, and has bulk actions, import, service accounts, jobs, reports and unused files
+- The look of an instance: name, logo, an accent for light and dark, login text and a banner. Maintenance mode stops every write and holds jobs
+- Anonymising an account, with a reason, and `diffluence audit prune` with a signed anchor
+
+### Security
+- A passkey now needs a PIN or fingerprint on the device, at login and when it is added. A key without one no longer works
+- Adding or removing a passkey and turning off a factor ask for proof again. After removing one, Diffluence offers to log you out elsewhere, and an administrator's reset does that by itself
+- A failed login no longer stores the address that was typed, which could hold a password by accident. Old rows stay until their retention ends
+- The signatures on the audit log are now checked: by the daily job, by Verify and by `diffluence audit verify`, which `restore.sh` runs. A failure shows in the console
+- New recovery codes hold 128 bits. Codes people already have keep working until they set up again
+- SCIM tokens end after a year or on a date you choose, the console warns a month ahead, and Rotate gives a successor that overlaps for 7 days. Existing tokens get a year from the upgrade
+- An administrator sees a page they cannot read in the audit log by its id, with the words (Censored title), on the screen and in exports. The id leads to a note on the page, without its title
+- Administrators need a second factor 14 days after a new instance began. An operator can choose another rule in Rules
+- What identifies a person in an audit event now sits apart from the chain, so anonymising erases it and the chain still holds. Events written before this stay as they are
+- The audit log stays 12 months by default. Longer needs a stated reason
+- Anonymising also removes follows, watches, what was seen, notifications, queued mail, favourites, recent pages and drafts
+
+Upgrade impact: migration 0010 adds columns and tables, and gives members the right to a personal space. Expand only, so the previous release keeps working. New passwords are held to the new rules from now on. API tokens and the screens above need no setup. Reset links and invitations go by mail once `DIFFLUENCE_SMTP_HOST` is set. An instance older than 14 days asks its administrators for a second factor at their next login.
+
 ### Changed: the editor after the first test
 - A table has one button on its outline, with one menu for rows, columns, cells, colours and width. The row of tools no longer changes in a table
 - Tables have a clear outline and a soft grid

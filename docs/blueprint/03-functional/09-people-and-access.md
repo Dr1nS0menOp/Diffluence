@@ -12,48 +12,48 @@
 - **ACC-008** · built · A person registers, lists and removes passkeys.
 - **ACC-009** · built · An administrator resets a password or the second factor of a person, and it is audited.
 - **ACC-010** · built · The first administrator is created from the command line.
-- **ACC-011** · new · **Forgot password:** a person asks for a link by e-mail, which works once and expires within an hour. It works only when e-mail is configured, and never for accounts of an identity provider.
-- **ACC-012** · new · **Invitation:** an administrator invites by e-mail. The person chooses their own password and name, and the link expires.
-- **ACC-013** · new · **Self sign-up:** optional, limited to e-mail domains on a list. Off by default.
-- **ACC-014** · new · **Password rules:** a minimum length, with a check against lists of leaked passwords that works offline, and no rules that force odd characters.
-- **ACC-015** · new · An administrator can require a second factor for all members, or for administrators only.
-- **ACC-016** · new · A session ends after a configurable idle time, with a warning first, and the draft stays safe.
-- **ACC-017** · new · A person sees recent logins with place and device, and is told by e-mail of a login from a new device.
+- **ACC-011** · built · **Forgot password:** a person asks for a link by e-mail, which works once and expires within an hour. It works only when e-mail is configured, and never for accounts of an identity provider.
+- **ACC-012** · built · **Invitation:** an administrator invites by e-mail. The person chooses their own password and name, and the link expires.
+- **ACC-013** · built · **Self sign-up:** optional, limited to e-mail domains on a list. Off by default.
+- **ACC-014** · built · **Password rules:** a minimum length, with a check against lists of leaked passwords that works offline, and no rules that force odd characters.
+- **ACC-015** · built · An administrator can require a second factor for all members, or for administrators only.
+- **ACC-016** · built · A session ends after a configurable idle time, with a warning first, and the draft stays safe.
+- **ACC-017** · built · A person sees recent logins with place and device, and is told by e-mail of a login from a new device.
 - **ACC-018** · built · Single sign-on links accounts on stable ids, and never takes over a local account by e-mail alone.
-- **ACC-019** · new · **Personal API tokens:** a person creates tokens for scripts, with a name, an expiry and a limited scope. Tokens are shown once, stored hashed, and can be revoked. An administrator can turn the feature off.
+- **ACC-019** · built · **Personal API tokens:** a person creates tokens for scripts, with a name, an expiry and a limited scope. Tokens are shown once, stored hashed, and can be revoked. An administrator can turn the feature off.
 
 ## 9.2 Profile and preferences
 
-- **ACC-020** · new · A profile screen shows the picture, name, job title, department, location, local time, e-mail and a short text, within what the viewer may see.
-- **ACC-021** · new · It lists recent pages, spaces and blog posts by the person, filtered for the viewer.
-- **ACC-022** · new · A person uploads and crops a profile picture. Without one, the initials show on a tint chosen from the name.
-- **ACC-023** · new · A person chooses which fields are visible to others. An identity provider can fill and lock some fields.
-- **ACC-024** · partly · **Your account** holds security, sessions and passkeys. Built. New: profile, preferences, notifications, watches.
-- **ACC-025** · new · **Preferences:** language, time zone, date format, theme, keyboard shortcuts on or off, hover cards on or off, typing replacements on or off, toolbar pinned or not, editor width.
-- **ACC-026** · new · Preferences are stored with the account, not in the browser, so they follow a person.
-- **ACC-027** · new · A person can download all their personal data, and ask an administrator for removal, for GDPR requests.
-- **ACC-028** · new · A disabled person's name stays on their work, marked as no longer active. An administrator can anonymise the name for a GDPR removal, with the content untouched.
+- **ACC-020** · built · A profile screen shows the picture, name, job title, department, location, local time, e-mail and a short text, within what the viewer may see.
+- **ACC-021** · partly · It lists recent pages, spaces and blog posts by the person, filtered for the viewer. Built: recent pages. Still open: spaces and blog posts.
+- **ACC-022** · built · A person uploads and crops a profile picture. Without one, the initials show on a tint chosen from the name.
+- **ACC-023** · built · A person chooses which fields are visible to others. An identity provider can fill and lock some fields.
+- **ACC-024** · partly · **Your account** holds security, sessions and passkeys. Built: profile, preferences, security, tokens, data. Still open: notifications and watches (wave C).
+- **ACC-025** · partly · **Preferences:** language, time zone, date format, theme, keyboard shortcuts on or off, hover cards on or off, typing replacements on or off, toolbar pinned or not, editor width. Built: language, time zone, date format, first day, theme, shortcuts, cards. Still open: typing replacements, toolbar pinned, editor width.
+- **ACC-026** · built · Preferences are stored with the account, not in the browser, so they follow a person.
+- **ACC-027** · built · A person can download all their personal data, and ask an administrator for removal, for GDPR requests.
+- **ACC-028** · built · A disabled person's name stays on their work, marked as no longer active. An administrator can anonymise the name for a GDPR removal, with the content untouched.
 
 ## 9.3 Groups
 
 - **ACC-029** · built · An administrator creates, renames and deletes groups, and adds and removes members.
 - **ACC-030** · built · Groups from SCIM or single sign-on are read-only in the screens.
 - **ACC-031** · built · Groups hold global permissions and space permissions, and appear on restrictions.
-- **ACC-032** · new · A group has an owner who may manage its members without being an administrator.
-- **ACC-033** · new · A person sees the groups they belong to on their profile.
-- **ACC-034** · new · Deleting a group shows which spaces and restrictions use it, and what changes. A group that would leave a space with no administrator cannot be deleted.
+- **ACC-032** · built · A group has an owner who may manage its members without being an administrator.
+- **ACC-033** · built · A person sees the groups they belong to on their profile.
+- **ACC-034** · built · Deleting a group shows which spaces and restrictions use it, and what changes. A group that would leave a space with no administrator cannot be deleted.
 
 ## 9.4 Guests and other kinds of account
 
 - **ACC-035** · built · A guest is a user type. Guests are never part of "all members".
 - **ACC-036** · built · Guests see only what is granted to them directly, and cannot browse people unless granted *view profiles*.
 - **ACC-037** · built · Guests can be granted any space, but start with none.
-- **ACC-038** · new · A guest has a mark on their name, so others know they are talking to someone outside.
-- **ACC-039** · new · A guest account can expire on a date, and an administrator gets a reminder before that.
-- **ACC-040** · new · An administrator can list guests with their spaces and last login.
-- **ACC-041** · new · A space administrator can invite a guest to their space, when an administrator allows it.
-- **ACC-042** · new · A guest can be turned into a member, and back, with a clear warning about what changes.
-- **ACC-043** · partly · A service account is a user type for automation. Built: the type. New: it cannot log in with a browser, and it uses tokens from an administrator.
+- **ACC-038** · built · A guest has a mark on their name, so others know they are talking to someone outside.
+- **ACC-039** · built · A guest account can expire on a date, and an administrator gets a reminder before that.
+- **ACC-040** · partly · An administrator can list guests with their spaces and last login. Built: guests by filter, with last login. Still open: their spaces in the list.
+- **ACC-041** · built · A space administrator can invite a guest to their space, when an administrator allows it.
+- **ACC-042** · built · A guest can be turned into a member, and back, with a clear warning about what changes.
+- **ACC-043** · built · A service account is a user type for automation.
 
 ## 9.5 Provisioning
 
@@ -75,19 +75,19 @@
 - **ACC-056** · built · A person who may not view gets "not found". A person who may view but not act gets "forbidden".
 - **ACC-057** · built · Every refusal is audited as denied.
 - **ACC-058** · built · Global permissions are: use the product, create spaces, view profiles, administrator, system administrator.
-- **ACC-059** · new · A global permission **create personal space**.
-- **ACC-060** · new · Global permission screens show who has each permission through which group.
+- **ACC-059** · built · A global permission **create personal space**.
+- **ACC-060** · built · Global permission screens show who has each permission through which group.
 
 ## 9.7 Page restrictions
 
 - **ACC-061** · built · The lock opens the restrictions of the page: who can view it and everything below it, and who can edit it.
 - **ACC-062** · built · The dialog shows restrictions inherited from pages above.
 - **ACC-063** · built · Restrictions are managed by people with *manage restrictions*, who can see the page.
-- **ACC-064** · new · Three clear states at the top of the dialog: **Open** (everyone in the space can view and edit), **View only for most** (everyone can view, chosen people can edit), and **Private** (only chosen people).
-- **ACC-065** · new · A person setting a restriction is added to it, so nobody locks themselves out by accident.
-- **ACC-066** · new · The lock icon shows the state: open or closed. Everyone who can see the page can see that it is restricted.
+- **ACC-064** · built · Three clear states at the top of the dialog: **Open** (everyone in the space can view and edit), **View only for most** (everyone can view, chosen people can edit), and **Private** (only chosen people).
+- **ACC-065** · built · A person setting a restriction is added to it, so nobody locks themselves out by accident.
+- **ACC-066** · partly · The lock icon shows the state: open or closed. Everyone who can see the page can see that it is restricted. Built: the word Restricted for everyone who can see the page. Still open: an open and a closed lock.
 - **ACC-067** · new · A list in space settings shows all restricted pages (SPC-065).
-- **ACC-068** · new · The dialog says how many pages below are affected.
+- **ACC-068** · built · The dialog says how many pages below are affected.
 
 ## 9.8 When something is off
 

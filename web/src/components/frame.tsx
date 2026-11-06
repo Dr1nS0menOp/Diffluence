@@ -36,7 +36,9 @@ import {
   IconHome,
   IconInfo,
   IconLink,
+  IconLock,
   IconMore,
+  IconPeople,
   IconSliders,
   IconStar,
   IconTable2,
@@ -57,6 +59,9 @@ const SPACE_ROUTES = [
   '/spaces/:key/settings',
   '/spaces/:key/trash',
   '/spaces/:key/overview',
+  '/spaces/:key/access',
+  '/spaces/:key/people',
+  '/spaces/:key/audit',
   '/spaces/:key/content',
   '/spaces/:key/blog',
   '/spaces/:key/archive',
@@ -212,6 +217,13 @@ function SpaceLinks({ space, current }: { space: Space; current?: string }) {
       <Link href={overview} className="side-link" aria-current={pathname === overview ? 'page' : undefined}>
         <IconInfo size={LINK_ICON_SIZE} /> {t('space.overview')}
       </Link>
+      <Link
+        href={`/spaces/${space.key}/people`}
+        className="side-link"
+        aria-current={pathname === `/spaces/${space.key}/people` ? 'page' : undefined}
+      >
+        <IconPeople size={LINK_ICON_SIZE} /> {t('access.peopleTitle')}
+      </Link>
       {(space.features?.blog ?? true) && (
         <Link
           href={`/spaces/${space.key}/blog`}
@@ -311,17 +323,26 @@ function Sidebar({
           onDialog={(page, dialog) => setRowDialog({ page, dialog })}
         />
       )}
-      {space.can?.['space.administer'] && (
+      {space.can?.['space.manage_access'] && (
         <nav className="sidebar-foot" aria-label={t('space.settings')}>
-          <Link href={`/spaces/${space.key}/settings`} className="side-link">
-            <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
+          {space.can['space.administer'] && (
+            <Link href={`/spaces/${space.key}/settings`} className="side-link">
+              <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
+            </Link>
+          )}
+          {space.can['space.administer'] && (
+            <Link href={`/spaces/${space.key}/content`} className="side-link">
+              <IconTable2 size={MENU_ICON_SIZE} /> {t('content.title')}
+            </Link>
+          )}
+          <Link href={`/spaces/${space.key}/access`} className="side-link">
+            <IconLock size={MENU_ICON_SIZE} /> {t('access.title')}
           </Link>
-          <Link href={`/spaces/${space.key}/content`} className="side-link">
-            <IconTable2 size={MENU_ICON_SIZE} /> {t('content.title')}
-          </Link>
-          <Link href={`/spaces/${space.key}/trash`} className="side-link">
-            <IconTrash size={MENU_ICON_SIZE} /> {t('space.trash')}
-          </Link>
+          {space.can['space.administer'] && (
+            <Link href={`/spaces/${space.key}/trash`} className="side-link">
+              <IconTrash size={MENU_ICON_SIZE} /> {t('space.trash')}
+            </Link>
+          )}
         </nav>
       )}
       {adding && <NewPageDialog space={space} parent={adding.parent} onClose={() => setAdding(null)} />}

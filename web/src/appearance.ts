@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 
 const IMPORTED_FAMILY = 'Diffluence Imported';
+const NOTES_POLL_MS = 30_000;
 
 export interface ImportedFont {
   name: string;
@@ -11,10 +12,35 @@ export interface ImportedFont {
   version: string;
 }
 
+interface AccentColours {
+  accent: string;
+  hover: string;
+  tint: string;
+}
+
+/** What the instance looks like, and what anyone may know before logging in. */
+export interface Appearance {
+  font: ImportedFont | null;
+  name: string;
+  accent: { light: AccentColours; dark: AccentColours } | null;
+  login_welcome: string;
+  terms_url: string;
+  banner: { text: string; level: string } | null;
+  welcome_page: string;
+  help_url: string;
+  maintenance: { on: boolean; message: string };
+  logo: string;
+  mail_ready: boolean;
+  self_signup: boolean;
+}
+
 export const appearanceQuery = {
   queryKey: ['appearance'],
-  queryFn: () => api.get<{ font: ImportedFont | null }>('/appearance'),
+  queryFn: () => api.poll<Appearance>('/appearance'),
 };
+
+/** The same answer, kept fresh, so maintenance mode reaches an open screen. */
+export const liveAppearanceQuery = { ...appearanceQuery, refetchInterval: NOTES_POLL_MS };
 
 /**
  * Applies the font an administrator imported, here and only here. The stack
@@ -42,4 +68,25 @@ export function useImportedFont(): void {
       root.style.removeProperty('--font-sans');
     };
   }, [version]);
+}
+
+const ACCENT_TOKENS = [
+  ['--color-accent', 'accent'],
+  ['--color-accent-hover', 'hover'],
+  ['--color-accent-tint', 'tint'],
+] as const;
+
+/** Applies the accent pair of the instance. The server already checked its contrast. */
+export function useAccent(): void {
+  const accent = useQuery(appearanceQuery).data?.accent;
+  useEffect(() => {
+    if (!accent) return;
+    const root = document.documentElement;
+    for (const [token, part] of ACCENT_TOKENS) {
+      root.style.setProperty(token, `light-dark(${accent.light[part]}, ${accent.dark[part]})`);
+    }
+    return () => {
+      for (const [token] of ACCENT_TOKENS) root.style.removeProperty(token);
+    };
+  }, [accent]);
 }

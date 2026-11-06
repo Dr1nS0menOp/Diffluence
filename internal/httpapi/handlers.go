@@ -11,6 +11,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/version"
 	"github.com/diffluence/diffluence/internal/webui"
 )
@@ -34,9 +35,10 @@ func (s *Server) registerRoutes() {
 	r.HandleFunc("GET /api/v1/me", Authenticated(), s.handleMe)
 	r.HandleFunc("GET /api/v1/system/info", Permission(identity.PermUseProduct), s.handleSystemInfo)
 
-	r.HandleFunc("GET /api/v1/admin/audit-events", Permission(identity.PermAdministrator), s.handleAuditList)
-	r.HandleFunc("GET /api/v1/admin/audit-events/export", Permission(identity.PermAdministrator), s.handleAuditExport)
-	r.HandleFunc("GET /api/v1/admin/audit-events/verify", Permission(identity.PermAdministrator), s.handleAuditVerify)
+	auditor := SessionOnly(Permission(identity.PermAdministrator))
+	r.HandleFunc("GET /api/v1/admin/audit-events", auditor, s.handleAuditList)
+	r.HandleFunc("GET /api/v1/admin/audit-events/export", auditor, s.handleAuditExport)
+	r.HandleFunc("GET /api/v1/admin/audit-events/verify", auditor, s.handleAuditVerify)
 
 	s.registerContentRoutes()
 	s.registerReadingRoutes()
@@ -45,6 +47,8 @@ func (s *Server) registerRoutes() {
 	s.registerTogetherRoutes()
 	s.registerIdentityRoutes()
 	s.registerAppearanceRoutes()
+	s.registerPeopleRoutes()
+	s.registerConsoleRoutes()
 }
 
 type userJSON struct {
@@ -134,7 +138,27 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms, "preferences": preferences})
+	mine, err := s.deps.Spaces.PersonalOf(r.Context(), p.User.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	var personal string
+	if mine != nil {
+		personal = mine.Key
+	}
+	signIn, err := s.deps.Identity.SignInStatus(r.Context(), p.User.ID)
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	access := settings.DefaultAccess
+	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionAccess, &access); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms, "preferences": preferences,
+		"personal_space": personal, "needs_second_factor": p.NeedsSecondFactor, "sign_in": signIn, "idle_minutes": access.IdleMinutes})
 }
 
 func (s *Server) handleSystemInfo(w http.ResponseWriter, _ *http.Request) {
@@ -157,7 +181,8 @@ func (s *Server) auditAdmin(r *http.Request, action string, details map[string]a
 
 func parseAuditFilter(r *http.Request) (audit.Filter, error) {
 	q := r.URL.Query()
-	f := audit.Filter{ActorID: q.Get("actor_id"), Action: q.Get("action"), Limit: 100}
+	f := audit.Filter{ActorID: q.Get("actor_id"), Action: q.Get("action"), ObjectType: q.Get("object_type"),
+		ObjectID: q.Get("object_id"), SpaceID: q.Get("space_id"), Result: q.Get("result"), Limit: 100}
 	var err error
 	parseTime := func(key string) time.Time {
 		v := q.Get(key)
@@ -197,6 +222,10 @@ func (s *Server) handleAuditList(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	if f.Censor, err = s.deps.Pages.AuditCensor(r.Context(), s.caller(r)); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	events, err := audit.List(r.Context(), s.deps.Pool, f)
 	if err != nil {
 		s.internalError(w, r, err)
@@ -225,6 +254,10 @@ func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "bad_request", err.Error())
 		return
 	}
+	if f.Censor, err = s.deps.Pages.AuditCensor(r.Context(), s.caller(r)); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	// Audit first: an export is recorded even if the download is interrupted.
 	if err := s.auditAdmin(r, "audit.exported", map[string]any{"format": "csv", "filter_actor_id": f.ActorID, "filter_action": f.Action}); err != nil {
 		s.internalError(w, r, err)
@@ -240,12 +273,12 @@ func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
-	res, err := audit.Verify(r.Context(), s.deps.Pool)
+	res, err := s.deps.CheckAudit(r.Context())
 	if err != nil {
 		s.internalError(w, r, err)
 		return
 	}
-	if err := s.auditAdmin(r, "audit.verified", map[string]any{"ok": res.OK, "checked": res.Checked}); err != nil {
+	if err := s.auditAdmin(r, "audit.verified", map[string]any{"ok": res.OK, "checked": res.Checked, "checkpoints": res.Checkpoints}); err != nil {
 		s.internalError(w, r, err)
 		return
 	}

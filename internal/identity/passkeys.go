@@ -24,12 +24,20 @@ import (
 const (
 	challengePasskeyRegister = "passkey_register"
 	challengePasskeyLogin    = "passkey_login"
+	challengePasskeyReauth   = "passkey_reauth"
 	passkeyTTL               = 5 * time.Minute
 )
 
 // NewWebAuthn builds the relying party from the public URL of this installation.
 func NewWebAuthn(instanceName, host, origin string) (*webauthn.WebAuthn, error) {
 	return webauthn.New(&webauthn.Config{RPDisplayName: instanceName, RPID: host, RPOrigins: []string{origin}})
+}
+
+// requireLocalCheck asks for a PIN or biometric on the device. A passkey counts as a
+// second factor, so a stolen key alone must not be enough (SEC-134). The library
+// enforces this from the session it stores, and only when it says required.
+func requireLocalCheck() webauthn.LoginOption {
+	return webauthn.WithUserVerification(protocol.VerificationRequired)
 }
 
 // passkeyUser adapts an account to the webauthn library.
@@ -81,7 +89,11 @@ func (s *Service) BeginPasskey(ctx context.Context, c Caller) (any, string, erro
 		exclude = append(exclude, cred.Descriptor())
 	}
 	options, session, err := s.webauthn.BeginRegistration(u,
-		webauthn.WithResidentKeyRequirement(protocol.ResidentKeyRequirementRequired),
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+			ResidentKey:        protocol.ResidentKeyRequirementRequired,
+			RequireResidentKey: protocol.ResidentKeyRequired(),
+			UserVerification:   protocol.VerificationRequired,
+		}),
 		webauthn.WithExclusions(exclude))
 	if err != nil {
 		return nil, "", err
@@ -119,6 +131,9 @@ func (s *Service) FinishPasskey(ctx context.Context, c Caller, token, name strin
 	}
 	id := ids.New()
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.clearSecondFactorDemand(ctx, tx, c.UserID); err != nil {
+			return err
+		}
 		_, err := tx.Exec(ctx, "INSERT INTO webauthn_credentials (id, user_id, credential_id, credential, name) VALUES ($1, $2, $3, $4, $5)",
 			id, c.UserID, cred.ID, body, name)
 		if db.IsUniqueViolation(err) {
@@ -170,10 +185,54 @@ func (s *Service) RemovePasskey(ctx context.Context, c Caller, id uuid.UUID) err
 	})
 }
 
+// BeginPasskeyReauth asks for a passkey of the person already logged in, for a
+// sensitive action (spec 013, F6).
+func (s *Service) BeginPasskeyReauth(ctx context.Context, c Caller) (any, string, error) {
+	u, err := s.loadPasskeyUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return nil, "", err
+	}
+	options, session, err := s.webauthn.BeginLogin(u, requireLocalCheck())
+	if err != nil {
+		return nil, "", apperr.Invalid("This account has no passkey.")
+	}
+	token, err := s.NewChallenge(ctx, s.pool, challengePasskeyReauth, &c.UserID, session, passkeyTTL)
+	return options, token, err
+}
+
+// FinishPasskeyReauth verifies the assertion. Only a passkey of the caller counts.
+func (s *Service) FinishPasskeyReauth(ctx context.Context, c Caller, sessionID uuid.UUID, token string, response []byte) error {
+	var session webauthn.SessionData
+	owner, err := s.TakeChallenge(ctx, s.pool, challengePasskeyReauth, token, &session)
+	if err != nil || owner == nil || *owner != c.UserID {
+		return ErrInvalidCredentials
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(response))
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	u, err := s.loadPasskeyUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return err
+	}
+	cred, err := s.webauthn.ValidateLogin(u, session, parsed)
+	if err != nil {
+		return ErrInvalidCredentials
+	}
+	updated, err := json.Marshal(cred)
+	if err != nil {
+		return err
+	}
+	if _, err := s.pool.Exec(ctx, "UPDATE webauthn_credentials SET credential = $2, last_used_at = now() WHERE credential_id = $1", cred.ID, updated); err != nil {
+		return err
+	}
+	return s.confirmSession(ctx, c, sessionID)
+}
+
 // BeginPasskeyLogin starts a login without a user name: the browser offers the
 // passkeys it has for this site.
 func (s *Service) BeginPasskeyLogin(ctx context.Context) (any, string, error) {
-	options, session, err := s.webauthn.BeginDiscoverableLogin()
+	options, session, err := s.webauthn.BeginDiscoverableLogin(requireLocalCheck())
 	if err != nil {
 		return nil, "", err
 	}

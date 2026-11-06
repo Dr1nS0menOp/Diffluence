@@ -10,11 +10,13 @@ import { Link } from '../router';
 import { countWords, readingMinutes } from './editor/outline';
 import { OwnerDialog, ReviewDialog } from '../views/page-actions';
 import { IconClose } from './icons';
+import { PersonName } from './person';
 import { LabelBar } from './page-labels';
 import { StageMark } from './page-marks';
 import { SubjectPicker } from './picker';
 import { PageMark } from './topbar';
-import { ErrorNote, formatDate, formatSize, Loading } from './ui';
+import { useDates } from '../dates';
+import { ErrorNote, formatSize, Loading } from './ui';
 
 function PageLinks({ title, pages, empty }: { title: string; pages: PageRef[]; empty: string }) {
   return (
@@ -124,6 +126,7 @@ function Watchers({ pageId }: { pageId: string }) {
 
 export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () => void }) {
   const { t } = useTranslation();
+  const dates = useDates();
   const heading = useRef<HTMLHeadingElement>(null);
   const [changing, setChanging] = useState<'owner' | 'review' | null>(null);
   const q = useQuery({
@@ -188,10 +191,10 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
               )}
             </Fact>
             <Fact name={t('details.created')}>
-              {facts.created_by_name || t('common.unknown')}, {formatDate(facts.created_at)}
+              {facts.created_by_name || t('common.unknown')}, {dates.moment(facts.created_at)}
             </Fact>
             <Fact name={t('details.changed')}>
-              {facts.updated_by_name || t('common.unknown')}, {formatDate(facts.updated_at)}
+              {facts.updated_by_name || t('common.unknown')}, {dates.moment(facts.updated_at)}
             </Fact>
             <Fact name={t('details.length')}>{t('details.words', { count: words })}</Fact>
             {minutes !== null && <Fact name={t('details.readTime')}>{t('page.readTime', { minutes })}</Fact>}
@@ -204,7 +207,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
             <ul className="plain-list details-links">
               {facts.contributors.map((c) => (
                 <li key={c.id}>
-                  {c.name || t('common.unknown')}
+                  <PersonName id={c.id} name={c.name || t('common.unknown')} />
                   <span className="muted">{t('details.versions', { count: c.versions })}</span>
                   <FollowButton person={c.id} />
                 </li>

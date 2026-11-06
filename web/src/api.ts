@@ -11,44 +11,83 @@ export class ApiError extends Error {
   }
 }
 
-async function send(method: string, path: string, body?: unknown, raw?: Blob | File): Promise<Response> {
-  const init: RequestInit = { method, credentials: 'same-origin', headers: {} };
-  if (raw !== undefined) {
-    init.body = raw;
-    init.headers = { 'Content-Type': 'application/octet-stream' };
-  } else if (body !== undefined) {
-    init.body = JSON.stringify(body);
-    init.headers = { 'Content-Type': 'application/json' };
-  }
-  const res = await fetch('/api/v1' + path, init);
-  if (!res.ok) {
-    let code = 'error';
-    let message = res.statusText;
-    try {
-      const e = (await res.json()) as { error?: { code: string; message: string } };
-      if (e.error) ({ code, message } = e.error);
-    } catch {
-      // not JSON: keep the status text
-    }
-    throw new ApiError(res.status, code, message);
-  }
-  return res;
+interface Call {
+  method: string;
+  path: string;
+  body?: unknown;
+  raw?: Blob | File;
+  /** A request no person asked for: it does not keep a session alive (spec 013, D8). */
+  background?: boolean;
 }
 
-async function json<T>(method: string, path: string, body?: unknown, raw?: Blob | File): Promise<T> {
-  const res = await send(method, path, body, raw);
-  if (res.status === 204) return undefined as T;
-  return (await res.json()) as T;
+const BACKGROUND_HEADER = 'X-Background';
+
+// Module state, on purpose: `api` is used outside React, and what answers a request
+// for proof is a dialog inside it. `ReauthProvider` sets this once.
+let confirmIdentity: (() => Promise<boolean>) | null = null;
+let lastRequestAt = Date.now();
+
+/** Lets a dialog answer `reauth_required`, so the request can be sent again. */
+export function answerReauthWith(confirm: (() => Promise<boolean>) | null): void {
+  confirmIdentity = confirm;
+}
+
+/** When a person last did something the server saw. */
+export const lastRequestTime = () => lastRequestAt;
+
+function sendOnce(call: Call): Promise<Response> {
+  const headers: Record<string, string> = {};
+  const init: RequestInit = { method: call.method, credentials: 'same-origin', headers };
+  if (call.raw !== undefined) {
+    init.body = call.raw;
+    headers['Content-Type'] = 'application/octet-stream';
+  } else if (call.body !== undefined) {
+    init.body = JSON.stringify(call.body);
+    headers['Content-Type'] = 'application/json';
+  }
+  if (call.background) headers[BACKGROUND_HEADER] = '1';
+  else lastRequestAt = Date.now();
+  return fetch('/api/v1' + call.path, init);
+}
+
+async function errorOf(res: Response): Promise<ApiError> {
+  let code = 'error';
+  let message = res.statusText;
+  try {
+    const e = (await res.json()) as { error?: { code: string; message: string } };
+    if (e.error) ({ code, message } = e.error);
+  } catch {
+    // not JSON: keep the status text
+  }
+  return new ApiError(res.status, code, message);
+}
+
+async function send(call: Call): Promise<Response> {
+  const res = await sendOnce(call);
+  if (res.ok) return res;
+  const error = await errorOf(res);
+  if (error.code !== 'reauth_required' || !confirmIdentity || !(await confirmIdentity())) throw error;
+  const again = await sendOnce(call);
+  if (!again.ok) throw await errorOf(again);
+  return again;
+}
+
+async function json<T>(call: Call): Promise<T> {
+  const res = await send(call);
+  const body = await res.text();
+  return (body ? JSON.parse(body) : undefined) as T;
 }
 
 export const api = {
-  get: <T>(path: string) => json<T>('GET', path),
-  post: <T>(path: string, body?: unknown) => json<T>('POST', path, body ?? {}),
-  put: <T>(path: string, body?: unknown) => json<T>('PUT', path, body ?? {}),
-  patch: <T>(path: string, body: unknown) => json<T>('PATCH', path, body),
-  del: <T = void>(path: string, body?: unknown) => json<T>('DELETE', path, body),
-  upload: <T>(path: string, file: Blob | File) => json<T>('POST', path, undefined, file),
-  replace: <T>(path: string, file: Blob | File) => json<T>('PUT', path, undefined, file),
+  get: <T>(path: string) => json<T>({ method: 'GET', path }),
+  /** For polling: see `Call.background`. */
+  poll: <T>(path: string) => json<T>({ method: 'GET', path, background: true }),
+  post: <T>(path: string, body?: unknown) => json<T>({ method: 'POST', path, body: body ?? {} }),
+  put: <T>(path: string, body?: unknown) => json<T>({ method: 'PUT', path, body: body ?? {} }),
+  patch: <T>(path: string, body: unknown) => json<T>({ method: 'PATCH', path, body }),
+  del: <T = void>(path: string, body?: unknown) => json<T>({ method: 'DELETE', path, body }),
+  upload: <T>(path: string, file: Blob | File) => json<T>({ method: 'POST', path, raw: file }),
+  replace: <T>(path: string, file: Blob | File) => json<T>({ method: 'PUT', path, raw: file }),
 };
 
 export type Json = Record<string, unknown>;
@@ -68,12 +107,86 @@ export interface Preferences {
   hover_cards: boolean;
   sidebar_width: number;
   tree_view: string;
+  language: string;
+  time_zone: string;
+  date_format: string;
+  first_day: number;
+  welcome_dismissed: boolean;
+  tour_seen: boolean;
 }
 
 export interface Me {
   user: User;
   global_permissions: string[];
   preferences: Preferences;
+  /** The key of the person's own space, or empty. */
+  personal_space: string;
+  needs_second_factor: boolean;
+  sign_in: { weak: boolean; prompt: boolean };
+  /** Zero means sessions do not end from idleness. */
+  idle_minutes: number;
+}
+
+export interface Person {
+  id: string;
+  name: string;
+  type: string;
+  active: boolean;
+  job_title: string;
+  department: string;
+  has_picture: boolean;
+}
+
+export interface Profile extends Person {
+  email: string;
+  location: string;
+  about: string;
+  time_zone: string;
+  visibility?: Record<string, string>;
+  locked_fields?: string[];
+  is_self: boolean;
+}
+
+export interface Token {
+  id: string;
+  name: string;
+  can_write: boolean;
+  expires_at: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+export interface LoginEntry {
+  method: string;
+  ip: string;
+  user_agent: string;
+  at: string;
+}
+
+export interface MemberGroup {
+  id: string;
+  name: string;
+  owner: boolean;
+}
+
+export interface Holder {
+  subject: Subject;
+  name: string;
+  role: string;
+  source: string;
+  via: string;
+}
+
+export interface GrantPreview {
+  gains: string[];
+  loses: string[];
+  people: number;
+  loses_view: boolean;
+}
+
+export interface Category {
+  id: string;
+  name: string;
 }
 
 export interface SystemInfo {
@@ -88,6 +201,8 @@ export interface Space {
   icon: string;
   status: string;
   home_page_id: string | null;
+  kind?: string;
+  owner_id?: string | null;
   favourite?: boolean;
   can?: Record<string, boolean>;
   has_icon?: boolean;
@@ -654,6 +769,8 @@ export interface UserDetail {
   totp_enabled: boolean;
   passkeys: number;
   global_permissions: string[];
+  expires_at: string | null;
+  last_login_at: string | null;
 }
 
 export interface Group {
@@ -675,6 +792,7 @@ export interface AuditEvent {
   object_id?: string;
   result: string;
   ip?: string;
+  details?: Json;
 }
 
 export const NIL_ID = '00000000-0000-0000-0000-000000000000';
@@ -682,6 +800,7 @@ export const GLOBAL_PERMISSIONS = [
   'use_product',
   'create_space',
   'view_profiles',
+  'create_personal_space',
   'administrator',
   'system_administrator',
 ];
