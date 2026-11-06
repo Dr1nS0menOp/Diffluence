@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Attachment } from '../api';
+import { api, type Attachment, type Me, type SearchResult } from '../api';
 import { OpenInCraft } from '../components/craft-frame';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
@@ -103,6 +103,92 @@ function Rename({ file, onChanged }: { file: Attachment; onChanged: () => Promis
   );
 }
 
+const MAX_PAGE_RESULTS = 8;
+
+/** Moving asks more of a person than copying, so the server decides each of them. */
+function MoveOrCopy({
+  file,
+  canMove,
+  onChanged,
+}: {
+  file: Attachment;
+  canMove: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState('');
+  const [target, setTarget] = useState<SearchResult | null>(null);
+  const [copied, setCopied] = useState('');
+  const pages = useQuery({
+    queryKey: ['file-target', search],
+    queryFn: () =>
+      api.get<{ results: SearchResult[] }>(
+        `/search?q=${encodeURIComponent(search)}&limit=${MAX_PAGE_RESULTS}`,
+      ),
+    enabled: search.trim().length > 0 && !target,
+  });
+  const send = useMutation({
+    mutationFn: (how: 'move' | 'copy') =>
+      api.post(`/attachments/${file.id}/${how}`, { page_id: target?.page_id }),
+    onSuccess: async (_answer, how) => {
+      setCopied(how === 'copy' ? (target?.title ?? '') : '');
+      setTarget(null);
+      setSearch('');
+      await onChanged();
+    },
+  });
+  const results = (pages.data?.results ?? []).filter((result) => result.page_id !== file.page_id);
+  return (
+    <section aria-label={t('files.moveTitle')}>
+      <h3>{t('files.moveTitle')}</h3>
+      <ErrorNote error={send.error ?? pages.error} />
+      {copied && (
+        <p role="status" className="note">
+          {t('files.copied', { title: copied })}
+        </p>
+      )}
+      {target ? (
+        <div className="row">
+          <span>{target.title}</span>
+          {canMove && (
+            <button type="button" onClick={() => send.mutate('move')}>
+              {t('files.move')}
+            </button>
+          )}
+          <button type="button" onClick={() => send.mutate('copy')}>
+            {t('files.copy')}
+          </button>
+          <button type="button" className="ghost" onClick={() => setTarget(null)}>
+            {t('common.cancel')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <Field label={t('files.movePage')}>
+            <input value={search} onChange={(e) => setSearch(e.target.value)} />
+          </Field>
+          <ul className="plain-list">
+            {results.map((result) => (
+              <li key={result.page_id}>
+                <button type="button" className="ghost" onClick={() => setTarget(result)}>
+                  {result.title}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
+    </section>
+  );
+}
+
+function OpenAsPDF({ file }: { file: Attachment }) {
+  const { t } = useTranslation();
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
+  if (!file.office || !me.data?.office_preview) return null;
+  return <a href={`/api/v1/attachments/${file.id}/preview.pdf`}>{t('files.openAsPdf')}</a>;
+}
+
 const TEXT_FILE = /^text\/|json|xml|yaml/;
 
 function TextPreview({ file }: { file: Attachment }) {
@@ -126,21 +212,25 @@ export function FileDetailsDialog({
   file,
   canChange,
   canRemove,
+  canMove,
   onChanged,
   onClose,
 }: {
   file: Attachment;
   canChange: boolean;
   canRemove: boolean;
+  canMove: boolean;
   onChanged: () => Promise<void>;
   onClose: () => void;
 }) {
   return (
     <Dialog title={file.filename} onClose={onClose}>
+      <OpenAsPDF file={file} />
       <OpenInCraft file={file} address={`/api/v1/attachments/${file.id}/content`} />
       {canChange && <Rename file={file} onChanged={onChanged} />}
       <Versions file={file} canChange={canChange} canRemove={canRemove} onChanged={onChanged} />
       {TEXT_FILE.test(file.content_type) && <TextPreview file={file} />}
+      <MoveOrCopy file={file} canMove={canMove} onChanged={onChanged} />
     </Dialog>
   );
 }

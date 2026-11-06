@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -78,6 +79,22 @@ const (
 	refJoins   = `JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		JOIN spaces s ON s.id = p.space_id`
 )
+
+// maxReachableIDs is more links than a page can sensibly hold.
+const maxReachableIDs = 500
+
+// Reachable answers which of these pages the caller can open. A page that is hidden and
+// a page that is gone are both simply left out, so the two cannot be told apart.
+func (s *Service) Reachable(ctx context.Context, c identity.Caller, ids []uuid.UUID) ([]uuid.UUID, error) {
+	if len(ids) > maxReachableIDs {
+		return nil, apperr.Invalid("That is too many pages to ask about at once.")
+	}
+	rows, err := s.pool.Query(ctx, "SELECT v.page_id FROM perm_visible_pages($1) v WHERE v.page_id = ANY($2)", c.UserID, ids)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
 
 // syncLinks makes page_links follow the current version, in the transaction that
 // publishes it.

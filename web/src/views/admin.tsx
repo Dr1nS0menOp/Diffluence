@@ -923,6 +923,7 @@ function AuditTab() {
 interface Settings {
   trash_retention_days: number;
   max_upload_mib: number;
+  blocked_file_types: string[];
 }
 
 function ExampleSpaceSection() {
@@ -995,6 +996,12 @@ function SettingsTab() {
             max={10240}
             value={form.max_upload_mib}
             onChange={(e) => setForm({ ...form, max_upload_mib: Number(e.target.value) })}
+          />
+        </Field>
+        <Field label={t('admin.blockedTypes')} help={t('admin.blockedTypesHelp')}>
+          <input
+            value={form.blocked_file_types.join(',')}
+            onChange={(e) => setForm({ ...form, blocked_file_types: e.target.value.split(',') })}
           />
         </Field>
         <button type="submit" className="primary">

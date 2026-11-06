@@ -527,6 +527,28 @@ mutate_web "offline text stays after logout" src/personal.ts \
   's.replace("localStorage.getItem(unsavedMarkOf(name)) === null &&", "localStorage.getItem(unsavedMarkOf(name)) === \"never\" &&")' src/personal.test.ts
 mutate_web "unsaved work goes at logout" src/personal.ts \
   's.replace(" && !key.includes(UNSAVED_PART))\n    .forEach", ")\n    .forEach")' src/personal.test.ts
+mutate "a move skips add on the target" internal/attachments/moves.go \
+  's.replace("c.UserID, target, permissions.AttachmentAdd, uuid.Nil); err != nil {\n\t\t\treturn err", "c.UserID, target, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\t\treturn err")' $app -run TestMovingAFileNeedsDeleteOnTheSourceAndAddOnTheTarget
+mutate "a copy skips add on the target" internal/attachments/moves.go \
+  's.replace("c.UserID, target, permissions.AttachmentAdd, uuid.Nil); err != nil {\n\t\treturn Attachment{}, err", "c.UserID, target, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Attachment{}, err")' $app -run TestACopyDoesNotTellWhatAPageItMayNotChangeHolds
+mutate "a move overwrites a file with the same name" internal/attachments/moves.go \
+  's.replace("if taken {\n\t\t\treturn errNameTaken()", "if taken && len(a.Filename) < 0 {\n\t\t\treturn errNameTaken()")' $app -run TestAMoveDoesNotOverwriteAFileWithTheSameName
+mutate "a blocked type looks at the name only" internal/attachments/kinds.go \
+  's.replace("found := []string{extension, detectedExtensions[contentType]}", "found := []string{extension}")' $app -run TestABlockedFileTypeIsRefusedByNameAndByContent
+mutate "a program named as a picture gets through" internal/attachments/kinds.go \
+  's.replace("if bytes.HasPrefix(head, windowsProgramMark) {", "if bytes.HasPrefix(head, windowsProgramMark) && len(name) < 0 {")' $app -run TestABlockedFileTypeIsRefusedByNameAndByContent
+mutate "a rename gets around a blocked type" internal/attachments/versions.go \
+  's.replace("if isBlocked(blocked, name, \"\", nil) {", "if isBlocked(blocked, name, \"\", nil) && len(name) < 0 {")' $app -run TestRenamingCannotGetAroundABlockedType
+mutate "a hidden page counts as reachable" internal/pages/details.go \
+  's.replace("SELECT v.page_id FROM perm_visible_pages($1) v WHERE v.page_id = ANY($2)", "SELECT p.id FROM pages p WHERE $1::uuid IS NOT NULL AND p.id = ANY($2) AND p.status = \x27published\x27")' $app -run TestAHiddenPageAndADeletedPageLookTheSameToAReader
+mutate "pasted Markdown has no limit" internal/httpapi/handlers_organising.go \
+  's.replace("if len(in.Markdown) > maxPastedMarkdown {", "if len(in.Markdown) > maxPastedMarkdown && len(in.Markdown) < 0 {")' $app -run TestPastedMarkdownHasALimit
+mutate "a text file goes to the office helper" internal/httpapi/handlers_files.go \
+  's.replace("if !attachments.IsOffice(a.Filename) || !s.deps.Exchange.OfficeAvailable() {", "if !s.deps.Exchange.OfficeAvailable() {")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
+mutate "the office helper hears the file name" internal/exchange/office.go \
+  's.replace("officeDocumentName+path.Ext(filename)", "filename+path.Ext(filename)")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
+mutate "a converted file loses its locked headers" internal/httpapi/handlers_files.go \
+  's.replace("h.Set(\"Content-Security-Policy\", \"default-src \x27none\x27; sandbox\")\n\t\th.Set(\"X-Content-Type-Options\", \"nosniff\")\n\t\th.Set(\"Cache-Control\", \"private, no-store\")\n\t\th.Set(\"Content-Type\", \"application/octet-stream\")\n\t\th.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))", "h.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

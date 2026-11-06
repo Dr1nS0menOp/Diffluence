@@ -55,14 +55,18 @@ type Service struct {
 	log         *slog.Logger
 	tempDir     string
 	pdfURL      string
+	// collaboraURL is an office service that an administrator configured. Empty = none.
+	collaboraURL string
 }
 
 // Options are the parts of the service that are not other modules.
 type Options struct {
 	TempDir string
 	PDFURL  string // the helper process that makes PDF files; empty = no PDF
-	Log     *slog.Logger
-	Keyring *keys.Keyring
+	// CollaboraURL converts office files when it is set, in place of the PDF helper.
+	CollaboraURL string
+	Log          *slog.Logger
+	Keyring      *keys.Keyring
 	// InstanceID is what a bundle says it came from.
 	InstanceID uuid.UUID
 }
@@ -71,7 +75,7 @@ type Options struct {
 func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, att *attachments.Service,
 	store storage.Store, jb *jobs.Service, st *settings.Service, o Options) *Service {
 	s := &Service{pool: pool, perms: perms, pages: pg, attachments: att, store: store, jobs: jb, settings: st,
-		log: o.Log, tempDir: o.TempDir, pdfURL: o.PDFURL, keyring: o.Keyring, instanceID: o.InstanceID}
+		log: o.Log, tempDir: o.TempDir, pdfURL: o.PDFURL, collaboraURL: o.CollaboraURL, keyring: o.Keyring, instanceID: o.InstanceID}
 	jb.Register(JobKindImport, s.runImport)
 	jb.Register(JobKindImportRead, s.readImport)
 	jb.Register(JobKindExport, s.runExport)

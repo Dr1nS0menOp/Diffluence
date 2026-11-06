@@ -54,12 +54,14 @@ type Preferences struct {
 	StartScreen string `json:"start_screen"`
 	// ShowPresence lets others see this person on a page.
 	ShowPresence bool `json:"show_presence"`
+	// TypingHelp turns what people type, such as :) and ->, into the real character.
+	TypingHelp bool `json:"typing_help"`
 }
 
 // DefaultPreferences is what someone has who never chose anything.
 func DefaultPreferences() Preferences {
 	return Preferences{Theme: "system", Shortcuts: true, Contents: true, HoverCards: true,
-		SidebarWidth: defaultSidebarWidth, TreeView: "tree", Language: "en", TimeZone: "", DateFormat: "medium", FirstDay: 1, StartScreen: "company", ShowPresence: true}
+		SidebarWidth: defaultSidebarWidth, TreeView: "tree", Language: "en", TimeZone: "", DateFormat: "medium", FirstDay: 1, StartScreen: "company", ShowPresence: true, TypingHelp: true}
 }
 
 func (p Preferences) validate() error {

@@ -97,6 +97,7 @@ describe('changing the number of columns', () => {
 });
 
 describe('finding text', () => {
+  const anyCase = { matchCase: false, wholeWord: false };
   const doc = schema.nodeFromJSON({
     type: 'doc',
     content: [
@@ -113,22 +114,22 @@ describe('finding text', () => {
   });
 
   it('ignores case unless asked', () => {
-    expect(findMatches(doc, 'cat', false)).toHaveLength(3);
-    expect(findMatches(doc, 'Cat', true)).toHaveLength(1);
+    expect(findMatches(doc, 'cat', anyCase)).toHaveLength(3);
+    expect(findMatches(doc, 'Cat', { matchCase: true, wholeWord: false })).toHaveLength(1);
   });
 
   it('gives positions that select exactly the words', () => {
-    const match = findMatches(doc, 'and', false)[0];
+    const match = findMatches(doc, 'and', anyCase)[0];
     expect(match && doc.textBetween(match.from, match.to)).toBe('and');
   });
 
   it('keeps positions right after an item without text', () => {
-    const matches = findMatches(doc, 'cat', false);
+    const matches = findMatches(doc, 'cat', anyCase);
     const last = matches[matches.length - 1];
     expect(last && doc.textBetween(last.from, last.to)).toBe('cat');
   });
 
   it('finds nothing for an empty query', () => {
-    expect(findMatches(doc, '', false)).toEqual([]);
+    expect(findMatches(doc, '', anyCase)).toEqual([]);
   });
 });

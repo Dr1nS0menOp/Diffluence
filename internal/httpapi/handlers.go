@@ -165,7 +165,8 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms, "preferences": preferences,
-		"personal_space": personal, "needs_second_factor": p.NeedsSecondFactor, "sign_in": signIn, "idle_minutes": access.IdleMinutes, "drawing_origin": s.deps.Config.DrawingOrigin()})
+		"personal_space": personal, "needs_second_factor": p.NeedsSecondFactor, "sign_in": signIn, "idle_minutes": access.IdleMinutes, "drawing_origin": s.deps.Config.DrawingOrigin(),
+		"office_preview": s.deps.Exchange.OfficeAvailable()})
 }
 
 func (s *Server) handleSystemInfo(w http.ResponseWriter, _ *http.Request) {

@@ -12,6 +12,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   contents: true,
   hover_cards: true,
   show_presence: true,
+  typing_help: true,
   sidebar_width: 18,
   tree_view: 'tree',
   language: 'en',

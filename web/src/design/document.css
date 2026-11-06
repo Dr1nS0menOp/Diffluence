@@ -41,6 +41,105 @@
   margin-block: 0 var(--space-3);
 }
 
+/* Each level looks different, so the reader sees where a list goes deeper (EDT-047). */
+.prose ul ul {
+  list-style-type: circle;
+}
+
+.prose ul ul ul {
+  list-style-type: square;
+}
+
+.prose ol ol {
+  list-style-type: lower-alpha;
+}
+
+.prose ol ol ol {
+  list-style-type: lower-roman;
+}
+
+.file-missing {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px dashed var(--color-guide);
+  border-radius: var(--radius-card);
+  color: var(--color-muted);
+}
+
+.file-facts {
+  font-size: var(--text-small);
+}
+
+.table-filter {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
+.table-sort {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: 1.5rem;
+  block-size: 1.5rem;
+  margin-inline-start: var(--space-1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  vertical-align: middle;
+}
+
+/* Drawn here: this button is made outside React, so an icon of the set cannot go in. */
+.table-sort::after {
+  content: '';
+  border-inline: 0.3em solid transparent;
+  border-block-end: 0.45em solid currentcolor;
+}
+
+.table-sort[data-direction='none']::after {
+  opacity: 0.5;
+}
+
+.table-sort[data-direction='down']::after {
+  rotate: 180deg;
+}
+
+.prose .row-filtered {
+  display: none;
+}
+
+.prose .tableWrapper.table-long {
+  max-block-size: 70vh;
+  overflow: auto;
+}
+
+.prose .tableWrapper.table-long th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--layer-sticky);
+  background: var(--color-surface);
+}
+
+@media print {
+  .table-sort,
+  .table-filter {
+    display: none;
+  }
+
+  .prose .tableWrapper.table-long {
+    max-block-size: none;
+  }
+}
+
+.link-gone {
+  color: var(--color-muted);
+  text-decoration: line-through;
+}
+
 .prose img {
   max-inline-size: 100%;
   block-size: auto;
@@ -307,6 +406,14 @@ a.file-tile:hover {
 
 .editor-sheet.full {
   max-inline-size: none;
+}
+
+.word-count {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+  font-size: var(--text-small);
 }
 
 /* What belongs to the title. It stays quiet until someone comes near (spec 017, D8). */

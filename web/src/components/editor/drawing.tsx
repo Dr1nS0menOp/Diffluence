@@ -10,7 +10,45 @@ import { api, type Attachment, type Me } from '../../api';
 import { Dialog, ErrorNote } from '../ui';
 
 const EMPTY_DRAWING = '<mxfile/>';
+const DRAWING_PREFIX = 'drawing-';
 const PNG_PREFIX = 'data:image/png;base64,';
+
+/** A saved drawing. The PNG holds the diagram, which is what makes it editable. */
+export interface DrawingFile {
+  id: string;
+  filename: string;
+}
+
+export const isDrawing = (filename: string) =>
+  filename.startsWith(DRAWING_PREFIX) && filename.endsWith('.png');
+
+/** What the service gets when it is ready: an empty drawing, or the stored one. */
+export function loadMessage(storedPng: string | null) {
+  return storedPng
+    ? { action: 'load', xmlpng: storedPng, autosave: 0 }
+    : { action: 'load', xml: EMPTY_DRAWING, autosave: 0 };
+}
+
+async function storedPng(file: DrawingFile | undefined): Promise<string | null> {
+  if (!file) return null;
+  const answer = await fetch(`/api/v1/attachments/${file.id}/content`);
+  if (!answer.ok) throw new Error(answer.statusText);
+  const bytes = await answer.blob();
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result).replace(/^data:[^,]*,/, PNG_PREFIX));
+    reader.onerror = () => reject(new Error('unreadable'));
+    reader.readAsDataURL(bytes);
+  });
+}
+
+/** The address stays the same for a new version, so the images load it again. */
+export function showNewVersion(root: HTMLElement, id: string) {
+  root.querySelectorAll<HTMLImageElement>(`img[src*="${id}"]`).forEach((image) => {
+    const address = image.src;
+    image.src = address;
+  });
+}
 
 interface DrawingMessage {
   event: string;
@@ -66,7 +104,7 @@ export function pngFromDataAddress(address: unknown): Blob | null {
 }
 
 function drawingFilename(now: Date): string {
-  return `drawing-${now
+  return `${DRAWING_PREFIX}${now
     .toISOString()
     .replace(/[^0-9]/g, '')
     .slice(0, 14)}.png`;
@@ -75,11 +113,13 @@ function drawingFilename(now: Date): string {
 function DrawingFrame({
   origin,
   pageId,
+  existing,
   onDone,
   onClose,
 }: {
   origin: string;
   pageId: string;
+  existing?: DrawingFile;
   onDone: (attachment: Attachment) => void;
   onClose: () => void;
 }) {
@@ -95,7 +135,8 @@ function DrawingFrame({
         setError(new Error(t('drawing.failed')));
         return;
       }
-      const name = encodeURIComponent(drawingFilename(new Date()));
+      // The same name makes a new version of the same file, so the page keeps showing it.
+      const name = encodeURIComponent(existing?.filename ?? drawingFilename(new Date()));
       try {
         onDone(
           await api.upload<Attachment>(
@@ -109,14 +150,16 @@ function DrawingFrame({
     };
     const listen = (event: MessageEvent) => {
       const message = drawingMessage(event, frame.current?.contentWindow, origin);
-      if (message?.event === 'init') send({ action: 'load', xml: EMPTY_DRAWING, autosave: 0 });
+      if (message?.event === 'init') {
+        storedPng(existing).then((png) => send(loadMessage(png)), setError);
+      }
       if (message?.event === 'save') send({ action: 'export', format: 'xmlpng' });
       if (message?.event === 'export') void save(message.data);
       if (message?.event === 'exit') onClose();
     };
     window.addEventListener('message', listen);
     return () => window.removeEventListener('message', listen);
-  }, [origin, pageId, onDone, onClose, t]);
+  }, [origin, pageId, existing, onDone, onClose, t]);
   return (
     <>
       <ErrorNote error={error} />
@@ -134,10 +177,12 @@ function DrawingFrame({
 
 export function DrawingDialog({
   pageId,
+  existing,
   onDone,
   onClose,
 }: {
   pageId: string;
+  existing?: DrawingFile;
   onDone: (attachment: Attachment) => void;
   onClose: () => void;
 }) {
@@ -148,7 +193,9 @@ export function DrawingDialog({
     <Dialog title={t('drawing.title')} onClose={onClose}>
       <ErrorNote error={me.error} />
       {me.data && !origin && <p className="muted">{t('drawing.off')}</p>}
-      {origin && <DrawingFrame origin={origin} pageId={pageId} onDone={onDone} onClose={onClose} />}
+      {origin && (
+        <DrawingFrame origin={origin} pageId={pageId} existing={existing} onDone={onDone} onClose={onClose} />
+      )}
     </Dialog>
   );
 }

@@ -21,6 +21,7 @@ import { countBelow } from '../components/tree-model';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { OpenInCraft } from '../components/craft-frame';
 import { FileDetailsDialog } from './file-details';
+import { arrangedFiles, FILE_ORDERS, type FileOrder } from './file-list';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
 export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
@@ -35,15 +36,20 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
     mutationFn: (id: string) => api.del(`/attachments/${id}`),
     onSettled: () => client.invalidateQueries({ queryKey: key }),
   });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') }).data;
   const [openId, setOpenId] = useState<string | null>(null);
+  const [order, setOrder] = useState<FileOrder>('name');
+  const [filter, setFilter] = useState('');
   const canAdd = page.can['attachment.add'];
   const open = q.data?.attachments.find((a) => a.id === openId);
+  const shown = arrangedFiles(q.data?.attachments ?? [], order, filter);
   if (open) {
     return (
       <FileDetailsDialog
         file={open}
         canChange={canAdd ?? false}
         canRemove={page.can['attachment.delete_any'] ?? false}
+        canMove={(page.can['attachment.delete_any'] ?? false) || open.created_by === me?.user.id}
         onChanged={() => client.invalidateQueries({ queryKey: key })}
         onClose={() => setOpenId(null)}
       />
@@ -59,8 +65,30 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
           {canAdd && page.can['page.edit'] && <p className="muted">{t('attachments.howToAdd')}</p>}
         </>
       )}
+      {(q.data?.attachments.length ?? 0) > 1 && (
+        <div className="row">
+          <input
+            type="search"
+            aria-label={t('files.search')}
+            placeholder={t('files.search')}
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+          />
+          <select
+            aria-label={t('files.orderBy')}
+            value={order}
+            onChange={(e) => setOrder(e.target.value as FileOrder)}
+          >
+            {FILE_ORDERS.map((option) => (
+              <option key={option} value={option}>
+                {t(`files.order_${option}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       <ul className="plain-list">
-        {q.data?.attachments.map((a) => (
+        {shown.map((a) => (
           <li key={a.id} className="row">
             {a.inline && <img className="thumb" src={`/api/v1/attachments/${a.id}/content`} alt="" />}
             <a href={`/api/v1/attachments/${a.id}/content?download=1`}>{a.filename}</a>

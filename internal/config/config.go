@@ -61,6 +61,9 @@ type Config struct {
 	CollabToken string
 	// PDFURL is the helper process that makes PDF files. Empty = no PDF.
 	PDFURL string
+	// CollaboraURL is an office service. It opens office files as a PDF, in place of the
+	// LibreOffice of the PDF helper. Empty = that helper, if there is one.
+	CollaboraURL string
 	// PublishDir is where public sites go. It is configuration and not a setting,
 	// because a person must not be able to write anywhere on the server. Empty = no sites.
 	PublishDir string
@@ -150,6 +153,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		CollabURL:             l.str("COLLAB_URL", ""),
 		CollabToken:           l.str("COLLAB_TOKEN", ""),
 		PDFURL:                l.str("PDF_URL", ""),
+		CollaboraURL:          l.str("COLLABORA_URL", ""),
 		PublishDir:            l.str("PUBLISH_DIR", ""),
 		OIDC: OIDC{
 			Issuer:       l.str("OIDC_ISSUER", ""),

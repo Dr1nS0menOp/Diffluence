@@ -185,17 +185,20 @@ export function setStretch(editor: Editor, pos: number, stretch: number, factor:
   editor.view.dispatch(tr);
 }
 
-/** Sorting moves whole rows, which merged cells do not allow. */
-export function canSortTable(editor: Editor): boolean {
-  const found = tableAround(editor);
-  if (!found) return false;
+export function hasMergedCells(table: ProseNode): boolean {
   let merged = false;
-  found.table.descendants((node) => {
+  table.descendants((node) => {
     const { colspan, rowspan } = node.attrs as { colspan?: number; rowspan?: number };
     if ((colspan ?? 1) > 1 || (rowspan ?? 1) > 1) merged = true;
     return !merged;
   });
-  return !merged;
+  return merged;
+}
+
+/** Sorting moves whole rows, which merged cells do not allow. */
+export function canSortTable(editor: Editor): boolean {
+  const found = tableAround(editor);
+  return found !== null && !hasMergedCells(found.table);
 }
 
 export function sortTable(editor: Editor, direction: 'up' | 'down') {

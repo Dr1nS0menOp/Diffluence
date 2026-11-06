@@ -8,6 +8,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -27,7 +30,11 @@ const (
 	keyMailExcerpts       = "mail_excerpts"
 	keyReactionsEnabled   = "reactions_enabled"
 	keyGroupMentions      = "group_mentions"
+	keyBlockedFileTypes   = "blocked_file_types"
 )
+
+// fileType is an extension as an administrator lists it, once cleaned.
+var fileType = regexp.MustCompile(`^[a-z0-9]{1,16}$`)
 
 // Values are the runtime settings.
 type Values struct {
@@ -37,6 +44,8 @@ type Values struct {
 	MailExcerpts       bool `json:"mail_excerpts"`
 	ReactionsEnabled   bool `json:"reactions_enabled"`
 	GroupMentions      bool `json:"group_mentions"`
+	// BlockedFileTypes are extensions no upload may have, by name or by content.
+	BlockedFileTypes []string `json:"blocked_file_types"`
 }
 
 // Defaults apply until an administrator changes something (spec 003, spec 010).
@@ -57,8 +66,9 @@ func NewService(pool *pgxpool.Pool, store storage.Store) *Service {
 // Get returns the current values.
 func (s *Service) Get(ctx context.Context) (Values, error) {
 	v := Defaults
+	v.BlockedFileTypes = []string{}
 	rows, err := s.pool.Query(ctx, "SELECT key, value FROM settings WHERE key = ANY($1)",
-		[]string{keyTrashRetentionDays, keyMaxUploadMiB, keyMailEnabled, keyMailExcerpts, keyReactionsEnabled, keyGroupMentions})
+		[]string{keyTrashRetentionDays, keyMaxUploadMiB, keyMailEnabled, keyMailExcerpts, keyReactionsEnabled, keyGroupMentions, keyBlockedFileTypes})
 	if err != nil {
 		return v, err
 	}
@@ -73,7 +83,12 @@ func (s *Service) Get(ctx context.Context) (Values, error) {
 			return v, err
 		}
 		// A damaged value falls back to the default.
-		if target, ok := numbers[key]; ok {
+		if key == keyBlockedFileTypes {
+			var list []string
+			if json.Unmarshal(raw, &list) == nil && list != nil {
+				v.BlockedFileTypes = list
+			}
+		} else if target, ok := numbers[key]; ok {
 			var n int
 			if json.Unmarshal(raw, &n) == nil {
 				*target = n
@@ -132,6 +147,28 @@ func (s *Service) MaxUploadBytes(ctx context.Context) (int64, error) {
 	return int64(v.MaxUploadMiB) << 20, err
 }
 
+// BlockedFileTypes are the extensions no upload may have.
+func (s *Service) BlockedFileTypes(ctx context.Context) ([]string, error) {
+	v, err := s.Get(ctx)
+	return v.BlockedFileTypes, err
+}
+
+// cleanFileTypes accepts what people write, such as ".EXE", and refuses what is no type.
+func cleanFileTypes(types []string) ([]string, error) {
+	out := []string{}
+	for _, raw := range types {
+		kind := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(raw), "."))
+		if kind == "" || slices.Contains(out, kind) {
+			continue
+		}
+		if !fileType.MatchString(kind) {
+			return nil, apperr.Invalid("A blocked file type is an extension, such as exe.")
+		}
+		out = append(out, kind)
+	}
+	return out, nil
+}
+
 // HasMark reports whether something the instance only does once has been done.
 func (s *Service) HasMark(ctx context.Context, name string) (bool, error) {
 	var found bool
@@ -153,10 +190,14 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, v Values) error
 	if v.MaxUploadMiB < 1 || v.MaxUploadMiB > 10240 {
 		return apperr.Invalid("The maximum upload size must be between 1 MiB and 10 GiB.")
 	}
+	blocked, err := cleanFileTypes(v.BlockedFileTypes)
+	if err != nil {
+		return err
+	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		stored := map[string]any{keyTrashRetentionDays: v.TrashRetentionDays, keyMaxUploadMiB: v.MaxUploadMiB,
 			keyMailEnabled: v.MailEnabled, keyMailExcerpts: v.MailExcerpts,
-			keyReactionsEnabled: v.ReactionsEnabled, keyGroupMentions: v.GroupMentions}
+			keyReactionsEnabled: v.ReactionsEnabled, keyGroupMentions: v.GroupMentions, keyBlockedFileTypes: blocked}
 		for key, value := range stored {
 			if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
 				ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, key, value); err != nil {

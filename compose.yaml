@@ -56,6 +56,7 @@ services:
       DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-starttls}
       # PDF files need the helper below. Empty = no PDF, and browser print remains.
       DIFFLUENCE_PDF_URL: ${DIFFLUENCE_PDF_URL:-}
+      DIFFLUENCE_COLLABORA_URL: ${DIFFLUENCE_COLLABORA_URL:-}
       # Public sites are written below this folder. Empty = no sites.
       DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
     secrets: [database_url, migrate_database_url]

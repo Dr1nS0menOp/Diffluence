@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useQuery } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import type { EditorView } from '@tiptap/pm/view';
-import type { Json } from '../../api';
+import { api, type Json } from '../../api';
+import { readRecentItems, rememberItem, usePerson } from '../../personal';
+import { usePreferences } from '../../preferences';
 import { navigate } from '../../router';
 import { CommentHighlights, refreshHighlights, type Highlight } from '../comments/anchor';
 import { useCopy, useToast } from '../toast';
@@ -15,15 +18,18 @@ import type { ShownImage } from '../viewers';
 import {
   attachmentNode,
   NameTakenDialog,
+  PageFilesDialog,
   uploadAsking,
   type FileAddress,
   type NameChoice,
 } from './attachments';
-import { DrawingDialog } from './drawing';
+import { continueAtEnd } from './block-commands';
+import { DrawingDialog, showNewVersion, type DrawingFile } from './drawing';
 import { BlockHandle, useBlockTracking } from './block-handle';
 import { useCodeColours } from './code';
 import { documentExtensions, type TaskToggle } from './extensions';
 import { FindBar, FindReplace } from './find';
+import { GoneLinks, linkedPages, refreshGoneLinks } from './gone-links';
 import {
   EmojiSuggestions,
   INSERT_ITEMS,
@@ -33,14 +39,18 @@ import {
   TEMPLATE_ITEMS,
 } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
+import { convertPastedMarkdown, looksLikeMarkdown } from './paste';
 import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog } from './template-item';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
+import { ReaderTables } from './reader-tables';
 import { TableFrame, useTableTracking } from './table-frame';
 import { Toolbar } from './toolbar';
+import { TypingHelp } from './typing';
 import { pickWordFile } from './word';
+import { WordCount } from './word-count';
 
 function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: ShownImage }[] {
   return Array.from(root.querySelectorAll<HTMLImageElement>('figure.doc-image img')).map((element) => ({
@@ -77,6 +87,20 @@ function usePrintOpensSections() {
   }, []);
 }
 
+/** The pages this document links to that the reader cannot reach. */
+function useGoneLinks(document: Json, enabled: boolean): Set<string> {
+  const linked = useMemo(() => (enabled ? linkedPages(document) : []), [document, enabled]);
+  const reachable = useQuery({
+    queryKey: ['reachable', linked],
+    queryFn: () => api.post<{ pages: string[] }>('/pages/reachable', { ids: linked }),
+    enabled: linked.length > 0,
+  });
+  return useMemo(() => {
+    const found = reachable.data?.pages;
+    return new Set(found ? linked.filter((page) => !found.includes(page)) : []);
+  }, [linked, reachable.data]);
+}
+
 /**
  * Shows a stored document. The editor renders it, so no HTML is ever injected.
  * `plain` leaves out what only makes sense on the page itself, such as heading links.
@@ -91,6 +115,7 @@ export function DocumentView({
   onHighlight,
   onTask,
   onView,
+  checkLinks,
 }: {
   document: Json;
   plain?: boolean;
@@ -101,9 +126,14 @@ export function DocumentView({
   onHighlight?: (id: string) => void;
   onTask?: TaskToggle;
   onView?: (view: EditorView) => void;
+  /** Marks links to what this reader cannot reach. Needs someone who is logged in. */
+  checkLinks?: boolean;
 }) {
   const { t } = useTranslation();
   const copy = useCopy();
+  const goneLinks = useGoneLinks(document, checkLinks ?? false);
+  const gone = useRef(goneLinks);
+  gone.current = goneLinks;
   const marks = useRef<Highlight[]>([]);
   marks.current = highlights ?? [];
   const found = useRef(onFound);
@@ -122,6 +152,7 @@ export function DocumentView({
           onTask: onTask ? (id, done) => tick.current?.(id, done) : undefined,
         }),
         TaskDates.configure({ overdueWord: t('tasks.overdue') }),
+        GoneLinks.configure({ gone: () => gone.current, explanation: t('page.linkGone') }),
         ...(plain
           ? []
           : [
@@ -129,6 +160,7 @@ export function DocumentView({
                 label: t('page.copyHeadingLink'),
                 onCopy: (slug) => copyHeading.current(slug),
               }),
+              ReaderTables,
               CommentHighlights.configure({
                 highlights: () => marks.current,
                 // Later: this runs while the editor is made, in the middle of a render.
@@ -149,6 +181,9 @@ export function DocumentView({
   useEffect(() => {
     if (!plain) editor.view.dispatch(editor.state.tr.setMeta(refreshHighlights, true));
   }, [editor, highlights, plain]);
+  useEffect(() => {
+    editor.view.dispatch(editor.state.tr.setMeta(refreshGoneLinks, true));
+  }, [editor, goneLinks]);
   useEffect(() => onView?.(editor.view), [editor, onView]);
 
   const openMark = (target: HTMLElement): boolean => {
@@ -209,6 +244,7 @@ export function DocumentEditor({
   onShare,
   together,
   onReady,
+  onFocusTitle,
 }: {
   pageId: string;
   initial: Json;
@@ -227,12 +263,18 @@ export function DocumentEditor({
   /** Editing together: the shared document replaces the initial text. */
   together?: Together | null;
   onReady?: (editor: Editor) => void;
+  /** Backspace at the very start of the text goes here. */
+  onFocusTitle?: () => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const person = usePerson();
+  const typingHelp = useRef(true);
+  typingHelp.current = usePreferences().preferences.typing_help;
   const [uploading, setUploading] = useState('');
   const [uploadError, setUploadError] = useState<unknown>(null);
-  const [drawing, setDrawing] = useState(false);
+  const [drawing, setDrawing] = useState<DrawingFile | 'new' | null>(null);
+  const [pickingFile, setPickingFile] = useState(false);
   const [nameQuestion, setNameQuestion] = useState<{
     filename: string;
     answer: (choice: NameChoice) => void;
@@ -247,6 +289,7 @@ export function DocumentEditor({
   const [finding, setFinding] = useState(false);
   const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+  const plainPaste = useRef(false);
   const change = useRef(onChange);
   change.current = onChange;
 
@@ -278,6 +321,8 @@ export function DocumentEditor({
   const add = useRef(addFiles);
   add.current = addFiles;
 
+  const pasteMarkdown = useRef<(text: string) => void>(() => undefined);
+
   // Extensions are made once, so they reach the latest functions through this ref.
   const actions = useRef<EditorActions>(noActions);
 
@@ -298,7 +343,10 @@ export function DocumentEditor({
       SlashCommands.configure({
         actions: () => actions.current,
         items: inTemplate ? [...INSERT_ITEMS, ...TEMPLATE_ITEMS] : INSERT_ITEMS,
+        recent: () => readRecentItems(person),
+        onUsed: (id) => rememberItem(person, id),
       }),
+      TypingHelp.configure({ isOn: () => typingHelp.current }),
       EmojiSuggestions,
       MentionSuggestions.configure({ pageId, onNoAccess: (name) => actions.current.mentionNoAccess(name) }),
       FindReplace.configure({ onOpen: () => actions.current.openFind() }),
@@ -313,14 +361,28 @@ export function DocumentEditor({
         'aria-label': t('editor.content'),
         role: 'textbox',
         'aria-multiline': 'true',
+        spellcheck: 'true',
       },
       // Files are taken by the area around the editor, so a drop beside the page counts too.
       handleDrop: (_view, event) => carriesFiles(event.dataTransfer),
-      handlePaste: (_view, event) => {
+      handleKeyDown: (_view, event) => {
+        plainPaste.current =
+          (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'v';
+        return false;
+      },
+      handlePaste: (view, event) => {
         const images = Array.from(event.clipboardData?.files ?? []).filter((f) =>
           f.type.startsWith('image/'),
         );
-        if (images.length === 0) return false;
+        if (images.length === 0) {
+          const inCode = view.state.selection.$from.parent.type.spec.code === true;
+          const text = event.clipboardData?.getData('text/plain') ?? '';
+          const formatted = event.clipboardData?.types.includes('text/html') ?? false;
+          if (!plainPaste.current && !inCode && !formatted && looksLikeMarkdown(text)) {
+            pasteMarkdown.current(text);
+          }
+          return false;
+        }
         void add.current(images);
         return true;
       },
@@ -331,6 +393,7 @@ export function DocumentEditor({
       if (transaction.docChanged) change.current(e.getJSON() as Json);
     },
   });
+  pasteMarkdown.current = (text) => convertPastedMarkdown(editor, text);
   const tracker = useBlockTracking(editor);
   const sheet = useRef<HTMLDivElement>(null);
   const tables = useTableTracking(editor, sheet);
@@ -343,12 +406,17 @@ export function DocumentEditor({
     pickWord: () => pickWordFile(editor, pageId, (message) => toast({ message })),
     openLink: () => setLinking(true),
     openFind: () => setFinding(true),
-    openDrawing: () => setDrawing(true),
+    openDrawing: (existing) => setDrawing(existing ?? 'new'),
+    openPageFiles: () => setPickingFile(true),
     openBlockMenu: tracker.openAtCursor,
     openTableMenu: tables.open,
     openTemplateItem: setTemplateItem,
     publish: onPublish,
     save: onSave,
+    focusTitle: () => {
+      onFocusTitle?.();
+      return onFocusTitle !== undefined;
+    },
     mentionNoAccess: (name) =>
       toast({
         message: t('mentions.noAccess', { name }),
@@ -366,9 +434,16 @@ export function DocumentEditor({
     void addFiles(Array.from(e.dataTransfer.files));
   };
 
+  /** The sheet goes on below the text, and a click there means: go on writing. */
+  const clickBelowText = (e: MouseEvent<HTMLDivElement>) => {
+    const onEmptySheet = e.target === e.currentTarget || e.target === sheet.current;
+    if (onEmptySheet && e.clientY > editor.view.dom.getBoundingClientRect().bottom) continueAtEnd(editor);
+  };
+
   return (
     <div
       className={dropping ? 'editor-area dropping' : 'editor-area'}
+      onClick={clickBelowText}
       onDragOver={(e) => {
         if (!carriesFiles(e.dataTransfer)) return;
         e.preventDefault();
@@ -415,15 +490,20 @@ export function DocumentEditor({
         {drawing && (
           <DrawingDialog
             pageId={pageId}
+            existing={drawing === 'new' ? undefined : drawing}
             onDone={(attachment) => {
-              setDrawing(false);
+              setDrawing(null);
+              if (drawing !== 'new') {
+                showNewVersion(editor.view.dom, attachment.id);
+                return;
+              }
               editor
                 ?.chain()
                 .focus()
                 .insertContentAt(editor.state.selection.to, attachmentNode(attachment))
                 .run();
             }}
-            onClose={() => setDrawing(false)}
+            onClose={() => setDrawing(null)}
           />
         )}
         {nameQuestion && (
@@ -437,9 +517,24 @@ export function DocumentEditor({
         )}
         {header}
         <EditorContent editor={editor} />
+        <WordCount editor={editor} />
         {footer}
       </div>
       {linking && <LinkDialog editor={editor} onClose={() => setLinking(false)} />}
+      {pickingFile && (
+        <PageFilesDialog
+          pageId={pageId}
+          onPick={(attachment) => {
+            setPickingFile(false);
+            editor
+              .chain()
+              .focus()
+              .insertContentAt(editor.state.selection.to, attachmentNode(attachment))
+              .run();
+          }}
+          onClose={() => setPickingFile(false)}
+        />
+      )}
       {templateItem && (
         <TemplateItemDialog editor={editor} what={templateItem} onClose={() => setTemplateItem(null)} />
       )}

@@ -17,20 +17,30 @@ interface Match {
   to: number;
 }
 
-interface FindState {
-  query: string;
+interface FindOptions {
   matchCase: boolean;
+  wholeWord: boolean;
+}
+
+interface FindState extends FindOptions {
+  query: string;
   matches: Match[];
   current: number;
 }
 
-const EMPTY: FindState = { query: '', matchCase: false, matches: [], current: 0 };
+const NO_OPTIONS: FindOptions = { matchCase: false, wholeWord: false };
+const EMPTY: FindState = { ...NO_OPTIONS, query: '', matches: [], current: 0 };
+const WORD_CHARACTER = /[\p{L}\p{N}_]/u;
+
+const isWordCharacter = (character: string | undefined) =>
+  character !== undefined && WORD_CHARACTER.test(character);
 
 const findKey = new PluginKey<FindState>('find');
 
 /** Every place where the words occur. A match never crosses from one block to the next. */
-export function findMatches(doc: ProseNode, query: string, matchCase: boolean): Match[] {
+export function findMatches(doc: ProseNode, query: string, options: FindOptions): Match[] {
   if (!query) return [];
+  const { matchCase, wholeWord } = options;
   const needle = matchCase ? query : query.toLowerCase();
   const matches: Match[] = [];
   doc.descendants((node, pos) => {
@@ -38,6 +48,8 @@ export function findMatches(doc: ProseNode, query: string, matchCase: boolean): 
     const raw = node.textBetween(0, node.content.size, undefined, LEAF_PLACEHOLDER);
     const text = matchCase ? raw : raw.toLowerCase();
     for (let at = text.indexOf(needle); at !== -1; at = text.indexOf(needle, at + needle.length)) {
+      const inLongerWord = isWordCharacter(text[at - 1]) || isWordCharacter(text[at + needle.length]);
+      if (wholeWord && inLongerWord) continue;
       matches.push({ from: pos + 1 + at, to: pos + 1 + at + needle.length });
     }
     return false;
@@ -77,7 +89,7 @@ export const FindReplace = Extension.create<{ onOpen: () => void }>({
             const update = tr.getMeta(findKey) as Partial<FindState> | undefined;
             if (!update && !tr.docChanged) return value;
             const merged = { ...value, ...update };
-            const matches = findMatches(next.doc, merged.query, merged.matchCase);
+            const matches = findMatches(next.doc, merged.query, merged);
             return { ...merged, matches, current: Math.min(merged.current, Math.max(matches.length - 1, 0)) };
           },
         },
@@ -94,8 +106,8 @@ export const FindReplace = Extension.create<{ onOpen: () => void }>({
 
 const stateOf = (editor: Editor) => findKey.getState(editor.state) ?? EMPTY;
 
-function search(editor: Editor, query: string, matchCase: boolean) {
-  editor.view.dispatch(editor.state.tr.setMeta(findKey, { query, matchCase, current: 0 }));
+function search(editor: Editor, query: string, options: FindOptions) {
+  editor.view.dispatch(editor.state.tr.setMeta(findKey, { ...options, query, current: 0 }));
 }
 
 function revealCurrent(editor: Editor) {
@@ -133,7 +145,7 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
   const [replacement, setReplacement] = useState('');
-  const [matchCase, setMatchCase] = useState(false);
+  const [options, setOptions] = useState(NO_OPTIONS);
   const found = useEditorState({
     editor,
     selector: (s) => {
@@ -142,9 +154,14 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
     },
   });
   const close = () => {
-    search(editor, '', false);
+    search(editor, '', NO_OPTIONS);
     onClose();
     editor.commands.focus();
+  };
+  const changeOptions = (change: Partial<FindOptions>) => {
+    const next = { ...options, ...change };
+    setOptions(next);
+    search(editor, query, next);
   };
   const keys = (e: KeyboardEvent) => {
     if (e.key === 'Escape') close();
@@ -162,7 +179,7 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
         placeholder={t('editor.find')}
         onChange={(e) => {
           setQuery(e.target.value);
-          search(editor, e.target.value, matchCase);
+          search(editor, e.target.value, options);
           revealCurrent(editor);
         }}
       />
@@ -190,13 +207,18 @@ export function FindBar({ editor, onClose }: { editor: Editor; onClose: () => vo
       <label className="row find-option">
         <input
           type="checkbox"
-          checked={matchCase}
-          onChange={(e) => {
-            setMatchCase(e.target.checked);
-            search(editor, query, e.target.checked);
-          }}
+          checked={options.matchCase}
+          onChange={(e) => changeOptions({ matchCase: e.target.checked })}
         />
         {t('editor.matchCase')}
+      </label>
+      <label className="row find-option">
+        <input
+          type="checkbox"
+          checked={options.wholeWord}
+          onChange={(e) => changeOptions({ wholeWord: e.target.checked })}
+        />
+        {t('editor.wholeWord')}
       </label>
       <input
         className="find-input"

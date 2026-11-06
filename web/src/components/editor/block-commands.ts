@@ -16,6 +16,62 @@ function dispatchStep(editor: Editor, tr: Transaction) {
   editor.view.dispatch(closeHistory(tr));
 }
 
+/** Puts the cursor after everything, in a new paragraph when the last block is not one. */
+export function continueAtEnd(editor: Editor) {
+  const { doc } = editor.state;
+  const chain = editor.chain();
+  if (doc.lastChild?.type.name !== 'paragraph') {
+    chain.insertContentAt(doc.content.size, { type: 'paragraph' });
+  }
+  chain.focus('end').run();
+}
+
+const LIST_ITEMS = { bulletList: 'listItem', orderedList: 'listItem', taskList: 'taskItem' } as const;
+
+export type ListKind = keyof typeof LIST_ITEMS;
+
+const isList = (node: ProseNode) => node.type.name in LIST_ITEMS;
+
+function listOfKind(list: ProseNode, kind: ListKind): ProseNode {
+  const { nodes } = list.type.schema;
+  const items: ProseNode[] = [];
+  list.forEach((item) => {
+    const content: ProseNode[] = [];
+    item.forEach((child) => content.push(isList(child) ? listOfKind(child, kind) : child));
+    items.push(nodes[LIST_ITEMS[kind]]!.create(null, content));
+  });
+  return nodes[kind]!.create(null, items);
+}
+
+/** Turns the whole list at the cursor into another kind. Text and nesting stay (EDT-052). */
+export function setListKind(editor: Editor, kind: ListKind): boolean {
+  const { selection, tr } = editor.state;
+  const { $from } = selection;
+  for (let depth = 1; depth <= $from.depth; depth += 1) {
+    const node = $from.node(depth);
+    if (!isList(node)) continue;
+    if (node.type.name === kind) return false;
+    const start = $from.before(depth);
+    tr.replaceWith(start, start + node.nodeSize, listOfKind(node, kind));
+    tr.setSelection(Selection.near(tr.doc.resolve(selection.from)));
+    dispatchStep(editor, tr);
+    return true;
+  }
+  return false;
+}
+
+/** The list tools: another kind of list changes, the same kind goes back to text. */
+export function toggleList(editor: Editor, kind: ListKind) {
+  if (setListKind(editor, kind)) {
+    editor.commands.focus();
+    return;
+  }
+  const chain = editor.chain().focus();
+  if (kind === 'bulletList') chain.toggleBulletList().run();
+  else if (kind === 'orderedList') chain.toggleOrderedList().run();
+  else chain.toggleTaskList().run();
+}
+
 export function blockAtCursor(editor: Editor): number | null {
   const { $from } = editor.state.selection;
   if ($from.depth === 0) return editor.state.selection.from;

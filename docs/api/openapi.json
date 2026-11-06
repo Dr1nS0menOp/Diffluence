@@ -2390,6 +2390,87 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/attachments/{id}/copy": {
+      "post": {
+        "operationId": "post /api/v1/attachments/{id}/copy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
+    "/api/v1/attachments/{id}/move": {
+      "post": {
+        "operationId": "post /api/v1/attachments/{id}/move",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:attachment.delete"
+      }
+    },
+    "/api/v1/attachments/{id}/preview.pdf": {
+      "get": {
+        "operationId": "get /api/v1/attachments/{id}/preview.pdf",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
     "/api/v1/attachments/{id}/text": {
       "get": {
         "operationId": "get /api/v1/attachments/{id}/text",
@@ -3519,6 +3600,24 @@
         "x-access": "public"
       }
     },
+    "/api/v1/markdown/document": {
+      "post": {
+        "operationId": "post /api/v1/markdown/document",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "markdown"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/me": {
       "get": {
         "operationId": "get /api/v1/me",
@@ -4333,6 +4432,24 @@
     "/api/v1/pages/bulk-move": {
       "post": {
         "operationId": "post /api/v1/pages/bulk-move",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/pages/reachable": {
+      "post": {
+        "operationId": "post /api/v1/pages/reachable",
         "parameters": [],
         "responses": {
           "200": {

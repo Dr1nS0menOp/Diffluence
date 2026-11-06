@@ -44,7 +44,7 @@ import {
   IconSliders,
 } from '../icons';
 import { Dialog, Field } from '../ui';
-import { insertColumns } from './block-commands';
+import { insertColumns, toggleList } from './block-commands';
 import { DYNAMIC_KINDS } from './dynamic/kinds';
 import { addChart } from './dynamic/nodes';
 import emoji from './emoji.json';
@@ -88,9 +88,9 @@ export const INSERT_ITEMS: InsertItem[] = [
     icon: IconHeading,
     run: (editor: Editor) => setTextStyle(editor, level),
   })),
-  { id: 'bullet', icon: IconBullet, run: (editor) => editor.chain().focus().toggleBulletList().run() },
-  { id: 'ordered', icon: IconNumbered, run: (editor) => editor.chain().focus().toggleOrderedList().run() },
-  { id: 'task', icon: IconTask, run: (editor) => editor.chain().focus().toggleTaskList().run() },
+  { id: 'bullet', icon: IconBullet, run: (editor) => toggleList(editor, 'bulletList') },
+  { id: 'ordered', icon: IconNumbered, run: (editor) => toggleList(editor, 'orderedList') },
+  { id: 'task', icon: IconTask, run: (editor) => toggleList(editor, 'taskList') },
   { id: 'quote', icon: IconQuote, run: (editor) => editor.chain().focus().toggleBlockquote().run() },
   { id: 'code', icon: IconCodeBlock, run: (editor) => editor.chain().focus().toggleCodeBlock().run() },
   { id: 'rule', icon: IconRule, run: (editor) => editor.chain().focus().setHorizontalRule().run() },
@@ -109,6 +109,7 @@ export const INSERT_ITEMS: InsertItem[] = [
     run: (editor) => editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
   },
   { id: 'attach', icon: IconAttach, run: (_editor, actions) => actions.pickFiles() },
+  { id: 'pageFile', icon: IconAttach, run: (_editor, actions) => actions.openPageFiles() },
   { id: 'importWord', icon: IconAttach, run: (_editor, actions) => actions.pickWord() },
   { id: 'link', icon: IconLink, run: (_editor, actions) => actions.openLink() },
   {
@@ -193,6 +194,45 @@ INSERT_ITEMS.push(
 
 export const TURN_INTO_ITEMS = INSERT_ITEMS.filter((item) => TURN_INTO_IDS.includes(item.id));
 
+// In the order of INSERT_ITEMS, so a group never falls apart. What is not here is a block.
+const ITEM_GROUPS: Record<string, string[]> = {
+  text: ['text', ...HEADING_LEVELS.map((l) => `h${l}`), 'bullet', 'ordered', 'task', 'quote', 'code', 'rule'],
+  layout: [
+    'panelInfo',
+    'panelNote',
+    'panelSuccess',
+    'panelWarning',
+    'panelError',
+    'expand',
+    'columns2',
+    'columns3',
+    'decision',
+    'table',
+  ],
+  files: ['attach', 'pageFile', 'importWord', 'link'],
+  inline: ['status', 'date', 'emoji'],
+  template: TEMPLATE_ITEMS.map((item) => item.id),
+};
+
+const groupOf = (id: string) =>
+  Object.keys(ITEM_GROUPS).find((group) => ITEM_GROUPS[group]?.includes(id)) ?? 'blocks';
+
+export interface ArrangedItem extends InsertItem {
+  group: string;
+}
+
+/** What a person used lately comes first, under a heading of its own (EDT-017). */
+export function arrangedItems(items: InsertItem[], recentIds: string[]): ArrangedItem[] {
+  const recent = recentIds.flatMap((id) => {
+    const item = items.find((candidate) => candidate.id === id);
+    return item ? [{ ...item, group: 'recent' }] : [];
+  });
+  const others = items
+    .filter((item) => !recentIds.includes(item.id))
+    .map((item) => ({ ...item, group: groupOf(item.id) }));
+  return [...recent, ...others];
+}
+
 /** Looks in names and in the extra words a person might try. */
 export function matchingItems(query: string, items: InsertItem[] = INSERT_ITEMS): InsertItem[] {
   const needle = query.trim().toLowerCase();
@@ -212,6 +252,23 @@ interface ListEntry {
   name: string;
   hint?: string;
   icon?: ReactNode;
+  /** The heading above this entry, and the ones after it with the same heading. */
+  group?: string;
+}
+
+interface EntryRun {
+  group: string | undefined;
+  entries: { entry: ListEntry; index: number }[];
+}
+
+function entryRuns(entries: ListEntry[]): EntryRun[] {
+  const runs: EntryRun[] = [];
+  entries.forEach((entry, index) => {
+    const last = runs[runs.length - 1];
+    if (last && last.group === entry.group) last.entries.push({ entry, index });
+    else runs.push({ group: entry.group, entries: [{ entry, index }] });
+  });
+  return runs;
 }
 
 interface ListProps {
@@ -262,26 +319,41 @@ const SuggestionList = forwardRef<ListHandle, ListProps>(function SuggestionList
   }));
 
   if (entries.length === 0) return null;
+  const option = ({ entry, index }: EntryRun['entries'][number]) => (
+    <li
+      key={entry.id}
+      id={`${listId}-${index}`}
+      role="option"
+      aria-selected={index === active}
+      className={index === active ? 'suggestion active' : 'suggestion'}
+      onMouseEnter={() => setActive(index)}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        choose(index);
+      }}
+    >
+      {entry.icon}
+      <span className="suggestion-name">{entry.name}</span>
+      {entry.hint && <span className="muted suggestion-hint">{entry.hint}</span>}
+    </li>
+  );
   return (
-    <ul id={listId} role="listbox" aria-label={label} className="suggestions">
-      {entries.map((entry, index) => (
-        <li
-          key={entry.id}
-          id={`${listId}-${index}`}
-          role="option"
-          aria-selected={index === active}
-          className={index === active ? 'suggestion active' : 'suggestion'}
-          onMouseEnter={() => setActive(index)}
-          onMouseDown={(e) => {
-            e.preventDefault();
-            choose(index);
-          }}
-        >
-          {entry.icon}
-          <span className="suggestion-name">{entry.name}</span>
-          {entry.hint && <span className="muted suggestion-hint">{entry.hint}</span>}
-        </li>
-      ))}
+    // A long list scrolls, so it needs a Tab stop. Tab itself chooses the entry.
+    <ul id={listId} role="listbox" aria-label={label} className="suggestions" tabIndex={0}>
+      {entryRuns(entries).map((run) =>
+        run.group === undefined ? (
+          run.entries.map(option)
+        ) : (
+          <li key={run.group} role="group" aria-label={run.group}>
+            <span className="suggestion-group" aria-hidden="true">
+              {run.group}
+            </span>
+            <ul role="presentation" className="suggestion-run">
+              {run.entries.map(option)}
+            </ul>
+          </li>
+        ),
+      )}
     </ul>
   );
 });
@@ -323,35 +395,44 @@ function popupRender<Item>(label: () => string, toEntry: (item: Item) => ListEnt
   };
 }
 
-const itemEntry = (item: InsertItem): ListEntry => ({
+const itemEntry = (item: ArrangedItem): ListEntry => ({
   id: item.id,
+  group: i18n.t(`insert.group_${item.group}`),
   name: i18n.t(`insert.${item.id}.name`),
   hint: i18n.t(`insert.${item.id}.hint`),
   icon: <item.icon size={ITEM_ICON_SIZE} />,
 });
 
-export const SlashCommands = Extension.create<{ actions: () => EditorActions; items: InsertItem[] }>({
+interface SlashOptions {
+  actions: () => EditorActions;
+  items: InsertItem[];
+  recent: () => string[];
+  onUsed: (id: string) => void;
+}
+
+export const SlashCommands = Extension.create<SlashOptions>({
   name: 'slashCommands',
   // Before our own keys, so that Escape closes the menu first.
   priority: 1100,
   addOptions() {
-    return { actions: () => noActions, items: INSERT_ITEMS };
+    return { actions: () => noActions, items: INSERT_ITEMS, recent: () => [], onUsed: () => undefined };
   },
   addProseMirrorPlugins() {
-    const { actions, items } = this.options;
+    const { actions, items, recent, onUsed } = this.options;
     return [
-      Suggestion<InsertItem>({
+      Suggestion<ArrangedItem>({
         editor: this.editor,
         char: '/',
         allowSpaces: true,
         pluginKey: new PluginKey('slashCommands'),
         allow: ({ editor }) => !editor.isActive('codeBlock'),
-        items: ({ query }) => matchingItems(query, items),
+        items: ({ query }) => arrangedItems(matchingItems(query, items), recent()),
         command: ({ editor, range, props }) => {
           editor.chain().focus().deleteRange(range).run();
+          onUsed(props.id);
           props.run(editor, actions());
         },
-        render: popupRender<InsertItem>(() => i18n.t('editor.insert'), itemEntry),
+        render: popupRender<ArrangedItem>(() => i18n.t('editor.insert'), itemEntry),
       }),
     ];
   },

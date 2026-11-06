@@ -106,6 +106,7 @@ export interface Preferences {
   contents: boolean;
   hover_cards: boolean;
   show_presence: boolean;
+  typing_help: boolean;
   sidebar_width: number;
   tree_view: string;
   language: string;
@@ -118,6 +119,7 @@ export interface Preferences {
 
 export interface Me {
   drawing_origin?: string;
+  office_preview?: boolean;
   user: User;
   global_permissions: string[];
   preferences: Preferences;
@@ -475,11 +477,13 @@ export interface DiffBlock {
 
 export interface Attachment {
   id: string;
+  page_id: string;
   filename: string;
   version: number;
   size: number;
   content_type: string;
   inline: boolean;
+  office: boolean;
   created_by: string;
   updated_at: string;
 }

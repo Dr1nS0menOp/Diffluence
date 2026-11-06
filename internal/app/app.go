@@ -204,7 +204,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.webhooks = webhooks.NewService(a.pool, a.perms, a.identity, a.outward, a.keyring, a.notify)
 	a.collab = collab.NewService(a.pool, a.perms, a.identity, collab.Options{URL: cfg.CollabURL, Token: cfg.CollabToken})
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, a.settings,
-		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
+		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, CollaboraURL: cfg.CollaboraURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
 	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,
 		sites.Options{PublishDir: cfg.PublishDir, Origin: cfg.PublicOrigin(), Log: log})
 	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments, a.templates)

@@ -10,6 +10,8 @@ import {
   markSharedUnsaved,
   personalKey,
   readDraft,
+  readRecentItems,
+  rememberItem,
   sharedDocumentName,
   sharedDocumentsToForget,
   unsavedKey,
@@ -151,5 +153,29 @@ describe('a comment draft', () => {
   it('counts as gone when it cannot be read', () => {
     localStorage.setItem(personalKey('anna', 'draft.page'), 'not json');
     expect(readDraft('anna', 'page', NOW)).toBeUndefined();
+  });
+});
+
+describe('what a person took from the / menu lately', () => {
+  beforeEach(() => vi.stubGlobal('localStorage', new FakeStorage()));
+
+  it('keeps the newest first, without doubles, and at most five', () => {
+    ['a', 'b', 'c', 'd', 'e', 'f', 'b'].forEach((id) => rememberItem('me', id));
+    expect(readRecentItems('me')).toEqual(['b', 'f', 'e', 'd', 'c']);
+  });
+
+  it('belongs to one person, and goes at logout', () => {
+    rememberItem('me', 'a');
+    expect(readRecentItems('someone else')).toEqual([]);
+    forgetPersonalData();
+    expect(readRecentItems('me')).toEqual([]);
+  });
+
+  it('survives something unreadable in the browser', () => {
+    const key = personalKey('me', 'insert.recent');
+    localStorage.setItem(key, 'not json');
+    expect(readRecentItems('me')).toEqual([]);
+    localStorage.setItem(key, '{"a":1}');
+    expect(readRecentItems('me')).toEqual([]);
   });
 });

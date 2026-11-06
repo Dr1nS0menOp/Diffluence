@@ -414,6 +414,296 @@
      ]
     }
    ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Sorting and filtering as a reader"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Press the small arrow in a header cell to sort this table, or use the box above it to filter the rows. Only you see that: nothing changes in the page."
+    }
+   ]
+  },
+  {
+   "type": "table",
+   "content": [
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableHeader",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "River"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableHeader",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Length in km"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Rhine"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "1230"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Meuse"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "925"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Scheldt"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "350"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "IJssel"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "125"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Amstel"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "31"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Vecht"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "60"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "type": "tableRow",
+     "content": [
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "Dommel"
+          }
+         ]
+        }
+       ]
+      },
+      {
+       "type": "tableCell",
+       "content": [
+        {
+         "type": "paragraph",
+         "content": [
+          {
+           "type": "text",
+           "text": "146"
+          }
+         ]
+        }
+       ]
+      }
+     ]
+    }
+   ]
   }
  ]
 }

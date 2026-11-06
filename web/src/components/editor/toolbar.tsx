@@ -35,6 +35,7 @@ import {
   IconUndo,
 } from '../icons';
 import { Menu, MenuItem } from '../menu';
+import { toggleList } from './block-commands';
 import type { EditorActions } from './keys';
 import { indentBlock, setAlignment, setTextStyle } from './marks';
 import { MARK_COLORS, TEXT_COLORS } from './palette';
@@ -299,7 +300,7 @@ function BlockTools({ editor }: { editor: Editor }) {
         editor={editor}
         label={t('editor.bullet')}
         active="bulletList"
-        run={() => chain().toggleBulletList().run()}
+        run={() => toggleList(editor, 'bulletList')}
       >
         <IconBullet size={TOOL_ICON_SIZE} />
       </Tool>
@@ -307,7 +308,7 @@ function BlockTools({ editor }: { editor: Editor }) {
         editor={editor}
         label={t('editor.ordered')}
         active="orderedList"
-        run={() => chain().toggleOrderedList().run()}
+        run={() => toggleList(editor, 'orderedList')}
       >
         <IconNumbered size={TOOL_ICON_SIZE} />
       </Tool>
@@ -315,7 +316,7 @@ function BlockTools({ editor }: { editor: Editor }) {
         editor={editor}
         label={t('editor.task')}
         active="taskList"
-        run={() => chain().toggleTaskList().run()}
+        run={() => toggleList(editor, 'taskList')}
       >
         <IconTask size={TOOL_ICON_SIZE} />
       </Tool>
@@ -437,7 +438,7 @@ export function Toolbar({
           </Tool>
         </>
       )}
-      <SelectionTools editor={editor} />
+      <SelectionTools editor={editor} actions={actions} />
     </div>
   );
 }

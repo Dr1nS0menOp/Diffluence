@@ -96,9 +96,9 @@ This pair turns pages into a small database: a block of facts on each page, and 
 ## 5.10 Diagrams and embedded media
 
 - **BLK-063** · phase 4 · **Diagram.** A diagram written as text with Mermaid, shown as a picture, with an editor beside a live preview.
-- **BLK-064** · partly · **Drawing.** A simple drawing surface for boxes and arrows, stored as a document and an image. Still open: this runs in the optional draw.io service (ADR-026), and changing a saved drawing is not built.
+- **BLK-064** · built · **Drawing.** A simple drawing surface for boxes and arrows, stored as a document and an image. It runs in the optional draw.io service (ADR-026), and a saved drawing can be changed.
 - **BLK-065** · new · **Timeline.** A simple plan with lanes, bars and markers on a time scale, edited on the page.
 - **BLK-066** · partly · **PDF viewer.** Shows a PDF attachment in the page, with paging, when the instance allows it. Still open: it opens in PdfCraft in a window over the page, not in the page itself, and no setting turns it off.
-- **BLK-067** · new · **Office preview.** Shows Word, Excel and PowerPoint attachments as pages, when a converter is installed.
+- **BLK-067** · partly · **Office preview.** Shows Word, Excel and PowerPoint attachments as pages, when a converter is installed. Built: with a helper, an office file opens as a PDF download. New: showing it as pages inside the page.
 - **BLK-068** · later · **External embed.** Shows content of another site in a frame. The Content Security Policy allows only domains on a list set by an administrator, and the frame is sandboxed. Nothing is embedded by default.
 - **BLK-069** · new · **Calendar block** when calendars are built (chapter 13).

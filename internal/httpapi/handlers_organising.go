@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"encoding/json"
 	"net/http"
 	"strconv"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
@@ -44,6 +46,8 @@ func (s *Server) registerOrganisingRoutes() {
 	r.HandleFunc("GET "+pagesPath+"/{id}/approvals", Object("page.view"), s.handleApprovals)
 	// Lists and personal rounds: the module checks each page and each person.
 	r.HandleFunc("POST "+pagesPath+"/bulk-move", me, s.handleBulkMove)
+	r.HandleFunc("POST "+pagesPath+"/reachable", me, s.handleReachable)
+	r.HandleFunc("POST /api/v1/markdown/document", me, s.handleMarkdownDocument)
 	r.HandleFunc("GET /api/v1/labels", me, s.handleLabels)
 	r.HandleFunc("GET /api/v1/labels/{label}/pages", me, s.handleLabelPages)
 	r.HandleFunc("GET /api/v1/posts", me, s.handleAllPosts)
@@ -505,6 +509,52 @@ func (s *Server) handleBulkMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"moved": moved, "failed": failed})
+}
+
+func (s *Server) handleReachable(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		IDs []uuid.UUID `json:"ids"`
+	}
+	if !body(w, r, &in) {
+		return
+	}
+	found, err := s.deps.Pages.Reachable(r.Context(), s.caller(r), in.IDs)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"pages": found})
+}
+
+// maxPastedMarkdown is far more than anyone pastes. It keeps the parser's work bounded.
+const maxPastedMarkdown = 1 << 20
+
+// handleMarkdownDocument turns pasted Markdown into a document. Nothing is stored, and
+// the result went through the same gate as everything that is saved.
+func (s *Server) handleMarkdownDocument(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Markdown string `json:"markdown"`
+	}
+	if decodeJSON(w, r, maxDocumentBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	if len(in.Markdown) > maxPastedMarkdown {
+		writeError(w, http.StatusBadRequest, "too_large", "That is too much text to convert at once.")
+		return
+	}
+	parsed, _ := document.FromMarkdown([]byte(in.Markdown), nil)
+	raw, err := json.Marshal(parsed)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	checked, err := document.Normalize(raw)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"document": checked})
 }
 
 func (s *Server) handleSortChildren(w http.ResponseWriter, r *http.Request) {

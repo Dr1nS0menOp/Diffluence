@@ -894,6 +894,27 @@
      "text": "A line, like the one above, separates two parts of a page."
     }
    ]
+  },
+  {
+   "type": "heading",
+   "attrs": {
+    "level": 2
+   },
+   "content": [
+    {
+     "type": "text",
+     "text": "Small helps while typing"
+    }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    {
+     "type": "text",
+     "text": "Typing an arrow, three dots, straight quotes or a smiley gives the real character. Backspace right after it brings back what you typed, and Preferences can turn it off. Text in Markdown turns into blocks when you paste it, and Undo brings back the plain text. Word count, at the foot of the sheet, also counts a selection."
+    }
+   ]
   }
  ]
 }

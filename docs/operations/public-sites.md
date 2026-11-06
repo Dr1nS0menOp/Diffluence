@@ -34,4 +34,4 @@ Keep the folder out of the reach of the instance's own address, and do not list 
 
 ## PDF
 
-PDF needs the helper process: `docker compose --profile pdf up -d`, and `DIFFLUENCE_PDF_URL=http://pdf:3000`. It gets only HTML that Diffluence made, and needs no outside network.
+PDF needs the helper process: `docker compose --profile pdf up -d`, and `DIFFLUENCE_PDF_URL=http://pdf:3000`. It gets only HTML that Diffluence made, and needs no outside network. The same helper opens office files as a PDF, on request of someone who may see them. For those it gets the content and the extension of the file. To use Collabora for them instead, set `DIFFLUENCE_COLLABORA_URL`.

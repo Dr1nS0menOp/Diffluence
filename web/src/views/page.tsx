@@ -754,6 +754,7 @@ export function PageView({ pageId }: { pageId: string }) {
             onHighlight={openComments}
             onTask={page.can['page.edit'] ? (id, done) => tick.mutate({ id, done }) : undefined}
             onView={keepView}
+            checkLinks
           />
         )}
         <ErrorNote error={tick.error} />

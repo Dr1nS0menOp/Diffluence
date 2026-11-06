@@ -88,6 +88,7 @@ GET /api/v1/appearance/font                                    public
 GET /api/v1/appearance/logo                                    public
 GET /api/v1/approvals/{id}                                     authenticated
 GET /api/v1/attachments/{id}/content                           object:page.view
+GET /api/v1/attachments/{id}/preview.pdf                       object:page.view
 GET /api/v1/attachments/{id}/text                              object:page.view
 GET /api/v1/attachments/{id}/versions                          object:page.view
 GET /api/v1/auth/invitation                                    public
@@ -275,6 +276,8 @@ POST /api/v1/admin/users/{id}/reset-password                   sensitive permiss
 POST /api/v1/admin/webhooks                                    permission:administrator
 POST /api/v1/approvals/{id}/close                              authenticated
 POST /api/v1/attachments/lookup                                authenticated
+POST /api/v1/attachments/{id}/copy                             object:page.view
+POST /api/v1/attachments/{id}/move                             object:attachment.delete
 POST /api/v1/attachments/{id}/versions/{number}/current        object:attachment.add
 POST /api/v1/auth/forgot                                       public
 POST /api/v1/auth/invitation                                   public
@@ -297,6 +300,7 @@ POST /api/v1/exports                                           object:space.expo
 POST /api/v1/imports/{id}/run                                  authenticated
 POST /api/v1/imports/{id}/undo                                 authenticated
 POST /api/v1/mail/unsubscribe/{token}                          public
+POST /api/v1/markdown/document                                 authenticated
 POST /api/v1/me/export                                         session-only authenticated
 POST /api/v1/me/notifications/read-all                         authenticated
 POST /api/v1/me/passkeys/begin                                 sensitive authenticated
@@ -312,6 +316,7 @@ POST /api/v1/me/totp/confirm                                   session-only auth
 POST /api/v1/me/totp/disable                                   sensitive authenticated
 POST /api/v1/pages                                             object:page.create
 POST /api/v1/pages/bulk-move                                   authenticated
+POST /api/v1/pages/reachable                                   authenticated
 POST /api/v1/pages/{id}/access-requests                        authenticated
 POST /api/v1/pages/{id}/approvals                              object:page.edit
 POST /api/v1/pages/{id}/archive                                object:page.archive

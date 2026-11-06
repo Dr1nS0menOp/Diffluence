@@ -24,6 +24,9 @@ import {
   unwrapBlock,
   updateSelected,
 } from './block-commands';
+import { useFileFacts } from './attachments';
+import { isDrawing } from './drawing';
+import type { EditorActions } from './keys';
 import { LanguageDialog } from './language-dialog';
 import { IMAGE_SIZES, MARK_COLORS, PANEL_KINDS, PANEL_TINT } from './palette';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
@@ -62,7 +65,19 @@ function DescribeDialog({ editor, onClose }: { editor: Editor; onClose: () => vo
   );
 }
 
-function ImageTools({ editor }: { editor: Editor }) {
+function EditDrawingTool({ editor, actions }: { editor: Editor; actions: EditorActions }) {
+  const { t } = useTranslation();
+  const id = (editor.getAttributes('image') as { attachment_id: string | null }).attachment_id;
+  const file = useFileFacts(id, true).data;
+  if (!file || !isDrawing(file.filename)) return null;
+  return (
+    <button type="button" className="ghost" onClick={() => actions.openDrawing(file)}>
+      {t('drawing.edit')}
+    </button>
+  );
+}
+
+function ImageTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const { t } = useTranslation();
   const [describing, setDescribing] = useState(false);
   const attrs = useEditorState({
@@ -112,6 +127,7 @@ function ImageTools({ editor }: { editor: Editor }) {
         <IconRename size={TOOL_ICON_SIZE} />
       </Tool>
       {describing && <DescribeDialog editor={editor} onClose={() => setDescribing(false)} />}
+      <EditDrawingTool editor={editor} actions={actions} />
     </>
   );
 }
@@ -340,7 +356,7 @@ function CodeTools({ editor }: { editor: Editor }) {
 }
 
 /** The tools for what is selected. Only the innermost thing gets them, so the row stays short. */
-export function SelectionTools({ editor }: { editor: Editor }) {
+export function SelectionTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const active = useEditorState({
     editor,
     selector: (s) =>
@@ -352,7 +368,7 @@ export function SelectionTools({ editor }: { editor: Editor }) {
     // Keyed on the place, so a second mark does not show the words of the first.
     status: <StatusTools key={editor.state.selection.from} editor={editor} />,
     date: <DateTools key="date" editor={editor} />,
-    image: <ImageTools key="image" editor={editor} />,
+    image: <ImageTools key="image" editor={editor} actions={actions} />,
     codeBlock: <CodeTools key="code" editor={editor} />,
 
     panel: <PanelTools key="panel" editor={editor} />,

@@ -4,6 +4,29 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the rest of daily writing, reader tables and moving files (wave J)
+
+- A new page starts in the title. Enter moves to the text, and Backspace at the very start moves back.
+- A click below the text goes on writing there. Word count, at the foot of the sheet, also counts a selection.
+- Arrows, an ellipsis, curly quotes and smileys come from what people type anyway. A preference turns it off, and Backspace right after it brings back what was typed, also after a heading or list shortcut.
+- The `/` menu has group headings, and what a person used lately comes first.
+- Pasted Markdown turns into blocks, and Undo brings back the plain text. Ctrl Shift V keeps it plain.
+- Lists change style by level, a list changes kind without losing its nesting, Find has Whole word, and the browser's spell checker is on.
+- Readers can sort and filter a table for themselves, and a long table keeps its header in view. Nothing in the page changes.
+- A link to a page the reader cannot reach is struck through and says why. A hidden page and a deleted page look the same.
+- A file on the page can be shown again without a new upload. A tile shows the type and size, and a missing file or image says so.
+- A file moves or copies to another page, and its tiles keep working. The list of a page sorts and filters.
+- Administrators can block file types, by name and by content.
+- With a helper connected, office files open as a PDF. A saved drawing can be changed.
+
+**Upgrade impact:** no migration. To use Collabora for office files, set `DIFFLUENCE_COLLABORA_URL`. Without it, the LibreOffice of the PDF helper does the work.
+
+### Security
+
+- Moving a file needs delete on the source and add on the target, and from then on the rules of the new page decide who gets it.
+- A blocked type looks at what a file contains too, and a rename cannot get around it.
+- The office helper gets the content and the extension of a file, not its name. What comes back is a download with the same locked headers as every file.
+
 ### Added: databases (wave I)
 - A database is a fourth kind of item, beside pages, blog posts and folders. It works like a simple spreadsheet: type, move with the arrows and Tab, paste from Excel, sums such as `=SUM(B1:B3)`, and undo
 - Columns hold text, numbers, dates, ticks, choices or links. Readers can sort and filter. Permissions, history, search, trash and copying work as for a page

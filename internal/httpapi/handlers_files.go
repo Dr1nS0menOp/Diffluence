@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"io"
 	"net/http"
 	"time"
 
@@ -20,6 +21,10 @@ func (s *Server) registerFileRoutes() {
 	r.HandleFunc("DELETE "+files+"/{id}/versions/{number}", Object("attachment.delete_any"), s.handleFileVersionDelete)
 	r.HandleFunc("PATCH "+files+"/{id}", Object("attachment.add"), s.handleFileUpdate)
 	r.HandleFunc("GET "+files+"/{id}/text", Object("page.view"), s.handleFileText)
+	r.HandleFunc("GET "+files+"/{id}/preview.pdf", Object("page.view"), s.handleFilePDF)
+	// The rule covers the source. The target page is checked by the module.
+	r.HandleFunc("POST "+files+"/{id}/move", Object("attachment.delete"), s.handleFileMove)
+	r.HandleFunc("POST "+files+"/{id}/copy", Object("page.view"), s.handleFileCopy)
 	// A list: hidden and unknown ids answer the same, and the module decides.
 	r.HandleFunc("POST "+files+"/lookup", Authenticated(), s.handleFileLookup)
 	r.HandleFunc("GET /api/v1/pages/{id}/attachments.zip", Object("page.view"), s.handleFilesZip)
@@ -97,6 +102,71 @@ func (s *Server) handleFileText(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, text)
+}
+
+func (s *Server) fileToPage(w http.ResponseWriter, r *http.Request, act func(identity.Caller, uuid.UUID, uuid.UUID) (attachments.Attachment, error)) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		PageID uuid.UUID `json:"page_id"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	a, err := act(s.caller(r), id, in.PageID)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, a)
+}
+
+func (s *Server) handleFileMove(w http.ResponseWriter, r *http.Request) {
+	s.fileToPage(w, r, func(c identity.Caller, id, target uuid.UUID) (attachments.Attachment, error) {
+		return s.deps.Attachments.Move(r.Context(), c, id, target)
+	})
+}
+
+func (s *Server) handleFileCopy(w http.ResponseWriter, r *http.Request) {
+	s.fileToPage(w, r, func(c identity.Caller, id, target uuid.UUID) (attachments.Attachment, error) {
+		return s.deps.Attachments.Copy(r.Context(), c, id, target)
+	})
+}
+
+// handleFilePDF serves an office file as a PDF, locked down like every other file. It is
+// a download: opening it is up to the reader's own PDF viewer.
+func (s *Server) handleFilePDF(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	a, f, err := s.deps.Attachments.Open(r.Context(), s.caller(r), id, true)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	if !attachments.IsOffice(a.Filename) || !s.deps.Exchange.OfficeAvailable() {
+		writeError(w, http.StatusConflict, "no_preview", "This file cannot open as a PDF here.")
+		return
+	}
+	err = s.deps.Exchange.OfficeToPDF(r.Context(), a.Filename, f, func(pdf io.Reader) error {
+		h := w.Header()
+		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
+		h.Set("X-Content-Type-Options", "nosniff")
+		h.Set("Cache-Control", "private, no-store")
+		h.Set("Content-Type", "application/octet-stream")
+		h.Set("Content-Disposition", attachmentHeader(a.Filename+".pdf"))
+		_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(uploadDeadline))
+		_, err := io.Copy(w, pdf)
+		return err
+	})
+	if err != nil {
+		s.fail(w, r, err)
+	}
 }
 
 func (s *Server) handleFileLookup(w http.ResponseWriter, r *http.Request) {

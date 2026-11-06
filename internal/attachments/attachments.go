@@ -44,6 +44,7 @@ type Attachment struct {
 	Size        int64     `json:"size"`
 	ContentType string    `json:"content_type"`
 	Inline      bool      `json:"inline"`
+	Office      bool      `json:"office"`
 	CreatedBy   uuid.UUID `json:"created_by"`
 	UpdatedAt   time.Time `json:"updated_at"`
 }
@@ -189,6 +190,13 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 		return Attachment{}, err
 	}
 	contentType, _, _ := strings.Cut(http.DetectContentType(head), ";")
+	blocked, err := s.settings.BlockedFileTypes(ctx)
+	if err != nil {
+		return Attachment{}, err
+	}
+	if isBlocked(blocked, name, contentType, head) {
+		return Attachment{}, errBlocked()
+	}
 
 	key := "attachments/" + ids.New().String()
 	obj, err := s.store.Put(ctx, key, reader, limit)
@@ -259,6 +267,7 @@ func scan(r pgx.Row) (Attachment, error) {
 	var a Attachment
 	err := r.Scan(&a.ID, &a.PageID, &a.SpaceID, &a.Filename, &a.Version, &a.Size, &a.ContentType, &a.CreatedBy, &a.UpdatedAt)
 	a.Inline = IsInline(a.ContentType)
+	a.Office = IsOffice(a.Filename)
 	return a, err
 }
 

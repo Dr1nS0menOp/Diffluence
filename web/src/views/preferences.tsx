@@ -125,6 +125,12 @@ export function PreferencesView() {
         value={preferences.show_presence}
         onChange={(show_presence) => update({ show_presence })}
       />
+      <PreferenceSwitch
+        label={t('preferences.typingHelp')}
+        value={preferences.typing_help}
+        onChange={(typing_help) => update({ typing_help })}
+      />
+      <p className="muted">{t('preferences.typingHelpHelp')}</p>
     </>
   );
 }

@@ -252,6 +252,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
   const [sharing, setSharing] = useState(false);
   const [offerDraft, setOfferDraft] = useState(!!data.privateDraft);
   const sharedEditor = useRef<Editor | null>(null);
+  const titleField = useRef<HTMLInputElement>(null);
   useSharedTitle(together, setTitle);
   const editorView = useRef<EditorView | null>(null);
   const keepView = useCallback((view: EditorView) => {
@@ -419,6 +420,9 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
   const isDatabase = page.kind === 'database';
   const titleInput = (
     <input
+      ref={titleField}
+      // A new page starts with its name. Later visits are about the text.
+      autoFocus={!published && data.title === ''}
       className="title-input"
       value={title}
       aria-label={t('page.title')}
@@ -427,6 +431,11 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
         setTitle(e.target.value);
         if (together) writeSharedTitle(together, e.target.value);
         schedule();
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== 'Enter' || e.nativeEvent.isComposing) return;
+        e.preventDefault();
+        sharedEditor.current?.commands.focus('start');
       }}
       required
     />
@@ -535,6 +544,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
           onView={keepView}
           together={together}
           onReady={editorReady}
+          onFocusTitle={() => titleField.current?.focus()}
           onShare={() => setSharing(true)}
           onPublish={() => void publish(false)}
           onSave={() => {

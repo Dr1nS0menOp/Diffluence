@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // Images and files in a document. Both are attachments of the page, never outside addresses.
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Node as DocumentNode } from '@tiptap/core';
 import Image, { type ImageOptions } from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError, type Attachment } from '../../api';
 import { OpenInCraft } from '../craft-frame';
-import { IconDownload, IconPage } from '../icons';
-import { Dialog } from '../ui';
+import { IconDownload, IconPage, IconPicture } from '../icons';
+import { Dialog, ErrorNote, formatSize, Loading } from '../ui';
 
 const DOWNLOAD_ICON_SIZE = 18;
+const MISSING_ICON_SIZE = 20;
 const MAX_COPIES = 50;
 
 /** Where a file of a document lives. A template serves its own files. */
@@ -25,10 +28,38 @@ interface ImageAttrs {
   align: string | null;
 }
 
+interface FileFacts {
+  id: string;
+  filename: string;
+  size: number;
+}
+
+/** Null means the file is gone or hidden, which look the same on purpose. */
+export function useFileFacts(id: string | null, enabled: boolean) {
+  return useQuery({
+    queryKey: ['file-facts', id],
+    queryFn: () => api.post<{ files: FileFacts[] }>('/attachments/lookup', { ids: [id] }),
+    select: (found) => found.files[0] ?? null,
+    enabled: enabled && !!id,
+  });
+}
+
 function ImageView({ node, editor, extension }: ReactNodeViewProps) {
+  const { t } = useTranslation();
   const { attachment_id: id, alt, caption, size, align } = node.attrs as ImageAttrs;
   const { fileAddress } = extension.options as { fileAddress: FileAddress };
-  const image = <img src={fileAddress(id)} alt={alt ?? ''} />;
+  const [isMissing, setIsMissing] = useState(false);
+  if (isMissing) {
+    return (
+      <NodeViewWrapper as="figure" className="doc-image">
+        <span className="file-missing">
+          <IconPicture size={MISSING_ICON_SIZE} /> {alt ? `${alt}: ` : ''}
+          {t('files.imageGone')}
+        </span>
+      </NodeViewWrapper>
+    );
+  }
+  const image = <img src={fileAddress(id)} alt={alt ?? ''} onError={() => setIsMissing(true)} />;
   return (
     <NodeViewWrapper
       as="figure"
@@ -91,19 +122,35 @@ export const AttachmentImage = Image.extend<ImageOptions & { fileAddress: FileAd
   },
 });
 
+/** The type as people name it, from the end of the file name. */
+export function fileKind(filename: string): string {
+  const dot = filename.lastIndexOf('.');
+  return dot > 0 ? filename.slice(dot + 1).toUpperCase() : '';
+}
+
 /** A file in the document: a tile to download. While editing it is a block to move or remove. */
 function FileTile({ node, editor, extension }: ReactNodeViewProps) {
+  const { t } = useTranslation();
   const { attachment_id: id, filename } = node.attrs as { attachment_id: string; filename: string };
   const { fileAddress } = extension.options as { fileAddress: FileAddress };
+  // A template or a public page serves its own files, and has nothing to ask.
+  const facts = useFileFacts(id, fileAddress === pageFileAddress);
+  const isGone = facts.data === null;
   const label = (
     <>
       <IconPage />
       <span className="file-name">{filename}</span>
+      {facts.data && (
+        <span className="muted file-facts">
+          {fileKind(filename)} · {formatSize(facts.data.size)}
+        </span>
+      )}
+      {isGone && <span className="muted file-facts">{t('files.fileGone')}</span>}
     </>
   );
   return (
     <NodeViewWrapper className="file-block">
-      {editor.isEditable ? (
+      {editor.isEditable || isGone ? (
         <span className="file-tile">{label}</span>
       ) : (
         <>
@@ -161,6 +208,41 @@ export function attachmentNode(attachment: Attachment) {
     return { type: 'media', attrs: { attachment_id: attachment.id, kind } };
   }
   return { type: 'file', attrs: { attachment_id: attachment.id, filename: attachment.filename } };
+}
+
+/** Adds what the page already holds, so one file can show in several places (FIL-015). */
+export function PageFilesDialog({
+  pageId,
+  onPick,
+  onClose,
+}: {
+  pageId: string;
+  onPick: (attachment: Attachment) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['attachments', pageId],
+    queryFn: () => api.get<{ attachments: Attachment[] }>(`/pages/${pageId}/attachments`),
+  });
+  return (
+    <Dialog title={t('insert.pageFile.name')} onClose={onClose}>
+      {q.isPending && <Loading />}
+      <ErrorNote error={q.error} />
+      {q.data?.attachments.length === 0 && <p className="muted">{t('attachments.none')}</p>}
+      <ul className="plain-list insert-list">
+        {q.data?.attachments.map((attachment) => (
+          <li key={attachment.id}>
+            <button type="button" className="suggestion" onClick={() => onPick(attachment)}>
+              <IconPage size={DOWNLOAD_ICON_SIZE} />
+              <span className="suggestion-name">{attachment.filename}</span>
+              <span className="muted suggestion-hint">{formatSize(attachment.size)}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+    </Dialog>
+  );
 }
 
 export type NameChoice = 'version' | 'both' | 'cancel';

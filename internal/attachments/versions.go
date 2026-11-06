@@ -157,6 +157,13 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 	if utf8.RuneCountInString(in.Comment) > maxCommentRune {
 		return Attachment{}, apperr.Invalid("A comment on a file can have at most 500 characters.")
 	}
+	blocked, err := s.settings.BlockedFileTypes(ctx)
+	if err != nil {
+		return Attachment{}, err
+	}
+	if isBlocked(blocked, name, "", nil) {
+		return Attachment{}, errBlocked()
+	}
 	var out Attachment
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		a, err := get(ctx, tx, id)
@@ -172,7 +179,7 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 			return err
 		}
 		if taken {
-			return apperr.Conflict("name_taken", "This page already has a file with that name.")
+			return errNameTaken()
 		}
 		if _, err := tx.Exec(ctx, "UPDATE attachments SET filename = $2, comment = $3, updated_at = now() WHERE id = $1", id, name, in.Comment); err != nil {
 			return err
@@ -199,10 +206,7 @@ func (s *Service) NameTaken(ctx context.Context, c identity.Caller, pageID uuid.
 	if err != nil {
 		return false, err
 	}
-	var taken bool
-	err = s.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM attachments WHERE page_id = $1
-		AND status = 'active' AND lower(filename) = lower($2))`, pageID, name).Scan(&taken)
-	return taken, err
+	return nameTaken(ctx, s.pool, pageID, name)
 }
 
 // Text is a file as plain text, for a preview. It is data, never a document.

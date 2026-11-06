@@ -13,6 +13,8 @@ const SHARED_PART = '.shared.';
 const UNKEYED_NAMES = ['diffluence.searches'];
 const UNKEYED_PREFIXES = ['diffluence.tree.', 'diffluence.comment.', 'diffluence.backup.'];
 const DRAFT_KEEP_MS = 7 * 86_400_000;
+const RECENT_ITEMS_NAME = 'insert.recent';
+const MAX_RECENT_ITEMS = 5;
 
 const PersonContext = createContext('');
 
@@ -83,6 +85,25 @@ export function dropUnkeyedData(): void {
   storedKeys()
     .filter((key) => UNKEYED_NAMES.includes(key) || UNKEYED_PREFIXES.some((prefix) => key.startsWith(prefix)))
     .forEach((key) => localStorage.removeItem(key));
+}
+
+/** What this person took from the `/` menu lately, newest first. */
+export function readRecentItems(person: string): string[] {
+  try {
+    const stored: unknown = JSON.parse(localStorage.getItem(personalKey(person, RECENT_ITEMS_NAME)) ?? '[]');
+    return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    // Unreadable means nothing to show first: the menu keeps its usual order.
+    return [];
+  }
+}
+
+export function rememberItem(person: string, id: string): void {
+  const recent = [id, ...readRecentItems(person).filter((other) => other !== id)];
+  localStorage.setItem(
+    personalKey(person, RECENT_ITEMS_NAME),
+    JSON.stringify(recent.slice(0, MAX_RECENT_ITEMS)),
+  );
 }
 
 interface StoredDraft {
