@@ -22,7 +22,7 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 - **UI text** only through translation files.
 - **Design:** every screen follows `docs/design/README.md` (the product owner's decision, ADR-021). Values come only from `web/src/design/tokens.css`. Build from the listed frames and components, never a second way. A new screen gets a picture in `web/e2e/0-design.spec.ts`. Look at every new or changed picture before committing, and never update one just to get past a failure. Changing the look itself is the product owner's decision.
 - **IDs** are UUIDv7 (`ids.New()`).
-- **No personal details:** nothing in this repository names the product owner, or says anything personal about them, such as where they work or what they run at home. Write "the product owner", in code, docs, specs, handoffs and commit messages alike.
+- **No personal details:** nothing in this repository names the product owner, or says anything personal about them, such as where they work or what they run at home. Write "the product owner", in code, docs, specs, handoffs and commit messages alike. The only public contact is the address and the line about the author in `README.md`.
 
 ## Layout
 ```

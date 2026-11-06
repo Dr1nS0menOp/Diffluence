@@ -6,7 +6,7 @@ Diffluence is **pre-alpha**. No version is supported before 1.0. From 1.0 on, on
 
 ## Reporting a vulnerability
 
-**Do not open a public issue.** Use GitHub's *Report a vulnerability* button (private vulnerability reporting) on this repository.
+**Do not open a public issue.** Use GitHub's *Report a vulnerability* button (private vulnerability reporting) on this repository. If you cannot use it, mail DiffluenceCreator@protonmail.com.
 
 Please include the affected version or commit, the steps to reproduce, and the impact you expect.
 

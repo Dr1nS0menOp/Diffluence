@@ -57,6 +57,10 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md). Every commit needs a DCO sign-off (`git
 
 Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
+## Contact
+
+Mail [DiffluenceCreator@protonmail.com](mailto:DiffluenceCreator@protonmail.com). The author is Dutch and prefers to stay anonymous.
+
 ## Licence
 
 [Apache License 2.0](LICENSE)
