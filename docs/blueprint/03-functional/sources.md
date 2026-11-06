@@ -24,6 +24,14 @@ Base address: `https://support.atlassian.com/confluence-cloud/docs/`, followed b
 
 **Automation:** `https://support.atlassian.com/cloud-automation/docs/actions-in-confluence-automation/`, `https://support.atlassian.com/cloud-automation/docs/triggers-in-confluence-automation/`.
 
+## Enterprise document features in the roadmap
+
+Read on 2026-11-06 for behaviour only, through a tool that returns a summary, to describe these features in `08-roadmap.md`. No requirement in chapters 1 to 13 comes from them. Each feature gets its own study and sources before it is built.
+
+- **Document control:** the public Comala Document Control and Document Management pages at `https://appfire.atlassian.net/wiki/spaces/CDCCL/` and `https://appfire.atlassian.net/wiki/spaces/COMALACDCLS/`.
+- **Draft and published spaces:** `https://appfire.atlassian.net/wiki/spaces/AHP/pages/649954539` and `https://marketplace.atlassian.com/apps/143/comala-publishing`.
+- **Guided templates:** `https://marketplace.atlassian.com/apps/1224664/templating-app-project-templates-issue-templates-for-jira`.
+
 ## What came from elsewhere
 
 Names, numbers and defaults in chapters 1 to 13 are our own choices unless the behaviour itself required them. Standards are cited where used: WCAG 2.2, RFC 6238, OpenID Connect, SCIM 2.0, WebAuthn, CommonMark, iCalendar and WebDAV. The chapters on identity, permissions, audit and operations come from our own blueprint and specs.

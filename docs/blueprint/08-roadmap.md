@@ -73,6 +73,18 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 - **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
 - **S3 storage.** It needs a client module, chosen when the time comes.
 
+## Enterprise document features
+
+The product owner counts these as basic enterprise features (2026-11-06). Each is a clean-room build, as `02-clean-room-and-licensing.md` describes: the products below are named only to say which behaviour is meant. We read their public pages for behaviour, write our own spec, and copy no text, workflow, icon or layout. Each starts with its own study. No phase is chosen yet. The sources are in `03-functional/sources.md`.
+
+| Feature | What people get | What exists already |
+|---|---|---|
+| **Document control**, the behaviour of Comala Document Management | A page or a whole space follows a workflow of states, such as in review, rejected and approved, with assigned reviewers. A change to approved content sends it back to review. Readers see the last approved version, and only authors and reviewers see the draft. A space workflow overrides page workflows, and a page has one workflow at a time. Regulated work can ask for an electronic signature. | Approvals, fixed approvers per space, the record of past rounds and page status (PAG-062 to PAG-069). Missing: workflows of our own states, readers held on the approved version, signatures. |
+| **Draft and published spaces**, the behaviour of Comala Publishing | Two linked spaces: people write in the draft space, and readers only have the published one, so a draft cannot leak through a page setting. It shows what is out of step, publishes one page or the whole space, can leave pages out, and can follow a workflow, so approval publishes. | Public sites on a separate host, and copying pages. Missing: the link between two spaces inside an instance, and tracking what is out of step. |
+| **Guided templates**, the behaviour of Templating.app | One action creates a whole set of linked items from a template, with variables. Forms with many field types guide the person who creates, without scripting. Content is filled in by conditions. Rights are set per template, and an administrator approves templates that others may use. | Templates with labels, a title pattern and guided pages (ORG-045 to ORG-061). Missing: a set of pages at once, more field types, conditions, rights per template. |
+
+The public pages of Templating.app describe a Jira app, for issues and projects. Here it means the same behaviour for pages.
+
 ## Kinds of item
 
 Create offers four kinds of item, made the same way, each with its own job (ADR-028):
