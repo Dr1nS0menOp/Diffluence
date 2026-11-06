@@ -221,9 +221,13 @@ test('a table stretches from the menu and by keys, and readers see the same', as
   expect(full?.width ?? 0).toBeGreaterThan((text?.width ?? 0) + 200);
   await page.keyboard.press('Escape');
 
-  await edge(page).focus();
-  await page.keyboard.press('Home');
-  await expect(edge(page)).toHaveAttribute('aria-valuenow', '0');
+  // The closing menu hands the focus back a moment later, which on a slow machine can come after
+  // this focus. Home means the same each time, so trying again changes nothing else.
+  await expect(async () => {
+    await edge(page).focus();
+    await page.keyboard.press('Home');
+    await expect(edge(page)).toHaveAttribute('aria-valuenow', '0', { timeout: 1000 });
+  }).toPass();
   // A change redraws the table, and the edge takes the focus back a moment later.
   await expect(edge(page)).toBeFocused();
   await page.keyboard.press('ArrowRight');
