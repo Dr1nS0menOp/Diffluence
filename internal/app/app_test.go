@@ -387,7 +387,7 @@ func TestProbesAndNotFound(t *testing.T) {
 	if strings.Contains(policy, "script-src 'unsafe") {
 		t.Errorf("inline scripts must stay forbidden: %s", policy)
 	}
-	if strings.Contains(policy, "frame-src") {
-		t.Errorf("without a drawing service no frame may load: %s", policy)
+	if strings.Contains(policy, "frame-src 'self'") || strings.Contains(policy, "wasm-unsafe-eval") {
+		t.Errorf("only the viewers may load in a frame, and only they run WebAssembly: %s", policy)
 	}
 }

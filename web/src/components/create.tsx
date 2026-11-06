@@ -104,6 +104,50 @@ export function NewPostDialog({ space, onClose }: { space: Space; onClose: () =>
   );
 }
 
+/** A database: it has its grid from the start, so the editor opens on it. */
+export function NewDatabaseDialog({
+  space,
+  parent,
+  onClose,
+}: {
+  space: Space;
+  parent: string | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [title, setTitle] = useState('');
+  const create = useMutation({
+    mutationFn: () =>
+      api.post<Page>('/pages', { space_id: space.id, parent_id: parent, title, kind: 'database' }),
+    onSuccess: async (p) => {
+      await client.invalidateQueries({ queryKey: ['tree', space.id] });
+      onClose();
+      navigate(`/pages/${p.id}/edit`);
+    },
+  });
+  return (
+    <Dialog title={t('sheet.new')} onClose={onClose}>
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          create.mutate();
+        }}
+      >
+        <ErrorNote error={create.error} />
+        <Field label={t('page.title')}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        </Field>
+        <div className="dialog-actions">
+          <button type="submit" className="primary" disabled={create.isPending}>
+            {t('common.create')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 /** A tree entry that opens an address outside this space. */
 export function NewLinkDialog({
   space,

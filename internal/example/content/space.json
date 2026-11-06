@@ -106,6 +106,12 @@
    "folder": true,
    "children": [
     {
+     "slug": "team-budget",
+     "title": "Team budget",
+     "document": "team-budget.json",
+     "database": true
+    },
+    {
      "slug": "team-holidays",
      "title": "Holidays",
      "document": "team-holidays.json",

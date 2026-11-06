@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Attachment } from '../api';
+import { OpenInCraft } from '../components/craft-frame';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
 
@@ -136,6 +137,7 @@ export function FileDetailsDialog({
 }) {
   return (
     <Dialog title={file.filename} onClose={onClose}>
+      <OpenInCraft file={file} address={`/api/v1/attachments/${file.id}/content`} />
       {canChange && <Rename file={file} onChanged={onChanged} />}
       <Versions file={file} canChange={canChange} canRemove={canRemove} onChanged={onChanged} />
       {TEXT_FILE.test(file.content_type) && <TextPreview file={file} />}

@@ -465,7 +465,21 @@ mutate "an editor removes an old version" internal/attachments/versions.go \
 mutate "the drawing service shares our origin" internal/config/config.go \
   's.replace("if public != nil && strings.EqualFold(u.Scheme, public.Scheme)", "if false && strings.EqualFold(u.Scheme, public.Scheme)")' ./internal/config/ -run TestTheDrawingServiceIsOptionalAndNeverOurOwnOrigin
 mutate "any address may be framed" internal/webui/webui.go \
-  's.replace("frames = \"frame-src \" + drawingOrigin + \"; \"", "frames = \"frame-src *; \"")' ./internal/webui/ -run TestOnlyTheDrawingServiceMayBeFramed
+  's.replace("frames += \" \" + drawingOrigin", "frames += \" *\"")' ./internal/webui/ -run TestOnlyOurViewersAndTheDrawingServiceMayBeFramed
+mutate "a viewer may reach our origin" internal/webui/webui.go \
+  's.replace("sandbox allow-scripts allow-downloads", "sandbox allow-scripts allow-downloads allow-same-origin")' ./internal/webui/ -run TestAViewerRunsInASandboxThatCannotReachTheSession
+mutate "the whole app may run WebAssembly" internal/webui/webui.go \
+  's.replace("return \"default-src \x27none\x27; script-src \x27self\x27; style-src", "return \"default-src \x27none\x27; script-src \x27self\x27 \x27wasm-unsafe-eval\x27; style-src")' ./internal/webui/ -run TestOnlyTheViewersGetTheLoosePolicy
+mutate "a normal page holds a sheet" internal/pages/kinds.go \
+  's.replace("if kind != KindDatabase && document.HasSheet(doc) {", "if false {")' $app -run TestADocumentMustFitItsKind
+mutate "a database holds anything" internal/pages/kinds.go \
+  's.replace("if kind == KindDatabase && !document.IsSheetDocument(doc) {", "if false {")' $app -run TestADocumentMustFitItsKind
+mutate "a link cell skips the link gate" internal/document/sheet.go \
+  's.replace("href, err := SafeHref(s)", "href, err := s, error(nil)")' ./internal/document/ -run TestASheetThatBreaksARuleIsRefused
+mutate_web "a CSV cell may start a formula" src/components/sheet/csv.ts \
+  's.replace("DANGEROUS_START.test(value) && !PLAIN_NUMBER.test(value)", "false")' src/components/sheet/sheet.test.ts
+mutate_web "a formula leaves in a CSV" src/components/sheet/csv.ts \
+  's.replace("csvField(read(r, c))", "csvField(sheet.rows[r]?.cells[sheet.columns[c]?.id ?? \"\"] ?? \"\")")' src/components/sheet/sheet.test.ts
 mutate "the policy blocks video and audio" internal/webui/webui.go \
   's.replace("media-src \x27self\x27; ", "")' ./internal/webui/ -run TestVideoAndAudioFromOurOwnOriginMayPlay
 

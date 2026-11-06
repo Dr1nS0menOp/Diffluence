@@ -113,6 +113,7 @@ function Filters({
           <option value="">{t('search.kind_any')}</option>
           <option value="page">{t('search.kind_page')}</option>
           <option value="post">{t('search.kind_post')}</option>
+          <option value="database">{t('search.kind_database')}</option>
           <option value="comment">{t('search.kind_comment')}</option>
         </select>
       </label>

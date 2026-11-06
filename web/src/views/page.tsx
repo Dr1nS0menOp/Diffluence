@@ -56,6 +56,7 @@ import {
 } from '../components/page-marks';
 import { MIN_HEADINGS_FOR_CONTENTS, PageContents } from '../components/page-contents';
 import { ChildPages, DetailsPanel } from '../components/page-details';
+import { SheetReader } from '../components/sheet/editor';
 import { ShareDialog } from '../components/share-dialog';
 import { useShortcut } from '../components/shortcuts';
 import { useToast } from '../components/toast';
@@ -737,7 +738,14 @@ export function PageView({ pageId }: { pageId: string }) {
             </a>
           </p>
         )}
-        {page.kind !== 'folder' && page.kind !== 'link' && (
+        {page.kind === 'database' && (
+          <SheetReader
+            document={page.document}
+            title={page.title}
+            canExport={page.can['space.export'] ?? false}
+          />
+        )}
+        {page.kind !== 'folder' && page.kind !== 'link' && page.kind !== 'database' && (
           <DocumentView
             document={page.document}
             onImage={(images, start) => setLightbox({ images, start })}

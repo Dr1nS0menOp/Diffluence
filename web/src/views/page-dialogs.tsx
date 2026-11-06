@@ -19,6 +19,7 @@ import { SubjectPicker } from '../components/picker';
 import { useToast } from '../components/toast';
 import { countBelow } from '../components/tree-model';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { OpenInCraft } from '../components/craft-frame';
 import { FileDetailsDialog } from './file-details';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
@@ -66,6 +67,7 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
             <span className="muted">
               {t('attachments.version', { number: a.version })} · {formatSize(a.size)}
             </span>
+            <OpenInCraft file={a} address={`/api/v1/attachments/${a.id}/content`} />
             <button type="button" className="ghost" onClick={() => setOpenId(a.id)}>
               {t('files.details')}
             </button>

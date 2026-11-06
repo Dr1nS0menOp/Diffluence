@@ -5,6 +5,7 @@ import Image, { type ImageOptions } from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
 import { api, ApiError, type Attachment } from '../../api';
+import { OpenInCraft } from '../craft-frame';
 import { IconDownload, IconPage } from '../icons';
 import { Dialog } from '../ui';
 
@@ -105,10 +106,13 @@ function FileTile({ node, editor, extension }: ReactNodeViewProps) {
       {editor.isEditable ? (
         <span className="file-tile">{label}</span>
       ) : (
-        <a className="file-tile" href={`${fileAddress(id)}?download=1`} download={filename}>
-          {label}
-          <IconDownload size={DOWNLOAD_ICON_SIZE} />
-        </a>
+        <>
+          <a className="file-tile" href={`${fileAddress(id)}?download=1`} download={filename}>
+            {label}
+            <IconDownload size={DOWNLOAD_ICON_SIZE} />
+          </a>
+          <OpenInCraft file={{ filename }} address={fileAddress(id)} />
+        </>
       )}
     </NodeViewWrapper>
   );

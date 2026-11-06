@@ -4,6 +4,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: databases (wave I)
+- A database is a fourth kind of item, beside pages, blog posts and folders. It works like a simple spreadsheet: type, move with the arrows and Tab, paste from Excel, sums such as `=SUM(B1:B3)`, and undo
+- Columns hold text, numbers, dates, ticks, choices or links. Readers can sort and filter. Permissions, history, search, trash and copying work as for a page
+- CSV in and out, and Open in GridCraft for heavy work, for those who may export. Spreadsheet files on a page open in GridCraft too
+- Upgrade impact: one migration that only widens what is allowed. Nothing to do
+
+### Added: PDF in the browser
+- A PDF opens in PdfCraft, from the file in the page, the Files list or its details, so people can look at it and change it there. The result is saved as a download. Download always stays next to it, because a screen reader cannot read the viewer
+- Upgrade impact: the program grows by about 28 MiB. Nothing to do. The viewers run in a sandboxed frame with their own policy, and the rest of the app stays as strict as it was
+
 ### Added: insight, automation and the platform (wave H)
 - Analytics with their own switch, off by default. Counts mode keeps nothing that points at a person once a day has closed. Name mode says what it does, and leaving it deletes the names for good. Your own views do not count, and page views stay out of the audit log
 - A view count in the byline for those who may see it, insights for a page, a space and the instance, what people search for, most viewed pages on the overview, and sortable tables with a safe CSV

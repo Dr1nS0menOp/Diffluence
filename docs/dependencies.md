@@ -24,6 +24,15 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 |---|---|---|---|
 | SecLists `xato-net-10-million-passwords.txt` (`internal/identity/leaked/passwords.bloom`) | MIT | The check of new passwords against leaked ones, which must work offline. Kept as a Bloom filter of 10 MB, never as text. `go run ./cmd/password-filter list.txt internal/identity/leaked/passwords.bloom` rebuilds it. Source: `github.com/danielmiessler/SecLists`, `Passwords/Common-Credentials/`, sha256 `c95989fe...72fe`, 5,054,227 unique entries in lower case | The product owner, 2026-11-05 |
 
+## Web builds, not compiled here
+
+Downloaded by `scripts/fetch-craft.py`, which refuses any file but the pinned release. The files are stored in `web/public/vendor/`, each with its LICENSE-MIT, LICENSE-APACHE, NOTICE and ATTRIBUTION.md, and `scripts/craft-checksums.sha256` with a test keeps them unchanged. They are loaded only when someone opens a file in them, in a sandboxed frame without `allow-same-origin`. The ArtCraft name and logos stay unmodified, as part of the product; a fork of these builds must remove them. Spec 019 holds the measurements.
+
+| Build | Licence | Why | Pin | Approved |
+|---|---|---|---|---|
+| PdfCraft 0.18.2 (`storytold/pdfcraft`, `pdfcraft-web-0.18.2.zip`, 18.7 MiB) | MIT or Apache-2.0 | Viewing and changing a PDF in the browser | sha256 `3f2c11ae...6867` | The product owner, ADR-026 |
+| GridCraft 0.16.1 (`storytold/gridcraft`, `gridcraft-web-0.16.1.zip`, 8.9 MiB) | MIT or Apache-2.0 | Opening a spreadsheet file, or a database for heavy work | sha256 `496785cf...8368` | The product owner, 2026-11-06 |
+
 ## Pictures
 
 | What | Licence | Why |

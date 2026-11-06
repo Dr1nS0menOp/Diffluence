@@ -596,3 +596,58 @@ test('the editor with every block passes the accessibility check', async ({ page
   await page.keyboard.press('Control+End');
   await checkAccessibility(page);
 });
+
+// A small real PDF: the offsets in its table must be right, or a reader refuses it.
+function onePagePdf(): Buffer {
+  const objects = [
+    '<</Type/Catalog/Pages 2 0 R>>',
+    '<</Type/Pages/Kids[3 0 R]/Count 1>>',
+    '<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
+    '<</Length 44>>stream\nBT /F1 18 Tf 20 100 Td (Hello Diffluence) Tj ET\nendstream',
+    '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
+  ];
+  let body = '%PDF-1.4\n';
+  const offsets = objects.map((object, i) => {
+    const at = body.length;
+    body += `${i + 1} 0 obj\n${object}\nendobj\n`;
+    return at;
+  });
+  const table = body.length;
+  body += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n`;
+  for (const at of offsets) body += `${String(at).padStart(10, '0')} 00000 n \n`;
+  body += `trailer<</Size ${objects.length + 1}/Root 1 0 R>>\nstartxref\n${table}\n%%EOF\n`;
+  return Buffer.from(body, 'latin1');
+}
+
+test('a PDF opens in a sandboxed viewer that cannot reach the session', async ({ page }) => {
+  await editing(page, 'A PDF');
+  await page.locator('input[type=file][aria-label="Add image or file"]').setInputFiles({
+    name: 'hello.pdf',
+    mimeType: 'application/pdf',
+    buffer: onePagePdf(),
+  });
+  await expect(body(page).locator('.file-tile')).toContainText('hello.pdf');
+  await publish(page);
+  await page.getByRole('button', { name: 'Open in PdfCraft' }).click();
+  const dialog = page.getByRole('dialog', { name: 'hello.pdf' });
+  await expect(dialog.getByRole('status')).toHaveCount(0, { timeout: 60_000 });
+  await expect(dialog.getByRole('link', { name: 'Download the file' })).toBeVisible();
+  const viewer = page.frames().find((frame) => frame.url().includes('/vendor/pdfcraft/'));
+  if (!viewer) throw new Error('the viewer has no frame');
+  const seen = await viewer.evaluate(async () => {
+    const answer = await fetch('/api/v1/me', { credentials: 'include' }).then(
+      (r) => r.status,
+      () => 0,
+    );
+    let cookie = 'readable';
+    try {
+      cookie = document.cookie;
+    } catch {
+      cookie = 'refused';
+    }
+    return { origin: self.origin, answer, cookie };
+  });
+  expect(seen).toEqual({ origin: 'null', answer: 0, cookie: 'refused' });
+  await page.frameLocator('iframe.craft-frame').locator('canvas').press('Escape');
+  await expect(dialog).toHaveCount(0);
+});

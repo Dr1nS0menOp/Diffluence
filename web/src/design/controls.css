@@ -591,6 +591,104 @@ dialog.wide {
   inline-size: min(52rem, 92vw);
 }
 
+.sheet-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-block-end: var(--space-3);
+}
+
+.sheet-scroll {
+  overflow: auto;
+  max-block-size: 75vh;
+  border: 1px solid var(--color-line);
+}
+
+.sheet table {
+  margin: 0;
+  border-collapse: separate;
+  border-spacing: 0;
+  inline-size: max-content;
+  min-inline-size: 100%;
+}
+
+.sheet th,
+.sheet td {
+  min-inline-size: 8rem;
+  max-inline-size: 24rem;
+  block-size: 2rem;
+  padding: var(--space-1) var(--space-2);
+  border-block-end: 1px solid var(--color-line);
+  border-inline-end: 1px solid var(--color-line);
+  overflow-wrap: anywhere;
+  text-align: start;
+}
+
+.sheet thead th {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: var(--layer-frame);
+  background: var(--color-side);
+}
+
+.sheet .sheet-corner,
+.sheet .sheet-number {
+  min-inline-size: 3rem;
+  background: var(--color-side);
+  color: var(--color-muted);
+  font-weight: var(--weight-regular);
+  text-align: end;
+}
+
+.sheet td[data-type='number'],
+.sheet th[data-type='number'] {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.sheet td[data-active='true'] {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+.sheet td[data-bad] {
+  color: var(--color-danger);
+}
+
+.sheet td input,
+.sheet td select {
+  inline-size: 100%;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  font: inherit;
+}
+
+.sheet-sort {
+  all: unset;
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.sheet-up {
+  transform: rotate(180deg);
+}
+
+.sheet-page {
+  padding-inline: var(--space-4);
+}
+
+.craft-frame {
+  display: block;
+  inline-size: 100%;
+  block-size: calc(100vh - 16rem);
+  border: 1px solid var(--color-line);
+}
+
 dialog::backdrop {
   background: var(--color-backdrop);
 }

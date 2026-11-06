@@ -11,6 +11,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -20,7 +21,23 @@ import (
 const (
 	defaultPosts = 20
 	maxPosts     = 100
+
+	// The columns of a new database, ready to rename.
+	firstColumnName  = "Name"
+	secondColumnName = "Notes"
 )
+
+// checkDocumentKind keeps a sheet where it belongs: a database is exactly one sheet,
+// and nothing else holds one. This is the one place all new text passes.
+func checkDocumentKind(kind string, doc document.Node) error {
+	if kind == KindDatabase && !document.IsSheetDocument(doc) {
+		return apperr.Invalid("A database holds one sheet and nothing else.")
+	}
+	if kind != KindDatabase && document.HasSheet(doc) {
+		return apperr.Invalid("Only a database holds a sheet.")
+	}
+	return nil
+}
 
 // SetKind turns a page into another kind. A folder keeps its old text in its
 // versions, so it comes back when it is a page again.
@@ -58,6 +75,9 @@ func (s *Service) SetKind(ctx context.Context, c identity.Caller, id uuid.UUID, 
 func (s *Service) checkKindChange(ctx context.Context, tx pgx.Tx, p Page, kind string) error {
 	if p.Kind == KindLink {
 		return apperr.Conflict("link_entry", "A link entry stays a link entry.")
+	}
+	if p.Kind == KindDatabase {
+		return apperr.Conflict("database", "A database stays a database.")
 	}
 	if kind == KindFolder {
 		home, err := isHomePage(ctx, tx, p)

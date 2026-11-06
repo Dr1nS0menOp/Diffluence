@@ -185,6 +185,8 @@ func (w *htmlWriter) node(n Node) {
 		w.b.WriteString(`<div class="table"><table>`)
 		w.children(n)
 		w.b.WriteString("</table></div>")
+	case TypeSheet:
+		w.sheet(n)
 	case TypeTableRow:
 		w.tag("tr", "", n)
 	case TypeTableCell:
@@ -197,6 +199,24 @@ func (w *htmlWriter) node(n Node) {
 			w.b.WriteString("<p>" + esc(words) + "</p>")
 		}
 	}
+}
+
+// sheet writes a database as a plain table. Formulas are worked out in the browser,
+// so a static copy shows the formula itself.
+func (w *htmlWriter) sheet(n Node) {
+	w.b.WriteString("<table>")
+	for i, line := range sheetLines(n) {
+		cell := "td"
+		if i == 0 {
+			cell = "th"
+		}
+		w.b.WriteString("<tr>")
+		for _, value := range line {
+			w.b.WriteString("<" + cell + ">" + esc(value) + "</" + cell + ">")
+		}
+		w.b.WriteString("</tr>")
+	}
+	w.b.WriteString("</table>")
 }
 
 func (w *htmlWriter) mention(n Node) string {

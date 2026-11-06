@@ -49,6 +49,7 @@ const (
 	KindPost     = "post"
 	KindFolder   = "folder"
 	KindLink     = "link"
+	KindDatabase = "database"
 	KindTemplate = permissions.KindTemplate
 )
 
@@ -306,11 +307,16 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 			}
 		}
 		p, err = s.insert(ctx, tx, c, newPage{spaceID: in.SpaceID, parent: in.ParentID, title: title, author: c.UserID, kind: in.Kind, link: link})
-		if err != nil || (in.Kind != KindLink && in.Kind != KindFolder) {
+		if err != nil || (in.Kind != KindLink && in.Kind != KindFolder && in.Kind != KindDatabase) {
 			return err
 		}
 		// A link entry and a folder have nothing to write, so they are published at once.
-		p, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: document.Empty(), Author: c.UserID})
+		// A database starts as an empty sheet, so it has its grid from the first moment.
+		doc := document.Empty()
+		if in.Kind == KindDatabase {
+			doc = document.EmptySheet(firstColumnName, secondColumnName)
+		}
+		p, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID})
 		return err
 	})
 	return p, err
@@ -318,7 +324,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 
 func (in NewPage) cleanedTitle() (string, error) {
 	switch in.Kind {
-	case "", KindPage, KindPost, KindFolder, KindLink:
+	case "", KindPage, KindPost, KindFolder, KindLink, KindDatabase:
 	default:
 		return "", apperr.Invalid("That is not a kind of page.")
 	}
@@ -388,6 +394,9 @@ func syncMentions(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc document
 // appendVersion writes the next version and updates the page and search index.
 func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, in newVersion) (Page, error) {
 	title, doc, author := in.Title, in.Doc, in.Author
+	if err := checkDocumentKind(p.Kind, doc); err != nil {
+		return Page{}, err
+	}
 	if err := tasks.AssignIDs(ctx, tx, p.ID, &doc); err != nil {
 		return p, err
 	}
@@ -603,7 +612,7 @@ func (s *Service) touchRecent(ctx context.Context, userID uuid.UUID, p Page) {
 }
 
 // treeKinds are the kinds that have a place in the tree.
-var treeKinds = []string{KindPage, KindFolder, KindLink}
+var treeKinds = []string{KindPage, KindFolder, KindLink, KindDatabase}
 
 // Node is one entry of the page tree, with what its row shows. HasDraft and
 // VisitedAt are about the person asking.

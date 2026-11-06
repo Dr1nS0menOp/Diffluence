@@ -1,0 +1,25 @@
+{
+  "type": "doc",
+  "content": [
+    {
+      "type": "sheet",
+      "attrs": {
+        "columns": [
+          { "id": "item", "name": "Item", "type": "text" },
+          { "id": "amount", "name": "Amount", "type": "number" },
+          { "id": "due", "name": "Due", "type": "date" },
+          { "id": "paid", "name": "Paid", "type": "check" },
+          { "id": "kind", "name": "Kind", "type": "choice", "options": ["Travel", "Food", "Tools"] },
+          { "id": "more", "name": "More", "type": "link" }
+        ],
+        "rows": [
+          { "id": "r1", "cells": { "item": "Train to the team day", "amount": "84.50", "due": "2026-11-20", "paid": "true", "kind": "Travel" } },
+          { "id": "r2", "cells": { "item": "Lunch", "amount": "120", "due": "2026-11-21", "kind": "Food" } },
+          { "id": "r3", "cells": { "item": "New whiteboard", "amount": "210.25", "due": "2026-12-01", "kind": "Tools", "more": "https://example.com/whiteboard" } },
+          { "id": "r4", "cells": { "item": "Total", "amount": "=SUM(B1:B3)" } },
+          { "id": "r5", "cells": { "item": "Average per item", "amount": "=ROUND(AVERAGE(B1:B3),2)" } }
+        ]
+      }
+    }
+  ]
+}

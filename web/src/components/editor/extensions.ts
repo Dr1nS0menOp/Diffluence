@@ -3,6 +3,7 @@ import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
+import { SheetNode } from '../sheet/sheet-node';
 import { AttachmentFile, AttachmentImage, pageFileAddress, type FileAddress } from './attachments';
 import { Column, Columns, Decision, Expand, Panel } from './blocks';
 import { CodeBlock } from './code';
@@ -96,6 +97,7 @@ export function documentExtensions({
     Excerpt,
     Anchor,
     ChartNode,
+    SheetNode,
     Media,
     Status,
     DateMark,

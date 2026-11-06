@@ -519,6 +519,8 @@ func (w *mdWriter) block(n Node, prefix string) {
 	case TypeDynamic:
 		kind, _ := n.Attrs["kind"].(string)
 		w.line(prefix, "*(A dynamic block: "+kind+")*")
+	case TypeSheet:
+		w.b.WriteString(sheetMarkdown(n))
 	case TypeChart:
 		title, _ := n.Attrs["title"].(string)
 		w.line(prefix, "*(A chart: "+title+")*")

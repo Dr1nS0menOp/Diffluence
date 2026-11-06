@@ -13,6 +13,7 @@ import (
 	"fmt"
 	"net/url"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 	"unicode/utf8"
@@ -102,7 +103,7 @@ var (
 
 // children says which node types may appear inside each node type.
 var children = map[string][]string{
-	TypeDoc:            blockTypes,
+	TypeDoc:            append(slices.Clone(blockTypes), TypeSheet),
 	TypeParagraph:      inlineTypes,
 	TypeHeading:        inlineTypes,
 	TypeBulletList:     {TypeListItem},
@@ -131,6 +132,7 @@ var children = map[string][]string{
 	TypeExcerpt:        blockTypes,
 	TypeAnchor:         {},
 	TypeChart:          {},
+	TypeSheet:          {},
 	TypeMedia:          {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},
@@ -321,6 +323,9 @@ func wordsOf(n Node) string {
 	if n.Type == TypeMention {
 		return mentionText(n)
 	}
+	if n.Type == TypeSheet {
+		return sheetText(n)
+	}
 	s, _ := n.Attrs[key].(string)
 	return s
 }
@@ -349,7 +354,7 @@ func Text(n Node) string {
 	var b strings.Builder
 	Walk(n, func(c Node) {
 		switch c.Type {
-		case TypeParagraph, TypeHeading, TypeCodeBlock, TypeFile, TypeDecision:
+		case TypeParagraph, TypeHeading, TypeCodeBlock, TypeFile, TypeDecision, TypeSheet:
 			if t := BlockText(c); t != "" {
 				b.WriteString(t)
 				b.WriteByte('\n')

@@ -25,6 +25,7 @@ import {
   IconExternal,
   IconEye,
   IconFolder,
+  IconSheet,
   IconLink,
   IconLocate,
   IconLock,
@@ -386,7 +387,13 @@ function RowTools({ node, tabStop, onAdd, onDialog }: RowProps) {
 
 function RowIcon({ node }: { node: TreeNode }) {
   const plain =
-    node.kind === 'folder' ? <IconFolder size={ROW_ICON_SIZE} /> : <IconPage size={ROW_ICON_SIZE} />;
+    node.kind === 'folder' ? (
+      <IconFolder size={ROW_ICON_SIZE} />
+    ) : node.kind === 'database' ? (
+      <IconSheet size={ROW_ICON_SIZE} />
+    ) : (
+      <IconPage size={ROW_ICON_SIZE} />
+    );
   return (
     <span className="twist">
       {node.emoji ? (

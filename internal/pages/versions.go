@@ -58,6 +58,13 @@ func (s *Service) SaveDraft(ctx context.Context, c identity.Caller, id uuid.UUID
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {
 		return Draft{}, err
 	}
+	p, err := load(ctx, s.pool, id)
+	if err != nil {
+		return Draft{}, err
+	}
+	if err := checkDocumentKind(p.Kind, doc); err != nil {
+		return Draft{}, err
+	}
 	d := Draft{PageID: id, Title: title, Document: raw, SchemaVersion: document.SchemaVersion, BaseVersion: in.BaseVersion}
 	err = s.pool.QueryRow(ctx, `INSERT INTO drafts (page_id, user_id, title, document, schema_version, base_version)
 		VALUES ($1, $2, $3, $4, $5, $6)

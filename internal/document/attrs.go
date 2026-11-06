@@ -335,6 +335,7 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeExcerpt:       cleanExcerpt,
 	TypeAnchor:        cleanAnchor,
 	TypeChart:         cleanChart,
+	TypeSheet:         cleanSheet,
 	TypeMedia:         cleanMedia}
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.

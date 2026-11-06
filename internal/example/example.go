@@ -78,6 +78,7 @@ type planPage struct {
 	Labels         []string      `json:"labels"`
 	Stage          *planStage    `json:"stage"`
 	Folder         bool          `json:"folder"`
+	Database       bool          `json:"database"`
 	Children       []planPage    `json:"children"`
 }
 
@@ -358,13 +359,20 @@ func (s *Service) makePages(ctx context.Context, c identity.Caller, p plan, sp s
 			id := refs.pages[parent.Slug]
 			under = &id
 		}
-		created, err := s.pages.Create(ctx, c, pages.NewPage{SpaceID: sp.ID, ParentID: under, Title: page.Title})
+		kind := pages.KindPage
+		if page.Database {
+			kind = pages.KindDatabase
+		}
+		created, err := s.pages.Create(ctx, c, pages.NewPage{SpaceID: sp.ID, ParentID: under, Title: page.Title, Kind: kind})
 		if err != nil {
 			failure = err
 			return
 		}
 		refs.pages[page.Slug] = created.ID
-		_, failure = s.pages.Publish(ctx, c, created.ID, pages.PublishInput{Title: page.Title, Document: oneLine(firstVersionText)})
+		// A database is born with its first version: an empty sheet.
+		if !page.Database {
+			_, failure = s.pages.Publish(ctx, c, created.ID, pages.PublishInput{Title: page.Title, Document: oneLine(firstVersionText)})
+		}
 		if failure != nil {
 			return
 		}

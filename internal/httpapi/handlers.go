@@ -29,7 +29,7 @@ func (s *Server) registerRoutes() {
 	// page has to load before anyone is logged in. Unknown API paths get a JSON 404.
 	r.Handle("/", Public, webui.Handler(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Not found.")
-	}, s.deps.Config.DrawingOrigin()))
+	}, s.deps.Config.DrawingOrigin(), s.deps.Config.PublicOrigin()))
 
 	r.HandleFunc("POST /api/v1/auth/logout", Authenticated(), s.handleLogout)
 	r.HandleFunc("GET /api/v1/me", Authenticated(), s.handleMe)

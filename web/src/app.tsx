@@ -7,7 +7,7 @@ import { appearanceQuery, useAccent, useImportedFont } from './appearance';
 import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
-import { NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
+import { NewDatabaseDialog, NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
 import { SpaceShell, useCreateTarget, useCurrentSpace } from './components/frame';
 import { IconChevronDown, IconPlus, Logo } from './components/icons';
 import { Menu, MenuItem } from './components/menu';
@@ -51,7 +51,7 @@ import { PageInsightsView, SpaceInsightsView } from './views/insights';
 import { RulesView, RuleView } from './views/rules';
 import { WebhooksView } from './views/webhooks';
 
-type Creating = 'page' | 'template' | 'post' | 'space' | null;
+type Creating = 'page' | 'template' | 'post' | 'database' | 'space' | null;
 
 /** These need no session: they are how a person gets one. */
 const PUBLIC_SCREENS: Record<string, () => ReactNode> = {
@@ -84,6 +84,7 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
           trigger={<IconChevronDown size={16} />}
         >
           <MenuItem onClick={() => onCreate('page')}>{t('space.newPage')}</MenuItem>
+          <MenuItem onClick={() => onCreate('database')}>{t('sheet.new')}</MenuItem>
           <MenuItem onClick={() => onCreate('template')}>{t('organise.fromTemplate')}</MenuItem>
           {(target.space.features?.blog ?? true) && (
             <MenuItem onClick={() => onCreate('post')}>{t('blog.newPost')}</MenuItem>
@@ -154,6 +155,9 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
       )}
       {creating === 'template' && target && (
         <TemplateGallery space={target.space} parent={target.parent} onClose={() => setCreating(null)} />
+      )}
+      {creating === 'database' && target && (
+        <NewDatabaseDialog space={target.space} parent={target.parent} onClose={() => setCreating(null)} />
       )}
       {creating === 'post' && target && (
         <NewPostDialog space={target.space} onClose={() => setCreating(null)} />

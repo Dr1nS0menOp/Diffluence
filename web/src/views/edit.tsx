@@ -29,6 +29,7 @@ import {
   type LinkState,
   type Together,
 } from '../components/editor/together';
+import { SheetEditor } from '../components/sheet/editor';
 import { IconArrowBack, IconChevronDown } from '../components/icons';
 import { PageHeader, usePageLook } from '../components/page-header';
 import { LabelBar } from '../components/page-labels';
@@ -78,7 +79,8 @@ export function readBackup(stored: string | null): Backup | null {
 async function load(id: string): Promise<Loaded> {
   const page = await api.get<PageDetail>(`/pages/${id}`);
   const info = await api.get<CollabInfo>(`/pages/${id}/collab`);
-  const collab = info.enabled ? info : null;
+  // A sheet has no shared draft: editing together works on the text of a document.
+  const collab = info.enabled && page.kind !== 'database' ? info : null;
   if (page.has_draft) {
     const d = await api.get<Draft>(`/pages/${id}/draft`);
     if (collab) {
@@ -414,6 +416,21 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
   const published = page.status === 'published';
   const changed = published && (page.has_draft || state !== 'idle');
   const showOffer = !published && !typing && isEmptyDocument(data.document) && page.kind === 'page';
+  const isDatabase = page.kind === 'database';
+  const titleInput = (
+    <input
+      className="title-input"
+      value={title}
+      aria-label={t('page.title')}
+      placeholder={t('editor.titlePlaceholder')}
+      onChange={(e) => {
+        setTitle(e.target.value);
+        if (together) writeSharedTitle(together, e.target.value);
+        schedule();
+      }}
+      required
+    />
+  );
   return (
     <>
       <div className="edit-bar">
@@ -437,7 +454,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
           aria-label={t('editor.summary')}
           placeholder={t('editor.summary')}
         />
-        {page.status === 'published' && (
+        {page.status === 'published' && !isDatabase && (
           <button
             type="button"
             className="quiet"
@@ -489,48 +506,45 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
       )}
       <EditorNotes page={page} title={title} />
       {showOffer && <TemplateOffer page={page} />}
-      <DocumentEditor
-        key={start.generation}
-        pageId={page.id}
-        initial={start.document}
-        canAttach={page.can['attachment.add'] ?? false}
-        fullWidth={look.look.full_width}
-        onFullWidth={() => look.change({ full_width: !look.look.full_width })}
-        onChange={(d) => {
-          doc.current = d;
-          schedule();
-        }}
-        onView={keepView}
-        together={together}
-        onReady={editorReady}
-        onShare={() => setSharing(true)}
-        onPublish={() => void publish(false)}
-        onSave={() => {
-          dirty.current = true;
-          void save();
-        }}
-        header={
-          <PageHeader
-            page={page}
-            look={look}
-            title={
-              <input
-                className="title-input"
-                value={title}
-                aria-label={t('page.title')}
-                placeholder={t('editor.titlePlaceholder')}
-                onChange={(e) => {
-                  setTitle(e.target.value);
-                  if (together) writeSharedTitle(together, e.target.value);
-                  schedule();
-                }}
-                required
-              />
-            }
+      {isDatabase && (
+        <div className="sheet-page">
+          <PageHeader page={page} look={look} title={titleInput} />
+          <SheetEditor
+            key={start.generation}
+            initial={start.document}
+            title={title}
+            onChange={(d) => {
+              doc.current = d;
+              schedule();
+            }}
           />
-        }
-        footer={<LabelBar page={page} />}
-      />
+        </div>
+      )}
+      {!isDatabase && (
+        <DocumentEditor
+          key={start.generation}
+          pageId={page.id}
+          initial={start.document}
+          canAttach={page.can['attachment.add'] ?? false}
+          fullWidth={look.look.full_width}
+          onFullWidth={() => look.change({ full_width: !look.look.full_width })}
+          onChange={(d) => {
+            doc.current = d;
+            schedule();
+          }}
+          onView={keepView}
+          together={together}
+          onReady={editorReady}
+          onShare={() => setSharing(true)}
+          onPublish={() => void publish(false)}
+          onSave={() => {
+            dirty.current = true;
+            void save();
+          }}
+          header={<PageHeader page={page} look={look} title={titleInput} />}
+          footer={<LabelBar page={page} />}
+        />
+      )}
       {optionsOpen && (
         <PublishOptionsDialog
           page={page}
