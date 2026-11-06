@@ -79,7 +79,14 @@ type Row struct {
 	ForceMail bool // a rule sends an e-mail: mail unless the person turned this type off
 }
 
-func groupKey(r Row) string { return fmt.Sprintf("%s:%s", r.Type, r.PageID) }
+// groupKey puts rows on one line. Each answer to an invitation has its own address and
+// reason, so those stay apart.
+func groupKey(r Row) string {
+	if r.Type == TypeInvitationAnswer {
+		return fmt.Sprintf("%s:%s", r.Type, r.Event)
+	}
+	return fmt.Sprintf("%s:%s", r.Type, r.PageID)
+}
 
 func (s *Service) mayHear(ctx context.Context, q db.Querier, r Row) (bool, error) {
 	if r.NoCheck {

@@ -3546,6 +3546,78 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/invitation-requests": {
+      "get": {
+        "operationId": "get /api/v1/invitation-requests",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "invitation-requests"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
+    "/api/v1/invitation-requests/{id}/approve": {
+      "post": {
+        "operationId": "post /api/v1/invitation-requests/{id}/approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "invitation-requests"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
+    "/api/v1/invitation-requests/{id}/refuse": {
+      "post": {
+        "operationId": "post /api/v1/invitation-requests/{id}/refuse",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "invitation-requests"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
     "/api/v1/jobs/{id}": {
       "get": {
         "operationId": "get /api/v1/jobs/{id}",
@@ -5381,6 +5453,33 @@
           "pages"
         ],
         "x-access": "object:analytics.view"
+      }
+    },
+    "/api/v1/pages/{id}/invitation-requests": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/invitation-requests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
       }
     },
     "/api/v1/pages/{id}/kind": {

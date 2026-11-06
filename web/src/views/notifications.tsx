@@ -19,6 +19,7 @@ const TYPES = [
   'page_changed',
   'access_request',
   'access_answer',
+  'invitation_answer',
   'access_recovered',
   'draft_expiring',
   'rule',

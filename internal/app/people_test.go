@@ -684,13 +684,15 @@ func TestAnInvitationMakesAnAccountOnce(t *testing.T) {
 
 func TestAGuestInvitationCarriesOneSpace(t *testing.T) {
 	e := newEnv(t)
-	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
-	viewer := e.user("viewer@example.com", identity.PermUseProduct)
+	root := admin(e)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace, identity.PermInvitePeople)
+	viewer := e.user("viewer@example.com", identity.PermUseProduct, identity.PermInvitePeople)
 	space, home := owner.space("ENG")
 	owner.grant(space, "user", viewer.id, permissions.TemplateViewer)
 	viewer.want(403, "POST", "/api/v1/spaces/"+space+"/guests", map[string]any{"email": "guest@example.com"})
 
-	link := owner.ok("POST", "/api/v1/spaces/"+space+"/guests", map[string]any{"email": "guest@example.com"})["link"].(string)
+	request := owner.ok("POST", "/api/v1/spaces/"+space+"/guests", map[string]any{"email": "guest@example.com"})["id"].(string)
+	link := root.ok("POST", "/api/v1/invitation-requests/"+request+"/approve", map[string]any{"reason": "Known to us"})["link"].(string)
 	u, _ := url.Parse(link)
 	if status, out := publicPost(e, "/api/v1/auth/invitation", map[string]any{"token": u.Query().Get("token"), "display_name": "Guest", "password": "a long enough passphrase"}); status != 204 {
 		t.Fatalf("accept: %d %s", status, out)

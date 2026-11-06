@@ -356,36 +356,53 @@ type NewInvitation struct {
 	SpaceID *uuid.UUID
 }
 
+// InvitationAddress cleans an address someone typed for an invitation.
+func InvitationAddress(email string) (string, error) {
+	address := normalizeEmail(email)
+	if !validEmail(address) {
+		return "", apperr.Invalid("That is not an e-mail address.")
+	}
+	return address, nil
+}
+
 // Invite stores an invitation, and sends it. Without mail it returns the link, so
 // the administrator can pass it on.
 func (s *Service) Invite(ctx context.Context, c Caller, in NewInvitation) (string, error) {
-	in.Email = normalizeEmail(in.Email)
-	if !validEmail(in.Email) {
-		return "", apperr.Invalid("That is not an e-mail address.")
+	var link string
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		link, err = s.InviteWithin(ctx, tx, c, in)
+		return err
+	})
+	return link, err
+}
+
+// InviteWithin is Invite inside a transaction of the caller. The mail is queued before
+// that transaction ends, so a failure to queue it undoes everything.
+func (s *Service) InviteWithin(ctx context.Context, tx pgx.Tx, c Caller, in NewInvitation) (string, error) {
+	address, err := InvitationAddress(in.Email)
+	if err != nil {
+		return "", err
 	}
+	in.Email = address
 	if in.Type != TypeMember && in.Type != TypeGuest {
 		return "", apperr.Invalid("A person is invited as a member or a guest.")
 	}
-	var token string
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var exists bool
-		if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)", in.Email).Scan(&exists); err != nil {
-			return err
-		}
-		if exists {
-			return apperr.Conflict("email_taken", "This e-mail address already has an account.")
-		}
-		if _, err := tx.Exec(ctx, "DELETE FROM auth_challenges WHERE kind = $1 AND data->>'email' = $2", challengeInvitation, in.Email); err != nil {
-			return err
-		}
-		var err error
-		token, err = s.NewChallenge(ctx, tx, challengeInvitation, nil, invitationData(in), invitationTTL)
-		if err != nil {
-			return err
-		}
-		return s.record(ctx, tx, c, "invitation.created", "invitation", "", map[string]any{"type": in.Type})
-	})
+	var exists bool
+	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM users WHERE lower(email) = $1)", in.Email).Scan(&exists); err != nil {
+		return "", err
+	}
+	if exists {
+		return "", apperr.Conflict("email_taken", "This e-mail address already has an account.")
+	}
+	if _, err := tx.Exec(ctx, "DELETE FROM auth_challenges WHERE kind = $1 AND data->>'email' = $2", challengeInvitation, in.Email); err != nil {
+		return "", err
+	}
+	token, err := s.NewChallenge(ctx, tx, challengeInvitation, nil, invitationData(in), invitationTTL)
 	if err != nil {
+		return "", err
+	}
+	if err := s.record(ctx, tx, c, "invitation.created", "invitation", "", map[string]any{"type": in.Type}); err != nil {
 		return "", err
 	}
 	link := s.link("/invitation", token)
@@ -688,6 +705,7 @@ func forgetLinksOf(ctx context.Context, tx pgx.Tx, id uuid.UUID) error {
 	for _, statement := range []string{
 		"DELETE FROM follows WHERE followed_id = $1",
 		"DELETE FROM access_requests WHERE requester_id = $1",
+		"DELETE FROM invitation_requests WHERE requester_id = $1",
 		"UPDATE notifications SET actor_id = NULL WHERE actor_id = $1",
 	} {
 		if _, err := tx.Exec(ctx, statement, id); err != nil {

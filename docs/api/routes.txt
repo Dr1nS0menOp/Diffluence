@@ -105,6 +105,7 @@ GET /api/v1/exports/{id}/file                                  authenticated
 GET /api/v1/feed                                               authenticated
 GET /api/v1/groups/{id}                                        object:group.manage_members
 GET /api/v1/imports/{id}                                       authenticated
+GET /api/v1/invitation-requests                                session-only authenticated
 GET /api/v1/jobs/{id}                                          object:job.owner
 GET /api/v1/labels                                             authenticated
 GET /api/v1/labels/{label}/pages                               authenticated
@@ -304,6 +305,8 @@ POST /api/v1/comments/{id}/undo-delete                         authenticated
 POST /api/v1/exports                                           object:space.export
 POST /api/v1/imports/{id}/run                                  authenticated
 POST /api/v1/imports/{id}/undo                                 authenticated
+POST /api/v1/invitation-requests/{id}/approve                  session-only authenticated
+POST /api/v1/invitation-requests/{id}/refuse                   session-only authenticated
 POST /api/v1/mail/unsubscribe/{token}                          public
 POST /api/v1/markdown/document                                 authenticated
 POST /api/v1/me/export                                         session-only authenticated
@@ -329,6 +332,7 @@ POST /api/v1/pages/{id}/attachments                            object:attachment
 POST /api/v1/pages/{id}/comments                               object:comment.add
 POST /api/v1/pages/{id}/copy                                   object:page.create
 POST /api/v1/pages/{id}/import-word                            object:page.edit
+POST /api/v1/pages/{id}/invitation-requests                    object:page.view
 POST /api/v1/pages/{id}/kind                                   object:page.edit
 POST /api/v1/pages/{id}/labels                                 object:page.edit
 POST /api/v1/pages/{id}/move                                   object:page.edit

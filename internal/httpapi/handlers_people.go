@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/watches"
 )
 
@@ -668,6 +669,21 @@ func (s *Server) handleInviteGuest(w http.ResponseWriter, r *http.Request) {
 	}
 	if !access.GuestInvites {
 		s.fail(w, r, apperr.Conflict("guest_invites_off", "An administrator turned guest invitations off."))
+		return
+	}
+	administrator, err := s.deps.Identity.HasGlobalPermission(r.Context(), c.UserID, identity.PermAdministrator)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	// Only an administrator lets someone in. Anyone else asks one (ADR-033).
+	if !administrator {
+		request, err := s.deps.Sharing.AskGuestInvitation(r.Context(), c, id, sharing.InvitationAsk{Email: in.Email})
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": request, "waiting": true})
 		return
 	}
 	link, err := s.deps.Identity.Invite(r.Context(), c, identity.NewInvitation{Email: in.Email, Type: identity.TypeGuest, SpaceID: &id})

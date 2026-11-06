@@ -131,6 +131,7 @@ var idColumns = map[string]string{
 	"page_restrictions.subject_id":    "the rule stays: an empty restriction would open a page",
 	"access_requests.asked_id":        "someone else's request keeps who it went to",
 	"access_requests.answered_by":     "someone else's request keeps who answered",
+	"invitation_requests.decided_by":  "someone else's request keeps who answered",
 }
 
 func uuidColumns(t *testing.T, e *env) []string {

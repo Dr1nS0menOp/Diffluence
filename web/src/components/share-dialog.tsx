@@ -1,10 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // One place for "who can see this" (spec 010, C7). Sharing only notifies: it never gives
-// anyone access, and the dialog says who cannot see the page.
-import { useState } from 'react';
+// anyone access, and the dialog says who cannot see the page. Someone with the role can
+// also ask an administrator to invite a person without an account (spec 022).
+import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type AccessEntry, type AccessRequest, type MentionCandidate, type PageSummary } from '../api';
+import {
+  api,
+  type AccessEntry,
+  type AccessRequest,
+  type Me,
+  type MentionCandidate,
+  type PageSummary,
+} from '../api';
 import { useCopy } from './toast';
 import { Dialog, ErrorNote, Field, Loading } from './ui';
 
@@ -166,6 +174,50 @@ function PeopleField({
   );
 }
 
+/** Only someone with the role sees this, and the server asks for the role as well. */
+function InviteSomeone({ page }: { page: PageSummary }) {
+  const { t } = useTranslation();
+  const [email, setEmail] = useState('');
+  const [note, setNote] = useState('');
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
+  const ask = useMutation({
+    mutationFn: () => api.post(`/pages/${page.id}/invitation-requests`, { email, note }),
+    onSuccess: () => {
+      setEmail('');
+      setNote('');
+    },
+  });
+  if (!me.data?.global_permissions.includes('invite_people')) return null;
+  return (
+    <section>
+      <h3>{t('share.inviteTitle')}</h3>
+      <p className="muted">{t('share.inviteHelp')}</p>
+      <ErrorNote error={ask.error} />
+      {ask.isSuccess && (
+        <p role="status" className="note">
+          {t('share.inviteWaiting')}
+        </p>
+      )}
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          ask.mutate();
+        }}
+      >
+        <Field label={t('common.email')}>
+          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} required />
+        </Field>
+        <Field label={t('share.inviteNote')}>
+          <textarea rows={2} maxLength={MAX_MESSAGE} value={note} onChange={(e) => setNote(e.target.value)} />
+        </Field>
+        <button type="submit" disabled={ask.isPending}>
+          {t('share.inviteAsk')}
+        </button>
+      </form>
+    </section>
+  );
+}
+
 export function ShareDialog({
   page,
   onClose,
@@ -228,6 +280,7 @@ export function ShareDialog({
           {t('share.send')}
         </button>
       </div>
+      <InviteSomeone page={page} />
       <AccessList page={page} />
       {onRestrictions && page.can['restriction.manage'] && (
         <button type="button" onClick={onRestrictions}>

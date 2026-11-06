@@ -11,12 +11,89 @@ import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
 
 const DAY_MS = 86_400_000;
 const SERVICE_TOKEN_DAYS = 365;
+const MAX_ANSWER_REASON = 500;
 
 interface Invitation {
   id: string;
   email: string;
   type: string;
   expires_at: string;
+}
+
+interface InvitationRequest {
+  id: string;
+  email: string;
+  requester_name: string;
+  space_name: string;
+  note: string;
+}
+
+/** One request that waits. Both answers need a reason, and the requester reads it. */
+function WaitingRequest({ request, onLink }: { request: InvitationRequest; onLink: (link: string) => void }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [reason, setReason] = useState('');
+  const answer = useMutation({
+    mutationFn: (verdict: 'approve' | 'refuse') =>
+      api.post<{ link?: string } | undefined>(`/invitation-requests/${request.id}/${verdict}`, { reason }),
+    onSuccess: async (result) => {
+      onLink(result?.link ?? '');
+      await client.invalidateQueries({ queryKey: ['invitation-requests'] });
+      await client.invalidateQueries({ queryKey: ['admin-invitations'] });
+    },
+  });
+  return (
+    <li>
+      <p>
+        <strong>{request.email}</strong> · {t('admin.invitationAskedBy', { name: request.requester_name })}
+      </p>
+      {request.note && <q className="comment-quote">{request.note}</q>}
+      <p className="muted">
+        {t('admin.invitationGrants', { email: request.email, space: request.space_name })}
+      </p>
+      <ErrorNote error={answer.error} />
+      <Field label={t('admin.invitationReason', { name: request.requester_name })}>
+        <input value={reason} maxLength={MAX_ANSWER_REASON} onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <div className="row">
+        <button
+          type="button"
+          className="primary"
+          disabled={reason.trim() === '' || answer.isPending}
+          onClick={() => answer.mutate('approve')}
+        >
+          {t('admin.invitationApprove')}
+        </button>
+        <button
+          type="button"
+          disabled={reason.trim() === '' || answer.isPending}
+          onClick={() => answer.mutate('refuse')}
+        >
+          {t('admin.invitationRefuse')}
+        </button>
+      </div>
+    </li>
+  );
+}
+
+function WaitingRequests({ onLink }: { onLink: (link: string) => void }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['invitation-requests'],
+    queryFn: () => api.get<{ requests: InvitationRequest[] }>('/invitation-requests'),
+  });
+  if (q.error) return <ErrorNote error={q.error} />;
+  if (!q.data || q.data.requests.length === 0) return null;
+  return (
+    <section>
+      <h3>{t('admin.invitationRequests')}</h3>
+      <ul className="plain-list">
+        {q.data.requests.map((r) => (
+          <WaitingRequest key={r.id} request={r} onLink={onLink} />
+        ))}
+      </ul>
+    </section>
+  );
 }
 
 function NewInvitation({ onLink }: { onLink: (link: string) => void }) {
@@ -138,6 +215,7 @@ export function InvitationsTab() {
   return (
     <>
       {mailReady === false && <p className="note">{t('admin.invitationNoMail')}</p>}
+      <WaitingRequests onLink={setLink} />
       <NewInvitation onLink={setLink} />
       {link && (
         <p role="status" className="note">

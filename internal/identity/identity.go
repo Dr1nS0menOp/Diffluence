@@ -39,10 +39,13 @@ const (
 	PermAdministrator       = "administrator"
 	PermSystemAdministrator = "system_administrator"
 	PermPersonalSpace       = "create_personal_space"
+	// PermInvitePeople lets someone ask for an invitation for a person without an account.
+	// An administrator still approves each one (ADR-033).
+	PermInvitePeople = "invite_people"
 )
 
 // AllGlobalPermissions lists every global permission.
-var AllGlobalPermissions = []string{PermUseProduct, PermCreateSpace, PermViewProfiles, PermAdministrator, PermSystemAdministrator, PermPersonalSpace}
+var AllGlobalPermissions = []string{PermUseProduct, PermCreateSpace, PermViewProfiles, PermAdministrator, PermSystemAdministrator, PermPersonalSpace, PermInvitePeople}
 
 // User types and statuses.
 const (

@@ -49,6 +49,7 @@ const ATTENTION_LINKS: Record<string, string> = {
   nodes_differ: '/admin/system',
   no_passkey: '/me/security',
   tokens_expiring: '/admin/scim',
+  invitations_waiting: '/admin/invitations',
   events_failed: '/admin/care',
   events_waiting: '/admin/care',
   audit_damaged: '/admin/audit',

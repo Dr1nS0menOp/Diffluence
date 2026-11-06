@@ -4,6 +4,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: inviting someone without an account (COL-047)
+- A person with the new global permission `invite_people` can ask for an invitation from the Share dialog. An administrator approves or refuses each one under Invitations, with a reason, and the person who asked hears the answer
+- The recipient gets an invitation and never the content, and becomes a guest with view on that one space
+### Changed: space managers no longer invite guests by themselves
+- Inviting a guest from a space now needs `invite_people` and waits for an administrator, unless you are an administrator (ADR-033)
+- Upgrade impact: one migration. Nobody holds `invite_people` yet, so give it to the people or groups who invite guests today
+
 ### Changed: backups are encrypted (wave K)
 - `scripts/backup.sh` and `scripts/restore.sh` now take a key file, and all of a backup is encrypted with AES-256. The script refuses to run without a key, or with the key inside the backup folder
 - Upgrade impact: make a key as `docs/operations/backup-restore.md` says, and change your cron line. A backup is run with `bash`, and needs `gpg`. Older backups are restored with the older script

@@ -55,6 +55,13 @@ func (s *Server) registerTogetherRoutes() {
 	r.HandleFunc("POST /api/v1/access-requests/{id}/allow", Object("restriction.manage"), s.handleAccessAnswer(true))
 	r.HandleFunc("POST /api/v1/access-requests/{id}/refuse", Object("restriction.manage"), s.handleAccessAnswer(false))
 
+	// The module asks for the role and the administrator, so no caller skips them. A
+	// person with the role only ever files a request (ADR-033).
+	r.HandleFunc("POST "+pagesPath+"/invitation-requests", Object("page.view"), s.handleInvitationAsk)
+	r.HandleFunc("GET /api/v1/invitation-requests", SessionOnly(me), s.handleInvitationRequests)
+	r.HandleFunc("POST /api/v1/invitation-requests/{id}/approve", SessionOnly(me), s.handleInvitationApprove)
+	r.HandleFunc("POST /api/v1/invitation-requests/{id}/refuse", SessionOnly(me), s.handleInvitationRefuse)
+
 	r.HandleFunc("GET "+pagesPath+"/watch", Object("page.view"), s.handleWatchState)
 	r.HandleFunc("PUT "+pagesPath+"/watch", Object("page.view"), s.handleWatchPage(true))
 	r.HandleFunc("DELETE "+pagesPath+"/watch", Object("page.view"), s.handleWatchPage(false))

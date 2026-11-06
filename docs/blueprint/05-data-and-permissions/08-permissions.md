@@ -14,6 +14,7 @@ Granted to a person or a group in `global_grants`.
 | **PRM-004** | built | `administrator` | Users, groups, settings, audit, spaces as metadata, recover access. **No content** | First person, through the command line |
 | **PRM-005** | built | `system_administrator` | Infrastructure, keys, backups, maintenance mode | First person |
 | **PRM-006** | wave F | `create_personal_space` | One personal space | Members who can use the product |
+| **PRM-009** | built | `invite_people` | Ask for an invitation for someone without an account. An administrator approves each one (ADR-033, spec 022) | Nobody |
 
 - **PRM-007** · built · At least one active administrator must remain. People cannot break that. It does not hold for an identity provider on purpose, because a sync that fails would lock people out. The way back is `diffluence user create-admin`.
 - **PRM-008** · built · Only a system administrator gives or takes `system_administrator`.

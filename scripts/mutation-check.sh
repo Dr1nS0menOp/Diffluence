@@ -559,6 +559,34 @@ mutate "the office helper hears the file name" internal/exchange/office.go \
   's.replace("officeDocumentName+path.Ext(filename)", "filename+path.Ext(filename)")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
 mutate "a converted file loses its locked headers" internal/httpapi/handlers_files.go \
   's.replace("h.Set(\"Content-Security-Policy\", \"default-src \x27none\x27; sandbox\")\n\t\th.Set(\"X-Content-Type-Options\", \"nosniff\")\n\t\th.Set(\"Cache-Control\", \"private, no-store\")\n\t\th.Set(\"Content-Type\", \"application/octet-stream\")\n\t\th.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))", "h.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
+mutate "a member without the role asks for an invitation" internal/sharing/invitations.go \
+  's.replace("if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tspace, _, err", "if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil \x26\x26 len(in.Email) < 0 {\n\t\t\treturn err\n\t\t}\n\t\tspace, _, err")' $app -run TestInvitationMatrix
+mutate "a space manager without the role asks for a guest" internal/sharing/invitations.go \
+  's.replace("if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {\n\t\treturn uuid.Nil, err", "if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil \x26\x26 len(in.Email) < 0 {\n\t\treturn uuid.Nil, err")' $app -run TestASpaceManagerOnlyAsksForAGuest
+mutate "a space manager invites a guest without approval" internal/httpapi/handlers_people.go \
+  's.replace("if !administrator {", "if !administrator \x26\x26 len(in.Email) < 0 {")' $app -run TestASpaceManagerOnlyAsksForAGuest
+mutate "asking sends the invitation at once" internal/sharing/invitations.go \
+  's.replace("return recordInvitation(ctx, tx, c, \"invitation.requested\", r)", "if _, err := s.identity.InviteWithin(ctx, tx, c, identity.NewInvitation{Email: address, Type: identity.TypeGuest, SpaceID: \x26r.spaceID}); err != nil {\n\t\treturn err\n\t}\n\treturn recordInvitation(ctx, tx, c, \"invitation.requested\", r)")' $app -run TestAskingForAnInvitationSendsNothing
+mutate "someone who is no administrator answers" internal/sharing/invitations.go \
+  's.replace("if err := s.requireGlobal(ctx, c, identity.PermAdministrator); err != nil {\n\t\treturn \"\", err", "if err := s.requireGlobal(ctx, c, identity.PermAdministrator); err != nil \x26\x26 len(reason) < 0 {\n\t\treturn \"\", err")' $app -run TestInvitationMatrix
+mutate "someone who is no administrator lists requests" internal/sharing/invitations.go \
+  's.replace("if err := s.requireGlobal(ctx, c, identity.PermAdministrator); err != nil {\n\t\treturn nil, err", "if err := s.requireGlobal(ctx, c, identity.PermAdministrator); err != nil \x26\x26 c.System != \"\" {\n\t\treturn nil, err")' $app -run TestInvitationMatrix
+mutate "a refused invitation is approved after all" internal/sharing/invitations.go \
+  's.replace("if status != invitationWaiting {", "if status != invitationWaiting \x26\x26 status == \"\" {")' $app -run TestARefusalSendsNothingAndStays
+mutate "an answer needs no reason" internal/sharing/invitations.go \
+  's.replace("if reason == \"\" || !utf8.ValidString(reason)", "if !utf8.ValidString(reason)")' $app -run TestAnAnswerNeedsAReason
+mutate "an approval goes through after the role is lost" internal/sharing/invitations.go \
+  's.replace("if !mayInvite {", "if !mayInvite \x26\x26 r.email == \"\" {")' $app -run TestApprovalFailsWhenTheRequesterLostTheRole
+mutate "an approval goes through while invitations are off" internal/sharing/invitations.go \
+  's.replace("r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.requireInvitationsOn(ctx); err != nil {\n\t\t\treturn err\n\t\t}", "r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}")' $app -run TestRequestsWaitOnlyWhileInvitationsAreOn
+mutate "the invitation makes a member, not a guest" internal/sharing/invitations.go \
+  's.replace("identity.NewInvitation{Email: r.email, Type: identity.TypeGuest, SpaceID: \x26r.spaceID})\n\t\treturn err", "identity.NewInvitation{Email: r.email, Type: identity.TypeMember, SpaceID: \x26r.spaceID})\n\t\treturn err")' $app -run TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent
+mutate "the requester never hears the answer" internal/sharing/invitations.go \
+  's.replace("return s.notify.Deliver(ctx, tx, notify.Row{UserID: r.requester,", "return s.notify.Deliver(ctx, tx, notify.Row{UserID: c.UserID,")' $app -run TestTheRequesterHearsTheAnswerAndTheReason
+mutate "the console shows the page title" internal/sharing/invitations.go \
+  's.replace("SELECT r.id, r.email, u.display_name, r.space_id, sp.name, r.note, r.created_at\n\t\tFROM invitation_requests r\n\t\tJOIN users u ON u.id = r.requester_id", "SELECT r.id, r.email, u.display_name, r.space_id, sp.name, r.note || (SELECT title FROM pages WHERE id = r.page_id), r.created_at\n\t\tFROM invitation_requests r\n\t\tJOIN users u ON u.id = r.requester_id")' $app -run TestTheConsoleShowsTheSpaceAndNeverThePage
+mutate "two answers on a page share a line" internal/notify/notify.go \
+  's.replace("if r.Type == TypeInvitationAnswer {", "if r.Type == \"\" {")' $app -run TestTheRequesterHearsTheAnswerAndTheReason
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

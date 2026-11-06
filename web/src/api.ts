@@ -664,7 +664,15 @@ export interface Notification {
   comment_id: string | null;
   read: boolean;
   at: string;
-  data: { message?: string; request_id?: string; export_id?: string; filename?: string };
+  data: {
+    message?: string;
+    request_id?: string;
+    export_id?: string;
+    filename?: string;
+    email?: string;
+    answer?: 'approved' | 'refused';
+    reason?: string;
+  };
 }
 
 export interface NotificationSettings {
@@ -919,6 +927,7 @@ export const GLOBAL_PERMISSIONS = [
   'create_space',
   'view_profiles',
   'create_personal_space',
+  'invite_people',
   'administrator',
   'system_administrator',
 ];

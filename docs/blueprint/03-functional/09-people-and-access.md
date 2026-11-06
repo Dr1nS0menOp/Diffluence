@@ -51,7 +51,7 @@
 - **ACC-038** · built · A guest has a mark on their name, so others know they are talking to someone outside.
 - **ACC-039** · built · A guest account can expire on a date, and an administrator gets a reminder before that.
 - **ACC-040** · partly · An administrator can list guests with their spaces and last login. Built: guests by filter, with last login. Still open: their spaces in the list.
-- **ACC-041** · built · A space administrator can invite a guest to their space, when an administrator allows it.
+- **ACC-041** · built · A space administrator with `invite_people` can ask for a guest in their space, when an administrator allows it. An administrator approves each one (ADR-033, spec 022).
 - **ACC-042** · built · A guest can be turned into a member, and back, with a clear warning about what changes.
 - **ACC-043** · built · A service account is a user type for automation.
 

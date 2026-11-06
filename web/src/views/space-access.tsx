@@ -196,7 +196,7 @@ function InviteGuest({ space }: { space: Space }) {
   const { t } = useTranslation();
   const [email, setEmail] = useState('');
   const invite = useMutation({
-    mutationFn: () => api.post<{ link: string }>(`/spaces/${space.id}/guests`, { email }),
+    mutationFn: () => api.post<{ link?: string; waiting?: boolean }>(`/spaces/${space.id}/guests`, { email }),
     onSuccess: () => setEmail(''),
   });
   return (
@@ -206,7 +206,9 @@ function InviteGuest({ space }: { space: Space }) {
       <ErrorNote error={invite.error} />
       {invite.data && (
         <p role="status" className="note">
-          {invite.data.link ? t('access.inviteLink', { link: invite.data.link }) : t('access.inviteSent')}
+          {invite.data.waiting && t('access.inviteWaiting')}
+          {!invite.data.waiting &&
+            (invite.data.link ? t('access.inviteLink', { link: invite.data.link }) : t('access.inviteSent'))}
         </p>
       )}
       <form

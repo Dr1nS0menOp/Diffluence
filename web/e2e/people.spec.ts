@@ -626,6 +626,53 @@ test('a page out of reach shows in the audit log by id, with a censored title', 
   await checkAccessibility(page);
 });
 
+test('someone with the role asks for an invitation, an administrator approves, and a member sees no option', async ({
+  page,
+  browser,
+}) => {
+  const inviterEmail = `${unique('inviter')}@example.com`;
+  const memberEmail = `${unique('member')}@example.com`;
+  const outsider = `${unique('outsider')}@example.org`;
+  await createUser(browser, inviterEmail, 'member', ['use_product', 'create_space', 'invite_people']);
+  const memberId = await createUser(browser, memberEmail);
+  const inviter = await browserAs(browser, inviterEmail);
+  const space = await newSpace(inviter, 'Shared with outsiders');
+  await grant(inviter, space.id, { type: 'user', id: memberId }, VIEWER);
+  const pageId = await publishedPage(inviter, space.id, 'Merger with Initech', 'text');
+
+  const member = await browserAs(browser, memberEmail);
+  await member.goto(`/pages/${pageId}?share=1`);
+  const theirDialog = member.getByRole('dialog', { name: 'Share this page' });
+  await expect(theirDialog.getByRole('heading', { name: 'Who can see this page' })).toBeVisible();
+  await expect(theirDialog.getByRole('button', { name: 'Ask an administrator' })).toHaveCount(0);
+  await member.context().close();
+
+  await inviter.goto(`/pages/${pageId}?share=1`);
+  const dialog = inviter.getByRole('dialog', { name: 'Share this page' });
+  await dialog.getByLabel('Email').fill(outsider);
+  await dialog.getByLabel('Note for the administrator').fill('Our auditor');
+  await dialog.getByRole('button', { name: 'Ask an administrator' }).click();
+  await expect(dialog.getByRole('status')).toContainText('waits for an administrator');
+  await checkAccessibility(inviter);
+
+  await login(page, ADMIN.email, ADMIN.password);
+  await page.goto('/admin/invitations');
+  const request = page.getByRole('listitem').filter({ hasText: outsider });
+  await expect(request).toContainText('Shared with outsiders');
+  await expect(request).not.toContainText('Initech');
+  await expect(request.getByRole('button', { name: 'Approve' })).toBeDisabled();
+  await checkAccessibility(page);
+  await request.getByLabel(/^Reason/).fill('Known to us');
+  await request.getByRole('button', { name: 'Approve' }).click();
+  await expect(page.getByRole('row', { name: new RegExp(outsider) })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: outsider })).toHaveCount(0);
+
+  await inviter.goto('/notifications');
+  await expect(inviter.getByText(`approved your invitation for ${outsider}`)).toBeVisible();
+  await expect(inviter.getByText('Known to us')).toBeVisible();
+  await inviter.context().close();
+});
+
 test('the account stays in reach in a full top bar', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
   const space = await newSpace(page, 'A space with a long name for the filter');

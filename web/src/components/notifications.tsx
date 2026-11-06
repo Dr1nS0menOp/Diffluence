@@ -35,6 +35,9 @@ export function useNotificationSentence() {
       n.actors.length > 1
         ? t('notifications.people', { count: n.actors.length })
         : (first ?? t('notifications.someone'));
+    if (n.type === 'invitation_answer') {
+      return t(`notifications.invitation_${n.data.answer ?? 'refused'}`, { name, email: n.data.email });
+    }
     return t(`notifications.type_${n.type}`, { name, page: n.page_title, file: n.data.filename });
   };
 }
@@ -71,6 +74,7 @@ export function NotificationRow({ n, onOpen }: { n: Notification; onOpen?: () =>
         </Link>
         {!n.read && <span className="visually-hidden">{t('notifications.unreadWord')}</span>}
         {n.data.message && <q className="comment-quote">{n.data.message}</q>}
+        {n.data.reason && <q className="comment-quote">{n.data.reason}</q>}
         <span className="muted">
           {n.space_name} · {t(`notifications.reason_${n.reason}`)} · <RelativeTime value={n.at} />
         </span>

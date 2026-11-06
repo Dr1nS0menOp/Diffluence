@@ -26,19 +26,20 @@ const excerptRunes = 200
 // sentences are all the words of a mail. They sit together, so a person's language
 // can follow later without touching the code around them (wave F).
 var sentences = map[string]string{
-	TypeMention:         "%s mentioned you on %s",
-	TypeTaskAssigned:    "%s gave you a task on %s",
-	TypeTaskDue:         "A task on %[2]s is due",
-	TypeShare:           "%s shared %s with you",
-	TypeComment:         "%s commented on %s",
-	TypeReply:           "%s replied to you on %s",
-	TypeReaction:        "%s reacted on %s",
-	TypePageChanged:     "%s changed %s",
-	TypeAccessRequest:   "%s asks for access to %s",
-	TypeAccessAnswer:    "%s answered your request for %s",
-	TypeRule:            "%s sent a message about %s",
-	TypeAccessRecovered: "%s took access to %s as an administrator",
-	TypeDraftExpiring:   "Your draft of %[2]s will be removed in two weeks",
+	TypeMention:          "%s mentioned you on %s",
+	TypeTaskAssigned:     "%s gave you a task on %s",
+	TypeTaskDue:          "A task on %[2]s is due",
+	TypeShare:            "%s shared %s with you",
+	TypeComment:          "%s commented on %s",
+	TypeReply:            "%s replied to you on %s",
+	TypeReaction:         "%s reacted on %s",
+	TypePageChanged:      "%s changed %s",
+	TypeAccessRequest:    "%s asks for access to %s",
+	TypeAccessAnswer:     "%s answered your request for %s",
+	TypeRule:             "%s sent a message about %s",
+	TypeAccessRecovered:  "%s took access to %s as an administrator",
+	TypeDraftExpiring:    "Your draft of %[2]s will be removed in two weeks",
+	TypeInvitationAnswer: "%s answered your invitation from %s",
 }
 
 const (
