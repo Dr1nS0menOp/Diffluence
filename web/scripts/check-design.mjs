@@ -12,6 +12,8 @@ import ts from 'typescript';
 const DESIGN_DIRECTORY = 'src/design';
 const TOKENS_FILE = 'src/design/tokens.css';
 const ICONS_FILE = 'src/components/icons.tsx';
+// The only other files that may draw: charts and drawings need shapes of their own (ADR-026).
+const DRAWING_FILES = [ICONS_FILE, 'src/components/chart.tsx', 'src/components/drawing.tsx'];
 const VIEWS_DIRECTORY = 'src/views';
 const PICTURES_FILE = 'e2e/0-design.spec.ts';
 
@@ -257,7 +259,8 @@ export function checkSource(file, source, classNames) {
       (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
       node.tagName.getText() === 'svg'
     ) {
-      if (!file.replaceAll('\\', '/').endsWith(ICONS_FILE)) report(node, `svg outside ${ICONS_FILE}`);
+      const path = file.replaceAll('\\', '/');
+      if (!DRAWING_FILES.some((name) => path.endsWith(name))) report(node, `svg outside ${ICONS_FILE}`);
     }
     if (
       ts.isCallExpression(node) &&

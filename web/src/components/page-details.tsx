@@ -35,6 +35,20 @@ function PageLinks({ title, pages, empty }: { title: string; pages: PageRef[]; e
   );
 }
 
+function UsedBy({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['used-by', pageId],
+    queryFn: () => api.get<{ pages: PageRef[] }>(`/pages/${pageId}/used-by`),
+  });
+  return (
+    <>
+      <ErrorNote error={q.error} />
+      {q.data && <PageLinks title={t('details.usedBy')} pages={q.data.pages} empty={t('details.notUsed')} />}
+    </>
+  );
+}
+
 function Fact({ name, children }: { name: string; children: ReactNode }) {
   return (
     <div>
@@ -216,6 +230,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
           </section>
           <PageLinks title={t('details.incoming')} pages={facts.incoming} empty={t('details.noIncoming')} />
           <PageLinks title={t('details.outgoing')} pages={facts.outgoing} empty={t('details.noOutgoing')} />
+          <UsedBy pageId={page.id} />
           <LabelBar page={page} />
           <Files pageId={page.id} />
           {page.can['space.administer'] && <Watchers pageId={page.id} />}

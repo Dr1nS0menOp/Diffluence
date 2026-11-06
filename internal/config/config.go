@@ -52,8 +52,10 @@ type Config struct {
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
 	ExampleSpace          bool // make the example space on a new instance
-	OIDC                  OIDC
-	SMTP                  SMTP
+	// DrawingURL is the optional draw.io service. Nil = off, and nothing is framed.
+	DrawingURL *url.URL
+	OIDC       OIDC
+	SMTP       SMTP
 }
 
 // The ways a connection to a mail server is encrypted.
@@ -97,6 +99,14 @@ func (c Config) KeyFile() string {
 
 // PublicOrigin returns scheme://host[:port] of the public URL.
 func (c Config) PublicOrigin() string { return c.PublicURL.Scheme + "://" + c.PublicURL.Host }
+
+// DrawingOrigin returns scheme://host[:port] of the drawing service, or empty when off.
+func (c Config) DrawingOrigin() string {
+	if c.DrawingURL == nil {
+		return ""
+	}
+	return c.DrawingURL.Scheme + "://" + c.DrawingURL.Host
+}
 
 // LookupFunc matches os.LookupEnv. Tests pass a map-backed function.
 type LookupFunc func(key string) (string, bool)
@@ -184,6 +194,14 @@ func Load(lookup LookupFunc) (Config, error) {
 		l.fail("PUBLIC_URL", errors.New("must look like https://wiki.example.com (no path, query or credentials)"))
 	default:
 		c.PublicURL = u
+	}
+
+	if address := l.str("DRAWING_URL", ""); address != "" {
+		drawing, err := parseDrawingURL(address, c.PublicURL)
+		if err != nil {
+			l.fail("DRAWING_URL", err)
+		}
+		c.DrawingURL = drawing
 	}
 
 	switch lvl := strings.ToLower(l.str("LOG_LEVEL", "info")); lvl {
@@ -290,4 +308,20 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 		return def
 	}
 	return d
+}
+
+// parseDrawingURL checks the address of the drawing service. A frame on our own origin
+// would reach our session, so the service must live on another one (SEC-521).
+func parseDrawingURL(address string, public *url.URL) (*url.URL, error) {
+	u, err := url.Parse(address)
+	if err != nil {
+		return nil, err
+	}
+	if (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.User != nil {
+		return nil, errors.New("must look like https://draw.example.com (no path, query or credentials)")
+	}
+	if public != nil && strings.EqualFold(u.Scheme, public.Scheme) && strings.EqualFold(u.Host, public.Host) {
+		return nil, errors.New("must be another origin than PUBLIC_URL")
+	}
+	return &url.URL{Scheme: u.Scheme, Host: strings.ToLower(u.Host)}, nil
 }

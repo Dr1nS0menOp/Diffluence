@@ -116,6 +116,7 @@ export interface Preferences {
 }
 
 export interface Me {
+  drawing_origin?: string;
   user: User;
   global_permissions: string[];
   preferences: Preferences;

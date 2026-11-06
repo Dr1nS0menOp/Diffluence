@@ -15,7 +15,7 @@ Decided by the product owner on 2026-11-05 (ADR-022): **a file belongs in the te
 - **FIL-009** · built · A failed upload shows the reason, such as the size limit, and leaves the document as it was. Other files in the same drop continue.
 - **FIL-010** · built · A person without *add attachments* sees no tool, and a drop says that they cannot add files here.
 - **FIL-011** · new · The upload shows progress as a percentage for large files, and can be cancelled.
-- **FIL-012** · new · A file with the same name as one already on the page asks: add as a new version, or keep both under another name.
+- **FIL-012** · built · A file with the same name as one already on the page asks: add as a new version, or keep both under another name.
 - **FIL-013** · new · Dragging a file onto an existing tile replaces it with a new version.
 - **FIL-014** · new · Dropping an archive does not unpack it.
 - **FIL-015** · new · A picker lists files already on the page, so one file can appear more than once without a new upload.
@@ -36,7 +36,7 @@ Decided by the product owner on 2026-11-05 (ADR-022): **a file belongs in the te
 - **FIL-024** · built · A file shows as a tile with an icon and its name. Selecting it downloads the file.
 - **FIL-025** · new · The tile also shows the type and size.
 - **FIL-026** · new · A tile can be small (one line) or large (with a preview image of the first page).
-- **FIL-027** · new · A preview opens on top of the page for images, PDF, text and common office formats, with download and next and previous. Previews never run code from the file.
+- **FIL-027** · partly · A preview opens on top of the page for images, PDF, text and common office formats, with download and next and previous. Previews never run code from the file. Still open: images, PDF and office files, and opening from a tile. Text shows under Details.
 - **FIL-028** · new · Text files show with syntax highlighting in the preview.
 - **FIL-029** · new · A tile whose attachment was deleted says so, and is not a broken link.
 - **FIL-030** · built · The name of a file is part of the document, so search finds it and comparing versions shows when it came or went.
@@ -47,19 +47,19 @@ Decided by the product owner on 2026-11-05 (ADR-022): **a file belongs in the te
 - **FIL-032** · built · Anyone who can view the page can see the list and download. The empty list explains how to add a file.
 - **FIL-033** · built · A person with the right to delete removes a file from the list. It goes to the trash. Removing a tile from the text does not delete the file.
 - **FIL-034** · new · The list can be sorted by name, date, size and type, and filtered by name.
-- **FIL-035** · new · **Download all** gives one zip of all files of the page.
+- **FIL-035** · built · **Download all** gives one zip of all files of the page.
 - **FIL-036** · new · Each row shows who added it and when, and whether the current page uses it.
-- **FIL-037** · new · **Versions:** a row opens to show every version, with date, person and size. Old versions can be downloaded. A person with *delete any* can remove an old version.
-- **FIL-038** · new · An older version can be made the current one, which adds a new version.
-- **FIL-039** · new · **File details:** rename, add a comment, add labels, move to another page. Moving needs *add* on the target and *delete* on the source, and leaves tiles pointing at the moved file working.
+- **FIL-037** · built · **Versions:** a row opens to show every version, with date, person and size. Old versions can be downloaded. A person with *delete any* can remove an old version.
+- **FIL-038** · built · An older version can be made the current one, which adds a new version.
+- **FIL-039** · partly · **File details:** rename, add a comment, add labels, move to another page. Moving needs *add* on the target and *delete* on the source, and leaves tiles pointing at the moved file working. Still open: labels and moving to another page.
 - **FIL-040** · new · A file can be copied to another page.
 - **FIL-041** · new · Attachments can have labels, and search can filter on them.
 - **FIL-042** · new · A direct link to a file can point to the latest version or to one version.
 
 ## 6.5 Files of a whole space
 
-- **FIL-043** · new · A **Files** screen per space lists all files in that space, with page, size, date and uploader, filtered by name, type, label and person. It respects restrictions.
-- **FIL-044** · new · The screen shows how much storage a space uses, and which files are largest.
+- **FIL-043** · partly · A **Files** screen per space lists all files in that space, with page, size, date and uploader, filtered by name, type, label and person. It respects restrictions. Still open: filters other than the name.
+- **FIL-044** · built · The screen shows how much storage a space uses, and which files are largest.
 - **FIL-045** · new · Space administrators can delete files in bulk from it.
 
 ## 6.6 Pages and files together

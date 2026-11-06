@@ -27,6 +27,7 @@ import { DeleteDialog, RenameDialog } from '../views/page-dialogs';
 import { NewLinkDialog, NewPageDialog, type CreateTarget } from './create';
 import {
   IconArchive,
+  IconAttach,
   IconBlog,
   IconChevronLeft,
   IconChevronRight,
@@ -59,6 +60,7 @@ const SPACE_ROUTES = [
   '/spaces/:key/settings',
   '/spaces/:key/trash',
   '/spaces/:key/overview',
+  '/spaces/:key/files',
   '/spaces/:key/access',
   '/spaces/:key/people',
   '/spaces/:key/audit',
@@ -233,6 +235,13 @@ function SpaceLinks({ space, current }: { space: Space; current?: string }) {
           <IconBlog size={LINK_ICON_SIZE} /> {t('blog.title')}
         </Link>
       )}
+      <Link
+        href={`/spaces/${space.key}/files`}
+        className="side-link"
+        aria-current={pathname === `/spaces/${space.key}/files` ? 'page' : undefined}
+      >
+        <IconAttach size={LINK_ICON_SIZE} /> {t('files.title')}
+      </Link>
       <Link
         href={`/spaces/${space.key}/archive`}
         className="side-link"

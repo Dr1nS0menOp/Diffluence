@@ -18,6 +18,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/blocks"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
@@ -54,6 +55,7 @@ type Deps struct {
 	Spaces      *spaces.Service
 	Pages       *pages.Service
 	Attachments *attachments.Service
+	Blocks      *blocks.Service
 	People      *people.Service
 	Console     *console.Service
 	Search      *search.Service

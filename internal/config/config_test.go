@@ -90,3 +90,27 @@ func TestHTTPSAndProxies(t *testing.T) {
 		t.Errorf("proxies = %v", c.TrustedProxies)
 	}
 }
+
+func TestTheDrawingServiceIsOptionalAndNeverOurOwnOrigin(t *testing.T) {
+	load := func(address string) (Config, error) {
+		return Load(env(map[string]string{
+			"DIFFLUENCE_DATABASE_URL": "postgres://x",
+			"DIFFLUENCE_PUBLIC_URL":   "https://wiki.example.com",
+			"DIFFLUENCE_DRAWING_URL":  address,
+		}))
+	}
+	c, err := load("")
+	if err != nil || c.DrawingOrigin() != "" {
+		t.Fatalf("off by default: %q %v", c.DrawingOrigin(), err)
+	}
+	c, err = load("https://draw.example.com")
+	if err != nil || c.DrawingOrigin() != "https://draw.example.com" {
+		t.Fatalf("own address: %q %v", c.DrawingOrigin(), err)
+	}
+	for _, bad := range []string{"https://wiki.example.com", "HTTPS://WIKI.example.com", "ftp://draw.example.com",
+		"https://draw.example.com/path", "https://user@draw.example.com", "https://draw.example.com?a=1", "draw.example.com"} {
+		if _, err := load(bad); err == nil || !strings.Contains(err.Error(), "DRAWING_URL") {
+			t.Errorf("%s: want a DRAWING_URL error, got %v", bad, err)
+		}
+	}
+}

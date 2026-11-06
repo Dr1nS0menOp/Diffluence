@@ -1118,6 +1118,8 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 		return path, `{"name":"x"}`
 	case pattern == "POST /api/v1/pages/{id}/comments" || pattern == "PATCH /api/v1/comments/{id}":
 		return path, `{"body":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"x"}]}]}}`
+	case pattern == "PATCH /api/v1/attachments/{id}":
+		return path, `{"filename":"renamed.txt"}`
 	case strings.HasSuffix(pattern, "/look"):
 		return path, `{"title_align":"start","header_position":50}`
 	case strings.HasSuffix(pattern, "/shortcuts") && strings.HasPrefix(pattern, "PUT"):

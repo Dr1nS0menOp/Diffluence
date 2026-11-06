@@ -33,6 +33,7 @@ import { ArchiveView, BlogView, LabelsView, LabelView, MissingPage } from './vie
 import { NotificationSettingsView, NotificationsView, WatchingView } from './views/notifications';
 import { EditView } from './views/edit';
 import { CompareView, HistoryView } from './views/history';
+import { FilesView } from './views/files';
 import { SpaceOverviewView } from './views/overview';
 import { PageView } from './views/page';
 import { PeopleView, PersonView } from './views/people';
@@ -314,6 +315,7 @@ function Routes({ me }: { me: Me }) {
   if ((m = match('/admin/:tab', pathname))) return <AdminView tab={m.tab ?? 'summary'} me={me} />;
   if ((m = match('/spaces/:key', pathname))) return <SpaceHome spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/overview', pathname))) return <SpaceOverviewView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/files', pathname))) return <FilesView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings', pathname))) return <SpaceSettingsView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/trash', pathname))) return <TrashView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/access', pathname))) return <SpaceAccessView spaceKey={m.key ?? ''} />;

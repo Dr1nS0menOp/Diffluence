@@ -24,6 +24,23 @@
      "emoji": "🧱"
     },
     {
+     "slug": "dynamic-blocks",
+     "title": "Blocks that fill themselves",
+     "document": "dynamic-blocks.json",
+     "emoji": "🔁",
+     "files": [
+      "chime.wav"
+     ],
+     "children": [
+      {
+       "slug": "reused-text",
+       "title": "Text to reuse",
+       "document": "reused-text.json",
+       "emoji": "♻️"
+      }
+     ]
+    },
+    {
      "slug": "tables",
      "title": "Tables",
      "document": "tables.json",

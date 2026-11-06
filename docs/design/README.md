@@ -119,6 +119,9 @@ Use these. Reuse beats a new variant.
 | Tabs inside a screen | `Tabs`, with arrow keys |
 | Sections of Your account | `AccountNav`, which holds real addresses |
 | Numbers on a summary | `.tiles` |
+| A block that fills itself | `.dynamic`, with `.dynamic-head` only while editing. Empty is one muted sentence |
+| A chart | `Chart` in `components/chart.tsx`. Series differ by shape as well as colour, and the numbers are one press away |
+| Something drawn | Only `components/icons.tsx`, `components/chart.tsx` and `components/drawing.tsx` may hold SVG (ADR-026) |
 | A message in the flow | `.note`, `.note-error`, `ErrorNote` |
 | A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
 | A time | `RelativeTime` |

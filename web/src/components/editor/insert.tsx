@@ -40,9 +40,13 @@ import {
   IconTable,
   IconTask,
   IconText,
+  IconPicture,
+  IconSliders,
 } from '../icons';
 import { Dialog, Field } from '../ui';
 import { insertColumns } from './block-commands';
+import { DYNAMIC_KINDS } from './dynamic/kinds';
+import { addChart } from './dynamic/nodes';
 import emoji from './emoji.json';
 import { today } from './inline';
 import { noActions, type EditorActions } from './keys';
@@ -139,6 +143,52 @@ const TURN_INTO_IDS = [
   'panelInfo',
   'expand',
 ];
+
+/** Every dynamic block is an entry of the same menu. */
+const BLOCK_ITEMS: InsertItem[] = Object.keys(DYNAMIC_KINDS).map((kind) => ({
+  id: `block_${kind}`,
+  icon: IconSliders,
+  run: (editor) => editor.chain().focus().insertContent({ type: 'dynamic', attrs: { kind } }).run(),
+}));
+
+const FACTS_TABLE = {
+  type: 'pageFacts',
+  content: [
+    {
+      type: 'table',
+      content: [0, 1].map(() => ({
+        type: 'tableRow',
+        content: [0, 1].map(() => ({ type: 'tableCell', content: [{ type: 'paragraph' }] })),
+      })),
+    },
+  ],
+};
+
+INSERT_ITEMS.push(
+  ...BLOCK_ITEMS,
+  { id: 'block_chart', icon: IconTable, run: (editor) => addChart(editor) },
+  { id: 'block_drawing', icon: IconPicture, run: (_editor, actions) => actions.openDrawing() },
+  {
+    id: 'block_anchor',
+    icon: IconLink,
+    run: (editor) =>
+      editor
+        .chain()
+        .focus()
+        .insertContent({ type: 'anchor', attrs: { name: 'anchor' } })
+        .run(),
+  },
+  {
+    id: 'block_facts',
+    icon: IconSliders,
+    run: (editor) => editor.chain().focus().insertContent(FACTS_TABLE).run(),
+  },
+  {
+    id: 'block_excerpt',
+    icon: IconSliders,
+    run: (editor) => editor.chain().focus().wrapIn('excerpt', { name: 'excerpt' }).run(),
+  },
+);
 
 export const TURN_INTO_ITEMS = INSERT_ITEMS.filter((item) => TURN_INTO_IDS.includes(item.id));
 

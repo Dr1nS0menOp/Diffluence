@@ -502,6 +502,12 @@ func (w *mdWriter) block(n Node, prefix string) {
 		w.line(prefix, "**Decision:** "+inlineMarkdown(n.Content))
 	case TypeTable:
 		w.table(n, prefix)
+	case TypeDynamic:
+		kind, _ := n.Attrs["kind"].(string)
+		w.line(prefix, "*(A dynamic block: "+kind+")*")
+	case TypeChart:
+		title, _ := n.Attrs["title"].(string)
+		w.line(prefix, "*(A chart: "+title+")*")
 	default:
 		w.blocks(n.Content, prefix)
 	}

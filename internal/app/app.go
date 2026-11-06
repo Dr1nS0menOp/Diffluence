@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/blocks"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
@@ -190,7 +191,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 
 	if cfg.Role.RunsAPI() {
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
-			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, People: a.people, Console: a.console, Search: a.search,
+			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Blocks: blocks.NewService(a.pool), People: a.people, Console: a.console, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,

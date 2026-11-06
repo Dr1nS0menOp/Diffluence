@@ -406,6 +406,27 @@ mutate "a removed version lives on in a quote" internal/pages/versions.go \
 mutate "nodes hand out rights at the same time" internal/db/db.go \
   's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 
+mutate "a block shows a hidden page" internal/blocks/lists.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t")' $app -run TestNoBlockShowsAHiddenPage
+mutate "an include skips the check at a level" internal/blocks/reuse.go \
+  's.replace("if ok, err := r.visible(ctx, in.Page); !ok {\n\t\treturn nil, nil, err\n\t}\n", "")' $app -run TestIncludesCheckEveryLevelAndStopOnALoop
+mutate "an include has no depth limit" internal/blocks/reuse.go \
+  's.replace("if depth > maxDepth {", "if false {")' $app -run TestIncludesCheckEveryLevelAndStopOnALoop
+mutate "an include runs in a loop" internal/blocks/reuse.go \
+  's.replace("if seen[in.Page] {", "if false {")' $app -run TestIncludesCheckEveryLevelAndStopOnALoop
+mutate "HTML passes as a video" internal/httpapi/handlers_content.go \
+  's.replace("attachments.IsMedia(a.ContentType)", "true")' $app -run TestAnHTMLFileNamedMp4StaysADownload
+mutate "anyone reads the storage of a space" internal/attachments/versions.go \
+  's.replace("if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {\n\t\treturn Usage{}, err\n\t}\n", "")' $app -run TestFilesNeverLeakAcrossARestriction
+mutate "an editor removes an old version" internal/attachments/versions.go \
+  's.replace("permissions.AttachmentDeleteAny", "permissions.AttachmentAdd")' $app -run TestFileVersionsCanBeRestoredAndRemovedByThoseWhoMay
+mutate "the drawing service shares our origin" internal/config/config.go \
+  's.replace("if public != nil && strings.EqualFold(u.Scheme, public.Scheme)", "if false && strings.EqualFold(u.Scheme, public.Scheme)")' ./internal/config/ -run TestTheDrawingServiceIsOptionalAndNeverOurOwnOrigin
+mutate "any address may be framed" internal/webui/webui.go \
+  's.replace("frames = \"frame-src \" + drawingOrigin + \"; \"", "frames = \"frame-src *; \"")' ./internal/webui/ -run TestOnlyTheDrawingServiceMayBeFramed
+mutate "the policy blocks video and audio" internal/webui/webui.go \
+  's.replace("media-src \x27self\x27; ", "")' ./internal/webui/ -run TestVideoAndAudioFromOurOwnOriginMayPlay
+
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

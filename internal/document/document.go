@@ -96,8 +96,8 @@ const (
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor}
 )
 
 // children says which node types may appear inside each node type.
@@ -126,6 +126,12 @@ var children = map[string][]string{
 	TypeTemplateField:  {},
 	TypeInstruction:    {},
 	TypeMention:        {},
+	TypeDynamic:        {},
+	TypePageFacts:      {TypeTable},
+	TypeExcerpt:        blockTypes,
+	TypeAnchor:         {},
+	TypeChart:          {},
+	TypeMedia:          {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},
 	TypeTableCell:      blockTypes,

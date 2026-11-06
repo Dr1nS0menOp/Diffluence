@@ -422,6 +422,9 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err := syncLinks(ctx, tx, p.ID, doc); err != nil {
 		return p, err
 	}
+	if err := syncBlocks(ctx, tx, p.ID, doc); err != nil {
+		return p, err
+	}
 	mentions, mentionedGroups, err := syncMentions(ctx, tx, p.ID, doc)
 	if err != nil {
 		return p, err

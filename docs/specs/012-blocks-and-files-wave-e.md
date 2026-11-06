@@ -325,7 +325,7 @@ Changed: `POST /pages/{id}/attachments` takes `on_conflict=ask`. `GET /attachmen
 
 ## Data
 
-Migration 0009, expand only:
+Migration 0016, expand only:
 
 - `page_facts`: page, facts id, key, position, value text, date, number.
 - `page_decisions`: page, block id, text, person, date.
@@ -445,6 +445,8 @@ The wave is large. Commits can follow these steps, with one commit note each, wh
 ## The product owner's decisions (ADR-026)
 
 These replace the options below, which stay as the record of what was asked.
+
+**Correction, 2026-11-06:** PdfCraft is AGPL-3.0, by its LICENSE file and the GitHub API, not MIT or Apache-2.0. That is outside the licence list, and a site served from our own origin is no separate program, so it is not embedded and PDF stays a download. Its size was not measured. The product owner decides what happens next.
 
 - **PDF:** PdfCraft instead of `pdfjs-dist`, if its web build is not too large. It is MIT or Apache-2.0, and alpha. Its WebAssembly static site is served from our own origin in a sandboxed frame, so the policy for WebAssembly applies to that frame only. Measure the size first, and pin the version. The product owner wants people to be able to change a PDF themselves: pages, comments and forms work today, and changing text is thin. Printing is missing from its web build. If it is too large, or cannot be embedded, say so and leave PDF as a download.
 - **Diagrams:** draw.io instead of `mermaid`, as an optional separate service in embed mode. A person draws in a frame, and the result is stored as a PNG with the diagram inside it (`xmlpng`), as a normal attachment. Only an address the administrator set is used: `embed.diagrams.net` would tell an outside party who is drawing what. The editor is Apache-2.0, its Docker wrapper is GPL-3.0, and that is a separate program. Stencils have terms of their own, to check.

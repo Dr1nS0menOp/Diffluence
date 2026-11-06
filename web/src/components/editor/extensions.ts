@@ -6,6 +6,8 @@ import { TableKit } from '@tiptap/extension-table';
 import { AttachmentFile, AttachmentImage, pageFileAddress, type FileAddress } from './attachments';
 import { Column, Columns, Decision, Expand, Panel } from './blocks';
 import { CodeBlock } from './code';
+import { Dynamic } from './dynamic/dynamic';
+import { Anchor, ChartNode, Excerpt, Media, PageFacts } from './dynamic/nodes';
 import { DateMark, Instruction, Status, TemplateField } from './inline';
 import { BlockFormat, Highlight, Subscript, Superscript, TextColor } from './marks';
 import { Mention } from './people';
@@ -85,6 +87,12 @@ export function documentExtensions({
     Columns,
     Column,
     Decision,
+    Dynamic,
+    PageFacts,
+    Excerpt,
+    Anchor,
+    ChartNode,
+    Media,
     Status,
     DateMark,
     Mention,

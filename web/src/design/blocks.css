@@ -593,3 +593,193 @@
     inset-inline-start: 0;
   }
 }
+
+.dynamic {
+  margin-block: var(--space-4);
+}
+
+.dynamic.selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: var(--space-1);
+}
+
+.dynamic-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  justify-content: space-between;
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  margin-block-end: var(--space-1);
+}
+
+.dynamic-body {
+  min-block-size: var(--size-control);
+}
+
+.block-list {
+  margin: 0;
+  padding-inline-start: var(--space-5);
+}
+
+.block-list li[data-level='2'] {
+  margin-inline-start: var(--space-4);
+}
+
+.block-list li[data-level='3'] {
+  margin-inline-start: var(--space-8);
+}
+
+.block-frame {
+  overflow-x: auto;
+}
+
+.block-include.framed {
+  border: 1px solid var(--color-line);
+  padding: var(--space-3);
+}
+
+.block-source {
+  display: block;
+  font-size: var(--text-small);
+  margin-block-start: var(--space-1);
+}
+
+.block-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-image-small), 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.block-card {
+  border: 1px solid var(--color-line);
+  padding: var(--space-3);
+}
+
+.page-facts,
+.excerpt {
+  margin-block: var(--space-4);
+}
+
+.excerpt.editing {
+  border-inline-start: 2px solid var(--color-guide);
+  padding-inline-start: var(--space-3);
+}
+
+.hidden-block {
+  display: none;
+}
+
+.anchor-mark {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+.doc-media {
+  margin: var(--space-4) 0;
+}
+
+.doc-media video,
+.doc-media audio {
+  display: block;
+  max-inline-size: 100%;
+}
+
+.chart {
+  margin: var(--space-4) 0;
+}
+
+.chart svg {
+  display: block;
+  inline-size: 100%;
+  block-size: auto;
+}
+
+.chart-line {
+  fill: none;
+  stroke-width: 2;
+}
+
+.chart-line.filled {
+  fill-opacity: 0.2;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  list-style: none;
+  margin: var(--space-2) 0;
+  padding: 0;
+}
+
+.chart-key {
+  display: inline-block;
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  margin-inline-end: var(--space-1);
+  background: currentcolor;
+}
+
+.chart-slice {
+  stroke: var(--color-surface);
+}
+
+.chart-series-0 {
+  color: var(--color-text-blue);
+  fill: var(--color-text-blue);
+  stroke: var(--color-text-blue);
+}
+
+.chart-series-1 {
+  color: var(--color-text-orange);
+  fill: var(--color-text-orange);
+  stroke: var(--color-text-orange);
+}
+
+.chart-series-2 {
+  color: var(--color-text-teal);
+  fill: var(--color-text-teal);
+  stroke: var(--color-text-teal);
+}
+
+.chart-series-3 {
+  color: var(--color-text-purple);
+  fill: var(--color-text-purple);
+  stroke: var(--color-text-purple);
+}
+
+.chart-series-4 {
+  color: var(--color-text-red);
+  fill: var(--color-text-red);
+  stroke: var(--color-text-red);
+}
+
+.chart-series-5 {
+  color: var(--color-text-brown);
+  fill: var(--color-text-brown);
+  stroke: var(--color-text-brown);
+}
+
+.file-table td,
+.file-table th {
+  text-align: start;
+}
+
+.file-text {
+  max-block-size: var(--size-image-medium);
+  overflow: auto;
+  background: var(--color-code);
+  padding: var(--space-3);
+  font-family: var(--font-mono);
+  font-size: var(--text-code);
+}
+
+.drawing-frame {
+  inline-size: 100%;
+  block-size: 70vh;
+  border: 1px solid var(--color-line);
+}

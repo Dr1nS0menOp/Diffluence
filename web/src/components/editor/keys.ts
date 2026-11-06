@@ -10,6 +10,7 @@ export interface EditorActions {
   pickFiles: () => void;
   openLink: () => void;
   openFind: () => void;
+  openDrawing: () => void;
   openBlockMenu: () => void;
   openTableMenu: () => void;
   openTemplateItem: (what: 'field' | 'instruction') => void;
@@ -22,6 +23,7 @@ export const noActions: EditorActions = {
   pickFiles: () => undefined,
   openLink: () => undefined,
   openFind: () => undefined,
+  openDrawing: () => undefined,
   openBlockMenu: () => undefined,
   openTableMenu: () => undefined,
   openTemplateItem: () => undefined,

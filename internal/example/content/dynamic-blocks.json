@@ -1,0 +1,634 @@
+{
+    "content":  [
+                    {
+                        "content":  [
+                                        {
+                                            "text":  "The blocks on this page fill themselves. Each reader gets an answer of their own, so a block never shows a page that reader may not open.",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "paragraph"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "toc",
+                                      "settings":  {
+                                                       "to":  2,
+                                                       "from":  2
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "Finding your way",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "content":  [
+                                        {
+                                            "attrs":  {
+                                                          "name":  "finding"
+                                                      },
+                                            "type":  "anchor"
+                                        },
+                                        {
+                                            "text":  "An anchor marks this line, so a link can jump straight here.",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "paragraph"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "search_box",
+                                      "settings":  {
+                                                       "placeholder":  "Search the example",
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "breadcrumbs"
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "child_pages",
+                                      "settings":  {
+                                                       "max":  10
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "page_tree",
+                                      "settings":  {
+                                                       "page":  "@page:writing"
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "space_index"
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "spaces_list"
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "link_cards",
+                                      "settings":  {
+                                                       "pages":  [
+                                                                     "@page:start-here",
+                                                                     "@page:writing"
+                                                                 ]
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "back_to_top"
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "What is going on",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "recent_changes",
+                                      "settings":  {
+                                                       "max":  5,
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "blog_posts",
+                                      "settings":  {
+                                                       "max":  3,
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "contributors"
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "history_here",
+                                      "settings":  {
+                                                       "max":  3
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "attachments_here",
+                                      "settings":  {
+                                                       "page":  "@page:images-and-files"
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "Just for you",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "my_favourites",
+                                      "settings":  {
+                                                       "max":  5
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "my_drafts",
+                                      "settings":  {
+                                                       "max":  5
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "my_tasks",
+                                      "settings":  {
+                                                       "max":  5
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "Reports",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "facts_id":  "project"
+                                  },
+                        "content":  [
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "content":  [
+                                                                                                                        {
+                                                                                                                            "text":  "Owner",
+                                                                                                                            "type":  "text"
+                                                                                                                        }
+                                                                                                                    ],
+                                                                                                        "type":  "paragraph"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "tableCell"
+                                                                                },
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "content":  [
+                                                                                                                        {
+                                                                                                                            "text":  "Team handbook",
+                                                                                                                            "type":  "text"
+                                                                                                                        }
+                                                                                                                    ],
+                                                                                                        "type":  "paragraph"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "tableCell"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableRow"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "content":  [
+                                                                                                                        {
+                                                                                                                            "text":  "Stage",
+                                                                                                                            "type":  "text"
+                                                                                                                        }
+                                                                                                                    ],
+                                                                                                        "type":  "paragraph"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "tableCell"
+                                                                                },
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "content":  [
+                                                                                                                        {
+                                                                                                                            "text":  "Ready",
+                                                                                                                            "type":  "text"
+                                                                                                                        }
+                                                                                                                    ],
+                                                                                                        "type":  "paragraph"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "tableCell"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableRow"
+                                                            }
+                                                        ],
+                                            "type":  "table"
+                                        }
+                                    ],
+                        "type":  "pageFacts"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "facts_report",
+                                      "settings":  {
+                                                       "facts_id":  "project",
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "filter_list",
+                                      "settings":  {
+                                                       "this_space":  true,
+                                                       "max":  5
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "report_table",
+                                      "settings":  {
+                                                       "this_space":  true,
+                                                       "max":  5
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "labels_list",
+                                      "settings":  {
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "decision_report",
+                                      "settings":  {
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "task_report",
+                                      "settings":  {
+                                                       "this_space":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "Text from another page",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "show_excerpt",
+                                      "settings":  {
+                                                       "name":  "welcome",
+                                                       "page":  "@page:reused-text",
+                                                       "frame":  true
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "kind":  "embedded_page",
+                                      "settings":  {
+                                                       "page":  "@page:reused-text"
+                                                   }
+                                  },
+                        "type":  "dynamic"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "A chart that reads a table",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "block_id":  "sales2026"
+                                  },
+                        "content":  [
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Quarter",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableHeader"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Pages",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableHeader"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Comments",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableHeader"
+                                                            }
+                                                        ],
+                                            "type":  "tableRow"
+                                        },
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Q1",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "12",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "30",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            }
+                                                        ],
+                                            "type":  "tableRow"
+                                        },
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Q2",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "18",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "42",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            }
+                                                        ],
+                                            "type":  "tableRow"
+                                        },
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "Q3",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "25",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            },
+                                                            {
+                                                                "content":  [
+                                                                                {
+                                                                                    "content":  [
+                                                                                                    {
+                                                                                                        "text":  "38",
+                                                                                                        "type":  "text"
+                                                                                                    }
+                                                                                                ],
+                                                                                    "type":  "paragraph"
+                                                                                }
+                                                                            ],
+                                                                "type":  "tableCell"
+                                                            }
+                                                        ],
+                                            "type":  "tableRow"
+                                        }
+                                    ],
+                        "type":  "table"
+                    },
+                    {
+                        "attrs":  {
+                                      "table":  "sales2026",
+                                      "title":  "Pages and comments by quarter",
+                                      "kind":  "bar"
+                                  },
+                        "type":  "chart"
+                    },
+                    {
+                        "attrs":  {
+                                      "table":  "sales2026",
+                                      "title":  "The same numbers as lines",
+                                      "kind":  "line"
+                                  },
+                        "type":  "chart"
+                    },
+                    {
+                        "attrs":  {
+                                      "level":  2
+                                  },
+                        "content":  [
+                                        {
+                                            "text":  "Sound and film",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "heading"
+                    },
+                    {
+                        "attrs":  {
+                                      "caption":  "A quarter of a second of silence",
+                                      "attachment_id":  "@file:chime.wav",
+                                      "kind":  "audio"
+                                  },
+                        "type":  "media"
+                    }
+                ],
+    "type":  "doc"
+}

@@ -3,10 +3,13 @@
 import { Node as DocumentNode } from '@tiptap/core';
 import Image, { type ImageOptions } from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
-import type { Attachment } from '../../api';
+import { useTranslation } from 'react-i18next';
+import { api, ApiError, type Attachment } from '../../api';
 import { IconDownload, IconPage } from '../icons';
+import { Dialog } from '../ui';
 
 const DOWNLOAD_ICON_SIZE = 18;
+const MAX_COPIES = 50;
 
 /** Where a file of a document lives. A template serves its own files. */
 export type FileAddress = (attachmentId: string) => string;
@@ -146,7 +149,81 @@ export const AttachmentFile = DocumentNode.create<{ fileAddress: FileAddress }>(
 
 /** What the server made of a file decides how it shows: only safe images show as images. */
 export function attachmentNode(attachment: Attachment) {
-  return attachment.inline
-    ? { type: 'image', attrs: { attachment_id: attachment.id, alt: attachment.filename } }
-    : { type: 'file', attrs: { attachment_id: attachment.id, filename: attachment.filename } };
+  if (attachment.inline) {
+    return { type: 'image', attrs: { attachment_id: attachment.id, alt: attachment.filename } };
+  }
+  const [kind] = attachment.content_type.split('/');
+  if (kind === 'video' || kind === 'audio') {
+    return { type: 'media', attrs: { attachment_id: attachment.id, kind } };
+  }
+  return { type: 'file', attrs: { attachment_id: attachment.id, filename: attachment.filename } };
+}
+
+export type NameChoice = 'version' | 'both' | 'cancel';
+
+/** Keep both puts the number before the extension: a.txt becomes a (2).txt. */
+export function copyName(filename: string, copy: number): string {
+  const dot = filename.lastIndexOf('.');
+  if (dot <= 0) return `${filename} (${copy})`;
+  return `${filename.slice(0, dot)} (${copy})${filename.slice(dot)}`;
+}
+
+function isNameTaken(error: unknown): boolean {
+  return error instanceof ApiError && error.code === 'name_taken';
+}
+
+/** Uploads a file and asks first when the page already has that name (FIL-012). */
+export async function uploadAsking(
+  pageId: string,
+  file: File,
+  ask: (filename: string) => Promise<NameChoice>,
+): Promise<Attachment | null> {
+  const send = (filename: string, query: string) =>
+    api.upload<Attachment>(
+      `/pages/${pageId}/attachments?filename=${encodeURIComponent(filename)}${query}`,
+      file,
+    );
+  const asking = '&on_conflict=ask';
+  try {
+    return await send(file.name, asking);
+  } catch (error) {
+    if (!isNameTaken(error)) throw error;
+  }
+  const choice = await ask(file.name);
+  if (choice === 'cancel') return null;
+  if (choice === 'version') return send(file.name, '');
+  for (let copy = 2; copy < MAX_COPIES; copy += 1) {
+    try {
+      return await send(copyName(file.name, copy), asking);
+    } catch (error) {
+      if (!isNameTaken(error)) throw error;
+    }
+  }
+  return send(copyName(file.name, MAX_COPIES), asking);
+}
+
+export function NameTakenDialog({
+  filename,
+  onAnswer,
+}: {
+  filename: string;
+  onAnswer: (choice: NameChoice) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <Dialog title={t('files.nameTaken')} onClose={() => onAnswer('cancel')}>
+      <p>{t('files.nameTakenHelp', { name: filename })}</p>
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={() => onAnswer('cancel')}>
+          {t('common.cancel')}
+        </button>
+        <button type="button" onClick={() => onAnswer('both')}>
+          {t('files.keepBoth')}
+        </button>
+        <button type="button" className="primary" onClick={() => onAnswer('version')}>
+          {t('files.newVersion')}
+        </button>
+      </div>
+    </Dialog>
+  );
 }

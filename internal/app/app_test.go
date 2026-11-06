@@ -111,7 +111,7 @@ func TestEveryNonPublicRouteRequiresASession(t *testing.T) {
 		if !ok {
 			t.Fatalf("route %q has no method", r.Pattern)
 		}
-		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}"} {
+		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}", "{kind}"} {
 			path = strings.ReplaceAll(path, wildcard, "00000000-0000-0000-0000-000000000001")
 		}
 		if strings.Contains(path, "{") {
@@ -331,12 +331,15 @@ func TestProbesAndNotFound(t *testing.T) {
 	}
 	resp, _ := e.do(c, "GET", "/pages/some-client-route", "")
 	policy := resp.Header.Get("Content-Security-Policy")
-	for _, want := range []string{"script-src 'self'", "require-trusted-types-for 'script'", "frame-ancestors 'none'", "base-uri 'none'"} {
+	for _, want := range []string{"script-src 'self'", "media-src 'self'", "require-trusted-types-for 'script'", "frame-ancestors 'none'", "base-uri 'none'"} {
 		if !strings.Contains(policy, want) {
 			t.Errorf("the app's policy lacks %q: %s", want, policy)
 		}
 	}
 	if strings.Contains(policy, "script-src 'unsafe") {
 		t.Errorf("inline scripts must stay forbidden: %s", policy)
+	}
+	if strings.Contains(policy, "frame-src") {
+		t.Errorf("without a drawing service no frame may load: %s", policy)
 	}
 }

@@ -34,6 +34,12 @@ export const DocumentTable = Table.extend({
         renderHTML: (attrs: { stretch?: number | null }) =>
           attrs.stretch ? { 'data-stretch': attrs.stretch } : {},
       },
+      block_id: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-block'),
+        renderHTML: (attrs: { block_id?: string | null }) =>
+          attrs.block_id ? { 'data-block': attrs.block_id } : {},
+      },
     };
   },
 }).configure({ resizable: true, View: StretchedTableView });

@@ -8,6 +8,7 @@ import {
   type DeleteImpact,
   type DirectoryEntry,
   type NamedSubject,
+  type PageRef,
   type PageSummary,
   type Me,
   type Restrictions,
@@ -18,6 +19,7 @@ import { SubjectPicker } from '../components/picker';
 import { useToast } from '../components/toast';
 import { countBelow } from '../components/tree-model';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { FileDetailsDialog } from './file-details';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
 export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
@@ -32,7 +34,20 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
     mutationFn: (id: string) => api.del(`/attachments/${id}`),
     onSettled: () => client.invalidateQueries({ queryKey: key }),
   });
+  const [openId, setOpenId] = useState<string | null>(null);
   const canAdd = page.can['attachment.add'];
+  const open = q.data?.attachments.find((a) => a.id === openId);
+  if (open) {
+    return (
+      <FileDetailsDialog
+        file={open}
+        canChange={canAdd ?? false}
+        canRemove={page.can['attachment.delete_any'] ?? false}
+        onChanged={() => client.invalidateQueries({ queryKey: key })}
+        onClose={() => setOpenId(null)}
+      />
+    );
+  }
   return (
     <Dialog title={t('attachments.title')} onClose={onClose}>
       {q.isPending && <Loading />}
@@ -51,6 +66,9 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
             <span className="muted">
               {t('attachments.version', { number: a.version })} · {formatSize(a.size)}
             </span>
+            <button type="button" className="ghost" onClick={() => setOpenId(a.id)}>
+              {t('files.details')}
+            </button>
             {canAdd && (
               <button type="button" className="ghost" onClick={() => remove.mutate(a.id)}>
                 {t('common.delete')}
@@ -59,6 +77,9 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
           </li>
         ))}
       </ul>
+      {(q.data?.attachments.length ?? 0) > 0 && (
+        <a href={`/api/v1/pages/${page.id}/attachments.zip`}>{t('files.downloadAll')}</a>
+      )}
     </Dialog>
   );
 }
@@ -335,6 +356,11 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
     queryFn: () => api.get<DeleteImpact>(`/pages/${page.id}/impact`),
     staleTime: 0,
   });
+  const usedBy = useQuery({
+    queryKey: ['used-by', page.id],
+    queryFn: () => api.get<{ pages: PageRef[] }>(`/pages/${page.id}/used-by`),
+    staleTime: 0,
+  });
   const refresh = () => client.invalidateQueries({ queryKey: ['tree', page.space_id] });
   const undo = async () => {
     try {
@@ -363,7 +389,7 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
   const moreLinks = (impact.data?.incoming_total ?? 0) - links.length;
   return (
     <Dialog title={t('page.delete')} onClose={onClose}>
-      <ErrorNote error={impact.error ?? remove.error} />
+      <ErrorNote error={impact.error ?? usedBy.error ?? remove.error} />
       <p>{pages > 1 ? t('page.confirmDeleteMany', { count: pages }) : t('page.confirmDelete')}</p>
       {links.length > 0 && (
         <>
@@ -376,6 +402,18 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
             ))}
           </ul>
           {moreLinks > 0 && <p className="muted">{t('page.moreLinks', { count: moreLinks })}</p>}
+        </>
+      )}
+      {(usedBy.data?.pages.length ?? 0) > 0 && (
+        <>
+          <p>{t('page.textIsShownOn')}</p>
+          <ul className="plain-list">
+            {usedBy.data?.pages.map((l) => (
+              <li key={l.id}>
+                <Link href={`/pages/${l.id}`}>{l.title}</Link>
+              </li>
+            ))}
+          </ul>
         </>
       )}
       <div className="dialog-actions">

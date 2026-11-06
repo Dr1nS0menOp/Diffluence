@@ -218,6 +218,7 @@ func cleanTable(in, out map[string]any) error {
 	if stretch, ok := intAttr(in["stretch"]); ok && stretch >= 1 && stretch <= maxTableStretch {
 		out["stretch"] = stretch
 	}
+	keepBlockID(in, out)
 	return nil
 }
 
@@ -328,7 +329,13 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeDate:          cleanDate,
 	TypeMention:       cleanMention,
 	TypeTemplateField: cleanTemplateField,
-	TypeInstruction:   cleanInstruction}
+	TypeInstruction:   cleanInstruction,
+	TypeDynamic:       cleanDynamic,
+	TypePageFacts:     cleanPageFacts,
+	TypeExcerpt:       cleanExcerpt,
+	TypeAnchor:        cleanAnchor,
+	TypeChart:         cleanChart,
+	TypeMedia:         cleanMedia}
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.
 func cleanAttrs(n *Node) error {

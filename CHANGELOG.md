@@ -4,6 +4,18 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: blocks and files (wave E)
+- Blocks that fill themselves: contents, child pages, page tree, page index, spaces, recent changes, your favourites, drafts and tasks, page lists and reports, labels, facts, decisions, tasks, contributors, history, files, blog posts, link cards and a search box. Each reader gets their own answer
+- Page facts with a report that sorts by real value, excerpts, showing text or a whole page from elsewhere, and anchors. A page that shows itself stops with a message, and text goes at most five levels deep. Details and Delete name the pages that show a page's text
+- Charts from a table in the document, in four kinds, with the numbers one press away. Video and audio play in the page
+- A Files screen per space, with storage for administrators. File versions, rename, a text preview and a zip of all files. The editor asks before it adds a version under a known name
+- Drawing through an optional draw.io service on an address the administrator sets
+
+### Security
+- media-src 'self' joins the policy, and only a video or audio file that really is one plays. rame-src appears only with a drawing service, and that service must be on another origin. Its messages are checked on window and origin
+
+Upgrade impact: migration 0016 adds tables and columns only. New optional setting DIFFLUENCE_DRAWING_URL. PDF stays a download.
+
 ### Added: people, access and administration (wave F)
 - People and a profile for everyone, with a picture you crop by mouse or keyboard, and a choice of who sees what. Names lead to a small card. Guests and former colleagues are marked
 - A forgotten password, invitations and self sign-up, by a link that works once. New passwords need 15 characters and are checked against 5 million leaked ones. Existing passwords stay valid

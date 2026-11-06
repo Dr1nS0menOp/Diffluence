@@ -82,7 +82,7 @@ test('the slash menu filters, inserts with Enter and with a click, and Escape ke
   await page.keyboard.press('Enter');
   await page.keyboard.type('/deci');
   await menu(page)
-    .getByRole('option', { name: /Decision/ })
+    .getByRole('option', { name: /^Decision / })
     .click();
   await expect(body(page).locator('.decision')).toBeVisible();
 });

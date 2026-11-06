@@ -227,6 +227,8 @@
     "linkAddress": "Address"
   },
   "details": {
+    "usedBy": "Shown on",
+    "notUsed": "No other page shows this text.",
     "title": "Details",
     "created": "Created",
     "changed": "Last change",
@@ -659,6 +661,7 @@
     "exportZip": "Export with sub-pages",
     "confirmDelete": "Delete this page? It goes to the trash.",
     "confirmDeleteMany": "Delete this page and everything below it, {{count}} pages in all? They go to the trash.",
+    "textIsShownOn": "Its text is shown on these pages too:",
     "linksWillBreak": "These pages link to it, and those links will stop working:",
     "moreLinks_one": "And {{count}} more.",
     "moreLinks_other": "And {{count}} more.",
@@ -839,7 +842,258 @@
     "revert": "Revert to published",
     "confirmRevert": "Throw away your changes and go back to the published version?"
   },
+  "blocks": {
+    "page": "Page",
+    "noSummary": "Untitled",
+    "source": "From {{title}}",
+    "tryAgain": "Try again",
+    "empty": "Nothing to show here yet.",
+    "noHeadings": "This page has no headings yet.",
+    "backToTop": "Back to top",
+    "failed": "This block could not be shown.",
+    "listHelp": "Separate with commas.",
+    "pageHelp": "Paste the address of a page. Empty means this page.",
+    "noSettings": "This block has nothing to set.",
+    "unknown": "This block is not known here.",
+    "settings": "Settings",
+    "factsId": "Facts name",
+    "hideFacts": "Hide on the page",
+    "excerptName": "Excerpt name",
+    "hideExcerpt": "Hide on this page",
+    "downloadMedia": "Download the file",
+    "anchorName": "Anchor name",
+    "searchHint": "Search",
+    "pagesHelp": "Paste page addresses, separated by commas.",
+    "field_placeholder": "Text in the box",
+    "field_pages": "Pages",
+    "field_labels": "With these labels",
+    "field_exclude_labels": "Without these labels",
+    "field_title": "Title contains",
+    "field_below": "Below this page",
+    "field_this_space": "Only this space",
+    "field_sort": "Sort by",
+    "field_descending": "Newest or last first",
+    "field_max": "At most",
+    "field_hide_empty": "Show nothing when empty",
+    "field_from": "From heading level",
+    "field_to": "To heading level",
+    "field_numbered": "Numbered",
+    "field_page": "Page",
+    "field_levels": "Levels",
+    "field_favourites": "Only my favourites",
+    "field_style": "Style",
+    "field_facts_id": "Facts name",
+    "field_columns": "Columns",
+    "field_sort_key": "Sort by column",
+    "field_mine": "Only mine",
+    "field_done": "Show finished tasks",
+    "field_name": "Excerpt name",
+    "field_frame": "Show a frame",
+    "field_pattern": "File name, with * as any text",
+    "option_tree": "Tree order",
+    "option_title": "Title",
+    "option_created": "Created",
+    "option_changed": "Changed",
+    "option_list": "List",
+    "option_cards": "Cards"
+  },
+  "files": {
+    "title": "Files",
+    "search": "Search files",
+    "none": "No files here.",
+    "name": "File name",
+    "page": "Page",
+    "size": "Size",
+    "uploader": "Added by",
+    "changed": "Changed",
+    "more": "Show more",
+    "usage": "Storage",
+    "total": "This space uses {{size}}.",
+    "largest": "Largest files",
+    "versions": "Versions",
+    "current": "Current",
+    "makeCurrent": "Make current",
+    "comment": "Comment",
+    "preview": "Preview",
+    "cut": "Only the start of this file is shown.",
+    "details": "Details",
+    "downloadAll": "Download all as zip",
+    "nameTaken": "That name is taken",
+    "nameTakenHelp": "This page already has a file called {{name}}.",
+    "keepBoth": "Keep both",
+    "newVersion": "New version"
+  },
+  "drawing": {
+    "title": "Drawing",
+    "off": "Drawing is not set up here. An administrator can add a drawing service.",
+    "failed": "The drawing could not be saved."
+  },
+  "chart": {
+    "untitled": "Chart",
+    "picture": "Chart: {{title}}. The numbers are in the table below it.",
+    "skipped_one": "{{count}} cell is not a number and is left out.",
+    "skipped_other": "{{count}} cells are not a number and are left out.",
+    "showData": "Show the numbers",
+    "label": "Label",
+    "noTable": "The table of this chart is gone.",
+    "title": "Chart title",
+    "kind": "Kind of chart",
+    "kind_bar": "Bars",
+    "kind_line": "Lines",
+    "kind_area": "Areas",
+    "kind_pie": "Pie"
+  },
   "insert": {
+    "block_toc": {
+      "name": "Contents",
+      "hint": "The headings of this page",
+      "keywords": "toc table of contents headings"
+    },
+    "block_back_to_top": {
+      "name": "Back to top",
+      "hint": "A link to the top of the page",
+      "keywords": "top jump"
+    },
+    "block_search_box": {
+      "name": "Search box",
+      "hint": "Search from within the page",
+      "keywords": "find search"
+    },
+    "block_link_cards": {
+      "name": "Link cards",
+      "hint": "Chosen pages as cards",
+      "keywords": "cards tiles links"
+    },
+    "block_child_pages": {
+      "name": "Child pages",
+      "hint": "The pages below this one",
+      "keywords": "children subpages list"
+    },
+    "block_page_tree": {
+      "name": "Page tree",
+      "hint": "The tree of pages from here",
+      "keywords": "tree hierarchy"
+    },
+    "block_space_index": {
+      "name": "Page index",
+      "hint": "Every page of this space, A to Z",
+      "keywords": "index alphabet"
+    },
+    "block_spaces_list": {
+      "name": "Spaces",
+      "hint": "The spaces you can open",
+      "keywords": "spaces directory"
+    },
+    "block_breadcrumbs": {
+      "name": "Breadcrumbs",
+      "hint": "The path to this page",
+      "keywords": "path trail"
+    },
+    "block_recent_changes": {
+      "name": "Recent changes",
+      "hint": "Pages that changed lately",
+      "keywords": "updated activity"
+    },
+    "block_my_favourites": {
+      "name": "My favourites",
+      "hint": "The pages you starred",
+      "keywords": "stars saved"
+    },
+    "block_my_drafts": {
+      "name": "My drafts",
+      "hint": "The drafts you have not published",
+      "keywords": "unpublished"
+    },
+    "block_my_tasks": {
+      "name": "My tasks",
+      "hint": "The tasks given to you",
+      "keywords": "todo assigned"
+    },
+    "block_filter_list": {
+      "name": "Page list",
+      "hint": "Pages that fit a filter",
+      "keywords": "filter labels content by label"
+    },
+    "block_report_table": {
+      "name": "Page report",
+      "hint": "A table of pages that fit a filter",
+      "keywords": "report table filter"
+    },
+    "block_labels_list": {
+      "name": "Labels",
+      "hint": "The labels in use",
+      "keywords": "tags cloud"
+    },
+    "block_facts_report": {
+      "name": "Facts report",
+      "hint": "One row for each page with facts",
+      "keywords": "page properties report"
+    },
+    "block_decision_report": {
+      "name": "Decisions report",
+      "hint": "The decisions on your pages",
+      "keywords": "decisions log"
+    },
+    "block_task_report": {
+      "name": "Tasks report",
+      "hint": "The tasks on your pages",
+      "keywords": "tasks todo report"
+    },
+    "block_show_excerpt": {
+      "name": "Show excerpt",
+      "hint": "Text from another page",
+      "keywords": "include reuse excerpt"
+    },
+    "block_embedded_page": {
+      "name": "Show page",
+      "hint": "All of another page, here",
+      "keywords": "include embed page"
+    },
+    "block_contributors": {
+      "name": "Contributors",
+      "hint": "Who wrote this page",
+      "keywords": "authors people"
+    },
+    "block_history_here": {
+      "name": "Change history",
+      "hint": "The versions of this page",
+      "keywords": "versions history"
+    },
+    "block_attachments_here": {
+      "name": "Files here",
+      "hint": "The files of this page",
+      "keywords": "attachments list"
+    },
+    "block_blog_posts": {
+      "name": "Blog posts",
+      "hint": "The latest posts",
+      "keywords": "blog news"
+    },
+    "block_chart": {
+      "name": "Chart",
+      "hint": "A chart of the table you are in",
+      "keywords": "graph bar line pie numbers"
+    },
+    "block_anchor": {
+      "name": "Anchor",
+      "hint": "A spot a link can jump to",
+      "keywords": "bookmark link target"
+    },
+    "block_drawing": {
+      "name": "Drawing",
+      "hint": "Draw a diagram and keep it as a picture",
+      "keywords": "diagram draw.io flowchart"
+    },
+    "block_facts": {
+      "name": "Page facts",
+      "hint": "A table a report can read",
+      "keywords": "page properties metadata"
+    },
+    "block_excerpt": {
+      "name": "Excerpt",
+      "hint": "Text other pages can show",
+      "keywords": "reuse excerpt"
+    },
     "text": {
       "name": "Text",
       "hint": "A normal paragraph",

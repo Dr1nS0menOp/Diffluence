@@ -1,0 +1,31 @@
+{
+    "content":  [
+                    {
+                        "attrs":  {
+                                      "name":  "welcome"
+                                  },
+                        "content":  [
+                                        {
+                                            "content":  [
+                                                            {
+                                                                "text":  "This text lives on one page and shows on others. Change it here, and every page follows.",
+                                                                "type":  "text"
+                                                            }
+                                                        ],
+                                            "type":  "paragraph"
+                                        }
+                                    ],
+                        "type":  "excerpt"
+                    },
+                    {
+                        "content":  [
+                                        {
+                                            "text":  "The text above is an excerpt. Everything on this page can also be shown elsewhere.",
+                                            "type":  "text"
+                                        }
+                                    ],
+                        "type":  "paragraph"
+                    }
+                ],
+    "type":  "doc"
+}

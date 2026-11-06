@@ -3,13 +3,20 @@ import { useEffect, useRef, useState, type DragEvent, type MouseEvent, type Reac
 import { useTranslation } from 'react-i18next';
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { EditorView } from '@tiptap/pm/view';
-import { api, type Attachment, type Json } from '../../api';
+import type { Json } from '../../api';
 import { navigate } from '../../router';
 import { CommentHighlights, refreshHighlights, type Highlight } from '../comments/anchor';
 import { useCopy, useToast } from '../toast';
 import { ErrorNote } from '../ui';
 import type { ShownImage } from '../viewers';
-import { attachmentNode, type FileAddress } from './attachments';
+import {
+  attachmentNode,
+  NameTakenDialog,
+  uploadAsking,
+  type FileAddress,
+  type NameChoice,
+} from './attachments';
+import { DrawingDialog } from './drawing';
 import { BlockHandle, useBlockTracking } from './block-handle';
 import { useCodeColours } from './code';
 import { documentExtensions, type TaskToggle } from './extensions';
@@ -215,6 +222,15 @@ export function DocumentEditor({
   const toast = useToast();
   const [uploading, setUploading] = useState('');
   const [uploadError, setUploadError] = useState<unknown>(null);
+  const [drawing, setDrawing] = useState(false);
+  const [nameQuestion, setNameQuestion] = useState<{
+    filename: string;
+    answer: (choice: NameChoice) => void;
+  } | null>(null);
+  const askAboutName = (filename: string) =>
+    new Promise<NameChoice>((resolve) => {
+      setNameQuestion({ filename, answer: resolve });
+    });
   const [dropping, setDropping] = useState(false);
   const [linking, setLinking] = useState(false);
   const [inserting, setInserting] = useState(false);
@@ -234,12 +250,15 @@ export function DocumentEditor({
     for (const file of files) {
       setUploading(file.name);
       try {
-        const attachment = await api.upload<Attachment>(
-          `/pages/${pageId}/attachments?filename=${encodeURIComponent(file.name)}`,
-          file,
-        );
+        const attachment = await uploadAsking(pageId, file, askAboutName);
         // After the selection, never over it: the previous file is still selected.
-        editor?.chain().focus().insertContentAt(editor.state.selection.to, attachmentNode(attachment)).run();
+        if (attachment) {
+          editor
+            ?.chain()
+            .focus()
+            .insertContentAt(editor.state.selection.to, attachmentNode(attachment))
+            .run();
+        }
       } catch (error) {
         setUploadError(error);
       }
@@ -300,6 +319,7 @@ export function DocumentEditor({
     pickFiles: () => fileInput.current?.click(),
     openLink: () => setLinking(true),
     openFind: () => setFinding(true),
+    openDrawing: () => setDrawing(true),
     openBlockMenu: tracker.openAtCursor,
     openTableMenu: tables.open,
     openTemplateItem: setTemplateItem,
@@ -368,6 +388,29 @@ export function DocumentEditor({
           </p>
         )}
         <ErrorNote error={uploadError} />
+        {drawing && (
+          <DrawingDialog
+            pageId={pageId}
+            onDone={(attachment) => {
+              setDrawing(false);
+              editor
+                ?.chain()
+                .focus()
+                .insertContentAt(editor.state.selection.to, attachmentNode(attachment))
+                .run();
+            }}
+            onClose={() => setDrawing(false)}
+          />
+        )}
+        {nameQuestion && (
+          <NameTakenDialog
+            filename={nameQuestion.filename}
+            onAnswer={(choice) => {
+              setNameQuestion(null);
+              nameQuestion.answer(choice);
+            }}
+          />
+        )}
         {header}
         <EditorContent editor={editor} />
         {footer}

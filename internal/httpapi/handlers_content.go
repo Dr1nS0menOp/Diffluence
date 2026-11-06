@@ -838,6 +838,17 @@ func (s *Server) handleAttachmentUpload(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
+	if r.URL.Query().Get("on_conflict") == "ask" {
+		taken, err := s.deps.Attachments.NameTaken(r.Context(), s.caller(r), id, r.URL.Query().Get("filename"))
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if taken {
+			writeError(w, http.StatusConflict, "name_taken", "This page already has a file with that name.")
+			return
+		}
+	}
 	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadDeadline))
 	a, err := s.deps.Attachments.Upload(r.Context(), s.caller(r), id, r.URL.Query().Get("filename"), r.Body)
 	if err != nil {
@@ -870,7 +881,7 @@ func serveFile(w http.ResponseWriter, r *http.Request, a attachments.Attachment,
 	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
 	h.Set("Cache-Control", "private, no-store")
-	if !download && attachments.IsInline(a.ContentType) {
+	if !download && (attachments.IsInline(a.ContentType) || attachments.IsMedia(a.ContentType)) {
 		h.Set("Content-Type", a.ContentType)
 		h.Set("Content-Disposition", mime.FormatMediaType("inline", map[string]string{"filename": a.Filename}))
 	} else {
