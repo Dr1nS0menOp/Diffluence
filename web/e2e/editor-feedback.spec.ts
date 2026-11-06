@@ -173,9 +173,9 @@ test('labels can still be set while editing', async ({ page }) => {
   const box = page.getByRole('combobox', { name: 'Add a label' });
   await box.fill('handbook');
   await box.press('Enter');
-  await expect(page.getByRole('link', { name: 'handbook' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'handbook', exact: true })).toBeVisible();
   await page.goto(`/pages/${id}`);
-  await expect(page.getByRole('link', { name: 'handbook' }).first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'handbook', exact: true })).toBeVisible();
 });
 
 test('the block handle stays off the cells of a stretched table', async ({ page }) => {
