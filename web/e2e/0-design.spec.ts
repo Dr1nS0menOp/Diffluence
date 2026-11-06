@@ -210,6 +210,7 @@ test.describe('the look of every kind of screen', () => {
   test.describe.configure({ mode: 'serial' });
   let pageId = '';
   let blocksPageId = '';
+  let templateId = '';
   let readerId = '';
   let spaceId = '';
 
@@ -228,6 +229,7 @@ test.describe('the look of every kind of screen', () => {
       'comment.add',
       'comment.delete_own',
       'page.delete_any',
+      'page.archive',
       'space.administer',
     ]);
 
@@ -572,6 +574,200 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  // Last on purpose: what these add to the handbook must not show up in the pictures above.
+  test('a page with an owner, a status, labels and an approval', async ({ browser }) => {
+    const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(setup, ADMIN.email, ADMIN.password);
+    const people = await setup.request.get('/api/v1/directory?q=Admin');
+    const { entries } = (await people.json()) as { entries: { id: string; type: string }[] };
+    const admin = entries.find((e) => e.type === 'user')?.id;
+    await setup.context().close();
+
+    const page = await newReaderPage(browser, 'light');
+    const api = page.request;
+    await api.put(`/api/v1/pages/${pageId}/stage`, { data: { text: 'Needs review', color: 'yellow' } });
+    await api.put(`/api/v1/pages/${pageId}/verification`, { data: { until: '2099-01-01' } });
+    await api.post(`/api/v1/pages/${pageId}/labels`, { data: { label: 'onboarding' } });
+    await api.post(`/api/v1/pages/${pageId}/labels`, { data: { label: 'new-starters' } });
+    const asked = await api.post(`/api/v1/pages/${pageId}/approvals`, {
+      data: { user_ids: [admin], message: 'Is this still right?', due_on: '' },
+    });
+    expect(asked.status(), await asked.text()).toBe(201);
+    await page.goto(`/pages/${pageId}`);
+    await expect(page.getByText('Waiting for approval')).toBeVisible();
+    await expect(page.getByRole('link', { name: 'onboarding', exact: true })).toBeVisible();
+    await picture(page, 'page-organised', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('LabelsView: labels of the space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/labels');
+    await expect(page.getByRole('link', { name: /onboarding/ })).toBeVisible();
+    await picture(page, 'labels');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('LabelView: pages with a label', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/labels/onboarding');
+    await expect(page.getByRole('link', { name: 'Your first week' })).toBeVisible();
+    await picture(page, 'label');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('ContentView: the table of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/content?sort=title');
+    await expect(page.locator('#main').getByRole('link', { name: 'Your first week' })).toBeVisible();
+    await page.getByRole('checkbox', { name: 'Your first week' }).check();
+    await expect(page.getByText('1 selected')).toBeVisible();
+    // A table takes its widths from its text, so "just now" must not move the columns.
+    await page.locator('table time').evaluateAll((times) => {
+      for (const time of times) time.textContent = 'a while ago';
+    });
+    await picture(page, 'content');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('BlogView: the blog of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const space = (await (await page.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };
+    const made = await page.request.post('/api/v1/pages', {
+      data: { space_id: space.id, title: 'We moved to the new office', kind: 'post' },
+    });
+    const post = (await made.json()) as { id: string };
+    const done = await page.request.post(`/api/v1/pages/${post.id}/publish`, {
+      data: { title: 'We moved to the new office', document: documentWithBlocks, base_version: 0 },
+    });
+    expect(done.ok(), await done.text()).toBeTruthy();
+    await page.goto('/spaces/HANDBOOK/blog');
+    await expect(page.getByRole('link', { name: 'We moved to the new office' })).toBeVisible();
+    await picture(page, 'blog', [page.locator('.post-list .muted'), page.locator('h2')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('ArchiveView: what left the tree', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const space = (await (await page.request.get('/api/v1/space-keys/HANDBOOK')).json()) as {
+      id: string;
+      home_page_id: string;
+    };
+    const old = await publishedPage(page, space.id, 'The old way of working', 'x', space.home_page_id);
+    const archived = await page.request.post(`/api/v1/pages/${old}/archive`, {
+      data: { include_children: true },
+    });
+    expect(archived.ok(), await archived.text()).toBeTruthy();
+    await page.goto('/spaces/HANDBOOK/archive');
+    await expect(page.getByRole('link', { name: 'The old way of working' })).toBeVisible();
+    await picture(page, 'archive', [page.locator('time')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('TemplatesView: the templates of a space', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const space = (await (await page.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };
+    const made = await page.request.post(`/api/v1/spaces/${space.id}/templates`, {
+      data: {
+        name: 'Team update',
+        description: 'What happened this week',
+        category: 'Teams',
+        labels: ['update'],
+        title_pattern: 'Update {date}',
+        steps: [],
+        default_parent: null,
+        hidden: false,
+        promoted: false,
+        document: {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'Goal: ' },
+                { type: 'templateField', attrs: { name: 'Goal', kind: 'line' } },
+                { type: 'text', text: ' ' },
+                { type: 'instruction', attrs: { text: 'Say why this matters.' } },
+              ],
+            },
+          ],
+        },
+      },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    templateId = ((await made.json()) as { id: string }).id;
+    await page.goto('/spaces/HANDBOOK/templates');
+    await expect(page.getByRole('link', { name: 'Team update' })).toBeVisible();
+    await picture(page, 'templates');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('TemplateView: writing a template', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/templates/${templateId}/edit`);
+    await expect(page.locator('.template-field')).toBeVisible();
+    await expect(page.locator('.instruction')).toBeVisible();
+    await picture(page, 'template');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the gallery of templates', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'More to create' }).click();
+    await page.getByRole('menuitem', { name: 'From a template' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Start from a template' });
+    await expect(dialog.getByRole('option').first()).toBeVisible();
+    await expect(dialog.locator('.prose')).toBeVisible();
+    await picture(page, 'gallery', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the publish options', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}/edit`);
+    await page.getByRole('button', { name: 'Publish options' }).click();
+    await expect(page.getByRole('dialog', { name: 'Publish options' })).toBeVisible();
+    await picture(page, 'publish-options');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('a folder with its pages, dark', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'dark');
+    const space = (await (await page.request.get('/api/v1/space-keys/HANDBOOK')).json()) as {
+      id: string;
+      home_page_id: string;
+    };
+    const folder = await publishedPage(page, space.id, 'Policies', 'x', space.home_page_id);
+    await publishedPage(page, space.id, 'Travel', 'x', folder);
+    const turned = await page.request.post(`/api/v1/pages/${folder}/kind`, { data: { kind: 'folder' } });
+    expect(turned.ok(), await turned.text()).toBeTruthy();
+    await page.goto(`/pages/${folder}`);
+    await expect(page.getByRole('heading', { name: 'Child pages' })).toBeVisible();
+    await picture(page, 'folder', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('search with its filters', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/search?q=first');
+    await expect(page.getByRole('link', { name: 'Your first week' }).first()).toBeVisible();
+    await picture(page, 'search-filters');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
   // Last, because from here on the bell of the reader shows a number.
   test.describe('working together', () => {
     const QUOTE = 'the kitchen rota';
@@ -585,6 +781,19 @@ test.describe('the look of every kind of screen', () => {
         data: { title: 'Team agreements', base_version: 1, document: documentWithTask(readerId) },
       });
       expect(published.ok(), await published.text()).toBeTruthy();
+      // Notifications arrive on their own time. The task comes first, so that the
+      // order of the list is the same in every run.
+      const reader = await newReaderPage(browser, 'light');
+      await expect
+        .poll(
+          async () => {
+            const res = await reader.request.get('/api/v1/me/notifications/count');
+            return ((await res.json()) as { unread: number }).unread;
+          },
+          { timeout: 20_000 },
+        )
+        .toBeGreaterThan(0);
+      await reader.context().close();
       const text = `We keep ${QUOTE} up to date.`;
       await addComment(setup, agreementsId, {
         body: asDocument('Could we also agree on the coffee machine?'),
@@ -604,19 +813,6 @@ test.describe('the look of every kind of screen', () => {
         `/api/v1/pages/${agreementsId}/reactions/${encodeURIComponent('🎉')}`,
       );
       expect(reacted.ok(), await reacted.text()).toBeTruthy();
-      // Notifications are made in the background, in the order they are picked up. The
-      // task comes first here, so the picture always shows the same order.
-      const reader = await newReaderPage(browser, 'light');
-      await expect
-        .poll(
-          async () => {
-            const res = await reader.request.get('/api/v1/me/notifications/count');
-            return ((await res.json()) as { unread: number }).unread;
-          },
-          { timeout: 20_000 },
-        )
-        .toBe(1);
-      await reader.context().close();
       const shared = await setup.request.post(`/api/v1/pages/${agreementsId}/share`, {
         data: {
           people: [{ type: 'user', id: readerId }],

@@ -36,6 +36,7 @@ import {
   IconQuote,
   IconRule,
   IconStatus,
+  IconRename,
   IconTable,
   IconTask,
   IconText,
@@ -113,6 +114,16 @@ export const INSERT_ITEMS: InsertItem[] = [
   },
   { id: 'date', icon: IconDate, run: (editor) => insertSelected(editor, 'date', { value: today() }) },
   { id: 'emoji', icon: IconEmoji, run: (editor) => insertText(editor, ':') },
+];
+
+/** Only a template asks questions, so only there do these appear. */
+export const TEMPLATE_ITEMS: InsertItem[] = [
+  { id: 'field', icon: IconRename, run: (_editor, actions) => actions.openTemplateItem('field') },
+  {
+    id: 'instruction',
+    icon: IconPanelNote,
+    run: (_editor, actions) => actions.openTemplateItem('instruction'),
+  },
 ];
 
 const TURN_INTO_IDS = [
@@ -268,15 +279,15 @@ const itemEntry = (item: InsertItem): ListEntry => ({
   icon: <item.icon size={ITEM_ICON_SIZE} />,
 });
 
-export const SlashCommands = Extension.create<{ actions: () => EditorActions }>({
+export const SlashCommands = Extension.create<{ actions: () => EditorActions; items: InsertItem[] }>({
   name: 'slashCommands',
   // Before our own keys, so that Escape closes the menu first.
   priority: 1100,
   addOptions() {
-    return { actions: () => noActions };
+    return { actions: () => noActions, items: INSERT_ITEMS };
   },
   addProseMirrorPlugins() {
-    const { actions } = this.options;
+    const { actions, items } = this.options;
     return [
       Suggestion<InsertItem>({
         editor: this.editor,
@@ -284,7 +295,7 @@ export const SlashCommands = Extension.create<{ actions: () => EditorActions }>(
         allowSpaces: true,
         pluginKey: new PluginKey('slashCommands'),
         allow: ({ editor }) => !editor.isActive('codeBlock'),
-        items: ({ query }) => matchingItems(query),
+        items: ({ query }) => matchingItems(query, items),
         command: ({ editor, range, props }) => {
           editor.chain().focus().deleteRange(range).run();
           props.run(editor, actions());

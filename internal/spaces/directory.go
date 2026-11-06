@@ -4,7 +4,6 @@ package spaces
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"slices"
 	"time"
@@ -13,6 +12,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -33,6 +33,7 @@ const (
 	defaultDirectoryRows = 50
 	maxDirectoryRows     = 100
 	maxMenuSpaces        = 6
+	overviewPosts        = 3
 )
 
 // DirectoryQuery asks the spaces directory for a part of the list.
@@ -85,11 +86,12 @@ const directorySQL = `WITH listed AS (
 		        ELSE sp.status = 'active' END
 	), counted AS (
 		SELECT p.space_id, count(*) AS pages, max(p.updated_at) AS changed
-		FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
+		FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		WHERE p.status = 'published' AND p.space_id IN (SELECT id FROM listed)
 		GROUP BY p.space_id
 	)
 	SELECT s.id, s.key, s.name, s.description, s.icon, s.status, s.home_page_id, s.created_by, s.created_at, s.updated_at,
+		s.icon_object <> '', s.title_align, s.review_months, s.approval_required,
 		f.user_id IS NOT NULL, COALESCE(c.pages, 0), COALESCE(c.changed, s.updated_at), count(*) OVER ()
 	FROM listed l
 	JOIN spaces s ON s.id = l.id
@@ -115,7 +117,8 @@ func (s *Service) Directory(ctx context.Context, c identity.Caller, in Directory
 	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (DirectoryRow, error) {
 		var d DirectoryRow
 		err := r.Scan(&d.ID, &d.Key, &d.Name, &d.Description, &d.Icon, &d.Status, &d.HomePageID, &d.CreatedBy,
-			&d.CreatedAt, &d.UpdatedAt, &d.Favourite, &d.PageCount, &d.LastChanged, &total)
+			&d.CreatedAt, &d.UpdatedAt, &d.HasIcon, &d.TitleAlign, &d.ReviewMonths, &d.ApprovalRequired,
+			&d.Favourite, &d.PageCount, &d.LastChanged, &total)
 		return d, err
 	})
 	if err != nil {
@@ -187,7 +190,9 @@ func (s *Service) SetFavourite(ctx context.Context, c identity.Caller, id uuid.U
 // Overview is what the overview screen of a space shows.
 type Overview struct {
 	pages.SpaceActivity
-	Administrators []string `json:"administrators"`
+	Administrators []string     `json:"administrators"`
+	Owners         []Person     `json:"owners"`
+	Posts          []pages.Post `json:"posts"`
 }
 
 // Overview summarises a space for someone who may view it.
@@ -204,28 +209,18 @@ func (s *Service) Overview(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if out.Administrators == nil {
 		out.Administrators = []string{}
 	}
-	return out, nil
-}
-
-// SetFeatures turns parts of a space on or off. Turning one off deletes nothing.
-func (s *Service) SetFeatures(ctx context.Context, c identity.Caller, id uuid.UUID, f permissions.Features) error {
-	raw, err := json.Marshal(f)
-	if err != nil {
-		return err
+	if out.Owners, err = s.Owners(ctx, s.pool, id); err != nil {
+		return out, err
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceAdminister); err != nil {
-			return err
-		}
-		sp, err := load(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "UPDATE spaces SET features = $2, updated_at = now() WHERE id = $1", id, raw); err != nil {
-			return err
-		}
-		return record(ctx, tx, c, "space.features_changed", sp, map[string]any{"features": f})
-	})
+	on, err := s.features.Enabled(ctx, s.pool, id, features.Blog)
+	if err != nil {
+		return out, err
+	}
+	out.Posts = []pages.Post{}
+	if on {
+		out.Posts, _, err = s.pages.Posts(ctx, c, &id, overviewPosts, 0)
+	}
+	return out, err
 }
 
 // Find looks for active spaces by name or key, for quick search.

@@ -201,7 +201,11 @@ export function SpaceBadge({ space, size }: { space: Space; size?: 'small' | 'la
   const mark = firstCharacter(space.icon.trim()) || firstCharacter(space.name).toUpperCase();
   return (
     <span className={`space-badge tint-${tintIndex(space.key)} ${size ?? ''}`} aria-hidden="true">
-      {mark}
+      {space.has_icon ? (
+        <img className="space-picture" src={`/api/v1/spaces/${space.id}/icon`} alt="" />
+      ) : (
+        mark
+      )}
     </span>
   );
 }

@@ -21,6 +21,9 @@ const (
 	maxCaptionBytes  = 500
 	maxTitleBytes    = 500
 	maxCodeTitle     = 200
+
+	maxFieldNameBytes   = 100
+	maxFieldOptionBytes = 2000
 )
 
 // choice is a short list of allowed names. Colours, sizes and alignment are
@@ -44,8 +47,12 @@ var (
 	imageAligns   = choices("start", "center", "end")
 	imageSizes    = choices("small", "medium", "large")
 	columnLayouts = choices("wide-start", "wide-end")
+	fieldKinds    = choices("line", "text", "choice")
 	mentionKinds  = choices(MentionUser, MentionGroup)
 )
+
+// IsMarkColor reports whether a colour name is on the short list for marks.
+func IsMarkColor(name string) bool { return markColors[name] }
 
 func (c choice) names() []string {
 	out := make([]string, 0, len(c))
@@ -271,24 +278,46 @@ func cleanDate(in, out map[string]any) error {
 	return nil
 }
 
+func cleanTemplateField(in, out map[string]any) error {
+	keepText(in, out, "name", maxFieldNameBytes)
+	if out["name"] == nil {
+		return errors.New("a field needs a name")
+	}
+	out["kind"] = "line"
+	fieldKinds.keep(in, out, "kind")
+	keepText(in, out, "options", maxFieldOptionBytes)
+	keepTrue(in, out, "required")
+	return nil
+}
+
+func cleanInstruction(in, out map[string]any) error {
+	keepText(in, out, "text", maxCaptionBytes)
+	if out["text"] == nil {
+		return errors.New("instruction text cannot be empty")
+	}
+	return nil
+}
+
 // attrCleaners rebuild the attributes of a node from scratch. A type without an
 // entry keeps none, so an attribute nobody thought about never gets through.
 var attrCleaners = map[string]func(in, out map[string]any) error{
-	TypeParagraph:   cleanTextBlock,
-	TypeHeading:     cleanHeading,
-	TypeOrderedList: cleanOrderedList,
-	TypeTaskItem:    cleanTaskItem,
-	TypeCodeBlock:   cleanCodeBlock,
-	TypeImage:       cleanImage,
-	TypeFile:        cleanFile,
-	TypeTableCell:   cleanCell,
-	TypeTableHeader: cleanCell,
-	TypePanel:       cleanPanel,
-	TypeExpand:      cleanExpand,
-	TypeColumns:     cleanColumns,
-	TypeStatus:      cleanStatus,
-	TypeDate:        cleanDate,
-	TypeMention:     cleanMention,
+	TypeParagraph:     cleanTextBlock,
+	TypeHeading:       cleanHeading,
+	TypeOrderedList:   cleanOrderedList,
+	TypeTaskItem:      cleanTaskItem,
+	TypeCodeBlock:     cleanCodeBlock,
+	TypeImage:         cleanImage,
+	TypeFile:          cleanFile,
+	TypeTableCell:     cleanCell,
+	TypeTableHeader:   cleanCell,
+	TypePanel:         cleanPanel,
+	TypeExpand:        cleanExpand,
+	TypeColumns:       cleanColumns,
+	TypeStatus:        cleanStatus,
+	TypeDate:          cleanDate,
+	TypeMention:       cleanMention,
+	TypeTemplateField: cleanTemplateField,
+	TypeInstruction:   cleanInstruction,
 }
 
 // cleanAttrs rebuilds the attributes from scratch, keeping only known ones.

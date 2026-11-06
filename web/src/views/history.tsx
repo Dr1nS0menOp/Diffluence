@@ -2,10 +2,49 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type DiffBlock, type PageDetail, type Version } from '../api';
+import { api, type DiffBlock, type Me, type PageDetail, type Version } from '../api';
 import { Link, navigate, useLocation } from '../router';
 import { DocumentView } from '../components/editor/editor';
-import { ConfirmButton, Dialog, ErrorNote, formatDate, Loading } from '../components/ui';
+import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
+
+/** For a leaked secret. The number stays, and the audit log keeps who, when and why. */
+function RemoveVersionDialog({
+  pageId,
+  number,
+  onClose,
+}: {
+  pageId: string;
+  number: number;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [reason, setReason] = useState('');
+  const remove = useMutation({
+    mutationFn: () => api.del(`/admin/pages/${pageId}/versions/${number}`, { reason }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['versions', pageId] });
+      onClose();
+    },
+  });
+  return (
+    <Dialog title={t('history.removeTitle', { number })} onClose={onClose}>
+      <ErrorNote error={remove.error} />
+      <p>{t('history.removeHelp')}</p>
+      <Field label={t('history.reason')}>
+        <input value={reason} required autoFocus onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button type="button" className="danger" disabled={!reason.trim()} onClick={() => remove.mutate()}>
+          {t('history.remove')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
 
 export function HistoryView({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
@@ -33,6 +72,9 @@ export function HistoryView({ pageId }: { pageId: string }) {
       navigate(`/pages/${pageId}`);
     },
   });
+  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
+  const isAdministrator = me.data?.global_permissions.includes('administrator') ?? false;
+  const [removing, setRemoving] = useState<number | null>(null);
   const toggle = (n: number) =>
     setPicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p.slice(-1), n]));
   const pair = [...picked].sort((a, b) => a - b);
@@ -71,13 +113,21 @@ export function HistoryView({ pageId }: { pageId: string }) {
                 {v.restored_from !== null && (
                   <span className="muted"> · {t('history.restoredFrom', { number: v.restored_from })}</span>
                 )}
+                {v.removed && <span className="lozenge">{t('history.removed')}</span>}
                 {v.summary && <div>{v.summary}</div>}
               </td>
               <td className="row">
-                <button type="button" className="ghost" onClick={() => setShown(v.number)}>
-                  {t('history.view')}
-                </button>
-                {canEdit && i > 0 && (
+                {!v.removed && (
+                  <button type="button" className="ghost" onClick={() => setShown(v.number)}>
+                    {t('history.view')}
+                  </button>
+                )}
+                {isAdministrator && !v.removed && i > 0 && (
+                  <button type="button" className="ghost" onClick={() => setRemoving(v.number)}>
+                    {t('history.remove')}
+                  </button>
+                )}
+                {canEdit && !v.removed && i > 0 && (
                   <ConfirmButton
                     label={t('history.restore')}
                     message={t('history.confirmRestore')}
@@ -97,6 +147,9 @@ export function HistoryView({ pageId }: { pageId: string }) {
             {t('history.compareSelected')}
           </Link>
         </div>
+      )}
+      {removing !== null && (
+        <RemoveVersionDialog pageId={pageId} number={removing} onClose={() => setRemoving(null)} />
       )}
       {shown !== null && (
         <Dialog title={t('history.version', { number: shown })} onClose={() => setShown(null)} wide>

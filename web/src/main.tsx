@@ -13,6 +13,7 @@ import './design/controls.css';
 import './design/layout.css';
 import './design/document.css';
 import './design/blocks.css';
+import './design/organise.css';
 import './design/together.css';
 
 const client = new QueryClient({

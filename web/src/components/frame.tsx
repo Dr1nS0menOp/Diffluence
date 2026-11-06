@@ -21,9 +21,13 @@ import {
 } from '../api';
 import { Link, match, useLocation } from '../router';
 import { usePreferences } from '../preferences';
-import { CopyDialog, DeleteDialog, MoveDialog, RenameDialog } from '../views/page-dialogs';
-import { NewPageDialog, type CreateTarget } from './create';
+import { CopyDialog, MoveDialog } from '../views/move-dialogs';
+import { ArchiveDialog, KindDialog, SortChildrenDialog } from '../views/page-actions';
+import { DeleteDialog, RenameDialog } from '../views/page-dialogs';
+import { NewLinkDialog, NewPageDialog, type CreateTarget } from './create';
 import {
+  IconArchive,
+  IconBlog,
   IconChevronLeft,
   IconChevronRight,
   IconDownload,
@@ -35,6 +39,7 @@ import {
   IconMore,
   IconSliders,
   IconStar,
+  IconTable2,
   IconTrash,
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuLink } from './menu';
@@ -48,7 +53,16 @@ const SIDEBAR_KEY = 'diffluence.sidebar';
 const SIDEBAR_HIDDEN = 'hidden';
 const NARROW_SCREEN = '(max-width: 50rem)';
 const PAGE_ROUTES = ['/pages/:id', '/pages/:id/history', '/pages/:id/compare'];
-const SPACE_ROUTES = ['/spaces/:key/settings', '/spaces/:key/trash', '/spaces/:key/overview'];
+const SPACE_ROUTES = [
+  '/spaces/:key/settings',
+  '/spaces/:key/trash',
+  '/spaces/:key/overview',
+  '/spaces/:key/content',
+  '/spaces/:key/blog',
+  '/spaces/:key/archive',
+  '/spaces/:key/labels',
+  '/spaces/:key/templates',
+];
 const MIN_SIDEBAR_REM = 14;
 const MAX_SIDEBAR_REM = 32;
 const MENU_ICON_SIZE = 18;
@@ -198,6 +212,22 @@ function SpaceLinks({ space, current }: { space: Space; current?: string }) {
       <Link href={overview} className="side-link" aria-current={pathname === overview ? 'page' : undefined}>
         <IconInfo size={LINK_ICON_SIZE} /> {t('space.overview')}
       </Link>
+      {(space.features?.blog ?? true) && (
+        <Link
+          href={`/spaces/${space.key}/blog`}
+          className="side-link"
+          aria-current={pathname === `/spaces/${space.key}/blog` ? 'page' : undefined}
+        >
+          <IconBlog size={LINK_ICON_SIZE} /> {t('blog.title')}
+        </Link>
+      )}
+      <Link
+        href={`/spaces/${space.key}/archive`}
+        className="side-link"
+        aria-current={pathname === `/spaces/${space.key}/archive` ? 'page' : undefined}
+      >
+        <IconArchive size={LINK_ICON_SIZE} /> {t('organise.archive')}
+      </Link>
       {shortcuts.data?.shortcuts.map((s) => (
         <ShortcutLink key={s.id} shortcut={s} />
       ))}
@@ -216,6 +246,11 @@ function RowDialogs({
   if (dialog === 'rename') return <RenameDialog page={page} onClose={onClose} />;
   if (dialog === 'move') return <MoveDialog page={page} onClose={onClose} />;
   if (dialog === 'copy') return <CopyDialog page={page} onClose={onClose} />;
+  if (dialog === 'archive') return <ArchiveDialog page={page} onClose={onClose} />;
+  if (dialog === 'sort') return <SortChildrenDialog page={page} onClose={onClose} />;
+  if (dialog === 'folder' || dialog === 'page') {
+    return <KindDialog page={page} kind={dialog} onClose={onClose} />;
+  }
   return <DeleteDialog page={page} onClose={onClose} />;
 }
 
@@ -232,6 +267,7 @@ function Sidebar({
 }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState<{ parent: string | null } | null>(null);
+  const [addingLink, setAddingLink] = useState(false);
   const [rowDialog, setRowDialog] = useState<{ page: PageSummary; dialog: RowDialog } | null>(null);
   const tree = useQuery({
     queryKey: ['tree', space.id],
@@ -271,6 +307,7 @@ function Sidebar({
           canMove={canCreate}
           onAdd={canCreate ? (id) => setAdding({ parent: id }) : undefined}
           onAddRoot={canCreate ? () => setAdding({ parent: parent ?? home }) : undefined}
+          onAddLink={canCreate ? () => setAddingLink(true) : undefined}
           onDialog={(page, dialog) => setRowDialog({ page, dialog })}
         />
       )}
@@ -279,12 +316,18 @@ function Sidebar({
           <Link href={`/spaces/${space.key}/settings`} className="side-link">
             <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
           </Link>
+          <Link href={`/spaces/${space.key}/content`} className="side-link">
+            <IconTable2 size={MENU_ICON_SIZE} /> {t('content.title')}
+          </Link>
           <Link href={`/spaces/${space.key}/trash`} className="side-link">
             <IconTrash size={MENU_ICON_SIZE} /> {t('space.trash')}
           </Link>
         </nav>
       )}
       {adding && <NewPageDialog space={space} parent={adding.parent} onClose={() => setAdding(null)} />}
+      {addingLink && (
+        <NewLinkDialog space={space} parent={parent ?? home} onClose={() => setAddingLink(false)} />
+      )}
       {rowDialog && <RowDialogs open={rowDialog} onClose={() => setRowDialog(null)} />}
     </aside>
   );

@@ -7,6 +7,7 @@ package settings
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -84,6 +85,38 @@ func (s *Service) Get(ctx context.Context) (Values, error) {
 		}
 	}
 	return v, rows.Err()
+}
+
+// Read fills v with one stored value, and leaves it alone when there is none.
+func (s *Service) Read(ctx context.Context, key string, v any) error {
+	var raw []byte
+	err := s.pool.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&raw)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(raw, v)
+}
+
+// Write stores one value, and audits who did it. The route decides who may.
+func (s *Service) Write(ctx context.Context, c identity.Caller, key string, v any) error {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, key, raw); err != nil {
+			return err
+		}
+		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", key, "", map[string]any{"key": key})); err != nil {
+			return err
+		}
+		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"key": key})
+		return err
+	})
 }
 
 // TrashRetention is how long deleted items are kept.

@@ -1,14 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // One panel for the facts around a page (spec 009, D7). It sits on top of the page
 // without taking over the screen, so reading goes on beside it.
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Attachment, type Me, type PageDetail, type PageFacts, type PageRef } from '../api';
 import { Link } from '../router';
 import { countWords, readingMinutes } from './editor/outline';
+import { OwnerDialog, ReviewDialog } from '../views/page-actions';
 import { IconClose } from './icons';
+import { LabelBar } from './page-labels';
+import { StageMark } from './page-marks';
 import { SubjectPicker } from './picker';
 import { PageMark } from './topbar';
 import { ErrorNote, formatDate, formatSize, Loading } from './ui';
@@ -122,6 +125,7 @@ function Watchers({ pageId }: { pageId: string }) {
 export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const heading = useRef<HTMLHeadingElement>(null);
+  const [changing, setChanging] = useState<'owner' | 'review' | null>(null);
   const q = useQuery({
     queryKey: ['page-details', page.id, page.current_version],
     queryFn: () => api.get<PageFacts>(`/pages/${page.id}/details`),
@@ -161,6 +165,28 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
       {facts && (
         <>
           <dl className="details-facts">
+            <Fact name={t('organise.owner')}>
+              {page.owner_name || t('common.unknown')}
+              {page.owner_disabled && <span className="muted"> {t('content.noLongerActive')}</span>}{' '}
+              {page.can['page.edit'] && (
+                <button type="button" className="ghost" onClick={() => setChanging('owner')}>
+                  {t('organise.changeOwner')}
+                </button>
+              )}
+            </Fact>
+            {page.stage_text && (
+              <Fact name={t('organise.status')}>
+                <StageMark text={page.stage_text} color={page.stage_color} />
+              </Fact>
+            )}
+            <Fact name={t('organise.reviewDate')}>
+              {page.review_on || t('common.none')}{' '}
+              {page.can['page.edit'] && (
+                <button type="button" className="ghost" onClick={() => setChanging('review')}>
+                  {t('organise.changeReview')}
+                </button>
+              )}
+            </Fact>
             <Fact name={t('details.created')}>
               {facts.created_by_name || t('common.unknown')}, {formatDate(facts.created_at)}
             </Fact>
@@ -187,10 +213,13 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
           </section>
           <PageLinks title={t('details.incoming')} pages={facts.incoming} empty={t('details.noIncoming')} />
           <PageLinks title={t('details.outgoing')} pages={facts.outgoing} empty={t('details.noOutgoing')} />
+          <LabelBar page={page} />
           <Files pageId={page.id} />
           {page.can['space.administer'] && <Watchers pageId={page.id} />}
         </>
       )}
+      {changing === 'owner' && <OwnerDialog page={page} onClose={() => setChanging(null)} />}
+      {changing === 'review' && <ReviewDialog page={page} onClose={() => setChanging(null)} />}
     </aside>,
     document.body,
   );

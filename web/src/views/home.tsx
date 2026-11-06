@@ -2,9 +2,19 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { api, type FeedItem, type ListedPage, type Me, type Space, type TaskItem } from '../api';
-import { Link } from '../router';
+import {
+  api,
+  NIL_ID,
+  type FeedItem,
+  type ListedPage,
+  type Me,
+  type PageDetail,
+  type Space,
+  type TaskItem,
+} from '../api';
+import { Link, useLocation } from '../router';
 import { NewSpaceDialog } from '../components/create';
+import { DocumentView } from '../components/editor/editor';
 import { IconPlus } from '../components/icons';
 import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge, Tabs } from '../components/ui';
@@ -33,6 +43,37 @@ function PageList({ title, path }: { title: string; path: string }) {
       </ul>
     </section>
   );
+}
+
+function CompanyHome({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({ queryKey: ['page', pageId], queryFn: () => api.get<PageDetail>(`/pages/${pageId}`) });
+  if (q.isPending) return <Loading />;
+  if (q.error) return <ErrorNote error={q.error} />;
+  return (
+    <>
+      <p>
+        <Link href="/?personal=1">{t('home.yourStart')}</Link>
+      </p>
+      <h1>{q.data.title}</h1>
+      <DocumentView document={q.data.document} />
+    </>
+  );
+}
+
+/** The company home for those who may see it, unless they prefer their own screen. */
+export function StartScreen({ me }: { me: Me }) {
+  const { searchParams } = useLocation();
+  const personal = searchParams.get('personal') === '1' || me.preferences.start_screen === 'personal';
+  const start = useQuery({
+    queryKey: ['start'],
+    queryFn: () => api.get<{ page_id: string | null }>('/start'),
+    enabled: !personal,
+  });
+  const homeId = start.data?.page_id;
+  if (!personal && start.isPending) return <Loading />;
+  if (!personal && homeId && homeId !== NIL_ID) return <CompanyHome pageId={homeId} />;
+  return <HomeView me={me} />;
 }
 
 function OpenTasks() {

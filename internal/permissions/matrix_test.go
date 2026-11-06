@@ -91,14 +91,23 @@ var restrictionCases = []restrictionCase{
 	{name: "view-user-edit-other", viewLeaf: "user", editLeaf: "other"},
 }
 
-var pageStates = []struct {
+type pageState struct {
 	name, status string
 	ownDraft     bool
-}{
-	{"published", "published", false},
-	{"others-draft", "draft", false},
-	{"own-draft", "draft", true},
-	{"trashed", "trashed", false},
+	archived     bool
+	kind         string
+}
+
+var pageStates = []pageState{
+	{"published", "published", false, false, "page"},
+	{"others-draft", "draft", false, false, "page"},
+	{"own-draft", "draft", true, false, "page"},
+	{"trashed", "trashed", false, false, "page"},
+	{"archived", "published", false, true, "page"},
+	{"own-archived", "published", true, true, "page"},
+	{"post", "published", false, false, "post"},
+	{"template", "published", false, false, "template"},
+	{"own-template", "published", true, false, "template"},
 }
 
 var spaceStates = []string{"active", "archived", "trashed"}
@@ -112,7 +121,8 @@ var actions = []string{
 
 // literalRule is the rule of spec 002, written out independently of Evaluate.
 // It deliberately works on the case tables, not on the production types.
-func literalRule(u userCase, g grantCase, r restrictionCase, pageStatus string, ownPage bool, spaceStatus, action string) bool {
+func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, spaceStatus, action string) bool {
+	pageStatus, ownPage := ps.status, ps.ownDraft
 	has := func(perm string) bool {
 		applies := false
 		switch g.subject {
@@ -155,8 +165,8 @@ func literalRule(u userCase, g grantCase, r restrictionCase, pageStatus string, 
 	if spaceStatus == "trashed" || !has(permissions.SpaceView) {
 		return false
 	}
-	// Page state.
-	if pageStatus == "trashed" || (pageStatus == "draft" && !ownPage) {
+	// Page state. A template is never a page, whoever asks.
+	if pageStatus == "trashed" || (pageStatus == "draft" && !ownPage) || ps.kind == "template" {
 		return false
 	}
 	// View restrictions on every ancestor including the page.
@@ -168,6 +178,16 @@ func literalRule(u userCase, g grantCase, r restrictionCase, pageStatus string, 
 	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister:
 	default:
 		if spaceStatus == "archived" {
+			return false
+		}
+	}
+	// An archived page can be read, exported and deleted, brought back, and
+	// restricted. Nothing else.
+	switch action {
+	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister,
+		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage:
+	default:
+		if ps.archived {
 			return false
 		}
 	}
@@ -253,7 +273,7 @@ func TestMatrixEvaluate(t *testing.T) {
 					if ps.ownDraft {
 						owner = me
 					}
-					page := permissions.PageFacts{ID: leaf, Status: ps.status, CreatedBy: owner,
+					page := permissions.PageFacts{ID: leaf, Status: ps.status, CreatedBy: owner, Kind: ps.kind, Archived: ps.archived,
 						ViewChain: chain, EditSubjects: subject(r.editLeaf)}
 					for _, ss := range spaceStates {
 						for _, action := range actions {
@@ -261,7 +281,7 @@ func TestMatrixEvaluate(t *testing.T) {
 							got := permissions.Evaluate(permissions.Input{User: facts,
 								Space: permissions.SpaceFacts{ID: ids.New(), Status: ss, Grants: grants},
 								Page:  &page, Action: action, Owner: owner})
-							want := literalRule(u, g, r, ps.status, ps.ownDraft, ss, action)
+							want := literalRule(u, g, r, ps, ss, action)
 							if got.Allowed != want {
 								t.Fatalf("user=%s grant=%s restriction=%s page=%s space=%s action=%s: Evaluate=%v, rule=%v\nchecks: %+v",
 									u.name, g.name, r.name, ps.name, ss, action, got.Allowed, want, got.Checks)
@@ -325,10 +345,10 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 		users = append(users, realUser{id, u})
 	}
 
-	addPage := func(space uuid.UUID, parent *uuid.UUID, status string, by uuid.UUID) uuid.UUID {
+	addPage := func(space uuid.UUID, parent *uuid.UUID, ps pageState, by uuid.UUID) uuid.UUID {
 		id := ids.New()
-		exec(`INSERT INTO pages (id, origin_instance_id, space_id, parent_id, title, status, created_by, updated_by)
-			VALUES ($1, $2, $3, $4, 't', $5, $6, $6)`, id, inst, space, parent, status, by)
+		exec(`INSERT INTO pages (id, origin_instance_id, space_id, parent_id, title, status, created_by, updated_by, kind, archived_at)
+			VALUES ($1, $2, $3, $4, 't', $5, $6, $6, $7, CASE WHEN $8 THEN now() END)`, id, inst, space, parent, ps.status, by, ps.kind, ps.archived)
 		exec("INSERT INTO page_tree (ancestor_id, descendant_id, depth) VALUES ($1, $1, 0)", id)
 		if parent != nil {
 			exec(`INSERT INTO page_tree (ancestor_id, descendant_id, depth)
@@ -342,7 +362,7 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 		g           grantCase
 		r           restrictionCase
 		spaceStatus string
-		pageStatus  string
+		page        pageState
 		creator     uuid.UUID
 	}
 	var all []built
@@ -372,9 +392,9 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 						if ps.ownDraft {
 							creator = ru.id
 						}
-						root := addPage(space, nil, "published", other)
-						mid := addPage(space, &root, "published", other)
-						leaf := addPage(space, &mid, ps.status, creator)
+						root := addPage(space, nil, pageStates[0], other)
+						mid := addPage(space, &root, pageStates[0], other)
+						leaf := addPage(space, &mid, ps, creator)
 						restrict := func(page uuid.UUID, kind, who string) {
 							if who == "" {
 								return
@@ -393,48 +413,88 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 						restrict(leaf, "view", r.viewLeaf)
 						restrict(leaf, "edit", r.editLeaf)
 						restrict(mid, "edit", r.editOnMid)
-						all = append(all, built{space, leaf, g, r, ss, ps.status, creator})
+						all = append(all, built{space, leaf, g, r, ss, ps, creator})
 					}
 				}
 			}
 		}
 		// Compare this user's copy right away; it keeps the working set small.
-		visible := map[uuid.UUID]bool{}
-		rows, err := pool.Query(ctx, "SELECT page_id FROM perm_visible_pages($1)", ru.id)
-		if err != nil {
-			t.Fatal(err)
-		}
-		for rows.Next() {
-			var id uuid.UUID
-			if err := rows.Scan(&id); err != nil {
+		pagesIn := func(function string) map[uuid.UUID]bool {
+			t.Helper()
+			found := map[uuid.UUID]bool{}
+			rows, err := pool.Query(ctx, "SELECT page_id FROM "+function+"($1)", ru.id)
+			if err != nil {
 				t.Fatal(err)
 			}
-			visible[id] = true
+			defer rows.Close()
+			for rows.Next() {
+				var id uuid.UUID
+				if err := rows.Scan(&id); err != nil {
+					t.Fatal(err)
+				}
+				found[id] = true
+			}
+			return found
 		}
-		rows.Close()
+		visible, listed := pagesIn("perm_visible_pages"), pagesIn("perm_listed_pages")
 
 		facts, err := svc.LoadUser(ctx, pool, ru.id)
 		if err != nil {
 			t.Fatal(err)
 		}
 		for _, b := range all {
-			name := fmt.Sprintf("user=%s grant=%s restriction=%s page=%s space=%s", ru.name, b.g.name, b.r.name, b.pageStatus, b.spaceStatus)
+			name := fmt.Sprintf("user=%s grant=%s restriction=%s page=%s space=%s", ru.name, b.g.name, b.r.name, b.page.name, b.spaceStatus)
 			space, page, err := svc.LoadPage(ctx, pool, b.leaf)
 			if err != nil {
 				t.Fatalf("%s: %v", name, err)
 			}
-			want := literalRule(ru.userCase, b.g, b.r, b.pageStatus, b.creator == ru.id, b.spaceStatus, permissions.ActionPageView)
+			want := literalRule(ru.userCase, b.g, b.r, b.page, b.spaceStatus, permissions.ActionPageView)
 			if visible[b.leaf] != want {
 				t.Fatalf("%s: SQL said %v, rule says %v", name, visible[b.leaf], want)
 			}
+			if listed[b.leaf] != (want && !b.page.archived) {
+				t.Fatalf("%s: lists said %v, rule says %v", name, listed[b.leaf], want && !b.page.archived)
+			}
 			for _, action := range actions {
 				d := permissions.Evaluate(permissions.Input{User: facts, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
-				if rule := literalRule(ru.userCase, b.g, b.r, b.pageStatus, b.creator == ru.id, b.spaceStatus, action); d.Allowed != rule {
+				if rule := literalRule(ru.userCase, b.g, b.r, b.page, b.spaceStatus, action); d.Allowed != rule {
 					t.Fatalf("%s action=%s: loaded facts gave %v, rule says %v\nchecks: %+v", name, action, d.Allowed, rule, d.Checks)
 				}
 			}
 		}
 		all = all[:0]
+	}
+}
+
+// ActionApprovalRead is view without the rule on unpublished pages, and nothing else.
+func TestApprovalReadIsViewWithoutTheDraftRule(t *testing.T) {
+	reader, author, pageID := uuid.New(), uuid.New(), uuid.New()
+	in := func(p permissions.PageFacts, action string) permissions.Input {
+		p.ID, p.CreatedBy = pageID, author
+		return permissions.Input{
+			User:   permissions.UserFacts{ID: reader, Type: "member", Active: true, Global: []string{"use_product"}},
+			Space:  permissions.SpaceFacts{Status: "active", Grants: []permissions.Grant{{Subject: permissions.Subject{Type: permissions.SubjectUser, ID: reader}, Permission: permissions.SpaceView}}},
+			Page:   &p,
+			Action: action,
+		}
+	}
+	draft := permissions.PageFacts{Status: "draft", Kind: "page"}
+	if permissions.Evaluate(in(draft, permissions.ActionPageView)).Allowed {
+		t.Fatal("an unpublished page is private")
+	}
+	if !permissions.Evaluate(in(draft, permissions.ActionApprovalRead)).Allowed {
+		t.Fatal("someone named in a round reads what they were asked about")
+	}
+	restricted := draft
+	restricted.ViewChain = []permissions.RestrictionLevel{{PageID: pageID, Subjects: []permissions.Subject{{Type: permissions.SubjectUser, ID: author}}}}
+	template := draft
+	template.Kind = permissions.KindTemplate
+	trashed := draft
+	trashed.Status = "trashed"
+	for name, p := range map[string]permissions.PageFacts{"restricted": restricted, "template": template, "trashed": trashed} {
+		if permissions.Evaluate(in(p, permissions.ActionApprovalRead)).Allowed {
+			t.Fatalf("every other rule still counts: %s", name)
+		}
 	}
 }
 

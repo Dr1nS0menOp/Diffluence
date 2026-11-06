@@ -85,6 +85,12 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               <dt>{t('directory.administrators')}</dt>
               <dd>{facts.administrators.join(', ') || t('common.none')}</dd>
             </div>
+            {facts.owners.length > 0 && (
+              <div>
+                <dt>{t('spaceSettings.owners')}</dt>
+                <dd>{facts.owners.map((o) => o.name).join(', ')}</dd>
+              </div>
+            )}
             <div>
               <dt>{t('space.pages')}</dt>
               <dd>{facts.page_count}</dd>
@@ -105,6 +111,21 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               ))}
             </ul>
           </section>
+          {facts.posts.length > 0 && (
+            <section>
+              <h2>{t('blog.title')}</h2>
+              <ul className="page-list">
+                {facts.posts.map((p) => (
+                  <li key={p.id}>
+                    <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                    <span className="muted">
+                      <RelativeTime value={p.published_at} />
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
         </>
       )}
     </Frame>

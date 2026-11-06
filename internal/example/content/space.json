@@ -69,6 +69,37 @@
    ]
   },
   {
+   "slug": "organising",
+   "title": "Keeping things in order",
+   "document": "organising.json",
+   "emoji": "🗂️",
+   "labels": [
+    "getting-started",
+    "how-to"
+   ],
+   "stage": {
+    "text": "Being written",
+    "color": "blue"
+   }
+  },
+  {
+   "slug": "team-handbook",
+   "title": "Team handbook",
+   "document": "team-handbook.json",
+   "folder": true,
+   "children": [
+    {
+     "slug": "team-holidays",
+     "title": "Holidays",
+     "document": "team-holidays.json",
+     "emoji": "🏖️",
+     "labels": [
+      "how-to"
+     ]
+    }
+   ]
+  },
+  {
    "slug": "wide-page",
    "title": "A wide page",
    "document": "wide-page.json",
@@ -98,6 +129,27 @@
   {
    "label": "Source code",
    "target": "https://github.com/Dr1nS0menOp/Diffluence"
+  }
+ ],
+ "posts": [
+  {
+   "title": "Welcome to the blog",
+   "document": "post-welcome.json",
+   "labels": [
+    "getting-started"
+   ]
+  }
+ ],
+ "templates": [
+  {
+   "name": "Team update",
+   "description": "What the team did this week",
+   "category": "Teams",
+   "document": "template-team-update.json",
+   "labels": [
+    "update"
+   ],
+   "title_pattern": "Team update {date}"
   }
  ]
 }

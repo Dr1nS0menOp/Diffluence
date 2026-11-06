@@ -19,12 +19,14 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/trash"
 )
 
@@ -49,8 +51,12 @@ type Space struct {
 	UpdatedAt   time.Time       `json:"updated_at"`
 	Favourite   bool            `json:"favourite"`
 	Can         map[string]bool `json:"can,omitempty"`
-
-	Features *permissions.Features `json:"features,omitempty"`
+	// The settings of a space.
+	HasIcon          bool            `json:"has_icon"`
+	TitleAlign       string          `json:"title_align"`
+	ReviewMonths     int             `json:"review_months"`
+	ApprovalRequired bool            `json:"approval_required"`
+	Features         map[string]bool `json:"features,omitempty"`
 }
 
 // Input is what a user fills in.
@@ -67,12 +73,14 @@ type Service struct {
 	perms      *permissions.Service
 	pages      *pages.Service
 	settings   *settings.Service
+	features   *features.Service
+	store      storage.Store
 	instanceID uuid.UUID
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, st *settings.Service, instanceID uuid.UUID) *Service {
-	return &Service{pool: pool, perms: perms, pages: pg, settings: st, instanceID: instanceID}
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, st *settings.Service, ft *features.Service, store storage.Store, instanceID uuid.UUID) *Service {
+	return &Service{pool: pool, perms: perms, pages: pg, settings: st, features: ft, store: store, instanceID: instanceID}
 }
 
 var keyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$`)
@@ -92,11 +100,13 @@ func (in *Input) validate() error {
 	return nil
 }
 
-const columns = "id, key, name, description, icon, status, home_page_id, created_by, created_at, updated_at"
+const columns = `id, key, name, description, icon, status, home_page_id, created_by, created_at, updated_at,
+	icon_object <> '', title_align, review_months, approval_required`
 
 func scan(r pgx.Row) (Space, error) {
 	var s Space
-	err := r.Scan(&s.ID, &s.Key, &s.Name, &s.Description, &s.Icon, &s.Status, &s.HomePageID, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt)
+	err := r.Scan(&s.ID, &s.Key, &s.Name, &s.Description, &s.Icon, &s.Status, &s.HomePageID, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt,
+		&s.HasIcon, &s.TitleAlign, &s.ReviewMonths, &s.ApprovalRequired)
 	return s, err
 }
 
@@ -132,7 +142,13 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 	var out Space
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		id := ids.New()
-		var err error
+		taken, err := keyTaken(ctx, tx, in.Key, id)
+		if err != nil {
+			return err
+		}
+		if taken {
+			return apperr.Conflict("key_taken", "This key is already in use.")
+		}
 		out, err = scan(tx.QueryRow(ctx, `INSERT INTO spaces (id, origin_instance_id, key, name, description, icon, status, created_by)
 			VALUES ($1, $2, $3, $4, $5, $6, 'active', $7) RETURNING `+columns,
 			id, s.instanceID, in.Key, in.Name, in.Description, in.Icon, c.UserID))
@@ -143,6 +159,9 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 			return err
 		}
 		if err := permissions.ApplyTemplateTx(ctx, tx, id, permissions.Subject{Type: permissions.SubjectUser, ID: c.UserID}, permissions.TemplateSpaceAdmin); err != nil {
+			return err
+		}
+		if err := s.features.Start(ctx, tx, id); err != nil {
 			return err
 		}
 		if err := record(ctx, tx, c, "space.created", out, map[string]any{"name": out.Name}); err != nil {
@@ -181,7 +200,7 @@ func collect(rows pgx.Rows, err error) ([]Space, error) {
 // ListAll returns every space that is not in the trash. The route requires
 // administrator. It shows metadata only: administrators get no content access.
 func (s *Service) ListAll(ctx context.Context) ([]Space, error) {
-	rows, err := s.pool.Query(ctx, "SELECT "+columns+" FROM spaces WHERE status <> 'trashed' ORDER BY lower(name), id")
+	rows, err := s.pool.Query(ctx, "SELECT "+columns+" FROM spaces WHERE status <> 'trashed' AND NOT system ORDER BY lower(name), id")
 	return collect(rows, err)
 }
 
@@ -198,11 +217,9 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 	if err != nil {
 		return sp, err
 	}
-	features, err := s.perms.LoadFeatures(ctx, s.pool, id)
-	if err != nil {
+	if sp.Features, err = s.features.ForSpace(ctx, s.pool, id); err != nil {
 		return sp, err
 	}
-	sp.Features = &features
 	sp.Can = map[string]bool{}
 	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport} {
 		d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, id, action)
@@ -217,7 +234,8 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 // GetByKey resolves a key, and then behaves like Get.
 func (s *Service) GetByKey(ctx context.Context, c identity.Caller, key string) (Space, error) {
 	var id uuid.UUID
-	err := s.pool.QueryRow(ctx, "SELECT id FROM spaces WHERE lower(key) = lower($1)", key).Scan(&id)
+	err := s.pool.QueryRow(ctx, `SELECT id FROM spaces WHERE lower(key) = lower($1)
+		UNION ALL SELECT space_id FROM space_key_aliases WHERE alias = lower($1) LIMIT 1`, key).Scan(&id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return Space{}, apperr.NotFound()
 	}

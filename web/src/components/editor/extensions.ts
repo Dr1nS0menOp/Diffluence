@@ -3,10 +3,10 @@ import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
-import { AttachmentFile, AttachmentImage } from './attachments';
+import { AttachmentFile, AttachmentImage, pageFileAddress, type FileAddress } from './attachments';
 import { Column, Columns, Decision, Expand, Panel } from './blocks';
 import { CodeBlock } from './code';
-import { DateMark, Status } from './inline';
+import { DateMark, Instruction, Status, TemplateField } from './inline';
 import { BlockFormat, Highlight, Subscript, Superscript, TextColor } from './marks';
 import { Mention } from './people';
 import { DocumentCell, DocumentHeaderCell } from './table';
@@ -43,7 +43,15 @@ const DocumentTaskItem = TaskItem.extend({
 export type TaskToggle = (id: string, done: boolean) => void;
 
 /** Everything a document can hold, for reading and for writing. */
-export function documentExtensions(onTask?: TaskToggle): AnyExtension[] {
+export interface DocumentOptions {
+  fileAddress?: FileAddress;
+  onTask?: TaskToggle;
+}
+
+export function documentExtensions({
+  fileAddress = pageFileAddress,
+  onTask,
+}: DocumentOptions = {}): AnyExtension[] {
   return [
     StarterKit.configure({
       codeBlock: false,
@@ -69,8 +77,8 @@ export function documentExtensions(onTask?: TaskToggle): AnyExtension[] {
     DocumentCell,
     DocumentHeaderCell,
     CodeBlock,
-    AttachmentImage,
-    AttachmentFile,
+    AttachmentImage.configure({ fileAddress }),
+    AttachmentFile.configure({ fileAddress }),
     Panel,
     Expand,
     Columns,
@@ -79,6 +87,8 @@ export function documentExtensions(onTask?: TaskToggle): AnyExtension[] {
     Status,
     DateMark,
     Mention,
+    TemplateField,
+    Instruction,
     TextColor,
     Highlight,
     Subscript,

@@ -15,6 +15,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -98,11 +99,11 @@ func (s *Service) reactionsOn(ctx context.Context, q db.Querier, spaceID uuid.UU
 	if err != nil {
 		return false, err
 	}
-	f, err := s.perms.LoadFeatures(ctx, q, spaceID)
+	on, err := s.features.Enabled(ctx, q, spaceID, features.Reactions)
 	if err != nil {
 		return false, err
 	}
-	return values.ReactionsEnabled && f.Reactions, nil
+	return values.ReactionsEnabled && on, nil
 }
 
 // SetReaction adds or removes the caller's own reaction.

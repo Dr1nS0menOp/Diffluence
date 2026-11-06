@@ -57,13 +57,13 @@ func collectList(rows pgx.Rows, err error) ([]ListItem, error) {
 }
 
 // Recent lists pages for one tab of the Recent screen, as far as the user may
-// still see them. Every tab goes through perm_visible_pages.
+// still see them. Every tab goes through perm_listed_pages.
 func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([]ListItem, error) {
 	switch kind {
 	case "", RecentVisited:
 		rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, p.space_id, s.key, s.name, r.viewed_at, p.status = 'draft'
 			FROM recent_pages r
-			JOIN perm_visible_pages($1) v ON v.page_id = r.page_id
+			JOIN perm_listed_pages($1) v ON v.page_id = r.page_id
 			JOIN pages p ON p.id = r.page_id
 			JOIN spaces s ON s.id = p.space_id
 			WHERE r.user_id = $1 ORDER BY r.viewed_at DESC LIMIT $2`, c.UserID, maxRecentPages)
@@ -75,7 +75,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 					UNION ALL
 					SELECT page_id, created_at FROM comments WHERE author_id = $1 AND trash_item_id IS NULL
 				) made GROUP BY page_id) w
-			JOIN perm_visible_pages($1) v ON v.page_id = w.page_id
+			JOIN perm_listed_pages($1) v ON v.page_id = w.page_id
 			JOIN pages p ON p.id = w.page_id
 			JOIN spaces s ON s.id = p.space_id
 			ORDER BY w.at DESC LIMIT $2`, c.UserID, maxRecentPages)
@@ -84,7 +84,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 		rows, err := s.pool.Query(ctx, `SELECT p.id, COALESCE(NULLIF(d.title, ''), p.title), p.emoji, p.space_id, s.key, s.name,
 				COALESCE(d.updated_at, p.updated_at), p.status = 'draft'
 			FROM pages p
-			JOIN perm_visible_pages($1) v ON v.page_id = p.id
+			JOIN perm_listed_pages($1) v ON v.page_id = p.id
 			JOIN spaces s ON s.id = p.space_id
 			LEFT JOIN drafts d ON d.page_id = p.id AND d.user_id = $1
 			WHERE d.page_id IS NOT NULL OR (p.status = 'draft' AND p.created_by = $1)
@@ -99,7 +99,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 func (s *Service) Favourites(ctx context.Context, c identity.Caller) ([]ListItem, error) {
 	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, p.space_id, s.key, s.name, f.created_at, p.status = 'draft'
 		FROM favourites f
-		JOIN perm_visible_pages($1) v ON v.page_id = f.page_id
+		JOIN perm_listed_pages($1) v ON v.page_id = f.page_id
 		JOIN pages p ON p.id = f.page_id
 		JOIN spaces s ON s.id = p.space_id
 		WHERE f.user_id = $1 ORDER BY f.position NULLS FIRST, f.created_at DESC LIMIT $2`, c.UserID, maxFavouritePages)
@@ -133,7 +133,7 @@ func (s *Service) OrderFavourites(ctx context.Context, c identity.Caller, pageID
 // RecentSpaceIDs lists the spaces of recently visited pages, newest first.
 func (s *Service) RecentSpaceIDs(ctx context.Context, c identity.Caller) ([]uuid.UUID, error) {
 	rows, err := s.pool.Query(ctx, `SELECT p.space_id FROM recent_pages r
-		JOIN perm_visible_pages($1) v ON v.page_id = r.page_id
+		JOIN perm_listed_pages($1) v ON v.page_id = r.page_id
 		JOIN pages p ON p.id = r.page_id
 		WHERE r.user_id = $1 GROUP BY p.space_id ORDER BY max(r.viewed_at) DESC LIMIT $2`, c.UserID, maxRecentSpaces*2)
 	if err != nil {
@@ -154,14 +154,14 @@ func (s *Service) Activity(ctx context.Context, c identity.Caller, spaceID uuid.
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceView); err != nil {
 		return out, err
 	}
-	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
+	err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		WHERE p.space_id = $2 AND p.status = 'published'`, c.UserID, spaceID).Scan(&out.PageCount)
 	if err != nil {
 		return out, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, p.space_id, s.key, s.name, p.updated_at, false
 		FROM pages p
-		JOIN perm_visible_pages($1) v ON v.page_id = p.id
+		JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		JOIN spaces s ON s.id = p.space_id
 		WHERE p.space_id = $2 AND p.status = 'published'
 		ORDER BY p.updated_at DESC, p.id LIMIT $3`, c.UserID, spaceID, recentChangeCount)

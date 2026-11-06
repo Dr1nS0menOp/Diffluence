@@ -5,6 +5,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"mime"
 	"net/http"
 	"strconv"
@@ -150,6 +151,9 @@ type spaceBody struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
 	Icon        string `json:"icon"`
+	// When creating: which space template, and which permission set.
+	TemplateID *uuid.UUID `json:"template_id"`
+	Preset     string     `json:"preset"`
 }
 
 func (b spaceBody) input() spaces.Input {
@@ -171,7 +175,21 @@ func (s *Server) handleSpaceCreate(w http.ResponseWriter, r *http.Request) {
 		badBody(w)
 		return
 	}
-	sp, err := s.deps.Spaces.Create(r.Context(), s.caller(r), in.input())
+	var sp spaces.Space
+	var err error
+	if in.TemplateID != nil {
+		sp, err = s.deps.Templates.StartSpace(r.Context(), s.caller(r), in.input(), *in.TemplateID)
+	} else {
+		sp, err = s.deps.Spaces.Create(r.Context(), s.caller(r), in.input())
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	preset, err := s.deps.Spaces.StartingPreset(r.Context(), in.Preset)
+	if err == nil && preset != "" {
+		err = s.deps.Permissions.ApplyPreset(r.Context(), s.caller(r), sp.ID, preset)
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -313,7 +331,8 @@ func (s *Server) handleTrashList(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	items, err := s.deps.Trash.ListSpace(r.Context(), s.caller(r), id)
+	q := r.URL.Query()
+	items, err := s.deps.Trash.ListSpace(r.Context(), s.caller(r), id, q.Get("q"), q.Get("sort"))
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -334,12 +353,16 @@ func (s *Server) handlePageCreate(w http.ResponseWriter, r *http.Request) {
 		SpaceID  uuid.UUID  `json:"space_id"`
 		ParentID *uuid.UUID `json:"parent_id"`
 		Title    string     `json:"title"`
+		Untitled bool       `json:"untitled"`
+		Kind     string     `json:"kind"`
+		Link     string     `json:"link"`
 	}
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return
 	}
-	p, err := s.deps.Pages.Create(r.Context(), s.caller(r), pages.NewPage{SpaceID: in.SpaceID, ParentID: in.ParentID, Title: in.Title})
+	p, err := s.deps.Pages.Create(r.Context(), s.caller(r), pages.NewPage{SpaceID: in.SpaceID, ParentID: in.ParentID, Title: in.Title,
+		Untitled: in.Untitled, Kind: in.Kind, Link: in.Link})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -416,13 +439,18 @@ func (s *Server) handlePublish(w http.ResponseWriter, r *http.Request) {
 		Summary     string          `json:"summary"`
 		Overwrite   bool            `json:"overwrite"`
 		Silent      bool            `json:"silent"`
+		Stage       *pages.Stage    `json:"stage"`
 	}
 	if decodeJSON(w, r, maxDocumentBody, &in) != nil {
 		badBody(w)
 		return
 	}
-	p, err := s.deps.Pages.Publish(r.Context(), s.caller(r), id, pages.PublishInput{Title: in.Title, Document: in.Document,
-		BaseVersion: in.BaseVersion, Summary: in.Summary, Overwrite: in.Overwrite, Silent: in.Silent})
+	publish := pages.PublishInput{Title: in.Title, Document: in.Document,
+		BaseVersion: in.BaseVersion, Summary: in.Summary, Overwrite: in.Overwrite, Silent: in.Silent}
+	if in.Stage != nil {
+		publish.SetStage, publish.StageText, publish.StageColor = true, in.Stage.Text, in.Stage.Color
+	}
+	p, err := s.deps.Pages.Publish(r.Context(), s.caller(r), id, publish)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -436,6 +464,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
+		SpaceID  *uuid.UUID `json:"space_id"`
 		ParentID *uuid.UUID `json:"parent_id"`
 		BeforeID *uuid.UUID `json:"before_id"`
 	}
@@ -443,7 +472,7 @@ func (s *Server) handleMove(w http.ResponseWriter, r *http.Request) {
 		badBody(w)
 		return
 	}
-	p, err := s.deps.Pages.Move(r.Context(), s.caller(r), id, pages.MoveInput{ParentID: in.ParentID, BeforeID: in.BeforeID})
+	p, err := s.deps.Pages.Move(r.Context(), s.caller(r), id, pages.MoveInput{SpaceID: in.SpaceID, ParentID: in.ParentID, BeforeID: in.BeforeID})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -457,14 +486,40 @@ func (s *Server) handleCopy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		ParentID        *uuid.UUID `json:"parent_id"`
-		IncludeChildren bool       `json:"include_children"`
+		SpaceID          *uuid.UUID `json:"space_id"`
+		ParentID         *uuid.UUID `json:"parent_id"`
+		IncludeChildren  bool       `json:"include_children"`
+		KeepLabels       bool       `json:"keep_labels"`
+		KeepRestrictions *bool      `json:"keep_restrictions"`
+		Prefix           string     `json:"prefix"`
+		Suffix           string     `json:"suffix"`
+		Find             string     `json:"find"`
+		Replace          string     `json:"replace"`
 	}
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return
 	}
-	p, err := s.deps.Pages.Copy(r.Context(), s.caller(r), id, pages.CopyInput{ParentID: in.ParentID, IncludeChildren: in.IncludeChildren})
+	copyInput := pages.CopyInput{SpaceID: in.SpaceID, ParentID: in.ParentID, IncludeChildren: in.IncludeChildren,
+		KeepLabels: in.KeepLabels, KeepRestrictions: in.KeepRestrictions,
+		Titles: pages.TitleChange{Prefix: in.Prefix, Suffix: in.Suffix, Find: in.Find, Replace: in.Replace}}
+	if in.IncludeChildren {
+		size, err := s.deps.Pages.BranchSize(r.Context(), s.caller(r), id)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		if pages.IsLargeCopy(size) {
+			job, err := s.deps.Pages.StartCopy(r.Context(), s.caller(r), id, copyInput)
+			if err != nil {
+				s.fail(w, r, err)
+				return
+			}
+			writeJSON(w, http.StatusAccepted, map[string]any{"job_id": job})
+			return
+		}
+	}
+	p, err := s.deps.Pages.Copy(r.Context(), s.caller(r), id, copyInput)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -801,6 +856,10 @@ func (s *Server) handleAttachmentContent(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	defer func() { _ = f.Close() }()
+	serveFile(w, r, a, f, download)
+}
+
+func serveFile(w http.ResponseWriter, r *http.Request, a attachments.Attachment, f io.ReadSeeker, download bool) {
 	h := w.Header()
 	h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 	h.Set("X-Content-Type-Options", "nosniff")
@@ -915,11 +974,43 @@ func (s *Server) handleFavourites(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
+	query, ok := searchQuery(w, r)
+	if !ok {
+		return
+	}
+	userID := s.caller(r).UserID
+	var err error
+	if query.MayNamePeople, err = s.deps.Identity.HasGlobalPermission(r.Context(), userID, identity.PermViewProfiles); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	results, err := s.deps.Search.Search(r.Context(), userID, query)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, results)
+}
+
+// searchQuery reads the filters from the address, so a search can be shared.
+func searchQuery(w http.ResponseWriter, r *http.Request) (search.Query, bool) {
 	q := r.URL.Query()
-	query := search.Query{Text: q.Get("q")}
+	query := search.Query{Text: q.Get("q"), IncludeArchived: q.Get("archived") == "1", Kinds: q["kind"], Labels: q["label"],
+		Stage: q.Get("stage"), TitlesOnly: q.Get("titles") == "1", ByDate: q.Get("sort") == "date"}
 	var bad error
 	if query.SpaceID, bad = optionalID(q.Get("space_id")); bad == nil {
 		query.AuthorID, bad = optionalID(q.Get("author_id"))
+	}
+	if bad == nil {
+		query.Below, bad = optionalID(q.Get("below"))
+	}
+	for _, value := range q["contributor"] {
+		id, err := uuid.Parse(value)
+		if err != nil {
+			bad = err
+			break
+		}
+		query.Contributors = append(query.Contributors, id)
 	}
 	parse := func(key string) time.Time {
 		if v := q.Get(key); v != "" && bad == nil {
@@ -940,12 +1031,7 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 	}
 	if bad != nil {
 		writeError(w, http.StatusBadRequest, "bad_request", "A search filter is not valid.")
-		return
+		return query, false
 	}
-	results, err := s.deps.Search.Search(r.Context(), s.caller(r).UserID, query)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"results": results})
+	return query, true
 }

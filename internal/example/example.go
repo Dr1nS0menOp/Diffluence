@@ -24,6 +24,7 @@ import (
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/diffluence/diffluence/internal/templates"
 )
 
 //go:embed content
@@ -55,6 +56,12 @@ type planComment struct {
 	Quote string `json:"quote"`
 }
 
+// planStage is the status of a page: a word from the list of the space, and its colour.
+type planStage struct {
+	Text  string `json:"text"`
+	Color string `json:"color"`
+}
+
 type planPage struct {
 	Slug           string        `json:"slug"`
 	Title          string        `json:"title"`
@@ -68,7 +75,27 @@ type planPage struct {
 	EditOnlyOwner  bool          `json:"edit_only_owner"`
 	Comments       []planComment `json:"comments"`
 	Reactions      []string      `json:"reactions"`
+	Labels         []string      `json:"labels"`
+	Stage          *planStage    `json:"stage"`
+	Folder         bool          `json:"folder"`
 	Children       []planPage    `json:"children"`
+}
+
+// planPost is a blog post of the space.
+type planPost struct {
+	Title    string   `json:"title"`
+	Document string   `json:"document"`
+	Labels   []string `json:"labels"`
+}
+
+// planTemplate is a template of the space.
+type planTemplate struct {
+	Name         string   `json:"name"`
+	Description  string   `json:"description"`
+	Category     string   `json:"category"`
+	Document     string   `json:"document"`
+	Labels       []string `json:"labels"`
+	TitlePattern string   `json:"title_pattern"`
 }
 
 type planShortcut struct {
@@ -84,6 +111,8 @@ type plan struct {
 	Home        string         `json:"home"`
 	HomeFiles   []string       `json:"home_files"`
 	Pages       []planPage     `json:"pages"`
+	Posts       []planPost     `json:"posts"`
+	Templates   []planTemplate `json:"templates"`
 	Shortcuts   []planShortcut `json:"shortcuts"`
 }
 
@@ -168,12 +197,13 @@ type Service struct {
 	attachments *attachments.Service
 	permissions *permissions.Service
 	comments    *comments.Service
+	templates   *templates.Service
 }
 
 // NewService creates the service.
 func NewService(id *identity.Service, st *settings.Service, sp *spaces.Service, pg *pages.Service,
-	att *attachments.Service, perms *permissions.Service, cm *comments.Service) *Service {
-	return &Service{identity: id, settings: st, spaces: sp, pages: pg, attachments: att, permissions: perms, comments: cm}
+	att *attachments.Service, perms *permissions.Service, cm *comments.Service, tpl *templates.Service) *Service {
+	return &Service{identity: id, settings: st, spaces: sp, pages: pg, attachments: att, permissions: perms, comments: cm, templates: tpl}
 }
 
 // OnNewInstance makes the example space on an instance that has never had a
@@ -238,7 +268,60 @@ func (s *Service) Create(ctx context.Context, c identity.Caller) (spaces.Space, 
 	if failure != nil {
 		return sp, failure
 	}
+	if err := s.makePosts(ctx, c, p, sp.ID, refs); err != nil {
+		return sp, err
+	}
+	if err := s.makeTemplates(ctx, c, p, sp.ID, refs); err != nil {
+		return sp, err
+	}
+	if err := s.spaces.SetOwners(ctx, c, sp.ID, []uuid.UUID{c.UserID}); err != nil {
+		return sp, err
+	}
 	return sp, s.setShortcuts(ctx, c, sp.ID, p, refs)
+}
+
+func (s *Service) makePosts(ctx context.Context, c identity.Caller, p plan, spaceID uuid.UUID, refs references) error {
+	for _, post := range p.Posts {
+		created, err := s.pages.Create(ctx, c, pages.NewPage{SpaceID: spaceID, Title: post.Title, Kind: pages.KindPost})
+		if err != nil {
+			return err
+		}
+		if err := s.fillIn(ctx, c, created.ID, post.Title, post.Document, 0, refs); err != nil {
+			return err
+		}
+		if err := s.addLabels(ctx, c, created.ID, post.Labels); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) makeTemplates(ctx context.Context, c identity.Caller, p plan, spaceID uuid.UUID, refs references) error {
+	for _, template := range p.Templates {
+		raw, err := content.ReadFile("content/" + template.Document)
+		if err != nil {
+			return fmt.Errorf("example: read %s: %w", template.Document, err)
+		}
+		filled, err := refs.fill(raw)
+		if err != nil {
+			return err
+		}
+		_, err = s.templates.Create(ctx, c, &spaceID, templates.Input{Name: template.Name, Description: template.Description,
+			Category: template.Category, Labels: template.Labels, TitlePattern: template.TitlePattern, Document: filled})
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *Service) addLabels(ctx context.Context, c identity.Caller, pageID uuid.UUID, labels []string) error {
+	for _, label := range labels {
+		if _, err := s.pages.AddLabel(ctx, c, pageID, label); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (s *Service) upload(ctx context.Context, c identity.Caller, pageID uuid.UUID, names []string, refs references) error {
@@ -328,11 +411,32 @@ func (s *Service) finish(ctx context.Context, c identity.Caller, page planPage, 
 	if err := s.respond(ctx, c, page, id); err != nil {
 		return err
 	}
+	if err := s.organise(ctx, c, page, id); err != nil {
+		return err
+	}
 	if !page.EditOnlyOwner {
 		return nil
 	}
 	owner := permissions.Subject{Type: permissions.SubjectUser, ID: c.UserID}
 	return s.permissions.SetRestrictions(ctx, c, id, "edit", []permissions.Subject{owner})
+}
+
+// organise gives a page its labels and status, and turns it into a folder last,
+// because a folder keeps its text in its versions.
+func (s *Service) organise(ctx context.Context, c identity.Caller, page planPage, id uuid.UUID) error {
+	if err := s.addLabels(ctx, c, id, page.Labels); err != nil {
+		return err
+	}
+	if page.Stage != nil {
+		if _, err := s.pages.SetStage(ctx, c, id, page.Stage.Text, page.Stage.Color); err != nil {
+			return err
+		}
+	}
+	if !page.Folder {
+		return nil
+	}
+	_, err := s.pages.SetKind(ctx, c, id, pages.KindFolder)
+	return err
 }
 
 // respond adds the comments and reactions of a page, after its real text is there.

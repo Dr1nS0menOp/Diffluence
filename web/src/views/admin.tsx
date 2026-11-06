@@ -17,8 +17,20 @@ import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
 import { AppearanceSection } from './admin-appearance';
+import { OrganisingTab, TemplatesTab } from './admin-organising';
 
-const TABS = ['users', 'groups', 'spaces', 'audit', 'settings', 'mail', 'scim', 'system'] as const;
+const TABS = [
+  'users',
+  'groups',
+  'spaces',
+  'templates',
+  'organising',
+  'audit',
+  'settings',
+  'mail',
+  'scim',
+  'system',
+] as const;
 const MAIL_SWITCHES = ['mail_enabled', 'mail_excerpts', 'reactions_enabled', 'group_mentions'] as const;
 
 function GlobalPermissions({ current, onChange }: { current: string[]; onChange: (next: string[]) => void }) {
@@ -906,6 +918,8 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
           {tab === 'users' && <UsersTab />}
           {tab === 'groups' && <GroupsTab />}
           {tab === 'spaces' && <SpacesTab />}
+          {tab === 'templates' && <TemplatesTab />}
+          {tab === 'organising' && <OrganisingTab />}
           {tab === 'audit' && <AuditTab />}
           {tab === 'settings' && <SettingsTab />}
           {tab === 'mail' && <MailTab />}

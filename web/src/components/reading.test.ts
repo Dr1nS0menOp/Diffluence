@@ -79,6 +79,11 @@ const node = (id: string, parent: string | null, title: string, extra: Partial<T
   updated_at: '2026-01-01T00:00:00Z',
   updated_by_name: '',
   visited_at: null,
+  kind: 'page',
+  link_target: '',
+  owner_name: '',
+  stage_text: '',
+  stage_color: '',
   ...extra,
 });
 
@@ -139,7 +144,7 @@ describe('the tree', () => {
 });
 
 describe('quick search', () => {
-  const labels = { pages: 'Pages', spaces: 'Spaces', files: 'Files', people: 'People' };
+  const labels = { pages: 'Pages', posts: 'Blog posts', spaces: 'Spaces', files: 'Files', people: 'People' };
 
   it('puts the groups in order, so arrows follow what is on screen', () => {
     const results: QuickResults = {

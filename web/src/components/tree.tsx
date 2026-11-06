@@ -13,15 +13,18 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Page, type PageSummary, type TreeNode } from '../api';
+import { BulkMoveDialog } from '../views/move-dialogs';
 import { Link } from '../router';
 import { usePreferences } from '../preferences';
 import {
+  IconArchive,
   IconChevronDown,
   IconChevronRight,
   IconCollapse,
   IconCopy,
   IconExternal,
   IconEye,
+  IconFolder,
   IconLink,
   IconLocate,
   IconLock,
@@ -30,12 +33,14 @@ import {
   IconPage,
   IconPlus,
   IconRename,
+  IconSortDown,
   IconStar,
+  IconTask,
   IconTrash,
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuSeparator } from './menu';
 import { personalKey, usePerson } from '../personal';
-import { useCopy } from './toast';
+import { useCopy, useToast } from './toast';
 import {
   ancestorsOf,
   buildTree,
@@ -46,8 +51,11 @@ import {
   isBranchOpen,
   matchParts,
   openBranch,
+  PAGE_DRAG_TYPE,
+  rangeOfRows,
   readBranchMemory,
   revealPage,
+  toggleRow,
   typeAheadRow,
   type Branch,
   type BranchMemory,
@@ -66,7 +74,7 @@ const TYPE_AHEAD_MS = 700;
 const SCROLL_EDGE_PX = 40;
 const SCROLL_STEP_PX = 12;
 
-export type RowDialog = 'rename' | 'move' | 'copy' | 'delete';
+export type RowDialog = 'rename' | 'move' | 'copy' | 'delete' | 'archive' | 'sort' | 'folder' | 'page';
 
 /** Collapsed branches stay collapsed while the reader moves through the space. */
 function useBranchMemory(spaceId: string): [BranchMemory, (next: BranchMemory) => void] {
@@ -143,6 +151,26 @@ function RowActions({
               <IconCopy size={MENU_ICON_SIZE} /> {t('page.copy')}
             </MenuItem>
           )}
+          {page.can['page.edit'] && page.kind === 'page' && (
+            <MenuItem onClick={() => onDialog(page, 'folder')}>
+              <IconFolder size={MENU_ICON_SIZE} /> {t('organise.turnInto_folder')}
+            </MenuItem>
+          )}
+          {page.can['page.edit'] && page.kind === 'folder' && (
+            <MenuItem onClick={() => onDialog(page, 'page')}>
+              <IconPage size={MENU_ICON_SIZE} /> {t('organise.turnInto_page')}
+            </MenuItem>
+          )}
+          {page.can['page.edit'] && (
+            <MenuItem onClick={() => onDialog(page, 'sort')}>
+              <IconSortDown size={MENU_ICON_SIZE} /> {t('organise.sortLevel')}
+            </MenuItem>
+          )}
+          {page.can['page.archive'] && (
+            <MenuItem onClick={() => onDialog(page, 'archive')}>
+              <IconArchive size={MENU_ICON_SIZE} /> {t('organise.archivePage')}
+            </MenuItem>
+          )}
           {page.can['page.delete'] && (
             <>
               <MenuSeparator />
@@ -172,6 +200,12 @@ function RowMarks({ node }: { node: TreeNode }) {
   return (
     <>
       {node.status === 'draft' && <span className="visually-hidden">{t('tree.unpublished')}</span>}
+      {node.kind === 'link' && (
+        <span className="node-mark" title={t('space.opensNewTab')}>
+          <IconExternal size={MARK_ICON_SIZE} />
+          <span className="visually-hidden">{t('space.opensNewTab')}</span>
+        </span>
+      )}
       {node.restricted && (
         <span className="node-mark" title={t('page.restricted')}>
           <IconLock size={MARK_ICON_SIZE} />
@@ -246,6 +280,8 @@ function RowCard({
         {t('tree.changedBy', { name: node.updated_by_name || t('common.unknown') })}{' '}
         <RelativeTime value={node.updated_at} />
       </span>
+      {node.owner_name && <span className="muted">{t('tree.ownedBy', { name: node.owner_name })}</span>}
+      {node.stage_text && <span className="muted">{node.stage_text}</span>}
     </div>
   );
 }
@@ -259,27 +295,61 @@ interface RowProps {
   onDialog: (page: PageSummary, dialog: RowDialog) => void;
   onFocusRow: (id: string) => void;
   card: ReturnType<typeof useRowCard>;
+  picking: boolean;
+  picked: boolean;
+  onPick: (id: string, range: boolean) => void;
 }
 
-function RowLink({ node, current, filter, tabStop, onFocusRow, card }: RowProps) {
+function RowLink({ node, current, filter, tabStop, onFocusRow, card, picking, picked, onPick }: RowProps) {
+  const { t } = useTranslation();
+  const shared = {
+    draggable: false,
+    'data-row': node.id,
+    tabIndex: tabStop ? 0 : -1,
+    onFocus: (e: { currentTarget: HTMLElement }) => {
+      onFocusRow(node.id);
+      card.show(node, e.currentTarget);
+    },
+    onBlur: card.hide,
+    onMouseEnter: (e: { currentTarget: HTMLElement }) => card.show(node, e.currentTarget),
+    onMouseLeave: card.hide,
+    onClick: (e: { preventDefault: () => void; shiftKey: boolean }) => {
+      if (!picking) return;
+      e.preventDefault();
+      onPick(node.id, e.shiftKey);
+    },
+  };
+  if (node.kind === 'link') {
+    return (
+      <a {...shared} href={node.link_target} target="_blank" rel="noopener noreferrer">
+        <RowTitle node={node} filter={filter} />
+      </a>
+    );
+  }
   return (
     <Link
+      {...shared}
       href={`/pages/${node.id}`}
-      draggable={false}
-      data-row={node.id}
-      tabIndex={tabStop ? 0 : -1}
       className={node.status === 'draft' ? 'unpublished' : undefined}
       aria-current={node.id === current ? 'page' : undefined}
-      onFocus={(e) => {
-        onFocusRow(node.id);
-        card.show(node, e.currentTarget);
-      }}
-      onBlur={card.hide}
-      onMouseEnter={(e) => card.show(node, e.currentTarget)}
-      onMouseLeave={card.hide}
     >
       <RowTitle node={node} filter={filter} />
+      {picked && <span className="visually-hidden"> {t('tree.selected')}</span>}
     </Link>
+  );
+}
+
+function RowCheck({ node, picked, onPick }: RowProps) {
+  const { t } = useTranslation();
+  return (
+    <input
+      type="checkbox"
+      className="row-check"
+      tabIndex={-1}
+      aria-label={t('favourites.pick', { title: node.title })}
+      checked={picked}
+      onChange={(e) => onPick(node.id, (e.nativeEvent as MouseEvent).shiftKey)}
+    />
   );
 }
 
@@ -315,14 +385,18 @@ function RowTools({ node, tabStop, onAdd, onDialog }: RowProps) {
 }
 
 function RowIcon({ node }: { node: TreeNode }) {
+  const plain =
+    node.kind === 'folder' ? <IconFolder size={ROW_ICON_SIZE} /> : <IconPage size={ROW_ICON_SIZE} />;
   return (
     <span className="twist">
       {node.emoji ? (
         <span className="page-emoji" aria-hidden="true">
           {node.emoji}
         </span>
+      ) : node.kind === 'link' ? (
+        <IconLink size={ROW_ICON_SIZE} />
       ) : (
-        <IconPage size={ROW_ICON_SIZE} />
+        plain
       )}
     </span>
   );
@@ -336,6 +410,7 @@ function FlatList({ nodes, row }: { nodes: TreeNode[]; row: (node: TreeNode) => 
         return (
           <li key={node.id}>
             <div className={node.id === props.current ? 'node current' : 'node'}>
+              {props.picking && <RowCheck {...props} />}
               <RowIcon node={node} />
               <RowLink {...props} />
               <RowMarks node={node} />
@@ -359,6 +434,8 @@ export function PageTree({
   onMemory,
   onAdd,
   onDialog,
+  selection,
+  onSelection,
 }: {
   spaceId: string;
   nodes: TreeNode[];
@@ -370,6 +447,9 @@ export function PageTree({
   onMemory: (next: BranchMemory) => void;
   onAdd?: (parent: string) => void;
   onDialog: (page: PageSummary, dialog: RowDialog) => void;
+  /** The picked rows while Select is on. */
+  selection: string[] | null;
+  onSelection: (next: string[]) => void;
 }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -385,6 +465,7 @@ export function PageTree({
   const [focusRow, setFocusRow] = useState<string | undefined>();
   const openTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const typed = useRef({ text: '', at: 0 });
+  const anchor = useRef('');
 
   // Going to a page reveals it, also in a collapsed branch. Only a new page does:
   // collapsing the branch you are in must stay possible.
@@ -434,6 +515,15 @@ export function PageTree({
     if (id && id !== parent && id !== before) move.mutate({ id, parent_id: parent, before_id: before });
   };
 
+  const pick = (id: string, range: boolean) => {
+    if (!selection) return;
+    const order = visibleRows().map((row) => row.dataset.row ?? '');
+    onSelection(
+      range && anchor.current ? rangeOfRows(order, selection, anchor.current, id) : toggleRow(selection, id),
+    );
+    anchor.current = id;
+  };
+
   const moveFocus = (row: HTMLAnchorElement | undefined) => row?.focus();
   const typeAhead = (key: string, rows: HTMLAnchorElement[], at: number) => {
     const now = Date.now();
@@ -464,6 +554,8 @@ export function PageTree({
       const parent = nodes.find((n) => n.id === id)?.parent_id;
       if (toggle && isOpen) onMemory(collapseBranch(memory, id));
       else if (parent) moveFocus(rows.find((r) => r.dataset.row === parent));
+    } else if (e.key === ' ' && selection) {
+      pick(id, e.shiftKey);
     } else if (e.key.length === 1 && e.key !== ' ' && view === 'tree') {
       typeAhead(e.key, rows, at);
     } else {
@@ -483,6 +575,9 @@ export function PageTree({
     onDialog,
     onFocusRow: setFocusRow,
     card,
+    picking: selection !== null,
+    picked: selection?.includes(node.id) ?? false,
+    onPick: pick,
   });
 
   const render = (list: Branch[], depth: number): ReactNode => (
@@ -512,6 +607,7 @@ export function PageTree({
               onDragStart={(e) => {
                 e.dataTransfer.effectAllowed = 'move';
                 e.dataTransfer.setData('text/plain', b.title);
+                e.dataTransfer.setData(PAGE_DRAG_TYPE, b.id);
                 setDragging(b.id);
               }}
               onDragEnd={() => {
@@ -529,6 +625,7 @@ export function PageTree({
               }}
               onDrop={(e) => finish(e, b.id, null)}
             >
+              {selection !== null && <RowCheck {...rowProps(b)} />}
               {hasChildren ? (
                 <button
                   type="button"
@@ -586,6 +683,50 @@ export function PageTree({
   );
 }
 
+/** What can be done to several rows at once. */
+function SelectionBar({
+  spaceId,
+  picked,
+  onDone,
+}: {
+  spaceId: string;
+  picked: string[];
+  onDone: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const toast = useToast();
+  const [moving, setMoving] = useState(false);
+  const archive = useMutation({
+    mutationFn: async () => {
+      const answers = await Promise.allSettled(
+        picked.map((id) => api.post(`/pages/${id}/archive`, { include_children: true })),
+      );
+      return answers.filter((a) => a.status === 'fulfilled').length;
+    },
+    onSuccess: async (done) => {
+      await client.invalidateQueries({ queryKey: ['tree', spaceId] });
+      toast({ message: t('move.archived', { done, failed: picked.length - done }) });
+      onDone();
+    },
+  });
+  return (
+    <div className="select-bar" role="group" aria-label={t('tree.select')}>
+      <span role="status">{t('content.selected', { count: picked.length })}</span>
+      <button type="button" disabled={picked.length === 0} onClick={() => setMoving(true)}>
+        {t('page.move')}
+      </button>
+      <button type="button" disabled={picked.length === 0} onClick={() => archive.mutate()}>
+        {t('organise.archivePage')}
+      </button>
+      <ErrorNote error={archive.error} />
+      {moving && (
+        <BulkMoveDialog ids={picked} spaceId={spaceId} onClose={() => setMoving(false)} onDone={onDone} />
+      )}
+    </div>
+  );
+}
+
 /** The heading, tools, filter and tree of a space's sidebar. */
 export function PagesSection({
   spaceId,
@@ -594,6 +735,7 @@ export function PagesSection({
   canMove,
   onAdd,
   onAddRoot,
+  onAddLink,
   onDialog,
 }: {
   spaceId: string;
@@ -602,12 +744,14 @@ export function PagesSection({
   canMove: boolean;
   onAdd?: (parent: string) => void;
   onAddRoot?: () => void;
+  onAddLink?: () => void;
   onDialog: (page: PageSummary, dialog: RowDialog) => void;
 }) {
   const { t } = useTranslation();
   const { preferences, update } = usePreferences();
   const [memory, setMemory] = useBranchMemory(spaceId);
   const [filter, setFilter] = useState('');
+  const [selection, setSelection] = useState<string[] | null>(null);
   const view = TREE_VIEWS.find((v) => v === preferences.tree_view) ?? 'tree';
   const showCurrent = () => {
     setFilter('');
@@ -653,6 +797,29 @@ export function PagesSection({
               <IconPlus size={ROW_ICON_SIZE} />
             </button>
           )}
+          {onAddLink && (
+            <button
+              type="button"
+              className="node-add always"
+              aria-label={t('tree.addLink')}
+              title={t('tree.addLink')}
+              onClick={onAddLink}
+            >
+              <IconLink size={ROW_ICON_SIZE} />
+            </button>
+          )}
+          {canMove && (
+            <button
+              type="button"
+              className="node-add always"
+              aria-label={t('tree.select')}
+              title={t('tree.select')}
+              aria-pressed={selection !== null}
+              onClick={() => setSelection(selection === null ? [] : null)}
+            >
+              <IconTask size={ROW_ICON_SIZE} />
+            </button>
+          )}
         </span>
       </div>
       <div className="tree-controls">
@@ -689,7 +856,12 @@ export function PagesSection({
         onMemory={setMemory}
         onAdd={onAdd}
         onDialog={onDialog}
+        selection={selection}
+        onSelection={setSelection}
       />
+      {selection !== null && (
+        <SelectionBar spaceId={spaceId} picked={selection} onDone={() => setSelection(null)} />
+      )}
     </>
   );
 }

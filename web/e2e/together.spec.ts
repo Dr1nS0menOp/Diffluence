@@ -351,7 +351,7 @@ test('closing comments stops new ones, and a space can turn them off', async ({ 
   });
   expect(refused.ok()).toBeFalsy();
 
-  const off = await page.request.patch(`/api/v1/spaces/${spaceId}/features`, {
+  const off = await page.request.put(`/api/v1/spaces/${spaceId}/features`, {
     data: { comments: false, reactions: false, access_requests: false },
   });
   expect(off.ok(), await off.text()).toBeTruthy();
@@ -508,8 +508,11 @@ test('a watcher hears about a change, unless it is published without notifying',
   await editorSettled(page);
   await page.keyboard.press('End');
   await page.keyboard.type(' Quietly.');
-  await page.getByRole('button', { name: 'More options' }).click();
-  await page.getByRole('menuitem', { name: 'Publish without notifying' }).click();
+  await page.getByRole('button', { name: 'Publish options' }).click();
+  const options = page.getByRole('dialog', { name: 'Publish options' });
+  await options.getByLabel('Notify watchers').uncheck();
+  await options.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Working agreement', level: 1 })).toBeVisible();
 
   await publish(page, pageId, 'Out loud.', 2);
@@ -561,7 +564,7 @@ test('asking for access only exists where the space allows it', async ({ page, b
   await expect(other.getByRole('alert')).toContainText('does not exist, or you cannot see it');
   await expect(other.getByRole('button', { name: 'Ask for access' })).toHaveCount(0);
 
-  const on = await page.request.patch(`/api/v1/spaces/${spaceId}/features`, {
+  const on = await page.request.put(`/api/v1/spaces/${spaceId}/features`, {
     data: { comments: true, reactions: true, access_requests: true },
   });
   expect(on.ok(), await on.text()).toBeTruthy();

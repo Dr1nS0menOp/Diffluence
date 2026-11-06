@@ -159,6 +159,17 @@ Use these. Reuse beats a new variant.
 | Code block | A header with title, language and Copy for readers. Always left-to-right |
 | Image | A `figure` with a caption, in three sizes or its own |
 
+## What organises a page
+
+- **Status** is always a word and a colour, in the style of a status mark in a document. It sits at the end of the byline.
+- **Verified and Approved** have an icon and a word.
+- **Labels** sit at the bottom of a page, as small quiet tags. Each has its own remove button, of at least 24 pixels.
+- **Notes on a page**, such as archived, scheduled and approval, use `.note` under the byline. Past review is a muted line, for editors only.
+- **The publish arrow** sits beside Publish, in the same colour, with a small gap.
+- **Fields and instruction text** in a template: a field has a dashed border, instruction text is muted and italic.
+- **Selected rows** have the accent tint and a real checkbox, so state never rests on colour.
+- A restricted item in the trash shows the words "A restricted page", with no title.
+
 ## Working together
 
 `web/src/design/together.css` holds comments, reactions, mentions, the bell and the feed.

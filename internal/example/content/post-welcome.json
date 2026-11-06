@@ -1,0 +1,15 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "A blog post is a page with a date, for news that does not need a place in the tree. It has the same editor, comments, reactions and labels." }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [{ "type": "text", "text": "Write your own with Blog post under Create." }]
+  }
+ ]
+}

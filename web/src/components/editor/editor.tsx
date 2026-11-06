@@ -9,13 +9,21 @@ import { CommentHighlights, refreshHighlights, type Highlight } from '../comment
 import { useCopy, useToast } from '../toast';
 import { ErrorNote } from '../ui';
 import type { ShownImage } from '../viewers';
-import { attachmentNode } from './attachments';
+import { attachmentNode, type FileAddress } from './attachments';
 import { BlockHandle, useBlockTracking } from './block-handle';
 import { documentExtensions, type TaskToggle } from './extensions';
 import { FindBar, FindReplace } from './find';
-import { EmojiSuggestions, InsertDialog, MentionSuggestions, SlashCommands } from './insert';
+import {
+  EmojiSuggestions,
+  INSERT_ITEMS,
+  InsertDialog,
+  MentionSuggestions,
+  SlashCommands,
+  TEMPLATE_ITEMS,
+} from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
 import { LinkDialog } from './link-dialog';
+import { TemplateItemDialog } from './template-item';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
 import { Toolbar } from './toolbar';
@@ -62,6 +70,7 @@ function usePrintOpensSections() {
 export function DocumentView({
   document,
   plain,
+  fileAddress,
   onImage,
   highlights,
   onFound,
@@ -71,6 +80,7 @@ export function DocumentView({
 }: {
   document: Json;
   plain?: boolean;
+  fileAddress?: FileAddress;
   onImage?: (images: ShownImage[], start: number) => void;
   highlights?: Highlight[];
   onFound?: (ids: string[]) => void;
@@ -93,7 +103,10 @@ export function DocumentView({
   const editor = useEditor(
     {
       extensions: [
-        ...documentExtensions(onTask ? (id, done) => tick.current?.(id, done) : undefined),
+        ...documentExtensions({
+          fileAddress,
+          onTask: onTask ? (id, done) => tick.current?.(id, done) : undefined,
+        }),
         TaskDates.configure({ overdueWord: t('tasks.overdue') }),
         ...(plain
           ? []
@@ -168,6 +181,8 @@ export function DocumentEditor({
   pageId,
   initial,
   canAttach,
+  inTemplate,
+  fileAddress,
   header,
   onChange,
   onPublish,
@@ -178,6 +193,8 @@ export function DocumentEditor({
   pageId: string;
   initial: Json;
   canAttach: boolean;
+  inTemplate?: boolean;
+  fileAddress?: FileAddress;
   header: ReactNode;
   onChange: (doc: Json) => void;
   onPublish: () => void;
@@ -193,6 +210,7 @@ export function DocumentEditor({
   const [linking, setLinking] = useState(false);
   const [inserting, setInserting] = useState(false);
   const [finding, setFinding] = useState(false);
+  const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const change = useRef(onChange);
   change.current = onChange;
@@ -227,8 +245,11 @@ export function DocumentEditor({
 
   const editor = useEditor({
     extensions: [
-      ...documentExtensions(),
-      SlashCommands.configure({ actions: () => actions.current }),
+      ...documentExtensions({ fileAddress }),
+      SlashCommands.configure({
+        actions: () => actions.current,
+        items: inTemplate ? [...INSERT_ITEMS, ...TEMPLATE_ITEMS] : INSERT_ITEMS,
+      }),
       EmojiSuggestions,
       MentionSuggestions.configure({ pageId, onNoAccess: (name) => actions.current.mentionNoAccess(name) }),
       FindReplace.configure({ onOpen: () => actions.current.openFind() }),
@@ -264,6 +285,7 @@ export function DocumentEditor({
     openLink: () => setLinking(true),
     openFind: () => setFinding(true),
     openBlockMenu: tracker.openAtCursor,
+    openTemplateItem: setTemplateItem,
     publish: onPublish,
     save: onSave,
     mentionNoAccess: (name) =>
@@ -319,6 +341,9 @@ export function DocumentEditor({
         <EditorContent editor={editor} />
       </div>
       {linking && <LinkDialog editor={editor} onClose={() => setLinking(false)} />}
+      {templateItem && (
+        <TemplateItemDialog editor={editor} what={templateItem} onClose={() => setTemplateItem(null)} />
+      )}
       {inserting && (
         <InsertDialog editor={editor} actions={actions.current} onClose={() => setInserting(false)} />
       )}

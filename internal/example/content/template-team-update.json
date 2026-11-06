@@ -1,0 +1,23 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "heading",
+   "attrs": { "level": 2 },
+   "content": [{ "type": "text", "text": "This week" }]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "Our focus: " },
+    { "type": "templateField", "attrs": { "name": "Focus", "kind": "line", "required": true } }
+   ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "instruction", "attrs": { "text": "Say what went well, and what is stuck. This line never reaches a reader." } }
+   ]
+  }
+ ]
+}

@@ -21,16 +21,19 @@ import {
   readingMinutes,
 } from '../components/editor/outline';
 import {
+  IconArchive,
   IconAttach,
   IconClock,
   IconComment,
   IconCopy,
   IconDownload,
   IconEye,
+  IconFolder,
   IconInfo,
   IconLock,
   IconMore,
   IconMove,
+  IconPage,
   IconPencil,
   IconPresent,
   IconPrint,
@@ -40,6 +43,15 @@ import {
   IconTrash,
 } from '../components/icons';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
+import { LabelBar } from '../components/page-labels';
+import {
+  ApprovalBanner,
+  ApprovalsDialog,
+  PageNotes,
+  StageControl,
+  VerifiedMark,
+  VerifyDialog,
+} from '../components/page-marks';
 import { MIN_HEADINGS_FOR_CONTENTS, PageContents } from '../components/page-contents';
 import { ChildPages, DetailsPanel } from '../components/page-details';
 import { ShareDialog } from '../components/share-dialog';
@@ -48,16 +60,25 @@ import { useToast } from '../components/toast';
 import { Avatar, ErrorNote, formatDay, Loading } from '../components/ui';
 import { Lightbox, Presentation, type ShownImage } from '../components/viewers';
 import { useDocumentTitle, useScrollMemory } from '../page-title';
-import {
-  AttachmentsDialog,
-  CopyDialog,
-  DeleteDialog,
-  MoveDialog,
-  RenameDialog,
-  RestrictionsDialog,
-} from './page-dialogs';
+import { CopyDialog, MoveDialog } from './move-dialogs';
+import { ArchiveDialog, KindDialog, SaveTemplateDialog } from './page-actions';
+import { AttachmentsDialog, DeleteDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
 
-type PageDialog = 'attachments' | 'restrictions' | 'move' | 'rename' | 'copy' | 'delete' | 'share';
+type PageDialog =
+  | 'attachments'
+  | 'restrictions'
+  | 'move'
+  | 'rename'
+  | 'copy'
+  | 'delete'
+  | 'share'
+  | 'approvals'
+  | 'verify'
+  | 'archive'
+  | 'template'
+  | 'folder'
+  | 'page'
+  | 'post';
 type WatchScope = 'page' | 'branch';
 
 interface WatchState {
@@ -133,7 +154,7 @@ function Byline({
   onComments: () => void;
 }) {
   const { t } = useTranslation();
-  const author = page.created_by_name || t('common.unknown');
+  const author = page.owner_name || page.created_by_name || t('common.unknown');
   const minutes = useMemo(() => readingMinutes(countWords(page.document)), [page.document]);
   return (
     <div className="byline">
@@ -141,6 +162,7 @@ function Byline({
       <button type="button" className="byline-author" onClick={onDetails}>
         {t('page.byline', { name: author })}
       </button>
+      {page.owner_disabled && <span className="muted">{t('content.noLongerActive')}</span>}
       <span aria-hidden="true">·</span>
       <span data-testid="last-updated">{t('page.lastUpdated', { date: formatDay(page.updated_at) })}</span>
       {page.current_version > 0 && (
@@ -164,6 +186,8 @@ function Byline({
         </>
       )}
       {page.restricted && <span className="lozenge">{t('page.restricted')}</span>}
+      <StageControl page={page} />
+      <VerifiedMark page={page} />
     </div>
   );
 }
@@ -271,6 +295,44 @@ function PageMenu({
       {page.can['page.create'] && published && (
         <MenuEntry icon={<IconCopy size={MENU_ICON_SIZE} />} onClick={() => onOpen('copy')}>
           {t('page.copy')}
+        </MenuEntry>
+      )}
+      <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('approvals')}>
+        {t('organise.approvals')}
+      </MenuEntry>
+      {page.can['page.verify'] && !page.verified && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('verify')}>
+          {t('organise.verify')}
+        </MenuEntry>
+      )}
+      {page.can['space.administer'] && published && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('template')}>
+          {t('organise.saveAsTemplate')}
+        </MenuEntry>
+      )}
+      {canEdit && page.kind === 'page' && (
+        <MenuEntry icon={<IconFolder size={MENU_ICON_SIZE} />} onClick={() => onOpen('folder')}>
+          {t('organise.turnInto_folder')}
+        </MenuEntry>
+      )}
+      {canEdit && page.kind === 'folder' && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
+          {t('organise.turnInto_page')}
+        </MenuEntry>
+      )}
+      {canEdit && !published && page.kind === 'page' && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('post')}>
+          {t('organise.turnInto_post')}
+        </MenuEntry>
+      )}
+      {canEdit && !published && page.kind === 'post' && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
+          {t('organise.turnInto_page')}
+        </MenuEntry>
+      )}
+      {page.can['page.archive'] && !page.archived_at && (
+        <MenuEntry icon={<IconArchive size={MENU_ICON_SIZE} />} onClick={() => onOpen('archive')}>
+          {t('organise.archivePage')}
         </MenuEntry>
       )}
       <MenuSeparator />
@@ -488,6 +550,7 @@ export function PageView({ pageId }: { pageId: string }) {
   const [lightbox, setLightbox] = useState<{ images: ShownImage[]; start: number } | null>(null);
   const [onImage, setOnImage] = useState<CommentAnchor | null>(null);
   const [reader, setReader] = useReaderMode();
+  const moveTo = useLocation().searchParams.get('move_to');
   const view = useRef<EditorView | null>(null);
   const keepView = useCallback((next: EditorView) => {
     view.current = next;
@@ -609,6 +672,8 @@ export function PageView({ pageId }: { pageId: string }) {
           onComments={() => openComments(null)}
         />
         <ErrorNote error={favourite.error} />
+        <PageNotes page={page} />
+        <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
         {page.status === 'draft' && (
           <p role="status" className="note">
             {t('page.unpublished')}
@@ -619,17 +684,27 @@ export function PageView({ pageId }: { pageId: string }) {
             <Link href={`/pages/${page.id}/edit`}>{t('page.draftExists')}</Link>
           </p>
         )}
-        <DocumentView
-          document={page.document}
-          onImage={(images, start) => setLightbox({ images, start })}
-          highlights={threads.highlights}
-          onFound={threads.setFound}
-          onHighlight={openComments}
-          onTask={page.can['page.edit'] ? (id, done) => tick.mutate({ id, done }) : undefined}
-          onView={keepView}
-        />
+        {page.kind === 'link' && (
+          <p>
+            <a href={page.link_target} target="_blank" rel="noopener noreferrer">
+              {page.link_target}
+            </a>
+          </p>
+        )}
+        {page.kind !== 'folder' && page.kind !== 'link' && (
+          <DocumentView
+            document={page.document}
+            onImage={(images, start) => setLightbox({ images, start })}
+            highlights={threads.highlights}
+            onFound={threads.setFound}
+            onHighlight={openComments}
+            onTask={page.can['page.edit'] ? (id, done) => tick.mutate({ id, done }) : undefined}
+            onView={keepView}
+          />
+        )}
         <ErrorNote error={tick.error} />
-        {!page.hide_children && <ChildPages pageId={page.id} />}
+        {(!page.hide_children || page.kind === 'folder') && <ChildPages pageId={page.id} />}
+        <LabelBar page={page} />
         {isPublished && page.features.reactions && (
           <Reactions
             path={`/pages/${page.id}`}
@@ -657,6 +732,16 @@ export function PageView({ pageId }: { pageId: string }) {
       {dialog === 'rename' && <RenameDialog page={page} onClose={close} />}
       {dialog === 'copy' && <CopyDialog page={page} onClose={close} />}
       {dialog === 'delete' && <DeleteDialog page={page} onClose={close} />}
+      {moveTo && (
+        <MoveDialog page={page} toSpace={moveTo} onClose={() => navigate(`/pages/${page.id}`, true)} />
+      )}
+      {dialog === 'approvals' && <ApprovalsDialog page={page} onClose={close} />}
+      {dialog === 'verify' && <VerifyDialog page={page} onClose={close} />}
+      {dialog === 'archive' && <ArchiveDialog page={page} onClose={close} />}
+      {dialog === 'template' && <SaveTemplateDialog page={page} onClose={close} />}
+      {(dialog === 'folder' || dialog === 'page' || dialog === 'post') && (
+        <KindDialog page={page} kind={dialog} onClose={close} />
+      )}
       {details && <DetailsPanel page={page} onClose={closeDetails} />}
       {threads.panel.open && (
         <CommentsPanel

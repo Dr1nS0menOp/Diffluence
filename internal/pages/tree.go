@@ -5,6 +5,7 @@ package pages
 import (
 	"context"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -40,8 +41,9 @@ func viewRestricted(ctx context.Context, q db.Querier, id uuid.UUID) ([]uuid.UUI
 }
 
 // MoveInput says where a page goes: under ParentID (nil = top level), before
-// sibling BeforeID (nil = at the end).
+// sibling BeforeID (nil = at the end), and to another space when SpaceID is set.
 type MoveInput struct {
+	SpaceID  *uuid.UUID
 	ParentID *uuid.UUID
 	BeforeID *uuid.UUID
 }
@@ -52,6 +54,13 @@ func (s *Service) Move(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		p, err := load(ctx, tx, id)
 		if err != nil {
+			return err
+		}
+		if p.Kind == KindPost && in.ParentID != nil {
+			return apperr.Invalid("A blog post has no place in the tree.")
+		}
+		if in.SpaceID != nil && *in.SpaceID != p.SpaceID {
+			out, err = s.moveToSpace(ctx, tx, c, p, in)
 			return err
 		}
 		if err := lockTree(ctx, tx, p.SpaceID); err != nil {
@@ -114,29 +123,33 @@ func (s *Service) reparent(ctx context.Context, tx pgx.Tx, c identity.Caller, p 
 			break
 		}
 	}
-	// Detach the subtree from its old ancestors, then attach it to the new ones.
+	return relink(ctx, tx, p.ID, parent)
+}
+
+// relink detaches a branch from its old ancestors and attaches it to the new ones.
+func relink(ctx context.Context, tx pgx.Tx, id uuid.UUID, parent *uuid.UUID) error {
 	if _, err := tx.Exec(ctx, `DELETE FROM page_tree
 		WHERE descendant_id IN (SELECT descendant_id FROM page_tree WHERE ancestor_id = $1)
-		  AND ancestor_id NOT IN (SELECT descendant_id FROM page_tree WHERE ancestor_id = $1)`, p.ID); err != nil {
+		  AND ancestor_id NOT IN (SELECT descendant_id FROM page_tree WHERE ancestor_id = $1)`, id); err != nil {
 		return err
 	}
 	if parent != nil {
 		if _, err := tx.Exec(ctx, `INSERT INTO page_tree (ancestor_id, descendant_id, depth)
 			SELECT a.ancestor_id, d.descendant_id, a.depth + d.depth + 1
 			FROM page_tree a CROSS JOIN page_tree d
-			WHERE a.descendant_id = $1 AND d.ancestor_id = $2`, *parent, p.ID); err != nil {
+			WHERE a.descendant_id = $1 AND d.ancestor_id = $2`, *parent, id); err != nil {
 			return err
 		}
 	}
-	_, err = tx.Exec(ctx, "UPDATE pages SET parent_id = $2, updated_at = now() WHERE id = $1", p.ID, parent)
+	_, err := tx.Exec(ctx, "UPDATE pages SET parent_id = $2, updated_at = now() WHERE id = $1", id, parent)
 	return err
 }
 
 // reposition rewrites the order of the new siblings with the page in its place.
 func reposition(ctx context.Context, tx pgx.Tx, p Page, in MoveInput) error {
 	rows, err := tx.Query(ctx, `SELECT id FROM pages
-		WHERE space_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND id <> $3 ORDER BY position, id`,
-		p.SpaceID, in.ParentID, p.ID)
+		WHERE space_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND id <> $3 AND kind = ANY($4) ORDER BY position, id`,
+		p.SpaceID, in.ParentID, p.ID, treeKinds)
 	if err != nil {
 		return err
 	}
@@ -157,10 +170,44 @@ func reposition(ctx context.Context, tx pgx.Tx, p Page, in MoveInput) error {
 	return err
 }
 
+// TitleChange changes the titles of copied pages together (PAG-049).
+type TitleChange struct {
+	Prefix  string
+	Suffix  string
+	Find    string
+	Replace string
+}
+
+func (t TitleChange) isSet() bool {
+	return t.Prefix != "" || t.Suffix != "" || t.Find != ""
+}
+
+func (t TitleChange) apply(title string) string {
+	if t.Find != "" {
+		title = strings.ReplaceAll(title, t.Find, t.Replace)
+	}
+	return t.Prefix + title + t.Suffix
+}
+
 // CopyInput says what to copy and where.
 type CopyInput struct {
+	SpaceID         *uuid.UUID
 	ParentID        *uuid.UUID
 	IncludeChildren bool
+	KeepLabels      bool
+	// KeepRestrictions defaults to yes: dropping them needs manage restrictions.
+	KeepRestrictions *bool
+	Titles           TitleChange
+}
+
+func (in CopyInput) keepRestrictions() bool {
+	return in.KeepRestrictions == nil || *in.KeepRestrictions
+}
+
+// copyPlan is what stays the same for every page of a copy.
+type copyPlan struct {
+	CopyInput
+	spaceID uuid.UUID
 }
 
 // Copy creates an independent copy of a page.
@@ -174,32 +221,56 @@ func (s *Service) Copy(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 			return err
 		}
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, p.SpaceID, permissions.PageCreate); err != nil {
+		plan := copyPlan{CopyInput: in, spaceID: p.SpaceID}
+		if in.SpaceID != nil {
+			plan.spaceID = *in.SpaceID
+		}
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.PageCreate); err != nil {
 			return err
 		}
 		if p.CurrentVersion == 0 {
 			return apperr.Conflict("not_published", "Publish the page before copying it.")
 		}
-		if err := lockTree(ctx, tx, p.SpaceID); err != nil {
+		if err := lockSpaces(ctx, tx, p.SpaceID, plan.spaceID); err != nil {
 			return err
 		}
 		if in.ParentID != nil {
-			if err := s.checkParent(ctx, tx, c, p.SpaceID, *in.ParentID); err != nil {
+			if err := s.checkParent(ctx, tx, c, plan.spaceID, *in.ParentID); err != nil {
 				return err
 			}
 		}
-		if out, err = s.copyOne(ctx, tx, c, p, in.ParentID, "Copy of "+p.Title); err != nil {
+		// Like a move: a copy must not quietly lift what the page inherits. Several
+		// levels add up and cannot become one list, so such a copy can only be refused.
+		lost, _, err := inheritedChange(ctx, tx, p, in.ParentID)
+		if err != nil {
+			return err
+		}
+		if len(lost) > 0 {
+			if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.RestrictionManage, uuid.Nil); err != nil {
+				return err
+			}
+		}
+		title := "Copy of " + p.Title
+		if in.Titles.isSet() {
+			title = in.Titles.apply(p.Title)
+		}
+		if out, err = s.copyOne(ctx, tx, c, p, in.ParentID, title, plan); err != nil {
 			return err
 		}
 		if !in.IncludeChildren {
 			return nil
 		}
-		return s.copyChildren(ctx, tx, c, p.ID, out.ID)
+		return s.copyChildren(ctx, tx, c, p.ID, out.ID, plan)
 	})
 	return out, err
 }
 
-func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, parent *uuid.UUID, title string) (Page, error) {
+func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, parent *uuid.UUID, title string, plan copyPlan) (Page, error) {
+	if !plan.keepRestrictions() {
+		if err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {
+			return Page{}, err
+		}
+	}
 	if r := []rune(title); len(r) > maxTitleRunes {
 		title = string(r[:maxTitleRunes])
 	}
@@ -213,34 +284,46 @@ func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 	}
 	// The row comes first so attachments have a page to belong to; the first
 	// version follows once images point at the copied files.
-	n, err := s.insert(ctx, tx, c, p.SpaceID, parent, title, c.UserID)
+	n, err := s.insert(ctx, tx, c, newPage{spaceID: plan.spaceID, parent: parent, title: title, author: c.UserID, kind: p.Kind, link: p.LinkTarget})
 	if err != nil {
 		return Page{}, err
 	}
-	mapping, err := s.attachments.CopyAll(ctx, tx, c, p.ID, n.ID, p.SpaceID)
+	mapping, err := s.attachments.CopyAll(ctx, tx, c, p.ID, n.ID, plan.spaceID)
 	if err != nil {
 		return Page{}, err
 	}
 	document.RemapAttachments(&doc, mapping)
-	// A copy is a new page: its tasks are its own, and nobody is told about them twice.
-	if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
-		SELECT $2::uuid, kind, subject_type, subject_id FROM page_restrictions WHERE page_id = $1`, p.ID, n.ID); err != nil {
-		return Page{}, err
+	if plan.keepRestrictions() {
+		if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
+			SELECT $2::uuid, kind, subject_type, subject_id FROM page_restrictions WHERE page_id = $1`, p.ID, n.ID); err != nil {
+			return Page{}, err
+		}
 	}
+	if plan.KeepLabels {
+		if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)
+			SELECT $2::uuid, label, $3 FROM page_labels WHERE page_id = $1`, p.ID, n.ID, c.UserID); err != nil {
+			return Page{}, err
+		}
+	}
+	// A copy is a new page: its tasks are its own, and nobody is told about them twice.
 	if n, err = s.appendVersion(ctx, tx, c, n, newVersion{Title: title, Doc: doc, Author: c.UserID, Silent: true}); err != nil {
 		return Page{}, err
 	}
 	return n, record(ctx, tx, c, "page.copied", n, map[string]any{"copied_from": p.ID})
 }
 
-// copyChildren copies what the user can see; hidden pages stay behind.
-func (s *Service) copyChildren(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to uuid.UUID) error {
-	rows, err := tx.Query(ctx, `SELECT p.id FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
-		WHERE p.parent_id = $2 AND p.status = 'published' ORDER BY p.position, p.id`, c.UserID, from)
+// childrenToCopy lists what the user can see; hidden pages stay behind.
+func childrenToCopy(ctx context.Context, q db.Querier, userID, from uuid.UUID) ([]uuid.UUID, error) {
+	rows, err := q.Query(ctx, `SELECT p.id FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
+		WHERE p.parent_id = $2 AND p.status = 'published' ORDER BY p.position, p.id`, userID, from)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	children, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+}
+
+func (s *Service) copyChildren(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to uuid.UUID, plan copyPlan) error {
+	children, err := childrenToCopy(ctx, tx, c.UserID, from)
 	if err != nil {
 		return err
 	}
@@ -249,11 +332,11 @@ func (s *Service) copyChildren(ctx context.Context, tx pgx.Tx, c identity.Caller
 		if err != nil {
 			return err
 		}
-		n, err := s.copyOne(ctx, tx, c, p, &to, p.Title)
+		n, err := s.copyOne(ctx, tx, c, p, &to, plan.Titles.apply(p.Title), plan)
 		if err != nil {
 			return err
 		}
-		if err := s.copyChildren(ctx, tx, c, child, n.ID); err != nil {
+		if err := s.copyChildren(ctx, tx, c, child, n.ID, plan); err != nil {
 			return err
 		}
 	}

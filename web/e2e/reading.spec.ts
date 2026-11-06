@@ -264,24 +264,30 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
 }) => {
   const space = await newSpace(page, 'Shortcut space');
   await page.goto(`/spaces/${space.key}/settings`);
-  await page.getByLabel('Label').fill('Runbook');
-  await page.getByPlaceholder(/Address/).fill(`/pages/${space.home_page_id}`);
-  await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+  const shortcuts = page.locator('section', { has: page.getByRole('heading', { name: 'Shortcuts' }) });
+  await shortcuts.getByLabel('Label', { exact: true }).fill('Runbook');
+  await shortcuts.getByPlaceholder(/Address/).fill(`/pages/${space.home_page_id}`);
+  await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Move Runbook up' })).toBeVisible();
-  await page.getByLabel('Label').fill('Status');
-  await page.getByPlaceholder(/Address/).fill('https://status.example.com');
-  await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+  await shortcuts.getByLabel('Label', { exact: true }).fill('Status');
+  await shortcuts.getByPlaceholder(/Address/).fill('https://status.example.com');
+  await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('button', { name: 'Move Status up' }).click();
 
   const links = page.getByRole('navigation', { name: 'Space links' });
-  await expect(links.locator('.side-link').nth(2)).toContainText('Status');
+  await expect(
+    links
+      .locator('.side-link')
+      .filter({ hasText: /Status|Runbook/ })
+      .first(),
+  ).toContainText('Status');
   const outside = links.getByRole('link', { name: /Status/ });
   await expect(outside).toHaveAttribute('target', '_blank');
   await expect(outside).toHaveAttribute('rel', /noopener/);
 
-  await page.getByLabel('Label').fill('Bad');
-  await page.getByPlaceholder(/Address/).fill('javascript:alert(1)');
-  await page.getByRole('button', { name: 'Add', exact: true }).first().click();
+  await shortcuts.getByLabel('Label', { exact: true }).fill('Bad');
+  await shortcuts.getByPlaceholder(/Address/).fill('javascript:alert(1)');
+  await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();
   await expect(page.getByRole('alert')).toContainText('A shortcut goes to');
 });
 

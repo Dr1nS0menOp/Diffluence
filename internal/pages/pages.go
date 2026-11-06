@@ -24,8 +24,10 @@ import (
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/search"
@@ -38,6 +40,16 @@ const (
 	StatusDraft     = "draft"
 	StatusPublished = "published"
 	StatusTrashed   = "trashed"
+)
+
+// Kinds of page. They share versions, drafts, restrictions and search, so a blog
+// post is a page that does not sit in the tree (spec 011, D1).
+const (
+	KindPage     = "page"
+	KindPost     = "post"
+	KindFolder   = "folder"
+	KindLink     = "link"
+	KindTemplate = permissions.KindTemplate
 )
 
 const maxTitleRunes = 255
@@ -55,6 +67,15 @@ type Page struct {
 	UpdatedBy      uuid.UUID  `json:"updated_by"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      time.Time  `json:"updated_at"`
+	Kind           string     `json:"kind"`
+	OwnerID        uuid.UUID  `json:"owner_id"`
+	StageText      string     `json:"stage_text"`
+	StageColor     string     `json:"stage_color"`
+	ReviewOn       string     `json:"review_on"`
+	ArchivedAt     *time.Time `json:"archived_at"`
+	ArchivedBy     *uuid.UUID `json:"archived_by"`
+	PublishedAt    *time.Time `json:"published_at"`
+	LinkTarget     string     `json:"link_target"`
 	CommentsClosed bool       `json:"comments_closed"`
 	Look
 }
@@ -78,8 +99,16 @@ type Detail struct {
 	Favourite     bool            `json:"favourite"`
 	Restricted    bool            `json:"restricted"`
 	Can           map[string]bool `json:"can"`
+	OwnerName     string          `json:"owner_name"`
+	OwnerDisabled bool            `json:"owner_disabled"`
+	Labels        []string        `json:"labels"`
+	Verified      *Verified       `json:"verified"`
+	// SeenVersion is the version this person read last time, or 0 on a first visit.
+	SeenVersion int        `json:"seen_version"`
+	Scheduled   *Scheduled `json:"scheduled"`
+	Approval    *Approval  `json:"approval"`
 
-	Features permissions.Features `json:"features"`
+	Features map[string]bool `json:"features"`
 }
 
 // Service manages pages.
@@ -88,12 +117,18 @@ type Service struct {
 	perms       *permissions.Service
 	attachments *attachments.Service
 	settings    *settings.Service
+	features    *features.Service
+	jobs        *jobs.Service
 	instanceID  uuid.UUID
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, att *attachments.Service, st *settings.Service, instanceID uuid.UUID) *Service {
-	return &Service{pool: pool, perms: perms, attachments: att, settings: st, instanceID: instanceID}
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, att *attachments.Service, st *settings.Service,
+	ft *features.Service, jb *jobs.Service, instanceID uuid.UUID) *Service {
+	s := &Service{pool: pool, perms: perms, attachments: att, settings: st, features: ft, jobs: jb, instanceID: instanceID}
+	jb.Register(jobCopy, s.runCopyJob)
+	jb.Register(jobContent, s.runContentJob)
+	return s
 }
 
 func cleanTitle(title string) (string, error) {
@@ -111,13 +146,16 @@ func cleanTitle(title string) (string, error) {
 }
 
 const pageColumns = `id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at,
-	comments_closed, emoji, full_width, title_align, hide_children, header_attachment_id, header_position`
+	comments_closed, emoji, full_width, title_align, hide_children, header_attachment_id, header_position,
+	kind, COALESCE(owner_id, created_by), stage_text, stage_color, COALESCE(to_char(review_on, 'YYYY-MM-DD'), ''),
+	archived_at, archived_by, published_at, link_target`
 
 func scanPage(r pgx.Row) (Page, error) {
 	var p Page
 	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
 		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt, &p.CommentsClosed,
-		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition)
+		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition,
+		&p.Kind, &p.OwnerID, &p.StageText, &p.StageColor, &p.ReviewOn, &p.ArchivedAt, &p.ArchivedBy, &p.PublishedAt, &p.LinkTarget)
 	return p, err
 }
 
@@ -157,34 +195,55 @@ func recordEvent(ctx context.Context, tx pgx.Tx, c identity.Caller, action strin
 	if payload == nil {
 		payload = map[string]any{}
 	}
-	payload["page_id"], payload["space_id"], payload["version"] = p.ID, p.SpaceID, p.CurrentVersion
+	payload["page_id"], payload["space_id"], payload["version"], payload["kind"] = p.ID, p.SpaceID, p.CurrentVersion, p.Kind
 	if _, set := payload["actor_id"]; !set {
 		payload["actor_id"] = c.UserID
+	}
+	// Those who send notifications must know who an event is for.
+	for _, key := range []string{"owner_id", "user_id"} {
+		if v, ok := details[key]; ok {
+			payload[key] = v
+		}
 	}
 	_, err := outbox.Enqueue(ctx, tx, action, payload)
 	return err
 }
 
-// insert adds a page row and its closure rows, at the end of its siblings.
-func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, parent *uuid.UUID, title string, author uuid.UUID) (Page, error) {
+// newPage is a row to add.
+type newPage struct {
+	spaceID uuid.UUID
+	parent  *uuid.UUID
+	title   string
+	author  uuid.UUID
+	kind    string
+	link    string
+}
+
+// insert adds a page row and its closure rows, at the end of its siblings. Kinds
+// outside the tree take no position, or they would leave gaps between pages.
+func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, in newPage) (Page, error) {
 	id := ids.New()
+	if in.kind == "" {
+		in.kind = KindPage
+	}
 	var pos int
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(max(position) + 1, 0) FROM pages
-		WHERE space_id = $1 AND parent_id IS NOT DISTINCT FROM $2`, spaceID, parent).Scan(&pos); err != nil {
+		WHERE space_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND kind = ANY($3)`, in.spaceID, in.parent, treeKinds).Scan(&pos); err != nil {
 		return Page{}, err
 	}
-	p, err := scanPage(tx.QueryRow(ctx, `INSERT INTO pages (id, origin_instance_id, space_id, parent_id, position, title, status, created_by, updated_by)
-		VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $7) RETURNING `+pageColumns,
-		id, s.instanceID, spaceID, parent, pos, title, author))
+	p, err := scanPage(tx.QueryRow(ctx, `INSERT INTO pages (id, origin_instance_id, space_id, parent_id, position, title, status,
+			created_by, updated_by, owner_id, kind, link_target, title_align)
+		VALUES ($1, $2, $3, $4, $5, $6, 'draft', $7, $7, $7, $8, $9, (SELECT title_align FROM spaces WHERE id = $3)) RETURNING `+pageColumns,
+		id, s.instanceID, in.spaceID, in.parent, pos, in.title, in.author, in.kind, in.link))
 	if err != nil {
 		return p, err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO page_tree (ancestor_id, descendant_id, depth)
 		SELECT ancestor_id, $2::uuid, depth + 1 FROM page_tree WHERE descendant_id = $1
-		UNION ALL SELECT $2::uuid, $2::uuid, 0`, parent, id); err != nil {
+		UNION ALL SELECT $2::uuid, $2::uuid, 0`, in.parent, id); err != nil {
 		return p, err
 	}
-	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": parent})
+	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": in.parent})
 }
 
 // NewPage is the input for Create.
@@ -192,6 +251,11 @@ type NewPage struct {
 	SpaceID  uuid.UUID
 	ParentID *uuid.UUID
 	Title    string
+	// Untitled starts a page whose title comes later. It cannot be published
+	// until it has one (PAG-003).
+	Untitled bool
+	Kind     string
+	Link     string
 }
 
 // checkParent makes sure a page may go under parent.
@@ -214,7 +278,11 @@ func (s *Service) checkParent(ctx context.Context, q db.Querier, c identity.Call
 
 // Create starts a new unpublished page, visible only to its creator.
 func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Page, error) {
-	title, err := cleanTitle(in.Title)
+	title, err := in.cleanedTitle()
+	if err != nil {
+		return Page{}, err
+	}
+	link, err := in.cleanedLink()
 	if err != nil {
 		return Page{}, err
 	}
@@ -222,6 +290,11 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := s.perms.RequireSpace(ctx, tx, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {
 			return err
+		}
+		if in.Kind == KindPost {
+			if err := s.requireFeature(ctx, tx, in.SpaceID, features.Blog); err != nil {
+				return err
+			}
 		}
 		if err := lockTree(ctx, tx, in.SpaceID); err != nil {
 			return err
@@ -231,16 +304,47 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 				return err
 			}
 		}
-		p, err = s.insert(ctx, tx, c, in.SpaceID, in.ParentID, title, c.UserID)
+		p, err = s.insert(ctx, tx, c, newPage{spaceID: in.SpaceID, parent: in.ParentID, title: title, author: c.UserID, kind: in.Kind, link: link})
+		if err != nil || (in.Kind != KindLink && in.Kind != KindFolder) {
+			return err
+		}
+		// A link entry and a folder have nothing to write, so they are published at once.
+		p, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: document.Empty(), Author: c.UserID})
 		return err
 	})
 	return p, err
 }
 
+func (in NewPage) cleanedTitle() (string, error) {
+	switch in.Kind {
+	case "", KindPage, KindPost, KindFolder, KindLink:
+	default:
+		return "", apperr.Invalid("That is not a kind of page.")
+	}
+	if in.Kind == KindPost && in.ParentID != nil {
+		return "", apperr.Invalid("A blog post has no place in the tree.")
+	}
+	if in.Untitled && strings.TrimSpace(in.Title) == "" {
+		return "", nil
+	}
+	return cleanTitle(in.Title)
+}
+
+func (in NewPage) cleanedLink() (string, error) {
+	if in.Kind != KindLink {
+		return "", nil
+	}
+	link, err := document.SafeHref(in.Link)
+	if err != nil {
+		return "", apperr.Invalid("A link entry goes to an address in this instance, or to an http or https address.")
+	}
+	return link, nil
+}
+
 // CreatePublished adds a published page inside tx. The caller has already
 // checked permissions. It is for home pages, copies and imports.
 func (s *Service) CreatePublished(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, parent *uuid.UUID, title string, doc document.Node, author uuid.UUID) (Page, error) {
-	p, err := s.insert(ctx, tx, c, spaceID, parent, title, author)
+	p, err := s.insert(ctx, tx, c, newPage{spaceID: spaceID, parent: parent, title: title, author: author})
 	if err != nil {
 		return p, err
 	}
@@ -297,10 +401,20 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, in.Summary, in.RestoredFrom, in.Silent); err != nil {
 		return p, err
 	}
-	p, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now()
+	if p.PublishedAt == nil {
+		if _, err := tx.Exec(ctx, `UPDATE pages p SET review_on = (now() + make_interval(months => s.review_months))::date
+			FROM spaces s WHERE p.id = $1 AND s.id = p.space_id AND p.review_on IS NULL AND s.review_months > 0`, p.ID); err != nil {
+			return p, err
+		}
+	}
+	p, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now(),
+			published_at = COALESCE(published_at, now())
 		WHERE id = $1 RETURNING `+pageColumns, p.ID, number, title, author))
 	if err != nil {
 		return p, err
+	}
+	if p.Kind == KindTemplate {
+		return p, nil // a template is never found, and has no page to link from
 	}
 	if err := search.Index(ctx, tx, p.ID, title, document.Text(doc)); err != nil {
 		return p, err
@@ -335,6 +449,9 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if in.RestoredFrom != nil {
 		details["restored_from"] = *in.RestoredFrom
 	}
+	if in.Silent {
+		details["silent"] = true
+	}
 	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.Silent, "first": first,
 		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned})
 }
@@ -349,7 +466,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		return Detail{}, err
 	}
 	d := Detail{Page: p}
-	if d.Features, err = s.perms.LoadFeatures(ctx, s.pool, p.SpaceID); err != nil {
+	if d.Features, err = s.features.ForSpace(ctx, s.pool, p.SpaceID); err != nil {
 		return d, err
 	}
 	if p.CurrentVersion > 0 {
@@ -393,7 +510,10 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if d.CreatedByName, d.UpdatedByName, err = s.authorNames(ctx, p); err != nil {
 		return d, err
 	}
-	if d.Can, err = s.capabilities(ctx, c, id); err != nil {
+	if d.Can, err = s.capabilities(ctx, c, p); err != nil {
+		return d, err
+	}
+	if err := s.fillOrganising(ctx, c, &d); err != nil {
 		return d, err
 	}
 	if d.HeaderAttachmentID != nil {
@@ -406,7 +526,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 			d.HeaderAttachmentID = nil
 		}
 	}
-	s.touchRecent(ctx, c.UserID, id)
+	s.touchRecent(ctx, c.UserID, p)
 	return d, nil
 }
 
@@ -450,36 +570,45 @@ func (s *Service) authorNames(ctx context.Context, p Page) (created, updated str
 
 // capabilities tells the UI which buttons to show. The server still checks
 // every action; this only avoids offering what would be refused.
-func (s *Service) capabilities(ctx context.Context, c identity.Caller, id uuid.UUID) (map[string]bool, error) {
+func (s *Service) capabilities(ctx context.Context, c identity.Caller, p Page) (map[string]bool, error) {
 	u, err := s.perms.LoadUser(ctx, s.pool, c.UserID)
 	if err != nil {
 		return nil, err
 	}
-	space, page, err := s.perms.LoadPage(ctx, s.pool, id)
+	space, page, err := s.perms.LoadPage(ctx, s.pool, p.ID)
 	if err != nil {
 		return nil, err
 	}
 	out := map[string]bool{}
-	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.ActionPageDelete,
+	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.PageArchive, permissions.ActionPageDelete,
 		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
 		permissions.CommentAdd, permissions.ActionReact} {
 		d := permissions.Evaluate(permissions.Input{User: u, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
 		out[action] = d.Allowed
 	}
+	out[capabilityVerify] = out[permissions.PageEdit] && (p.OwnerID == c.UserID || out[permissions.SpaceAdminister])
 	return out, nil
 }
 
 // touchRecent is a convenience list, so a failure must never fail the read.
-func (s *Service) touchRecent(ctx context.Context, userID, pageID uuid.UUID) {
-	_, _ = s.pool.Exec(ctx, `INSERT INTO recent_pages (user_id, page_id) VALUES ($1, $2)
-		ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at = now()`, userID, pageID)
+func (s *Service) touchRecent(ctx context.Context, userID uuid.UUID, p Page) {
+	_, _ = s.pool.Exec(ctx, `INSERT INTO recent_pages (user_id, page_id, seen_version) VALUES ($1, $2, $3)
+		ON CONFLICT (user_id, page_id) DO UPDATE SET viewed_at = now(), seen_version = EXCLUDED.seen_version`, userID, p.ID, p.CurrentVersion)
 	_, _ = s.pool.Exec(ctx, `DELETE FROM recent_pages WHERE user_id = $1 AND page_id NOT IN
 		(SELECT page_id FROM recent_pages WHERE user_id = $1 ORDER BY viewed_at DESC LIMIT 50)`, userID)
 }
 
+// treeKinds are the kinds that have a place in the tree.
+var treeKinds = []string{KindPage, KindFolder, KindLink}
+
 // Node is one entry of the page tree, with what its row shows. HasDraft and
 // VisitedAt are about the person asking.
 type Node struct {
+	Kind          string     `json:"kind"`
+	LinkTarget    string     `json:"link_target"`
+	OwnerName     string     `json:"owner_name"`
+	StageText     string     `json:"stage_text"`
+	StageColor    string     `json:"stage_color"`
 	ID            uuid.UUID  `json:"id"`
 	ParentID      *uuid.UUID `json:"parent_id"`
 	Position      int        `json:"position"`
@@ -500,19 +629,22 @@ func (s *Service) Tree(ctx context.Context, c identity.Caller, spaceID uuid.UUID
 	}
 	rows, err := s.pool.Query(ctx, `SELECT p.id, p.parent_id, p.position, p.title, p.status, p.emoji,
 			EXISTS (SELECT 1 FROM page_restrictions r WHERE r.page_id = p.id),
-			d.page_id IS NOT NULL, p.updated_at, COALESCE(u.display_name, ''), rp.viewed_at
-		FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id
+			d.page_id IS NOT NULL, p.updated_at, COALESCE(u.display_name, ''), rp.viewed_at,
+			p.kind, p.link_target, COALESCE(o.display_name, ''), p.stage_text, p.stage_color
+		FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		LEFT JOIN users u ON u.id = p.updated_by
+		LEFT JOIN users o ON o.id = COALESCE(p.owner_id, p.created_by)
 		LEFT JOIN drafts d ON d.page_id = p.id AND d.user_id = $1
 		LEFT JOIN recent_pages rp ON rp.page_id = p.id AND rp.user_id = $1
-		WHERE p.space_id = $2 ORDER BY p.parent_id NULLS FIRST, p.position, p.id`, c.UserID, spaceID)
+		WHERE p.space_id = $2 AND p.kind = ANY($3) ORDER BY p.parent_id NULLS FIRST, p.position, p.id`, c.UserID, spaceID, treeKinds)
 	if err != nil {
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Node, error) {
 		var n Node
 		err := r.Scan(&n.ID, &n.ParentID, &n.Position, &n.Title, &n.Status, &n.Emoji,
-			&n.Restricted, &n.HasDraft, &n.UpdatedAt, &n.UpdatedByName, &n.VisitedAt)
+			&n.Restricted, &n.HasDraft, &n.UpdatedAt, &n.UpdatedByName, &n.VisitedAt,
+			&n.Kind, &n.LinkTarget, &n.OwnerName, &n.StageText, &n.StageColor)
 		return n, err
 	})
 	if out == nil {

@@ -43,7 +43,7 @@ async function slash(page: Page, query: string) {
 }
 
 async function publish(page: Page) {
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
 }
 

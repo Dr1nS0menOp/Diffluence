@@ -71,11 +71,11 @@ func collectRefs(rows pgx.Rows, err error) ([]PageRef, error) {
 	return out, err
 }
 
-// refColumns and refJoins read a page through perm_visible_pages, the only way a
+// refColumns and refJoins read a page through perm_listed_pages, the only way a
 // list sees content. A page the caller may not see can never become a reference.
 const (
 	refColumns = "p.id, p.title, p.emoji, s.key, s.name"
-	refJoins   = `JOIN perm_visible_pages($1) v ON v.page_id = p.id
+	refJoins   = `JOIN perm_listed_pages($1) v ON v.page_id = p.id
 		JOIN spaces s ON s.id = p.space_id`
 )
 
@@ -108,8 +108,8 @@ func outgoingLinks(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) 
 
 func childPages(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) ([]PageRef, error) {
 	rows, err := q.Query(ctx, `SELECT `+refColumns+` FROM pages p `+refJoins+`
-		WHERE p.parent_id = $2 AND p.status = 'published'
-		ORDER BY p.position, p.id LIMIT $3`, userID, pageID, maxListedChildren)
+		WHERE p.parent_id = $2 AND p.status = 'published' AND p.kind = ANY($4)
+		ORDER BY p.position, p.id LIMIT $3`, userID, pageID, maxListedChildren, treeKinds)
 	return collectRefs(rows, err)
 }
 
@@ -154,7 +154,7 @@ func (s *Service) PageSummary(ctx context.Context, c identity.Caller, id uuid.UU
 	if err != nil {
 		return out, err
 	}
-	out.Can, err = s.capabilities(ctx, c, id)
+	out.Can, err = s.capabilities(ctx, c, p)
 	return out, err
 }
 

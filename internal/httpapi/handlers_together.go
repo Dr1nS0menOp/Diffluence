@@ -64,7 +64,6 @@ func (s *Server) registerTogetherRoutes() {
 	r.HandleFunc("GET "+pagesPath+"/watchers", Object("space.administer"), s.handleWatchers)
 	r.HandleFunc("PUT "+pagesPath+"/watchers/{user}", Object("space.administer"), s.handleWatcher(true))
 	r.HandleFunc("DELETE "+pagesPath+"/watchers/{user}", Object("space.administer"), s.handleWatcher(false))
-	r.HandleFunc("PATCH /api/v1/spaces/{id}/features", Object("space.administer"), s.handleSpaceFeatures)
 	r.HandleFunc("GET /api/v1/me/watches", me, s.handleMyWatches)
 
 	r.HandleFunc("GET /api/v1/me/tasks", me, s.handleMyTasks)
@@ -409,23 +408,6 @@ func (s *Server) handleMyWatches(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"watches": list})
-}
-
-func (s *Server) handleSpaceFeatures(w http.ResponseWriter, r *http.Request) {
-	id, ok := pathID(w, r, "id")
-	if !ok {
-		return
-	}
-	var in permissions.Features
-	if decodeJSON(w, r, maxSmallBody, &in) != nil {
-		badBody(w)
-		return
-	}
-	if err := s.deps.Spaces.SetFeatures(r.Context(), s.caller(r), id, in); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleMyTasks(w http.ResponseWriter, r *http.Request) {

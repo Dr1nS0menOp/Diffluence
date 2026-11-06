@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
 // Images and files in a document. Both are attachments of the page, never outside addresses.
 import { Node as DocumentNode } from '@tiptap/core';
-import Image from '@tiptap/extension-image';
+import Image, { type ImageOptions } from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import type { Attachment } from '../../api';
 import { IconDownload, IconPage } from '../icons';
 
 const DOWNLOAD_ICON_SIZE = 18;
+
+/** Where a file of a document lives. A template serves its own files. */
+export type FileAddress = (attachmentId: string) => string;
+
+export const pageFileAddress: FileAddress = (id) => `/api/v1/attachments/${id}/content`;
 
 interface ImageAttrs {
   attachment_id: string;
@@ -16,9 +21,10 @@ interface ImageAttrs {
   align: string | null;
 }
 
-function ImageView({ node, editor }: ReactNodeViewProps) {
+function ImageView({ node, editor, extension }: ReactNodeViewProps) {
   const { attachment_id: id, alt, caption, size, align } = node.attrs as ImageAttrs;
-  const image = <img src={`/api/v1/attachments/${id}/content`} alt={alt ?? ''} />;
+  const { fileAddress } = extension.options as { fileAddress: FileAddress };
+  const image = <img src={fileAddress(id)} alt={alt ?? ''} />;
   return (
     <NodeViewWrapper
       as="figure"
@@ -50,16 +56,20 @@ const dataAttribute = (name: string) => ({
  * Images are attachments, never external addresses (spec 001). Pasted images
  * from elsewhere are dropped here, and the server refuses them as well.
  */
-export const AttachmentImage = Image.extend({
+export const AttachmentImage = Image.extend<ImageOptions & { fileAddress: FileAddress }>({
   draggable: true,
+  addOptions() {
+    return { ...(this.parent?.() as ImageOptions), fileAddress: pageFileAddress };
+  },
   addAttributes() {
+    const { fileAddress } = this.options;
     return {
       attachment_id: {
         default: null,
         parseHTML: (el: HTMLElement) => el.getAttribute('data-attachment-id'),
         renderHTML: (attrs: Record<string, string>) => ({
           'data-attachment-id': attrs.attachment_id,
-          src: `/api/v1/attachments/${attrs.attachment_id}/content`,
+          src: fileAddress(attrs.attachment_id ?? ''),
         }),
       },
       alt: { default: null },
@@ -78,8 +88,9 @@ export const AttachmentImage = Image.extend({
 });
 
 /** A file in the document: a tile to download. While editing it is a block to move or remove. */
-function FileTile({ node, editor }: ReactNodeViewProps) {
+function FileTile({ node, editor, extension }: ReactNodeViewProps) {
   const { attachment_id: id, filename } = node.attrs as { attachment_id: string; filename: string };
+  const { fileAddress } = extension.options as { fileAddress: FileAddress };
   const label = (
     <>
       <IconPage />
@@ -91,7 +102,7 @@ function FileTile({ node, editor }: ReactNodeViewProps) {
       {editor.isEditable ? (
         <span className="file-tile">{label}</span>
       ) : (
-        <a className="file-tile" href={`/api/v1/attachments/${id}/content?download=1`} download={filename}>
+        <a className="file-tile" href={`${fileAddress(id)}?download=1`} download={filename}>
           {label}
           <IconDownload size={DOWNLOAD_ICON_SIZE} />
         </a>
@@ -100,11 +111,14 @@ function FileTile({ node, editor }: ReactNodeViewProps) {
   );
 }
 
-export const AttachmentFile = DocumentNode.create({
+export const AttachmentFile = DocumentNode.create<{ fileAddress: FileAddress }>({
   name: 'file',
   group: 'block',
   atom: true,
   draggable: true,
+  addOptions() {
+    return { fileAddress: pageFileAddress };
+  },
   addAttributes() {
     return {
       attachment_id: {

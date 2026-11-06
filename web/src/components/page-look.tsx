@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type Attachment, type PageLook, type PageSummary } from '../api';
 import emoji from './editor/emoji.json';
+import { LabelBar } from './page-labels';
 import { Dialog, ErrorNote, Field, FilePicker } from './ui';
 
 const EMOJI_SHOWN = 40;
@@ -134,6 +135,7 @@ export function PageLookDialog({ page, onClose }: { page: PageSummary; onClose: 
           />
         </Field>
       )}
+      <LabelBar page={page} />
     </Dialog>
   );
 }

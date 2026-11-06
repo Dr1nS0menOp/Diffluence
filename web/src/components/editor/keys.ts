@@ -11,6 +11,7 @@ export interface EditorActions {
   openLink: () => void;
   openFind: () => void;
   openBlockMenu: () => void;
+  openTemplateItem: (what: 'field' | 'instruction') => void;
   publish: () => void;
   save: () => void;
   mentionNoAccess: (name: string) => void;
@@ -21,6 +22,7 @@ export const noActions: EditorActions = {
   openLink: () => undefined,
   openFind: () => undefined,
   openBlockMenu: () => undefined,
+  openTemplateItem: () => undefined,
   publish: () => undefined,
   save: () => undefined,
   mentionNoAccess: () => undefined,
@@ -40,7 +42,7 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
   },
   addKeyboardShortcuts() {
     const editor = () => this.editor;
-    const run = (action: Exclude<keyof EditorActions, 'mentionNoAccess'>) => () => {
+    const run = (action: Exclude<keyof EditorActions, 'mentionNoAccess' | 'openTemplateItem'>) => () => {
       this.options.actions()[action]();
       return true;
     };

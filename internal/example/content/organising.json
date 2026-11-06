@@ -1,0 +1,55 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "A wiki that grows needs order. This page shows what keeps it tidy, and you can try each part on it." }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": { "level": 2 },
+   "content": [{ "type": "text", "text": "Who looks after a page" }]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "Every page has an owner, shown beside the date at the top. Open Details to hand a page to someone else. The word next to it is its status, which you can change from the same line." }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": { "level": 2 },
+   "content": [{ "type": "text", "text": "Labels" }]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "The labels at the bottom of this page group it with others, across spaces. Follow one to see all its pages, or type a new one." }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": { "level": 2 },
+   "content": [{ "type": "text", "text": "Starting from something" }]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "Choose From a template under Create. This space has a template of its own, called Team update, which asks a question before the page starts." }
+   ]
+  },
+  {
+   "type": "heading",
+   "attrs": { "level": 2 },
+   "content": [{ "type": "text", "text": "News and folders" }]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "Blog in the sidebar lists the news of this space, outside the tree. The Team handbook in the tree is a folder: it has no text of its own, and groups the pages below it." }
+   ]
+  }
+ ]
+}

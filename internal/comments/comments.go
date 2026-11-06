@@ -22,6 +22,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
@@ -99,12 +100,13 @@ type Service struct {
 	pool       *pgxpool.Pool
 	perms      *permissions.Service
 	settings   *settings.Service
+	features   *features.Service
 	instanceID uuid.UUID
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, st *settings.Service, instanceID uuid.UUID) *Service {
-	return &Service{pool: pool, perms: perms, settings: st, instanceID: instanceID}
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, st *settings.Service, f *features.Service, instanceID uuid.UUID) *Service {
+	return &Service{pool: pool, perms: perms, settings: st, features: f, instanceID: instanceID}
 }
 
 type row struct {
@@ -237,7 +239,7 @@ func attachmentsOnPage(ctx context.Context, q db.Querier, pageID uuid.UUID, list
 }
 
 func (s *Service) checkOpen(ctx context.Context, q db.Querier, pageID, spaceID uuid.UUID) error {
-	f, err := s.perms.LoadFeatures(ctx, q, spaceID)
+	on, err := s.features.Enabled(ctx, q, spaceID, features.Comments)
 	if err != nil {
 		return err
 	}
@@ -245,7 +247,7 @@ func (s *Service) checkOpen(ctx context.Context, q db.Querier, pageID, spaceID u
 	if err := q.QueryRow(ctx, "SELECT comments_closed FROM pages WHERE id = $1", pageID).Scan(&closed); err != nil {
 		return err
 	}
-	if !f.Comments || closed {
+	if !on || closed {
 		return apperr.Conflict("comments_closed", "Comments are closed here.")
 	}
 	return nil

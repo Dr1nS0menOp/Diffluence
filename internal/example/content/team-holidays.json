@@ -1,0 +1,9 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [{ "type": "text", "text": "A page inside a folder. It works like every other page, and the folder only gives it a place." }]
+  }
+ ]
+}

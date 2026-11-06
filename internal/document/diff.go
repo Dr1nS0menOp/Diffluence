@@ -72,7 +72,7 @@ func Compare(before, after Node) []DiffBlock {
 	texts := func(ns []Node) []string {
 		out := make([]string, len(ns))
 		for i, n := range ns {
-			out[i] = n.Type + "\x00" + BlockText(n)
+			out[i] = n.Type + "\x00" + compareKey(n)
 		}
 		return out
 	}
@@ -103,6 +103,18 @@ func Compare(before, after Node) []DiffBlock {
 	}
 	flush(len(a), len(b))
 	return out
+}
+
+// compareKey is what makes two blocks the same. An image with the same caption
+// can still be another image, and it must show as changed (PAG-092).
+func compareKey(n Node) string {
+	files := []string{BlockText(n)}
+	Walk(n, func(c Node) {
+		if id, ok := c.Attrs["attachment_id"].(string); ok && pointsToAttachment(c) {
+			files = append(files, id)
+		}
+	})
+	return strings.Join(files, "\x00")
 }
 
 func compareWords(before, after string) []WordOp {

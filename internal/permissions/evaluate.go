@@ -48,7 +48,10 @@ var AllSpacePermissions = []string{
 
 // Actions that are not permissions themselves.
 const (
-	ActionPageView         = "page.view"
+	ActionPageView = "page.view"
+	// ActionApprovalRead is view for someone named in an approval round. It is the
+	// rule without the part on unpublished pages, because they were asked.
+	ActionApprovalRead     = "approval.read"
 	ActionPageDelete       = "page.delete"       // own or any
 	ActionAttachmentDelete = "attachment.delete" // own or any
 	ActionCommentDelete    = "comment.delete"    // own or any
@@ -103,6 +106,8 @@ type PageFacts struct {
 	ID        uuid.UUID
 	Status    string // draft, published, trashed
 	CreatedBy uuid.UUID
+	Kind      string // page, post, folder, link, template
+	Archived  bool
 	// ViewChain holds the page and its ancestors that carry a view restriction.
 	ViewChain []RestrictionLevel
 	// EditSubjects is the edit restriction on the page itself (empty = none).
@@ -152,10 +157,24 @@ func isEdit(action string) bool {
 	return false
 }
 
+// KindTemplate marks a hidden page that holds a template. It is never a page to
+// anyone: the templates module reaches it through its own unchecked calls.
+const KindTemplate = "template"
+
+// worksOnArchivedPage lists what still works on a page in the archive: reading,
+// export and delete, restoring it, and who may see it.
+func worksOnArchivedPage(action string) bool {
+	switch action {
+	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:
+		return true
+	}
+	return false
+}
+
 // worksWhenArchived lists what still works in an archived (read-only) space.
 func worksWhenArchived(action string) bool {
 	switch action {
-	case SpaceView, ActionPageView, SpaceExport, SpaceAdminister:
+	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister:
 		return true
 	}
 	return false
@@ -218,7 +237,7 @@ func Evaluate(in Input) Decision {
 	check(LayerGlobal, globalUseProduct, slices.Contains(in.User.Global, globalUseProduct), true)
 	check(LayerSpace, "space_not_trashed", in.Space.Status != "trashed", true)
 	check(LayerSpace, SpaceView, holds(in, SpaceView), true)
-	if in.Action != SpaceView && in.Action != ActionPageView && in.Action != ActionReact {
+	if in.Action != SpaceView && in.Action != ActionPageView && in.Action != ActionApprovalRead && in.Action != ActionReact {
 		perm, ok := actionAllowedBySpace(in)
 		check(LayerSpace, perm, ok, false)
 	}
@@ -230,8 +249,14 @@ func Evaluate(in Input) Decision {
 		return d
 	}
 	p := in.Page
+	check(LayerPage, "not_a_template", p.Kind != KindTemplate, true)
 	check(LayerPage, "page_not_trashed", p.Status != "trashed", true)
-	check(LayerPage, "published_or_own_draft", p.Status != "draft" || p.CreatedBy == in.User.ID, true)
+	if in.Action != ActionApprovalRead {
+		check(LayerPage, "published_or_own_draft", p.Status != "draft" || p.CreatedBy == in.User.ID, true)
+	}
+	if p.Archived && !worksOnArchivedPage(in.Action) {
+		check(LayerPage, "page_not_archived", false, false)
+	}
 	for _, level := range p.ViewChain {
 		check(LayerRestriction, "view:"+level.PageID.String(), in.User.matchesAny(level.Subjects), true)
 	}

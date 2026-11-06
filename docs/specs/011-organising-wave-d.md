@@ -1,6 +1,6 @@
 # 011: Wave D, organising
 
-Status: planned in detail, not built yet
+Status: built on branch `wave-d`, except what the status lines in `docs/blueprint/03-functional/` and `docs/handoff/2026-11-05-wave-d.md` name as open
 Phase: wave D of `docs/blueprint/03-functional-requirements.md`. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave, and tests it when all waves are done. This wave comes after wave C (spec 010) and uses its notifications and watching.
 
 ## Problem
@@ -82,6 +82,13 @@ A wiki that grows needs order. Today a page has no owner, no status and no label
 | D30 | Removing a version deletes the row and leaves a marker | Versions stay immutable: the trigger forbids changes, and a purge already deletes rows. |
 | D31 | Starter templates are our own words, shipped in the binary | Clean-room rules apply to templates in particular. |
 | D32 | A space template holds text only: pages, labels and templates | Files would make a bundle large for little gain. |
+| D33 | A copy runs the check of a move (GAP-003) | Keep restrictions only covers direct ones, so a copy could quietly lose what it inherits. |
+| D34 | A trash item on a hidden page keeps its title from the person, and cannot be purged by hand (GAP-001) | Administering a space does not mean reading all of it. Retention still ends it. |
+| D35 | Files of a template have a route of the templates module (GAP-022) | `Evaluate` refuses template pages on purpose, so a bypass there would weaken it. |
+| D36 | `ActionApprovalRead` is a named variant of the rule (GAP-028) | Finding a rule by its name breaks quietly when the name changes. |
+| D37 | A copy past 50 pages runs as a job, one transaction per page | The audit log holds a lock until commit, so one large transaction would stop everyone. |
+| D38 | `space_features` is the one store of what is on in a space (GAP-005) | Comments and reactions had two truths after wave C. The column `spaces.features` goes in a contract migration. |
+| D39 | `perm_visible_comments` decides which comments a list may show (GAP-023) | A thread for editors or a comment in the trash must never surface through search. |
 
 ## Scope
 
@@ -402,37 +409,37 @@ The wave is large, so it goes in steps that each stay green. One commit at the e
 
 ## Acceptance criteria
 
-- [ ] AC-1 A page has an owner, and handing over gives no right to delete.
-- [ ] AC-2 Status can be set while reading and while editing, follows the list of the space, and shows in the byline, row card, lists, search and Content.
-- [ ] AC-3 Verified and the review date work, including a change after verification and a reminder.
-- [ ] AC-4 Labels are cleaned while typing, suggest, combine, and can be renamed and merged. Hidden pages never show through a label.
-- [ ] AC-5 The gallery works by keyboard, and a page from a template gets its text, labels and files.
-- [ ] AC-6 Fields, instruction text, title patterns and steps work. An answer can carry no markup. A reader never sees instruction text.
-- [ ] AC-7 Templates have versions, and changing one changes no page.
-- [ ] AC-8 The ten starter templates are there, and can be hidden.
-- [ ] AC-9 A space template creates a working space.
-- [ ] AC-10 Blog posts can be written, listed, scheduled and followed, and stay out of the tree.
-- [ ] AC-11 Folders, link entries and company home work.
-- [ ] AC-12 Publish options work: location, silent update, status, schedule, preview.
-- [ ] AC-13 A scheduled page publishes the latest draft, and stops when the person lost their rights.
-- [ ] AC-14 Text survives a failed save and a closed tab, and old drafts expire after a warning.
-- [ ] AC-15 A page moves to another space with everything on it, after showing the impact, and old addresses work.
-- [ ] AC-16 A move is refused when it would touch hidden pages or drop a restriction without the right.
-- [ ] AC-17 Copy works across spaces, with titles, and a large copy runs in the background.
-- [ ] AC-18 Several rows move together, and a row can be dragged to a space.
-- [ ] AC-19 An approval round runs from asking to Approved, and a new version removes the mark.
-- [ ] AC-20 A space can require approval, and then only approved text can be published.
-- [ ] AC-21 Archived pages are read-only, keep their address, stay out of lists, and can be restored without losing a restriction.
-- [ ] AC-22 The trash can be searched, and bulk restore works.
-- [ ] AC-23 What changed shows the differences since a person's last visit.
-- [ ] AC-24 An administrator can remove one version with a reason, and it shows as removed.
-- [ ] AC-25 The Content screen filters, shows a summary, and reports what worked and what did not.
-- [ ] AC-26 A key can change, and old addresses redirect.
-- [ ] AC-27 Features turn on and off without losing anything.
+- [x] AC-1 A page has an owner, and handing over gives no right to delete.
+- [x] AC-2 Status can be set while reading and while editing, follows the list of the space, and shows in the byline, row card, lists, search and Content.
+- [x] AC-3 Verified and the review date work, including a change after verification and a reminder.
+- [x] AC-4 Labels are cleaned while typing, suggest, combine, and can be renamed and merged. Hidden pages never show through a label.
+- [x] AC-5 The gallery works by keyboard, and a page from a template gets its text, labels and files.
+- [x] AC-6 Fields, instruction text, title patterns and steps work. An answer can carry no markup. A reader never sees instruction text.
+- [x] AC-7 Templates have versions, and changing one changes no page.
+- [x] AC-8 The ten starter templates are there, and can be hidden.
+- [x] AC-9 A space template creates a working space.
+- [ ] AC-10 Blog posts can be written, listed, scheduled and followed, and stay out of the tree. Following waits for wave C.
+- [x] AC-11 Folders, link entries and company home work.
+- [x] AC-12 Publish options work: location, silent update, status, schedule, preview.
+- [x] AC-13 A scheduled page publishes the latest draft, and stops when the person lost their rights.
+- [x] AC-14 Text survives a failed save and a closed tab, and old drafts expire after a warning.
+- [x] AC-15 A page moves to another space with everything on it, after showing the impact, and old addresses work.
+- [x] AC-16 A move is refused when it would touch hidden pages or drop a restriction without the right.
+- [x] AC-17 Copy works across spaces, with titles, and a large copy runs in the background.
+- [x] AC-18 Several rows move together, and a row can be dragged to a space.
+- [x] AC-19 An approval round runs from asking to Approved, and a new version removes the mark.
+- [x] AC-20 A space can require approval, and then only approved text can be published.
+- [x] AC-21 Archived pages are read-only, keep their address, stay out of lists, and can be restored without losing a restriction.
+- [x] AC-22 The trash can be searched, and bulk restore works.
+- [x] AC-23 What changed shows the differences since a person's last visit.
+- [x] AC-24 An administrator can remove one version with a reason, and it shows as removed.
+- [x] AC-25 The Content screen filters, shows a summary, and reports what worked and what did not.
+- [x] AC-26 A key can change, and old addresses redirect.
+- [x] AC-27 Features turn on and off without losing anything.
 - [ ] AC-28 Deleting a space asks for its key, and a permanent removal shows progress.
-- [ ] AC-29 All search filters work and live in the address, and a shared address gives the same results.
-- [ ] AC-30 The search language works, and nothing typed gives an error.
-- [ ] AC-31 Everything passes axe, and the new pictures have been looked at.
+- [x] AC-29 All search filters work and live in the address, and a shared address gives the same results.
+- [x] AC-30 The search language works, and nothing typed gives an error.
+- [x] AC-31 Everything passes axe, and the new pictures have been looked at.
 
 ## Risks
 

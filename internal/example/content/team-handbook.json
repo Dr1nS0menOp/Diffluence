@@ -1,0 +1,9 @@
+{
+ "type": "doc",
+ "content": [
+  {
+   "type": "paragraph",
+   "content": [{ "type": "text", "text": "This text stays in the history. As a folder, this entry shows the pages below it." }]
+  }
+ ]
+}

@@ -20,6 +20,11 @@ const node = (id: string, parent_id: string | null, position: number) => ({
   updated_at: '2026-01-01T00:00:00Z',
   updated_by_name: '',
   visited_at: null,
+  kind: 'page',
+  link_target: '',
+  owner_name: '',
+  stage_text: '',
+  stage_color: '',
   title: id,
   status: 'published',
 });

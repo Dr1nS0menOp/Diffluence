@@ -46,7 +46,7 @@ export const api = {
   post: <T>(path: string, body?: unknown) => json<T>('POST', path, body ?? {}),
   put: <T>(path: string, body?: unknown) => json<T>('PUT', path, body ?? {}),
   patch: <T>(path: string, body: unknown) => json<T>('PATCH', path, body),
-  del: <T = void>(path: string) => json<T>('DELETE', path),
+  del: <T = void>(path: string, body?: unknown) => json<T>('DELETE', path, body),
   upload: <T>(path: string, file: Blob | File) => json<T>('POST', path, undefined, file),
   replace: <T>(path: string, file: Blob | File) => json<T>('PUT', path, undefined, file),
 };
@@ -61,6 +61,7 @@ export interface User {
 }
 
 export interface Preferences {
+  start_screen?: string;
   theme: string;
   shortcuts: boolean;
   contents: boolean;
@@ -89,6 +90,10 @@ export interface Space {
   home_page_id: string | null;
   favourite?: boolean;
   can?: Record<string, boolean>;
+  has_icon?: boolean;
+  title_align?: string;
+  review_months?: number;
+  approval_required?: boolean;
   features?: Features;
 }
 
@@ -107,7 +112,134 @@ export interface Shortcut {
 export interface SpaceOverview {
   page_count: number;
   administrators: string[];
+  owners: { id: string; name: string }[];
   recent: ListedPage[];
+  posts: BlogPost[];
+}
+
+export interface BlogPost {
+  id: string;
+  title: string;
+  emoji: string;
+  space_id: string;
+  space_key: string;
+  space_name: string;
+  author_name: string;
+  published_at: string;
+  excerpt: string;
+}
+
+export interface Stage {
+  text: string;
+  color: string;
+}
+
+export interface LabelCount {
+  label: string;
+  count: number;
+}
+
+export interface Verified {
+  by: string;
+  by_name: string;
+  at: string;
+  until: string;
+  version: number;
+  changed_after: boolean;
+  expired: boolean;
+}
+
+export interface ApprovalMark {
+  round_id: string;
+  status: string;
+  approved_version: number;
+  is_current: boolean;
+  asked: number;
+  answered: number;
+  must_answer: boolean;
+}
+
+export interface ApprovalRound {
+  id: string;
+  asked_by: string;
+  asked_by_name: string;
+  message: string;
+  due_on: string;
+  title: string;
+  base_version: number;
+  approved_version: number;
+  status: string;
+  created_at: string;
+  answers: { user_id: string; name: string; answer: string; comment: string }[];
+  document?: Json;
+}
+
+export interface TemplateField {
+  name: string;
+  kind: string;
+  options?: string[];
+  required: boolean;
+}
+
+export interface TemplateSummary {
+  id: string;
+  space_id: string | null;
+  name: string;
+  description: string;
+  category: string;
+  labels: string[];
+  title_pattern: string;
+  steps: { title: string; fields: string[] }[];
+  default_parent: string | null;
+  hidden: boolean;
+  promoted: boolean;
+  starter: boolean;
+  favourite: boolean;
+  version: number;
+  fields?: TemplateField[];
+  document?: Json;
+}
+
+export interface ContentRow {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  owner_id: string;
+  owner_name: string;
+  owner_disabled: boolean;
+  stage_text: string;
+  stage_color: string;
+  labels: string[];
+  created_at: string;
+  updated_at: string;
+  children: number;
+}
+
+export interface BulkFailure {
+  id: string;
+  reason: string;
+}
+
+export interface ArchivedPage {
+  id: string;
+  parent_id: string | null;
+  title: string;
+  archived_at: string;
+  archived_by_name: string;
+}
+
+export interface CopyImpact {
+  restrictions_lost: string[];
+  needs_manage: boolean;
+}
+
+export interface MoveImpact {
+  pages: number;
+  hidden: boolean;
+  restrictions_lost: string[];
+  restrictions_gained: string[];
+  needs_manage: boolean;
+  other_space: boolean;
 }
 
 export interface TreeNode {
@@ -122,6 +254,11 @@ export interface TreeNode {
   updated_at: string;
   updated_by_name: string;
   visited_at: string | null;
+  kind: string;
+  link_target: string;
+  owner_name: string;
+  stage_text: string;
+  stage_color: string;
 }
 
 export interface PageLook {
@@ -143,6 +280,14 @@ export interface Page extends PageLook {
   current_version: number;
   created_by: string;
   updated_at: string;
+  kind: string;
+  owner_id: string;
+  stage_text: string;
+  stage_color: string;
+  review_on: string;
+  archived_at: string | null;
+  published_at: string | null;
+  link_target: string;
 }
 
 /** A page without its text: enough for a menu or a dialog. */
@@ -151,10 +296,12 @@ export interface PageSummary extends Page {
   can: Record<string, boolean>;
 }
 
+/** What is on in a space, by name. The server always sends every feature. */
 export interface Features {
   comments: boolean;
   reactions: boolean;
   access_requests: boolean;
+  [name: string]: boolean;
 }
 
 export interface PageDetail extends PageSummary {
@@ -165,6 +312,13 @@ export interface PageDetail extends PageSummary {
   updated_by_name: string;
   has_draft: boolean;
   restricted: boolean;
+  owner_name: string;
+  owner_disabled: boolean;
+  labels: string[];
+  verified: Verified | null;
+  seen_version: number;
+  scheduled: { at: string; silent: boolean } | null;
+  approval: ApprovalMark | null;
 }
 
 export interface Draft {
@@ -182,6 +336,7 @@ export interface Version {
   restored_from: number | null;
   created_at: string;
   document?: Json;
+  removed?: boolean;
 }
 
 export interface DiffBlock {
@@ -237,6 +392,8 @@ export interface TrashItem {
   title: string;
   deleted_at: string;
   purge_after: string;
+  deleted_by_name: string;
+  hidden: boolean;
 }
 
 export interface SearchResult {
@@ -246,6 +403,20 @@ export interface SearchResult {
   title: string;
   snippet: string;
   updated_at: string;
+  emoji?: string;
+  kind?: string;
+  stage_text?: string;
+  stage_color?: string;
+  archived?: boolean;
+  breadcrumbs?: { id: string; title: string }[];
+  comment_id?: string;
+}
+
+export interface SearchAnswer {
+  results: SearchResult[];
+  total: number;
+  capped: boolean;
+  suggestion: string;
 }
 
 export interface ListedPage {
@@ -446,6 +617,7 @@ export interface DeleteImpact {
 
 export interface QuickResults {
   pages: SearchResult[];
+  posts?: SearchResult[];
   spaces: Space[];
   files: { id: string; filename: string; page_id: string; page_title: string; space_name: string }[];
   people: { id: string; name: string }[];
@@ -454,7 +626,14 @@ export interface QuickResults {
 export interface Job {
   id: string;
   status: string;
-  result: { pages?: number; files?: number; warnings?: string[]; error?: string };
+  result: {
+    pages?: number;
+    files?: number;
+    warnings?: string[];
+    error?: string;
+    done?: number;
+    failed?: BulkFailure[];
+  };
 }
 
 export interface UserDetail {

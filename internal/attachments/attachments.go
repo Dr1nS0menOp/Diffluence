@@ -82,6 +82,13 @@ func (s *Service) IsImageOf(ctx context.Context, q db.Querier, id, pageID uuid.U
 	return IsInline(contentType), err
 }
 
+// MoveToSpace keeps the files of moved pages in step with their pages, inside the
+// transaction of the move.
+func (s *Service) MoveToSpace(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID, spaceID uuid.UUID) error {
+	_, err := tx.Exec(ctx, "UPDATE attachments SET space_id = $2 WHERE page_id = ANY($1)", pageIDs, spaceID)
+	return err
+}
+
 // Found is a file that matched a quick search.
 type Found struct {
 	ID        uuid.UUID `json:"id"`
@@ -101,7 +108,7 @@ func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spac
 	}
 	rows, err := s.pool.Query(ctx, `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
 		FROM attachments a
-		JOIN perm_visible_pages($1) v ON v.page_id = a.page_id
+		JOIN perm_listed_pages($1) v ON v.page_id = a.page_id
 		JOIN pages p ON p.id = a.page_id
 		JOIN spaces sp ON sp.id = a.space_id
 		WHERE a.status = 'active' AND sp.status = 'active' AND position(lower($2) IN lower(a.filename)) > 0
@@ -307,6 +314,20 @@ func (s *Service) Open(ctx context.Context, c identity.Caller, id uuid.UUID, dow
 		}
 	}
 	return a, f, nil
+}
+
+// OpenOfPage reads a file that must belong to this page. It is for a module with a
+// rule of its own, such as templates, whose pages the access rule refuses on purpose.
+func (s *Service) OpenOfPage(ctx context.Context, pageID, id uuid.UUID) (Attachment, io.ReadSeekCloser, error) {
+	a, err := get(ctx, s.pool, id)
+	if err != nil {
+		return a, nil, err
+	}
+	if a.PageID != pageID {
+		return a, nil, apperr.NotFound()
+	}
+	f, err := s.OpenUnchecked(ctx, a)
+	return a, f, err
 }
 
 // OpenUnchecked reads the current version, for callers that have already checked.

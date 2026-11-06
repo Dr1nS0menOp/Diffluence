@@ -14,10 +14,21 @@ import {
 } from '../api';
 import { navigate } from '../router';
 import { Frame, spaceByKeyQuery } from '../components/frame';
+import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp } from '../components/icons';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, formatDate, Loading } from '../components/ui';
 import { SubjectPicker } from '../components/picker';
 import { moved } from './lists';
+import {
+  DeleteSpaceButton,
+  FeaturesSection,
+  KeySection,
+  LabelsSection,
+  PeopleSection,
+  RulesSection,
+  SpaceLinksSection,
+  StatusesSection,
+} from './space-organise';
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
@@ -234,38 +245,6 @@ function PermissionsSection({ space }: { space: Space }) {
   );
 }
 
-const FEATURES = ['comments', 'reactions', 'access_requests'] as const;
-
-function FeaturesSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const features = space.features ?? { comments: true, reactions: true, access_requests: false };
-  const save = useMutation({
-    mutationFn: (next: typeof features) => api.patch(`/spaces/${space.id}/features`, next),
-    onSettled: async () => {
-      await client.invalidateQueries({ queryKey: ['space', space.key] });
-      await client.invalidateQueries({ queryKey: ['space-id', space.id] });
-    },
-  });
-  return (
-    <section>
-      <h2>{t('space.features')}</h2>
-      <p className="muted">{t('space.featuresHelp')}</p>
-      <ErrorNote error={save.error} />
-      {FEATURES.map((name) => (
-        <label key={name} className="check">
-          <input
-            type="checkbox"
-            checked={features[name]}
-            onChange={(e) => save.mutate({ ...features, [name]: e.target.checked })}
-          />
-          {t(`space.feature_${name}`)}
-        </label>
-      ))}
-    </section>
-  );
-}
-
 function ShortcutsSection({ space }: { space: Space }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -418,7 +397,13 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
           </button>
         </form>
       </section>
+      <SpaceLinksSection space={space} />
+      <KeySection space={space} />
+      <PeopleSection space={space} />
       <FeaturesSection space={space} />
+      <StatusesSection space={space} />
+      <LabelsSection space={space} />
+      <RulesSection space={space} />
       <ShortcutsSection space={space} />
       <PermissionsSection space={space} />
       <ImportBox space={space} />
@@ -438,12 +423,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
               {t('space.archive')}
             </button>
           )}
-          <ConfirmButton
-            label={t('space.deleteSpace')}
-            message={t('space.confirmDelete')}
-            className="danger"
-            onConfirm={() => remove.mutate()}
-          />
+          <DeleteSpaceButton space={space} onDelete={() => remove.mutate()} />
         </div>
       </section>
     </Frame>
@@ -455,9 +435,17 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
   const client = useQueryClient();
   const q = useSpaceByKey(spaceKey);
   const space = q.data;
+  const [filter, setFilter] = useState('');
+  const [byTitle, setByTitle] = useState(false);
+  const [picked, setPicked] = useState<string[]>([]);
+  const wanted = useDelayed(filter.trim());
   const items = useQuery({
-    queryKey: ['trash', space?.id],
-    queryFn: () => api.get<{ items: TrashItem[] }>(`/spaces/${space?.id}/trash`),
+    queryKey: ['trash', space?.id, wanted, byTitle],
+    queryFn: () => {
+      const params = new URLSearchParams({ q: wanted });
+      if (byTitle) params.set('sort', 'title');
+      return api.get<{ items: TrashItem[] }>(`/spaces/${space?.id}/trash?${params.toString()}`);
+    },
     enabled: !!space,
   });
   const refresh = async () => {
@@ -469,6 +457,12 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
     onSettled: refresh,
   });
   const purge = useMutation({ mutationFn: (id: string) => api.del(`/trash/${id}`), onSettled: refresh });
+  const bulk = useMutation({
+    mutationFn: (action: 'restore' | 'purge') =>
+      api.post(`/spaces/${space?.id}/trash/bulk`, { action, ids: picked }),
+    onSuccess: () => setPicked([]),
+    onSettled: refresh,
+  });
   if (q.error) {
     return (
       <main id="main" className="plain reading">
@@ -480,14 +474,44 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
   return (
     <Frame space={space}>
       <h1>{t('trash.title')}</h1>
-      <ErrorNote error={items.error ?? restore.error ?? purge.error} />
+      <ErrorNote error={items.error ?? restore.error ?? purge.error ?? bulk.error} />
+      <div className="row">
+        <input
+          type="search"
+          className="grow"
+          value={filter}
+          aria-label={t('trash.filter')}
+          placeholder={t('trash.filter')}
+          onChange={(e) => setFilter(e.target.value)}
+        />
+        <label className="check">
+          <input type="checkbox" checked={byTitle} onChange={(e) => setByTitle(e.target.checked)} />
+          {t('organise.byName')}
+        </label>
+      </div>
+      {picked.length > 0 && (
+        <div className="row" role="group" aria-label={t('content.actions')}>
+          <span>{t('content.selected', { count: picked.length })}</span>
+          <button type="button" onClick={() => bulk.mutate('restore')}>
+            {t('trash.restore')}
+          </button>
+          <ConfirmButton
+            label={t('trash.purge')}
+            message={t('trash.confirmPurgeMany', { count: picked.length })}
+            className="danger"
+            onConfirm={() => bulk.mutate('purge')}
+          />
+        </div>
+      )}
       {items.data?.items.length === 0 && <p className="muted">{t('trash.empty')}</p>}
       {(items.data?.items.length ?? 0) > 0 && (
         <table>
           <thead>
             <tr>
+              <th>{t('history.pick')}</th>
               <th>{t('common.name')}</th>
               <th>{t('common.type')}</th>
+              <th>{t('trash.deletedBy')}</th>
               <th>{t('trash.deleted')}</th>
               <th>{t('trash.purgeAfter')}</th>
               <th>{t('common.actions')}</th>
@@ -495,21 +519,34 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
           </thead>
           <tbody>
             {items.data?.items.map((i) => (
-              <tr key={i.id}>
-                <td>{i.title}</td>
+              <tr key={i.id} className={picked.includes(i.id) ? 'picked' : undefined}>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={t('favourites.pick', { title: i.hidden ? t('trash.restricted') : i.title })}
+                    checked={picked.includes(i.id)}
+                    onChange={(e) =>
+                      setPicked(e.target.checked ? [...picked, i.id] : picked.filter((x) => x !== i.id))
+                    }
+                  />
+                </td>
+                <td>{i.hidden ? t('trash.restricted') : i.title}</td>
                 <td>{i.object_type}</td>
+                <td>{i.deleted_by_name || t('common.unknown')}</td>
                 <td>{formatDate(i.deleted_at)}</td>
                 <td>{formatDate(i.purge_after)}</td>
                 <td className="row">
                   <button type="button" onClick={() => restore.mutate(i.id)}>
                     {t('trash.restore')}
                   </button>
-                  <ConfirmButton
-                    label={t('trash.purge')}
-                    message={t('trash.confirmPurge')}
-                    className="danger"
-                    onConfirm={() => purge.mutate(i.id)}
-                  />
+                  {!i.hidden && (
+                    <ConfirmButton
+                      label={t('trash.purge')}
+                      message={t('trash.confirmPurge')}
+                      className="danger"
+                      onConfirm={() => purge.mutate(i.id)}
+                    />
+                  )}
                 </td>
               </tr>
             ))}

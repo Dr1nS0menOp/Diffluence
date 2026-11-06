@@ -1059,6 +1059,8 @@ func objectRoute(pattern string, ids map[string]string) (method, path string) {
 	path = strings.ReplaceAll(path, "{id}", id)
 	path = strings.ReplaceAll(path, "{key}", "ENG")
 	path = strings.ReplaceAll(path, "{number}", "1")
+	path = strings.ReplaceAll(path, "{label}", "x")
+	path = strings.ReplaceAll(path, "{alias}", "x")
 	path = strings.ReplaceAll(path, "{emoji}", url.PathEscape("👍"))
 	path = strings.ReplaceAll(path, "{user}", ids["owner"])
 	return method, path
@@ -1087,6 +1089,32 @@ func validRequest(pattern, path string, ids map[string]string) (string, string) 
 	case pattern == "PATCH /api/v1/pages/{id}":
 		return path, `{"title":"x"}`
 	case pattern == "PATCH /api/v1/spaces/{id}":
+		return path, `{"name":"x"}`
+	case pattern == "POST /api/v1/pages/{id}/approvals":
+		return path, `{"user_ids":["` + ids["owner"] + `"]}`
+	case strings.HasSuffix(pattern, "/kind"):
+		return path, `{"kind":"folder"}`
+	case pattern == "POST /api/v1/pages/{id}/labels":
+		return path, `{"label":"x"}`
+	case strings.HasSuffix(pattern, "/sort-children"):
+		return path, `{"by":"title"}`
+	case strings.Contains(pattern, "/content/"):
+		return path, `{"action":"archive","page_ids":["` + ids["page"] + `"]}`
+	case strings.HasSuffix(pattern, "/icon") && strings.HasPrefix(pattern, "POST"):
+		return path, pngHeader
+	case strings.HasSuffix(pattern, "/labels/rename"):
+		return path, `{"from":"a","to":"b"}`
+	case strings.HasSuffix(pattern, "/schedule") && strings.HasPrefix(pattern, "PUT"):
+		return path, `{"at":"2099-01-01T00:00:00Z"}`
+	case strings.HasSuffix(pattern, "/verification") && strings.HasPrefix(pattern, "PUT"):
+		return path, `{"until":"2099-01-01"}`
+	case strings.HasSuffix(pattern, "/key"):
+		return path, `{"key":"FREEKEY"}`
+	case strings.HasSuffix(pattern, "/title-align"):
+		return path, `{"align":"center"}`
+	case strings.HasSuffix(pattern, "/trash/bulk"):
+		return path, `{"action":"restore","ids":["` + ids["trash"] + `"]}`
+	case pattern == "POST /api/v1/spaces/{id}/templates" || strings.HasSuffix(pattern, "/templates/import"):
 		return path, `{"name":"x"}`
 	case pattern == "POST /api/v1/pages/{id}/comments" || pattern == "PATCH /api/v1/comments/{id}":
 		return path, `{"body":{"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"x"}]}]}}`

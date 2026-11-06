@@ -71,6 +71,8 @@ const (
 	TypeDecision       = "decision"
 	TypeStatus         = "status"
 	TypeDate           = "date"
+	TypeTemplateField  = "templateField"
+	TypeInstruction    = "instruction"
 	TypeMention        = "mention"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
@@ -95,7 +97,7 @@ const (
 
 var (
 	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction}
 )
 
 // children says which node types may appear inside each node type.
@@ -121,6 +123,8 @@ var children = map[string][]string{
 	TypeDecision:       inlineTypes,
 	TypeStatus:         {},
 	TypeDate:           {},
+	TypeTemplateField:  {},
+	TypeInstruction:    {},
 	TypeMention:        {},
 	TypeTable:          {TypeTableRow},
 	TypeTableRow:       {TypeTableCell, TypeTableHeader},

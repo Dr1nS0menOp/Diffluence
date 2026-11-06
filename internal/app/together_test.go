@@ -172,9 +172,9 @@ func TestACommentIsCheckedAndStaysBehindItsPage(t *testing.T) {
 		t.Fatal("existing comments must stay readable")
 	}
 	owner.ok("PATCH", "/api/v1/pages/"+page+"/comments-closed", map[string]any{"closed": false})
-	owner.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": false, "reactions": true})
+	owner.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": false, "reactions": true})
 	reader.want(409, "POST", "/api/v1/pages/"+page+"/comments", map[string]any{"body": commentBody("x")})
-	owner.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true})
+	owner.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true})
 
 	for range 30 {
 		reader.comment(page, "again")
@@ -420,7 +420,7 @@ func TestAllowingAccessNamesEveryLevelAndNeedsThemAll(t *testing.T) {
 		"subject":     map[string]any{"type": "user", "id": manager.id},
 		"permissions": []string{permissions.SpaceView, permissions.RestrictionManage},
 	})
-	owner.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
+	owner.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
 	top := owner.page(space, nil, "Branch", "x")
 	middle := owner.page(space, top, "Middle", "x")
 	leaf := owner.page(space, middle, "Leaf", "x")
@@ -462,7 +462,7 @@ func TestAllowingOpensTheSpaceAndEveryRestriction(t *testing.T) {
 	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
 	outsider := e.user("outsider@example.com", identity.PermUseProduct)
 	space, _ := owner.space("ENG")
-	owner.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
+	owner.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
 	page := owner.page(space, nil, "Page", "x")
 	owner.restrict(page, "view", owner.id)
 
@@ -519,12 +519,12 @@ func TestReactionsHaveLimitsAndCanBeTurnedOff(t *testing.T) {
 		t.Fatal("no audit or outbox event")
 	}
 
-	admin.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": false})
+	admin.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": false})
 	reader.want(409, "PUT", path+thumb, nil)
 	if len(admin.ok("GET", "/api/v1/pages/"+page+"/reactions", nil)["reactions"].([]any)) != 0 {
 		t.Fatal("reactions must stop showing")
 	}
-	admin.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true})
+	admin.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true})
 	if len(admin.ok("GET", "/api/v1/pages/"+page+"/reactions", nil)["reactions"].([]any)) != 20 {
 		t.Fatal("turning off must delete nothing")
 	}
@@ -1010,7 +1010,7 @@ func TestAskingForAccessReachesSomeoneWhoMayGrantIt(t *testing.T) {
 	if body := reader.want(404, "GET", "/api/v1/pages/"+hidden, nil); strings.Contains(body, "not_found_ask") {
 		t.Fatal("the answer must not offer anything")
 	}
-	owner.ok("PATCH", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
+	owner.ok("PUT", "/api/v1/spaces/"+space+"/features", map[string]any{"comments": true, "reactions": true, "access_requests": true})
 	if body := reader.want(404, "GET", "/api/v1/pages/"+hidden, nil); !strings.Contains(body, "not_found_ask") {
 		t.Fatalf("no offer: %s", body)
 	}

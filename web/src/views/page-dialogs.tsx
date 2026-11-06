@@ -8,10 +8,8 @@ import {
   type DeleteImpact,
   type DirectoryEntry,
   type NamedSubject,
-  type Page,
   type PageSummary,
   type Restrictions,
-  type TreeNode,
 } from '../api';
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
@@ -211,53 +209,6 @@ export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClo
   );
 }
 
-export function MoveDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const tree = useQuery({
-    queryKey: ['tree', page.space_id],
-    queryFn: () => api.get<{ pages: TreeNode[] }>(`/spaces/${page.space_id}/tree`),
-  });
-  const [parent, setParent] = useState(page.parent_id ?? '');
-  const move = useMutation({
-    mutationFn: () => api.post(`/pages/${page.id}/move`, { parent_id: parent || null }),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ['tree', page.space_id] });
-      await client.invalidateQueries({ queryKey: ['page', page.id] });
-      onClose();
-    },
-  });
-  return (
-    <Dialog title={t('page.move')} onClose={onClose}>
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          move.mutate();
-        }}
-      >
-        <ErrorNote error={move.error} />
-        <Field label={t('page.moveTo')}>
-          <select value={parent} onChange={(e) => setParent(e.target.value)}>
-            <option value="">{t('page.topLevel')}</option>
-            {tree.data?.pages
-              .filter((n) => n.id !== page.id && n.status === 'published')
-              .map((n) => (
-                <option key={n.id} value={n.id}>
-                  {n.title}
-                </option>
-              ))}
-          </select>
-        </Field>
-        <div className="dialog-actions">
-          <button type="submit" className="primary">
-            {t('page.move')}
-          </button>
-        </div>
-      </form>
-    </Dialog>
-  );
-}
-
 export function RenameDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -351,34 +302,6 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
         </button>
         <button type="button" className="danger" disabled={remove.isPending} onClick={() => remove.mutate()}>
           {t('page.delete')}
-        </button>
-      </div>
-    </Dialog>
-  );
-}
-
-export function CopyDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const [children, setChildren] = useState(false);
-  const copy = useMutation({
-    mutationFn: () =>
-      api.post<Page>(`/pages/${page.id}/copy`, { parent_id: page.parent_id, include_children: children }),
-    onSuccess: async (p) => {
-      await client.invalidateQueries({ queryKey: ['tree', page.space_id] });
-      navigate(`/pages/${p.id}`);
-    },
-  });
-  return (
-    <Dialog title={t('page.copy')} onClose={onClose}>
-      <ErrorNote error={copy.error} />
-      <label className="check">
-        <input type="checkbox" checked={children} onChange={(e) => setChildren(e.target.checked)} />
-        {t('page.copyChildren')}
-      </label>
-      <div className="dialog-actions">
-        <button type="button" className="primary" onClick={() => copy.mutate()}>
-          {t('page.copy')}
         </button>
       </div>
     </Dialog>

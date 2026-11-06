@@ -25,6 +25,7 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/httpapi"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -45,6 +46,7 @@ import (
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/tasks"
+	"github.com/diffluence/diffluence/internal/templates"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/version"
 	"github.com/diffluence/diffluence/internal/watches"
@@ -64,6 +66,8 @@ type App struct {
 	identity   *identity.Service
 	perms      *permissions.Service
 	settings   *settings.Service
+	features   *features.Service
+	templates  *templates.Service
 	store      storage.Store
 	attach     *attachments.Service
 	pages      *pages.Service
@@ -140,14 +144,17 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	}
 	a.perms = permissions.NewService(a.pool)
 	a.settings = settings.NewService(a.pool, a.store)
+	a.features = features.NewService(a.pool, a.settings)
+	a.jobs = jobs.NewService(a.pool, log)
 	a.attach = attachments.NewService(a.pool, a.perms, a.store, a.settings, a.instanceID)
-	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.instanceID)
-	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.instanceID)
+	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.features, a.jobs, a.instanceID)
+	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.features, a.store, a.instanceID)
+	a.templates = templates.NewService(a.pool, a.perms, a.pages, a.spaces, a.identity, a.attach)
 	a.trash = trash.NewService(a.pool, a.perms, a.identity, log)
 	a.trash.Register(trash.TypePage, a.pages)
 	a.trash.Register(trash.TypeAttachment, a.attach)
 	a.trash.Register(trash.TypeSpace, a.spaces)
-	a.comments = comments.NewService(a.pool, a.perms, a.settings, a.instanceID)
+	a.comments = comments.NewService(a.pool, a.perms, a.settings, a.features, a.instanceID)
 	a.trash.Register(trash.TypeComment, a.comments)
 	a.watches = watches.NewService(a.pool, a.perms)
 	a.tasks = tasks.NewService(a.pool)
@@ -156,11 +163,10 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		InstanceName: cfg.InstanceName, PublicOrigin: cfg.PublicOrigin(), Keyring: a.keyring})
 	a.mail = mail.NewService(a.pool, mailSender(cfg), log)
 	a.mail.SetRenderer(a.notify.Render)
-	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify)
+	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
-	a.jobs = jobs.NewService(a.pool, log)
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, cfg.DataDir)
-	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments)
+	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments, a.templates)
 	a.scim = scim.NewService(a.pool, a.identity, cfg.PublicOrigin(), log)
 	if cfg.OIDC.Issuer != "" {
 		a.sso = sso.New(sso.Config{Issuer: cfg.OIDC.Issuer, ClientID: cfg.OIDC.ClientID, ClientSecret: cfg.OIDC.ClientSecret,
@@ -173,7 +179,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
-			Sharing: a.sharing, Feed: a.feed,
+			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
 			SystemStatus: a.SystemStatus,
 			InstanceID:   a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
@@ -366,6 +372,9 @@ func (a *App) Jobs() *jobs.Service { return a.jobs }
 // Trash exposes the trash (used by tests).
 func (a *App) Trash() *trash.Service { return a.trash }
 
+// Pages exposes pages (used by tests).
+func (a *App) Pages() *pages.Service { return a.pages }
+
 // Attachments exposes attachments (used by tests).
 func (a *App) Attachments() *attachments.Service { return a.attach }
 
@@ -395,6 +404,9 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "audit-verify", Every: 24 * time.Hour, Run: a.verifyAudit},
 		{Name: "audit-checkpoint", Every: 24 * time.Hour, Run: a.signCheckpoint},
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},
+		{Name: "publish-scheduled", Every: time.Minute, Run: a.pages.PublishDue},
+		{Name: "remind-reviews", Every: 24 * time.Hour, Run: a.pages.RemindReviews},
+		{Name: "expire-drafts", Every: 24 * time.Hour, Run: a.pages.ExpireDrafts},
 		{Name: "task-reminders", Every: time.Hour, Run: a.notify.RemindDue},
 		{Name: "notification-digests", Every: time.Hour, Run: a.notify.SendDigests},
 		{Name: "purge-notifications", Every: 24 * time.Hour, Run: a.notify.Purge},

@@ -122,6 +122,45 @@ func TestANewInstanceGetsTheExampleSpaceOnceItHasAnAdministrator(t *testing.T) {
 	}
 }
 
+func TestTheExampleShowsHowASpaceIsKeptInOrder(t *testing.T) {
+	e := newEnvWith(t, withExample)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	member := e.user("member@example.com", identity.PermUseProduct)
+	e.tick()
+	space := member.ok("GET", "/api/v1/space-keys/"+exampleKey, nil)["id"].(string)
+
+	var organised, folder string
+	for _, node := range member.ok("GET", "/api/v1/spaces/"+space+"/tree", nil)["pages"].([]any) {
+		row := node.(map[string]any)
+		if row["title"] == "Keeping things in order" {
+			organised = row["id"].(string)
+		}
+		if row["kind"] == "folder" {
+			folder = row["id"].(string)
+		}
+	}
+	if organised == "" || folder == "" {
+		t.Fatal("the example needs a page about order, and a folder")
+	}
+	page := member.ok("GET", "/api/v1/pages/"+organised, nil)
+	if len(page["labels"].([]any)) == 0 || page["stage_text"] == "" || page["owner_id"] != admin.id {
+		t.Fatalf("the example shows labels, a status and an owner: %v", page)
+	}
+	if posts := member.ok("GET", "/api/v1/spaces/"+space+"/posts", nil)["posts"].([]any); len(posts) == 0 {
+		t.Fatal("the example shows a blog post")
+	}
+	found := false
+	for _, entry := range member.ok("GET", "/api/v1/spaces/"+space+"/templates", nil)["templates"].([]any) {
+		found = found || entry.(map[string]any)["name"] == "Team update"
+	}
+	if !found {
+		t.Fatal("the example shows a template of its own")
+	}
+	if owners := member.ok("GET", "/api/v1/spaces/"+space+"/overview", nil)["owners"].([]any); len(owners) != 1 {
+		t.Fatalf("the example says who to ask: %v", owners)
+	}
+}
+
 func TestADeletedExampleStaysGone(t *testing.T) {
 	e := newEnvWith(t, withExample)
 	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)

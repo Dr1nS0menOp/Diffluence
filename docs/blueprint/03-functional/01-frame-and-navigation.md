@@ -25,7 +25,7 @@ How to read this chapter: see `../03-functional-requirements.md`. Every line has
 - **NAV-016** · partly · **Recent** opens a menu with the last pages the person visited, with tabs for pages they visited, pages they worked on and their drafts. Each row shows the title, the space and when. Still open: the tabs live on the Recent screen, and the menu lists visited pages.
 - **NAV-017** · built · **Favourites** opens a menu with favourite pages. It stays empty with one sentence that explains how to add one.
 - **NAV-018** · built · **Create** is the one primary button of the top bar. Inside a space it adds a page below the page being read, if the person may. Outside a space it starts a new space.
-- **NAV-019** · partly · Create offers a small menu when there is more than one thing to make: page, page from a template, blog post, space. The most used choice stays one click away. Still open: page from a template and blog post (wave D).
+- **NAV-019** · built · Create offers a small menu when there is more than one thing to make: page, page from a template, blog post, space. The most used choice stays one click away.
 - **NAV-020** · built · The search box sits on the far side.
 - **NAV-021** · built · A bell shows how many unread notifications there are, and opens the notification panel (chapter 7).
 - **NAV-022** · built · A help menu offers the keyboard shortcuts, the documentation and the version number.

@@ -118,7 +118,7 @@ mutate "a page returns while its parent is in the trash" internal/pages/tree.go 
 mutate "SVG shown inline" internal/attachments/attachments.go \
   's.replace(`"image/webp": true}`, `"image/webp": true, "text/xml; charset=utf-8": true, "text/plain": true, "text/xml": true}`)' $app
 mutate "publish loses its audit event" internal/pages/pages.go \
-  's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
+  's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
   's.replace("default:\n\t\treturn \"\", bad\n\t}\n\treturn href, nil", "default:\n\t}\n\treturn href, nil")' ./internal/document/
 mutate "a file may point anywhere" internal/document/attrs.go \
@@ -156,7 +156,7 @@ mutate "disabled users keep their sessions" internal/identity/users.go \
   's.replace("if _, err := tx.Exec(ctx, \"DELETE FROM sessions WHERE user_id = $1\", id); err != nil {\n\t\t\t\treturn err\n\t\t\t}\n\t\t\tif err := s.keepsAnAdministrator", "if err := s.keepsAnAdministrator")' $app -run TestAdminUserManagement
 
 mutate "links reveal hidden pages" internal/pages/details.go \
-  's.replace("refJoins   = `JOIN perm_visible_pages($1) v ON v.page_id = p.id", "refJoins   = `JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestDetailsNeverRevealHiddenPages
+  's.replace("refJoins   = `JOIN perm_listed_pages($1) v ON v.page_id = p.id", "refJoins   = `JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestDetailsNeverRevealHiddenPages
 mutate "a header can be a file from another page" internal/attachments/attachments.go \
   's.replace("WHERE a.id = $1 AND a.page_id = $2 AND a.status = \x27active\x27`, id, pageID)", "WHERE a.id = $1 AND $2::uuid IS NOT NULL AND a.status = \x27active\x27`, id, pageID)")' $app -run TestPageLook
 mutate "anyone can undo a delete" internal/trash/trash.go \
@@ -168,13 +168,57 @@ mutate "any theme is accepted" internal/identity/preferences.go \
 mutate "a shortcut may go anywhere" internal/spaces/shortcuts.go \
   's.replace("if err != nil || strings.HasPrefix(lower", "if (err != nil && len(lower) < 0) || strings.HasPrefix(lower")' $app -run TestShortcuts
 mutate "the directory counts hidden pages" internal/spaces/directory.go \
-  's.replace("FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id", "FROM pages p")' $app -run TestDirectory
+  's.replace("FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id", "FROM pages p")' $app -run TestDirectory
 mutate "quick search shows people to everyone" internal/httpapi/handlers_reading.go \
   's.replace("if err != nil || !allowed {", "if err != nil || (!allowed && len(text) < 0) {")' $app -run TestQuickSearch
 mutate "quick search shows hidden files" internal/attachments/attachments.go \
-  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestQuickSearch
+  's.replace("JOIN perm_listed_pages($1) v ON v.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestQuickSearch
 mutate "a row menu counts as a visit" internal/pages/details.go \
-  's.replace("out.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, id)\n\tout.Can, err = s.capabilities(ctx, c, id)\n\treturn out, err")' $app -run TestOpeningARowMenu
+  's.replace("out.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, p)\n\tout.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err")' $app -run TestOpeningARowMenu
+
+mutate "archived pages stay writable" internal/permissions/evaluate.go \
+  's.replace("if p.Archived && !worksOnArchivedPage(in.Action) {", "if p.Archived && len(in.Action) < 0 {")' $perms
+mutate "templates open as pages" internal/permissions/evaluate.go \
+  's.replace("p.Kind != KindTemplate, true)", "true, true)")' $perms
+mutate "SQL: lists show archived pages" internal/db/migrations/0008_organising.sql \
+  's.replace("WHERE p.archived_at IS NULL\n$$;", "WHERE true\n$$;")' $perms
+mutate "SQL: templates show in lists" internal/db/migrations/0008_organising.sql \
+  's.replace("AND p.kind <> \x27template\x27\n", "\n")' $perms
+mutate "a label reveals hidden pages" internal/pages/labels.go \
+  's.replace("JOIN perm_listed_pages($1) v ON v.page_id = l.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestLabelsAreCleanedAndNeverRevealHiddenPages
+mutate "a spelling suggestion uses hidden titles" internal/search/search.go \
+  's.replace("SELECT p.title FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id", "SELECT p.title FROM pages p JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestSearchFiltersNeverRevealHiddenPages
+mutate "a move skips hidden pages" internal/pages/move.go \
+  's.replace("if hidden {\n", "if hidden && len(tree) < 0 {\n")' $app -run TestMoveBetweenSpacesIsRefusedWhenItWouldTouchTooMuch
+mutate "a restore drops a restriction" internal/pages/archive.go \
+  's.replace("if len(parents) > 0 && !withParents {", "if len(parents) < 0 && !withParents {")' $app -run TestARestoreBelowAnArchivedPageCannotDropARestriction
+mutate "publishing ignores required approval" internal/pages/versions.go \
+  's.replace("if err := s.requireApproved(ctx, tx, p, title, doc); err != nil {", "if err := s.requireApproved(ctx, tx, p, title, doc); err != nil && len(title) < 0 {")' $app -run TestASpaceCanRequireApprovalOfTheExactText
+mutate "a scheduled publish ignores lost rights" internal/pages/schedule.go \
+  's.replace("_, err = s.Publish(ctx, identity.Caller{UserID: due.user}, due.page,", "var author uuid.UUID\n\t\t_ = s.pool.QueryRow(ctx, \"SELECT created_by FROM pages WHERE id = $1\", due.page).Scan(&author)\n\t\t_, err = s.Publish(ctx, identity.Caller{UserID: author}, due.page,")' $app -run TestScheduledPublishingStopsWhenTheRightsAreGone
+mutate "handing over gives delete own" internal/permissions/service.go \
+  's.replace("SELECT space_id, status, created_by, kind,", "SELECT space_id, status, COALESCE(owner_id, created_by), kind,")' $app -run TestHandingOverAPageGivesNoRightToDeleteIt
+mutate "a bulk job skips the check" internal/pages/content.go \
+  's.replace("if err := s.applyContent(ctx, c, id, in.Action); err != nil {", "var author uuid.UUID\n\t\t_ = s.pool.QueryRow(ctx, \"SELECT created_by FROM pages WHERE id = $1\", id).Scan(&author)\n\t\t_ = c\n\t\tif err := s.applyContent(ctx, identity.Caller{UserID: author}, id, in.Action); err != nil {")' $app -run TestContentScreenFiltersAndReportsWhatWorked
+
+mutate "the trash names a hidden page" internal/trash/trash.go \
+  's.replace("CASE WHEN h.page_id IS NULL THEN t.title ELSE \x27\x27 END, t.deleted_by", "t.title, t.deleted_by")' $app -run TestTrashNeverNamesWhatIsHiddenFromThePerson
+mutate "the trash search finds a hidden title" internal/trash/trash.go \
+  's.replace("($2 = \x27\x27 OR (h.page_id IS NULL AND position(", "($2 = \x27\x27 OR (position(")' $app -run TestTrashNeverNamesWhatIsHiddenFromThePerson
+mutate "a hidden item can be purged by hand" internal/trash/trash.go \
+  's.replace("if hidden {\n", "if hidden && len(it.Title) < 0 {\n")' $app -run TestTrashNeverNamesWhatIsHiddenFromThePerson
+mutate "a purge takes hidden pages along" internal/trash/trash.go \
+  's.replace("OR h.page_id IN (SELECT t.descendant_id FROM page_tree t WHERE t.ancestor_id = $2))", "OR h.page_id = $2)")' $app -run TestPurgingAPageIsRefusedWhenAPageBelowItIsHidden
+mutate "a copy can lose a restriction from above" internal/pages/tree.go \
+  's.replace("lost, _, err := inheritedChange(ctx, tx, p, in.ParentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif len(lost) > 0 {", "lost, _, err := inheritedChange(ctx, tx, p, in.ParentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif len(lost) < 0 {")' $app -run TestACopyCannotQuietlyLoseAnInheritedRestriction
+mutate "any file comes through a template" internal/attachments/attachments.go \
+  's.replace("if a.PageID != pageID {", "if a.PageID != pageID && len(a.Filename) < 0 {")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+mutate "template files ignore who may read the template" internal/templates/templates.go \
+  's.replace("if err := s.mayRead(ctx, s.pool, c, t); err != nil {\n\t\treturn attachments.Attachment{}, nil, err\n\t}\n\treturn s.files.OpenOfPage", "return s.files.OpenOfPage")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+mutate "the link filter tells hidden from gone" internal/pages/content.go \
+  's.replace("AND k.target_id NOT IN (SELECT g.page_id FROM perm_visible_pages($1) g)))", "AND k.target_id NOT IN (SELECT g.id FROM pages g WHERE g.status <> \x27trashed\x27 AND $1::uuid IS NOT NULL)))")' $app -run TestABrokenLinkFilterTreatsHiddenPagesAsGone
+mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \
+  's.replace("for _, level := range p.ViewChain {", "for _, level := range p.ViewChain {\n\t\tif in.Action == ActionApprovalRead {\n\t\t\tbreak\n\t\t}")' $perms -run TestApprovalReadIsViewWithoutTheDraftRule
 
 mutate "a notification reaches someone who cannot see the page" internal/notify/notify.go \
   's.replace("if err != nil || !allowed {\n\t\treturn err\n\t}\n\tdata, err :=", "if err != nil || (!allowed && len(r.Type) < 0) {\n\t\treturn err\n\t}\n\tdata, err :=")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
@@ -202,11 +246,11 @@ mutate "a silent update reaches watchers" internal/notify/fanout.go \
 mutate "a stored mention keeps the name" internal/document/attrs.go \
   's.replace("out[\"kind\"] = MentionUser\n\t}\n\treturn nil", "out[\"kind\"] = MentionUser\n\t}\n\tout[\"label\"] = in[\"label\"]\n\treturn nil")' $app -run TestAMentionStoresTheIdAndNeverTheName
 mutate "search does not find a mentioned person" internal/search/search.go \
-  's.replace("WHERE (d.tsv || n.tsv) @@ q.query)", "WHERE d.tsv @@ q.query)")' $app -run TestAMentionStoresTheIdAndNeverTheName
+  's.replace("WHERE (x.tsv || n.tsv) @@ q.query", "WHERE x.tsv @@ q.query")' $app -run TestAMentionStoresTheIdAndNeverTheName
 mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
   's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
-  's.replace("case SpaceView, ActionPageView, SpaceExport, SpaceAdminister:", "case SpaceView, ActionPageView, SpaceExport, SpaceAdminister, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
+  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
 mutate "following tells who exists" internal/watches/watches.go \
   's.replace("if !known || !slices.Contains(facts.Global, identity.PermViewProfiles) {", "if !known || (len(facts.Global) < 0 && !slices.Contains(facts.Global, identity.PermViewProfiles)) {")' $app -run TestFollowingGoesByTheRuleForSeeingPeople
 mutate "allowing skips a level out of reach" internal/sharing/sharing.go \
@@ -236,6 +280,20 @@ mutate "an instance with spaces gets an example" internal/example/example.go \
 mutate "any member can add the example space" internal/httpapi/handlers_reading.go \
   's.replace("Permission(identity.PermAdministrator), s.handleExampleSpace", "Permission(identity.PermUseProduct), s.handleExampleSpace")' $app -run TestAnAdministratorCanAddTheExampleLater
 
+mutate "a move leaves comments behind" internal/pages/move.go \
+  's.replace("var tablesWithSpace = []string{\"comments\", ", "var tablesWithSpace = []string{")' $app -run TestAMoveTakesEveryRowOfTheBranchAlong
+mutate "a move leaves the trash behind" internal/pages/move.go \
+  's.replace("OR object_id IN (SELECT id FROM comments WHERE page_id = ANY($1))", "")' $app -run TestAMoveTakesEveryRowOfTheBranchAlong
+mutate "search shows a thread for editors" internal/db/migrations/0008_organising.sql \
+  's.replace("AND (NOT c.editors_only OR c.page_id IN (SELECT e.page_id FROM perm_editable_pages(u) e))", "")' $app -run TestCommentSearchFollowsTheRuleOfAComment
+mutate "search shows a comment in the trash" internal/db/migrations/0008_organising.sql \
+  's.replace("WHERE c.trash_item_id IS NULL AND NOT c.purged", "WHERE NOT c.purged")' $app -run TestCommentSearchFollowsTheRuleOfAComment
+mutate "an edit restriction does not count for a thread" internal/db/migrations/0008_organising.sql \
+  's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
+mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
+  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
+mutate "a removed version lives on in a quote" internal/pages/versions.go \
+  's.replace("if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {", "_ = removed\n\t\tif err := comments.BlankQuotes(ctx, tx, c, id, current, current); err != nil {")' $app -run TestRemovingAVersionBlanksTheQuotesThatHoldIt
 mutate "nodes hand out rights at the same time" internal/db/db.go \
   's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
 

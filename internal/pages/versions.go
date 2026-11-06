@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,6 +15,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -59,7 +61,7 @@ func (s *Service) SaveDraft(ctx context.Context, c identity.Caller, id uuid.UUID
 	err = s.pool.QueryRow(ctx, `INSERT INTO drafts (page_id, user_id, title, document, schema_version, base_version)
 		VALUES ($1, $2, $3, $4, $5, $6)
 		ON CONFLICT (page_id, user_id) DO UPDATE SET title = EXCLUDED.title, document = EXCLUDED.document,
-			schema_version = EXCLUDED.schema_version, base_version = EXCLUDED.base_version, updated_at = now()
+			schema_version = EXCLUDED.schema_version, base_version = EXCLUDED.base_version, updated_at = now(), warned_at = NULL
 		RETURNING updated_at`, id, c.UserID, title, raw, document.SchemaVersion, in.BaseVersion).Scan(&d.UpdatedAt)
 	return d, err
 }
@@ -100,6 +102,10 @@ type PublishInput struct {
 	Summary     string
 	Overwrite   bool // publish even though someone else published in between
 	Silent      bool // tell no watcher: a small fix (PAG-025)
+	// StageText and StageColor apply when SetStage is true (PAG-057).
+	SetStage   bool
+	StageText  string
+	StageColor string
 }
 
 func checkSummary(summary string) (string, error) {
@@ -125,6 +131,9 @@ func (s *Service) Publish(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if err != nil {
 		return Page{}, err
 	}
+	if doc, err = document.ForPublish(doc); err != nil {
+		return Page{}, err
+	}
 	title, err := cleanTitle(in.Title)
 	if err != nil {
 		return Page{}, err
@@ -145,7 +154,21 @@ func (s *Service) Publish(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		if p.CurrentVersion != in.BaseVersion && !in.Overwrite {
 			return apperr.Conflict("version_conflict", "Someone else published this page while you were editing.")
 		}
+		if err := s.requireApproved(ctx, tx, p, title, doc); err != nil {
+			return err
+		}
+		if in.SetStage {
+			if err := s.applyStage(ctx, tx, c, p, in.StageText, in.StageColor); err != nil {
+				return err
+			}
+		}
 		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID, Summary: summary, Silent: in.Silent}); err != nil {
+			return err
+		}
+		if err := endRoundsOnPublish(ctx, tx, id, out.CurrentVersion, title, doc); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM scheduled_publications WHERE page_id = $1", id); err != nil {
 			return err
 		}
 		_, err = tx.Exec(ctx, "DELETE FROM drafts WHERE page_id = $1 AND user_id = $2", id, c.UserID)
@@ -208,6 +231,8 @@ type Version struct {
 	RestoredFrom *int            `json:"restored_from"`
 	CreatedAt    time.Time       `json:"created_at"`
 	Document     json.RawMessage `json:"document,omitempty"`
+	// Removed marks a version an administrator took out, whose number stays.
+	Removed bool `json:"removed"`
 }
 
 const versionColumns = `v.number, v.title, v.author_id, COALESCE(u.display_name, ''), v.summary, v.restored_from, v.created_at`
@@ -227,10 +252,27 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 		err := r.Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt)
 		return v, err
 	})
+	if err != nil {
+		return nil, err
+	}
+	removed, err := s.pool.Query(ctx, "SELECT number, removed_at FROM removed_versions WHERE page_id = $1", id)
+	if err != nil {
+		return nil, err
+	}
+	gone, err := pgx.CollectRows(removed, func(r pgx.CollectableRow) (Version, error) {
+		v := Version{Removed: true}
+		err := r.Scan(&v.Number, &v.CreatedAt)
+		return v, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	out = append(out, gone...)
+	slices.SortFunc(out, func(a, b Version) int { return b.Number - a.Number })
 	if out == nil {
 		out = []Version{}
 	}
-	return out, err
+	return out, nil
 }
 
 func (s *Service) version(ctx context.Context, id uuid.UUID, number int) (Version, error) {
@@ -239,9 +281,59 @@ func (s *Service) version(ctx context.Context, id uuid.UUID, number int) (Versio
 		LEFT JOIN users u ON u.id = v.author_id WHERE v.page_id = $1 AND v.number = $2`, id, number).
 		Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt, &v.Document)
 	if errors.Is(err, pgx.ErrNoRows) {
+		var removed bool
+		if err := s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM removed_versions WHERE page_id = $1 AND number = $2)", id, number).Scan(&removed); err != nil {
+			return v, err
+		}
+		if removed {
+			return v, apperr.Conflict("version_removed", "An administrator removed this version.")
+		}
 		return v, apperr.NotFound()
 	}
 	return v, err
+}
+
+// RemoveVersion takes one version out, for a leaked secret. The route requires
+// administrator. Versions are immutable, so this deletes the row and leaves a
+// marker: the number stays, and the audit log keeps who, when and why (PAG-096).
+func (s *Service) RemoveVersion(ctx context.Context, c identity.Caller, id uuid.UUID, number int, reason string) error {
+	reason = strings.TrimSpace(reason)
+	if reason == "" || utf8.RuneCountInString(reason) > 500 {
+		return apperr.Invalid("Give a reason of at most 500 characters.")
+	}
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		p, err := lockPage(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if number == p.CurrentVersion {
+			return apperr.Conflict("current_version", "The current version cannot be removed. Publish a new one first.")
+		}
+		var raw []byte
+		err = tx.QueryRow(ctx, "DELETE FROM page_versions WHERE page_id = $1 AND number = $2 RETURNING document", id, number).Scan(&raw)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound()
+		}
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "INSERT INTO removed_versions (page_id, number, removed_by, reason) VALUES ($1, $2, $3, $4)", id, number, c.UserID, reason); err != nil {
+			return err
+		}
+		removed, err := document.Parse(raw)
+		if err != nil {
+			return err
+		}
+		current, err := currentDocument(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+		// A quote copies words from the page, so they would outlive the version (SEC-407).
+		if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {
+			return err
+		}
+		return record(ctx, tx, c, "page.version_removed", p, map[string]any{"version": number, "reason": reason})
+	})
 }
 
 // GetVersion returns one version with its content.

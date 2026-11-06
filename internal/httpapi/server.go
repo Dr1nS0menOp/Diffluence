@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
@@ -32,6 +33,7 @@ import (
 	"github.com/diffluence/diffluence/internal/spaces"
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/tasks"
+	"github.com/diffluence/diffluence/internal/templates"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/watches"
 )
@@ -49,6 +51,8 @@ type Deps struct {
 	Search      *search.Service
 	Trash       *trash.Service
 	Settings    *settings.Service
+	Features    *features.Service
+	Templates   *templates.Service
 	Jobs        *jobs.Service
 	Exchange    *exchange.Service
 	Example     *example.Service

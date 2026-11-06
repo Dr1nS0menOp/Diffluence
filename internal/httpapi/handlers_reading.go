@@ -251,6 +251,7 @@ type quickPerson struct {
 
 type quickResults struct {
 	Pages  []search.Result     `json:"pages"`
+	Posts  []search.Result     `json:"posts"`
 	Spaces []spaces.Space      `json:"spaces"`
 	Files  []attachments.Found `json:"files"`
 	People []quickPerson       `json:"people"`
@@ -284,12 +285,19 @@ func (s *Server) handleQuickSearch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	text, c := q.Get("q"), s.caller(r)
-	out := quickResults{Pages: []search.Result{}, Spaces: []spaces.Space{}, Files: []attachments.Found{}, People: []quickPerson{}}
+	out := quickResults{Pages: []search.Result{}, Posts: []search.Result{}, Spaces: []spaces.Space{}, Files: []attachments.Found{}, People: []quickPerson{}}
 	if text == "" {
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	out.Pages, err = s.deps.Search.Search(r.Context(), c.UserID, search.Query{Text: text, SpaceID: spaceID, Limit: quickGroupSize, ActiveSpacesOnly: true})
+	found, err := s.deps.Search.Search(r.Context(), c.UserID, search.Query{Text: text, SpaceID: spaceID, Limit: 2 * quickGroupSize})
+	for _, result := range found.Results {
+		if result.Kind == pages.KindPost {
+			out.Posts = append(out.Posts, result)
+		} else if len(out.Pages) < quickGroupSize {
+			out.Pages = append(out.Pages, result)
+		}
+	}
 	if err == nil {
 		out.Files, err = s.deps.Attachments.Find(r.Context(), c, text, spaceID, quickGroupSize)
 	}

@@ -4,6 +4,29 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: organising (wave D)
+- A page has an owner, a status, a Verified mark and a review date. Handing a page over gives no right to delete it
+- Labels at the bottom of a page, with their own screens. A space can keep to a fixed list
+- Templates: a gallery, fields that a form fills in, instruction text for the writer, ten starters, and templates for a whole space
+- Blog posts, folders, link entries in the tree, and a company home page
+- Publish options: location, status, silent update, a schedule and a preview
+- Archiving: a page leaves the tree, keeps its address and can come back
+- Approvals: ask people to approve a page, and a space can require it
+- Moves and copies between spaces say what changes first. Several rows move together, and a row can be dragged to a space
+- The Content screen filters the pages of a space and works on many at once, with a summary first and a report after
+- Space settings: key, owners, home page, features, statuses, labels, picture
+- Search understands quotes, AND, OR, NOT, brackets, wildcards and fields such as `label:hr`, with filters in the address
+- Text stays in the browser when saving fails, and Close waits for the save
+- An administrator can remove one version with a reason
+- The trash can be searched, sorted and worked off together. It no longer names what is hidden from the person, and such an item cannot be purged by hand
+- A copy that would lose a restriction from a page above it now needs the right to manage restrictions
+- Comments can be searched, and a result links to the comment. A thread for editors and a comment in the trash stay out
+- Removing a version also takes its words out of comments that quote them
+- A page that moves to another space takes its comments, tasks, notifications and requests along
+- The example space shows labels, a status, a folder, a blog post and a template
+
+Upgrade impact: migration 0008 adds columns, tables, `perm_listed_pages` and `perm_visible_comments`, and replaces `perm_visible_pages`. It copies `spaces.features` into `space_features`, and that column stays until a contract migration. A change to those switches on the previous release during an upgrade is not carried over. Expand only. While both releases run, the old one shows posts in the tree, and nobody can make a post on it.
+
 ### Added: working together (wave C)
 - Comments under a page, with replies, edits, removal with Undo, and a link to each comment. A draft stays in your browser
 - Comments on chosen words or on an image. The words stay marked while the page changes around them, and a thread says so when they are gone. Threads can be resolved and reopened, and a panel beside the page lists them all

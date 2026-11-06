@@ -25,6 +25,8 @@ const (
 var (
 	themes    = []string{"system", "light", "dark"}
 	treeViews = []string{"tree", "visited", "updated", "alphabet"}
+	// Empty is what a client sends that does not know this setting yet.
+	startScreens = []string{"", "company", "personal"}
 )
 
 // Preferences are personal settings that follow a person to other devices. They
@@ -36,11 +38,13 @@ type Preferences struct {
 	HoverCards   bool   `json:"hover_cards"`
 	SidebarWidth int    `json:"sidebar_width"`
 	TreeView     string `json:"tree_view"`
+	// StartScreen is company or personal, for an instance with a company home.
+	StartScreen string `json:"start_screen"`
 }
 
 func defaultPreferences() Preferences {
 	return Preferences{Theme: "system", Shortcuts: true, Contents: true, HoverCards: true,
-		SidebarWidth: defaultSidebarWidth, TreeView: "tree"}
+		SidebarWidth: defaultSidebarWidth, TreeView: "tree", StartScreen: "company"}
 }
 
 func (p Preferences) validate() error {
@@ -51,6 +55,8 @@ func (p Preferences) validate() error {
 		return apperr.Invalid("That is not a view of the page tree.")
 	case p.SidebarWidth < minSidebarWidth || p.SidebarWidth > maxSidebarWidth:
 		return apperr.Invalid("The sidebar is between 14 and 32 wide.")
+	case !slices.Contains(startScreens, p.StartScreen):
+		return apperr.Invalid("The start screen is company or personal.")
 	}
 	return nil
 }

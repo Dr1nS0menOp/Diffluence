@@ -7,10 +7,11 @@ import { useImportedFont } from './appearance';
 import { forgetPersonalData, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
-import { NewPageDialog, NewSpaceDialog } from './components/create';
+import { NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
 import { SpaceShell, useCreateTarget, useCurrentSpace } from './components/frame';
 import { IconChevronDown, IconPlus, Logo } from './components/icons';
 import { Menu, MenuItem } from './components/menu';
+import { TemplateGallery } from './components/template-gallery';
 import { NotificationBell } from './components/notifications';
 import { QuickSearch } from './components/quick-search';
 import { ShortcutsProvider, useShortcut } from './components/shortcuts';
@@ -18,10 +19,12 @@ import { ToastProvider } from './components/toast';
 import { AccountMenu, FavouritesMenu, HelpMenu, RecentMenu, SpacesMenu } from './components/topbar';
 import { ErrorNote, Loading } from './components/ui';
 import { AdminView } from './views/admin';
+import { ContentView } from './views/content';
 import { DirectoryView } from './views/directory';
-import { HomeView } from './views/home';
+import { StartScreen } from './views/home';
 import { FavouritesView, RecentView } from './views/lists';
 import { LoginView } from './views/login';
+import { ArchiveView, BlogView, LabelsView, LabelView, MissingPage } from './views/organise';
 import { NotificationSettingsView, NotificationsView, WatchingView } from './views/notifications';
 import { EditView } from './views/edit';
 import { CompareView, HistoryView } from './views/history';
@@ -32,9 +35,10 @@ import { ProfileView } from './views/profile';
 import { SearchView } from './views/search';
 import { SpaceHome, SpaceSettingsView, TrashView } from './views/space';
 import { TasksView } from './views/tasks';
+import { TemplatesView, TemplateView } from './views/templates';
 import { UnsubscribeView } from './views/unsubscribe';
 
-type Creating = 'page' | 'space' | null;
+type Creating = 'page' | 'template' | 'post' | 'space' | null;
 
 function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => void }) {
   const { t } = useTranslation();
@@ -50,7 +54,7 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
       <button type="button" className="primary" onClick={() => onCreate(main)}>
         <IconPlus size={16} /> {t('nav.create')}
       </button>
-      {target && canCreateSpace && (
+      {target && (
         <Menu
           label={t('nav.createMenu')}
           align="start"
@@ -58,7 +62,11 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
           trigger={<IconChevronDown size={16} />}
         >
           <MenuItem onClick={() => onCreate('page')}>{t('space.newPage')}</MenuItem>
-          <MenuItem onClick={() => onCreate('space')}>{t('home.newSpace')}</MenuItem>
+          <MenuItem onClick={() => onCreate('template')}>{t('organise.fromTemplate')}</MenuItem>
+          {(target.space.features?.blog ?? true) && (
+            <MenuItem onClick={() => onCreate('post')}>{t('blog.newPost')}</MenuItem>
+          )}
+          {canCreateSpace && <MenuItem onClick={() => onCreate('space')}>{t('home.newSpace')}</MenuItem>}
         </Menu>
       )}
     </span>
@@ -105,6 +113,12 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
       {creating === 'page' && target && (
         <NewPageDialog space={target.space} parent={target.parent} onClose={() => setCreating(null)} />
       )}
+      {creating === 'template' && target && (
+        <TemplateGallery space={target.space} parent={target.parent} onClose={() => setCreating(null)} />
+      )}
+      {creating === 'post' && target && (
+        <NewPostDialog space={target.space} onClose={() => setCreating(null)} />
+      )}
       {creating === 'space' && <NewSpaceDialog onClose={() => setCreating(null)} />}
     </>
   );
@@ -125,7 +139,7 @@ function Routes({ me }: { me: Me }) {
   if (pathname === '/') {
     return (
       <Plain>
-        <HomeView me={me} />
+        <StartScreen me={me} />
       </Plain>
     );
   }
@@ -199,11 +213,45 @@ function Routes({ me }: { me: Me }) {
       </Plain>
     );
   }
+  if ((m = match('/labels', pathname))) {
+    return (
+      <Plain width="reading">
+        <LabelsView />
+      </Plain>
+    );
+  }
+  if ((m = match('/labels/:label', pathname))) {
+    return (
+      <Plain width="reading">
+        <LabelView label={m.label ?? ''} />
+      </Plain>
+    );
+  }
+  if ((m = match('/blog', pathname))) {
+    return (
+      <Plain width="reading">
+        <BlogView />
+      </Plain>
+    );
+  }
+  if ((m = match('/templates/:id/edit', pathname))) {
+    return (
+      <main id="main" className="focus">
+        <TemplateView templateId={m.id ?? ''} />
+      </main>
+    );
+  }
   if ((m = match('/admin/:tab', pathname))) return <AdminView tab={m.tab ?? 'users'} me={me} />;
   if ((m = match('/spaces/:key', pathname))) return <SpaceHome spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/overview', pathname))) return <SpaceOverviewView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings', pathname))) return <SpaceSettingsView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/trash', pathname))) return <TrashView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/content', pathname))) return <ContentView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/blog', pathname))) return <BlogView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/archive', pathname))) return <ArchiveView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/labels', pathname))) return <LabelsView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/templates', pathname))) return <TemplatesView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/new', pathname))) return <MissingPage spaceKey={m.key ?? ''} />;
   if ((m = match('/pages/:id/edit', pathname))) {
     return (
       <main id="main" className="focus">

@@ -136,6 +136,23 @@ export function flatPages(nodes: TreeNode[], view: TreeView): TreeNode[] {
   return [...nodes].sort((a, b) => a.title.localeCompare(b.title));
 }
 
+/** Lets a dragged row reach the Spaces menu in the top bar. */
+export const PAGE_DRAG_TYPE = 'application/x-diffluence-page';
+
+/** Ctrl, Space and a click on a checkbox add or take away one row. */
+export function toggleRow(picked: string[], id: string): string[] {
+  return picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id];
+}
+
+/** Shift adds every row between the last one touched and this one. */
+export function rangeOfRows(order: string[], picked: string[], anchor: string, id: string): string[] {
+  const from = order.indexOf(anchor);
+  const to = order.indexOf(id);
+  if (from < 0 || to < 0) return toggleRow(picked, id);
+  const between = order.slice(Math.min(from, to), Math.max(from, to) + 1);
+  return [...new Set([...picked, ...between])];
+}
+
 /** The next row after `from` whose title starts with what was typed, going round. */
 export function typeAheadRow(titles: string[], from: number, typed: string): number {
   const wanted = typed.toLowerCase();

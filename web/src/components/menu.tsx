@@ -43,6 +43,7 @@ export function Menu({
   children,
   align = 'end',
   floating,
+  opensOnDrag,
   tabIndex,
 }: {
   label: string;
@@ -52,6 +53,8 @@ export function Menu({
   align?: 'start' | 'end';
   /** For a menu inside a scrolling area, which would otherwise be cut off. */
   floating?: boolean;
+  /** Holding a dragged item of this type over the button opens the menu. */
+  opensOnDrag?: string;
   /** For a menu in a list with roving focus, where only one row is a Tab stop. */
   tabIndex?: number;
 }) {
@@ -111,6 +114,9 @@ export function Menu({
         aria-haspopup="menu"
         aria-expanded={open}
         onClick={() => setOpen(!open)}
+        onDragEnter={(e) => {
+          if (opensOnDrag && e.dataTransfer.types.includes(opensOnDrag)) setOpen(true);
+        }}
       >
         {trigger}
       </button>
@@ -122,6 +128,7 @@ export function Menu({
           className={floating ? 'menu-list floating' : `menu-list ${align}`}
           onKeyDown={keys}
           onClick={() => setOpen(false)}
+          onDrop={() => setOpen(false)}
         >
           {children}
         </div>

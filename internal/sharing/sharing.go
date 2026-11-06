@@ -19,6 +19,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/notify"
@@ -51,11 +52,12 @@ type Service struct {
 	identity *identity.Service
 	settings *settings.Service
 	notify   *notify.Service
+	features *features.Service
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, id *identity.Service, st *settings.Service, n *notify.Service) *Service {
-	return &Service{pool: pool, perms: perms, identity: id, settings: st, notify: n}
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, id *identity.Service, st *settings.Service, n *notify.Service, f *features.Service) *Service {
+	return &Service{pool: pool, perms: perms, identity: id, settings: st, notify: n, features: f}
 }
 
 // Entry is someone who has access.
@@ -474,8 +476,7 @@ func (s *Service) MayAsk(ctx context.Context, c identity.Caller, pageID uuid.UUI
 	if page.Status != "published" {
 		return false, nil
 	}
-	f, err := s.perms.LoadFeatures(ctx, s.pool, space.ID)
-	return f.AccessRequests, err
+	return s.features.Enabled(ctx, s.pool, space.ID, features.AccessRequests)
 }
 
 func (s *Service) checkMayRequest(ctx context.Context, q db.Querier, c identity.Caller, pageID uuid.UUID, kind string) error {

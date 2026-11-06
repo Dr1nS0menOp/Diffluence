@@ -5,10 +5,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, type ListedPage, type Me, type SystemInfo } from '../api';
+import { navigate } from '../router';
 import { IconChevronDown, IconHelp, IconPage } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from './menu';
 import { ShortcutsDialog } from './shortcuts';
 import { useOrderedSpaces } from './space-strip';
+import { PAGE_DRAG_TYPE } from './tree-model';
 import { Avatar, Dialog, ErrorNote, Loading, RelativeTime, SpaceBadge } from './ui';
 
 const RECENT_IN_MENU = 8;
@@ -24,7 +26,19 @@ function SpaceEntries() {
   return (
     <>
       {entries.map((s) => (
-        <MenuLink key={s.id} href={`/spaces/${s.key}`}>
+        <MenuLink
+          key={s.id}
+          href={`/spaces/${s.key}`}
+          onDragOver={(e) => {
+            if (e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) e.preventDefault();
+          }}
+          onDrop={(e) => {
+            const dragged = e.dataTransfer.getData(PAGE_DRAG_TYPE);
+            if (!dragged) return;
+            e.preventDefault();
+            navigate(`/pages/${dragged}?move_to=${s.id}`);
+          }}
+        >
           <SpaceBadge space={s} size="small" /> {s.name}
         </MenuLink>
       ))}
@@ -41,6 +55,7 @@ export function SpacesMenu() {
       label={t('nav.spaces')}
       align="start"
       className="nav-link"
+      opensOnDrag={PAGE_DRAG_TYPE}
       trigger={
         <>
           {t('nav.spaces')} <IconChevronDown size={SPACE_MENU_ICON_SIZE} />

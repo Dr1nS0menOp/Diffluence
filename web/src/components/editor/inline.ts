@@ -51,6 +51,75 @@ export const Status = DocumentNode.create({
   },
 });
 
+/** A question in a template. The form that starts a page fills it in. */
+export const TemplateField = DocumentNode.create({
+  name: 'templateField',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return {
+      name: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-field'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-field': attrs.name }),
+      },
+      kind: {
+        default: 'line',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-kind'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-kind': attrs.kind }),
+      },
+      options: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-options'),
+        renderHTML: (attrs: Record<string, string | null>) =>
+          attrs.options ? { 'data-options': attrs.options } : {},
+      },
+      required: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.hasAttribute('data-required') || null,
+        renderHTML: (attrs: Record<string, boolean | null>) =>
+          attrs.required ? { 'data-required': '' } : {},
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-field]' }];
+  },
+  renderHTML({ HTMLAttributes, node }) {
+    return ['span', mergeAttributes(HTMLAttributes, { class: 'template-field' }), node.attrs.name as string];
+  },
+  renderText({ node }) {
+    return node.attrs.name as string;
+  },
+});
+
+/** Help for the writer. Typing replaces it, and it never reaches a reader. */
+export const Instruction = DocumentNode.create({
+  name: 'instruction',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return {
+      text: {
+        default: '',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-instruction'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-instruction': attrs.text }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-instruction]' }];
+  },
+  renderHTML({ HTMLAttributes, node }) {
+    return ['span', mergeAttributes(HTMLAttributes, { class: 'instruction' }), node.attrs.text as string];
+  },
+  renderText() {
+    return '';
+  },
+});
+
 export const DateMark = DocumentNode.create({
   name: 'date',
   group: 'inline',

@@ -53,6 +53,15 @@ export function PreferencesView() {
           ))}
         </select>
       </Field>
+      <Field label={t('preferences.startScreen')}>
+        <select
+          value={preferences.start_screen ?? ''}
+          onChange={(e) => update({ start_screen: e.target.value })}
+        >
+          <option value="">{t('preferences.start_company')}</option>
+          <option value="personal">{t('preferences.start_personal')}</option>
+        </select>
+      </Field>
       <PreferenceSwitch
         label={t('preferences.shortcuts')}
         value={preferences.shortcuts}

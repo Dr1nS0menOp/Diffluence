@@ -41,6 +41,12 @@ func documents(t *testing.T) map[string]document.Node {
 	}
 	add(plan.Home)
 	plan.walk(func(p planPage, _ *planPage) { add(p.Document) })
+	for _, post := range plan.Posts {
+		add(post.Document)
+	}
+	for _, template := range plan.Templates {
+		add(template.Document)
+	}
 	return out
 }
 

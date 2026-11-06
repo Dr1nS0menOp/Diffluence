@@ -64,7 +64,7 @@ test('writing a page with Markdown shortcuts and publishing it', async ({ page }
   await page.keyboard.press('Enter');
   await page.keyboard.type('const a = 1;');
 
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Shortcuts', level: 1 })).toBeVisible();
 
   const doc = page.locator('.prose');
@@ -85,7 +85,7 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
   await editorSettled(page);
   await page.keyboard.type('Name');
   await page.getByRole('button', { name: 'Add row' }).click();
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('.prose table tr')).toHaveCount(4);
   await expect(page.locator('.prose th').first()).toHaveText('Name');
 
@@ -102,7 +102,7 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
     alerted = true;
     await d.dismiss();
   });
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('.prose')).toContainText('<img src=x onerror=alert(1)>');
   expect(alerted).toBe(false);
   await expect(page.locator('.prose img')).toHaveCount(0);
@@ -129,7 +129,7 @@ test('drafts survive a reload, and history compares and restores', async ({ page
 
   await page.getByRole('link', { name: 'You have an unsaved draft' }).click();
   await page.getByLabel('What changed?').fill('Added words');
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('.prose')).toContainText('and more');
 
   await page.getByRole('button', { name: 'More actions' }).click();
@@ -171,7 +171,7 @@ test('publishing over someone else warns first', async ({ page, browser }) => {
   expect(res.ok()).toBeTruthy();
   await other.close();
 
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Someone else published' })).toBeVisible();
   await page.getByRole('button', { name: 'Publish anyway' }).click();
   await expect(page.locator('.prose')).toContainText('mine');
@@ -201,7 +201,7 @@ test('images go in through the toolbar and show on the page', async ({ page }) =
     buffer: PNG,
   });
   await expect(page.locator('.prose.editing img')).toBeVisible();
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   const image = page.locator('.prose img');
   await expect(image).toBeVisible();
   await expect.poll(() => image.evaluate((i: HTMLImageElement) => i.naturalWidth)).toBe(1);
@@ -218,7 +218,7 @@ test('a file dragged into the editor becomes part of the page', async ({ page })
   await page.goto(`/pages/${id}/edit`);
   await dropFiles(page, '.prose.editing', [{ name: 'notes.txt', type: 'text/plain', text: 'hello' }]);
   await expect(page.locator('.prose.editing .file-tile')).toContainText('notes.txt');
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
 
   const tile = page.locator('.prose').getByRole('link', { name: 'notes.txt' });
   await expect(tile).toBeVisible();
@@ -360,7 +360,7 @@ test('Create adds a page below the one you are reading', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Page content' }).click();
   await editorSettled(page);
   await page.keyboard.type('text');
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Below', level: 1 })).toBeVisible();
   await expect(page.getByRole('navigation', { name: 'Breadcrumbs' })).toContainText('Reading');
 });
@@ -405,11 +405,11 @@ test('a link is added through our own dialog, and no browser dialog ever opens',
   );
 
   await page.getByLabel('Text style').selectOption({ label: 'Heading 2' });
-  await page.getByRole('button', { name: 'Publish' }).click();
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.locator('.prose h2 a')).toHaveAttribute('href', 'https://example.com/');
 
   await page.getByRole('link', { name: 'Edit', exact: true }).click();
-  await page.getByRole('button', { name: 'Discard draft' }).click();
+  await page.getByRole('button', { name: 'Revert to published' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   expect(browserDialogs).toBe(0);
@@ -425,7 +425,7 @@ test('trash: delete, restore, and purge', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
 
   await page.goto(`/spaces/${space.key}/trash`);
-  await expect(page.getByRole('cell', { name: 'Doomed' })).toBeVisible();
+  await expect(page.getByRole('cell', { name: 'Doomed', exact: true })).toBeVisible();
   await checkAccessibility(page);
   await page.getByRole('button', { name: 'Restore' }).click();
   await expect(page.getByText('The trash is empty.')).toBeVisible();

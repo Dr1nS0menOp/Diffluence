@@ -2,8 +2,9 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Page, type Space } from '../api';
+import { api, type Page, type Space, type TemplateSummary } from '../api';
 import { navigate } from '../router';
+import { TemplateGallery } from './template-gallery';
 import { Dialog, ErrorNote, Field } from './ui';
 
 const SUGGESTED_KEY_LENGTH = 12;
@@ -32,15 +33,56 @@ export function NewPageDialog({
 }) {
   const { t } = useTranslation();
   const [title, setTitle] = useState('');
+  const [gallery, setGallery] = useState(false);
   const create = useMutation({
-    mutationFn: () => api.post<Page>('/pages', { space_id: space.id, parent_id: parent, title }),
+    mutationFn: (untitled: boolean) =>
+      api.post<Page>('/pages', { space_id: space.id, parent_id: parent, title, untitled }),
+    onSuccess: (p) => {
+      onClose();
+      navigate(`/pages/${p.id}/edit`);
+    },
+  });
+  if (gallery) return <TemplateGallery space={space} parent={parent} onClose={onClose} />;
+  return (
+    <Dialog title={t('space.newPage')} onClose={onClose}>
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          create.mutate(false);
+        }}
+      >
+        <ErrorNote error={create.error} />
+        <Field label={t('page.title')}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        </Field>
+        <div className="dialog-actions">
+          <button type="button" className="quiet" onClick={() => setGallery(true)}>
+            {t('organise.fromTemplate')}
+          </button>
+          <button type="button" className="quiet" onClick={() => create.mutate(true)}>
+            {t('organise.noTitleYet')}
+          </button>
+          <button type="submit" className="primary" disabled={create.isPending}>
+            {t('common.create')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+export function NewPostDialog({ space, onClose }: { space: Space; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [title, setTitle] = useState('');
+  const create = useMutation({
+    mutationFn: () => api.post<Page>('/pages', { space_id: space.id, title, kind: 'post' }),
     onSuccess: (p) => {
       onClose();
       navigate(`/pages/${p.id}/edit`);
     },
   });
   return (
-    <Dialog title={t('space.newPage')} onClose={onClose}>
+    <Dialog title={t('blog.newPost')} onClose={onClose}>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
@@ -61,11 +103,68 @@ export function NewPageDialog({
   );
 }
 
+/** A tree entry that opens an address outside this space. */
+export function NewLinkDialog({
+  space,
+  parent,
+  onClose,
+}: {
+  space: Space;
+  parent: string | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [title, setTitle] = useState('');
+  const [link, setLink] = useState('');
+  const create = useMutation({
+    mutationFn: () =>
+      api.post<Page>('/pages', { space_id: space.id, parent_id: parent, title, kind: 'link', link }),
+    onSuccess: async () => {
+      await client.invalidateQueries({ queryKey: ['tree', space.id] });
+      onClose();
+    },
+  });
+  return (
+    <Dialog title={t('tree.addLink')} onClose={onClose}>
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          create.mutate();
+        }}
+      >
+        <ErrorNote error={create.error} />
+        <Field label={t('page.title')}>
+          <input value={title} onChange={(e) => setTitle(e.target.value)} required autoFocus />
+        </Field>
+        <Field label={t('tree.linkAddress')}>
+          <input type="url" value={link} onChange={(e) => setLink(e.target.value)} required />
+        </Field>
+        <div className="dialog-actions">
+          <button type="submit" className="primary" disabled={create.isPending}>
+            {t('common.create')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
 export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [form, setForm] = useState({ key: '', name: '', description: '', icon: '' });
   const [keyTouched, setKeyTouched] = useState(false);
+  const [templateId, setTemplateId] = useState('');
+  const [preset, setPreset] = useState('');
+  const starts = useQuery({
+    queryKey: ['space-templates'],
+    queryFn: () =>
+      api.get<{ templates: Pick<TemplateSummary, 'id' | 'name' | 'description'>[]; default_preset: string }>(
+        '/space-templates',
+      ),
+  });
+  const chosenPreset = preset || starts.data?.default_preset || 'private';
   const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
     setForm({ ...form, [k]: e.target.value });
   const free = useQuery({
@@ -74,7 +173,12 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
     enabled: VALID_KEY.test(form.key),
   });
   const create = useMutation({
-    mutationFn: () => api.post<Space>('/spaces', form),
+    mutationFn: () =>
+      api.post<Space>('/spaces', {
+        ...form,
+        preset: chosenPreset,
+        ...(templateId ? { template_id: templateId } : {}),
+      }),
     onSuccess: async (s) => {
       await client.invalidateQueries({ queryKey: ['spaces'] });
       onClose();
@@ -125,6 +229,23 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
         </Field>
         <Field label={t('space.icon')}>
           <input value={form.icon} onChange={set('icon')} maxLength={8} />
+        </Field>
+        <Field label={t('spaceSettings.startFrom')}>
+          <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
+            <option value="">{t('spaceSettings.startEmpty')}</option>
+            {starts.data?.templates.map((x) => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label={t('spaceSettings.whoGetsAccess')} help={t(`spaceSettings.access_${chosenPreset}`)}>
+          <select value={chosenPreset} onChange={(e) => setPreset(e.target.value)}>
+            <option value="private">{t('spaceSettings.preset_private')}</option>
+            <option value="team_space">{t('permissions.team_space')}</option>
+            <option value="read_only_kb">{t('permissions.read_only_kb')}</option>
+          </select>
         </Field>
         <div className="dialog-actions">
           <button type="submit" className="primary" disabled={create.isPending}>

@@ -42,13 +42,21 @@ export function addSearch(searches: string[], text: string): string[] {
 /** What the panel shows, in the order of the arrow keys. */
 export function rowsOf(
   results: QuickResults | undefined,
-  labels: { pages: string; spaces: string; files: string; people: string },
+  labels: { pages: string; posts: string; spaces: string; files: string; people: string },
 ): QuickRow[] {
   if (!results) return [];
   return [
     ...results.pages.map((p) => ({
       id: `page-${p.page_id}`,
       group: labels.pages,
+      title: p.title,
+      detail: `${p.space_name} · ${formatDay(p.updated_at)}`,
+      run: 'open' as const,
+      target: `/pages/${p.page_id}`,
+    })),
+    ...(results.posts ?? []).map((p) => ({
+      id: `post-${p.page_id}`,
+      group: labels.posts,
       title: p.title,
       detail: `${p.space_name} · ${formatDay(p.updated_at)}`,
       run: 'open' as const,
@@ -81,7 +89,7 @@ export function rowsOf(
   ];
 }
 
-function useDelayed(value: string): string {
+export function useDelayed(value: string): string {
   const [delayed, setDelayed] = useState(value);
   useEffect(() => {
     const timer = setTimeout(() => setDelayed(value), PAUSE_MS);
@@ -131,6 +139,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
 
   const labels = {
     pages: t('search.groupPages'),
+    posts: t('search.groupPosts'),
     spaces: t('search.groupSpaces'),
     files: t('search.groupFiles'),
     people: t('search.groupPeople'),
