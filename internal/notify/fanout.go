@@ -35,6 +35,7 @@ type payload struct {
 	RequestID       uuid.UUID   `json:"request_id"`
 	AskedID         uuid.UUID   `json:"asked_id"`
 	RequesterID     uuid.UUID   `json:"requester_id"`
+	Version         int         `json:"version"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
@@ -153,6 +154,7 @@ func (s *Service) onPublished(ctx context.Context, event uuid.UUID, p payload) e
 	if err != nil {
 		return err
 	}
+	base.Data = map[string]any{"version": p.Version}
 	return s.tell(ctx, watchers, base, TypePageChanged, ReasonWatching)
 }
 

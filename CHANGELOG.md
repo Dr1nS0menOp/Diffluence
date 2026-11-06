@@ -4,6 +4,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Changed: animals, and changes you can see
+- Every space has a cartoon animal, picked from its key. Pick another in Space settings, or use a character of your own
+- A comparison now looks like the page: added on green, removed on red and struck through, with the word beside it
+- Opening a version in History shows what changed in it, with a button for the clean page
+- Fields for people show them as soon as you click in them, and work with the arrow keys
+
+Upgrade impact: no database change. Existing spaces get an animal at once, unless they chose a character.
 ### Added: organising (wave D)
 - A page has an owner, a status, a Verified mark and a review date. Handing a page over gives no right to delete it
 - Labels at the bottom of a page, with their own screens. A space can keep to a fixed list

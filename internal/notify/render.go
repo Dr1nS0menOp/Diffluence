@@ -17,6 +17,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/pages"
 )
 
 // excerptRunes keeps an excerpt short when an instance allows them at all.
@@ -42,6 +43,9 @@ const (
 	footerStop     = "Stop this kind of mail"
 	lineStop       = "Stop watching"
 	footerSettings = "Your notification settings"
+	changeAdded    = "Added"
+	changeRemoved  = "Removed"
+	changeMore     = "And {count} more changes on the page"
 	testSubject    = "Test mail from %s"
 	testBody       = "If you can read this, mail from %s works."
 	digestSubject  = "%d things happened in %s"
@@ -49,7 +53,7 @@ const (
 
 var mailPage = template.Must(template.New("mail").Parse(`<!DOCTYPE html>
 <html><body>
-{{range .Spaces}}<h2>{{.Name}}</h2><ul>{{range .Lines}}<li><a href="{{.Link}}">{{.Words}}</a>{{if .Excerpt}}<br>{{.Excerpt}}{{end}}{{if .Stop}}<br><a href="{{.Stop}}">{{.StopLabel}}</a>{{end}}</li>{{end}}</ul>{{end}}
+{{range .Spaces}}<h2>{{.Name}}</h2><ul>{{range .Lines}}<li><a href="{{.Link}}">{{.Words}}</a>{{if .Excerpt}}<br>{{.Excerpt}}{{end}}{{if .ChangesHTML}}<div>{{.ChangesHTML}}</div>{{end}}{{if .Stop}}<br><a href="{{.Stop}}">{{.StopLabel}}</a>{{end}}</li>{{end}}</ul>{{end}}
 <p><a href="{{.Settings}}">{{.SettingsLabel}}</a> | <a href="{{.Stop}}">{{.StopLabel}}</a></p>
 </body></html>`))
 
@@ -59,6 +63,9 @@ type mailLine struct {
 	Excerpt   string
 	Stop      string // only when a watch brought this line
 	StopLabel string
+
+	Changes     string
+	ChangesHTML template.HTML
 }
 
 type mailSpace struct {
@@ -117,13 +124,44 @@ func (s *Service) excerpt(ctx context.Context, i Item, allowed bool) (string, er
 	if err != nil {
 		return "", fmt.Errorf("notify: read comment: %v", err)
 	}
-	names, err := identity.DisplayNames(ctx, s.pool, append(document.MentionedUsers(n), document.MentionedGroups(n)...))
-	if err != nil {
+	if err := s.fillNames(ctx, &n); err != nil {
 		return "", err
 	}
-	document.FillMentionNames(&n, names)
 	words := []rune(strings.TrimSpace(document.BlockText(n)))
 	return string(words[:min(len(words), excerptRunes)]), nil
+}
+
+// fillNames puts today's names into a document, as stored versions hold only ids.
+func (s *Service) fillNames(ctx context.Context, n *document.Node) error {
+	names, err := identity.DisplayNames(ctx, s.pool, append(document.MentionedUsers(*n), document.MentionedGroups(*n)...))
+	if err != nil {
+		return err
+	}
+	document.FillMentionNames(n, names)
+	return nil
+}
+
+// changes shows what a page change was, when the instance allows content in mail. It
+// runs after mailRows, so the person may still see this page at the moment of sending.
+func (s *Service) changes(ctx context.Context, i Item, allowed bool) (string, template.HTML, error) {
+	newest := versionOf(i)
+	if !allowed || i.Type != TypePageChanged || i.firstVersion <= 1 {
+		return "", "", nil
+	}
+	before, after, found, err := pages.VersionsForMail(ctx, s.pool, i.PageID, i.firstVersion-1, newest)
+	if err != nil || !found {
+		return "", "", err
+	}
+	if err := s.fillNames(ctx, &before); err != nil {
+		return "", "", err
+	}
+	if err := s.fillNames(ctx, &after); err != nil {
+		return "", "", err
+	}
+	blocks := document.Compare(before, after)
+	labels := document.ChangeLabels{Added: changeAdded, Removed: changeRemoved, More: changeMore}
+	//nolint:gosec // G203: ChangesHTML escapes every word that comes from a page.
+	return document.ChangesText(blocks, labels), template.HTML(document.ChangesHTML(blocks, labels)), nil
 }
 
 func (s *Service) stopLink(user uuid.UUID, i Item) (string, error) {
@@ -148,7 +186,12 @@ func (s *Service) mailSpaces(ctx context.Context, user uuid.UUID, items []Item, 
 		if err != nil {
 			return nil, err
 		}
-		line := mailLine{Words: sentence(i), Link: s.link(i), Excerpt: text, Stop: stop, StopLabel: lineStop}
+		changes, changesHTML, err := s.changes(ctx, i, excerpts)
+		if err != nil {
+			return nil, err
+		}
+		line := mailLine{Words: sentence(i), Link: s.link(i), Excerpt: text, Stop: stop, StopLabel: lineStop,
+			Changes: changes, ChangesHTML: changesHTML}
 		at := slices.IndexFunc(out, func(m mailSpace) bool { return m.Name == i.SpaceName })
 		if at < 0 {
 			out = append(out, mailSpace{Name: i.SpaceName})
@@ -167,6 +210,9 @@ func plainText(v mailView) string {
 			b.WriteString("- " + line.Words + "\n  " + line.Link + "\n")
 			if line.Excerpt != "" {
 				b.WriteString("  " + line.Excerpt + "\n")
+			}
+			if line.Changes != "" {
+				b.WriteString("  " + strings.ReplaceAll(strings.TrimSpace(line.Changes), "\n", "\n  ") + "\n")
 			}
 			if line.Stop != "" {
 				b.WriteString("  " + line.StopLabel + ": " + line.Stop + "\n")

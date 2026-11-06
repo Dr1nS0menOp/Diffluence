@@ -673,9 +673,9 @@ test('a new space suggests its key, and says at once when it is taken', async ({
   await page.getByRole('button', { name: 'New space' }).click();
   const dialog = page.getByRole('dialog', { name: 'New space' });
   await dialog.getByLabel('Name').fill('Team Handbook');
-  await expect(dialog.getByLabel('Key')).toHaveValue('TEAMHANDBOOK');
-  await dialog.getByLabel('Key').fill(taken.key);
+  await expect(dialog.getByRole('textbox', { name: /^Key/ })).toHaveValue('TEAMHANDBOOK');
+  await dialog.getByRole('textbox', { name: /^Key/ }).fill(taken.key);
   await expect(dialog.getByRole('alert')).toHaveText('This key is already in use.');
   await dialog.getByLabel('Name').fill('Something else');
-  await expect(dialog.getByLabel('Key')).toHaveValue(taken.key);
+  await expect(dialog.getByRole('textbox', { name: /^Key/ })).toHaveValue(taken.key);
 });

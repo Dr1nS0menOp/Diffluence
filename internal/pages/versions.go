@@ -16,6 +16,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/comments"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -379,6 +380,29 @@ func (s *Service) Compare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	}
 	a.Document, b.Document = nil, nil
 	return Comparison{From: a, To: b, Blocks: document.Compare(da, db)}, nil
+}
+
+// VersionsForMail reads two versions of a page. It checks no access: the caller has
+// just done that for the person the mail goes to. Found is false when one of them is
+// gone, which happens when a version was removed.
+func VersionsForMail(ctx context.Context, q db.Querier, pageID uuid.UUID, from, to int) (before, after document.Node, found bool, err error) {
+	read := func(number int) (document.Node, bool, error) {
+		var raw []byte
+		err := q.QueryRow(ctx, "SELECT document FROM page_versions WHERE page_id = $1 AND number = $2", pageID, number).Scan(&raw)
+		if errors.Is(err, pgx.ErrNoRows) {
+			return document.Node{}, false, nil
+		}
+		if err != nil {
+			return document.Node{}, false, err
+		}
+		n, err := document.Parse(raw)
+		return n, err == nil, err
+	}
+	if before, found, err = read(from); !found || err != nil {
+		return before, after, false, err
+	}
+	after, found, err = read(to)
+	return before, after, found, err
 }
 
 // RestoreVersion publishes a new version with the content of an old one.

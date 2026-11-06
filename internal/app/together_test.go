@@ -1443,3 +1443,100 @@ func TestEventsReachPeopleThroughTheRealQueue(t *testing.T) {
 	}
 	t.Fatal("the event never arrived")
 }
+
+// watchedPageMail publishes a change that a watcher hears about by mail right away.
+func watchedPageMail(t *testing.T, excerpts bool, change func(owner, anna *user, page string)) (*env, *fakeSender) {
+	t.Helper()
+	e := newEnv(t)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	values := admin.ok("GET", "/api/v1/admin/settings", nil)
+	values["mail_excerpts"] = excerpts
+	admin.ok("PUT", "/api/v1/admin/settings", values)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+	space, _ := owner.space("ENG")
+	owner.grant(space, "user", anna.id, permissions.TemplateViewer)
+	page := owner.page(space, nil, "Roadmap", "the old plan")
+	e.deliver()
+	anna.ok("PUT", "/api/v1/pages/"+page+"/watch", nil)
+	settings := anna.ok("GET", "/api/v1/me/notification-settings", nil)
+	settings["channels"].(map[string]any)["page_changed"] = "app_mail"
+	anna.ok("PUT", "/api/v1/me/notification-settings", settings)
+	change(owner, anna, page)
+	e.deliver()
+	f := &fakeSender{}
+	e.dueNow()
+	if _, err := e.mailer(f).RunOnce(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return e, f
+}
+
+func TestAMailAboutAChangeShowsTheChange(t *testing.T) {
+	_, f := watchedPageMail(t, true, func(owner, _ *user, page string) {
+		owner.publish(page, "Roadmap", 1, para(`the new <script>alert("x")</script> plan`))
+	})
+	if len(f.sent) != 1 {
+		t.Fatalf("sent: %+v", f.sent)
+	}
+	m := f.sent[0]
+	if !strings.Contains(m.Text, "[-old-]") || !strings.Contains(m.Text, "{+new") {
+		t.Fatalf("no changes in the text: %s", m.Text)
+	}
+	if !strings.Contains(m.HTML, ">old</del>") || !strings.Contains(m.HTML, "<ins") {
+		t.Fatalf("no changes in the HTML: %s", m.HTML)
+	}
+	if strings.Contains(m.HTML, "<script") || !strings.Contains(m.HTML, "&lt;script&gt;") {
+		t.Fatalf("words from a page reached the mail unescaped: %s", m.HTML)
+	}
+}
+
+func TestAMailShowsNoChangesWhenTheInstanceAllowsNoContent(t *testing.T) {
+	_, f := watchedPageMail(t, false, func(owner, _ *user, page string) {
+		owner.publish(page, "Roadmap", 1, para("the secret new plan"))
+	})
+	if len(f.sent) != 1 {
+		t.Fatalf("sent: %+v", f.sent)
+	}
+	if m := f.sent[0]; strings.Contains(m.Text+m.HTML, "secret") || !strings.Contains(m.Text, "Roadmap") {
+		t.Fatalf("content in a mail that may hold none:\n%s\n%s", m.Text, m.HTML)
+	}
+}
+
+func TestAMailAboutAChangeGoesNowhereWhenThePageBecameHidden(t *testing.T) {
+	_, f := watchedPageMail(t, true, func(owner, _ *user, page string) {
+		owner.publish(page, "Roadmap", 1, para("the secret new plan"))
+		owner.e.deliver()
+		owner.restrict(page, "view", owner.id)
+	})
+	if len(f.sent) != 0 {
+		t.Fatalf("a person who lost access got the changes: %+v", f.sent)
+	}
+}
+
+func TestAMailNeverShowsAVersionThatWasRemoved(t *testing.T) {
+	_, f := watchedPageMail(t, true, func(owner, _ *user, page string) {
+		owner.publish(page, "Roadmap", 1, para("the safe plan"))
+		admin := owner.e.user("second@example.com", identity.AllGlobalPermissions...)
+		admin.ok("DELETE", "/api/v1/admin/pages/"+page+"/versions/1", map[string]any{"reason": "A leaked password"})
+	})
+	if len(f.sent) != 1 {
+		t.Fatalf("sent: %+v", f.sent)
+	}
+	if m := f.sent[0]; strings.Contains(m.Text+m.HTML, "old") {
+		t.Fatalf("words of a removed version reached a mail:\n%s\n%s", m.Text, m.HTML)
+	}
+}
+
+func TestADigestShowsEverythingSinceTheOldestChange(t *testing.T) {
+	_, f := watchedPageMail(t, true, func(owner, _ *user, page string) {
+		owner.publish(page, "Roadmap", 1, para("the middle plan"))
+		owner.publish(page, "Roadmap", 2, para("the final plan"))
+	})
+	if len(f.sent) != 1 {
+		t.Fatalf("two changes must be one mail: %+v", f.sent)
+	}
+	if m := f.sent[0]; !strings.Contains(m.Text, "[-old-]") || !strings.Contains(m.Text, "{+final+}") {
+		t.Fatalf("the mail must compare with the first version the person missed: %s", m.Text)
+	}
+}

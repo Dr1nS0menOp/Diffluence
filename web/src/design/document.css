@@ -179,23 +179,42 @@ a.file-tile:hover {
   color: var(--color-syntax-title);
 }
 
-.diff {
-  margin-block: var(--space-1);
-  padding: var(--space-1) var(--space-2);
+/* A comparison is the page itself. Colour is never alone: words, underline, strikethrough. */
+.prose .diff-block {
+  padding-inline: var(--space-2);
+  border-inline-start: 3px solid var(--color-field);
   border-radius: var(--radius);
 }
 
-.diff.changed {
-  background: var(--color-code);
-}
-
-.diff.added,
-.diff .added {
+.prose .diff-block.added {
+  border-inline-start-color: var(--color-text-green);
   background: var(--color-added);
 }
 
-.diff.removed,
-.diff .removed {
+.prose .diff-block.removed {
+  border-inline-start-color: var(--color-text-red);
+  background: var(--color-removed);
+  text-decoration: line-through;
+}
+
+.prose :is(ul, ol).diff-block {
+  padding-inline-start: var(--space-8);
+}
+
+.diff-label {
+  display: block;
+  margin-block-start: var(--space-2);
+  color: var(--color-muted);
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+}
+
+.diff-ins {
+  background: var(--color-added);
+  text-decoration: underline;
+}
+
+.diff-del {
   background: var(--color-removed);
   text-decoration: line-through;
 }

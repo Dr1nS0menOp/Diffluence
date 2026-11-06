@@ -2,8 +2,9 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type DiffBlock, type Me, type PageDetail, type Version } from '../api';
+import { api, ApiError, type DiffBlock, type Me, type PageDetail, type Version } from '../api';
 import { Link, navigate, useLocation } from '../router';
+import { DiffDocument } from '../components/editor/diff-view';
 import { DocumentView } from '../components/editor/editor';
 import { ConfirmButton, Dialog, ErrorNote, Field, formatDate, Loading } from '../components/ui';
 
@@ -46,6 +47,66 @@ function RemoveVersionDialog({
   );
 }
 
+interface Comparison {
+  from: Version;
+  to: Version;
+  blocks: DiffBlock[];
+}
+
+const comparisonQuery = (pageId: string, from: string | number | null, to: string | number | null) => ({
+  queryKey: ['compare', pageId, String(from), String(to)],
+  queryFn: () => api.get<Comparison>(`/pages/${pageId}/compare?from=${from}&to=${to}`),
+});
+
+/** Opens on what changed in this version, because that is why people come here. */
+function VersionDialog({ pageId, number, onClose }: { pageId: string; number: number; onClose: () => void }) {
+  const { t } = useTranslation();
+  const [clean, setClean] = useState(false);
+  const version = useQuery({
+    queryKey: ['version', pageId, number],
+    queryFn: () => api.get<Version>(`/pages/${pageId}/versions/${number}`),
+  });
+  const comparison = useQuery({ ...comparisonQuery(pageId, number - 1, number), enabled: number > 1 });
+  // An administrator can remove the version before this one, and then there is nothing to compare with.
+  const previousGone = comparison.error instanceof ApiError && comparison.error.code === 'version_removed';
+  const hasPrevious = number > 1 && !previousGone;
+  const shown = version.data;
+  return (
+    <Dialog title={t('history.version', { number })} onClose={onClose} wide>
+      <ErrorNote error={version.error ?? (previousGone ? null : comparison.error)} />
+      {!shown?.document && <Loading />}
+      {shown?.document && (
+        <>
+          <p role="status" className="note">
+            {t('history.oldVersion', {
+              number: shown.number,
+              name: shown.author_name,
+              date: formatDate(shown.created_at),
+            })}{' '}
+            <Link href={`/pages/${pageId}`}>{t('history.toCurrent')}</Link>
+          </p>
+          {hasPrevious && (
+            <p>
+              <button type="button" onClick={() => setClean(!clean)}>
+                {clean ? t('history.showChanges') : t('history.showClean')}
+              </button>
+            </p>
+          )}
+          {hasPrevious && !clean ? (
+            comparison.data ? (
+              <Changes comparison={comparison.data} />
+            ) : (
+              <Loading />
+            )
+          ) : (
+            <DocumentView document={shown.document} plain />
+          )}
+        </>
+      )}
+    </Dialog>
+  );
+}
+
 export function HistoryView({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -59,11 +120,6 @@ export function HistoryView({ pageId }: { pageId: string }) {
   });
   const [picked, setPicked] = useState<number[]>([]);
   const [shown, setShown] = useState<number | null>(null);
-  const version = useQuery({
-    queryKey: ['version', pageId, shown],
-    queryFn: () => api.get<Version>(`/pages/${pageId}/versions/${shown}`),
-    enabled: shown !== null,
-  });
   const restore = useMutation({
     mutationFn: (n: number) => api.post(`/pages/${pageId}/versions/${n}/restore`),
     onSuccess: async () => {
@@ -151,25 +207,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
       {removing !== null && (
         <RemoveVersionDialog pageId={pageId} number={removing} onClose={() => setRemoving(null)} />
       )}
-      {shown !== null && (
-        <Dialog title={t('history.version', { number: shown })} onClose={() => setShown(null)} wide>
-          {version.data?.document ? (
-            <>
-              <p role="status" className="note">
-                {t('history.oldVersion', {
-                  number: version.data.number,
-                  name: version.data.author_name,
-                  date: formatDate(version.data.created_at),
-                })}{' '}
-                <Link href={`/pages/${pageId}`}>{t('history.toCurrent')}</Link>
-              </p>
-              <DocumentView document={version.data.document} plain />
-            </>
-          ) : (
-            <Loading />
-          )}
-        </Dialog>
-      )}
+      {shown !== null && <VersionDialog pageId={pageId} number={shown} onClose={() => setShown(null)} />}
     </>
   );
 }
@@ -209,9 +247,7 @@ export function foldUnchanged(blocks: DiffBlock[]): CompareRun[] {
 function FoldedRun({ blocks }: { blocks: DiffBlock[] }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  if (open) {
-    return blocks.map((b, i) => <Block key={i} block={b} />);
-  }
+  if (open) return <DiffDocument blocks={blocks} />;
   return (
     <p className="diff-fold">
       <button type="button" className="ghost" onClick={() => setOpen(true)}>
@@ -221,20 +257,19 @@ function FoldedRun({ blocks }: { blocks: DiffBlock[] }) {
   );
 }
 
-function Block({ block }: { block: DiffBlock }) {
-  if (block.op === 'changed' && block.words) {
-    return (
-      <p className="diff changed">
-        {block.words.map((w, i) => (
-          <span key={i} className={w.op}>
-            {w.text}{' '}
-          </span>
-        ))}
-      </p>
-    );
-  }
+/** What changed, in the look of the page. Long runs without changes fold. */
+function Changes({ comparison }: { comparison: Comparison }) {
+  const { t } = useTranslation();
+  const { from, to, blocks } = comparison;
+  const changed = blocks.some((b) => b.op !== 'equal') || from.title !== to.title;
   return (
-    <p className={'diff ' + block.op}>{block.op === 'added' ? block.after : block.before || block.after}</p>
+    <>
+      {!changed && <p className="muted">{t('history.unchanged')}</p>}
+      {from.title !== to.title && <p>{t('history.titleChanged', { from: from.title, to: to.title })}</p>}
+      {foldUnchanged(blocks).map((run, i) =>
+        run.folded ? <FoldedRun key={i} blocks={run.blocks} /> : <DiffDocument key={i} blocks={run.blocks} />,
+      )}
+    </>
   );
 }
 
@@ -243,16 +278,9 @@ export function CompareView({ pageId }: { pageId: string }) {
   const { searchParams } = useLocation();
   const from = searchParams.get('from');
   const to = searchParams.get('to');
-  const q = useQuery({
-    queryKey: ['compare', pageId, from, to],
-    queryFn: () =>
-      api.get<{ from: Version; to: Version; blocks: DiffBlock[] }>(
-        `/pages/${pageId}/compare?from=${from}&to=${to}`,
-      ),
-  });
+  const q = useQuery(comparisonQuery(pageId, from, to));
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
-  const changed = q.data.blocks.some((b) => b.op !== 'equal') || q.data.from.title !== q.data.to.title;
   return (
     <>
       <h1>{t('editor.compare')}</h1>
@@ -260,16 +288,7 @@ export function CompareView({ pageId }: { pageId: string }) {
         <Link href={`/pages/${pageId}/history`}>{t('history.title')}</Link>
       </p>
       <p>{t('history.comparing', { from: q.data.from.number, to: q.data.to.number })}</p>
-      {!changed && <p className="muted">{t('history.unchanged')}</p>}
-      <div>
-        {foldUnchanged(q.data.blocks).map((run, i) =>
-          run.folded ? (
-            <FoldedRun key={i} blocks={run.blocks} />
-          ) : (
-            run.blocks.map((b, j) => <Block key={`${i}-${j}`} block={b} />)
-          ),
-        )}
-      </div>
+      <Changes comparison={q.data} />
     </>
   );
 }

@@ -105,6 +105,7 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 - **NAV-085** · built · An administrator can add the example space later, in Administration, Settings.
 - **NAV-086** · built · A setting starts a new instance empty.
 - **NAV-087** · built · The example always shows every block and mark of the document format: a test fails when it does not. Waves C, D and E add comments, labels, a blog post, templates and dynamic blocks to it.
+- **NAV-088** · built · A field for people shows them as soon as it has focus, and works by keyboard. Without *view profiles* it shows none.
 
 ## 1.9 Narrow screens, dark mode, languages, accessibility
 

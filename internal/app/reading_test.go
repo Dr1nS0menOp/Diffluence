@@ -579,3 +579,31 @@ func TestKeyCheckTellsWhetherAKeyIsFree(t *testing.T) {
 	}
 	reader.want(403, "GET", "/api/v1/space-key-check?key=eng", nil)
 }
+
+func TestASpaceCanPickAnAnimalByName(t *testing.T) {
+	e := newEnv(t)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := owner.space("ENG")
+	owner.ok("PATCH", "/api/v1/spaces/"+space, map[string]any{"name": "Space ENG", "icon": "crocodile"})
+	if owner.ok("GET", "/api/v1/spaces/"+space, nil)["icon"] != "crocodile" {
+		t.Fatal("the animal was not kept")
+	}
+	owner.want(400, "PATCH", "/api/v1/spaces/"+space, map[string]any{"name": "Space ENG", "icon": "much too long for an icon"})
+	owner.want(400, "PATCH", "/api/v1/spaces/"+space, map[string]any{"name": "Space ENG", "icon": "<b>"})
+}
+
+func TestAComparisonCarriesTheBlocks(t *testing.T) {
+	e := newEnv(t)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := owner.space("ENG")
+	page := owner.page(space, nil, "Page", "the old words")
+	owner.publish(page, "Page", 1, para("the new words"))
+	blocks := owner.ok("GET", "/api/v1/pages/"+page+"/compare?from=1&to=2", nil)["blocks"].([]any)
+	if len(blocks) != 1 {
+		t.Fatalf("blocks: %v", blocks)
+	}
+	block := blocks[0].(map[string]any)
+	if block["op"] != "changed" || block["node"].(map[string]any)["type"] != "paragraph" || block["previous"] == nil {
+		t.Fatalf("block: %v", block)
+	}
+}

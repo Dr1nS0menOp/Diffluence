@@ -83,6 +83,9 @@ func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Servic
 	return &Service{pool: pool, perms: perms, pages: pg, settings: st, features: ft, store: store, instanceID: instanceID}
 }
 
+// maxIconRunes fits the longest animal, and a few characters of a person's own.
+const maxIconRunes = 12
+
 var keyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$`)
 
 func (in *Input) validate() error {
@@ -94,8 +97,8 @@ func (in *Input) validate() error {
 		return apperr.Invalid("A space needs a name of at most 200 characters.")
 	case utf8.RuneCountInString(in.Description) > 2000 || strings.Contains(in.Description, "\x00"):
 		return apperr.Invalid("A description can have at most 2000 characters.")
-	case utf8.RuneCountInString(in.Icon) > 8 || strings.ContainsAny(in.Icon, "\r\n\x00<>"):
-		return apperr.Invalid("An icon is one emoji or a few characters.")
+	case utf8.RuneCountInString(in.Icon) > maxIconRunes || strings.ContainsAny(in.Icon, "\r\n\x00<>"):
+		return apperr.Invalid("An icon is the name of an animal, one emoji or a few characters.")
 	}
 	return nil
 }

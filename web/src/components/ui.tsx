@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ApiError, type Space } from '../api';
+import { animalOf, animalPicture } from './animals';
 import { IconClose, IconUpload } from './icons';
 
 const TINT_COUNT = 4;
@@ -197,7 +198,18 @@ export function Avatar({ name, size }: { name: string; size?: 'small' }) {
   );
 }
 
-export function SpaceBadge({ space, size }: { space: Space; size?: 'small' | 'large' }) {
+export function SpaceBadge({
+  space,
+  size,
+}: {
+  space: Pick<Space, 'key' | 'name' | 'icon'> & Partial<Pick<Space, 'id' | 'has_icon'>>;
+  size?: 'small' | 'large';
+}) {
+  // A picture someone uploaded comes first.
+  const animal = space.has_icon ? null : animalOf(space);
+  // The name of the space is always beside it, so the picture needs no words of its own.
+  if (animal)
+    return <img className={`space-badge animal ${size ?? ''}`} src={animalPicture(animal)} alt="" />;
   const mark = firstCharacter(space.icon.trim()) || firstCharacter(space.name).toUpperCase();
   return (
     <span className={`space-badge tint-${tintIndex(space.key)} ${size ?? ''}`} aria-hidden="true">

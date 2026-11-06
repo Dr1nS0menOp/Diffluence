@@ -280,6 +280,16 @@ mutate "an instance with spaces gets an example" internal/example/example.go \
 mutate "any member can add the example space" internal/httpapi/handlers_reading.go \
   's.replace("Permission(identity.PermAdministrator), s.handleExampleSpace", "Permission(identity.PermUseProduct), s.handleExampleSpace")' $app -run TestAnAdministratorCanAddTheExampleLater
 
+mutate "changes in a mail are not escaped" internal/document/changes.go \
+  's.replace("text := html.EscapeString(w.Text)", "text := w.Text")' ./internal/document/
+mutate "added text in a mail is not escaped" internal/document/changes.go \
+  's.replace("html.EscapeString(text) + `</`", "text + `</`")' ./internal/document/
+
+mutate "a mail shows changes without the setting" internal/notify/render.go \
+  's.replace("if !allowed || i.Type != TypePageChanged || i.firstVersion <= 1 {", "if i.Type != TypePageChanged || i.firstVersion <= 1 {")' $app -run TestAMailShowsNoChanges
+mutate "a mail of changes reads through access" internal/notify/list.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
+
 mutate "a move leaves comments behind" internal/pages/move.go \
   's.replace("var tablesWithSpace = []string{\"comments\", ", "var tablesWithSpace = []string{")' $app -run TestAMoveTakesEveryRowOfTheBranchAlong
 mutate "a move leaves the trash behind" internal/pages/move.go \

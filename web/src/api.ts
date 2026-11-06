@@ -339,12 +339,19 @@ export interface Version {
   removed?: boolean;
 }
 
+export interface WordOp {
+  op: 'equal' | 'added' | 'removed';
+  text: string;
+}
+
 export interface DiffBlock {
   op: 'equal' | 'added' | 'removed' | 'changed';
   type: string;
   before?: string;
   after?: string;
-  words?: { op: 'equal' | 'added' | 'removed'; text: string }[];
+  words?: WordOp[];
+  node?: Json;
+  previous?: Json;
 }
 
 export interface Attachment {

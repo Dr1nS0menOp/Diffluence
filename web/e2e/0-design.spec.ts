@@ -413,8 +413,27 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}/compare?from=1&to=2`);
     await expect(page.getByRole('heading', { name: 'Compare versions' })).toBeVisible();
-    await expect(page.locator('.diff').first()).toBeVisible();
+    await expect(page.locator('.diff-block').first()).toBeVisible();
     await picture(page, 'compare');
+    await page.context().close();
+  });
+
+  test('a version with its changes', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}/history`);
+    await page.getByRole('button', { name: 'View' }).first().click();
+    await expect(page.getByRole('dialog').locator('.diff-block').first()).toBeVisible();
+    await picture(page, 'version-changes', [page.getByRole('dialog').getByRole('status')]);
+    await page.context().close();
+  });
+
+  test('a picker with people', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'Restrictions' }).click();
+    await page.getByRole('dialog').getByRole('combobox', { name: 'Check a person' }).click();
+    await expect(page.getByRole('dialog').getByRole('listbox').getByRole('option').first()).toBeVisible();
+    await picture(page, 'picker');
     await page.context().close();
   });
 
@@ -470,7 +489,8 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/overview');
     await expect(page.getByRole('heading', { name: 'Latest changes' })).toBeVisible();
-    await picture(page, 'overview', [page.locator('time')]);
+    // Pages changed in the same moment can swap places, so the names are masked as well.
+    await picture(page, 'overview', [page.locator('time'), page.locator('.page-list a')]);
     await page.context().close();
   });
 

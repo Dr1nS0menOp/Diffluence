@@ -120,9 +120,11 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-087** · built · Everyone who can view a page can list its versions, open any of them and compare any two.
 - **PAG-088** · built · The history lists the number, author, date, summary and whether it was restored from another version.
 - **PAG-089** · built · Restoring a version publishes a new version with that content. Nothing is overwritten.
-- **PAG-090** · built · Compare shows added, removed and changed blocks, with changed words marked.
+- **PAG-090** · built · Compare shows the page itself: added on green, removed on red and struck through, each with a word beside it, and changed words marked in place.
 - **PAG-091** · built · Compare can collapse parts that did not change, with a control to show them.
 - **PAG-092** · partly · Compare also shows changes in tables per cell, in images and in files. Still open: tables per cell. Images and files are built.
+- **PAG-127** · built · Opening a version shows its changes against the version before it, with a button for the clean page.
+- **PAG-128** · built · A mail about a change to a watched page shows those changes, when the instance allows content in mail and the person may still see the page. Several changes in one mail show everything since the first one.
 - **PAG-093** · built · A reader sees **What changed** beside the byline after an update, with the differences since their last visit.
 - **PAG-094** · built · An old version shows a banner: which version it is, who made it, and a link to the current one.
 - **PAG-095** · built · Comments are not part of a version, and stay with the page when a version is restored.

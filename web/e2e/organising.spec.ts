@@ -84,8 +84,8 @@ test('handing over a page, and a verified mark', async ({ page, browser }) => {
 
   await moreActions(page, 'Details');
   await page.getByRole('button', { name: 'Change owner' }).click();
-  await page.getByLabel('Find the new owner').fill(name);
-  await page.getByRole('button', { name: new RegExp(name) }).click();
+  await page.getByRole('combobox', { name: 'Find the new owner' }).fill(name);
+  await page.getByRole('option', { name: new RegExp(name) }).click();
   await expect(page.locator('.byline')).toContainText(name);
   await page.keyboard.press('Escape');
 
@@ -312,8 +312,8 @@ test('an approval from asking to approved, and a new version removes the mark', 
   await page.goto(`/pages/${id}`);
   await moreActions(page, 'Approvals');
   const dialog = page.getByRole('dialog', { name: 'Approvals' });
-  await dialog.getByLabel('Find a person').fill(name);
-  await dialog.getByRole('button', { name: new RegExp(name) }).click();
+  await dialog.getByRole('combobox', { name: 'Find a person' }).fill(name);
+  await dialog.getByRole('option', { name: new RegExp(name) }).click();
   await dialog.getByRole('button', { name: 'Send request' }).click();
   await expect(dialog.getByText('Still to answer')).toBeVisible();
   await checkAccessibility(page);

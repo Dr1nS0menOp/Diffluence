@@ -16,7 +16,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 ## 2.2 Details of a space
 
 - **SPC-009** · built · A space administrator edits the name, description and icon.
-- **SPC-010** · built · An icon is one character or an emoji. Without one, the first letter of the name is used.
+- **SPC-010** · built · An icon is an animal or one character. Without a choice, the key of the space picks an animal.
 - **SPC-011** · built · An icon can be an uploaded image, cropped to a square.
 - **SPC-012** · built · The key of a space can be changed by a space administrator. Old addresses that contain the key keep working through a redirect.
 - **SPC-013** · built · A space has a list of owners shown to everyone, so people know who to ask.
@@ -49,6 +49,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-084** · built · On the home page the breadcrumbs end in **Home**.
 - **SPC-085** · built · A strip of spaces at the top of the sidebar moves a person between spaces: favourites, then recent spaces, then the rest, as in the Spaces menu. It scrolls on its own, by wheel and by keyboard, and has a link to all spaces.
 - **SPC-086** · built · The strip marks the current space and keeps it in view, also when the space is archived.
+- **SPC-087** · built · A space administrator picks one of 30 cartoon animals in Space settings, and a person picks one when making a space.
 
 ## 2.5 The page tree
 

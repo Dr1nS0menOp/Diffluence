@@ -45,6 +45,9 @@ type Item struct {
 	Read      bool           `json:"read"`
 	At        time.Time      `json:"at"`
 	Data      map[string]any `json:"data"`
+
+	// firstVersion is the oldest version in a group, so a mail can show all of it.
+	firstVersion int
 }
 
 type stored struct {
@@ -78,6 +81,12 @@ func scanStored(r pgx.CollectableRow) (stored, error) {
 	return v, nil
 }
 
+// versionOf reads the version a change made. JSON numbers arrive as floats.
+func versionOf(i Item) int {
+	n, _ := i.Data["version"].(float64)
+	return int(n)
+}
+
 // grouped makes one line of unread rows of the same type on the same page. Newest
 // comes first, so the first row of a group gives it its time and link.
 func grouped(rows []stored) []Item {
@@ -90,10 +99,12 @@ func grouped(rows []stored) []Item {
 				out[i].Actors = append(out[i].Actors, r.actor)
 			}
 			out[i].Count++
+			out[i].firstVersion = versionOf(r.Item)
 			continue
 		}
 		item := r.Item
 		item.Count = 1
+		item.firstVersion = versionOf(r.Item)
 		item.Actors = []string{}
 		if r.actor != "" {
 			item.Actors = []string{r.actor}

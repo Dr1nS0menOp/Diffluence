@@ -17,6 +17,12 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | `pquerna/otp` | Apache-2.0 | TOTP codes and the QR code for enrolment. Replaced the planned hand-written TOTP and the frontend QR library. | The product owner, 2026-11-04 |
 | `yuin/goldmark` | MIT | Markdown parser, no dependencies of its own | The product owner, 2026-11-04 |
 
+## Pictures
+
+| What | Licence | Why |
+|---|---|---|
+| Kenney, Animal Pack Remastered: the 30 round PNGs in `web/public/animals/`, 115 KB, with its `LICENSE.txt` | CC0 1.0 | The animals of spaces (ADR-031). No code. Credit is not required, and it is given here with thanks |
+
 ## Deliberately not a dependency
 
 | Part | Decision | Why |

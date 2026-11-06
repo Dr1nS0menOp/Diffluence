@@ -138,7 +138,7 @@ test('drafts survive a reload, and history compares and restores', async ({ page
   await page.getByRole('checkbox', { name: 'Version 1' }).check();
   await page.getByRole('checkbox', { name: 'Version 2' }).check();
   await page.getByRole('link', { name: 'Compare selected' }).click();
-  await expect(page.locator('.diff.changed .added')).toContainText('and more');
+  await expect(page.locator('.diff-block.changed ins')).toContainText('and more');
   await checkAccessibility(page);
 
   await page.goto(`/pages/${id}/history`);

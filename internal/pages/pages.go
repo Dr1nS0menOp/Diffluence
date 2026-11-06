@@ -452,7 +452,7 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if in.Silent {
 		details["silent"] = true
 	}
-	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.Silent, "first": first,
+	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.Silent, "first": first, "version": number,
 		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned})
 }
 

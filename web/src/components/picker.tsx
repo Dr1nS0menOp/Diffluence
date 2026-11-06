@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState } from 'react';
+import { useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError, type DirectoryEntry } from '../api';
 
-/** Finds a user or group. */
+/**
+ * Finds a user or group. A combobox with a list: people show as soon as the field
+ * has focus, and focus stays in the field while the arrows mark a row (spec 018).
+ */
 export function SubjectPicker({
   onPick,
   label,
@@ -15,42 +18,95 @@ export function SubjectPicker({
   usersOnly?: boolean;
 }) {
   const { t } = useTranslation();
+  const listId = useId();
   const [text, setText] = useState('');
+  const [open, setOpen] = useState(false);
+  const [marked, setMarked] = useState(-1);
   const q = useQuery({
     queryKey: ['directory', text],
     queryFn: () => api.get<{ entries: DirectoryEntry[] }>('/directory?q=' + encodeURIComponent(text)),
-    enabled: text.length > 0,
+    enabled: open,
+    placeholderData: (previous) => previous,
   });
   const entries = (q.data?.entries ?? []).filter((e) => !usersOnly || e.type === 'user');
+  const refused = q.error instanceof ApiError && q.error.status === 403;
+  const showList = open && !refused;
+
+  const close = () => {
+    setOpen(false);
+    setMarked(-1);
+  };
+  const pick = (entry: DirectoryEntry) => {
+    onPick(entry);
+    setText('');
+    close();
+  };
+  const keys = (e: KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (!open) {
+        setOpen(true);
+      } else if (entries.length > 0) {
+        const step = e.key === 'ArrowDown' ? 1 : -1;
+        const from = marked < 0 && step < 0 ? 0 : marked;
+        setMarked((from + step + entries.length) % entries.length);
+      }
+    } else if (e.key === 'Enter') {
+      // A picker sits in forms, and Enter here must not send them.
+      e.preventDefault();
+      const entry = entries[marked];
+      if (open && entry) pick(entry);
+    } else if (e.key === 'Escape' && open) {
+      // The list closes first, and a second Escape is for the dialog around it.
+      e.preventDefault();
+      e.stopPropagation();
+      close();
+    }
+  };
+
+  const markedEntry = entries[marked];
   return (
     <div className="picker">
       <input
-        type="search"
+        type="text"
+        role="combobox"
+        autoComplete="off"
         value={text}
-        onChange={(e) => setText(e.target.value)}
         placeholder={label}
         aria-label={label}
+        aria-autocomplete="list"
+        aria-expanded={showList}
+        aria-controls={listId}
+        aria-activedescendant={markedEntry ? `${listId}-${markedEntry.id}` : undefined}
+        onChange={(e) => {
+          setText(e.target.value);
+          setMarked(-1);
+          setOpen(true);
+        }}
+        onFocus={() => setOpen(true)}
+        onClick={() => setOpen(true)}
+        onBlur={close}
+        onKeyDown={keys}
       />
-      {q.error instanceof ApiError && q.error.status === 403 && <p className="muted">{q.error.message}</p>}
-      {text.length > 0 && (
-        <ul className="plain-list">
-          {entries.map((e) => (
-            <li key={e.type + e.id}>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() => {
-                  onPick(e);
-                  setText('');
-                }}
-              >
-                {e.name} <span className="muted">{e.detail}</span>
-              </button>
-            </li>
-          ))}
-          {q.isSuccess && entries.length === 0 && <li className="muted">{t('search.noResults')}</li>}
-        </ul>
-      )}
+      {refused && <p className="muted">{q.error?.message}</p>}
+      <div id={listId} role="listbox" aria-label={label} className="picker-list" hidden={!showList}>
+        {entries.map((entry, index) => (
+          <div
+            key={entry.type + entry.id}
+            id={`${listId}-${entry.id}`}
+            role="option"
+            aria-selected={index === marked}
+            className={index === marked ? 'quick-row marked' : 'quick-row'}
+            // The field must keep focus, or the list closes before the click lands.
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => pick(entry)}
+          >
+            <span className="quick-title">{entry.name}</span>
+            {entry.detail && <span className="quick-detail">{entry.detail}</span>}
+          </div>
+        ))}
+        {q.isSuccess && entries.length === 0 && <p className="quick-note muted">{t('search.noResults')}</p>}
+      </div>
     </div>
   );
 }

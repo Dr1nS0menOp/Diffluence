@@ -108,7 +108,10 @@ Use these. Reuse beats a new variant.
 | Choosing a file outside the editor | `FilePicker` |
 | A file in a document | `.file-tile`, through the `file` block in `components/editor.tsx` |
 | A person | `Avatar` |
-| A space | `SpaceBadge` |
+| A space | `SpaceBadge`, which shows its animal |
+| Choosing the icon of a space | `AnimalChoice` |
+| A person or group in a form | `SubjectPicker`, which shows people on focus |
+| A comparison of versions | `DiffDocument` |
 | A status | `.lozenge` |
 | A message in the flow | `.note`, `.note-error`, `ErrorNote` |
 | A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
@@ -159,6 +162,9 @@ Use these. Reuse beats a new variant.
 | Code block | A header with title, language and Copy for readers. Always left-to-right |
 | Image | A `figure` with a caption, in three sizes or its own |
 
+## Changes between versions
+
+A comparison looks like the page. What was added sits on green, what was removed on red and struck through, and new words are underlined. Each changed block has the word Added, Removed or Changed beside it, so colour never stands alone. Words can be marked in paragraphs and headings. Other blocks show as they were and as they are.
 ## What organises a page
 
 - **Status** is always a word and a colour, in the style of a status mark in a document. It sits at the end of the byline.
@@ -196,7 +202,9 @@ Every screen handles all of these:
 
 `web/src/components/icons.tsx` is the only file that draws. Icons are our own line drawings on a 24 by 24 grid, stroke 1.8, round ends, `currentColor`, hidden from screen readers. To add one, add a line to that file. An icon needs words beside it, or an `aria-label` and `title` on its button.
 
-The logo is a river that splits in two, which is what the word diffluence means. Space and user marks use four tints, chosen by the space key or name, so they never change by themselves.
+The logo is a river that splits in two, which is what the word diffluence means. User marks use four tints, chosen by the name, so they never change by themselves.
+
+A space has a cartoon animal (ADR-031), picked from its key until someone chooses, and it can choose a character instead, which uses the tints. The animals are pictures from `web/public/animals/`, the one exception to our own line drawings, because they carry character and not meaning. They are always next to the name of the space.
 
 ## Words
 

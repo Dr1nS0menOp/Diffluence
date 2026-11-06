@@ -13,6 +13,7 @@ import {
   type TrashItem,
 } from '../api';
 import { navigate } from '../router';
+import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp } from '../components/icons';
@@ -342,7 +343,12 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   useEffect(() => {
     if (space) setForm({ name: space.name, description: space.description, icon: space.icon });
   }, [space]);
-  const refresh = () => client.invalidateQueries({ queryKey: ['space', spaceKey] });
+  const refresh = async () => {
+    await client.invalidateQueries({ queryKey: ['space', spaceKey] });
+    await client.invalidateQueries({ queryKey: ['space-id', space?.id] });
+    await client.invalidateQueries({ queryKey: ['spaces'] });
+    await client.invalidateQueries({ queryKey: ['my-spaces'] });
+  };
   const save = useMutation({ mutationFn: () => api.patch(`/spaces/${space?.id}`, form), onSuccess: refresh });
   const archive = useMutation({
     mutationFn: (to: string) => api.post(`/spaces/${space?.id}/${to}`),
@@ -385,13 +391,12 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
               rows={2}
             />
           </Field>
-          <Field label={t('space.icon')}>
-            <input
-              value={form.icon}
-              onChange={(e) => setForm({ ...form, icon: e.target.value })}
-              maxLength={8}
-            />
-          </Field>
+          <AnimalChoice
+            spaceKey={space.key}
+            name={form.name}
+            value={form.icon}
+            onChange={(icon) => setForm({ ...form, icon })}
+          />
           <button type="submit" className="primary">
             {t('common.save')}
           </button>

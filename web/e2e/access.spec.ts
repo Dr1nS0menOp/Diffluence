@@ -47,7 +47,7 @@ test('a guest cannot find a restricted page by any route', async ({ page, browse
   await page.getByRole('button', { name: 'Restrictions' }).click();
   const dialog = page.getByRole('dialog', { name: 'Page restrictions' });
   await dialog.getByPlaceholder('Add').first().fill('admin');
-  await dialog.getByRole('button', { name: /admin@example.com/ }).click();
+  await dialog.getByRole('option', { name: /admin@example.com/ }).click();
   await expect(dialog.getByRole('listitem').filter({ hasText: 'admin' }).first()).toBeVisible();
   await expect(dialog).toHaveCount(1);
   await checkAccessibility(page);
@@ -87,7 +87,7 @@ test('a guest cannot find a restricted page by any route', async ({ page, browse
     .fill(email.split('@')[0] ?? '');
   await page
     .getByRole('dialog')
-    .getByRole('button', { name: new RegExp(email) })
+    .getByRole('option', { name: new RegExp(email) })
     .click();
   await expect(page.getByRole('dialog').getByRole('status')).toHaveText('Denied');
   await expect(page.getByRole('dialog').getByRole('cell', { name: 'Failed' })).toBeVisible();

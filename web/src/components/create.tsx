@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Page, type Space, type TemplateSummary } from '../api';
 import { navigate } from '../router';
+import { AnimalChoice } from './animal-choice';
 import { TemplateGallery } from './template-gallery';
 import { Dialog, ErrorNote, Field } from './ui';
 
@@ -227,9 +228,12 @@ export function NewSpaceDialog({ onClose }: { onClose: () => void }) {
         <Field label={t('space.description')}>
           <textarea value={form.description} onChange={set('description')} rows={2} />
         </Field>
-        <Field label={t('space.icon')}>
-          <input value={form.icon} onChange={set('icon')} maxLength={8} />
-        </Field>
+        <AnimalChoice
+          spaceKey={form.key}
+          name={form.name}
+          value={form.icon}
+          onChange={(icon) => setForm({ ...form, icon })}
+        />
         <Field label={t('spaceSettings.startFrom')}>
           <select value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
             <option value="">{t('spaceSettings.startEmpty')}</option>

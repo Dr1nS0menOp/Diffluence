@@ -44,7 +44,7 @@ function slugMaker() {
   };
 }
 
-function textOf(node: JsonNode): string {
+export function textOf(node: JsonNode): string {
   return node.text ?? (node.content ?? []).map(textOf).join('');
 }
 

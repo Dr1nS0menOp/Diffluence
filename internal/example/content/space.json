@@ -2,7 +2,7 @@
  "key": "WELCOME",
  "name": "Welcome to Diffluence",
  "description": "An example of everything a page can do. Change it, or delete it when you are done.",
- "icon": "👋",
+ "icon": "owl",
  "home": "home.json",
  "pages": [
   {

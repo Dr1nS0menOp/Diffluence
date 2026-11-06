@@ -18,13 +18,17 @@ type WordOp struct {
 	Text string `json:"text"`
 }
 
-// DiffBlock is one top-level block in a comparison.
+// DiffBlock is one top-level block in a comparison. Node is the block as it is
+// now, or as it was when it was removed, so a reader can see the real thing.
+// Previous is the old block of a changed one.
 type DiffBlock struct {
-	Op     string   `json:"op"`
-	Type   string   `json:"type"`
-	Before string   `json:"before,omitempty"`
-	After  string   `json:"after,omitempty"`
-	Words  []WordOp `json:"words,omitempty"`
+	Op       string   `json:"op"`
+	Type     string   `json:"type"`
+	Before   string   `json:"before,omitempty"`
+	After    string   `json:"after,omitempty"`
+	Words    []WordOp `json:"words,omitempty"`
+	Node     *Node    `json:"node,omitempty"`
+	Previous *Node    `json:"previous,omitempty"`
 }
 
 // maxDiffCells caps the comparison table. Beyond it blocks are shown as
@@ -84,20 +88,21 @@ func Compare(before, after Node) []DiffBlock {
 	flush := func(toI, toJ int) {
 		for i < toI && j < toJ && a[i].Type == b[j].Type {
 			before, after := BlockText(a[i]), BlockText(b[j])
-			out = append(out, DiffBlock{Op: OpChanged, Type: a[i].Type, Before: before, After: after, Words: compareWords(before, after)})
+			out = append(out, DiffBlock{Op: OpChanged, Type: a[i].Type, Before: before, After: after,
+				Words: compareWords(before, after), Node: &b[j], Previous: &a[i]})
 			i++
 			j++
 		}
 		for ; i < toI; i++ {
-			out = append(out, DiffBlock{Op: OpRemoved, Type: a[i].Type, Before: BlockText(a[i])})
+			out = append(out, DiffBlock{Op: OpRemoved, Type: a[i].Type, Before: BlockText(a[i]), Node: &a[i]})
 		}
 		for ; j < toJ; j++ {
-			out = append(out, DiffBlock{Op: OpAdded, Type: b[j].Type, After: BlockText(b[j])})
+			out = append(out, DiffBlock{Op: OpAdded, Type: b[j].Type, After: BlockText(b[j]), Node: &b[j]})
 		}
 	}
 	for _, p := range pairs {
 		flush(p[0], p[1])
-		out = append(out, DiffBlock{Op: OpEqual, Type: a[i].Type, Before: BlockText(a[i]), After: BlockText(b[j])})
+		out = append(out, DiffBlock{Op: OpEqual, Type: a[i].Type, Before: BlockText(a[i]), After: BlockText(b[j]), Node: &b[j]})
 		i++
 		j++
 	}
