@@ -346,6 +346,11 @@
   display: flex;
 }
 
+/* A folded block hides its body; display: flex above would otherwise show it again. */
+.code-body[hidden] {
+  display: none;
+}
+
 .code-body pre {
   flex: 1;
   min-inline-size: 0;
