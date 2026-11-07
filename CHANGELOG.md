@@ -13,6 +13,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - Tables can number their rows, scale with the page, and have a caption. Text with tabs lands as cells
 - A table cannot hold another table any more. On saving, a table inside a table loses its inner grid and keeps its words
 - Upgrade impact: one migration
+### Added: the rest of files (wave N)
+- A large upload shows how far it is and can be stopped. A file dropped on a tile becomes its next version
+- A preview opens on top of the page, with colours for code and next and previous. Tiles can be small or large
+- The list of a page says who added a file and whether the page shows it, and offers to clear up what nothing uses
+- Files can have labels, and search and the Files screen filter on them. The Files screen also filters by type and person, and space administrators can delete many files at once
+- Each version of a file has its own address, which also makes old versions downloadable for the first time. The address gives no access
+- The page history shows when files came and went, from this release on
+- An administrator can give a space a storage limit
+- Fixed: renaming a file no longer wipes its comment
+- Upgrade impact: one migration, which reads all page versions once, so it takes longer on a large instance. Nothing else to do. No space gets a limit by itself
 
 ### Added: inviting someone without an account (COL-047)
 - A person with the new global permission `invite_people` can ask for an invitation from the Share dialog. An administrator approves or refuses each one under Invitations, with a reason, and the person who asked hears the answer

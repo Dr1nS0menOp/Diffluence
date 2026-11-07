@@ -411,6 +411,9 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, in.Summary, in.RestoredFrom, in.Silent); err != nil {
 		return p, err
 	}
+	if err := attachments.RecordUse(ctx, tx, p.ID, number, doc); err != nil {
+		return p, err
+	}
 	if p.PublishedAt == nil {
 		if _, err := tx.Exec(ctx, `UPDATE pages p SET review_on = (now() + make_interval(months => s.review_months))::date
 			FROM spaces s WHERE p.id = $1 AND s.id = p.space_id AND p.review_on IS NULL AND s.review_months > 0`, p.ID); err != nil {

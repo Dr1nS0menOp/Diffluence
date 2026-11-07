@@ -36,6 +36,7 @@ import {
   TypeChange,
 } from './admin-people';
 import { PermissionsTab, RulesTab } from './admin-rules';
+import { StorageLimitDialog } from './admin-storage';
 import { SettingsSearch, SummaryTab } from './admin-summary';
 
 const TABS = [
@@ -653,7 +654,10 @@ interface SpaceTotal {
   pages: number;
   bytes: number;
   last_activity: string | null;
+  limit_mib: number;
 }
+
+const MEBIBYTE = 1 << 20;
 
 function SpacesTab() {
   const { t } = useTranslation();
@@ -668,6 +672,7 @@ function SpacesTab() {
     queryFn: () => api.get<{ items: TrashItem[] }>('/admin/trash/spaces'),
   });
   const [recovering, setRecovering] = useState<Space | null>(null);
+  const [limiting, setLimiting] = useState<Space | null>(null);
   const [reason, setReason] = useState('');
   const recover = useMutation({
     mutationFn: () => api.post(`/admin/spaces/${recovering?.id}/recover`, { reason }),
@@ -712,9 +717,15 @@ function SpacesTab() {
                 <td>{s.key}</td>
                 <td>{s.status}</td>
                 <td>{total?.pages ?? 0}</td>
-                <td>{formatSize(total?.bytes ?? 0)}</td>
-                <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
                 <td>
+                  {formatSize(total?.bytes ?? 0)}
+                  {total?.limit_mib ? ` / ${formatSize(total.limit_mib * MEBIBYTE)}` : ''}
+                </td>
+                <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
+                <td className="row">
+                  <button type="button" className="ghost" onClick={() => setLimiting(s)}>
+                    {t('admin.storageLimit')}
+                  </button>
                   <button type="button" className="ghost" onClick={() => setRecovering(s)}>
                     {t('admin.recover')}
                   </button>
@@ -744,6 +755,13 @@ function SpacesTab() {
             ))}
           </ul>
         </>
+      )}
+      {limiting && (
+        <StorageLimitDialog
+          space={limiting}
+          limitMiB={q.data?.totals.find((row) => row.id === limiting.id)?.limit_mib ?? 0}
+          onClose={() => setLimiting(null)}
+        />
       )}
       {recovering && (
         <Dialog title={t('admin.recover')} onClose={() => setRecovering(null)}>

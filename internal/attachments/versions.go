@@ -7,6 +7,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -28,6 +29,7 @@ const (
 	maxLookupIDs   = 500
 	filesPageSize  = 50
 	largestShown   = 10
+	maxChoices     = 200
 )
 
 // mediaTypes are the video and audio types the browser may play, detected from the
@@ -105,6 +107,9 @@ func (s *Service) MakeCurrent(ctx context.Context, c identity.Caller, id uuid.UU
 			return apperr.NotFound()
 		}
 		if _, err := tx.Exec(ctx, "UPDATE attachments SET current_version = $2, updated_at = now() WHERE id = $1", id, next); err != nil {
+			return err
+		}
+		if err := addEvent(ctx, tx, c, a.PageID, id, a.Filename, eventVersion); err != nil {
 			return err
 		}
 		return record(ctx, tx, c, "attachment.version_restored", a, map[string]any{"from": number, "version": next})
@@ -250,6 +255,7 @@ type Facts struct {
 	ContentType string    `json:"content_type"`
 	Inline      bool      `json:"inline"`
 	Media       bool      `json:"media"`
+	Office      bool      `json:"office"`
 }
 
 // Lookup gives the live facts of files on pages the caller may see.
@@ -267,7 +273,7 @@ func (s *Service) Lookup(ctx context.Context, c identity.Caller, list []uuid.UUI
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Facts, error) {
 		var f Facts
 		err := r.Scan(&f.ID, &f.Filename, &f.Size, &f.ContentType)
-		f.Inline, f.Media = IsInline(f.ContentType), IsMedia(f.ContentType)
+		f.Inline, f.Media, f.Office = IsInline(f.ContentType), IsMedia(f.ContentType), IsOffice(f.Filename)
 		return f, err
 	})
 	if out == nil {
@@ -285,28 +291,68 @@ type SpaceFile struct {
 	PageTitle string    `json:"page_title"`
 	Uploader  string    `json:"uploader"`
 	UpdatedAt time.Time `json:"updated_at"`
+	Kind      string    `json:"kind"`
+	Labels    []string  `json:"labels"`
 }
 
 func scanSpaceFile(r pgx.CollectableRow) (SpaceFile, error) {
 	var f SpaceFile
-	err := r.Scan(&f.ID, &f.Filename, &f.Size, &f.PageID, &f.PageTitle, &f.Uploader, &f.UpdatedAt)
+	err := r.Scan(&f.ID, &f.Filename, &f.Size, &f.PageID, &f.PageTitle, &f.Uploader, &f.UpdatedAt, &f.Kind, &f.Labels)
 	return f, err
 }
 
-const spaceFileColumns = `a.id, a.filename, v.size, a.page_id, p.title, COALESCE(u.display_name, ''), a.updated_at`
+// FileKinds are the types the Files screen filters by.
+var FileKinds = []string{"image", "media", "pdf", "text", "office", "other"}
+
+// fileKindSQL sorts a file into a kind. The name decides for office files, because they
+// are detected as plain archives. Everything else goes by the detected content.
+var fileKindSQL = `CASE WHEN lower(a.filename) ~ '\.(` + strings.Join(officeExtensions, "|") + `)$' THEN 'office'
+	WHEN v.content_type = 'application/pdf' THEN 'pdf'
+	WHEN v.content_type LIKE 'image/%' THEN 'image'
+	WHEN v.content_type LIKE 'video/%' OR v.content_type LIKE 'audio/%' OR v.content_type = 'application/ogg' THEN 'media'
+	WHEN v.content_type LIKE 'text/%' THEN 'text'
+	ELSE 'other' END`
+
+var spaceFileColumns = `a.id, a.filename, v.size, a.page_id, p.title, COALESCE(u.display_name, ''), a.updated_at, ` + fileKindSQL + `, ` + labelsSQL
+
+// Every way to the files of a space goes through this: perm_visible_pages decides.
+const (
+	visibleFrom = ` FROM attachments a
+	JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
+	JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id
+	JOIN pages p ON p.id = a.page_id`
+	activeInSpace   = ` WHERE a.space_id = $2 AND a.status = 'active'`
+	visibleFilesSQL = visibleFrom + ` LEFT JOIN users u ON u.id = a.created_by` + activeInSpace
+)
+
+// FileFilter narrows the Files screen. Zero values mean no filter.
+type FileFilter struct {
+	Name     string
+	Kind     string
+	Label    string
+	Uploader uuid.UUID
+	Offset   int
+}
 
 // SpaceFiles lists the files of a space that the caller may see (FIL-043).
-func (s *Service) SpaceFiles(ctx context.Context, c identity.Caller, spaceID uuid.UUID, name string, offset int) ([]SpaceFile, error) {
+func (s *Service) SpaceFiles(ctx context.Context, c identity.Caller, spaceID uuid.UUID, f FileFilter) ([]SpaceFile, error) {
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceView); err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+` FROM attachments a
-		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
-		JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id
-		JOIN pages p ON p.id = a.page_id
-		LEFT JOIN users u ON u.id = a.created_by
-		WHERE a.space_id = $2 AND a.status = 'active' AND ($3 = '' OR position(lower($3) IN lower(a.filename)) > 0)
-		ORDER BY a.updated_at DESC, a.id LIMIT $4 OFFSET $5`, c.UserID, spaceID, name, filesPageSize, max(offset, 0))
+	if f.Kind != "" && !slices.Contains(FileKinds, f.Kind) {
+		return nil, apperr.Invalid("That is not a kind of file.")
+	}
+	var uploader *uuid.UUID
+	if f.Uploader != uuid.Nil {
+		uploader = &f.Uploader
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+visibleFilesSQL+`
+		AND ($3 = '' OR position(lower($3) IN lower(a.filename)) > 0)
+		AND ($4 = '' OR `+fileKindSQL+` = $4)
+		AND ($5 = '' OR EXISTS (SELECT 1 FROM attachment_labels l WHERE l.attachment_id = a.id AND l.label = lower($5)))
+		AND ($6::uuid IS NULL OR a.created_by = $6)
+		ORDER BY a.updated_at DESC, a.id LIMIT $7 OFFSET $8`,
+		c.UserID, spaceID, f.Name, f.Kind, f.Label, uploader, filesPageSize, max(f.Offset, 0))
 	if err != nil {
 		return nil, err
 	}
@@ -317,11 +363,55 @@ func (s *Service) SpaceFiles(ctx context.Context, c identity.Caller, spaceID uui
 	return out, err
 }
 
+// Uploader is a person who can be picked in the filter of the Files screen.
+type Uploader struct {
+	ID   uuid.UUID `json:"id"`
+	Name string    `json:"name"`
+}
+
+// Choices is what the filters of the Files screen offer.
+type Choices struct {
+	Labels    []string   `json:"labels"`
+	Uploaders []Uploader `json:"uploaders"`
+}
+
+// FileChoices lists the labels and people of the files the caller may see, so a list of
+// choices tells nothing about a hidden page (spec 024, D17).
+func (s *Service) FileChoices(ctx context.Context, c identity.Caller, spaceID uuid.UUID) (Choices, error) {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceView); err != nil {
+		return Choices{}, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT l.label`+visibleFrom+` JOIN attachment_labels l ON l.attachment_id = a.id`+
+		activeInSpace+` ORDER BY l.label LIMIT $3`, c.UserID, spaceID, maxChoices)
+	if err != nil {
+		return Choices{}, err
+	}
+	out := Choices{}
+	if out.Labels, err = pgx.CollectRows(rows, pgx.RowTo[string]); err != nil {
+		return out, err
+	}
+	rows, err = s.pool.Query(ctx, `SELECT DISTINCT u.id, COALESCE(u.display_name, '')`+visibleFrom+` JOIN users u ON u.id = a.created_by`+
+		activeInSpace+` ORDER BY 2, 1 LIMIT $3`, c.UserID, spaceID, maxChoices)
+	if err != nil {
+		return out, err
+	}
+	out.Uploaders, err = pgx.CollectRows(rows, pgx.RowToStructByPos[Uploader])
+	if out.Labels == nil {
+		out.Labels = []string{}
+	}
+	if out.Uploaders == nil {
+		out.Uploaders = []Uploader{}
+	}
+	return out, err
+}
+
 // Usage is how much a space stores. Only space administrators see it, because a
 // total would tell how much is hidden (spec 012, E12).
 type Usage struct {
-	Bytes   int64       `json:"bytes"`
-	Largest []SpaceFile `json:"largest"`
+	Bytes int64 `json:"bytes"`
+	// LimitBytes is zero when the space has no limit.
+	LimitBytes int64       `json:"limit_bytes"`
+	Largest    []SpaceFile `json:"largest"`
 }
 
 // SpaceUsage adds up the storage of a space.
@@ -330,17 +420,12 @@ func (s *Service) SpaceUsage(ctx context.Context, c identity.Caller, spaceID uui
 		return Usage{}, err
 	}
 	var out Usage
-	err := s.pool.QueryRow(ctx, `SELECT COALESCE(sum(v.size), 0) FROM attachments a
-		JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = $1 AND a.status = 'active'`, spaceID).Scan(&out.Bytes)
+	err := s.pool.QueryRow(ctx, `SELECT `+spaceBytesSQL+`, storage_limit_mib::bigint * $2 FROM spaces WHERE id = $1`,
+		spaceID, mebibyte).Scan(&out.Bytes, &out.LimitBytes)
 	if err != nil {
 		return out, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+` FROM attachments a
-		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
-		JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id
-		JOIN pages p ON p.id = a.page_id
-		LEFT JOIN users u ON u.id = a.created_by
-		WHERE a.space_id = $2 AND a.status = 'active' ORDER BY v.size DESC, a.id LIMIT $3`, c.UserID, spaceID, largestShown)
+	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+visibleFilesSQL+` ORDER BY v.size DESC, a.id LIMIT $3`, c.UserID, spaceID, largestShown)
 	if err != nil {
 		return out, err
 	}

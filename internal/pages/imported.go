@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/search"
@@ -97,6 +98,9 @@ func (s *Service) InsertImported(ctx context.Context, tx pgx.Tx, spaceID uuid.UU
 				author_id, summary, created_at, imported)
 			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true)`, ids.New(), in.Origin, in.ID, v.Number, v.Title, raw,
 			document.SchemaVersion, v.AuthorID, v.Summary, v.CreatedAt); err != nil {
+			return err
+		}
+		if err := attachments.RecordUse(ctx, tx, in.ID, v.Number, current); err != nil {
 			return err
 		}
 	}

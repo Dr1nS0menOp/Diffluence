@@ -102,7 +102,7 @@ type Found struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Find looks for files by name on pages the user may see. A zero spaceID means
+// Find looks for files by name or label on pages the user may see. A zero spaceID means
 // every space. Files in archived spaces stay out of quick search (SPC-069).
 func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spaceID uuid.UUID, limit int) ([]Found, error) {
 	var within *uuid.UUID
@@ -114,7 +114,8 @@ func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spac
 		JOIN perm_listed_pages($1) v ON v.page_id = a.page_id
 		JOIN pages p ON p.id = a.page_id
 		JOIN spaces sp ON sp.id = a.space_id
-		WHERE a.status = 'active' AND sp.status = 'active' AND position(lower($2) IN lower(a.filename)) > 0
+		WHERE a.status = 'active' AND sp.status = 'active' AND (position(lower($2) IN lower(a.filename)) > 0
+			OR EXISTS (SELECT 1 FROM attachment_labels l WHERE l.attachment_id = a.id AND l.label = lower($2)))
 		  AND ($3::uuid IS NULL OR a.space_id = $3)
 		ORDER BY a.updated_at DESC, a.id LIMIT $4`, c.UserID, text, within, limit)
 	if err != nil {
@@ -173,6 +174,73 @@ func (s *Service) reindexNames(ctx context.Context, tx pgx.Tx, pageID uuid.UUID)
 	return search.SetAttachmentNames(ctx, tx, pageID, names)
 }
 
+// incoming is a file in storage that no page holds yet.
+type incoming struct {
+	key         string
+	contentType string
+	size        int64
+	sha256      []byte
+}
+
+// receive stores what came in, after looking for a blocked type in the content and in
+// each of the names. The caller removes it again if it does not end up on a page.
+func (s *Service) receive(ctx context.Context, spaceID uuid.UUID, names []string, body io.Reader) (incoming, error) {
+	limit, err := s.allowanceFor(ctx, spaceID)
+	if err != nil {
+		return incoming{}, err
+	}
+	if limit.bytes <= 0 {
+		return incoming{}, limit.refusal
+	}
+	reader := bufio.NewReaderSize(body, 512)
+	head, err := reader.Peek(512)
+	if err != nil && !errors.Is(err, io.EOF) {
+		return incoming{}, err
+	}
+	contentType, _, _ := strings.Cut(http.DetectContentType(head), ";")
+	blocked, err := s.settings.BlockedFileTypes(ctx)
+	if err != nil {
+		return incoming{}, err
+	}
+	for _, name := range names {
+		if isBlocked(blocked, name, contentType, head) {
+			return incoming{}, errBlocked()
+		}
+	}
+	key := "attachments/" + ids.New().String()
+	obj, err := s.store.Put(ctx, key, reader, limit.bytes)
+	if errors.Is(err, storage.ErrTooLarge) {
+		return incoming{}, limit.refusal
+	}
+	if err != nil {
+		return incoming{}, err
+	}
+	return incoming{key: key, contentType: contentType, size: obj.Size, sha256: obj.SHA256}, nil
+}
+
+// addVersion makes a stored file the next version, with all that goes with it.
+func (s *Service) addVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, a Attachment, in incoming) error {
+	if _, err := tx.Exec(ctx, `INSERT INTO attachment_versions (id, attachment_id, number, object_key, sha256, size, content_type, uploaded_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, ids.New(), a.ID, a.Version, in.key, in.sha256, in.size, in.contentType, c.UserID); err != nil {
+		return err
+	}
+	if err := s.reindexNames(ctx, tx, a.PageID); err != nil {
+		return err
+	}
+	if _, err := audit.Record(ctx, tx, c.Event("attachment.uploaded", "attachment", a.ID.String(), a.SpaceID.String(), map[string]any{
+		"page_id": a.PageID, "filename": a.Filename, "version": a.Version, "size": in.size, "content_type": in.contentType})); err != nil {
+		return err
+	}
+	if _, err := outbox.Enqueue(ctx, tx, "attachment.uploaded", map[string]any{"attachment_id": a.ID, "page_id": a.PageID, "space_id": a.SpaceID}); err != nil {
+		return err
+	}
+	action := eventVersion
+	if a.Version == 1 {
+		action = eventAdded
+	}
+	return addEvent(ctx, tx, c, a.PageID, a.ID, a.Filename, action)
+}
+
 // Upload stores a file on a page. A file with the same name gets a new version.
 func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUID, filename string, body io.Reader) (Attachment, error) {
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.AttachmentAdd, uuid.Nil); err != nil {
@@ -182,33 +250,14 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 	if err != nil {
 		return Attachment{}, err
 	}
-	limit, err := s.settings.MaxUploadBytes(ctx)
+	spaceID, err := s.pageSpace(ctx, s.pool, pageID)
 	if err != nil {
 		return Attachment{}, err
 	}
-	reader := bufio.NewReaderSize(body, 512)
-	head, err := reader.Peek(512)
-	if err != nil && !errors.Is(err, io.EOF) {
-		return Attachment{}, err
-	}
-	contentType, _, _ := strings.Cut(http.DetectContentType(head), ";")
-	blocked, err := s.settings.BlockedFileTypes(ctx)
+	in, err := s.receive(ctx, spaceID, []string{name}, body)
 	if err != nil {
 		return Attachment{}, err
 	}
-	if isBlocked(blocked, name, contentType, head) {
-		return Attachment{}, errBlocked()
-	}
-
-	key := "attachments/" + ids.New().String()
-	obj, err := s.store.Put(ctx, key, reader, limit)
-	if errors.Is(err, storage.ErrTooLarge) {
-		return Attachment{}, apperr.TooLarge("The file is larger than the upload limit.")
-	}
-	if err != nil {
-		return Attachment{}, err
-	}
-
 	var a Attachment
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// Checked again: the rights may have changed during a long upload.
@@ -219,8 +268,10 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 		if err != nil {
 			return err
 		}
-		var id uuid.UUID
-		version := 1
+		if err := requireRoom(ctx, tx, spaceID, in.size); err != nil {
+			return err
+		}
+		id, version := uuid.Nil, 1
 		err = tx.QueryRow(ctx, `SELECT id, current_version + 1 FROM attachments
 			WHERE page_id = $1 AND lower(filename) = lower($2) AND status = 'active' FOR UPDATE`, pageID, name).Scan(&id, &version)
 		switch {
@@ -238,32 +289,71 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 				return err
 			}
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO attachment_versions (id, attachment_id, number, object_key, sha256, size, content_type, uploaded_by)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`, ids.New(), id, version, key, obj.SHA256, obj.Size, contentType, c.UserID); err != nil {
-			return err
-		}
-		if err := s.reindexNames(ctx, tx, pageID); err != nil {
-			return err
-		}
-		if _, err := audit.Record(ctx, tx, c.Event("attachment.uploaded", "attachment", id.String(), spaceID.String(), map[string]any{
-			"page_id": pageID, "filename": name, "version": version, "size": obj.Size, "content_type": contentType})); err != nil {
-			return err
-		}
-		if _, err := outbox.Enqueue(ctx, tx, "attachment.uploaded", map[string]any{"attachment_id": id, "page_id": pageID, "space_id": spaceID}); err != nil {
+		target := Attachment{ID: id, PageID: pageID, SpaceID: spaceID, Filename: name, Version: version}
+		if err := s.addVersion(ctx, tx, c, target, in); err != nil {
 			return err
 		}
 		a, err = get(ctx, tx, id)
 		return err
 	})
 	if err != nil {
-		_ = s.store.Delete(context.WithoutCancel(ctx), key)
+		_ = s.store.Delete(context.WithoutCancel(ctx), in.key)
 		return Attachment{}, err
 	}
 	return a, nil
 }
 
-const selectSQL = `SELECT a.id, a.page_id, a.space_id, a.filename, a.current_version, v.size, v.content_type, a.created_by, a.updated_at, encode(v.sha256, 'hex')
-	FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version`
+// AddVersion makes a file the next version of one that exists, whatever it was called
+// (FIL-013). The name stays, so tiles and links stay right, but the name it came with
+// still counts for blocked types.
+func (s *Service) AddVersion(ctx context.Context, c identity.Caller, id uuid.UUID, droppedName string, body io.Reader) (Attachment, error) {
+	current, err := get(ctx, s.pool, id)
+	if err != nil {
+		return Attachment{}, err
+	}
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, current.PageID, permissions.AttachmentAdd, uuid.Nil); err != nil {
+		return Attachment{}, err
+	}
+	name, err := cleanFilename(droppedName)
+	if err != nil {
+		return Attachment{}, err
+	}
+	in, err := s.receive(ctx, current.SpaceID, []string{current.Filename, name}, body)
+	if err != nil {
+		return Attachment{}, err
+	}
+	var out Attachment
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		a, err := s.changeable(ctx, tx, c, id)
+		if err != nil {
+			return err
+		}
+		if err := requireRoom(ctx, tx, a.SpaceID, in.size); err != nil {
+			return err
+		}
+		if err := tx.QueryRow(ctx, `UPDATE attachments SET current_version = current_version + 1, updated_at = now()
+			WHERE id = $1 RETURNING current_version`, id).Scan(&a.Version); err != nil {
+			return err
+		}
+		if err := s.addVersion(ctx, tx, c, a, in); err != nil {
+			return err
+		}
+		out, err = get(ctx, tx, id)
+		return err
+	})
+	if err != nil {
+		_ = s.store.Delete(context.WithoutCancel(ctx), in.key)
+		return Attachment{}, err
+	}
+	return out, nil
+}
+
+const (
+	selectColumns = `a.id, a.page_id, a.space_id, a.filename, a.current_version, v.size, v.content_type, a.created_by, a.updated_at, encode(v.sha256, 'hex')`
+	selectFrom    = `FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version`
+	selectSQL     = `SELECT ` + selectColumns + ` ` + selectFrom
+	labelsSQL     = `COALESCE((SELECT array_agg(l.label ORDER BY l.label) FROM attachment_labels l WHERE l.attachment_id = a.id), '{}')`
+)
 
 func scan(r pgx.Row) (Attachment, error) {
 	var a Attachment
@@ -368,24 +458,31 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.ActionAttachmentDelete, a.CreatedBy); err != nil {
 			return err
 		}
-		item, err := trash.Add(ctx, tx, trash.Item{SpaceID: a.SpaceID, ObjectType: trash.TypeAttachment, ObjectID: id,
-			Title: a.Filename, DeletedBy: c.UserID}, retention)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "UPDATE attachments SET status = 'trashed', trash_item_id = $2, updated_at = now() WHERE id = $1", id, item); err != nil {
-			return err
-		}
-		if err := s.reindexNames(ctx, tx, a.PageID); err != nil {
-			return err
-		}
-		if _, err := audit.Record(ctx, tx, c.Event("attachment.trashed", "attachment", id.String(), a.SpaceID.String(),
-			map[string]any{"page_id": a.PageID, "filename": a.Filename})); err != nil {
-			return err
-		}
-		_, err = outbox.Enqueue(ctx, tx, "attachment.trashed", map[string]any{"attachment_id": id, "page_id": a.PageID})
-		return err
+		return s.trashOne(ctx, tx, c, a, retention)
 	})
+}
+
+// trashOne does the work of a delete. The caller has checked the rights.
+func (s *Service) trashOne(ctx context.Context, tx pgx.Tx, c identity.Caller, a Attachment, retention time.Duration) error {
+	item, err := trash.Add(ctx, tx, trash.Item{SpaceID: a.SpaceID, ObjectType: trash.TypeAttachment, ObjectID: a.ID,
+		Title: a.Filename, DeletedBy: c.UserID}, retention)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE attachments SET status = 'trashed', trash_item_id = $2, updated_at = now() WHERE id = $1", a.ID, item); err != nil {
+		return err
+	}
+	if err := s.reindexNames(ctx, tx, a.PageID); err != nil {
+		return err
+	}
+	if _, err := audit.Record(ctx, tx, c.Event("attachment.trashed", "attachment", a.ID.String(), a.SpaceID.String(),
+		map[string]any{"page_id": a.PageID, "filename": a.Filename})); err != nil {
+		return err
+	}
+	if _, err := outbox.Enqueue(ctx, tx, "attachment.trashed", map[string]any{"attachment_id": a.ID, "page_id": a.PageID}); err != nil {
+		return err
+	}
+	return addEvent(ctx, tx, c, a.PageID, a.ID, a.Filename, eventRemoved)
 }
 
 // Restore implements trash.Handler.
@@ -414,8 +511,10 @@ func (s *Service) Restore(ctx context.Context, tx pgx.Tx, c identity.Caller, it 
 		map[string]any{"page_id": pageID, "filename": filename})); err != nil {
 		return err
 	}
-	_, err = outbox.Enqueue(ctx, tx, "attachment.restored", map[string]any{"attachment_id": it.ObjectID, "page_id": pageID})
-	return err
+	if _, err := outbox.Enqueue(ctx, tx, "attachment.restored", map[string]any{"attachment_id": it.ObjectID, "page_id": pageID}); err != nil {
+		return err
+	}
+	return addEvent(ctx, tx, c, pageID, it.ObjectID, filename, eventRestored)
 }
 
 // Purge implements trash.Handler.

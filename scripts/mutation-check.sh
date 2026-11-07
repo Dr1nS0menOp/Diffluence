@@ -611,6 +611,44 @@ mutate "a fragment may hold markup" internal/document/links.go \
   's.replace("len(fragment) <= maxFragmentBytes \x26\x26 fragmentPattern.MatchString(fragment)", "fragment != \"\"")' ./internal/document/
 mutate "a table may stay inside a table" internal/document/document.go \
   's.replace("\tliftNestedTables(\x26n, false)\n", "")' ./internal/document/
+mutate "one version of a file skips the check" internal/attachments/details.go \
+  's.replace("a, err := s.viewable(ctx, c, id)\n\tif err != nil {\n\t\treturn a, nil, err\n\t}\n\tvar key string", "a, err := get(ctx, s.pool, id)\n\tif err != nil {\n\t\treturn a, nil, err\n\t}\n\tvar key string")' $app -run TestOneVersionOfAFileHasItsOwnAddressThatGivesNoAccess
+mutate "a reader changes the labels of a file" internal/attachments/details.go \
+  's.replace("return a, s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.AttachmentAdd, uuid.Nil)", "return a, nil")' $app -run TestFileLabelsFollowTheRulesOfLabels
+mutate "a file label gets around the fixed list" internal/attachments/details.go \
+  's.replace("if refused {", "if refused \x26\x26 raw == \"\" {")' $app -run TestFileLabelsFollowTheRulesOfLabels
+mutate "search finds a page by the label of a trashed file" internal/search/search.go \
+  's.replace("fa.status = \x27active\x27 AND ", "")' $app -run TestSearchFindsAPageByTheLabelOfItsFileAndOnlyWhatMayBeSeen
+mutate "the Files screen shows what is hidden" internal/attachments/versions.go \
+  's.replace("JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) vp ON true")' $app -run TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen
+mutate "anyone deletes files in bulk" internal/attachments/details.go \
+  's.replace("permissions.SpaceAdminister); err != nil {\n\t\treturn Outcome{}, err", "permissions.SpaceAdminister); err != nil \x26\x26 len(list) < 0 {\n\t\treturn Outcome{}, err")' $app -run TestBulkDeleteTakesOnlyWhatTheAdministratorMayReachInThatSpace
+mutate "bulk delete ignores the page" internal/attachments/details.go \
+  's.replace("err = s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.ActionAttachmentDelete, a.CreatedBy)", "err = nil")' $app -run TestBulkDeleteTakesOnlyWhatTheAdministratorMayReachInThatSpace
+mutate "bulk delete reaches another space" internal/attachments/details.go \
+  's.replace("return a.SpaceID == spaceID", "return a.SpaceID != uuid.Nil")' $app -run TestBulkDeleteTakesOnlyWhatTheAdministratorMayReachInThatSpace
+mutate "a space administrator raises their own limit" internal/httpapi/handlers_files.go \
+  's.replace("SessionOnly(Permission(identity.PermAdministrator)), s.handleSpaceStorageLimit", "Object(\"space.administer\"), s.handleSpaceStorageLimit")' $app -run TestOnlyAnAdministratorSetsTheLimitOfASpace
+mutate "a full space takes a moved file" internal/attachments/limits.go \
+  's.replace("if limited \x26\x26 size > left {", "if limited \x26\x26 size > left \x26\x26 size < 0 {")' $app -run TestAFullSpaceRefusesEveryWayInAndLeavesNothingBehind
+mutate "a blocked name comes in on a tile" internal/attachments/attachments.go \
+  's.replace("[]string{current.Filename, name}", "[]string{current.Filename, name[:0]}")' $app -run TestADroppedFileCannotComeInUnderTheNameOfAnAllowedOne
+mutate "clearing up takes a file of an old version" internal/attachments/details.go \
+  's.replace("FROM attachment_refs r WHERE r.attachment_id = a.id)\n", "FROM attachment_refs r WHERE false AND r.attachment_id = a.id)\n")' $app -run TestOnlyFilesNothingHoldsAreOfferedForClearingUp
+mutate "clearing up takes a file of a draft" internal/attachments/details.go \
+  's.replace("FROM drafts d WHERE d.page_id", "FROM drafts d WHERE false AND d.page_id")' $app -run TestOnlyFilesNothingHoldsAreOfferedForClearingUp
+mutate "clearing up takes a file of a comment" internal/attachments/details.go \
+  's.replace("FROM comments m WHERE m.page_id", "FROM comments m WHERE false AND m.page_id")' $app -run TestOnlyFilesNothingHoldsAreOfferedForClearingUp
+mutate "clearing up takes the header of a page" internal/attachments/details.go \
+  's.replace("FROM pages h WHERE h.header_attachment_id", "FROM pages h WHERE false AND h.header_attachment_id")' $app -run TestOnlyFilesNothingHoldsAreOfferedForClearingUp
+mutate "clearing up takes an upload on its way" internal/attachments/details.go \
+  's.replace("a.created_at < now() - interval \x271 day\x27 AND NOT", "NOT")' $app -run TestOnlyFilesNothingHoldsAreOfferedForClearingUp
+mutate "clearing up looks into a hidden page" internal/attachments/details.go \
+  's.replace("func (s *Service) ClearUp(ctx context.Context, c identity.Caller, pageID uuid.UUID) (Outcome, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {", "func (s *Service) ClearUp(ctx context.Context, c identity.Caller, pageID uuid.UUID) (Outcome, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil \x26\x26 pageID == uuid.Nil {")' $app -run TestClearingUpOnlyTakesWhatThePersonMayDelete
+mutate "the history of files needs no access" internal/attachments/details.go \
+  's.replace("func (s *Service) Events(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Event, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {", "func (s *Service) Events(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Event, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil \x26\x26 pageID == uuid.Nil {")' $app -run TestThePageHistoryTellsWhatHappenedToItsFiles
+mutate "the history names the page a file went to" internal/attachments/moves.go \
+  's.replace("addEvent(ctx, tx, c, a.PageID, id, a.Filename, eventMovedAway)", "addEvent(ctx, tx, c, a.PageID, id, a.Filename+\" \"+target.String(), eventMovedAway)")' $app -run TestThePageHistoryTellsWhatHappenedToItsFiles
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

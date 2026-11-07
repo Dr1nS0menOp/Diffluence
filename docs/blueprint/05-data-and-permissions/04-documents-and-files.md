@@ -24,7 +24,7 @@ Owners: `internal/document`, `internal/attachments`, `internal/storage`, `intern
   - **A document does not point at a version.** An old page version shows the newest file, and a purged file shows as gone. Versions of a page are immutable, and the files in them are not.
 - **DAT-092** · built · `attachment_versions`: `id`, `attachment_id`, `number`, `object_key`, `sha256`, `size`, `content_type`, `encryption_key_id`, `uploaded_by`, `created_at`. `content_type` is detected from the file, never taken from the client. `encryption_key_id` is empty: files are not sealed yet, although blueprint 06 says so (GAP-017).
 - **DAT-093** · built · `storage_deletions`: objects to remove, written in the transaction of the purge, worked off by the worker. A crash can never leave a file behind for good.
-- **DAT-094** · wave E · `attachments.comment`, `attachment_refs` (which version uses which file, filled from every version), `attachment_events`, `spaces.storage_limit_mib`.
+- **DAT-094** · built · `attachments.comment`, `attachment_refs` (which version uses which file, filled from every version), `attachment_events`, `attachment_labels`, `spaces.storage_limit_mib` (spec 024).
 - **DAT-095** · built · The file itself lives under `storage.Store`, today on disk. The store knows no rules, and every read goes through `attachments`. `OpenUnchecked` and `ListForPage` exist for callers that checked already, and only `exchange` uses them.
 
 ## 4.3 Search and other derived tables

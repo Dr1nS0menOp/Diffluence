@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: Apache-2.0
-// One file up close: its versions, its name and, for text, what it says.
+// One file up close: its versions, its name, its labels and, for text, what it says.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Attachment, type Me, type SearchResult } from '../api';
+import { api, type Attachment, type FileRow, type Me, type SearchResult } from '../api';
 import { OpenInCraft } from '../components/craft-frame';
+import { isTextFile, TextPreview } from '../components/file-preview';
+import { IconClose } from '../components/icons';
+import { useCopy } from '../components/toast';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
+
+const REMOVE_ICON_SIZE = 12;
 
 interface FileVersion {
   number: number;
@@ -29,6 +34,10 @@ function Versions({
 }) {
   const { t } = useTranslation();
   const dates = useDates();
+  const copy = useCopy();
+  const copyLink = (address: string) =>
+    void copy(`${window.location.origin}${address}`, t('files.linkCopied'));
+  const latest = `/api/v1/attachments/${file.id}/content?download=1`;
   const key = ['file-versions', file.id];
   const client = useQueryClient();
   const q = useQuery({
@@ -52,6 +61,11 @@ function Versions({
       <h3>{t('files.versions')}</h3>
       {q.isPending && <Loading />}
       <ErrorNote error={q.error ?? makeCurrent.error ?? remove.error} />
+      <p>
+        <button type="button" className="ghost" onClick={() => copyLink(latest)}>
+          {t('files.copyLatest')}
+        </button>
+      </p>
       <ul className="plain-list">
         {q.data?.versions.map((version) => (
           <li key={version.number} className="row">
@@ -60,6 +74,16 @@ function Versions({
               {formatSize(version.size)} · {version.uploaded_by} · {dates.day(version.created_at)}
             </span>
             {version.current && <span className="muted">{t('files.current')}</span>}
+            <a href={`/api/v1/attachments/${file.id}/versions/${version.number}/content`}>
+              {t('attachments.download')}
+            </a>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => copyLink(`/api/v1/attachments/${file.id}/versions/${version.number}/content`)}
+            >
+              {t('files.copyVersion')}
+            </button>
             {!version.current && canChange && (
               <button type="button" className="ghost" onClick={() => makeCurrent.mutate(version.number)}>
                 {t('files.makeCurrent')}
@@ -77,10 +101,10 @@ function Versions({
   );
 }
 
-function Rename({ file, onChanged }: { file: Attachment; onChanged: () => Promise<void> }) {
+function Rename({ file, onChanged }: { file: FileRow; onChanged: () => Promise<void> }) {
   const { t } = useTranslation();
   const [filename, setFilename] = useState(file.filename);
-  const [comment, setComment] = useState('');
+  const [comment, setComment] = useState(file.comment);
   const save = useMutation({
     mutationFn: () => api.patch(`/attachments/${file.id}`, { filename, comment }),
     onSuccess: onChanged,
@@ -100,6 +124,69 @@ function Rename({ file, onChanged }: { file: Attachment; onChanged: () => Promis
       </Field>
       <button type="submit">{t('common.save')}</button>
     </form>
+  );
+}
+
+function FileLabels({
+  file,
+  canChange,
+  onChanged,
+}: {
+  file: FileRow;
+  canChange: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const { t } = useTranslation();
+  const [text, setText] = useState('');
+  const address = `/attachments/${file.id}/labels`;
+  const add = useMutation({
+    mutationFn: () => api.post(address, { label: text }),
+    onSuccess: async () => {
+      setText('');
+      await onChanged();
+    },
+  });
+  const remove = useMutation({
+    mutationFn: (label: string) => api.del(`${address}/${encodeURIComponent(label)}`),
+    onSuccess: onChanged,
+  });
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    add.mutate();
+  };
+  return (
+    <section aria-label={t('files.labels')}>
+      <h3>{t('files.labels')}</h3>
+      <ErrorNote error={add.error ?? remove.error} />
+      {file.labels.length === 0 && !canChange && <p className="muted">{t('files.noLabels')}</p>}
+      <ul className="plain-list row">
+        {file.labels.map((label) => (
+          <li key={label} className="row">
+            <span className="lozenge">{label}</span>
+            {canChange && (
+              <button
+                type="button"
+                className="icon"
+                aria-label={t('files.removeLabel', { label })}
+                onClick={() => remove.mutate(label)}
+              >
+                <IconClose size={REMOVE_ICON_SIZE} />
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {canChange && (
+        <form className="row" onSubmit={submit}>
+          <Field label={t('files.addLabel')}>
+            <input value={text} onChange={(e) => setText(e.target.value)} />
+          </Field>
+          <button type="submit" disabled={!text.trim()}>
+            {t('files.add')}
+          </button>
+        </form>
+      )}
+    </section>
   );
 }
 
@@ -189,25 +276,6 @@ function OpenAsPDF({ file }: { file: Attachment }) {
   return <a href={`/api/v1/attachments/${file.id}/preview.pdf`}>{t('files.openAsPdf')}</a>;
 }
 
-const TEXT_FILE = /^text\/|json|xml|yaml/;
-
-function TextPreview({ file }: { file: Attachment }) {
-  const { t } = useTranslation();
-  const q = useQuery({
-    queryKey: ['file-text', file.id, file.version],
-    queryFn: () => api.get<{ text: string; cut: boolean }>(`/attachments/${file.id}/text`),
-  });
-  return (
-    <section aria-label={t('files.preview')}>
-      <h3>{t('files.preview')}</h3>
-      {q.isPending && <Loading />}
-      <ErrorNote error={q.error} />
-      {q.data && <pre className="file-text">{q.data.text}</pre>}
-      {q.data?.cut && <p className="muted">{t('files.cut')}</p>}
-    </section>
-  );
-}
-
 export function FileDetailsDialog({
   file,
   canChange,
@@ -216,7 +284,7 @@ export function FileDetailsDialog({
   onChanged,
   onClose,
 }: {
-  file: Attachment;
+  file: FileRow;
   canChange: boolean;
   canRemove: boolean;
   canMove: boolean;
@@ -228,8 +296,9 @@ export function FileDetailsDialog({
       <OpenAsPDF file={file} />
       <OpenInCraft file={file} address={`/api/v1/attachments/${file.id}/content`} />
       {canChange && <Rename file={file} onChanged={onChanged} />}
+      <FileLabels file={file} canChange={canChange} onChanged={onChanged} />
       <Versions file={file} canChange={canChange} canRemove={canRemove} onChanged={onChanged} />
-      {TEXT_FILE.test(file.content_type) && <TextPreview file={file} />}
+      {isTextFile(file.content_type) && <TextPreview file={file} />}
       <MoveOrCopy file={file} canMove={canMove} onChanged={onChanged} />
     </Dialog>
   );

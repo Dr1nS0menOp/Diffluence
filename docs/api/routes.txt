@@ -12,6 +12,7 @@ DELETE /api/v1/admin/permission-sets/{id}                      session-only perm
 DELETE /api/v1/admin/scim-tokens/{id}                          session-only permission:administrator
 DELETE /api/v1/approvals/{id}/people/{user}                    authenticated
 DELETE /api/v1/attachments/{id}                                object:attachment.delete
+DELETE /api/v1/attachments/{id}/labels/{label}                 object:attachment.add
 DELETE /api/v1/attachments/{id}/versions/{number}              object:attachment.delete_any
 DELETE /api/v1/comments/{id}                                   object:comment.delete
 DELETE /api/v1/comments/{id}/reactions/{emoji}                 object:page.view
@@ -92,6 +93,7 @@ GET /api/v1/attachments/{id}/content                           object:page.view
 GET /api/v1/attachments/{id}/preview.pdf                       object:page.view
 GET /api/v1/attachments/{id}/text                              object:page.view
 GET /api/v1/attachments/{id}/versions                          object:page.view
+GET /api/v1/attachments/{id}/versions/{number}/content         object:page.view
 GET /api/v1/auth/invitation                                    public
 GET /api/v1/auth/oidc/callback                                 public
 GET /api/v1/auth/oidc/start                                    public
@@ -143,6 +145,7 @@ GET /api/v1/pages/{id}/editors                                 object:page.edit
 GET /api/v1/pages/{id}/explain                                 object:space.administer
 GET /api/v1/pages/{id}/export.md                               object:space.export
 GET /api/v1/pages/{id}/export.zip                              object:space.export
+GET /api/v1/pages/{id}/file-events                             object:page.view
 GET /api/v1/pages/{id}/impact                                  object:page.delete
 GET /api/v1/pages/{id}/insights                                object:analytics.view
 GET /api/v1/pages/{id}/labels                                  object:page.view
@@ -193,6 +196,7 @@ GET /api/v1/spaces/{id}/categories                             object:space.view
 GET /api/v1/spaces/{id}/content                                object:space.administer
 GET /api/v1/spaces/{id}/export.zip                             object:space.export
 GET /api/v1/spaces/{id}/files                                  object:space.view
+GET /api/v1/spaces/{id}/files/filters                          object:space.view
 GET /api/v1/spaces/{id}/files/usage                            object:space.administer
 GET /api/v1/spaces/{id}/grants                                 object:space.manage_access
 GET /api/v1/spaces/{id}/icon                                   object:space.view
@@ -286,7 +290,9 @@ POST /api/v1/admin/webhooks                                    permission:admini
 POST /api/v1/approvals/{id}/close                              authenticated
 POST /api/v1/attachments/lookup                                authenticated
 POST /api/v1/attachments/{id}/copy                             object:page.view
+POST /api/v1/attachments/{id}/labels                           object:attachment.add
 POST /api/v1/attachments/{id}/move                             object:attachment.delete
+POST /api/v1/attachments/{id}/versions                         object:attachment.add
 POST /api/v1/attachments/{id}/versions/{number}/current        object:attachment.add
 POST /api/v1/auth/forgot                                       public
 POST /api/v1/auth/invitation                                   public
@@ -333,6 +339,7 @@ POST /api/v1/pages/{id}/access-requests                        authenticated
 POST /api/v1/pages/{id}/approvals                              object:page.edit
 POST /api/v1/pages/{id}/archive                                object:page.archive
 POST /api/v1/pages/{id}/attachments                            object:attachment.add
+POST /api/v1/pages/{id}/attachments/clear-up                   object:page.view
 POST /api/v1/pages/{id}/comments                               object:comment.add
 POST /api/v1/pages/{id}/copy                                   object:page.create
 POST /api/v1/pages/{id}/import-word                            object:page.edit
@@ -361,6 +368,7 @@ POST /api/v1/spaces/{id}/archive                               object:space.admi
 POST /api/v1/spaces/{id}/bundles                               object:space.administer
 POST /api/v1/spaces/{id}/content/preview                       object:space.administer
 POST /api/v1/spaces/{id}/content/run                           object:space.administer
+POST /api/v1/spaces/{id}/files/delete                          object:space.administer
 POST /api/v1/spaces/{id}/grants/preview                        object:space.manage_access
 POST /api/v1/spaces/{id}/guests                                object:space.manage_access
 POST /api/v1/spaces/{id}/icon                                  object:space.administer
@@ -398,6 +406,7 @@ PUT /api/v1/admin/outgoing-hosts                               session-only perm
 PUT /api/v1/admin/permission-sets                              session-only permission:administrator
 PUT /api/v1/admin/settings                                     session-only permission:administrator
 PUT /api/v1/admin/settings/{section}                           session-only permission:administrator
+PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator
 PUT /api/v1/approvals/{id}/answer                              authenticated

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import type { EditorView } from '@tiptap/pm/view';
-import { api, type Json } from '../../api';
+import { api, isCancelled, type Json, type UploadWatch } from '../../api';
 import { readRecentItems, rememberItem, usePerson } from '../../personal';
 import { usePreferences } from '../../preferences';
 import { navigate } from '../../router';
@@ -19,7 +19,10 @@ import {
   attachmentNode,
   NameTakenDialog,
   PageFilesDialog,
+  markDropTile,
+  tileUnder,
   uploadAsking,
+  uploadNewVersion,
   type FileAddress,
   type NameChoice,
 } from './attachments';
@@ -238,6 +241,9 @@ export function DocumentView({
   );
 }
 
+/** Below this, an upload is gone before anyone could read a number (spec 024, D21). */
+const SHOWN_PROGRESS_BYTES = 1 << 20;
+
 const carriesFiles = (transfer: DataTransfer | null) => transfer?.types.includes('Files') ?? false;
 
 /** The editing surface. Markdown shortcuts (#, **, -, ```) come from the input rules. */
@@ -285,7 +291,9 @@ export function DocumentEditor({
   const person = usePerson();
   const typingHelp = useRef(true);
   typingHelp.current = usePreferences().preferences.typing_help;
-  const [uploading, setUploading] = useState('');
+  const client = useQueryClient();
+  const [uploading, setUploading] = useState<{ name: string; percent: number | null } | null>(null);
+  const stopUpload = useRef<AbortController | null>(null);
   const [uploadError, setUploadError] = useState<unknown>(null);
   const [drawing, setDrawing] = useState<DrawingFile | 'new' | null>(null);
   const [pickingFile, setPickingFile] = useState(false);
@@ -308,6 +316,35 @@ export function DocumentEditor({
   const change = useRef(onChange);
   change.current = onChange;
 
+  const watchUpload = (file: File): UploadWatch => {
+    const stop = new AbortController();
+    stopUpload.current = stop;
+    const isLarge = file.size >= SHOWN_PROGRESS_BYTES;
+    setUploading({ name: file.name, percent: isLarge ? 0 : null });
+    return {
+      signal: stop.signal,
+      onProgress: (share) => {
+        if (isLarge) setUploading({ name: file.name, percent: Math.round(share * 100) });
+      },
+    };
+  };
+
+  const addVersion = async (id: string, file: File) => {
+    setUploadError(null);
+    if (!canAttach) {
+      setUploadError(new Error(t('editor.cannotAttach')));
+      return;
+    }
+    try {
+      const attachment = await uploadNewVersion(id, file, watchUpload(file));
+      await client.invalidateQueries({ queryKey: ['file-facts', id] });
+      toast({ message: t('files.versionAdded', { name: attachment.filename, number: attachment.version }) });
+    } catch (error) {
+      if (!isCancelled(error)) setUploadError(error);
+    }
+    setUploading(null);
+  };
+
   const addFiles = async (files: File[]) => {
     setUploadError(null);
     if (!canAttach) {
@@ -316,9 +353,8 @@ export function DocumentEditor({
     }
     // One at a time, so files land in the order they were dropped.
     for (const file of files) {
-      setUploading(file.name);
       try {
-        const attachment = await uploadAsking(pageId, file, askAboutName);
+        const attachment = await uploadAsking(pageId, file, askAboutName, watchUpload(file));
         // After the selection, never over it: the previous file is still selected.
         if (attachment) {
           editor
@@ -328,10 +364,10 @@ export function DocumentEditor({
             .run();
         }
       } catch (error) {
-        setUploadError(error);
+        if (!isCancelled(error)) setUploadError(error);
       }
     }
-    setUploading('');
+    setUploading(null);
   };
   const add = useRef(addFiles);
   add.current = addFiles;
@@ -449,6 +485,13 @@ export function DocumentEditor({
     if (!carriesFiles(e.dataTransfer)) return;
     e.preventDefault();
     setDropping(false);
+    markDropTile(e.currentTarget, null);
+    const tile = tileUnder(e.target);
+    const [only, ...others] = Array.from(e.dataTransfer.files);
+    if (tile && only && others.length === 0) {
+      void addVersion(tile, only);
+      return;
+    }
     const target = editor.view.posAtCoords({ left: e.clientX, top: e.clientY });
     if (target) editor.commands.setTextSelection(target.pos);
     else if (!editor.isFocused) editor.commands.focus('end');
@@ -469,10 +512,12 @@ export function DocumentEditor({
         if (!carriesFiles(e.dataTransfer)) return;
         e.preventDefault();
         setDropping(true);
+        markDropTile(e.currentTarget, e.target);
       }}
       onDragLeave={(e) => {
         if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) {
           setDropping(false);
+          markDropTile(e.currentTarget, null);
         }
       }}
       onDrop={dropFiles}
@@ -503,8 +548,17 @@ export function DocumentEditor({
         <BlockHandle editor={editor} tracker={tracker} actions={actions.current} />
         <TableFrame editor={editor} tracker={tables} />
         {uploading && (
-          <p role="status" className="note">
-            {t('editor.uploading', { name: uploading })}
+          <p role="status" className="note row">
+            <span>
+              {uploading.percent === null
+                ? t('editor.uploading', { name: uploading.name })
+                : t('editor.uploadingShare', { name: uploading.name, percent: uploading.percent })}
+            </span>
+            {uploading.percent !== null && (
+              <button type="button" className="ghost" onClick={() => stopUpload.current?.abort()}>
+                {t('common.cancel')}
+              </button>
+            )}
           </p>
         )}
         <ErrorNote error={uploadError} />

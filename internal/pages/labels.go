@@ -4,9 +4,6 @@ package pages
 
 import (
 	"context"
-	"strings"
-	"unicode"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -15,31 +12,15 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
 const (
-	maxLabelRunes    = 64
 	maxLabelsPerPage = 50
 	maxListedLabels  = 200
 	maxLabelPages    = 200
 )
-
-// CleanLabel writes a label the one allowed way: small letters, dashes for
-// spaces, and letters of any language, digits, dashes and underscores.
-func CleanLabel(raw string) (string, error) {
-	label := strings.Join(strings.Fields(strings.ToLower(raw)), "-")
-	bad := apperr.Invalid("A label has letters, digits, dashes and underscores, and at most 64 characters.")
-	if label == "" || utf8.RuneCountInString(label) > maxLabelRunes {
-		return "", bad
-	}
-	for _, r := range label {
-		if !unicode.IsLetter(r) && !unicode.IsDigit(r) && r != '-' && r != '_' {
-			return "", bad
-		}
-	}
-	return label, nil
-}
 
 func labelsOf(ctx context.Context, q db.Querier, pageID uuid.UUID) ([]string, error) {
 	rows, err := q.Query(ctx, "SELECT label FROM page_labels WHERE page_id = $1 ORDER BY label", pageID)
@@ -51,14 +32,6 @@ func labelsOf(ctx context.Context, q db.Querier, pageID uuid.UUID) ([]string, er
 		out = []string{}
 	}
 	return out, err
-}
-
-func fixedLabelRefused(ctx context.Context, q db.Querier, spaceID uuid.UUID, label string) (bool, error) {
-	var refused bool
-	err := q.QueryRow(ctx, `SELECT s.fixed_labels AND NOT EXISTS
-			(SELECT 1 FROM space_fixed_labels f WHERE f.space_id = s.id AND f.label = $2)
-		FROM spaces s WHERE s.id = $1`, spaceID, label).Scan(&refused)
-	return refused, err
 }
 
 // addLabel puts a label on a page inside tx. The caller has checked the rights.
@@ -79,7 +52,7 @@ func addLabel(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, label s
 
 // AddLabel adds a label. It makes no version.
 func (s *Service) AddLabel(ctx context.Context, c identity.Caller, id uuid.UUID, raw string) ([]string, error) {
-	label, err := CleanLabel(raw)
+	label, err := labels.Clean(raw)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +65,7 @@ func (s *Service) AddLabel(ctx context.Context, c identity.Caller, id uuid.UUID,
 		if err != nil {
 			return err
 		}
-		refused, err := fixedLabelRefused(ctx, tx, p.SpaceID, label)
+		refused, err := labels.Refused(ctx, tx, p.SpaceID, label)
 		if err != nil {
 			return err
 		}
@@ -220,10 +193,10 @@ func (s *Service) SpaceLabelList(ctx context.Context, c identity.Caller, spaceID
 
 // SetFixedLabels turns the fixed list of a space on or off. Labels already on
 // pages stay.
-func (s *Service) SetFixedLabels(ctx context.Context, c identity.Caller, spaceID uuid.UUID, fixed bool, labels []string) error {
-	clean := make([]string, 0, len(labels))
-	for _, raw := range labels {
-		label, err := CleanLabel(raw)
+func (s *Service) SetFixedLabels(ctx context.Context, c identity.Caller, spaceID uuid.UUID, fixed bool, chosen []string) error {
+	clean := make([]string, 0, len(chosen))
+	for _, raw := range chosen {
+		label, err := labels.Clean(raw)
 		if err != nil {
 			return err
 		}
@@ -250,7 +223,7 @@ func (s *Service) SetFixedLabels(ctx context.Context, c identity.Caller, spaceID
 
 // RenameLabel renames a label in a space. Renaming onto an existing label merges them.
 func (s *Service) RenameLabel(ctx context.Context, c identity.Caller, spaceID uuid.UUID, from, to string) error {
-	target, err := CleanLabel(to)
+	target, err := labels.Clean(to)
 	if err != nil {
 		return err
 	}

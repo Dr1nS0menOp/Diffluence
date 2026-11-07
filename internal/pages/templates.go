@@ -13,6 +13,7 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -120,7 +121,7 @@ func (s *Service) StartFromTemplate(ctx context.Context, c identity.Caller, in T
 			return err
 		}
 		for _, label := range in.Labels {
-			refused, err := fixedLabelRefused(ctx, tx, in.SpaceID, label)
+			refused, err := labels.Refused(ctx, tx, in.SpaceID, label)
 			if err != nil {
 				return err
 			}

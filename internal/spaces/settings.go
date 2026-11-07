@@ -33,6 +33,9 @@ func (s *Service) requireAdmin(ctx context.Context, tx pgx.Tx, c identity.Caller
 	return load(ctx, tx, id)
 }
 
+// maxStorageLimitMiB is a petabyte, far above any real space, and it fits a column.
+const maxStorageLimitMiB = 1 << 30
+
 // systemSpaceKey is the space that holds templates of all spaces. It has no grants,
 // so nobody can open it, and it is left out of every list.
 const systemSpaceKey = "__templates"
@@ -203,6 +206,24 @@ func (s *Service) SetTitleAlign(ctx context.Context, c identity.Caller, id uuid.
 			return err
 		}
 		return record(ctx, tx, c, "space.title_align_changed", sp, map[string]any{"align": align})
+	})
+}
+
+// SetStorageLimit sets how much a space may store, in MiB, and zero means no limit. The
+// route requires administrator: a limit its space could raise would be none (FIL-020).
+func (s *Service) SetStorageLimit(ctx context.Context, c identity.Caller, id uuid.UUID, mib int) error {
+	if mib < 0 || mib > maxStorageLimitMiB {
+		return apperr.Invalid("A limit is a number of MiB, and 0 means no limit.")
+	}
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		sp, err := load(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "UPDATE spaces SET storage_limit_mib = $2 WHERE id = $1", id, mib); err != nil {
+			return err
+		}
+		return record(ctx, tx, c, "space.storage_limit_set", sp, map[string]any{"limit_mib": mib})
 	})
 }
 

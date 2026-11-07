@@ -59,7 +59,22 @@ func (s *Service) Move(ctx context.Context, c identity.Caller, id, target uuid.U
 		if err != nil {
 			return err
 		}
+		if spaceID != a.SpaceID {
+			var size int64
+			if err := tx.QueryRow(ctx, "SELECT COALESCE(sum(size), 0)::bigint FROM attachment_versions WHERE attachment_id = $1", id).Scan(&size); err != nil {
+				return err
+			}
+			if err := requireRoom(ctx, tx, spaceID, size); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.Exec(ctx, "UPDATE attachments SET page_id = $2, space_id = $3, updated_at = now() WHERE id = $1", id, target, spaceID); err != nil {
+			return err
+		}
+		if err := addEvent(ctx, tx, c, a.PageID, id, a.Filename, eventMovedAway); err != nil {
+			return err
+		}
+		if err := addEvent(ctx, tx, c, target, id, a.Filename, eventMovedHere); err != nil {
 			return err
 		}
 		if err := s.reindexNames(ctx, tx, a.PageID); err != nil {

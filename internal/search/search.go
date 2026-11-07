@@ -186,7 +186,9 @@ const searchFilters = `
 	  AND ($6::timestamptz IS NULL OR p.updated_at < $6)
 	  AND ($7::boolean OR (s.status = 'active' AND p.archived_at IS NULL))
 	  AND ($8::text[] IS NULL OR p.kind = ANY($8))
-	  AND ($9::text[] IS NULL OR EXISTS (SELECT 1 FROM page_labels l WHERE l.page_id = p.id AND l.label = ANY($9)))
+	  AND ($9::text[] IS NULL OR EXISTS (SELECT 1 FROM page_labels l WHERE l.page_id = p.id AND l.label = ANY($9))
+	       OR EXISTS (SELECT 1 FROM attachments fa JOIN attachment_labels fl ON fl.attachment_id = fa.id
+	                  WHERE fa.page_id = p.id AND fa.status = 'active' AND fl.label = ANY($9)))
 	  AND ($10::uuid[] IS NULL OR p.created_by = ANY($10)
 	       OR EXISTS (SELECT 1 FROM page_versions w WHERE w.page_id = p.id AND w.author_id = ANY($10)))
 	  AND ($11 = '' OR p.stage_text = $11)

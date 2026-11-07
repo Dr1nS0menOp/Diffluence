@@ -6,8 +6,9 @@ import { Node as DocumentNode } from '@tiptap/core';
 import Image, { type ImageOptions } from '@tiptap/extension-image';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { useTranslation } from 'react-i18next';
-import { api, ApiError, type Attachment } from '../../api';
+import { api, ApiError, type Attachment, type UploadWatch } from '../../api';
 import { OpenInCraft } from '../craft-frame';
+import { FilePreviewDialog, type PreviewFile } from '../file-preview';
 import { IconDownload, IconPage, IconPicture } from '../icons';
 import { Dialog, ErrorNote, formatSize, Loading } from '../ui';
 
@@ -28,9 +29,7 @@ interface ImageAttrs {
   align: string | null;
 }
 
-interface FileFacts {
-  id: string;
-  filename: string;
+interface FileFacts extends PreviewFile {
   size: number;
 }
 
@@ -128,11 +127,46 @@ export function fileKind(filename: string): string {
   return dot > 0 ? filename.slice(dot + 1).toUpperCase() : '';
 }
 
+/** The files a document shows, in order, for stepping through them in a preview. */
+function shownFileIds(doc: ReactNodeViewProps['editor']['state']['doc']): string[] {
+  const found = new Set<string>();
+  doc.descendants((node) => {
+    const { attachment_id: id } = node.attrs as { attachment_id?: string };
+    if (id && (node.type.name === 'file' || node.type.name === 'image')) found.add(id);
+    return true;
+  });
+  return [...found];
+}
+
+function PreviewOfDocument({
+  startId,
+  ids,
+  onClose,
+}: {
+  startId: string;
+  ids: string[];
+  onClose: () => void;
+}) {
+  const q = useQuery({
+    queryKey: ['file-facts-of', ids],
+    queryFn: () => api.post<{ files: FileFacts[] }>('/attachments/lookup', { ids }),
+  });
+  if (!q.data) return null;
+  // The server leaves out what is hidden or gone, in any order.
+  const files = ids.flatMap((id) => q.data.files.filter((file) => file.id === id));
+  return <FilePreviewDialog files={files} startId={startId} onClose={onClose} />;
+}
+
 /** A file in the document: a tile to download. While editing it is a block to move or remove. */
 function FileTile({ node, editor, extension }: ReactNodeViewProps) {
   const { t } = useTranslation();
-  const { attachment_id: id, filename } = node.attrs as { attachment_id: string; filename: string };
+  const {
+    attachment_id: id,
+    filename,
+    display,
+  } = node.attrs as { attachment_id: string; filename: string; display: string | null };
   const { fileAddress } = extension.options as { fileAddress: FileAddress };
+  const [previewing, setPreviewing] = useState<string[] | null>(null);
   // A template or a public page serves its own files, and has nothing to ask.
   const facts = useFileFacts(id, fileAddress === pageFileAddress);
   const isGone = facts.data === null;
@@ -149,7 +183,7 @@ function FileTile({ node, editor, extension }: ReactNodeViewProps) {
     </>
   );
   return (
-    <NodeViewWrapper className="file-block">
+    <NodeViewWrapper className="file-block" data-file-tile={id} data-display={display ?? undefined}>
       {editor.isEditable || isGone ? (
         <span className="file-tile">{label}</span>
       ) : (
@@ -159,6 +193,18 @@ function FileTile({ node, editor, extension }: ReactNodeViewProps) {
             <IconDownload size={DOWNLOAD_ICON_SIZE} />
           </a>
           <OpenInCraft file={{ filename }} address={fileAddress(id)} />
+          {facts.data && (
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => setPreviewing(shownFileIds(editor.state.doc))}
+            >
+              {t('files.preview')}
+            </button>
+          )}
+          {previewing && (
+            <PreviewOfDocument startId={id} ids={previewing} onClose={() => setPreviewing(null)} />
+          )}
         </>
       )}
     </NodeViewWrapper>
@@ -185,6 +231,7 @@ export const AttachmentFile = DocumentNode.create<{ fileAddress: FileAddress }>(
         parseHTML: (el: HTMLElement) => el.getAttribute('data-filename'),
         renderHTML: (attrs: Record<string, string>) => ({ 'data-filename': attrs.filename }),
       },
+      display: dataAttribute('display'),
     };
   },
   parseHTML() {
@@ -263,11 +310,13 @@ export async function uploadAsking(
   pageId: string,
   file: File,
   ask: (filename: string) => Promise<NameChoice>,
+  watch?: UploadWatch,
 ): Promise<Attachment | null> {
   const send = (filename: string, query: string) =>
     api.upload<Attachment>(
       `/pages/${pageId}/attachments?filename=${encodeURIComponent(filename)}${query}`,
       file,
+      watch,
     );
   const asking = '&on_conflict=ask';
   try {
@@ -286,6 +335,28 @@ export async function uploadAsking(
     }
   }
   return send(copyName(file.name, MAX_COPIES), asking);
+}
+
+/** A file dropped on a tile becomes its next version, under the name of the tile (FIL-013). */
+export const uploadNewVersion = (id: string, file: File, watch: UploadWatch) =>
+  api.upload<Attachment>(
+    `/attachments/${id}/versions?filename=${encodeURIComponent(file.name)}`,
+    file,
+    watch,
+  );
+
+/** The id of the tile under a drag, if there is one. */
+export function tileUnder(target: EventTarget | null): string | null {
+  if (!(target instanceof Element)) return null;
+  return target.closest<HTMLElement>('[data-file-tile]')?.dataset.fileTile ?? null;
+}
+
+/** Marks the tile a drop would land on. It is only a look, so it stays out of React. */
+export function markDropTile(area: HTMLElement, target: EventTarget | null) {
+  const id = tileUnder(target);
+  area.querySelectorAll<HTMLElement>('[data-file-tile]').forEach((tile) => {
+    tile.classList.toggle('drop-target', tile.dataset.fileTile === id);
+  });
 }
 
 export function NameTakenDialog({

@@ -18,7 +18,11 @@ const COMPARE: Record<FileOrder, (a: Attachment, b: Attachment) => number> = {
 };
 
 /** What fits the filter, in the chosen order. The newest and the largest come first. */
-export function arrangedFiles(files: Attachment[], order: FileOrder, filter: string): Attachment[] {
+export function arrangedFiles<File extends Attachment>(
+  files: File[],
+  order: FileOrder,
+  filter: string,
+): File[] {
   const needle = filter.trim().toLowerCase();
   return files
     .filter((file) => file.filename.toLowerCase().includes(needle))

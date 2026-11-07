@@ -444,6 +444,10 @@ func TestOneChangedByteStopsABundle(t *testing.T) {
 		if run["state"] != "failed" {
 			t.Fatalf("%s: %+v", name, run)
 		}
+		// The byte can also break the JSON, and then it would fail without the hash ever counting.
+		if name == "pages.json" && !strings.Contains(mustJSON(t, run["report"]), "does not match its manifest") {
+			t.Fatalf("%s failed for another reason: %+v", name, run)
+		}
 	}
 }
 

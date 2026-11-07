@@ -1656,6 +1656,33 @@
         "x-access": "sensitive permission:administrator"
       }
     },
+    "/api/v1/admin/spaces/{id}/storage-limit": {
+      "put": {
+        "operationId": "put /api/v1/admin/spaces/{id}/storage-limit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/storage/unused": {
       "get": {
         "operationId": "get /api/v1/admin/storage/unused",
@@ -2462,6 +2489,68 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/attachments/{id}/labels": {
+      "post": {
+        "operationId": "post /api/v1/attachments/{id}/labels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:attachment.add"
+      }
+    },
+    "/api/v1/attachments/{id}/labels/{label}": {
+      "delete": {
+        "operationId": "delete /api/v1/attachments/{id}/labels/{label}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "label",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:attachment.add"
+      }
+    },
     "/api/v1/attachments/{id}/move": {
       "post": {
         "operationId": "post /api/v1/attachments/{id}/move",
@@ -2568,6 +2657,31 @@
           "attachments"
         ],
         "x-access": "object:page.view"
+      },
+      "post": {
+        "operationId": "post /api/v1/attachments/{id}/versions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:attachment.add"
       }
     },
     "/api/v1/attachments/{id}/versions/{number}": {
@@ -2603,6 +2717,41 @@
           "attachments"
         ],
         "x-access": "object:attachment.delete_any"
+      }
+    },
+    "/api/v1/attachments/{id}/versions/{number}/content": {
+      "get": {
+        "operationId": "get /api/v1/attachments/{id}/versions/{number}/content",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "attachments"
+        ],
+        "x-access": "object:page.view"
       }
     },
     "/api/v1/attachments/{id}/versions/{number}/current": {
@@ -4914,6 +5063,33 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/attachments/clear-up": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/attachments/clear-up",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
     "/api/v1/pages/{id}/collab": {
       "get": {
         "operationId": "get /api/v1/pages/{id}/collab",
@@ -5368,6 +5544,33 @@
       },
       "put": {
         "operationId": "put /api/v1/pages/{id}/favourite",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
+    "/api/v1/pages/{id}/file-events": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/file-events",
         "parameters": [
           {
             "in": "path",
@@ -8202,6 +8405,60 @@
     "/api/v1/spaces/{id}/files": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/files",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      }
+    },
+    "/api/v1/spaces/{id}/files/delete": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/files/delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/files/filters": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/files/filters",
         "parameters": [
           {
             "in": "path",

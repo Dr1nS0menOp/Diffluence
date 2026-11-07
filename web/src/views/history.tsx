@@ -109,6 +109,38 @@ function VersionDialog({ pageId, number, onClose }: { pageId: string; number: nu
   );
 }
 
+interface FileEvent {
+  filename: string;
+  action: 'added' | 'version' | 'removed' | 'restored' | 'moved_here' | 'moved_away';
+  actor: string;
+  at: string;
+}
+
+/** Files change without a new version of the page, so they get their own list (FIL-050). */
+function FileHistory({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const q = useQuery({
+    queryKey: ['file-events', pageId],
+    queryFn: () => api.get<{ events: FileEvent[] }>(`/pages/${pageId}/file-events`),
+  });
+  if (q.data?.events.length === 0) return null;
+  return (
+    <section aria-label={t('history.files')}>
+      <h2>{t('history.files')}</h2>
+      <ErrorNote error={q.error} />
+      <ul className="plain-list">
+        {q.data?.events.map((event, index) => (
+          <li key={`${event.at}-${index}`}>
+            {t(`history.file_${event.action}`, { name: event.filename, person: event.actor })}{' '}
+            <span className="muted">{dates.moment(event.at)}</span>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function HistoryView({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
   const dates = useDates();
@@ -208,6 +240,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
           </Link>
         </div>
       )}
+      <FileHistory pageId={pageId} />
       {removing !== null && (
         <RemoveVersionDialog pageId={pageId} number={removing} onClose={() => setRemoving(null)} />
       )}

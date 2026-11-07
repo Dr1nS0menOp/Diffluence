@@ -428,6 +428,21 @@ func AttachmentIDs(n Node) []uuid.UUID {
 	return out
 }
 
+// FilesShown lists every attachment a document points at, once each, whatever kind of
+// block shows it.
+func FilesShown(n Node) []uuid.UUID {
+	seen := map[uuid.UUID]bool{}
+	var out []uuid.UUID
+	Walk(n, func(c Node) {
+		s, _ := c.Attrs["attachment_id"].(string)
+		if id, err := uuid.Parse(s); err == nil && !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	})
+	return out
+}
+
 // RemapAttachments points images and files at new attachments, after copying a page.
 func RemapAttachments(n *Node, mapping map[uuid.UUID]uuid.UUID) {
 	if pointsToAttachment(*n) {

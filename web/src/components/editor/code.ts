@@ -10,6 +10,7 @@ import i18n from '../../i18n';
 
 const COPY_MESSAGE_MS = 2000;
 const TAB_AS_SPACES = '  ';
+const MAX_COLOURED_CHARACTERS = 200_000;
 
 const lowlight = createLowlight(common);
 const COMMON_LANGUAGES = lowlight.listLanguages();
@@ -34,6 +35,21 @@ export function loadAllLanguages(): Promise<void> {
     },
   );
   return allLanguages;
+}
+
+/** What highlighting makes of a text: a tree, which is data and never markup. */
+export type HighlightedText = ReturnType<typeof lowlight.highlight>;
+
+/**
+ * Colours a text file by its extension, which highlight.js knows as a language name.
+ * Null means plain: an unknown type, or too long to colour in the browser (spec 024, D20).
+ */
+export async function highlightFile(filename: string, text: string): Promise<HighlightedText | null> {
+  const dot = filename.lastIndexOf('.');
+  if (dot <= 0 || text.length > MAX_COLOURED_CHARACTERS) return null;
+  await loadAllLanguages();
+  const extension = filename.slice(dot + 1).toLowerCase();
+  return lowlight.registered(extension) ? lowlight.highlight(extension, text) : null;
 }
 
 export const languageNames = (): string[] => lowlight.listLanguages();

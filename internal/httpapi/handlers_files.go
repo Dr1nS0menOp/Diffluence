@@ -17,6 +17,10 @@ func (s *Server) registerFileRoutes() {
 	r := s.router
 	files := "/api/v1/attachments"
 	r.HandleFunc("GET "+files+"/{id}/versions", Object("page.view"), s.handleFileVersions)
+	r.HandleFunc("POST "+files+"/{id}/versions", Object("attachment.add"), s.handleFileNewVersion)
+	r.HandleFunc("GET "+files+"/{id}/versions/{number}/content", Object("page.view"), s.handleFileVersionContent)
+	r.HandleFunc("POST "+files+"/{id}/labels", Object("attachment.add"), s.handleFileLabelAdd)
+	r.HandleFunc("DELETE "+files+"/{id}/labels/{label}", Object("attachment.add"), s.handleFileLabelRemove)
 	r.HandleFunc("POST "+files+"/{id}/versions/{number}/current", Object("attachment.add"), s.handleFileMakeCurrent)
 	r.HandleFunc("DELETE "+files+"/{id}/versions/{number}", Object("attachment.delete_any"), s.handleFileVersionDelete)
 	r.HandleFunc("PATCH "+files+"/{id}", Object("attachment.add"), s.handleFileUpdate)
@@ -28,8 +32,159 @@ func (s *Server) registerFileRoutes() {
 	// A list: hidden and unknown ids answer the same, and the module decides.
 	r.HandleFunc("POST "+files+"/lookup", Authenticated(), s.handleFileLookup)
 	r.HandleFunc("GET /api/v1/pages/{id}/attachments.zip", Object("page.view"), s.handleFilesZip)
+	r.HandleFunc("GET /api/v1/pages/{id}/file-events", Object("page.view"), s.handleFileEvents)
+	// The module decides per file, and skips what the person may not delete.
+	r.HandleFunc("POST /api/v1/pages/{id}/attachments/clear-up", Object("page.view"), s.handleFilesClearUp)
 	r.HandleFunc("GET /api/v1/spaces/{id}/files", Object("space.view"), s.handleSpaceFiles)
+	r.HandleFunc("GET /api/v1/spaces/{id}/files/filters", Object("space.view"), s.handleSpaceFileChoices)
 	r.HandleFunc("GET /api/v1/spaces/{id}/files/usage", Object("space.administer"), s.handleSpaceFileUsage)
+	r.HandleFunc("POST /api/v1/spaces/{id}/files/delete", Object("space.administer"), s.handleSpaceFilesDelete)
+	r.HandleFunc("PUT /api/v1/admin/spaces/{id}/storage-limit", SessionOnly(Permission(identity.PermAdministrator)), s.handleSpaceStorageLimit)
+}
+
+func (s *Server) handleFileNewVersion(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(uploadDeadline))
+	a, err := s.deps.Attachments.AddVersion(r.Context(), s.caller(r), id, r.URL.Query().Get("filename"), r.Body)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, a)
+}
+
+// handleFileVersionContent serves one version, always as a download: only the current
+// version is ever shown inside a page.
+func (s *Server) handleFileVersionContent(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	n, ok := versionNumber(w, r)
+	if !ok {
+		return
+	}
+	a, f, err := s.deps.Attachments.OpenVersion(r.Context(), s.caller(r), id, n)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	defer func() { _ = f.Close() }()
+	serveFile(w, r, a, f, true)
+}
+
+func (s *Server) handleFileLabelAdd(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Label string `json:"label"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	list, err := s.deps.Attachments.AddLabel(r.Context(), s.caller(r), id, in.Label)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"labels": list})
+}
+
+func (s *Server) handleFileLabelRemove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	list, err := s.deps.Attachments.RemoveLabel(r.Context(), s.caller(r), id, r.PathValue("label"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"labels": list})
+}
+
+func (s *Server) handleFileEvents(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	list, err := s.deps.Attachments.Events(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"events": list})
+}
+
+func (s *Server) handleFilesClearUp(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	out, err := s.deps.Attachments.ClearUp(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSpaceFileChoices(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	out, err := s.deps.Attachments.FileChoices(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSpaceFilesDelete(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		IDs []uuid.UUID `json:"ids"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	out, err := s.deps.Attachments.TrashFiles(r.Context(), s.caller(r), id, in.IDs)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSpaceStorageLimit(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		LimitMiB int `json:"limit_mib"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	if err := s.deps.Spaces.SetStorageLimit(r.Context(), s.caller(r), id, in.LimitMiB); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleFileVersions(w http.ResponseWriter, r *http.Request) {
@@ -206,7 +361,14 @@ func (s *Server) handleSpaceFiles(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	list, err := s.deps.Attachments.SpaceFiles(r.Context(), s.caller(r), id, r.URL.Query().Get("q"), queryInt(r, "offset"))
+	q := r.URL.Query()
+	uploader, err := optionalID(q.Get("uploader"))
+	if err != nil {
+		badBody(w)
+		return
+	}
+	filter := attachments.FileFilter{Name: q.Get("q"), Kind: q.Get("kind"), Label: q.Get("label"), Uploader: uploader, Offset: queryInt(r, "offset")}
+	list, err := s.deps.Attachments.SpaceFiles(r.Context(), s.caller(r), id, filter)
 	if err != nil {
 		s.fail(w, r, err)
 		return

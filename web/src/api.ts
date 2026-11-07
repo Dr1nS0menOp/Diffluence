@@ -18,9 +18,20 @@ interface Call {
   raw?: Blob | File;
   /** A request no person asked for: it does not keep a session alive (spec 013, D8). */
   background?: boolean;
+  watch?: UploadWatch;
 }
 
+/** Follows an upload while it runs. The share goes from 0 to 1. */
+export interface UploadWatch {
+  onProgress?: (share: number) => void;
+  signal?: AbortSignal;
+}
+
+/** True for an upload the person stopped, which is not a failure. */
+export const isCancelled = (error: unknown) => error instanceof DOMException && error.name === 'AbortError';
+
 const BACKGROUND_HEADER = 'X-Background';
+const NO_CONTENT = 204;
 
 // Module state, on purpose: `api` is used outside React, and what answers a request
 // for proof is a dialog inside it. `ReauthProvider` sets this once.
@@ -35,7 +46,31 @@ export function answerReauthWith(confirm: (() => Promise<boolean>) | null): void
 /** When a person last did something the server saw. */
 export const lastRequestTime = () => lastRequestAt;
 
+/** Fetch cannot tell how far an upload is. This gives the same Response, so all else stays the same. */
+function sendWatched(call: Call, watch: UploadWatch): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const request = new XMLHttpRequest();
+    request.open(call.method, '/api/v1' + call.path);
+    request.setRequestHeader('Content-Type', 'application/octet-stream');
+    request.upload.onprogress = (e) => {
+      if (e.lengthComputable) watch.onProgress?.(e.loaded / e.total);
+    };
+    request.onload = () => {
+      const body = request.status === NO_CONTENT ? null : request.responseText;
+      resolve(new Response(body, { status: request.status, statusText: request.statusText }));
+    };
+    request.onerror = () => reject(new TypeError('The upload did not reach the server.'));
+    request.onabort = () => reject(new DOMException('The upload was stopped.', 'AbortError'));
+    watch.signal?.addEventListener('abort', () => request.abort(), { once: true });
+    request.send(call.raw);
+  });
+}
+
 function sendOnce(call: Call): Promise<Response> {
+  if (call.watch) {
+    lastRequestAt = Date.now();
+    return sendWatched(call, call.watch);
+  }
   const headers: Record<string, string> = {};
   const init: RequestInit = { method: call.method, credentials: 'same-origin', headers };
   if (call.raw !== undefined) {
@@ -86,7 +121,8 @@ export const api = {
   put: <T>(path: string, body?: unknown) => json<T>({ method: 'PUT', path, body: body ?? {} }),
   patch: <T>(path: string, body: unknown) => json<T>({ method: 'PATCH', path, body }),
   del: <T = void>(path: string, body?: unknown) => json<T>({ method: 'DELETE', path, body }),
-  upload: <T>(path: string, file: Blob | File) => json<T>({ method: 'POST', path, raw: file }),
+  upload: <T>(path: string, file: Blob | File, watch?: UploadWatch) =>
+    json<T>({ method: 'POST', path, raw: file, watch }),
   replace: <T>(path: string, file: Blob | File) => json<T>({ method: 'PUT', path, raw: file }),
 };
 
@@ -487,6 +523,16 @@ export interface Attachment {
   office: boolean;
   created_by: string;
   updated_at: string;
+}
+
+/** A file as the list of a page shows it. */
+export interface FileRow extends Attachment {
+  comment: string;
+  added_by: string;
+  created_at: string;
+  labels: string[];
+  in_use: boolean;
+  clearable: boolean;
 }
 
 export interface Subject {

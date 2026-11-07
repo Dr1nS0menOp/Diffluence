@@ -47,6 +47,7 @@ var (
 	textAligns    = choices("center", "end")
 	imageAligns   = choices("start", "center", "end")
 	imageSizes    = choices("small", "medium", "large")
+	fileDisplays  = choices("small", "large")
 	columnLayouts = choices("wide-start", "wide-end")
 	fieldKinds    = choices("line", "text", "choice")
 	mentionKinds  = choices(MentionUser, MentionGroup)
@@ -209,6 +210,7 @@ func cleanFile(in, out map[string]any) error {
 	}
 	out["attachment_id"] = id
 	out["filename"] = name
+	fileDisplays.keep(in, out, "display")
 	return nil
 }
 

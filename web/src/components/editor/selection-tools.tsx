@@ -133,6 +133,25 @@ function ImageTools({ editor, actions }: { editor: Editor; actions: EditorAction
   );
 }
 
+function FileTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const display = useEditorState({
+    editor,
+    selector: (s) => (s.editor.getAttributes('file').display as string | null) ?? 'small',
+  });
+  return (
+    <select
+      className="tool-style"
+      aria-label={t('editor.fileDisplay')}
+      value={display}
+      onChange={(e) => updateSelected(editor, { display: e.target.value === 'large' ? 'large' : null })}
+    >
+      <option value="small">{t('editor.fileSmall')}</option>
+      <option value="large">{t('editor.fileLarge')}</option>
+    </select>
+  );
+}
+
 function PanelTools({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
   const kind = useEditorState({
@@ -363,8 +382,8 @@ export function SelectionTools({ editor, actions }: { editor: Editor; actions: E
   const active = useEditorState({
     editor,
     selector: (s) =>
-      ['status', 'date', 'image', ...LINK_KINDS, 'codeBlock', 'panel', 'expand', 'columns'].find((name) =>
-        s.editor.isActive(name),
+      ['status', 'date', 'image', 'file', ...LINK_KINDS, 'codeBlock', 'panel', 'expand', 'columns'].find(
+        (name) => s.editor.isActive(name),
       ),
   });
   const tools: Record<string, ReactNode> = {
@@ -372,6 +391,7 @@ export function SelectionTools({ editor, actions }: { editor: Editor; actions: E
     status: <StatusTools key={editor.state.selection.from} editor={editor} />,
     date: <DateTools key="date" editor={editor} />,
     image: <ImageTools key="image" editor={editor} actions={actions} />,
+    file: <FileTools key="file" editor={editor} />,
     codeBlock: <CodeTools key="code" editor={editor} />,
 
     panel: <PanelTools key="panel" editor={editor} />,

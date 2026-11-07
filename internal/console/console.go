@@ -210,6 +210,8 @@ type SpaceTotal struct {
 	Pages        int        `json:"pages"`
 	Bytes        int64      `json:"bytes"`
 	LastActivity *time.Time `json:"last_activity"`
+	// LimitMiB is the storage limit of the space, and zero means none.
+	LimitMiB int `json:"limit_mib"`
 }
 
 // SpaceTotals counts pages, stored bytes and the last change of every space. The route
@@ -219,7 +221,8 @@ func (s *Service) SpaceTotals(ctx context.Context) ([]SpaceTotal, error) {
 			(SELECT count(*) FROM pages p WHERE p.space_id = sp.id AND p.status = 'published'),
 			(SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
 				JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = sp.id),
-			(SELECT max(p.updated_at) FROM pages p WHERE p.space_id = sp.id)
+			(SELECT max(p.updated_at) FROM pages p WHERE p.space_id = sp.id),
+			sp.storage_limit_mib
 		FROM spaces sp WHERE sp.status <> 'trashed'`)
 	if err != nil {
 		return nil, err

@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api,
-  type Attachment,
   type DeleteImpact,
   type DirectoryEntry,
+  type FileRow,
   type NamedSubject,
   type PageRef,
   type PageSummary,
@@ -20,6 +20,8 @@ import { useToast } from '../components/toast';
 import { countBelow } from '../components/tree-model';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { OpenInCraft } from '../components/craft-frame';
+import { FilePreviewDialog } from '../components/file-preview';
+import { useDates } from '../dates';
 import { FileDetailsDialog } from './file-details';
 import { arrangedFiles, FILE_ORDERS, type FileOrder } from './file-list';
 
@@ -30,12 +32,19 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
   const key = ['attachments', page.id];
   const q = useQuery({
     queryKey: key,
-    queryFn: () => api.get<{ attachments: Attachment[] }>(`/pages/${page.id}/attachments`),
+    queryFn: () => api.get<{ attachments: FileRow[] }>(`/pages/${page.id}/attachments`),
   });
   const remove = useMutation({
     mutationFn: (id: string) => api.del(`/attachments/${id}`),
     onSettled: () => client.invalidateQueries({ queryKey: key }),
   });
+  const clearUp = useMutation({
+    mutationFn: () =>
+      api.post<{ deleted: number; skipped: number }>(`/pages/${page.id}/attachments/clear-up`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  const dates = useDates();
+  const [previewId, setPreviewId] = useState<string | null>(null);
   const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') }).data;
   const [openId, setOpenId] = useState<string | null>(null);
   const [order, setOrder] = useState<FileOrder>('name');
@@ -43,6 +52,10 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
   const canAdd = page.can['attachment.add'];
   const open = q.data?.attachments.find((a) => a.id === openId);
   const shown = arrangedFiles(q.data?.attachments ?? [], order, filter);
+  const clearable = q.data?.attachments.filter((a) => a.clearable).length ?? 0;
+  if (previewId) {
+    return <FilePreviewDialog files={shown} startId={previewId} onClose={() => setPreviewId(null)} />;
+  }
   if (open) {
     return (
       <FileDetailsDialog
@@ -58,7 +71,21 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
   return (
     <Dialog title={t('attachments.title')} onClose={onClose}>
       {q.isPending && <Loading />}
-      <ErrorNote error={q.error ?? remove.error} />
+      <ErrorNote error={q.error ?? remove.error ?? clearUp.error} />
+      {clearUp.data && (
+        <p role="status" className="note">
+          {t('files.clearedUp', { count: clearUp.data.deleted })}{' '}
+          {clearUp.data.skipped > 0 && t('files.skipped', { count: clearUp.data.skipped })}
+        </p>
+      )}
+      {clearable > 0 && (
+        <p className="row">
+          <span className="muted">{t('files.clearable', { count: clearable })}</span>
+          <button type="button" onClick={() => clearUp.mutate()}>
+            {t('files.clearUp')}
+          </button>
+        </p>
+      )}
       {q.data?.attachments.length === 0 && (
         <>
           <p className="muted">{t('attachments.none')}</p>
@@ -93,9 +120,14 @@ export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClos
             {a.inline && <img className="thumb" src={`/api/v1/attachments/${a.id}/content`} alt="" />}
             <a href={`/api/v1/attachments/${a.id}/content?download=1`}>{a.filename}</a>
             <span className="muted">
-              {t('attachments.version', { number: a.version })} · {formatSize(a.size)}
+              {t('attachments.version', { number: a.version })} · {formatSize(a.size)} · {a.added_by} ·{' '}
+              {dates.day(a.created_at)}
+              {!a.in_use && ` · ${t('files.notShown')}`}
             </span>
             <OpenInCraft file={a} address={`/api/v1/attachments/${a.id}/content`} />
+            <button type="button" className="ghost" onClick={() => setPreviewId(a.id)}>
+              {t('files.preview')}
+            </button>
             <button type="button" className="ghost" onClick={() => setOpenId(a.id)}>
               {t('files.details')}
             </button>

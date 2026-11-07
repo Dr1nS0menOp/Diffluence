@@ -28,6 +28,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -99,7 +100,7 @@ func (in *Input) validate() error {
 		return apperr.Invalid("A template can have at most ten steps.")
 	}
 	for i, raw := range in.Labels {
-		label, err := pages.CleanLabel(raw)
+		label, err := labels.Clean(raw)
 		if err != nil {
 			return err
 		}

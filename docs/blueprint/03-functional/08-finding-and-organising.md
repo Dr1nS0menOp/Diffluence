@@ -52,7 +52,7 @@
 - **ORG-039** · built · A list shows all labels of a space or the instance, alphabetically or by popularity, with the number of pages.
 - **ORG-040** · built · A space administrator can rename or merge labels in a space, in one action. It is audited.
 - **ORG-041** · built · A person with *edit* removes a label from a page with one click. A label that no page uses any more disappears.
-- **ORG-042** · partly · Labels also apply to blog posts and attachments. Still open: labels on attachments (wave E).
+- **ORG-042** · built · Labels also apply to blog posts and attachments.
 - **ORG-043** · built · An administrator can define an optional fixed list per space. Then only those labels can be used.
 - **ORG-044** · built · Removing or adding a label does not create a page version, but it shows in the activity of the page and in the audit log.
 

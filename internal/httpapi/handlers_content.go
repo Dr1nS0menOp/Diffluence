@@ -829,7 +829,7 @@ func (s *Server) handleAttachments(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	list, err := s.deps.Attachments.List(r.Context(), s.caller(r), id)
+	list, err := s.deps.Attachments.Rows(r.Context(), s.caller(r), id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
