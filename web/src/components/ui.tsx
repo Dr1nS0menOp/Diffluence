@@ -36,11 +36,14 @@ export function Dialog({
   children,
   wide,
   full,
+  side,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  /** Stands at the side and leaves the page in view, for settings that show at once. */
+  side?: boolean;
   /** Fills the window, for something a person works in, such as a viewer. */
   full?: boolean;
 }) {
@@ -55,7 +58,7 @@ export function Dialog({
       ref={ref}
       onClose={onClose}
       aria-label={title}
-      className={full ? 'full' : wide ? 'wide' : undefined}
+      className={full ? 'full' : side ? 'side' : wide ? 'wide' : undefined}
     >
       <header className="dialog-head">
         <h2>{title}</h2>

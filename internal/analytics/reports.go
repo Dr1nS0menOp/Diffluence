@@ -13,9 +13,13 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/csvout"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
+
+// popularCandidates limits what is read before spaces without analytics drop out.
+const popularCandidates = 200
 
 // Period is the stretch of days a report covers, both ends included.
 type Period struct {
@@ -223,6 +227,47 @@ func (s *Service) Popular(ctx context.Context, c identity.Caller, spaceID uuid.U
 		WHERE pg.space_id = $2 AND d.day >= $3 GROUP BY pg.id, pg.title ORDER BY 3 DESC LIMIT $4`,
 		c.UserID, spaceID, s.today().AddDate(0, 0, -29), limit)
 	return collect(rows, err, scanLink)
+}
+
+// PopularPages lists what people read most across the spaces a reader sees, for the block
+// of that name. Nothing shows while analytics is off, for all or for that space (BLK-026).
+func (s *Service) PopularPages(ctx context.Context, c identity.Caller, space *uuid.UUID, days, limit int) ([]LinkCount, error) {
+	st, err := s.Settings(ctx)
+	if err != nil || !st.Enabled {
+		return []LinkCount{}, err
+	}
+	rows, err := s.pool.Query(ctx, `SELECT pg.id, pg.title, sum(d.views)::int, pg.space_id FROM page_view_days d
+		JOIN pages pg ON pg.id = d.page_id JOIN perm_visible_pages($1) v ON v.page_id = pg.id
+		WHERE ($2::uuid IS NULL OR pg.space_id = $2) AND d.day >= $3 AND pg.status = 'published'
+		GROUP BY pg.id, pg.title, pg.space_id ORDER BY 3 DESC, pg.id LIMIT $4`,
+		c.UserID, space, s.today().AddDate(0, 0, 1-days), popularCandidates)
+	type candidate struct {
+		page  LinkCount
+		space uuid.UUID
+	}
+	found, err := collect(rows, err, func(r pgx.CollectableRow) (candidate, error) {
+		var v candidate
+		err := r.Scan(&v.page.ID, &v.page.Title, &v.page.Count, &v.space)
+		return v, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	out := []LinkCount{}
+	allowed := map[uuid.UUID]bool{}
+	for _, v := range found {
+		on, known := allowed[v.space]
+		if !known {
+			if on, err = s.features.Enabled(ctx, s.pool, v.space, features.Analytics); err != nil {
+				return nil, err
+			}
+			allowed[v.space] = on
+		}
+		if on && len(out) < limit {
+			out = append(out, v.page)
+		}
+	}
+	return out, nil
 }
 
 // ViewCount is the number of the byline, for those who may see it (PAG-105). The

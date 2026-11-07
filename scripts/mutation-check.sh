@@ -649,6 +649,31 @@ mutate "the history of files needs no access" internal/attachments/details.go \
   's.replace("func (s *Service) Events(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Event, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {", "func (s *Service) Events(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Event, error) {\n\tif err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil \x26\x26 pageID == uuid.Nil {")' $app -run TestThePageHistoryTellsWhatHappenedToItsFiles
 mutate "the history names the page a file went to" internal/attachments/moves.go \
   's.replace("addEvent(ctx, tx, c, a.PageID, id, a.Filename, eventMovedAway)", "addEvent(ctx, tx, c, a.PageID, id, a.Filename+\" \"+target.String(), eventMovedAway)")' $app -run TestThePageHistoryTellsWhatHappenedToItsFiles
+mutate "a label counts through a hidden page" internal/blocks/labels.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = l.page_id", "JOIN perm_visible_pages($1) v ON true")' $app -run 'TestLabelBlocksCountOnlyWhatAReaderMaySee|TestNoNewBlockShowsAHiddenPage'
+mutate "a related label reads a hidden page" internal/blocks/labels.go \
+  's.replace("func relatedLabels(ctx context.Context, r reader) (Answer, error) {\n\tid := r.target()\n\tif ok, err := r.visible(ctx, id); !ok {\n\t\treturn Answer{}, err\n\t}", "func relatedLabels(ctx context.Context, r reader) (Answer, error) {\n\tid := r.target()")' $app -run TestLabelBlocksCountOnlyWhatAReaderMaySee
+mutate "a file of a hidden page shows in a block" internal/blocks/files.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id", "JOIN perm_visible_pages($1) v ON true")' $app -run TestSpaceFilesWalkPastARestriction
+mutate "everyone sees who watches a page" internal/blocks/people.go \
+  's.replace("\tif d.Allowed {\n\t\treturn kinds, nil\n\t}", "\tif d.Allowed || len(kinds) > 0 {\n\t\treturn kinds, nil\n\t}")' $app -run TestWatchersShowOnlyToThoseWhoMaySeeThem
+mutate "a comment for editors makes a contributor" internal/blocks/people.go \
+  's.replace("WHERE page_id = $1 AND NOT editors_only AND NOT purged", "WHERE page_id = $1 AND NOT purged")' $app -run TestCommentsForEditorsDoNotCountForReaders
+mutate "a comment for editors counts in the table" internal/blocks/people.go \
+  's.replace("WHERE NOT c.editors_only AND NOT c.purged", "WHERE NOT c.purged")' $app -run TestCommentsForEditorsDoNotCountForReaders
+mutate "the contribution table shows a hidden page" internal/blocks/people.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = t.descendant_id", "JOIN perm_visible_pages($1) v ON true")' $app -run TestNoNewBlockShowsAHiddenPage
+mutate "a person card goes around the directory rule" internal/blocks/people.go \
+  's.replace("if errors.As(err, &refused) && refused.Kind == apperr.KindNotFound {\n\t\treturn Person{}, false, nil\n\t}", "if errors.As(err, &refused) && refused.Kind == apperr.KindNotFound {\n\t\treturn Person{ID: id, Name: \"stranger\"}, true, nil\n\t}")' $app -run TestAPersonCardShowsWhatTheDirectoryShows
+mutate "popular pages show while analytics is off" internal/analytics/reports.go \
+  's.replace("\tif err != nil || !st.Enabled {\n\t\treturn []LinkCount{}, err\n\t}", "\tif err != nil {\n\t\treturn []LinkCount{}, err\n\t}\n\t_ = st")' $app -run TestPopularPagesStayQuietWhileAnalyticsIsOff
+mutate "popular pages count a hidden page" internal/analytics/reports.go \
+  's.replace("sum(d.views)::int, pg.space_id FROM page_view_days d\n\t\tJOIN pages pg ON pg.id = d.page_id JOIN perm_visible_pages($1) v ON v.page_id = pg.id", "sum(d.views)::int, pg.space_id FROM page_view_days d\n\t\tJOIN pages pg ON pg.id = d.page_id JOIN perm_visible_pages($1) v ON true")' $app -run TestPopularPagesStayQuietWhileAnalyticsIsOff
+mutate "a synced block offers everyone its source" internal/blocks/reuse.go \
+  's.replace("source.CanEdit = d.Allowed", "source.CanEdit = d.Allowed || true")' $app -run TestASyncedBlockSaysWhetherTheReaderMayEditItsSource
+mutate "a filter by text finds a hidden page" internal/blocks/lists.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t", "JOIN perm_visible_pages($1) v ON true\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t")' $app -run TestFilterListFindsByTextPeopleAndDate
+
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

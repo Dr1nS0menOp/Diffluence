@@ -956,7 +956,74 @@
     "option_created": "Created",
     "option_changed": "Changed",
     "option_list": "List",
-    "option_cards": "Cards"
+    "option_cards": "Cards",
+    "rotating": "Cards that change by themselves",
+    "previousCard": "Previous card",
+    "nextCard": "Next card",
+    "cardOf": "{{shown}} of {{count}}",
+    "byLetter": "By first letter",
+    "allLetters": "All",
+    "expand": "Open {{title}}",
+    "collapse": "Close {{title}}",
+    "expandAll": "Expand all",
+    "collapseAll": "Collapse all",
+    "syncedFrom": "Kept in {{title}}",
+    "editSource": "Edit at the source",
+    "contributions_one": "{{count}} contribution",
+    "contributions_other": "{{count}} contributions",
+    "views_one": "{{count}} view",
+    "views_other": "{{count}} views",
+    "activityScope": "What to show",
+    "scope_all": "All spaces",
+    "scope_favourites": "Favourite spaces",
+    "scope_network": "People I follow",
+    "chooseTemplate": "Choose a template in the settings of this block.",
+    "createFromTemplate": "Create from template",
+    "noTimeline": "Add lines in the settings of this block.",
+    "column_person": "Person",
+    "column_creator": "Created by",
+    "column_changed": "Last changed",
+    "column_labels": "Labels",
+    "column_status": "Status",
+    "column_comments": "Comments",
+    "column_reactions": "Reactions",
+    "column_versions": "Versions",
+    "field_text": "Text contains",
+    "field_content_type": "Content type",
+    "field_direct": "Only directly below",
+    "field_spaces": "Spaces, by key",
+    "field_creator": "Created by, a name or address",
+    "field_contributor": "Worked on by, a name or address",
+    "field_mentioned": "Mentions, a name or address",
+    "field_created_after": "Created after",
+    "field_changed_after": "Changed after",
+    "field_preview": "Show the first lines",
+    "field_start": "From this anchor",
+    "field_end": "To this anchor",
+    "field_section": "Title of a collapsible section",
+    "field_categories": "Space categories",
+    "field_days": "Days back",
+    "field_person": "Person, a name or address",
+    "field_created_by": "Created by, a name or address",
+    "field_values": "Fill in the blanks",
+    "field_kinds": "Which kinds: versions, comments, labels, watchers",
+    "field_by": "Count by",
+    "field_people": "People, by name or address",
+    "field_group": "Group",
+    "field_file_type": "File type, such as pdf",
+    "field_authors": "Authors, by name or address",
+    "field_template": "Template",
+    "field_parent": "New pages go below",
+    "field_label": "Words on the button",
+    "field_items": "Plan",
+    "help_values": "One per line: name=value. The source writes {{name}}.",
+    "help_items": "One per line: lane | label | start | end. Dates as 2026-03-01. No end makes a marker.",
+    "option_page": "Pages",
+    "option_post": "Blog posts",
+    "option_all": "Pages and blog posts",
+    "option_cloud": "Word cloud",
+    "option_grid": "Grid",
+    "option_person": "By person"
   },
   "sheet": {
     "addColumn": "Add column",
@@ -1432,6 +1499,76 @@
       "name": "Import Word",
       "hint": "Add the content of a .docx file",
       "keywords": "docx word document"
+    },
+    "block_section_contents": {
+      "name": "Section contents",
+      "hint": "The headings of one part of this page",
+      "keywords": "toc section part headings"
+    },
+    "block_rotating_cards": {
+      "name": "Rotating cards",
+      "hint": "Cards that show one at a time",
+      "keywords": "carousel slides cards rotate"
+    },
+    "block_activity_tabs": {
+      "name": "Activity",
+      "hint": "Recent changes, with tabs",
+      "keywords": "activity recent network following"
+    },
+    "block_popular_pages": {
+      "name": "Popular pages",
+      "hint": "The pages read most",
+      "keywords": "popular views most read"
+    },
+    "block_popular_labels": {
+      "name": "Popular labels",
+      "hint": "The labels used most",
+      "keywords": "labels cloud tags popular"
+    },
+    "block_related_labels": {
+      "name": "Related labels",
+      "hint": "Labels near the labels of a page",
+      "keywords": "labels related tags"
+    },
+    "block_recent_labels": {
+      "name": "Recent labels",
+      "hint": "The newest labels",
+      "keywords": "labels new tags recent"
+    },
+    "block_synced_block": {
+      "name": "Synced block",
+      "hint": "Text kept in one place, shown here",
+      "keywords": "synced reuse shared snippet"
+    },
+    "block_contribution_table": {
+      "name": "Contribution table",
+      "hint": "Numbers by person or by page",
+      "keywords": "contributors statistics numbers"
+    },
+    "block_person_card": {
+      "name": "Person card",
+      "hint": "A card with one person",
+      "keywords": "person profile card contact"
+    },
+    "block_people_list": {
+      "name": "People list",
+      "hint": "A group, or people you choose",
+      "keywords": "people team group members"
+    },
+    "block_space_files": {
+      "name": "Space files",
+      "hint": "All files of this space",
+      "keywords": "files attachments documents"
+    },
+    "block_create_from_template": {
+      "name": "Create from template",
+      "hint": "A button that starts a page",
+      "keywords": "button template new page"
+    },
+    "block_timeline": {
+      "name": "Timeline",
+      "hint": "A simple plan on a time scale",
+      "keywords": "timeline plan roadmap gantt"
     }
   },
   "history": {
@@ -1790,7 +1927,18 @@
     "categoryName": "Name of the category",
     "templates": "Templates",
     "organising": "Organising",
-    "export": "Export and publishing"
+    "export": "Export and publishing",
+    "service": "Service account",
+    "source_local": "Local account",
+    "source_oidc": "Identity provider",
+    "source_scim": "Provisioned",
+    "perm_use_product": "Use the product",
+    "perm_create_space": "Create spaces",
+    "perm_view_profiles": "See the people directory",
+    "perm_create_personal_space": "Have a personal space",
+    "perm_invite_people": "Ask to invite people",
+    "perm_administrator": "Administrator",
+    "perm_system_administrator": "System administrator"
   },
   "site": {
     "banner": "Announcement",
@@ -2281,7 +2429,7 @@
   },
   "adminOrganise": {
     "companyHome": "Company home page",
-    "companyHomeHelp": "The id of a page. Leave empty for none.",
+    "companyHomeHelp": "Search for a page by its title. Leave empty for none.",
     "draftDays": "Keep old drafts for days",
     "draftDaysHelp": "People are warned 14 days before.",
     "defaultPreset": "Default permission set for new spaces",
@@ -2674,7 +2822,7 @@
     "importFailed": "The import failed.",
     "importDone": "The import is done.",
     "undone": "The import was undone. Its pages are in the trash.",
-    "reportCounts": "{{pages}} pages, {{files}} files, {{comments}} comments and {{versions}} versions.",
+    "reportCounts": "{{pages}}, {{files}}, {{comments}} and {{versions}}.",
     "warnings": "Warnings",
     "runImport": "Import",
     "undo": "Undo this import",
@@ -2717,7 +2865,16 @@
     "footer": "Footer",
     "marginHelp": "You can use {page}, {pages}, {title} and {date}.",
     "paperA4": "A4",
-    "paperLetter": "Letter"
+    "paperLetter": "Letter",
+    "linkHostHelp": "This is the path on your public site. Put the address of that site in front of it.",
+    "countPages_one": "{{count}} page",
+    "countPages_other": "{{count}} pages",
+    "countFiles_one": "{{count}} file",
+    "countFiles_other": "{{count}} files",
+    "countComments_one": "{{count}} comment",
+    "countComments_other": "{{count}} comments",
+    "countVersions_one": "{{count}} version",
+    "countVersions_other": "{{count}} versions"
   },
   "sites": {
     "title": "Public site",
@@ -2764,5 +2921,9 @@
     "state_failed": "Failed",
     "rollback": "Go back to this build",
     "download": "Download as zip"
+  },
+  "picker": {
+    "pageGone": "A page you cannot open",
+    "changePage": "Choose another page"
   }
 }

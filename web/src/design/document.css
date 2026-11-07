@@ -585,10 +585,15 @@ a.file-tile:hover {
   font-weight: var(--weight-regular);
 }
 
+/* A textarea that grows, so a long title stays readable while writing. */
 .title-input {
   flex: 1;
+  display: block;
   inline-size: 100%;
   min-inline-size: 0;
+  overflow: hidden;
+  resize: none;
+  field-sizing: content;
   margin-block-end: var(--space-4);
   padding: 0;
   border: 0;

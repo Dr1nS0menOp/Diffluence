@@ -4,6 +4,21 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the rest of dynamic blocks (wave O)
+- Lists and reports filter by text, type, person, date and space. The report table now really shows its columns, and a writer chooses them
+- New blocks: activity with tabs, popular pages, popular, related and recent labels, section contents, contribution table, person card, people list, space files, rotating cards, a button that starts a page from a template, a timeline, and a synced block
+- Link cards can come from a filter and show a picture. The page tree opens and closes, and the index and labels list have a letter bar
+- Reused text can have blanks that each page fills in, as `{{name}}`
+- Settings of a block stand at the side, so the block stays in view
+- Who watches a page shows in a block only to those who manage the space, and a comment for editors never counts
+- Upgrade impact: one migration. Tasks that exist get their last change as their creation date
+
+### Changed: small points of the UI test
+- The public link dialog has a copy button. The administration shows types, sources and permissions in words, and the company home page is chosen by title
+- A page with one version offers nothing to compare, the restore note shows a real time, and the import report counts correctly
+- The title field grows with a long title
+- Upgrade impact: none
+
 ### Added: links that follow their page, and tables with handles (wave M)
 - A link to a page without your own words shows the current title, as text, a tag or a card. The document holds only the id, so a reader who may not see the page gets neutral words
 - A link can lead to a heading or an anchor, here or on another page, and the link dialog starts with recent pages

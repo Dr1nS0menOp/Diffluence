@@ -94,7 +94,7 @@ function GlobalPermissions({ current, onChange }: { current: string[]; onChange:
             checked={current.includes(p)}
             onChange={(e) => onChange(e.target.checked ? [...current, p] : current.filter((x) => x !== p))}
           />
-          {p}
+          {t(`admin.perm_${p}`)}
         </label>
       ))}
     </fieldset>
@@ -129,7 +129,7 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
   return (
     <Dialog title={user.display_name} onClose={onClose}>
       <p className="muted">
-        {user.email} · {user.source}
+        {user.email} · {t(`admin.source_${user.source}`)}
       </p>
       <ErrorNote error={act.error ?? save.error ?? reset.error} />
       <GlobalPermissions
@@ -314,7 +314,7 @@ function UserFilters({
         label={t('admin.source')}
         value={values.source}
         options={USER_SOURCES}
-        name={String}
+        name={(o) => t(`admin.source_${o}`)}
         onChange={(v) => set('source', v)}
       />
       <FilterSelect
@@ -380,8 +380,8 @@ function UserTable({
               </button>
             </td>
             <td>{u.email}</td>
-            <td>{u.type}</td>
-            <td>{u.source}</td>
+            <td>{t(`admin.${u.type}`)}</td>
+            <td>{t(`admin.source_${u.source}`)}</td>
             <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
             <td>{dates.moment(u.last_login_at)}</td>
           </tr>

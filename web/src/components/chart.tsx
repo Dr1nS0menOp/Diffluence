@@ -178,3 +178,72 @@ export function Chart({ data, kind, title }: { data: ChartData; kind: string; ti
     </figure>
   );
 }
+
+export interface TimelineItem {
+  lane: string;
+  label: string;
+  start: number;
+  end?: number;
+  text: string;
+}
+
+const LANE_HEIGHT = 32;
+const LANE_LABEL_WIDTH = 140;
+const TIMELINE_WIDTH = 640;
+const BAR_HEIGHT = 20;
+const MARKER_SIZE = 7;
+const TEXT_DROP = 4;
+/** Room behind the last date, because a marker has its words beside it. */
+const END_ROOM = 120;
+
+function spanOf(items: TimelineItem[]): { start: number; end: number } {
+  const times = items.flatMap((item) => [item.start, item.end ?? item.start]);
+  const start = Math.min(...times);
+  const end = Math.max(...times);
+  return { start, end: end > start ? end : start + 1 };
+}
+
+/** Bars by attribute, because a style sheet cannot know a date. The list is for screen readers. */
+export function TimelineChart({ items }: { items: TimelineItem[] }) {
+  const lanes = [...new Set(items.map((item) => item.lane))];
+  const { start, end } = spanOf(items);
+  const place = (time: number) =>
+    LANE_LABEL_WIDTH + ((time - start) / (end - start)) * (TIMELINE_WIDTH - LANE_LABEL_WIDTH - END_ROOM);
+  return (
+    <div className="block-timeline">
+      <svg viewBox={`0 0 ${TIMELINE_WIDTH} ${lanes.length * LANE_HEIGHT}`} aria-hidden="true">
+        {lanes.map((lane, i) => (
+          <text key={lane} x={0} y={i * LANE_HEIGHT + LANE_HEIGHT / 2 + TEXT_DROP}>
+            {lane}
+          </text>
+        ))}
+        {items.map((item) => {
+          const middle = lanes.indexOf(item.lane) * LANE_HEIGHT + LANE_HEIGHT / 2;
+          const x = place(item.start);
+          return (
+            <g key={item.text}>
+              {item.end === undefined ? (
+                <circle cx={x} cy={middle} r={MARKER_SIZE} />
+              ) : (
+                <rect
+                  x={x}
+                  y={middle - BAR_HEIGHT / 2}
+                  width={Math.max(place(item.end) - x, 2)}
+                  height={BAR_HEIGHT}
+                />
+              )}
+              <text x={x + (item.end === undefined ? MARKER_SIZE * 2 : TEXT_DROP)} y={middle + TEXT_DROP}>
+                {item.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+      <ul className="visually-hidden">
+        {items.map((item) => (
+          <li key={item.text}>{item.text}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}

@@ -183,8 +183,9 @@ function SizedList({ title, rows }: { title: string; rows: Sized[] }) {
     <>
       <h3>{title}</h3>
       <ul className="plain-list">
-        {rows.map((r) => (
-          <li key={r.name} className="row">
+        {rows.map((r, i) => (
+          // A report by size can hold the same name twice, and a row never moves.
+          <li key={`${i}-${r.name}`} className="row">
             <span className="grow">{r.name}</span>
             <span className="muted">{formatSize(r.size)}</span>
           </li>

@@ -15,15 +15,23 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/analytics"
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/people"
+	"github.com/diffluence/diffluence/internal/permissions"
 )
 
 const (
-	defaultRows = 15
-	maxRows     = 500
-	maxDepth    = 5
+	defaultRows        = 15
+	defaultCards       = 6
+	defaultLabels      = 20
+	defaultPeople      = 30
+	defaultPopularDays = 30
+	maxRows            = 500
+	maxDepth           = 5
+	previewRunes       = 200
 )
 
 // Row is one line of an answer.
@@ -40,14 +48,18 @@ type Row struct {
 	Count     int        `json:"count,omitempty"`
 	Cells     []string   `json:"cells,omitempty"`
 	Done      *bool      `json:"done,omitempty"`
+	Image     *uuid.UUID `json:"image,omitempty"`
+	CanEdit   bool       `json:"can_edit,omitempty"`
 }
 
 // Answer is what one block shows to one reader.
 type Answer struct {
-	Rows     []Row           `json:"rows"`
-	Columns  []string        `json:"columns,omitempty"`
-	Document json.RawMessage `json:"document,omitempty"`
-	Source   *Row            `json:"source,omitempty"`
+	Rows       []Row           `json:"rows"`
+	Columns    []string        `json:"columns,omitempty"`
+	ColumnKeys []string        `json:"column_keys,omitempty"`
+	Document   json.RawMessage `json:"document,omitempty"`
+	Source     *Row            `json:"source,omitempty"`
+	People     []Person        `json:"people,omitempty"`
 }
 
 // Request asks for one block. PageID is the page it stands on, if any.
@@ -57,17 +69,34 @@ type Request struct {
 	Settings map[string]any
 }
 
+// directory is what a block may know about people, so the rule stays in one place.
+type directory interface {
+	Get(ctx context.Context, c identity.Caller, id uuid.UUID) (people.Profile, error)
+	List(ctx context.Context, c identity.Caller, q people.Query) ([]people.Row, int, error)
+}
+
+// viewCounts gives the pages people read most, with its own rule about when it may.
+type viewCounts interface {
+	PopularPages(ctx context.Context, c identity.Caller, space *uuid.UUID, days, limit int) ([]analytics.LinkCount, error)
+}
+
 // Service answers blocks.
 type Service struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	perms     *permissions.Service
+	people    directory
+	analytics viewCounts
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, people directory, analytics viewCounts) *Service {
+	return &Service{pool: pool, perms: perms, people: people, analytics: analytics}
+}
 
 // reader is one request with its clean settings.
 type reader struct {
 	s        *Service
+	caller   identity.Caller
 	userID   uuid.UUID
 	pageID   uuid.UUID
 	spaceID  uuid.UUID
@@ -137,9 +166,12 @@ func init() {
 		"my_favourites": myFavourites, "my_drafts": myDrafts, "my_tasks": myTasks,
 		"filter_list": filterList, "report_table": reportTable, "labels_list": labelsList,
 		"facts_report": factsReport, "decision_report": decisionReport, "task_report": taskReport,
-		document.KindShowExcerpt: showInclude, document.KindEmbeddedPage: showInclude,
+		document.KindShowExcerpt: showInclude, document.KindEmbeddedPage: showInclude, document.KindSyncedBlock: showInclude,
 		"contributors": contributors, "history_here": historyHere, "attachments_here": attachmentsHere,
-		"blog_posts": blogPosts, "link_cards": linkCards,
+		"blog_posts": blogPosts, "link_cards": linkCards, "rotating_cards": linkCards, "activity_tabs": activityTabs,
+		"popular_pages": popularPages, "popular_labels": popularLabels, "related_labels": relatedLabels,
+		"recent_labels": recentLabels, "contribution_table": contributionTable, "person_card": personCard,
+		"people_list": peopleList, "space_files": spaceFiles,
 	}
 }
 
@@ -158,7 +190,7 @@ func (s *Service) Answer(ctx context.Context, c identity.Caller, in Request) (An
 	if !ok {
 		return Answer{}, apperr.Invalid("That kind of block has no answer here.")
 	}
-	r := reader{s: s, userID: c.UserID, pageID: in.PageID, settings: document.CleanSettings(in.Kind, in.Settings)}
+	r := reader{s: s, caller: c, userID: c.UserID, pageID: in.PageID, settings: document.CleanSettings(in.Kind, in.Settings)}
 	if in.PageID != uuid.Nil {
 		// The page it stands on sets the space. A page the reader may not see sets nothing.
 		err := s.pool.QueryRow(ctx, `SELECT p.space_id FROM pages p JOIN perm_visible_pages($1) v ON v.page_id = p.id

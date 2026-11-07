@@ -62,7 +62,9 @@ function RecentList({ tab, filter }: { tab: Tab; filter: string }) {
         {pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={tab === 'drafts' ? `/pages/${p.id}/edit` : `/pages/${p.id}`}>{p.title}</Link>
+            <Link href={tab === 'drafts' ? `/pages/${p.id}/edit` : `/pages/${p.id}`}>
+              {p.title || t('page.untitled')}
+            </Link>
             <span className="muted">
               {p.space_name} · <RelativeTime value={p.at} />
             </span>

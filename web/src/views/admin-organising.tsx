@@ -4,6 +4,7 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, NIL_ID, type Space } from '../api';
+import { PagePicker } from '../components/picker';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TemplateManager } from './templates';
 
@@ -38,9 +39,12 @@ function OrganisingForm({ start }: { start: Organising }) {
       }}
     >
       <ErrorNote error={save.error} />
-      <Field label={t('adminOrganise.companyHome')} help={t('adminOrganise.companyHomeHelp')}>
-        <input value={home} onChange={(e) => setForm({ ...form, company_home: e.target.value })} />
-      </Field>
+      <PagePicker
+        label={t('adminOrganise.companyHome')}
+        help={t('adminOrganise.companyHomeHelp')}
+        value={home}
+        onChange={(id) => setForm({ ...form, company_home: id })}
+      />
       <Field label={t('adminOrganise.draftDays')} help={t('adminOrganise.draftDaysHelp')}>
         <input
           type="number"

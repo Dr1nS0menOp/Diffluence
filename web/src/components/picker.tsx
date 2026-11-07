@@ -2,7 +2,8 @@
 import { useId, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { api, ApiError, type DirectoryEntry } from '../api';
+import { api, ApiError, type DirectoryEntry, type SearchResult } from '../api';
+import { Field } from './ui';
 
 /**
  * Finds a user or group. A combobox with a list: people show as soon as the field
@@ -108,5 +109,73 @@ export function SubjectPicker({
         {q.isSuccess && entries.length === 0 && <p className="quick-note muted">{t('search.noResults')}</p>}
       </div>
     </div>
+  );
+}
+
+const MAX_PAGE_RESULTS = 8;
+
+/** Finds a page by its title. The value is its id, and empty means none. */
+export function PagePicker({
+  label,
+  help,
+  value,
+  onChange,
+}: {
+  label: string;
+  help: string;
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const { t } = useTranslation();
+  const [search, setSearch] = useState('');
+  const chosen = useQuery({
+    queryKey: ['picked-page', value],
+    queryFn: () => api.get<{ title: string }>(`/pages/${value}`),
+    enabled: value !== '',
+    retry: false,
+  });
+  const found = useQuery({
+    queryKey: ['page-picker', search],
+    queryFn: () =>
+      api.get<{ results: SearchResult[] }>(
+        `/search?q=${encodeURIComponent(search)}&limit=${MAX_PAGE_RESULTS}`,
+      ),
+    enabled: search.trim().length > 0,
+  });
+  if (value) {
+    return (
+      <div role="group" aria-label={label}>
+        <strong>{label}</strong>
+        <div className="row">
+          <span>{chosen.data?.title ?? t('picker.pageGone')}</span>
+          <button type="button" className="ghost" onClick={() => onChange('')}>
+            {t('picker.changePage')}
+          </button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <>
+      <Field label={label} help={help}>
+        <input type="search" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </Field>
+      <ul className="plain-list">
+        {found.data?.results.map((result) => (
+          <li key={result.page_id}>
+            <button
+              type="button"
+              className="ghost"
+              onClick={() => {
+                onChange(result.page_id);
+                setSearch('');
+              }}
+            >
+              {result.title}
+            </button>
+          </li>
+        ))}
+      </ul>
+    </>
   );
 }

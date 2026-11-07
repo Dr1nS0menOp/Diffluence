@@ -61,7 +61,7 @@
 - **ORG-045** · partly · An empty page offers templates beside the editor: a gallery with a search box, categories, a preview and a description. Choosing one fills the page. Still open: the gallery opens as a dialog from a note above the editor, not as a panel beside it.
 - **ORG-046** · built · A space administrator makes templates for a space. An administrator makes them for all spaces.
 - **ORG-047** · built · A template is written in the same editor as a page.
-- **ORG-048** · partly · A template can hold **labels**, which new pages receive, and **page facts** (BLK-039). Still open: page facts (wave E).
+- **ORG-048** · built · A template can hold **labels**, which new pages receive, and **page facts** (BLK-039).
 - **ORG-049** · built · A template can hold **instruction text**, which shows only in the editor and disappears when typing starts. Readers never see it.
 - **ORG-050** · built · A template can hold **fields**: single line, multiple lines or a list of choices. Creating a page first shows a short form, and the answers fill in the page. Fields with the same name share a value.
 - **ORG-051** · partly · A template can set the title pattern, such as `Meeting {date}`, and a default parent page. Still open: a field for the default parent. The server keeps it.

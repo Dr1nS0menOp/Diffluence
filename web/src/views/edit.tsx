@@ -38,7 +38,8 @@ import { useDelayed } from '../components/quick-search';
 import { ShareDialog } from '../components/share-dialog';
 import { TemplateGallery } from '../components/template-gallery';
 import { useToast } from '../components/toast';
-import { ConfirmButton, Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
+import { useDates } from '../dates';
+import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 import { MoveDialog } from './move-dialogs';
 import { EditingTogether } from '../components/presence';
 import { PublicMark } from './exchange';
@@ -160,9 +161,10 @@ function BackupNote({
   onDiscard: () => void;
 }) {
   const { t } = useTranslation();
+  const dates = useDates();
   return (
     <p role="status" className="note">
-      {t('editor.backupFound')} <RelativeTime value={backup.at} />{' '}
+      {t('editor.backupFound')} <time dateTime={backup.at}>{dates.moment(backup.at)}</time>{' '}
       <button type="button" className="ghost" onClick={onRestore}>
         {t('editor.backupRestore')}
       </button>
@@ -252,7 +254,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
   const [sharing, setSharing] = useState(false);
   const [offerDraft, setOfferDraft] = useState(!!data.privateDraft);
   const sharedEditor = useRef<Editor | null>(null);
-  const titleField = useRef<HTMLInputElement>(null);
+  const titleField = useRef<HTMLTextAreaElement>(null);
   useSharedTitle(together, setTitle);
   const editorView = useRef<EditorView | null>(null);
   const keepView = useCallback((view: EditorView) => {
@@ -425,17 +427,20 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
   const showOffer = !published && !typing && isEmptyDocument(data.document) && page.kind === 'page';
   const isDatabase = page.kind === 'database';
   const titleInput = (
-    <input
+    <textarea
       ref={titleField}
       // A new page starts with its name. Later visits are about the text.
       autoFocus={!published && data.title === ''}
       className="title-input"
+      rows={1}
       value={title}
       aria-label={t('page.title')}
       placeholder={t('editor.titlePlaceholder')}
       onChange={(e) => {
-        setTitle(e.target.value);
-        if (together) writeSharedTitle(together, e.target.value);
+        // A title is one line, also when a paste brings more.
+        const line = e.target.value.replace(/\s*\n\s*/g, ' ');
+        setTitle(line);
+        if (together) writeSharedTitle(together, line);
         schedule();
       }}
       onKeyDown={(e) => {

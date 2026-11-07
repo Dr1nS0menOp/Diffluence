@@ -403,10 +403,10 @@ function ReportTree({ run }: { run: ImportRun }) {
     <>
       <p>
         {t('exchange.reportCounts', {
-          pages: report.pages,
-          files: report.files,
-          comments: report.comments,
-          versions: report.versions,
+          pages: t('exchange.countPages', { count: report.pages }),
+          files: t('exchange.countFiles', { count: report.files }),
+          comments: t('exchange.countComments', { count: report.comments }),
+          versions: t('exchange.countVersions', { count: report.versions }),
         })}
       </p>
       {report.tree.length > 0 && (
@@ -755,6 +755,27 @@ export function ExportTab() {
   );
 }
 
+function CopyText({ text }: { text: string }) {
+  const { t } = useTranslation();
+  const [message, setMessage] = useState('');
+  const copy = () => {
+    navigator.clipboard.writeText(text).then(
+      () => setMessage(t('editor.copied')),
+      () => setMessage(t('editor.copyFailed')),
+    );
+  };
+  return (
+    <>
+      <button type="button" className="ghost" onClick={copy}>
+        {t('editor.copy')}
+      </button>
+      <span role="status" className="muted">
+        {message}
+      </span>
+    </>
+  );
+}
+
 /** More, Public link: one page for the world, under an address nobody can guess. */
 export function PublicLinkDialog({ page, onClose }: { page: { id: string }; onClose: () => void }) {
   const { t } = useTranslation();
@@ -783,9 +804,11 @@ export function PublicLinkDialog({ page, onClose }: { page: { id: string }; onCl
       {link.data ? (
         <>
           <p>{t('exchange.linkVersion', { version: link.data.version })}</p>
-          <p>
+          <div className="row">
             <code>{link.data.path}</code>
-          </p>
+            <CopyText text={link.data.path} />
+          </div>
+          <p className="muted">{t('exchange.linkHostHelp')}</p>
           <p className="muted">{t('exchange.linkHelp')}</p>
           <div className="dialog-actions">
             <button type="button" className="danger" onClick={() => withdraw.mutate()}>

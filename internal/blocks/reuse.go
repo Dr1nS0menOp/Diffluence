@@ -6,11 +6,13 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/permissions"
 )
 
 // factsReport makes one table of the facts of the pages that pass the filter. A
@@ -80,8 +82,43 @@ func showInclude(ctx context.Context, r reader) (Answer, error) {
 	if err != nil || source == nil {
 		return Answer{}, err
 	}
-	raw, err := document.Marshal(document.Node{Type: document.TypeDoc, Content: blocks})
+	d, err := r.s.perms.CheckPage(ctx, r.s.pool, r.userID, source.ID, permissions.PageEdit, uuid.Nil)
+	if err != nil {
+		return Answer{}, err
+	}
+	source.CanEdit = d.Allowed
+	raw, err := document.Marshal(document.Node{Type: document.TypeDoc, Content: fillBlanks(blocks, r.blanks())})
 	return Answer{Document: raw, Source: source}, err
+}
+
+// blanks reads name=value lines. A line without a name is left out.
+func (r reader) blanks() map[string]string {
+	out := map[string]string{}
+	for _, line := range r.list("values") {
+		if name, value, ok := strings.Cut(line, "="); ok && strings.TrimSpace(name) != "" {
+			out[strings.TrimSpace(name)] = strings.TrimSpace(value)
+		}
+	}
+	return out
+}
+
+// fillBlanks puts values into {{name}} blanks of text nodes. It runs after every check,
+// and only touches text, so a value can never become markup or point anywhere.
+func fillBlanks(nodes []document.Node, values map[string]string) []document.Node {
+	if len(values) == 0 {
+		return nodes
+	}
+	out := make([]document.Node, len(nodes))
+	for i, n := range nodes {
+		if n.Type == document.TypeText {
+			for name, value := range values {
+				n.Text = strings.ReplaceAll(n.Text, "{{"+name+"}}", value)
+			}
+		}
+		n.Content = fillBlanks(n.Content, values)
+		out[i] = n
+	}
+	return out
 }
 
 func messageBlock(text string) []document.Node {

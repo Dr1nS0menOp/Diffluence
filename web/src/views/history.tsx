@@ -170,6 +170,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
     setPicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p.slice(-1), n]));
   const pair = [...picked].sort((a, b) => a - b);
   const canEdit = page.data?.can['page.edit'];
+  const canCompare = (q.data?.versions.length ?? 0) > 1;
   return (
     <>
       <h1>{t('history.title')}</h1>
@@ -180,7 +181,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
       <table>
         <thead>
           <tr>
-            <th>{t('history.pick')}</th>
+            {canCompare && <th>{t('history.pick')}</th>}
             <th>{t('common.name')}</th>
             <th>{t('common.actions')}</th>
           </tr>
@@ -188,14 +189,16 @@ export function HistoryView({ pageId }: { pageId: string }) {
         <tbody>
           {q.data?.versions.map((v, i) => (
             <tr key={v.number}>
-              <td>
-                <input
-                  type="checkbox"
-                  aria-label={t('history.version', { number: v.number })}
-                  checked={picked.includes(v.number)}
-                  onChange={() => toggle(v.number)}
-                />
-              </td>
+              {canCompare && (
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={t('history.version', { number: v.number })}
+                    checked={picked.includes(v.number)}
+                    onChange={() => toggle(v.number)}
+                  />
+                </td>
+              )}
               <td>
                 <strong>{t('history.version', { number: v.number })}</strong>{' '}
                 {t('history.by', { name: v.author_name })}{' '}

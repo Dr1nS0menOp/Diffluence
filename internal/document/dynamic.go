@@ -27,6 +27,7 @@ const (
 const (
 	KindShowExcerpt  = "show_excerpt"
 	KindEmbeddedPage = "embedded_page"
+	KindSyncedBlock  = "synced_block"
 )
 
 const (
@@ -56,6 +57,7 @@ const (
 	settingPage
 	settingPages
 	settingChoice
+	settingDate
 )
 
 func number(lo, hi int) setting { return setting{kind: settingNumber, min: lo, max: hi} }
@@ -66,6 +68,7 @@ func oneOf(names ...string) setting {
 
 var (
 	freeText  = setting{kind: settingText}
+	day       = setting{kind: settingDate}
 	list      = setting{kind: settingList}
 	on        = setting{kind: settingSwitch}
 	page      = setting{kind: settingPage}
@@ -79,6 +82,8 @@ func pageFilter(extra map[string]setting) map[string]setting {
 	out := map[string]setting{
 		"labels": list, "exclude_labels": list, "title": freeText, "below": page, "this_space": on,
 		"sort": sortOrder, "descending": on, "max": number(1, 500), "hide_empty": on, "heading": freeText,
+		"spaces": list, "content_type": oneOf("page", "post", "all"), "text": freeText, "creator": freeText,
+		"contributor": freeText, "mentioned": freeText, "created_after": day, "changed_after": day, "direct": on,
 	}
 	for key, value := range extra {
 		out[key] = value
@@ -91,32 +96,49 @@ func pageFilter(extra map[string]setting) map[string]setting {
 var dynamicKinds = map[string]map[string]setting{
 	"toc": {"from": number(1, 6), "to": number(1, 6), "style": oneOf("list", "line"),
 		"numbered": on, "exclude": freeText, "no_print": on},
-	"back_to_top": {},
-	"search_box":  {"placeholder": freeText, "this_space": on, "below": page},
+	"section_contents": {"start": freeText, "end": freeText, "section": freeText, "from": number(1, 6), "to": number(1, 6)},
+	"back_to_top":      {},
+	"search_box": {"placeholder": freeText, "this_space": on, "below": page,
+		"content_type": oneOf("page", "post"), "labels": list},
 	"child_pages": {"page": page, "max": number(1, 500), "levels": number(1, 9), "sort": sortOrder,
 		"descending": on, "preview": on, "hide_empty": on},
-	"page_tree":       {"page": page},
-	"space_index":     {},
-	"spaces_list":     {"favourites": on, "style": listStyle},
-	"breadcrumbs":     {"page": page},
-	"recent_changes":  {"max": number(1, 200), "this_space": on, "hide_empty": on, "heading": freeText},
-	"my_favourites":   {"max": number(1, 200)},
-	"my_drafts":       {"max": number(1, 200)},
-	"my_tasks":        {"max": number(1, 200)},
-	"filter_list":     pageFilter(map[string]setting{"preview": on}),
-	"report_table":    pageFilter(nil),
-	"labels_list":     {"this_space": on, "max": number(1, 500)},
-	"facts_report":    pageFilter(map[string]setting{"facts_id": freeText, "columns": list, "sort_key": freeText}),
-	"decision_report": pageFilter(nil),
-	"task_report":     pageFilter(map[string]setting{"mine": on, "done": on}),
-	KindShowExcerpt:   {"page": page, "name": freeText, "frame": on, "values": list},
-	KindEmbeddedPage:  {"page": page},
-	"contributors":    {"page": page, "max": number(1, 100)},
-	"history_here":    {"page": page, "max": number(1, 50)},
+	"page_tree":   {"page": page},
+	"space_index": {},
+	"spaces_list": {"favourites": on, "style": listStyle, "categories": list},
+	"breadcrumbs": {"page": page},
+	"recent_changes": {"max": number(1, 200), "this_space": on, "hide_empty": on, "heading": freeText,
+		"spaces": list},
+	"activity_tabs":      {"max": number(1, 200), "scope": oneOf("all", "favourites", "network")},
+	"popular_pages":      {"max": number(1, 50), "days": number(1, 365), "this_space": on},
+	"my_favourites":      {"max": number(1, 200)},
+	"my_drafts":          {"max": number(1, 200)},
+	"my_tasks":           {"max": number(1, 200)},
+	"filter_list":        pageFilter(map[string]setting{"preview": on}),
+	"report_table":       pageFilter(map[string]setting{"columns": list}),
+	"labels_list":        {"this_space": on, "max": number(1, 500)},
+	"popular_labels":     {"this_space": on, "max": number(1, 100), "style": oneOf("list", "cloud")},
+	"related_labels":     {"page": page, "max": number(1, 100)},
+	"recent_labels":      {"this_space": on, "max": number(1, 100)},
+	"facts_report":       pageFilter(map[string]setting{"facts_id": freeText, "columns": list, "sort_key": freeText}),
+	"decision_report":    pageFilter(map[string]setting{"page": page, "person": freeText}),
+	"task_report":        pageFilter(map[string]setting{"mine": on, "done": on, "created_by": freeText}),
+	KindShowExcerpt:      {"page": page, "name": freeText, "frame": on, "values": list},
+	KindSyncedBlock:      {"page": page, "name": freeText, "values": list},
+	KindEmbeddedPage:     {"page": page},
+	"contributors":       {"page": page, "max": number(1, 100), "kinds": list},
+	"contribution_table": {"page": page, "by": oneOf("person", "page"), "max": number(1, 100)},
+	"person_card":        {"person": freeText},
+	"people_list":        {"group": freeText, "people": list, "style": oneOf("list", "grid"), "max": number(1, 100)},
+	"history_here":       {"page": page, "max": number(1, 50)},
 	"attachments_here": {"page": page, "pattern": freeText, "max": number(1, 200),
-		"sort": oneOf("name", "date", "size")},
-	"blog_posts": {"max": number(1, 50), "this_space": on, "labels": list},
-	"link_cards": {"pages": pageList},
+		"sort": oneOf("name", "date", "size"), "labels": list},
+	"space_files": {"labels": list, "file_type": freeText, "max": number(1, 200)},
+	"blog_posts": {"max": number(1, 50), "this_space": on, "labels": list, "days": number(1, 3650),
+		"authors": list},
+	"create_from_template": {"template": page, "parent": page, "label": freeText},
+	"link_cards":           pageFilter(map[string]setting{"pages": pageList}),
+	"rotating_cards":       pageFilter(map[string]setting{"pages": pageList}),
+	"timeline":             {"items": list},
 }
 
 // DynamicKinds lists the kinds of dynamic block.
@@ -159,6 +181,10 @@ func cleanSetting(rule setting, v any) (any, bool) {
 	case settingChoice:
 		s, _ := v.(string)
 		return s, rule.choices[s]
+	case settingDate:
+		s, _ := v.(string)
+		_, err := time.Parse(time.DateOnly, s)
+		return s, err == nil
 	}
 	return nil, false
 }
@@ -397,7 +423,7 @@ type Include struct {
 // IncludeOf reads what a dynamic block shows from another page, if anything.
 func IncludeOf(n Node) (Include, bool) {
 	kind, _ := n.Attrs["kind"].(string)
-	if n.Type != TypeDynamic || (kind != KindShowExcerpt && kind != KindEmbeddedPage) {
+	if n.Type != TypeDynamic || (kind != KindShowExcerpt && kind != KindEmbeddedPage && kind != KindSyncedBlock) {
 		return Include{}, false
 	}
 	settings, _ := n.Attrs["settings"].(map[string]any)

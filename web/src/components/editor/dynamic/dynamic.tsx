@@ -1,47 +1,25 @@
 // SPDX-License-Identifier: Apache-2.0
 // A block that shows something by itself. A document stores settings, and every
 // reader asks the server for their own answer (spec 012, E1).
-import { Component, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
+import { Component, useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { Node as DocumentNode } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, type ReactNodeViewProps } from '@tiptap/react';
 import { api, type Json } from '../../../api';
-import { useDates } from '../../../dates';
-import { Link, match, navigate, useLocation } from '../../../router';
+import { match, useLocation } from '../../../router';
 import { IconSliders } from '../../icons';
 import { Dialog, ErrorNote, Field, Loading } from '../../ui';
-import { DocumentView } from '../editor';
-import { contentsOf, jumpToHeading } from '../outline';
-import { DYNAMIC_KINDS, listFromText, LOCAL_KINDS, matchesPattern, type SettingField } from './kinds';
+import { Answer, type BlockAnswer } from './answers';
+import { DYNAMIC_KINDS, linesFromText, listFromText, LOCAL_KINDS, type SettingField } from './kinds';
+import { Local } from './local';
 
 const NEAR_SCREEN = '300px';
 const TYPING_PAUSE_MS = 300;
 const SETTINGS_ICON_SIZE = 16;
+const LINES_ROWS = 6;
 
 type Settings = Record<string, unknown>;
-
-interface BlockRow {
-  id: string;
-  parent_id?: string;
-  title: string;
-  emoji?: string;
-  space_key?: string;
-  space_name?: string;
-  at?: string;
-  by?: string;
-  detail?: string;
-  count?: number;
-  cells?: string[];
-  done?: boolean;
-}
-
-interface BlockAnswer {
-  rows: BlockRow[];
-  columns?: string[];
-  document?: Json;
-  source?: { id: string; title: string };
-}
 
 function usePageId(): string | undefined {
   const { pathname } = useLocation();
@@ -70,134 +48,6 @@ function useNearScreen(): [React.RefObject<HTMLDivElement | null>, boolean] {
   return [box, near];
 }
 
-function RowLink({ row }: { row: BlockRow }) {
-  return (
-    <Link href={`/pages/${row.id}`}>
-      {row.emoji && <span aria-hidden="true">{row.emoji} </span>}
-      {row.title}
-    </Link>
-  );
-}
-
-function PageRows({ rows }: { rows: BlockRow[] }) {
-  return (
-    <ul className="block-list">
-      {rows.map((row) => (
-        <li key={row.id}>
-          <RowLink row={row} />
-          {row.space_name && <span className="muted"> · {row.space_name}</span>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function LinkCards({ rows }: { rows: BlockRow[] }) {
-  return (
-    <ul className="block-cards">
-      {rows.map((row) => (
-        <li key={row.id} className="block-card">
-          <RowLink row={row} />
-          {row.detail && <p className="muted">{row.detail}</p>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function Report({ answer }: { answer: BlockAnswer }) {
-  const { t } = useTranslation();
-  return (
-    <div className="block-frame">
-      <table>
-        <thead>
-          <tr>
-            <th>{t('blocks.page')}</th>
-            {answer.columns?.map((column) => (
-              <th key={column}>{column}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {answer.rows.map((row) => (
-            <tr key={row.id}>
-              <td>
-                <RowLink row={row} />
-              </td>
-              {row.cells?.map((cell, i) => (
-                <td key={answer.columns?.[i] ?? i}>{cell}</td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-function PlainRows({ answer, kind }: { answer: BlockAnswer; kind: string }) {
-  const { t } = useTranslation();
-  const dates = useDates();
-  return (
-    <ul className="block-list">
-      {answer.rows.map((row, i) => (
-        <li key={`${row.id}-${i}`}>
-          {kind === 'attachments_here' ? (
-            <a href={`/api/v1/attachments/${row.id}/content?download=1`}>{row.title}</a>
-          ) : kind === 'decision_report' ? (
-            <Link href={`/pages/${row.id}`}>{row.title}</Link>
-          ) : kind === 'task_report' || kind === 'my_tasks' ? (
-            <Link href={`/pages/${row.parent_id}`}>{row.title}</Link>
-          ) : kind === 'spaces_list' ? (
-            <Link href={`/spaces/${row.space_key}`}>{row.title}</Link>
-          ) : (
-            <span>{row.title || t('blocks.noSummary')}</span>
-          )}
-          {row.detail && <span className="muted"> · {row.detail}</span>}
-          {row.by && <span className="muted"> · {row.by}</span>}
-          {row.at && <span className="muted"> · {dates.day(row.at)}</span>}
-          {kind === 'contributors' && (
-            <span className="muted"> · {t('details.versions', { count: row.count ?? 0 })}</span>
-          )}
-          {kind === 'labels_list' && <span className="muted"> · {row.count}</span>}
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-const PAGE_LISTS = new Set([
-  'child_pages',
-  'page_tree',
-  'space_index',
-  'recent_changes',
-  'my_favourites',
-  'my_drafts',
-  'filter_list',
-  'blog_posts',
-  'breadcrumbs',
-]);
-
-function Answer({ kind, answer, frame }: { kind: string; answer: BlockAnswer; frame: boolean }) {
-  const { t } = useTranslation();
-  if (answer.document) {
-    return (
-      <div className={frame ? 'block-include framed' : 'block-include'}>
-        <DocumentView document={answer.document} plain />
-        {answer.source?.title && (
-          <Link className="block-source" href={`/pages/${answer.source.id}`}>
-            {t('blocks.source', { title: answer.source.title })}
-          </Link>
-        )}
-      </div>
-    );
-  }
-  if (kind === 'facts_report' || kind === 'report_table') return <Report answer={answer} />;
-  if (kind === 'link_cards') return <LinkCards rows={answer.rows} />;
-  if (PAGE_LISTS.has(kind)) return <PageRows rows={answer.rows} />;
-  return <PlainRows answer={answer} kind={kind} />;
-}
-
 function Asked({ kind, settings }: { kind: string; settings: Settings }) {
   const { t } = useTranslation();
   const pageId = usePageId();
@@ -207,7 +57,7 @@ function Asked({ kind, settings }: { kind: string; settings: Settings }) {
     queryFn: () => api.post<BlockAnswer>(`/blocks/${kind}`, { page_id: pageId ?? null, settings }),
     enabled: near,
   });
-  const empty = q.data && q.data.rows.length === 0 && !q.data.document;
+  const empty = q.data && q.data.rows.length === 0 && !q.data.document && !q.data.people?.length;
   return (
     <div ref={box} className="dynamic-body">
       {(!near || q.isPending) && <Loading />}
@@ -220,84 +70,34 @@ function Asked({ kind, settings }: { kind: string; settings: Settings }) {
         </div>
       )}
       {empty && !settings.hide_empty && <p className="muted">{t('blocks.empty')}</p>}
-      {q.data && !empty && <Answer kind={kind} answer={q.data} frame={settings.frame === true} />}
+      {q.data && !empty && <Answer kind={kind} answer={q.data} settings={settings} />}
     </div>
   );
 }
 
-function Contents({ document: content, settings }: { document: Json; settings: Settings }) {
+const ACTIVITY_SCOPES = ['all', 'favourites', 'network'];
+
+/** Each tab asks the server again, so each is a list that follows the rules (spec 026, D6). */
+function ActivityTabs({ settings }: { settings: Settings }) {
   const { t } = useTranslation();
-  const from = typeof settings.from === 'number' ? settings.from : 1;
-  const to = typeof settings.to === 'number' ? settings.to : 3;
-  const exclude = typeof settings.exclude === 'string' ? settings.exclude : '';
-  const headings = contentsOf(content).filter(
-    (h) => h.level >= from && h.level <= to && !(exclude && matchesPattern(h.text, exclude)),
-  );
-  if (headings.length === 0) return <p className="muted">{t('blocks.noHeadings')}</p>;
-  const List = settings.numbered ? 'ol' : 'ul';
+  const [scope, setScope] = useState('all');
   return (
-    <List className="block-list">
-      {headings.map((h) => (
-        <li key={h.slug} data-level={h.level}>
-          <a
-            href={`#${h.slug}`}
-            onClick={(e) => {
-              e.preventDefault();
-              jumpToHeading(h.slug, true);
-            }}
+    <>
+      <div className="block-letters" role="group" aria-label={t('blocks.activityScope')}>
+        {ACTIVITY_SCOPES.map((item) => (
+          <button
+            key={item}
+            type="button"
+            className="ghost"
+            aria-pressed={scope === item}
+            onClick={() => setScope(item)}
           >
-            {h.text}
-          </a>
-        </li>
-      ))}
-    </List>
-  );
-}
-
-function SearchBox({ settings }: { settings: Settings }) {
-  const { t } = useTranslation();
-  const [query, setQuery] = useState('');
-  const pageId = usePageId();
-  const page = useQuery({
-    queryKey: ['block-search-page', pageId],
-    queryFn: () => api.get<{ space_id: string }>(`/pages/${pageId}`),
-    enabled: settings.this_space === true && !!pageId,
-  });
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const address = new URLSearchParams({ q: query });
-    if (page.data) address.set('space_id', page.data.space_id);
-    if (typeof settings.below === 'string') address.set('below', settings.below);
-    navigate(`/search?${address.toString()}`);
-  };
-  const hint = typeof settings.placeholder === 'string' ? settings.placeholder : t('blocks.searchHint');
-  return (
-    <form role="search" onSubmit={submit}>
-      <input
-        type="search"
-        aria-label={hint}
-        placeholder={hint}
-        value={query}
-        onChange={(e) => setQuery(e.target.value)}
-      />
-    </form>
-  );
-}
-
-function Local({ kind, settings, content }: { kind: string; settings: Settings; content: Json }) {
-  const { t } = useTranslation();
-  if (kind === 'toc') return <Contents document={content} settings={settings} />;
-  if (kind === 'search_box') return <SearchBox settings={settings} />;
-  return (
-    <a
-      href="#main"
-      onClick={(e) => {
-        e.preventDefault();
-        window.scrollTo(0, 0);
-      }}
-    >
-      {t('blocks.backToTop')}
-    </a>
+            {t(`blocks.scope_${item}`)}
+          </button>
+        ))}
+      </div>
+      <Asked kind="activity_tabs" settings={{ ...settings, scope }} />
+    </>
   );
 }
 
@@ -333,8 +133,8 @@ function FieldInput({
       </label>
     );
   }
-  if (field.type === 'sort' || field.type === 'style') {
-    const options = field.type === 'sort' ? ['tree', 'title', 'created', 'changed'] : ['list', 'cards'];
+  if (field.type === 'sort' || field.type === 'choice') {
+    const options = field.options ?? ['tree', 'title', 'created', 'changed'];
     return (
       <Field label={label}>
         <select value={typeof value === 'string' ? value : ''} onChange={(e) => onChange(e.target.value)}>
@@ -345,6 +145,28 @@ function FieldInput({
             </option>
           ))}
         </select>
+      </Field>
+    );
+  }
+  if (field.type === 'date') {
+    return (
+      <Field label={label}>
+        <input
+          type="date"
+          value={typeof value === 'string' ? value : ''}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      </Field>
+    );
+  }
+  if (field.type === 'lines') {
+    return (
+      <Field label={label} help={t(`blocks.help_${field.key}`)}>
+        <textarea
+          rows={LINES_ROWS}
+          defaultValue={Array.isArray(value) ? value.join('\n') : ''}
+          onChange={(e) => onChange(linesFromText(e.target.value))}
+        />
       </Field>
     );
   }
@@ -428,7 +250,7 @@ function SettingsDialog({
     timer.current = setTimeout(() => onChange(cleaned(next)), TYPING_PAUSE_MS);
   };
   return (
-    <Dialog title={t(`insert.block_${kind}.name`)} onClose={onClose}>
+    <Dialog title={t(`insert.block_${kind}.name`)} onClose={onClose} side>
       {(DYNAMIC_KINDS[kind] ?? []).map((field) => (
         <FieldInput
           key={field.key}
@@ -452,7 +274,7 @@ function DynamicView({ node, editor, updateAttributes, selected }: ReactNodeView
   return (
     <NodeViewWrapper
       as="section"
-      className={selected ? 'dynamic selected' : 'dynamic'}
+      className={selected && editor.isEditable ? 'dynamic selected' : 'dynamic'}
       aria-label={name}
       data-kind={kind}
       contentEditable={false}
@@ -470,7 +292,10 @@ function DynamicView({ node, editor, updateAttributes, selected }: ReactNodeView
         {known && LOCAL_KINDS.has(kind) && (
           <Local kind={kind} settings={settings} content={editor.getJSON() as Json} />
         )}
-        {known && !LOCAL_KINDS.has(kind) && <Asked kind={kind} settings={settings} />}
+        {known && kind === 'activity_tabs' && <ActivityTabs settings={settings} />}
+        {known && !LOCAL_KINDS.has(kind) && kind !== 'activity_tabs' && (
+          <Asked kind={kind} settings={settings} />
+        )}
       </BlockBoundary>
       {open && (
         <SettingsDialog
