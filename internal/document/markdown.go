@@ -37,6 +37,10 @@ type LinkResolver func(destination string) (href string, ok bool)
 
 // FromMarkdownLinked is FromMarkdown for a set of files, whose links lead to each other.
 func FromMarkdownLinked(source []byte, attachments AttachmentResolver, links LinkResolver) (Node, []string) {
+	if tooHardToParse(source) {
+		block := Node{Type: TypeCodeBlock, Content: textNode(string(source), nil)}
+		return Node{Type: TypeDoc, Content: []Node{block}}, []string{"This text holds a block too large to read as Markdown, so it is kept as plain text."}
+	}
 	c := &converter{src: source, attachments: attachments, links: links}
 	root := markdownParser.Parse(text.NewReader(source))
 	doc := Node{Type: TypeDoc, Content: c.blocks(root)}
@@ -44,6 +48,38 @@ func FromMarkdownLinked(source []byte, attachments AttachmentResolver, links Lin
 		doc.Content = []Node{{Type: TypeParagraph}}
 	}
 	return doc, c.warnings
+}
+
+// maxMarkdownBlockMarks is how many marks one block may hold. The parser's work grows with
+// the square of them: at this limit a block takes under a second, and at a megabyte of open
+// brackets it took minutes (spec 025).
+const maxMarkdownBlockMarks = 16 << 10
+
+// tooHardToParse reports whether a block, the lines between two blank lines, holds more marks
+// than the parser can take. It counts every line, also in code and tables: skipping those
+// would need the parser's own view of the text, and a wrong guess would let an attack through.
+func tooHardToParse(source []byte) bool {
+	marks, blankLine := 0, true
+	for _, c := range source {
+		switch c {
+		case '\n':
+			if blankLine {
+				marks = 0
+			}
+			marks++
+			blankLine = true
+		case ' ', '\t', '\r':
+		case '[', ']', '(', '!', '*', '_', '~', '>', '-', '+', '.':
+			marks++
+			blankLine = false
+		default:
+			blankLine = false
+		}
+		if marks > maxMarkdownBlockMarks {
+			return true
+		}
+	}
+	return false
 }
 
 type converter struct {

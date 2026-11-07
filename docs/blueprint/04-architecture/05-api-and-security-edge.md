@@ -48,7 +48,7 @@ request id → client address → log and recover → security headers
 
 ## 5.5 Limits
 
-- **ARC-154** · built · Logins are limited per address and per account.
+- **ARC-154** · built · Logins are limited per address, per account and address, and per account from all addresses together, at a higher number, so that nobody can lock a person out by guessing wrong on purpose (spec 025).
 - **ARC-155** · built · Tokens are limited per minute. A public hook has its own limit.
 - **ARC-156** · built · The reverse proxy limits requests per address, so a flood stops before the application. The application's own limits are for abuse by someone logged in. Built as advice in `docs/operations/install.md`.
 - **ARC-157** · built · Sizes are limited at each door: document 5 MiB, depth 100, title 255, upload by setting.

@@ -673,7 +673,18 @@ mutate "a synced block offers everyone its source" internal/blocks/reuse.go \
   's.replace("source.CanEdit = d.Allowed", "source.CanEdit = d.Allowed || true")' $app -run TestASyncedBlockSaysWhetherTheReaderMayEditItsSource
 mutate "a filter by text finds a hidden page" internal/blocks/lists.go \
   's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t", "JOIN perm_visible_pages($1) v ON true\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t")' $app -run TestFilterListFindsByTextPeopleAndDate
-
+mutate "wrong passwords lock the person out everywhere" internal/httpapi/handlers.go \
+  's.replace("accKey := allAddressesKey + \"|\" + meta.IP", "accKey := allAddressesKey")' $app -run TestWrongPasswordsFromOneAddressDoNotLockOutThePerson
+mutate "guesses from many addresses have no limit" internal/httpapi/handlers.go \
+  's.replace(" || !s.loginByAllIPs.allow(allAddressesKey)", "")' $app -run TestGuessesFromManyAddressesStillStopAtALimit
+mutate "any Markdown goes to the parser" internal/document/markdown.go \
+  's.replace("if tooHardToParse(source) {", "if false {")' ./internal/document -run TestTheLimitOfOneBlockIsExact
+mutate "pastes have no slots" internal/httpapi/handlers_organising.go \
+  's.replace("case s.markdownBusy <- struct{}{}:\n\t\tdefer func() { <-s.markdownBusy }()\n\tdefault:\n\t\twriteError(w, http.StatusTooManyRequests, \"rate_limited\", \"Too much text is being converted right now. Try again shortly.\")\n\t\treturn\n\t}", "default:\n\t}")' ./internal/httpapi -run TestPastesWaitForAFreeSlot
+mutate "an event too large stops the relay" internal/outbox/outbox.go \
+  's.replace("if len(body) > MaxEventBytes {", "if false {")' ./internal/outbox -run TestAnEventTooLargeForTheQueueDoesNotStopTheOthers
+mutate "a helper gets the network of the database" compose.yaml \
+  's.replace("    networks: [helpers]\n", "")' $app -run TestHelpersHaveNoWayOut
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

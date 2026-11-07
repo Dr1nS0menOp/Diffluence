@@ -371,7 +371,9 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	defer stopWork()
 
 	if a.cfg.Role.RunsWorker() {
-		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log}
+		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log, Refused: func(ctx context.Context, data []byte, cause error) error {
+			return a.failures.Record(ctx, "relay", data, cause)
+		}}
 		wg.Add(4)
 		go func() { defer wg.Done(); relay.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.Run(workCtx) }()

@@ -120,4 +120,6 @@ The chart has been checked with `helm lint` and `helm template`, not yet on a cl
 
 ## Load test
 
+[Known limits](limits.md) says what was measured, and what gives way first.
+
 `scripts/load/reading.js` is a [k6](https://k6.io) script with the pattern of a real reader, including the polling. Its header says how to run it. Run it against a copy, not against your live instance.

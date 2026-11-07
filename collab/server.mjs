@@ -4,7 +4,7 @@
 // about who may do what is an answer from the API, and it never writes a version.
 import { Server } from '@hocuspocus/server';
 import * as Y from 'yjs';
-import { documentJSON } from './document.mjs';
+import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
 
 const API_URL = (process.env.DIFFLUENCE_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 const TOKEN = process.env.DIFFLUENCE_COLLAB_TOKEN ?? '';
@@ -65,6 +65,8 @@ const authors = new Map();
 const server = new Server({
   port: PORT,
   quiet: true,
+  // The default of 100 MiB lets one person fill the memory of the service (spec 025).
+  websocketOptions: { maxPayload: MAX_MESSAGE_BYTES },
   debounce: SAVE_DEBOUNCE_MS,
   maxDebounce: SAVE_MAX_DEBOUNCE_MS,
 
@@ -126,18 +128,25 @@ const server = new Server({
 
   /** Every stored state passes the gate of the API, and a refused one is not kept (SEC-546). */
   async onStoreDocument({ documentName, document }) {
+    // Everyone goes back to the last good state. The browsers load it on reconnecting.
+    const refuse = () => document.getConnections().forEach((c) => c.close(CLOSE_REFUSED_STATE));
+    const state = Y.encodeStateAsUpdate(document);
+    if (!fitsTheStore(state)) {
+      refuse();
+      return;
+    }
     const res = await callAPI(`/documents/${documentName}`, {
       method: 'PUT',
       body: JSON.stringify({
-        state: Buffer.from(Y.encodeStateAsUpdate(document)).toString('base64'),
+        state: Buffer.from(state).toString('base64'),
         title: document.getText('title').toString(),
         document: documentJSON(document),
         authors: [...(authors.get(documentName) ?? [])],
       }),
     });
-    if (res.status === 422) {
-      // Everyone goes back to the last good state. The browsers load it on reconnecting.
-      document.getConnections().forEach((c) => c.close(CLOSE_REFUSED_STATE));
+    // A body the API cannot take answers 400, and it will not get smaller by trying again.
+    if (res.status === 422 || res.status === 400) {
+      refuse();
       return;
     }
     if (!res.ok) throw new Error('the document could not be stored');

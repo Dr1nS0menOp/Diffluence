@@ -9,6 +9,7 @@ package outbox
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -23,6 +24,13 @@ import (
 
 // SubjectPrefix is prepended to the event type to form the NATS subject.
 const SubjectPrefix = "diffluence.events."
+
+// MaxEventBytes stays below the 1 MiB that NATS takes in one message by default. An event
+// holds ids, so only a fault makes one this large.
+const MaxEventBytes = 900 << 10
+
+// errTooLarge says why an event was set aside.
+var errTooLarge = errors.New("the event is too large for the queue")
 
 var typePattern = regexp.MustCompile(`^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+$`)
 
@@ -69,6 +77,20 @@ type Relay struct {
 	Log       *slog.Logger
 	Interval  time.Duration // poll interval when idle (default 500ms)
 	BatchSize int           // events per transaction (default 100)
+	// Refused keeps an event the queue can never take, so that it is not lost and does
+	// not stop the events behind it. Without it, such an event is only logged.
+	Refused func(ctx context.Context, data []byte, cause error) error
+}
+
+// setAside takes a message the queue would refuse out of the way.
+func (r *Relay) setAside(ctx context.Context, m Message, body []byte) error {
+	if r.Log != nil {
+		r.Log.Error("outbox: an event is too large for the queue", "event_id", m.ID, "type", m.Type, "bytes", len(body))
+	}
+	if r.Refused == nil {
+		return nil
+	}
+	return r.Refused(ctx, body, errTooLarge)
 }
 
 // RunOnce publishes one batch and returns how many events it published.
@@ -100,7 +122,11 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 			if err != nil {
 				return err
 			}
-			if err := r.Publisher.Publish(ctx, SubjectPrefix+m.Type, body, m.ID.String()); err != nil {
+			if len(body) > MaxEventBytes {
+				if err := r.setAside(ctx, m, body); err != nil {
+					return fmt.Errorf("outbox: set aside %s: %w", m.ID, err)
+				}
+			} else if err := r.Publisher.Publish(ctx, SubjectPrefix+m.Type, body, m.ID.String()); err != nil {
 				return fmt.Errorf("outbox: publish %s: %w", m.ID, err)
 			}
 			if _, err := tx.Exec(ctx, "UPDATE outbox_events SET published_at = now() WHERE id = $1", m.ID); err != nil {

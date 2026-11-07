@@ -25,6 +25,7 @@ services:
     profiles: [collab]
     build: ./collab
     restart: unless-stopped
+    networks: [helpers]
     environment:
       DIFFLUENCE_API_URL: http://diffluence:8080
       DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
@@ -64,17 +65,24 @@ services:
     secrets: [database_url, migrate_database_url]
     ports: ["${DIFFLUENCE_PORT:-8080}:8080"]
     volumes: [data:/var/lib/diffluence]
+    networks: [default, helpers]
     read_only: true
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
 
-  # The helper for PDF files. It only gets HTML we made, and needs no outside network.
+  # The helper for PDF files and office previews. It reads hostile files, so it can only
+  # reach the app: no database, no internet (ARC-074).
   # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000.
   pdf:
-    image: gotenberg/gotenberg:8
+    image: gotenberg/gotenberg:8.40.0
     profiles: [pdf]
     restart: unless-stopped
+    networks: [helpers]
     security_opt: ["no-new-privileges:true"]
+
+networks:
+  helpers:
+    internal: true
 
 secrets:
   db_owner_password:

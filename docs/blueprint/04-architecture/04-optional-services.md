@@ -47,11 +47,11 @@ Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the b
 
 - **ARC-088** · built · One small interface: `Convert(file) → PDF`. Which program does it is chosen at installation with `DIFFLUENCE_OFFICE_CONVERTER` and its address.
 - **ARC-089** · partly · **Collabora** is the default choice, through `/cool/convert-to/pdf`. It only answers hosts on its `post_allow` list, so the install guide must set that. Confirm the path and the terms of the image at build time: the SDK pages could not be read for this study. Built in `internal/exchange/office.go` (wave J). Still open: one try with the real service, which only a fake has answered so far.
-- **ARC-090** · partly · **LibreOffice** needs no extra container when Gotenberg is there, through `/forms/libreoffice/convert`. This is the choice that costs least. Built in `internal/exchange/office.go` (wave J). Still open: one try with the real service, which only a fake has answered so far.
+- **ARC-090** · built · **LibreOffice** needs no extra container when Gotenberg is there, through `/forms/libreoffice/convert`. This is the choice that costs least. Built in `internal/exchange/office.go` (wave J), and tried with the real Gotenberg 8.40 (spec 025).
 - **ARC-091** · later · **Euro-Office** joins when its way of connecting is known. It is AGPLv3, which is fine for a separate program, and no source read here confirms how it connects.
 - **ARC-092** · built · No WOPI. Editing through WOPI needs public routes on our side, tokens per file and a frame per editor. None of that serves a preview, and each is attack surface. If office editing is ever wanted, it is a new study.
 - **ARC-093** · partly · The result is a derived file: `previews/<sha256 of the source>`, made once per version in a job, and removed when nothing uses it. The PDF viewer shows it. Built: the conversion and the viewer (wave J). Still open: storing the result under `previews/`.
-- **ARC-094** · partly · Office files can hold macros and links. The converter runs without network, per file, with a time limit, and the result is shown only through the PDF viewer. Still open: one try with the real service.
+- **ARC-094** · built · Office files can hold macros and links. The converter runs without network, per file, with a time limit, and the result is shown only through the PDF viewer. Word, ODT and RTF files that ask for outside images asked for nothing through the real Gotenberg (spec 025).
 
 ## 4.5 The PDF viewer
 

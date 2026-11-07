@@ -2,7 +2,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import * as Y from 'yjs';
-import { documentJSON } from './document.mjs';
+import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
 
 function paragraph(text, attributes) {
   const element = new Y.XmlElement('paragraph');
@@ -10,6 +10,11 @@ function paragraph(text, attributes) {
   element.insert(0, [words]);
   return { element, fill: () => words.insert(0, text, attributes) };
 }
+
+test('a state past the limit is not sent to the API', () => {
+  assert.equal(fitsTheStore(new Uint8Array(MAX_MESSAGE_BYTES)), true);
+  assert.equal(fitsTheStore(new Uint8Array(MAX_MESSAGE_BYTES + 1)), false);
+});
 
 test('a shared document becomes the JSON of a page', () => {
   const doc = new Y.Doc();

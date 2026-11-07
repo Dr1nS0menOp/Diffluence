@@ -38,6 +38,14 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - An administrator can give a space a storage limit
 - Fixed: renaming a file no longer wipes its comment
 - Upgrade impact: one migration, which reads all page versions once, so it takes longer on a large instance. Nothing else to do. No space gets a limit by itself
+### Security: what a test against the architecture found (spec 025)
+- Pasted Markdown can no longer keep the server busy for minutes. A paste is 256 KiB at most, and a block too large to read stays plain text with a warning
+- Wrong passwords no longer lock a person out from everywhere: the limit counts per account and address, with a wider limit per account
+- One event too large for the queue no longer stops all others
+- The editing service takes messages of 16 MiB at most, and goes back to the last good state past that
+- In `compose.yaml` the PDF helper and the editing service sit on an internal network, without a way to the database or the internet
+- `docs/operations/limits.md` lists what was measured, and what was not
+- Upgrade impact: if you added your own helper to `compose.yaml`, put it on the `helpers` network
 
 ### Added: inviting someone without an account (COL-047)
 - A person with the new global permission `invite_people` can ask for an invitation from the Share dialog. An administrator approves or refuses each one under Invitations, with a reason, and the person who asked hears the answer

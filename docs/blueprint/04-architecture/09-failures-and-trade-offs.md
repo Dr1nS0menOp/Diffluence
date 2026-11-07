@@ -20,7 +20,7 @@
 - **ARC-215** · built · NATS being down does not stop changes: the outbox is in PostgreSQL. `/readyz` still reports it, so a node with a broken connection leaves the pool.
 - **ARC-216** · built · That last point makes a NATS outage take down all API nodes, although they could serve people. An API node only needs NATS for health, so `/readyz` on role `api` should warn, and not fail. Only a worker needs it.
 - **ARC-217** · built · A failed save keeps text in the browser until it can be saved (PAG-016).
-- **ARC-218** · phase 3 · Every row above is drilled at least once, and the kill test of phase 3 covers the first four.
+- **ARC-218** · partly · Every row above is drilled at least once, and the kill test of phase 3 covers the first four. Built: the app, the worker, PostgreSQL and a full disk on one node (spec 025). Still open: the large shape and the other rows.
 
 ## 9.2 Upgrades
 

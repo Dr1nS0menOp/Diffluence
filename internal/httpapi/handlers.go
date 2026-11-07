@@ -83,8 +83,11 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	meta := metaFrom(r)
-	accKey := "acc:" + identityKey(in.Email)
-	if !s.loginByIP.allow("ip:"+meta.IP) || !s.loginByAcc.allow(accKey) {
+	// An account alone is not the key: anyone could then lock a person out by guessing
+	// wrong on purpose (spec 025). The wide limit stops guesses from many addresses.
+	allAddressesKey := "acc:" + identityKey(in.Email)
+	accKey := allAddressesKey + "|" + meta.IP
+	if !s.loginByIP.allow("ip:"+meta.IP) || !s.loginByAcc.allow(accKey) || !s.loginByAllIPs.allow(allAddressesKey) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(loginWindow.Seconds())))
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
@@ -105,6 +108,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.loginByIP.giveBack("ip:" + meta.IP)
+	s.loginByAllIPs.giveBack(allAddressesKey)
 	s.loginByAcc.reset(accKey)
 	s.setSessionCookie(w, token)
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User)})

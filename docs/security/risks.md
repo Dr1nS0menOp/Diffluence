@@ -25,7 +25,7 @@ You should know this to judge the risk yourself.
 
 - **Automated checks, not human review.** Much of the code is written with an AI assistant. No person reviews every line. Automated tests stand in for that review, including tests that break the permission code on purpose to prove that the tests notice ([mutation testing](#research)). Research found that people using an AI assistant wrote less secure code in a controlled study ([Perry et al.](#research)). Checks reduce that risk. They do not remove it.
 - **Tests only find what they look for.** Passing tests show that known mistakes are absent. They cannot show that no mistakes exist.
-- **The project attacks its own software.** Such a test has a blind spot: whoever wrote the software misses the same things twice. It is no replacement for an independent penetration test.
+- **The project attacks its own software.** Such a test has a blind spot: whoever wrote the software misses the same things twice. It is no replacement for an independent penetration test. What it measured is in [the limits](../operations/limits.md).
 - **Some parts were tested against stand-ins.** The optional helpers for PDF, office files and diagrams have not all been run for real. The Helm chart has not run on a real cluster. Tests with very many pages and with many people editing one page are not finished.
 
 ## What can go wrong

@@ -20,8 +20,8 @@ That is more than twice the old figure, and still not much: one node handles ove
 
 - **ARC-197** · phase 3 · `Get` loads permission facts once and reuses them for the buttons, which removes a third of its queries.
 - **ARC-198** · built · The recent list writes at most once a minute per person and page, and trims in a task instead of on each view. Going back to another page still writes at once, so the order stays right (spec 021 D8).
-- **ARC-199** · partly · The k6 test uses the real pattern of the frontend, with polling, and real spaces of 50,000 pages, not one small page in a loop. Built: `scripts/load/reading.js` with the real pattern. Still open: a run with 50,000 pages.
-- **ARC-200** · partly · Targets per query go in the test: tree, search, feed, directory. Built: targets per query in the script. Still open: a run at full size.
+- **ARC-199** · built · The k6 test uses the real pattern of the frontend, with polling, and real spaces of 50,000 pages, not one small page in a loop. The run is in `docs/operations/limits.md` (spec 025).
+- **ARC-200** · built · Targets per query go in the test: tree, search, feed, directory. At full size the page and the bell meet them, and the tree and search on a common word do not (`docs/operations/limits.md`).
 
 ## 8.2 What will hurt first
 
@@ -45,7 +45,7 @@ In order of how much it worries this study.
 With a commit of a few milliseconds that door passes a few hundred changes a second, and we expect five. So normal use is fine. The danger is a **long transaction that audits early**: until it commits, nobody can log in, publish or be refused. A copy of a large branch does this today: it records per page, in one transaction.
 
 - **ARC-201** · built · Rule: in a transaction, audit comes last, and long work runs as one transaction per page (ARC-064). `pages.Copy` of a large branch moves to a job in wave D, which also removes today's worst case.
-- **ARC-202** · phase 3 · A test holds a long transaction and measures what waits, and the load test watches the wait on this lock.
+- **ARC-202** · built · A test holds a long transaction and measures what waits (spec 025). With more waiting writes than connections in the pool, reading waits too, while `/readyz` says ready.
 - **ARC-203** · later · If the lock ever limits real use, events can be written without a hash in the transaction, and a single worker chains them seconds later. The log stays complete and tamper-evident, with a short tail that is not chained yet. That changes ADR-013, so it only happens with a measurement and the product owner's agreement.
 
 ### The tree, the lists, the directory

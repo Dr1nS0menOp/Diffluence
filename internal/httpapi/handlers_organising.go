@@ -526,8 +526,12 @@ func (s *Server) handleReachable(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"pages": found})
 }
 
-// maxPastedMarkdown is far more than anyone pastes. It keeps the parser's work bounded.
-const maxPastedMarkdown = 1 << 20
+// maxPastedMarkdown is far more than anyone pastes. It keeps the parser's work in a request
+// to seconds at worst, as requests never do slow work (ARC-014).
+const maxPastedMarkdown = 256 << 10
+
+// markdownSlots is how many pastes are converted at once, so nobody can fill every core.
+const markdownSlots = 2
 
 // handleMarkdownDocument turns pasted Markdown into a document. Nothing is stored, and
 // the result went through the same gate as everything that is saved.
@@ -541,6 +545,13 @@ func (s *Server) handleMarkdownDocument(w http.ResponseWriter, r *http.Request) 
 	}
 	if len(in.Markdown) > maxPastedMarkdown {
 		writeError(w, http.StatusBadRequest, "too_large", "That is too much text to convert at once.")
+		return
+	}
+	select {
+	case s.markdownBusy <- struct{}{}:
+		defer func() { <-s.markdownBusy }()
+	default:
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too much text is being converted right now. Try again shortly.")
 		return
 	}
 	parsed, _ := document.FromMarkdown([]byte(in.Markdown), nil)

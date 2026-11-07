@@ -45,7 +45,7 @@ func TestPastedMarkdownHasALimit(t *testing.T) {
 	e := newEnv(t)
 	anna := e.user("anna@example.com", identity.PermUseProduct)
 	anna.ok("POST", "/api/v1/markdown/document", map[string]any{"markdown": strings.Repeat("long text ", 20_000)})
-	anna.want(400, "POST", "/api/v1/markdown/document", map[string]any{"markdown": strings.Repeat("x", 1<<20+1)})
+	anna.want(400, "POST", "/api/v1/markdown/document", map[string]any{"markdown": strings.Repeat("x", 256<<10+1)})
 }
 
 func TestAHiddenPageAndADeletedPageLookTheSameToAReader(t *testing.T) {

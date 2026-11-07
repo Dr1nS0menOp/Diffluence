@@ -118,8 +118,12 @@ type Server struct {
 	cookieName string
 	loginByIP  *limiter
 	loginByAcc *limiter
-	tokenCalls *limiter
-	requests   *metrics.Requests
+	// loginByAllIPs counts tries on one account from every address together.
+	loginByAllIPs *limiter
+	tokenCalls    *limiter
+	requests      *metrics.Requests
+	// markdownBusy holds a place for every paste being converted.
+	markdownBusy chan struct{}
 }
 
 // New builds the API.
@@ -134,6 +138,9 @@ func New(d Deps) (*Server, error) {
 		loginByAcc: newLimiter(10, loginWindow),
 		tokenCalls: newLimiter(tokenCallsPerMinute, time.Minute),
 		requests:   metrics.NewRequests(),
+
+		loginByAllIPs: newLimiter(100, loginWindow),
+		markdownBusy:  make(chan struct{}, markdownSlots),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is

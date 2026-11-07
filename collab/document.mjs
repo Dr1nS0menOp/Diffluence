@@ -3,6 +3,17 @@
 // schema on purpose: what is allowed is decided in one place, document.Normalize.
 import * as Y from 'yjs';
 
+/** One message. A page holds 5 MiB at most, and its shared state can be about twice that. */
+export const MAX_MESSAGE_BYTES = 16 << 20;
+
+/** The API takes 32 MiB in one body. The state grows by a third as base64, and the page comes along. */
+const MAX_STATE_BYTES = 16 << 20;
+
+/** Whether a shared state is small enough for the API to keep. */
+export function fitsTheStore(state) {
+  return state.length <= MAX_STATE_BYTES;
+}
+
 function textNodes(text) {
   return text.toDelta().map(({ insert, attributes }) => {
     const node = { type: 'text', text: insert };
