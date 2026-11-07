@@ -24,6 +24,54 @@ export function looksLikeMarkdown(text: string): boolean {
   return text.split('\n').filter((line) => LIST_LINE.test(line)).length >= LIST_LINES_NEEDED;
 }
 
+const INLINE_IMAGE = /<img\b[^>]*\bsrc=["']data:(image\/(?:png|jpeg|gif|webp));base64,([^"']+)["'][^>]*>/gi;
+const ANY_IMAGE = /<img\b[^>]*>/gi;
+const OWN_IMAGE = /data-attachment-id/i;
+
+function fileOfBase64(type: string, data: string, index: number): File | null {
+  try {
+    const bytes = Uint8Array.from(atob(data), (letter) => letter.charCodeAt(0));
+    return new File([bytes], `pasted-${index + 1}.${type.split('/')[1]}`, { type });
+  } catch {
+    // Text that claims to be an image and is not counts as an image left behind.
+    return null;
+  }
+}
+
+/**
+ * The images in pasted HTML (spec 027, D8). Bytes in the clipboard can be stored. An image
+ * from another site cannot be fetched, because our policy forbids that, so it is only counted.
+ */
+export function pastedImages(html: string): { files: File[]; left: number } {
+  const outside = (html.match(ANY_IMAGE) ?? []).filter((tag) => !OWN_IMAGE.test(tag));
+  const files = Array.from(html.matchAll(INLINE_IMAGE))
+    .filter(([tag]) => !OWN_IMAGE.test(tag))
+    .flatMap(([, type = '', data = ''], index) => fileOfBase64(type, data, index) ?? []);
+  return { files, left: outside.length - files.length };
+}
+
+const WORD_LIST_ITEM = /<p\b[^>]*class=["']?MsoListParagraph[^>]*>([\s\S]*?)<\/p>/gi;
+const WORD_MARKER = /<!\[if !supportLists\]>([\s\S]*?)<!\[endif\]>/i;
+const GOOGLE_WRAPPER = /<b\b[^>]*id=["']docs-internal-guid[^>]*>([\s\S]*)<\/b>/i;
+const NUMBERED_MARKER = /\d|[a-z][.)]/i;
+const TAGS = /<[^>]+>/g;
+
+/** A run of list paragraphs from Word as one real list. Word marks items with a typed sign. */
+function wordRun(run: string): string {
+  const items = Array.from(run.matchAll(WORD_LIST_ITEM), (match) => match[1] ?? '');
+  const marker = (WORD_MARKER.exec(items[0] ?? '')?.[1] ?? '').replace(TAGS, '').trim();
+  const tag = NUMBERED_MARKER.test(marker) ? 'ol' : 'ul';
+  const lines = items.map((item) => `<li>${item.replace(WORD_MARKER, '')}</li>`);
+  return `<${tag}>${lines.join('')}</${tag}>`;
+}
+
+const WORD_LIST_RUN = /(?:<p\b[^>]*class=["']?MsoListParagraph[^>]*>[\s\S]*?<\/p>\s*)+/gi;
+
+/** Word and Google Docs write structure in their own way, and our blocks need the real thing (EDT-138). */
+export function cleanWordHtml(html: string): string {
+  return html.replace(WORD_LIST_RUN, wordRun).replace(GOOGLE_WRAPPER, '$1');
+}
+
 function replaceWithBlocks(editor: Editor, from: number, to: number, blocks: JSONContent[]) {
   const { doc } = editor.state;
   const $from = doc.resolve(from);

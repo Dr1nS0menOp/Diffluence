@@ -3,21 +3,26 @@
 // these appear there instead of in floating bars (spec 008, D3).
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import type { Node as ProseNode } from '@tiptap/pm/model';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
   IconAlignCenter,
   IconAlignEnd,
   IconAlignStart,
+  IconChevronDown,
+  IconFrame,
   IconLineNumbers,
   IconPicture,
   IconRename,
+  IconText,
   IconUnwrap,
   IconWrap,
 } from '../icons';
-import { Menu, MenuItem } from '../menu';
+import { Menu, MenuItem, MenuSeparator } from '../menu';
 import { Dialog, Field } from '../ui';
 import {
   columnCount,
+  imageIntoLine,
   MAX_COLUMNS,
   MIN_COLUMNS,
   setColumnCount,
@@ -25,29 +30,68 @@ import {
   updateSelected,
 } from './block-commands';
 import { useFileFacts } from './attachments';
+import { detectLanguage } from './code';
+import { today } from './inline';
 import { isDrawing } from './drawing';
 import type { EditorActions } from './keys';
 import { LanguageDialog } from './language-dialog';
 import { LinkTools } from './link-tools';
-import { IMAGE_SIZES, MARK_COLORS, PANEL_KINDS, PANEL_TINT } from './palette';
+import {
+  FIRST_PANEL_EMOJI,
+  IMAGE_BORDERS,
+  IMAGE_SIZES,
+  MARK_COLORS,
+  PANEL_EMOJI,
+  PANEL_KINDS,
+  PANEL_TINT,
+} from './palette';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
+
+const MIN_IMAGE_WIDTH = 5;
+const MAX_IMAGE_WIDTH = 100;
 
 function Swatch({ color }: { color: string }) {
   return <span className={`swatch mark-${color}`} />;
 }
 
-function DescribeDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+/** An image still called after its file has no words of its own yet. */
+const FILE_NAME = /\.[a-z0-9]{2,5}$/i;
+
+export function imagesWithoutWords(doc: ProseNode): number {
+  let count = 0;
+  doc.descendants((node) => {
+    const alt = node.attrs.alt as string | null | undefined;
+    if (node.type.name === 'image' && (!alt || FILE_NAME.test(alt))) count += 1;
+    return true;
+  });
+  return count;
+}
+
+export function DescribeDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
   const { t } = useTranslation();
-  const attrs = editor.getAttributes('image') as { alt: string | null; caption: string | null };
+  const attrs = editor.getAttributes('image') as {
+    alt: string | null;
+    caption: string | null;
+    width: number | null;
+    href: string | null;
+  };
   const [alt, setAlt] = useState(attrs.alt ?? '');
   const [caption, setCaption] = useState(attrs.caption ?? '');
+  const [width, setWidth] = useState(attrs.width?.toString() ?? '');
+  const [href, setHref] = useState(attrs.href ?? '');
   return (
     <Dialog title={t('editor.describe')} onClose={onClose}>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           onClose();
-          updateSelected(editor, { alt, caption: caption || null });
+          const share = Number(width);
+          updateSelected(editor, {
+            alt,
+            caption: caption || null,
+            width: share >= MIN_IMAGE_WIDTH && share <= MAX_IMAGE_WIDTH ? share : null,
+            href: href.trim() || null,
+          });
         }}
       >
         <Field label={t('editor.imageAlt')} help={t('editor.imageAltHelp')}>
@@ -55,6 +99,18 @@ function DescribeDialog({ editor, onClose }: { editor: Editor; onClose: () => vo
         </Field>
         <Field label={t('editor.imageCaption')}>
           <input value={caption} onChange={(e) => setCaption(e.target.value)} />
+        </Field>
+        <Field label={t('editor.imageWidth')} help={t('editor.imageWidthHelp')}>
+          <input
+            type="number"
+            min={MIN_IMAGE_WIDTH}
+            max={MAX_IMAGE_WIDTH}
+            value={width}
+            onChange={(e) => setWidth(e.target.value)}
+          />
+        </Field>
+        <Field label={t('editor.imageLink')} help={t('editor.imageLinkHelp')}>
+          <input value={href} onChange={(e) => setHref(e.target.value)} />
         </Field>
         <div className="dialog-actions">
           <button type="submit" className="primary">
@@ -80,12 +136,19 @@ function EditDrawingTool({ editor, actions }: { editor: Editor; actions: EditorA
 
 function ImageTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const { t } = useTranslation();
-  const [describing, setDescribing] = useState(false);
   const attrs = useEditorState({
     editor,
-    selector: (s) => s.editor.getAttributes('image') as { size: string | null; align: string | null },
+    selector: (s) =>
+      s.editor.getAttributes('image') as {
+        size: string | null;
+        align: string | null;
+        wrap: boolean;
+        border: string | null;
+        border_color: string | null;
+      },
   });
-  const set = (values: Record<string, string | null>) => updateSelected(editor, values);
+  const set = (values: Record<string, string | boolean | null>) => updateSelected(editor, values);
+  const canWrap = attrs.align === 'start' || attrs.align === 'end';
   const alignments = [
     { value: 'start', label: t('editor.alignStart'), icon: <IconAlignStart size={TOOL_ICON_SIZE} /> },
     { value: 'center', label: t('editor.alignCenter'), icon: <IconAlignCenter size={TOOL_ICON_SIZE} /> },
@@ -124,10 +187,55 @@ function ImageTools({ editor, actions }: { editor: Editor; actions: EditorAction
           {option.icon}
         </Tool>
       ))}
-      <Tool editor={editor} label={t('editor.describe')} run={() => setDescribing(true)}>
+      <Tool
+        editor={editor}
+        label={t('editor.imageWrap')}
+        pressed={attrs.wrap}
+        run={() => set({ wrap: !attrs.wrap, align: canWrap ? attrs.align : 'start' })}
+      >
+        <IconWrap size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Menu
+        label={t('editor.imageBorder')}
+        trigger={<IconFrame size={TOOL_ICON_SIZE} />}
+        className="tool"
+        align="start"
+      >
+        <MenuItem
+          role="menuitemradio"
+          aria-checked={!attrs.border}
+          onClick={() => set({ border: null, border_color: null })}
+        >
+          {t('editor.imageBorderNone')}
+        </MenuItem>
+        {IMAGE_BORDERS.map((border) => (
+          <MenuItem
+            key={border}
+            role="menuitemradio"
+            aria-checked={attrs.border === border}
+            onClick={() => set({ border })}
+          >
+            {t(`editor.imageBorder_${border}`)}
+          </MenuItem>
+        ))}
+        <MenuSeparator />
+        {MARK_COLORS.map((color) => (
+          <MenuItem
+            key={color}
+            role="menuitemradio"
+            aria-checked={attrs.border_color === color}
+            onClick={() => set({ border: attrs.border ?? 'thin', border_color: color })}
+          >
+            <Swatch color={color} /> {t(`editor.colors.${color}`)}
+          </MenuItem>
+        ))}
+      </Menu>
+      <Tool editor={editor} label={t('editor.imageInline')} run={() => imageIntoLine(editor)}>
+        <IconText size={TOOL_ICON_SIZE} />
+      </Tool>
+      <Tool editor={editor} label={t('editor.describe')} run={actions.openDescribe}>
         <IconRename size={TOOL_ICON_SIZE} />
       </Tool>
-      {describing && <DescribeDialog editor={editor} onClose={() => setDescribing(false)} />}
       <EditDrawingTool editor={editor} actions={actions} />
     </>
   );
@@ -154,12 +262,48 @@ function FileTools({ editor }: { editor: Editor }) {
 
 function PanelTools({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
-  const kind = useEditorState({
+  const attrs = useEditorState({
     editor,
-    selector: (s) => s.editor.getAttributes('panel').kind as string | undefined,
+    selector: (s) =>
+      s.editor.getAttributes('panel') as { kind?: string; emoji?: string | null; color?: string | null },
   });
+  const { kind } = attrs;
+  const change = (values: Record<string, string | null>) =>
+    editor.chain().focus().updateAttributes('panel', values).run();
   return (
     <>
+      <Menu
+        label={t('editor.panels.neutral')}
+        trigger={
+          <span className={kind === 'neutral' ? 'tool-emoji on' : 'tool-emoji'}>
+            {attrs.emoji ?? FIRST_PANEL_EMOJI}
+          </span>
+        }
+        className="tool"
+        align="start"
+      >
+        {PANEL_EMOJI.map((emoji) => (
+          <MenuItem
+            key={emoji}
+            role="menuitemradio"
+            aria-checked={attrs.emoji === emoji}
+            onClick={() => change({ kind: 'neutral', emoji })}
+          >
+            {emoji}
+          </MenuItem>
+        ))}
+        <MenuSeparator />
+        {MARK_COLORS.map((color) => (
+          <MenuItem
+            key={color}
+            role="menuitemradio"
+            aria-checked={attrs.color === color}
+            onClick={() => change({ kind: 'neutral', color, emoji: attrs.emoji ?? FIRST_PANEL_EMOJI })}
+          >
+            <Swatch color={color} /> {t(`editor.colors.${color}`)}
+          </MenuItem>
+        ))}
+      </Menu>
       {PANEL_KINDS.map((option) => (
         <button
           key={option}
@@ -169,7 +313,7 @@ function PanelTools({ editor }: { editor: Editor }) {
           aria-pressed={kind === option}
           title={t(`editor.panels.${option}`)}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => editor.chain().focus().updateAttributes('panel', { kind: option }).run()}
+          onClick={() => change({ kind: option, emoji: null, color: null })}
         >
           <Swatch color={PANEL_TINT[option]} />
         </button>
@@ -211,6 +355,7 @@ function ColumnTools({ editor }: { editor: Editor }) {
     selector: (s) => ({
       count: columnCount(s.editor),
       layout: s.editor.getAttributes('columns').layout as string | null | undefined,
+      width: s.editor.getAttributes('columns').width as string | null | undefined,
     }),
   });
   const counts = Array.from({ length: MAX_COLUMNS - MIN_COLUMNS + 1 }, (_, i) => i + MIN_COLUMNS);
@@ -218,6 +363,13 @@ function ColumnTools({ editor }: { editor: Editor }) {
     { value: null, label: t('editor.columnsEqual') },
     { value: 'wide-start', label: t('editor.columnsWideFirst') },
     { value: 'wide-end', label: t('editor.columnsWideLast') },
+    { value: 'sidebar-start', label: t('editor.columnsSidebarFirst') },
+    { value: 'sidebar-end', label: t('editor.columnsSidebarLast') },
+  ];
+  const widths = [
+    { value: '', label: t('editor.columnsNormal') },
+    { value: 'wide', label: t('editor.columnsWide') },
+    { value: 'full', label: t('editor.columnsFull') },
   ];
   return (
     <>
@@ -242,6 +394,18 @@ function ColumnTools({ editor }: { editor: Editor }) {
         {layouts.map((layout) => (
           <option key={layout.label} value={layout.value ?? ''}>
             {layout.label}
+          </option>
+        ))}
+      </select>
+      <select
+        className="tool-style"
+        aria-label={t('editor.columnsWidth')}
+        value={state.width ?? ''}
+        onChange={(e) => editor.commands.updateAttributes('columns', { width: e.target.value || null })}
+      >
+        {widths.map((width) => (
+          <option key={width.value} value={width.value}>
+            {width.label}
           </option>
         ))}
       </select>
@@ -319,10 +483,12 @@ function CodeTools({ editor }: { editor: Editor }) {
         title: string | null;
         line_numbers: boolean;
         wrap: boolean;
+        line_start: number | null;
+        folded: boolean;
       },
   });
   const [choosing, setChoosing] = useState(false);
-  const set = (values: Record<string, string | boolean | null>) =>
+  const set = (values: Record<string, string | boolean | number | null>) =>
     editor.commands.updateAttributes('codeBlock', values);
   const language = attrs.language ?? t('editor.plainText');
   return (
@@ -364,6 +530,39 @@ function CodeTools({ editor }: { editor: Editor }) {
       >
         <IconWrap size={TOOL_ICON_SIZE} />
       </Tool>
+      <Tool
+        editor={editor}
+        label={t('editor.codeFold')}
+        pressed={attrs.folded}
+        run={() => set({ folded: !attrs.folded })}
+      >
+        <IconChevronDown size={TOOL_ICON_SIZE} />
+      </Tool>
+      <button
+        type="button"
+        className="ghost"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          const found = detectLanguage(editor.state.selection.$from.parent.textContent);
+          if (found) set({ language: found });
+        }}
+      >
+        {t('editor.codeDetect')}
+      </button>
+      {attrs.line_numbers && (
+        <input
+          className="tool-input tool-number"
+          type="number"
+          min={1}
+          aria-label={t('editor.codeFirstLine')}
+          title={t('editor.codeFirstLine')}
+          value={attrs.line_start ?? 1}
+          onChange={(e) => {
+            const first = Number(e.target.value);
+            set({ line_start: first > 1 ? first : null });
+          }}
+        />
+      )}
       <input
         className="tool-input"
         aria-label={t('editor.codeTitle')}
@@ -375,6 +574,87 @@ function CodeTools({ editor }: { editor: Editor }) {
   );
 }
 
+function SpotlightTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const attrs = useEditorState({
+    editor,
+    selector: (s) =>
+      s.editor.getAttributes('spotlight') as {
+        color: string | null;
+        button_text: string | null;
+        button_href: string | null;
+      },
+  });
+  const set = (values: Record<string, string | null>) =>
+    editor.commands.updateAttributes('spotlight', values);
+  return (
+    <>
+      {MARK_COLORS.map((color) => (
+        <button
+          key={color}
+          type="button"
+          className={attrs.color === color ? 'tool on' : 'tool'}
+          aria-label={t(`editor.colors.${color}`)}
+          aria-pressed={attrs.color === color}
+          title={t(`editor.colors.${color}`)}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => set({ color })}
+        >
+          <Swatch color={color} />
+        </button>
+      ))}
+      <input
+        className="tool-input"
+        aria-label={t('editor.spotlightButton')}
+        placeholder={t('editor.spotlightButton')}
+        value={attrs.button_text ?? ''}
+        onChange={(e) => set({ button_text: e.target.value || null })}
+      />
+      <input
+        className="tool-input"
+        aria-label={t('editor.spotlightAddress')}
+        placeholder={t('editor.spotlightAddress')}
+        value={attrs.button_href ?? ''}
+        onChange={(e) => set({ button_href: e.target.value || null })}
+      />
+      <Tool editor={editor} label={t('editor.spotlightRemove')} run={() => unwrapBlock(editor, 'spotlight')}>
+        <IconUnwrap size={TOOL_ICON_SIZE} />
+      </Tool>
+    </>
+  );
+}
+
+/** A decision holds inline items, so a person and a date need no fields of their own (spec 027, D11). */
+function DecisionTools({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <button
+        type="button"
+        className="ghost"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => editor.chain().focus().insertContent({ type: 'text', text: ' @' }).run()}
+      >
+        {t('editor.decisionPerson')}
+      </button>
+      <button
+        type="button"
+        className="ghost"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() =>
+          editor
+            .chain()
+            .focus()
+            .insertContent({ type: 'date', attrs: { value: today() } })
+            .run()
+        }
+      >
+        {t('editor.decisionDate')}
+      </button>
+    </>
+  );
+}
+
 const LINK_KINDS = ['link', 'pageLink', 'pageCard', 'placeholderLink'];
 
 /** The tools for what is selected. Only the innermost thing gets them, so the row stays short. */
@@ -382,9 +662,19 @@ export function SelectionTools({ editor, actions }: { editor: Editor; actions: E
   const active = useEditorState({
     editor,
     selector: (s) =>
-      ['status', 'date', 'image', 'file', ...LINK_KINDS, 'codeBlock', 'panel', 'expand', 'columns'].find(
-        (name) => s.editor.isActive(name),
-      ),
+      [
+        'status',
+        'date',
+        'image',
+        'file',
+        ...LINK_KINDS,
+        'codeBlock',
+        'decision',
+        'spotlight',
+        'panel',
+        'expand',
+        'columns',
+      ].find((name) => s.editor.isActive(name)),
   });
   const tools: Record<string, ReactNode> = {
     // Keyed on the place, so a second mark does not show the words of the first.
@@ -394,6 +684,8 @@ export function SelectionTools({ editor, actions }: { editor: Editor; actions: E
     file: <FileTools key="file" editor={editor} />,
     codeBlock: <CodeTools key="code" editor={editor} />,
 
+    decision: <DecisionTools key="decision" editor={editor} />,
+    spotlight: <SpotlightTools key="spotlight" editor={editor} />,
     panel: <PanelTools key="panel" editor={editor} />,
     expand: <ExpandTools key="expand" editor={editor} />,
     columns: <ColumnTools key="columns" editor={editor} />,

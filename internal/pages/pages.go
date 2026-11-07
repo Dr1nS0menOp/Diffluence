@@ -147,7 +147,7 @@ func cleanTitle(title string) (string, error) {
 }
 
 const pageColumns = `id, space_id, parent_id, position, title, status, current_version, created_by, updated_by, created_at, updated_at,
-	comments_closed, emoji, full_width, title_align, hide_children, header_attachment_id, header_position,
+	comments_closed, emoji, full_width, title_align, hide_children, header_attachment_id, header_position, language,
 	kind, COALESCE(owner_id, created_by), stage_text, stage_color, COALESCE(to_char(review_on, 'YYYY-MM-DD'), ''),
 	archived_at, archived_by, published_at, link_target`
 
@@ -155,7 +155,7 @@ func scanPage(r pgx.Row) (Page, error) {
 	var p Page
 	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
 		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt, &p.CommentsClosed,
-		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition,
+		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition, &p.Language,
 		&p.Kind, &p.OwnerID, &p.StageText, &p.StageColor, &p.ReviewOn, &p.ArchivedAt, &p.ArchivedBy, &p.PublishedAt, &p.LinkTarget)
 	return p, err
 }
@@ -491,6 +491,10 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		if err != nil {
 			return d, err
 		}
+		if d.Document, err = document.Upgrade(d.Document, d.SchemaVersion); err != nil {
+			return d, err
+		}
+		d.SchemaVersion = document.SchemaVersion
 		if d.Document, err = s.withNames(ctx, d.Document); err != nil {
 			return d, err
 		}

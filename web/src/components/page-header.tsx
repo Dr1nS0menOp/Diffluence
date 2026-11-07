@@ -8,7 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type Attachment, type PageLook, type PageSummary } from '../api';
 import emoji from './editor/emoji.json';
 import { Menu, MenuItem } from './menu';
-import { Dialog, ErrorNote, FilePicker } from './ui';
+import { Dialog, ErrorNote, Field, FilePicker } from './ui';
 
 const EMOJI_SHOWN = 40;
 const SAVE_DELAY_MS = 400;
@@ -21,6 +21,25 @@ const LOOK_FIELDS: (keyof PageLook)[] = [
   'hide_children',
   'header_attachment_id',
   'header_position',
+  'language',
+];
+// The languages a writer picks from. The browser names them in the language of the reader.
+const PAGE_LANGUAGES = [
+  'en',
+  'nl',
+  'de',
+  'fr',
+  'es',
+  'it',
+  'pt',
+  'pl',
+  'sv',
+  'da',
+  'tr',
+  'ar',
+  'he',
+  'ja',
+  'zh',
 ];
 
 function lookOf(page: PageSummary): PageLook {
@@ -192,9 +211,49 @@ function HeaderImage({
 }
 
 /** Wraps the title field, with what belongs to it. */
-export function PageHeader({ page, look, title }: { page: PageSummary; look: Look; title: ReactNode }) {
+function LanguageDialog({
+  value,
+  onPick,
+  onClose,
+}: {
+  value: string;
+  onPick: (language: string) => void;
+  onClose: () => void;
+}) {
+  const { t, i18n } = useTranslation();
+  const names = new Intl.DisplayNames([i18n.language], { type: 'language' });
+  return (
+    <Dialog title={t('look.language')} onClose={onClose}>
+      <p className="muted">{t('look.languageHelp')}</p>
+      <Field label={t('look.language')}>
+        <select autoFocus value={value} onChange={(e) => onPick(e.target.value)}>
+          <option value="">{t('look.languageDefault')}</option>
+          {PAGE_LANGUAGES.map((code) => (
+            <option key={code} value={code}>
+              {names.of(code)}
+            </option>
+          ))}
+        </select>
+      </Field>
+    </Dialog>
+  );
+}
+
+export function PageHeader({
+  page,
+  look,
+  title,
+  above,
+}: {
+  page: PageSummary;
+  look: Look;
+  title: ReactNode;
+  /** What stands above the title while writing, such as the status of the page. */
+  above?: ReactNode;
+}) {
   const { t } = useTranslation();
   const [choosingEmoji, setChoosingEmoji] = useState(false);
+  const [choosingLanguage, setChoosingLanguage] = useState(false);
   const { look: value, change, changeSoon } = look;
   const upload = useMutation({
     mutationFn: (file: File) =>
@@ -245,7 +304,9 @@ export function PageHeader({ page, look, title }: { page: PageSummary; look: Loo
           >
             {t('look.showChildren')}
           </MenuItem>
+          <MenuItem onClick={() => setChoosingLanguage(true)}>{t('look.language')}</MenuItem>
         </Menu>
+        {above}
       </div>
       <div className={centred ? 'title-row title-center' : 'title-row'}>
         {value.emoji && (
@@ -261,6 +322,16 @@ export function PageHeader({ page, look, title }: { page: PageSummary; look: Loo
         )}
         {title}
       </div>
+      {choosingLanguage && (
+        <LanguageDialog
+          value={value.language}
+          onPick={(language) => {
+            setChoosingLanguage(false);
+            change({ language });
+          }}
+          onClose={() => setChoosingLanguage(false)}
+        />
+      )}
       {choosingEmoji && (
         <EmojiDialog
           value={value.emoji}

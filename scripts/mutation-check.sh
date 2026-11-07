@@ -685,6 +685,27 @@ mutate "an event too large stops the relay" internal/outbox/outbox.go \
   's.replace("if len(body) > MaxEventBytes {", "if false {")' ./internal/outbox -run TestAnEventTooLargeForTheQueueDoesNotStopTheOthers
 mutate "a helper gets the network of the database" compose.yaml \
   's.replace("    networks: [helpers]\n", "")' $app -run TestHelpersHaveNoWayOut
+mutate "a private saved block reaches everyone" internal/savedblocks/savedblocks.go \
+  's.replace("WHERE b.owner_id = $1\n", "WHERE b.owner_id = $1 OR true\n")' $app -run TestASavedBlockStaysPrivateUntilShared
+mutate "a guest sees what members shared" internal/savedblocks/savedblocks.go \
+  's.replace("u.type = '"'"'member'"'"'", "u.type IS NOT NULL")' $app -run TestAGuestDoesNotSeeSharedBlocks
+mutate "anyone deletes a saved block" internal/savedblocks/savedblocks.go \
+  's.replace("DELETE FROM saved_blocks WHERE id = $1 AND owner_id = $2", "DELETE FROM saved_blocks WHERE id = $1 AND $2::uuid IS NOT NULL")' $app -run TestOnlyTheOwnerChangesASavedBlock
+mutate "anyone shares a saved block" internal/savedblocks/savedblocks.go \
+  's.replace("UPDATE saved_blocks SET shared = $3 WHERE id = $1 AND owner_id = $2", "UPDATE saved_blocks SET shared = $3 WHERE id = $1 AND $2::uuid IS NOT NULL")' $app -run TestOnlyTheOwnerChangesASavedBlock
+mutate "a saved block skips the document gate" internal/savedblocks/savedblocks.go \
+  's.replace("doc, err := document.Normalize(raw)\n\tif err != nil {\n\t\treturn Block{}, err\n\t}\n\tstored, err := document.Marshal(doc)", "doc, _ := document.Normalize(raw)\n\tstored, err := document.Marshal(doc)\n\tstored = raw")' $app -run TestASavedBlockPassesTheDocumentGate
+mutate "a spotlight button takes any address" internal/document/attrs.go \
+  's.replace("safe, err := SafeHref(href)\n\tif err != nil {\n\t\treturn err\n\t}\n\tkeepText(in, out, \"button_text\", maxButtonBytes)", "safe := href\n\tkeepText(in, out, \"button_text\", maxButtonBytes)")' ./internal/document/
+mutate "an image link takes any address" internal/document/attrs.go \
+  's.replace("safe, err := SafeHref(href)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tout[\"href\"] = safe", "out[\"href\"] = href")' ./internal/document/
+mutate "an inline image points anywhere" internal/document/attrs.go \
+  's.replace("func cleanInlineImage(in, out map[string]any) error {\n\tid, ok := attachmentID(in)\n\tif !ok {\n\t\treturn errors.New(\"images must point to an attachment; external images are not allowed\")\n\t}", "func cleanInlineImage(in, out map[string]any) error {\n\tid, _ := attachmentID(in)")' ./internal/document/
+mutate "a panel emoji takes markup" internal/document/attrs.go \
+  's.replace("if !isEmoji(emoji) {\n\t\treturn errors.New(\"a panel takes one emoji\")\n\t}\n", "")' ./internal/document/
+mutate "an unknown block reaches an export" internal/document/html.go \
+  's.replace("w.b.WriteString(`<p class=\"unknown-block\">Block not shown: ` + esc(name) + `</p>`)", "orig, _ := n.Attrs[\"original\"].(string)\n\t\tw.b.WriteString(name + orig)")' ./internal/document/
+
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

@@ -289,9 +289,12 @@ func cleanPageFacts(in, out map[string]any) error {
 }
 
 var (
-	chartKinds  = choices("bar", "line", "pie", "area")
-	mediaKinds  = choices("video", "audio")
-	blockIDRule = regexp.MustCompile(`^[a-z0-9]{8,12}$`)
+	chartKinds   = choices("bar", "line", "pie", "area")
+	chartTotals  = choices("sum", "average", "count")
+	chartHeights = choices("small", "large")
+	chartLegends = choices("top", "bottom", "start", "end")
+	mediaKinds   = choices("video", "audio")
+	blockIDRule  = regexp.MustCompile(`^[a-z0-9]{8,12}$`)
 )
 
 func cleanChart(in, out map[string]any) error {
@@ -304,7 +307,14 @@ func cleanChart(in, out map[string]any) error {
 	chartKinds.keep(in, out, "kind")
 	keepText(in, out, "title", maxTitleBytes)
 	keepTrue(in, out, "legend")
+	keepTrue(in, out, "no_legend")
 	keepTrue(in, out, "smooth")
+	keepTrue(in, out, "points")
+	chartTotals.keep(in, out, "total")
+	chartHeights.keep(in, out, "height")
+	chartLegends.keep(in, out, "legend_position")
+	keepText(in, out, "x_title", maxTitleBytes)
+	keepText(in, out, "y_title", maxTitleBytes)
 	if axis, ok := intAttr(in["axis"]); ok && axis >= 0 && axis < 1000 {
 		out["axis"] = axis
 	}

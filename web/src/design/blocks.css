@@ -125,6 +125,43 @@
   line-height: var(--leading-title);
 }
 
+.panel-neutral {
+  background: var(--color-subtle);
+}
+
+/* A wide band for one message. The heading carries it, the tint only supports it. */
+.spotlight {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin-block: 0 var(--space-3);
+  padding: var(--space-5) var(--space-6);
+  border-radius: var(--radius-card);
+  background: var(--color-subtle);
+  color: var(--color-ink);
+}
+
+.spotlight-body {
+  inline-size: 100%;
+}
+
+.spotlight-body > div > :last-child {
+  margin-block-end: 0;
+}
+
+.unknown-block {
+  margin-block: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--color-guide);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+}
+
+.images-hint {
+  margin-block-start: var(--space-3);
+}
+
 .panel-body {
   flex: 1;
   min-inline-size: 0;
@@ -479,6 +516,187 @@
 
 .block-grip:hover {
   background: var(--color-subtle);
+}
+
+.beside-line {
+  position: absolute;
+  z-index: var(--layer-sticky);
+  border-inline-start: 2px dashed var(--color-accent);
+  pointer-events: none;
+}
+
+.image-link {
+  display: block;
+}
+
+.spotlight-button {
+  text-decoration: none;
+}
+
+.browse-preview {
+  min-inline-size: 0;
+}
+
+.tool-emoji {
+  line-height: var(--leading-title);
+}
+
+.block-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-twist);
+  min-block-size: var(--size-twist);
+  padding: 0;
+  background: none;
+  color: var(--color-muted);
+}
+
+/* The grip of a list item stands in the margin of the list. */
+.item-grip {
+  position: absolute;
+  z-index: var(--layer-sticky);
+  display: inline-flex;
+  margin-inline-start: calc(-1 * var(--space-3));
+  color: var(--color-muted);
+  cursor: grab;
+}
+
+@media (hover: none) {
+  .item-grip {
+    display: none;
+  }
+}
+
+.image-corner {
+  position: absolute;
+  inset-block-end: 0;
+  inset-inline-end: 0;
+  inline-size: var(--space-3);
+  block-size: var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+
+.doc-image[data-wrap][data-align='start'] {
+  float: inline-start;
+  margin-inline-end: var(--space-4);
+}
+
+.doc-image[data-wrap][data-align='end'] {
+  float: inline-end;
+  margin-inline-start: var(--space-4);
+}
+
+.doc-image[data-border='thin'] img {
+  border: 1px solid var(--color-line);
+}
+
+.doc-image[data-border='medium'] img {
+  border: 3px solid var(--color-line);
+}
+
+.doc-image[data-line='grey'] img {
+  border-color: var(--color-muted);
+}
+
+.doc-image[data-line='yellow'] img {
+  border-color: var(--color-mark-yellow);
+}
+
+.doc-image[data-line='green'] img {
+  border-color: var(--color-mark-green);
+}
+
+.doc-image[data-line='blue'] img {
+  border-color: var(--color-mark-blue);
+}
+
+.doc-image[data-line='purple'] img {
+  border-color: var(--color-mark-purple);
+}
+
+.doc-image[data-line='red'] img {
+  border-color: var(--color-mark-red);
+}
+
+.inline-image img {
+  display: inline;
+  block-size: 1.25em;
+  vertical-align: text-bottom;
+}
+
+.doc-columns[data-layout='sidebar-start'] > .doc-column:first-child,
+.doc-columns[data-layout='sidebar-end'] > .doc-column:last-child {
+  flex: 0.5;
+}
+
+.doc-columns[data-width='wide'] {
+  inline-size: 120%;
+  margin-inline-start: -10%;
+}
+
+.doc-columns[data-width='full'] {
+  inline-size: 140%;
+  margin-inline-start: -20%;
+}
+
+.code-unfold {
+  margin: var(--space-2);
+}
+
+.chart-point {
+  stroke: var(--color-surface);
+}
+
+.chart-axis {
+  fill: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+.chart[data-legend='top'] {
+  display: flex;
+  flex-direction: column;
+}
+
+.chart[data-legend='top'] .chart-legend {
+  order: -1;
+}
+
+.chart[data-legend='start'] .chart-legend {
+  justify-content: flex-start;
+}
+
+.chart[data-legend='end'] .chart-legend {
+  justify-content: flex-end;
+}
+
+.chart-options {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.browse {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: var(--space-4);
+}
+
+.browse-list {
+  max-block-size: 60vh;
+  overflow-y: auto;
+}
+
+.emoji-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(var(--size-tool), 1fr));
+  gap: var(--space-0-5);
+}
+
+.prose[lang] {
+  hyphens: auto;
 }
 
 .block-menu {

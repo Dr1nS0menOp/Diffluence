@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"github.com/google/uuid"
@@ -22,6 +24,12 @@ const (
 	maxTitleBytes    = 500
 	maxCodeTitle     = 200
 	maxTableStretch  = 100 // the whole width of the frame around the page
+	minImageWidth    = 5   // a share of the column
+	maxImageWidth    = 100
+	maxFirstLine     = 1000000
+	maxEmojiRunes    = 16 // room for a flag or a family, and far too short for a sentence
+	maxButtonBytes   = 80
+	maxUnknownName   = 100
 
 	maxFieldNameBytes   = 100
 	maxFieldOptionBytes = 2000
@@ -40,15 +48,21 @@ func choices(names ...string) choice {
 	return c
 }
 
+// panelNeutral is the kind of panel that takes its own emoji and colour.
+const panelNeutral = "neutral"
+
 var (
 	textColors    = choices("grey", "red", "orange", "amber", "green", "teal", "blue", "indigo", "purple", "pink", "brown", "slate")
 	markColors    = choices("grey", "yellow", "green", "blue", "purple", "red")
-	panelKinds    = choices("info", "note", "success", "warning", "error")
+	panelKinds    = choices("info", "note", "success", "warning", "error", panelNeutral)
 	textAligns    = choices("center", "end")
 	imageAligns   = choices("start", "center", "end")
 	imageSizes    = choices("small", "medium", "large")
 	fileDisplays  = choices("small", "large")
-	columnLayouts = choices("wide-start", "wide-end")
+	columnLayouts = choices("wide-start", "wide-end", "sidebar-start", "sidebar-end")
+	columnsWidths = choices("wide", "full")
+	textDirs      = choices("ltr", "rtl")
+	imageBorders  = choices("thin", "medium")
 	fieldKinds    = choices("line", "text", "choice")
 	mentionKinds  = choices(MentionUser, MentionGroup)
 )
@@ -126,6 +140,7 @@ func attachmentID(in map[string]any) (string, bool) {
 
 func cleanTextBlock(in, out map[string]any) error {
 	textAligns.keep(in, out, "align")
+	textDirs.keep(in, out, "dir")
 	if indent, ok := intAttr(in["indent"]); ok && indent >= 1 && indent <= maxIndent {
 		out["indent"] = indent
 	}
@@ -182,6 +197,10 @@ func cleanCodeBlock(in, out map[string]any) error {
 	keepText(in, out, "title", maxCodeTitle)
 	keepTrue(in, out, "line_numbers")
 	keepTrue(in, out, "wrap")
+	keepTrue(in, out, "folded")
+	if first, ok := intAttr(in["line_start"]); ok && first > 1 && first <= maxFirstLine {
+		out["line_start"] = first
+	}
 	return nil
 }
 
@@ -196,6 +215,30 @@ func cleanImage(in, out map[string]any) error {
 	keepText(in, out, "caption", maxCaptionBytes)
 	imageSizes.keep(in, out, "size")
 	imageAligns.keep(in, out, "align")
+	if width, ok := intAttr(in["width"]); ok && width >= minImageWidth && width <= maxImageWidth {
+		out["width"] = width
+	}
+	keepTrue(in, out, "wrap")
+	imageBorders.keep(in, out, "border")
+	markColors.keep(in, out, "border_color")
+	if href, set := in["href"].(string); set {
+		safe, err := SafeHref(href)
+		if err != nil {
+			return err
+		}
+		out["href"] = safe
+	}
+	return nil
+}
+
+// cleanInlineImage keeps a small image in a line of text. It is an attachment like any other.
+func cleanInlineImage(in, out map[string]any) error {
+	id, ok := attachmentID(in)
+	if !ok {
+		return errors.New("images must point to an attachment; external images are not allowed")
+	}
+	out["attachment_id"] = id
+	keepText(in, out, "alt", 1000)
 	return nil
 }
 
@@ -263,6 +306,62 @@ func cleanPanel(in, out map[string]any) error {
 	if out["kind"] == nil {
 		return errors.New("a panel needs a known kind")
 	}
+	if out["kind"] != panelNeutral {
+		return nil
+	}
+	markColors.keep(in, out, "color")
+	emoji, _ := in["emoji"].(string)
+	if emoji == "" {
+		return nil
+	}
+	if !isEmoji(emoji) {
+		return errors.New("a panel takes one emoji")
+	}
+	out["emoji"] = emoji
+	return nil
+}
+
+// isEmoji says whether a value can only be an emoji: no letters, digits or markup.
+func isEmoji(s string) bool {
+	if !utf8.ValidString(s) || utf8.RuneCountInString(s) > maxEmojiRunes {
+		return false
+	}
+	for _, r := range s {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) || unicode.IsSpace(r) || unicode.IsControl(r) || strings.ContainsRune(`<>&"'`, r) {
+			return false
+		}
+	}
+	return true
+}
+
+// cleanSpotlight keeps a colour and a button. A button needs both words and an address.
+func cleanSpotlight(in, out map[string]any) error {
+	markColors.keep(in, out, "color")
+	href, set := in["button_href"].(string)
+	if !set || href == "" {
+		return nil
+	}
+	safe, err := SafeHref(href)
+	if err != nil {
+		return err
+	}
+	keepText(in, out, "button_text", maxButtonBytes)
+	if out["button_text"] != nil {
+		out["button_href"] = safe
+	}
+	return nil
+}
+
+// cleanUnknownBlock keeps a block a release does not know as an opaque string. It is
+// never parsed and never shown: this is a place to keep it, not a way past the gate.
+func cleanUnknownBlock(in, out map[string]any) error {
+	keepText(in, out, "name", maxUnknownName)
+	if out["name"] == nil {
+		return errors.New("an unknown block needs its name")
+	}
+	if original, ok := in["original"].(string); ok && utf8.ValidString(original) {
+		out["original"] = original
+	}
 	return nil
 }
 
@@ -274,6 +373,7 @@ func cleanExpand(in, out map[string]any) error {
 
 func cleanColumns(in, out map[string]any) error {
 	columnLayouts.keep(in, out, "layout")
+	columnsWidths.keep(in, out, "width")
 	return nil
 }
 
@@ -324,6 +424,9 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeTaskItem:        cleanTaskItem,
 	TypeCodeBlock:       cleanCodeBlock,
 	TypeImage:           cleanImage,
+	TypeInlineImage:     cleanInlineImage,
+	TypeSpotlight:       cleanSpotlight,
+	TypeUnknownBlock:    cleanUnknownBlock,
 	TypeFile:            cleanFile,
 	TypeTable:           cleanTable,
 	TypeTableCell:       cleanCell,

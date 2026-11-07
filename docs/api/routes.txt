@@ -32,6 +32,7 @@ DELETE /api/v1/pages/{id}/verification                         object:page.edit
 DELETE /api/v1/pages/{id}/watch                                object:page.view
 DELETE /api/v1/pages/{id}/watchers/{user}                      object:space.administer
 DELETE /api/v1/rules/{id}                                      object:space.administer
+DELETE /api/v1/saved-blocks/{id}                               authenticated
 DELETE /api/v1/sites/{id}                                      object:space.administer
 DELETE /api/v1/spaces/{id}                                     object:space.administer
 DELETE /api/v1/spaces/{id}/favourite                           object:space.view
@@ -175,6 +176,7 @@ GET /api/v1/posts                                              authenticated
 GET /api/v1/rules/{id}                                         object:space.administer
 GET /api/v1/rules/{id}/runs                                    object:space.administer
 GET /api/v1/same-title                                         authenticated
+GET /api/v1/saved-blocks                                       authenticated
 GET /api/v1/search                                             object:page.view
 GET /api/v1/search/quick                                       authenticated
 GET /api/v1/sites/{id}                                         object:space.administer
@@ -248,6 +250,7 @@ PATCH /api/v1/pages/{id}                                       object:page.edit
 PATCH /api/v1/pages/{id}/comments-closed                       object:page.edit
 PATCH /api/v1/pages/{id}/look                                  object:page.edit
 PATCH /api/v1/pages/{id}/views                                 object:page.view
+PATCH /api/v1/saved-blocks/{id}                                authenticated
 PATCH /api/v1/sites/{id}                                       object:space.administer
 PATCH /api/v1/spaces/{id}                                      object:space.administer
 PATCH /api/v1/templates/{id}                                   authenticated
@@ -359,6 +362,7 @@ POST /api/v1/pages/{id}/views                                  object:page.view
 POST /api/v1/rules/{id}/hook                                   session-only object:space.administer
 POST /api/v1/rules/{id}/run                                    object:page.view
 POST /api/v1/rules/{id}/test                                   object:space.administer
+POST /api/v1/saved-blocks                                      authenticated
 POST /api/v1/sites/{id}/preview                                object:space.administer
 POST /api/v1/sites/{id}/publish                                object:space.administer
 POST /api/v1/sites/{id}/rollback                               object:space.administer

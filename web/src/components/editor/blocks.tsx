@@ -34,7 +34,22 @@ const PANEL_ICONS = {
 
 function PanelView({ node }: ReactNodeViewProps) {
   const { t } = useTranslation();
-  const kind = node.attrs.kind as PanelKind;
+  const kind = node.attrs.kind as PanelKind | 'neutral';
+  if (kind === 'neutral') {
+    const { emoji, color } = node.attrs as { emoji: string | null; color: string | null };
+    return (
+      <NodeViewWrapper
+        className={color ? `panel mark-${color}` : 'panel panel-neutral'}
+        role="note"
+        aria-label={t('editor.panels.neutral')}
+      >
+        <span className="panel-icon" contentEditable={false}>
+          {emoji}
+        </span>
+        <NodeViewContent className="panel-body" />
+      </NodeViewWrapper>
+    );
+  }
   const Icon = PANEL_ICONS[kind];
   return (
     <NodeViewWrapper
@@ -62,6 +77,8 @@ export const Panel = DocumentNode.create({
         parseHTML: (el: HTMLElement) => el.getAttribute('data-panel'),
         renderHTML: (attrs: Record<string, string>) => ({ 'data-panel': attrs.kind }),
       },
+      emoji: textAttribute('emoji'),
+      color: textAttribute('color'),
     };
   },
   parseHTML() {
@@ -77,6 +94,117 @@ export const Panel = DocumentNode.create({
     return [wrappingInputRule({ find: /^!!\s$/, type: this.type })];
   },
 });
+
+const textAttribute = (name: string) => ({
+  default: null,
+  parseHTML: (el: HTMLElement) => el.getAttribute(`data-${name}`),
+  renderHTML: (attrs: Record<string, string | null>) =>
+    attrs[name] ? { [`data-${name}`]: attrs[name] } : {},
+});
+
+function SpotlightView({ node, editor }: ReactNodeViewProps) {
+  const { t } = useTranslation();
+  const {
+    color,
+    button_text: text,
+    button_href: href,
+  } = node.attrs as {
+    color: string | null;
+    button_text: string | null;
+    button_href: string | null;
+  };
+  return (
+    <NodeViewWrapper
+      className={color ? `spotlight mark-${color}` : 'spotlight'}
+      role="group"
+      aria-label={t('insert.spotlight.name')}
+    >
+      <NodeViewContent className="spotlight-body" />
+      {text && href && (
+        <a
+          className="button spotlight-button"
+          contentEditable={false}
+          href={editor.isEditable ? undefined : href}
+          rel="noopener noreferrer"
+        >
+          {text}
+        </a>
+      )}
+    </NodeViewWrapper>
+  );
+}
+
+/** A wide band for an important message, with an optional button (EDT-123). */
+export const Spotlight = DocumentNode.create({
+  name: 'spotlight',
+  group: 'block',
+  content: 'block+',
+  defining: true,
+  addAttributes() {
+    return {
+      color: textAttribute('color'),
+      button_text: textAttribute('button_text'),
+      button_href: textAttribute('button_href'),
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-spotlight]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['div', mergeAttributes(HTMLAttributes, { 'data-spotlight': '' }), 0];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(SpotlightView);
+  },
+});
+
+function UnknownBlockView({ node }: ReactNodeViewProps) {
+  const { t } = useTranslation();
+  return (
+    <NodeViewWrapper className="unknown-block" contentEditable={false}>
+      {t('editor.unknownBlock', { name: node.attrs.name as string })}
+    </NodeViewWrapper>
+  );
+}
+
+/** A block from a newer release: shown as a note, and kept as it came (EDT-158, spec 027, D18). */
+export const UnknownBlock = DocumentNode.create({
+  name: 'unknownBlock',
+  group: 'block',
+  atom: true,
+  draggable: true,
+  addAttributes() {
+    return { name: { default: '', rendered: false }, original: { default: '', rendered: false } };
+  },
+  parseHTML() {
+    return [{ tag: 'div[data-unknown-block]' }];
+  },
+  renderHTML() {
+    return ['div', { 'data-unknown-block': '' }];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(UnknownBlockView);
+  },
+});
+
+interface StoredNode {
+  type?: string;
+  content?: StoredNode[];
+  [key: string]: unknown;
+}
+
+/** Keeps what this release cannot show, so that opening a document never loses a block. */
+export function keepUnknownBlocks(node: StoredNode, known: (type: string) => boolean): StoredNode {
+  if (!node.content) return node;
+  const content = node.content.map((child) => {
+    if (child.type && known(child.type)) return keepUnknownBlocks(child, known);
+    return {
+      type: 'unknownBlock',
+      attrs: { name: String(child.type ?? ''), original: JSON.stringify(child) },
+    };
+  });
+  return { ...node, content };
+}
 
 function ExpandView({ node, editor, getPos, updateAttributes }: ReactNodeViewProps) {
   const { t } = useTranslation();
@@ -158,6 +286,7 @@ export const Columns = DocumentNode.create({
         renderHTML: (attrs: Record<string, string | null>) =>
           attrs.layout ? { 'data-layout': attrs.layout } : {},
       },
+      width: textAttribute('width'),
     };
   },
   parseHTML() {

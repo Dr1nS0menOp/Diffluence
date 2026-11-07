@@ -225,3 +225,133 @@ caption {
 caption.below {
   caption-side: bottom;
 }
+
+.spotlight {
+  margin-block: 1em;
+  padding: 1.25em 1.5em;
+  border-radius: 0.5em;
+}
+
+.button {
+  display: inline-block;
+  padding: 0.25em 0.75em;
+  border: 1px solid currentColor;
+  border-radius: 0.25em;
+}
+
+.inline-image {
+  display: inline;
+  height: 1.25em;
+  vertical-align: text-bottom;
+}
+
+.wrap-start {
+  float: inline-start;
+  margin-inline-end: 1em;
+}
+
+.wrap-end {
+  float: inline-end;
+  margin-inline-start: 1em;
+}
+
+.border-thin img {
+  border: 1px solid #c4cad4;
+}
+
+.border-medium img {
+  border: 3px solid #c4cad4;
+}
+
+.line-yellow img {
+  border-color: #b58900;
+}
+
+.line-green img {
+  border-color: #2e7d32;
+}
+
+.line-blue img {
+  border-color: #1f5fbf;
+}
+
+.line-purple img {
+  border-color: #6a3fb5;
+}
+
+.line-red img {
+  border-color: #b3261e;
+}
+
+.columns.sidebar-start > .column:first-child,
+.columns.sidebar-end > .column:last-child {
+  flex: 0.5;
+}
+
+.unknown-block {
+  color: #5b6472;
+}
+
+.share-25 {
+  width: 25%;
+}
+
+.share-30 {
+  width: 30%;
+}
+
+.share-35 {
+  width: 35%;
+}
+
+.share-40 {
+  width: 40%;
+}
+
+.share-45 {
+  width: 45%;
+}
+
+.share-50 {
+  width: 50%;
+}
+
+.share-55 {
+  width: 55%;
+}
+
+.share-60 {
+  width: 60%;
+}
+
+.share-65 {
+  width: 65%;
+}
+
+.share-70 {
+  width: 70%;
+}
+
+.share-75 {
+  width: 75%;
+}
+
+.share-80 {
+  width: 80%;
+}
+
+.share-85 {
+  width: 85%;
+}
+
+.share-90 {
+  width: 90%;
+}
+
+.share-95 {
+  width: 95%;
+}
+
+.share-100 {
+  width: 100%;
+}

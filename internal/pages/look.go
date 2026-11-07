@@ -4,6 +4,7 @@ package pages
 
 import (
 	"context"
+	"regexp"
 	"strings"
 	"unicode"
 	"unicode/utf8"
@@ -38,7 +39,12 @@ type Look struct {
 	HideChildren       bool       `json:"hide_children"`
 	HeaderAttachmentID *uuid.UUID `json:"header_attachment_id"`
 	HeaderPosition     int        `json:"header_position"`
+	// Language says what the text is written in. Empty means the language of the instance.
+	Language string `json:"language"`
 }
+
+// languageTag is the short form of a language tag, which ends up in the lang attribute.
+var languageTag = regexp.MustCompile(`^[a-z]{2,3}(-[A-Z]{2})?$`)
 
 func cleanEmoji(emoji string) (string, error) {
 	emoji = strings.TrimSpace(emoji)
@@ -62,6 +68,9 @@ func (l Look) validated() (Look, error) {
 	l.Emoji = emoji
 	if l.TitleAlign != AlignStart && l.TitleAlign != AlignCenter {
 		return l, apperr.Invalid("A title is aligned to the start or the centre.")
+	}
+	if l.Language != "" && !languageTag.MatchString(l.Language) {
+		return l, apperr.Invalid("A page language looks like en or pt-BR.")
 	}
 	if l.HeaderPosition < 0 || l.HeaderPosition > maxHeaderPosition {
 		return l, apperr.Invalid("The position of a header image is between 0 and 100.")
@@ -95,8 +104,8 @@ func (s *Service) SetLook(ctx context.Context, c identity.Caller, id uuid.UUID, 
 			}
 		}
 		out, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET emoji = $2, full_width = $3, title_align = $4, hide_children = $5,
-			header_attachment_id = $6, header_position = $7, updated_at = now() WHERE id = $1 RETURNING `+pageColumns,
-			id, look.Emoji, look.FullWidth, look.TitleAlign, look.HideChildren, look.HeaderAttachmentID, look.HeaderPosition))
+			header_attachment_id = $6, header_position = $7, language = $8, updated_at = now() WHERE id = $1 RETURNING `+pageColumns,
+			id, look.Emoji, look.FullWidth, look.TitleAlign, look.HideChildren, look.HeaderAttachmentID, look.HeaderPosition, look.Language))
 		if err != nil {
 			return err
 		}

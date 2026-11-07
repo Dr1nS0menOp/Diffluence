@@ -96,6 +96,14 @@
      "text": "A tile shows the type and the size of its file. Under Attachments, in the More actions menu, a file can be moved or copied to another page, and the tile keeps working. In the editor, the / menu offers File on this page, to show a file again without a new upload."
     }
    ]
+  },
+  {
+   "type": "paragraph",
+   "content": [
+    { "type": "text", "text": "A small image can also stand in a line of text " },
+    { "type": "inlineImage", "attrs": { "attachment_id": "@file:river.png", "alt": "A blue river" } },
+    { "type": "text", "text": " like this." }
+   ]
   }
  ]
 }

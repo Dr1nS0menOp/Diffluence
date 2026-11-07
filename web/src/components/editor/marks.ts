@@ -100,6 +100,11 @@ export function setAlignment(editor: Editor, align: Alignment) {
     .run();
 }
 
+/** Marks a line for a language that runs the other way than the page (EDT-042). */
+export function setDirection(editor: Editor, dir: 'ltr' | 'rtl' | null) {
+  editor.chain().focus().updateAttributes('paragraph', { dir }).updateAttributes('heading', { dir }).run();
+}
+
 /** Alignment and indent of text blocks, stored as data attributes for the style sheet. */
 export const BlockFormat = Extension.create({
   name: 'blockFormat',
@@ -108,6 +113,11 @@ export const BlockFormat = Extension.create({
       {
         types: ['paragraph', 'heading'],
         attributes: {
+          dir: {
+            default: null,
+            parseHTML: (el: HTMLElement) => el.getAttribute('dir'),
+            renderHTML: (attrs: Record<string, unknown>) => (attrs.dir ? { dir: attrs.dir } : {}),
+          },
           align: {
             default: null,
             parseHTML: (el: HTMLElement) => el.getAttribute('data-align'),

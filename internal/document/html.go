@@ -34,6 +34,9 @@ type HTMLOptions struct {
 	Mention func(n Node) string
 }
 
+// imageWidthStep is how fine an export follows the width of an image.
+const imageWidthStep = 5
+
 // Heading is a heading of a document, with the id ToHTML gave it.
 type Heading struct {
 	ID    string
@@ -120,20 +123,30 @@ func blockClass(n Node) string {
 	return strings.Join(classes, " ")
 }
 
+// open writes the start of a block, with the class and direction it has.
+func (w *htmlWriter) open(name string, n Node, extra string) {
+	w.b.WriteString("<" + name + extra)
+	if c := blockClass(n); c != "" {
+		w.b.WriteString(` class="` + esc(c) + `"`)
+	}
+	if dir, _ := n.Attrs["dir"].(string); dir != "" {
+		w.b.WriteString(` dir="` + esc(dir) + `"`)
+	}
+	w.b.WriteString(">")
+}
+
 func (w *htmlWriter) node(n Node) {
 	switch n.Type {
 	case TypeText:
 		w.text(n)
 	case TypeParagraph:
-		w.tag("p", blockClass(n), n)
+		w.open("p", n, "")
+		w.children(n)
+		w.b.WriteString("</p>")
 	case TypeHeading:
 		level := strconv.Itoa(headingLevel(n))
 		id := slug(BlockText(n), w.seen)
-		w.b.WriteString(`<h` + level + ` id="` + esc(id) + `"`)
-		if c := blockClass(n); c != "" {
-			w.b.WriteString(` class="` + esc(c) + `"`)
-		}
-		w.b.WriteString(">")
+		w.open("h"+level, n, ` id="`+esc(id)+`"`)
 		w.children(n)
 		w.b.WriteString("</h" + level + ">")
 	case TypeBulletList:
@@ -156,6 +169,14 @@ func (w *htmlWriter) node(n Node) {
 		w.b.WriteString("<br>")
 	case TypeImage:
 		w.image(n)
+	case TypeInlineImage:
+		w.inlineImage(n)
+	case TypeSpotlight:
+		w.spotlight(n)
+	case TypeUnknownBlock:
+		// The name alone: what is kept in it was never checked, so it never leaves.
+		name, _ := n.Attrs["name"].(string)
+		w.b.WriteString(`<p class="unknown-block">Block not shown: ` + esc(name) + `</p>`)
 	case TypeFile:
 		w.file(n)
 	case TypePanel:
@@ -167,7 +188,8 @@ func (w *htmlWriter) node(n Node) {
 		w.children(n)
 		w.b.WriteString("</details>")
 	case TypeColumns:
-		w.tag("div", "columns", n)
+		layout, _ := n.Attrs["layout"].(string)
+		w.tag("div", strings.TrimSpace("columns "+layout), n)
 	case TypeColumn:
 		w.tag("div", "column", n)
 	case TypeDecision:
@@ -272,12 +294,71 @@ func (w *htmlWriter) image(n Node) {
 		}
 		return
 	}
-	size, _ := n.Attrs["size"].(string)
-	w.b.WriteString(`<figure class="image size-` + esc(size) + `"><img src="` + esc(src) + `" alt="` + esc(alt) + `">`)
+	w.b.WriteString(`<figure class="` + esc(imageClasses(n)) + `">`)
+	href, hasLink := n.Attrs["href"].(string)
+	if hasLink {
+		w.b.WriteString(`<a href="` + esc(href) + `" rel="noopener noreferrer">`)
+	}
+	w.b.WriteString(`<img src="` + esc(src) + `" alt="` + esc(alt) + `">`)
+	if hasLink {
+		w.b.WriteString("</a>")
+	}
 	if caption != "" {
 		w.b.WriteString("<figcaption>" + esc(caption) + "</figcaption>")
 	}
 	w.b.WriteString("</figure>")
+}
+
+// imageClasses names the look of an image. A style sheet cannot know a number, so a
+// share of the column goes to the nearest step, which an export has a class for.
+func imageClasses(n Node) string {
+	size, _ := n.Attrs["size"].(string)
+	classes := []string{"image", "size-" + size}
+	if width, ok := intAttr(n.Attrs["width"]); ok {
+		step := (width + imageWidthStep/2) / imageWidthStep * imageWidthStep
+		classes = append(classes, "share-"+strconv.Itoa(step))
+	}
+	if wrap, _ := n.Attrs["wrap"].(bool); wrap {
+		align, _ := n.Attrs["align"].(string)
+		classes = append(classes, "wrap-"+align)
+	}
+	if border, _ := n.Attrs["border"].(string); border != "" {
+		classes = append(classes, "border-"+border)
+	}
+	if color, _ := n.Attrs["border_color"].(string); color != "" {
+		classes = append(classes, "line-"+color)
+	}
+	return strings.Join(classes, " ")
+}
+
+func (w *htmlWriter) inlineImage(n Node) {
+	alt, _ := n.Attrs["alt"].(string)
+	id, err := uuid.Parse(fmt.Sprint(n.Attrs["attachment_id"]))
+	if err == nil && w.o.ImageSrc != nil {
+		if src, ok := w.o.ImageSrc(id); ok {
+			w.b.WriteString(`<img class="inline-image" src="` + esc(src) + `" alt="` + esc(alt) + `">`)
+			return
+		}
+	}
+	w.b.WriteString(esc(alt))
+}
+
+func (w *htmlWriter) spotlight(n Node) {
+	class := "spotlight"
+	if color, _ := n.Attrs["color"].(string); color != "" {
+		class += " mark-" + color
+	}
+	w.b.WriteString(`<aside class="` + esc(class) + `">`)
+	w.children(n)
+	text, _ := n.Attrs["button_text"].(string)
+	href, _ := n.Attrs["button_href"].(string)
+	// An address inside the instance means nothing in a file, so the words stay alone.
+	if text != "" && strings.HasPrefix(href, "/") {
+		w.b.WriteString(`<p>` + esc(text) + `</p>`)
+	} else if text != "" {
+		w.b.WriteString(`<a class="button" href="` + esc(href) + `" rel="noopener noreferrer">` + esc(text) + `</a>`)
+	}
+	w.b.WriteString("</aside>")
 }
 
 func (w *htmlWriter) file(n Node) {
@@ -294,6 +375,13 @@ func (w *htmlWriter) file(n Node) {
 
 func (w *htmlWriter) panel(n Node) {
 	kind, _ := n.Attrs["kind"].(string)
+	if kind == panelNeutral {
+		emoji, _ := n.Attrs["emoji"].(string)
+		w.b.WriteString(`<aside class="panel panel-` + esc(kind) + `"><p class="panel-kind">` + esc(emoji) + `</p>`)
+		w.children(n)
+		w.b.WriteString("</aside>")
+		return
+	}
 	// The word carries the meaning, because colour alone is not enough.
 	label := []rune(kind)
 	if len(label) > 0 {

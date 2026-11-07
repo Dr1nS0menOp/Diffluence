@@ -3,9 +3,16 @@ import type { AnyExtension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { TaskItem, TaskList } from '@tiptap/extension-list';
 import { TableKit } from '@tiptap/extension-table';
+import { KNOWN_NODE_TYPES } from './palette';
 import { SheetNode } from '../sheet/sheet-node';
-import { AttachmentFile, AttachmentImage, pageFileAddress, type FileAddress } from './attachments';
-import { Column, Columns, Decision, Expand, Panel } from './blocks';
+import {
+  AttachmentFile,
+  AttachmentImage,
+  InlineImage,
+  pageFileAddress,
+  type FileAddress,
+} from './attachments';
+import { Column, Columns, Decision, Expand, Panel, Spotlight, UnknownBlock } from './blocks';
 import { CodeBlock } from './code';
 import { Dynamic } from './dynamic/dynamic';
 import { Anchor, ChartNode, Excerpt, Media, PageFacts } from './dynamic/nodes';
@@ -45,6 +52,12 @@ const DocumentTaskItem = TaskItem.extend({
 
 /** Called with a task's id when a reader ticks it. */
 export type TaskToggle = (id: string, done: boolean) => void;
+
+// Every node of the schema, for telling what a stored document holds that this release does
+// not know. The list is short and fixed, so it is written out and checked by a test.
+const KNOWN_BLOCK_TYPES = new Set(KNOWN_NODE_TYPES);
+
+export const knownBlockType = (type: string) => KNOWN_BLOCK_TYPES.has(type);
 
 /** Everything a document can hold, for reading and for writing. */
 export interface DocumentOptions {
@@ -90,12 +103,15 @@ export function documentExtensions({
     DocumentHeaderCell,
     CodeBlock,
     AttachmentImage.configure({ fileAddress }),
+    InlineImage.configure({ fileAddress }),
     AttachmentFile.configure({ fileAddress }),
     Panel,
     Expand,
     Columns,
     Column,
     Decision,
+    Spotlight,
+    UnknownBlock,
     Dynamic,
     PageFacts,
     Excerpt,

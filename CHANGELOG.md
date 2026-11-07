@@ -4,6 +4,21 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
 
+### Added: the rest of the editor (wave Q)
+- Tools that do not fit fold into More, so a narrow window no longer covers the first line of the page
+- A plus on an empty line, Browse all with previews, and Turn into with the likely choices first. Panels and sections go back to text
+- Copy link to any block with text. Shift and a grip select several blocks, which then move, duplicate and go together. A list item drags with what is nested in it, and dropping a block at the edge of another makes columns
+- Saved blocks, private unless shared, in the `/` menu
+- Images: a corner to drag, a width, text around them, a border, a link, and a small image in a line of text. The editor asks for a description and says how many are missing
+- Images in pasted web pages are taken along when their bytes are in the clipboard. Otherwise a note says how many stayed behind
+- Code blocks: a first line number, folded for readers, language detection, and Tab on several lines
+- A panel with your own emoji, a spotlight band, a narrow sidebar split, and wider columns
+- An emoji picker with groups and recent emoji
+- Charts: axis and data columns, totals of repeated values, titles, legend, height, smooth lines and data points. Removing a table asks about its chart
+- The language of a page and the direction of a line
+- Lists from Word arrive as lists, and a block from a newer release is kept and shown as a note
+- Upgrade impact: one migration. Nobody needs to do anything
+
 ### Added: the rest of dynamic blocks (wave O)
 - Lists and reports filter by text, type, person, date and space. The report table now really shows its columns, and a writer chooses them
 - New blocks: activity with tabs, popular pages, popular, related and recent labels, section contents, contribution table, person card, people list, space files, rotating cards, a button that starts a page from a template, a timeline, and a synced block

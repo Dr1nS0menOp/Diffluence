@@ -11,6 +11,7 @@ import i18n from '../../i18n';
 const COPY_MESSAGE_MS = 2000;
 const TAB_AS_SPACES = '  ';
 const MAX_COLOURED_CHARACTERS = 200_000;
+const MIN_DETECTED_CHARACTERS = 20;
 
 const lowlight = createLowlight(common);
 const COMMON_LANGUAGES = lowlight.listLanguages();
@@ -107,14 +108,43 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className = ''):
   return el;
 }
 
-function renderLineNumbers(list: HTMLElement, text: string) {
+function renderLineNumbers(list: HTMLElement, text: string, first: number) {
   const lines = text.split('\n').length;
   while (list.children.length > lines) list.lastElementChild?.remove();
-  while (list.children.length < lines) {
-    const item = element('li');
-    item.textContent = String(list.children.length + 1);
-    list.append(item);
+  while (list.children.length < lines) list.append(element('li'));
+  Array.from(list.children).forEach((item, i) => {
+    item.textContent = String(first + i);
+  });
+}
+
+/** Adds or takes away two spaces at the start of every selected line (EDT-112). */
+export function indentCodeLines(editor: Editor, direction: 'in' | 'out'): boolean {
+  const { selection, tr } = editor.state;
+  const { $from, $to } = selection;
+  if ($from.parent.type.name !== 'codeBlock' || !$from.sameParent($to)) return false;
+  const start = $from.start();
+  const text = $from.parent.textContent;
+  const lineStarts = [0];
+  for (let i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) lineStarts.push(i + 1);
+  const from = selection.from - start;
+  const to = selection.to - start;
+  const touched = lineStarts.filter((line, i) => {
+    const end = lineStarts[i + 1] ?? text.length + 1;
+    return line < Math.max(to, from + 1) && end > from;
+  });
+  for (const line of [...touched].reverse()) {
+    if (direction === 'in') tr.insertText(TAB_AS_SPACES, start + line);
+    else if (text.startsWith(TAB_AS_SPACES, line))
+      tr.delete(start + line, start + line + TAB_AS_SPACES.length);
   }
+  editor.view.dispatch(tr);
+  return true;
+}
+
+/** A name for what a block holds. Guessing needs some text, and is only a suggestion. */
+export function detectLanguage(text: string): string | null {
+  if (text.trim().length < MIN_DETECTED_CHARACTERS) return null;
+  return highlighter.highlightAuto(text).data?.language ?? null;
 }
 
 /** A button for readers. It says so when the browser refuses, because that can happen. */
@@ -163,14 +193,32 @@ function codeView({ node: initial, editor }: NodeViewRendererProps) {
       title: string | null;
       line_numbers: boolean;
       wrap: boolean;
+      line_start: number | null;
+      folded: boolean;
     };
     title.textContent = attrs.title ?? '';
     language.textContent = attrs.language ?? '';
     frame.classList.toggle('wrap', attrs.wrap);
     head.hidden = editor.isEditable && !attrs.title;
     numbers.hidden = !attrs.line_numbers;
-    if (attrs.line_numbers) renderLineNumbers(numbers, node.textContent);
+    if (attrs.line_numbers) renderLineNumbers(numbers, node.textContent, attrs.line_start ?? 1);
+    // Hidden text cannot be edited, so a block only folds for readers (spec 027, D19).
+    if (!editor.isEditable && attrs.folded && !opened) fold();
   };
+  const fold = () => {
+    if (unfold.isConnected) return;
+    body.hidden = true;
+    unfold.textContent = i18n.t('editor.codeShow', { count: node.textContent.split('\n').length });
+    frame.append(unfold);
+  };
+  let opened = false;
+  const unfold = element('button', 'ghost code-unfold');
+  unfold.type = 'button';
+  unfold.addEventListener('click', () => {
+    opened = true;
+    body.hidden = false;
+    unfold.remove();
+  });
   render();
 
   return {
@@ -183,7 +231,8 @@ function codeView({ node: initial, editor }: NodeViewRendererProps) {
       return true;
     },
     ignoreMutation: (mutation: { target: Node }) => !code.contains(mutation.target),
-    stopEvent: (event: Event) => event.target instanceof Node && head.contains(event.target),
+    stopEvent: (event: Event) =>
+      event.target instanceof Node && (head.contains(event.target) || unfold.contains(event.target)),
   };
 }
 
@@ -194,6 +243,8 @@ export const CodeBlock = CodeBlockLowlight.extend({
       title: { default: null },
       line_numbers: { default: false },
       wrap: { default: false },
+      line_start: { default: null },
+      folded: { default: false },
     };
   },
   addNodeView() {
@@ -203,9 +254,12 @@ export const CodeBlock = CodeBlockLowlight.extend({
     return {
       ...this.parent?.(),
       // Escape moves to the tools (keys.ts), so Tab here is no keyboard trap.
-      Tab: () =>
-        this.editor.isActive(this.name) &&
-        this.editor.commands.insertContent({ type: 'text', text: TAB_AS_SPACES }),
+      Tab: () => {
+        if (!this.editor.isActive(this.name)) return false;
+        if (!this.editor.state.selection.empty) return indentCodeLines(this.editor, 'in');
+        return this.editor.commands.insertContent({ type: 'text', text: TAB_AS_SPACES });
+      },
+      'Shift-Tab': () => this.editor.isActive(this.name) && indentCodeLines(this.editor, 'out'),
     };
   },
 }).configure({ lowlight: highlighter });

@@ -488,6 +488,21 @@
      "text": " and a word for an emoji, such as 🌊."
     }
    ]
+  },
+  {
+   "type": "panel",
+   "attrs": { "kind": "neutral", "emoji": "🌊", "color": "blue" },
+   "content": [
+    { "type": "paragraph", "content": [{ "type": "text", "text": "A panel can also carry your own emoji and colour." }] }
+   ]
+  },
+  {
+   "type": "spotlight",
+   "attrs": { "color": "blue", "button_text": "Go to the start", "button_href": "#top" },
+   "content": [
+    { "type": "heading", "attrs": { "level": 3 }, "content": [{ "type": "text", "text": "A spotlight" }] },
+    { "type": "paragraph", "content": [{ "type": "text", "text": "A wide band for one important message, with a button if you want one." }] }
+   ]
   }
  ]
 }

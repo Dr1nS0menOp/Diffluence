@@ -82,7 +82,8 @@ func TestTheExampleShowsEverythingTheFormatCanHold(t *testing.T) {
 	}
 	missing := []string{}
 	for _, name := range document.NodeTypes() {
-		if !nodes[name] {
+		// Nobody writes this one: it is what a block of a newer release turns into.
+		if !nodes[name] && name != document.TypeUnknownBlock {
 			missing = append(missing, "node "+name)
 		}
 	}

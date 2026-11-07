@@ -14,6 +14,8 @@ const UNKEYED_NAMES = ['diffluence.searches'];
 const UNKEYED_PREFIXES = ['diffluence.tree.', 'diffluence.comment.', 'diffluence.backup.'];
 const DRAFT_KEEP_MS = 7 * 86_400_000;
 const RECENT_ITEMS_NAME = 'insert.recent';
+const RECENT_EMOJI_NAME = 'emoji.recent';
+const MAX_RECENT_EMOJI = 16;
 const MAX_RECENT_ITEMS = 5;
 
 const PersonContext = createContext('');
@@ -87,15 +89,28 @@ export function dropUnkeyedData(): void {
     .forEach((key) => localStorage.removeItem(key));
 }
 
-/** What this person took from the `/` menu lately, newest first. */
-export function readRecentItems(person: string): string[] {
+function readRecent(person: string, name: string): string[] {
   try {
-    const stored: unknown = JSON.parse(localStorage.getItem(personalKey(person, RECENT_ITEMS_NAME)) ?? '[]');
+    const stored: unknown = JSON.parse(localStorage.getItem(personalKey(person, name)) ?? '[]');
     return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
   } catch {
     // Unreadable means nothing to show first: the menu keeps its usual order.
     return [];
   }
+}
+
+/** What this person took from the `/` menu lately, newest first. */
+export const readRecentItems = (person: string): string[] => readRecent(person, RECENT_ITEMS_NAME);
+
+/** The emoji this person took from the picker lately, newest first. */
+export const readRecentEmoji = (person: string): string[] => readRecent(person, RECENT_EMOJI_NAME);
+
+export function rememberEmoji(person: string, glyph: string): void {
+  const recent = [glyph, ...readRecentEmoji(person).filter((other) => other !== glyph)];
+  localStorage.setItem(
+    personalKey(person, RECENT_EMOJI_NAME),
+    JSON.stringify(recent.slice(0, MAX_RECENT_EMOJI)),
+  );
 }
 
 export function rememberItem(person: string, id: string): void {

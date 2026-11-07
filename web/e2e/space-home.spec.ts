@@ -133,7 +133,7 @@ test('an administrator adds the example space, and every page of it works', asyn
   await expect(page.locator('.file-tile')).toContainText('team-notes.txt');
 
   await tree.getByRole('link', { name: 'Blocks', exact: true }).click();
-  await expect(page.locator('.panel')).toHaveCount(6);
+  await expect(page.locator('.panel')).toHaveCount(7);
   await expect(page.locator('.decision')).toBeVisible();
 
   await tree.getByRole('link', { name: 'A long read', exact: true }).click();

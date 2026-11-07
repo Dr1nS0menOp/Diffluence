@@ -18,6 +18,7 @@ import { useEditorState, type Editor } from '@tiptap/react';
 import {
   IconColumnAdd,
   IconColumnDelete,
+  IconChart,
   IconCopy,
   IconEqual,
   IconFullWidth,
@@ -36,6 +37,7 @@ import {
 import { FIXED_BARS, Menu, MenuItem } from '../menu';
 import { Dialog, Field } from '../ui';
 import { duplicateBlock } from './block-commands';
+import { addChart, chartsOfTable, removeCharts } from './dynamic/nodes';
 import { MARK_COLORS } from './palette';
 import {
   canSortTable,
@@ -244,6 +246,32 @@ function commitStretch(editor: Editor, pos: number, next: number) {
   setStretch(editor, pos, next, factor);
 }
 
+/** A chart without its table has nothing to show, so removing the table asks (EDT-134). */
+function RemoveTableDialog({ editor, onClose }: { editor: Editor; onClose: () => void }) {
+  const { t } = useTranslation();
+  const remove = (withCharts: boolean) => {
+    onClose();
+    if (withCharts) removeCharts(editor);
+    editor.chain().focus().deleteTable().run();
+  };
+  return (
+    <Dialog title={t('table.removeTitle')} onClose={onClose}>
+      <p>{t('table.removeHelp')}</p>
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button type="button" onClick={() => remove(false)}>
+          {t('table.removeKeepChart')}
+        </button>
+        <button type="button" className="danger" onClick={() => remove(true)}>
+          {t('table.removeBoth')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
 function CaptionDialog({ editor, pos, onClose }: { editor: Editor; pos: number; onClose: () => void }) {
   const { t } = useTranslation();
   const attrs = tableAt(editor, pos)?.attrs as { caption: string | null; caption_below: boolean } | undefined;
@@ -302,6 +330,7 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
     },
   });
   const [captioning, setCaptioning] = useState(false);
+  const [removing, setRemoving] = useState(false);
   // These leave the focus in the menu, which stays open for the next step.
   const chain = () => editor.chain();
   const widths = [
@@ -312,6 +341,7 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
   return (
     <>
       {captioning && <CaptionDialog editor={editor} pos={pos} onClose={() => setCaptioning(false)} />}
+      {removing && <RemoveTableDialog editor={editor} onClose={() => setRemoving(false)} />}
       <Menu
         label={t('table.menu')}
         trigger={<IconTableMenu size={MENU_ICON_SIZE} />}
@@ -415,8 +445,19 @@ function TableMenu({ editor, pos }: { editor: Editor; pos: number }) {
             <IconCopy size={MENU_ICON_SIZE} /> {t('table.duplicate')}
           </MenuItem>
           <MenuItem
+            onClick={() => {
+              addChart(editor);
+            }}
+          >
+            <IconChart size={MENU_ICON_SIZE} /> {t('table.addChart')}
+          </MenuItem>
+          <MenuItem
             className="danger"
             onClick={() => {
+              if (chartsOfTable(editor).length > 0) {
+                setRemoving(true);
+                return;
+              }
               chain().deleteTable().run();
               editor.commands.focus();
             }}

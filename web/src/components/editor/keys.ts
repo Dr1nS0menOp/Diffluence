@@ -30,6 +30,11 @@ export interface EditorActions {
   publish: () => void;
   save: () => void;
   mentionNoAccess: (name: string) => void;
+  /** Copies the address of a place on this page. */
+  copyBlockLink: (anchor: string) => void;
+  openSaveBlock: () => void;
+  openEmojiPicker: () => void;
+  openDescribe: () => void;
   /** Says whether there is a title to go to. */
   focusTitle: () => boolean;
 }
@@ -48,6 +53,10 @@ export const noActions: EditorActions = {
   publish: () => undefined,
   save: () => undefined,
   mentionNoAccess: () => undefined,
+  copyBlockLink: () => undefined,
+  openSaveBlock: () => undefined,
+  openEmojiPicker: () => undefined,
+  openDescribe: () => undefined,
   focusTitle: () => false,
 };
 
@@ -75,7 +84,12 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
       (
         action: Exclude<
           keyof EditorActions,
-          'mentionNoAccess' | 'openTemplateItem' | 'focusTitle' | 'openDrawing' | 'openTableSize'
+          | 'mentionNoAccess'
+          | 'copyBlockLink'
+          | 'openTemplateItem'
+          | 'focusTitle'
+          | 'openDrawing'
+          | 'openTableSize'
         >,
       ) =>
       () => {

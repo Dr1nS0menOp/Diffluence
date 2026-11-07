@@ -48,6 +48,7 @@ import (
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/presence"
 	"github.com/diffluence/diffluence/internal/queue"
+	"github.com/diffluence/diffluence/internal/savedblocks"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
@@ -223,7 +224,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Blocks: blocks.NewService(a.pool, a.perms, a.people, a.analytics), People: a.people, Console: a.console, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Sites: a.sites, Example: a.example,
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
-			Sharing: a.sharing, Feed: a.feed, Features: a.features, Templates: a.templates,
+			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
 			InstanceID: a.instanceID, Log: log, Ready: a.Ready})

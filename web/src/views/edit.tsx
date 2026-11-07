@@ -19,6 +19,7 @@ import { unsavedKey, usePerson } from '../personal';
 import { anchorOfSelection } from '../components/comments/anchor';
 import { NewThread } from '../components/comments/selection-bar';
 import { DocumentEditor } from '../components/editor/editor';
+import { StageControl } from '../components/page-marks';
 import {
   seed,
   TogetherPeople,
@@ -546,6 +547,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
           pageId={page.id}
           initial={start.document}
           canAttach={page.can['attachment.add'] ?? false}
+          language={look.look.language || undefined}
           fullWidth={look.look.full_width}
           onFullWidth={() => look.change({ full_width: !look.look.full_width })}
           onChange={(d) => {
@@ -562,7 +564,9 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
             dirty.current = true;
             void save();
           }}
-          header={<PageHeader page={page} look={look} title={titleInput} />}
+          header={
+            <PageHeader page={page} look={look} title={titleInput} above={<StageControl page={page} />} />
+          }
           footer={<LabelBar page={page} />}
         />
       )}

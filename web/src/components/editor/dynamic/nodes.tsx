@@ -7,9 +7,10 @@ import {
   NodeViewContent,
   NodeViewWrapper,
   ReactNodeViewRenderer,
+  useEditorState,
   type ReactNodeViewProps,
 } from '@tiptap/react';
-import { Chart, chartData } from '../../chart';
+import { Chart, chartData, type ChartLook, type ChartTotal } from '../../chart';
 
 export const dataAttribute = (name: string) => ({
   default: null,
@@ -225,16 +226,167 @@ export function addChart(editor: Editor): boolean {
   return false;
 }
 
+/** The charts that read the table at the cursor, last first, so that removing them keeps positions. */
+export function chartsOfTable(editor: Editor): number[] {
+  const { $from } = editor.state.selection;
+  let id: unknown = null;
+  for (let depth = $from.depth; depth > 0 && !id; depth -= 1) {
+    if ($from.node(depth).type.name === 'table') id = $from.node(depth).attrs.block_id;
+  }
+  const found: number[] = [];
+  if (!id) return found;
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name === 'chart' && node.attrs.table === id) found.unshift(pos);
+    return true;
+  });
+  return found;
+}
+
+export function removeCharts(editor: Editor) {
+  const { tr, doc } = editor.state;
+  chartsOfTable(editor).forEach((pos) => {
+    const chart = doc.nodeAt(pos);
+    if (chart) tr.delete(pos, pos + chart.nodeSize);
+  });
+  editor.view.dispatch(tr);
+}
+
+interface ChartAttrs extends ChartLook {
+  table: string;
+  kind: string;
+  title: string | null;
+  axis: number | null;
+  series: number[] | null;
+  total: ChartTotal | null;
+}
+
+const CHART_TOTALS: ChartTotal[] = ['sum', 'average', 'count'];
+
+/** The settings of a chart. The table decides which columns there are to choose from. */
+function ChartOptions({
+  attrs,
+  head,
+  onChange,
+}: {
+  attrs: ChartAttrs;
+  head: string[];
+  onChange: (values: Record<string, unknown>) => void;
+}) {
+  const { t } = useTranslation();
+  const axis = attrs.axis ?? 0;
+  const chosen = attrs.series ?? head.map((_, i) => i).filter((i) => i !== axis);
+  const toggle = (column: number) => {
+    const next = chosen.includes(column) ? chosen.filter((i) => i !== column) : [...chosen, column].sort();
+    onChange({ series: next.length > 0 ? next : null });
+  };
+  const text = (key: 'x_title' | 'y_title', label: string) => (
+    <input
+      aria-label={label}
+      placeholder={label}
+      value={attrs[key] ?? ''}
+      onChange={(e) => onChange({ [key]: e.target.value || null })}
+    />
+  );
+  return (
+    <details className="chart-options">
+      <summary>{t('chart.options')}</summary>
+      <label>
+        {t('chart.axis')}
+        <select value={axis} onChange={(e) => onChange({ axis: Number(e.target.value), series: null })}>
+          {head.map((name, i) => (
+            <option key={`${name}-${i}`} value={i}>
+              {name || t('chart.column', { number: i + 1 })}
+            </option>
+          ))}
+        </select>
+      </label>
+      <fieldset>
+        <legend>{t('chart.data')}</legend>
+        {head.map(
+          (name, i) =>
+            i !== axis && (
+              <label key={`${name}-${i}`} className="check">
+                <input type="checkbox" checked={chosen.includes(i)} onChange={() => toggle(i)} />
+                {name || t('chart.column', { number: i + 1 })}
+              </label>
+            ),
+        )}
+      </fieldset>
+      <label>
+        {t('chart.total')}
+        <select value={attrs.total ?? ''} onChange={(e) => onChange({ total: e.target.value || null })}>
+          <option value="">{t('chart.total_none')}</option>
+          {CHART_TOTALS.map((total) => (
+            <option key={total} value={total}>
+              {t(`chart.total_${total}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+      {text('x_title', t('chart.xTitle'))}
+      {text('y_title', t('chart.yTitle'))}
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={!attrs.no_legend}
+          onChange={(e) => onChange({ no_legend: !e.target.checked })}
+        />
+        {t('chart.legend')}
+      </label>
+      <label>
+        {t('chart.legendPosition')}
+        <select
+          value={attrs.legend_position ?? 'bottom'}
+          onChange={(e) => onChange({ legend_position: e.target.value })}
+        >
+          {['top', 'bottom', 'start', 'end'].map((position) => (
+            <option key={position} value={position}>
+              {t(`chart.legend_${position}`)}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        {t('chart.height')}
+        <select value={attrs.height ?? ''} onChange={(e) => onChange({ height: e.target.value || null })}>
+          <option value="small">{t('chart.height_small')}</option>
+          <option value="">{t('chart.height_medium')}</option>
+          <option value="large">{t('chart.height_large')}</option>
+        </select>
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={attrs.smooth ?? false}
+          onChange={(e) => onChange({ smooth: e.target.checked })}
+        />
+        {t('chart.smooth')}
+      </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={attrs.points ?? false}
+          onChange={(e) => onChange({ points: e.target.checked })}
+        />
+        {t('chart.points')}
+      </label>
+    </details>
+  );
+}
+
 function ChartView({ node, editor, updateAttributes }: ReactNodeViewProps) {
   const { t } = useTranslation();
-  const attrs = node.attrs as {
-    table: string;
-    kind: string;
-    title: string | null;
-    axis: number | null;
-    series: number[] | null;
-  };
-  const table = findTable(editor, attrs.table);
+  const attrs = node.attrs as ChartAttrs;
+  // The chart is a node of its own, so a change in the table reaches it only through the editor.
+  const shown = useEditorState({
+    editor,
+    selector: (s) => {
+      const found = findTable(s.editor, attrs.table);
+      return found ? JSON.stringify(rowsOfTable(found)) : null;
+    },
+  });
+  const table = shown !== null;
+  const rows = shown === null ? [] : (JSON.parse(shown) as string[][]);
   return (
     <NodeViewWrapper contentEditable={false}>
       {editor.isEditable && (
@@ -256,13 +408,15 @@ function ChartView({ node, editor, updateAttributes }: ReactNodeViewProps) {
               </option>
             ))}
           </select>
+          {table && <ChartOptions attrs={attrs} head={rows[0] ?? []} onChange={updateAttributes} />}
         </div>
       )}
       {table ? (
         <Chart
-          data={chartData(rowsOfTable(table), attrs.axis ?? 0, attrs.series)}
+          data={chartData(rows, attrs.axis ?? 0, attrs.series, attrs.total)}
           kind={attrs.kind}
           title={attrs.title ?? ''}
+          look={attrs}
         />
       ) : (
         <p className="muted">{t('chart.noTable')}</p>
@@ -286,7 +440,14 @@ export const ChartNode = DocumentNode.create({
       axis: plainAttribute(),
       series: plainAttribute(),
       legend: plainAttribute(),
+      no_legend: plainAttribute(),
       smooth: plainAttribute(),
+      points: plainAttribute(),
+      total: plainAttribute(),
+      height: plainAttribute(),
+      legend_position: plainAttribute(),
+      x_title: plainAttribute(),
+      y_title: plainAttribute(),
     };
   },
   parseHTML() {

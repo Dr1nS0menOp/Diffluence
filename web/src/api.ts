@@ -419,6 +419,7 @@ export interface TreeNode {
 }
 
 export interface PageLook {
+  language: string;
   emoji: string;
   full_width: boolean;
   title_align: string;

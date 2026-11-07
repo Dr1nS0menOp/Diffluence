@@ -540,8 +540,21 @@ func (w *mdWriter) block(n Node, prefix string) {
 		w.line(prefix, "["+escapeInline(name)+"]("+w.destination(n)+")")
 	case TypePanel:
 		kind, _ := n.Attrs["kind"].(string)
+		if kind == panelNeutral {
+			w.blocks(n.Content, prefix+"> ")
+			return
+		}
 		w.line(prefix+"> ", "[!"+alertNames[kind]+"]")
 		w.blocks(n.Content, prefix+"> ")
+	case TypeSpotlight:
+		w.blocks(n.Content, prefix)
+		if text, _ := n.Attrs["button_text"].(string); text != "" {
+			href, _ := n.Attrs["button_href"].(string)
+			w.line(prefix, "["+escapeInline(text)+"]("+href+")")
+		}
+	case TypeUnknownBlock:
+		name, _ := n.Attrs["name"].(string)
+		w.line(prefix, "Block not shown: "+escapeInline(name))
 	case TypeExpand:
 		if title := wordsOf(n); title != "" {
 			w.line(prefix, "**"+escapeInline(title)+"**")
@@ -628,7 +641,7 @@ func inlineMarkdown(nodes []Node) string {
 			b.WriteString("\\\n")
 			continue
 		}
-		if n.Type == TypeStatus || n.Type == TypeDate || n.Type == TypeMention {
+		if n.Type == TypeStatus || n.Type == TypeDate || n.Type == TypeMention || n.Type == TypeInlineImage {
 			b.WriteString(escapeInline(wordsOf(n)))
 			continue
 		}

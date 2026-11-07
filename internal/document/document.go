@@ -64,6 +64,9 @@ const (
 	TypeHorizontalRule = "horizontalRule"
 	TypeHardBreak      = "hardBreak"
 	TypeImage          = "image"
+	TypeInlineImage    = "inlineImage"
+	TypeSpotlight      = "spotlight"
+	TypeUnknownBlock   = "unknownBlock"
 	TypeFile           = "file"
 	TypePanel          = "panel"
 	TypeExpand         = "expand"
@@ -97,8 +100,8 @@ const (
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard, TypeSpotlight, TypeUnknownBlock}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink, TypeInlineImage}
 )
 
 // children says which node types may appear inside each node type.
@@ -116,6 +119,9 @@ var children = map[string][]string{
 	TypeHorizontalRule:  {},
 	TypeHardBreak:       {},
 	TypeImage:           {},
+	TypeInlineImage:     {},
+	TypeUnknownBlock:    {},
+	TypeSpotlight:       blockTypes,
 	TypeFile:            {},
 	TypePanel:           blockTypes,
 	TypeExpand:          blockTypes,
@@ -317,7 +323,7 @@ func Walk(n Node, visit func(Node)) {
 
 // wordsOf returns what a node itself says, apart from its children.
 func wordsOf(n Node) string {
-	key := map[string]string{TypeFile: "filename", TypeStatus: "text", TypeDate: "value", TypeImage: "caption", TypeExpand: "title", TypePlaceholderLink: "title"}[n.Type]
+	key := map[string]string{TypeFile: "filename", TypeStatus: "text", TypeDate: "value", TypeImage: "caption", TypeInlineImage: "alt", TypeExpand: "title", TypePlaceholderLink: "title"}[n.Type]
 	if n.Type == TypeText {
 		return n.Text
 	}
@@ -411,7 +417,9 @@ func LinkedPages(n Node) []uuid.UUID {
 	return out
 }
 
-func pointsToAttachment(n Node) bool { return n.Type == TypeImage || n.Type == TypeFile }
+func pointsToAttachment(n Node) bool {
+	return n.Type == TypeImage || n.Type == TypeInlineImage || n.Type == TypeFile
+}
 
 // AttachmentIDs lists the attachments a document shows.
 func AttachmentIDs(n Node) []uuid.UUID {

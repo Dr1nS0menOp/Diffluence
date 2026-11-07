@@ -758,6 +758,7 @@ export function PageView({ pageId }: { pageId: string }) {
         {page.kind !== 'folder' && page.kind !== 'link' && page.kind !== 'database' && (
           <DocumentView
             document={page.document}
+            language={page.language || undefined}
             onImage={(images, start) => setLightbox({ images, start })}
             highlights={threads.highlights}
             onFound={threads.setFound}

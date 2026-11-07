@@ -441,6 +441,47 @@ a.file-tile:hover {
   background: var(--color-side);
 }
 
+.tool-group,
+.tool-fold,
+.tool-side {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: var(--space-0-5);
+}
+
+.tool-side {
+  flex-wrap: wrap;
+}
+
+.tool-side:empty {
+  display: none;
+}
+
+.tool-more {
+  position: relative;
+}
+
+.tool-more-panel {
+  position: absolute;
+  inset-block-start: 100%;
+  inset-inline-end: 0;
+  z-index: var(--layer-sticky);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-0-5);
+  inline-size: max-content;
+  max-inline-size: 80vw;
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.tool-number {
+  inline-size: 5ch;
+}
+
 .tool-style {
   min-block-size: var(--size-tool);
   margin-inline-end: var(--space-1);

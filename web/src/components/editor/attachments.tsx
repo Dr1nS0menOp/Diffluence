@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Images and files in a document. Both are attachments of the page, never outside addresses.
-import { useState } from 'react';
+import { useLayoutEffect, useRef, useState, type PointerEvent, type RefObject } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Node as DocumentNode } from '@tiptap/core';
 import Image, { type ImageOptions } from '@tiptap/extension-image';
@@ -27,6 +27,53 @@ interface ImageAttrs {
   caption: string | null;
   size: string | null;
   align: string | null;
+  width: number | null;
+  wrap: boolean;
+  border: string | null;
+  border_color: string | null;
+  href: string | null;
+}
+
+const MIN_IMAGE_SHARE = 5;
+const MAX_IMAGE_SHARE = 100;
+
+/** A share of the column, from what a dragged corner reached. */
+export function imageShare(imageWidth: number, columnWidth: number): number {
+  const share = Math.round((imageWidth / Math.max(columnWidth, 1)) * MAX_IMAGE_SHARE);
+  return Math.min(MAX_IMAGE_SHARE, Math.max(MIN_IMAGE_SHARE, share));
+}
+
+/** The corner that sizes an image. The width is a share, so the reader never gets more than the column. */
+function ResizeCorner({
+  figure,
+  onDone,
+  label,
+}: {
+  figure: RefObject<HTMLElement | null>;
+  onDone: (share: number) => void;
+  label: string;
+}) {
+  const resize = (start: PointerEvent<HTMLSpanElement>) => {
+    const element = figure.current;
+    const column = element?.parentElement;
+    if (!element || !column) return;
+    start.preventDefault();
+    const corner = start.currentTarget;
+    corner.setPointerCapture(start.pointerId);
+    const left = element.getBoundingClientRect().left;
+    const shareAt = (x: number) => imageShare(x - left, column.getBoundingClientRect().width);
+    const follow = (e: globalThis.PointerEvent) => {
+      element.style.inlineSize = `${shareAt(e.clientX)}%`;
+    };
+    const finish = (e: globalThis.PointerEvent) => {
+      corner.removeEventListener('pointermove', follow);
+      corner.removeEventListener('pointerup', finish);
+      onDone(shareAt(e.clientX));
+    };
+    corner.addEventListener('pointermove', follow);
+    corner.addEventListener('pointerup', finish);
+  };
+  return <span className="image-corner" title={label} contentEditable={false} onPointerDown={resize} />;
 }
 
 interface FileFacts extends PreviewFile {
@@ -43,9 +90,25 @@ export function useFileFacts(id: string | null, enabled: boolean) {
   });
 }
 
-function ImageView({ node, editor, extension }: ReactNodeViewProps) {
+function ImageView({ node, editor, extension, updateAttributes, selected }: ReactNodeViewProps) {
   const { t } = useTranslation();
-  const { attachment_id: id, alt, caption, size, align } = node.attrs as ImageAttrs;
+  const figure = useRef<HTMLElement>(null);
+  const share = (node.attrs as ImageAttrs).width;
+  // A number has no class of its own, so our code sets it, as for the width of a table.
+  useLayoutEffect(() => {
+    if (figure.current) figure.current.style.inlineSize = share ? `${share}%` : '';
+  }, [share]);
+  const {
+    attachment_id: id,
+    alt,
+    caption,
+    size,
+    align,
+    wrap,
+    border,
+    border_color: borderColor,
+    href,
+  } = node.attrs as ImageAttrs;
   const { fileAddress } = extension.options as { fileAddress: FileAddress };
   const [isMissing, setIsMissing] = useState(false);
   if (isMissing) {
@@ -61,14 +124,31 @@ function ImageView({ node, editor, extension }: ReactNodeViewProps) {
   const image = <img src={fileAddress(id)} alt={alt ?? ''} onError={() => setIsMissing(true)} />;
   return (
     <NodeViewWrapper
+      ref={figure}
       as="figure"
       className="doc-image"
       data-size={size ?? undefined}
       data-align={align ?? undefined}
+      data-wrap={wrap || undefined}
+      data-border={border ?? undefined}
+      data-line={borderColor ?? undefined}
     >
       {/* A reader opens it large. The button gives the keyboard a way in. */}
       {editor.isEditable ? (
-        image
+        <>
+          {image}
+          {selected && (
+            <ResizeCorner
+              figure={figure}
+              label={t('editor.imageResize')}
+              onDone={(share) => updateAttributes({ width: share, size: null })}
+            />
+          )}
+        </>
+      ) : href ? (
+        <a className="image-link" href={href} rel="noopener noreferrer">
+          {image}
+        </a>
       ) : (
         <button type="button" className="image-open">
           {image}
@@ -111,6 +191,20 @@ export const AttachmentImage = Image.extend<ImageOptions & { fileAddress: FileAd
       caption: dataAttribute('caption'),
       size: dataAttribute('size'),
       align: dataAttribute('align'),
+      width: {
+        default: null,
+        parseHTML: (el: HTMLElement) => Number(el.getAttribute('data-width')) || null,
+        renderHTML: (attrs: Record<string, number | null>) =>
+          attrs.width ? { 'data-width': attrs.width } : {},
+      },
+      wrap: {
+        default: false,
+        parseHTML: (el: HTMLElement) => el.hasAttribute('data-wrap'),
+        renderHTML: (attrs: Record<string, boolean>) => (attrs.wrap ? { 'data-wrap': '' } : {}),
+      },
+      border: dataAttribute('border'),
+      border_color: dataAttribute('border_color'),
+      href: dataAttribute('href'),
     };
   },
   parseHTML() {
@@ -118,6 +212,47 @@ export const AttachmentImage = Image.extend<ImageOptions & { fileAddress: FileAd
   },
   addNodeView() {
     return ReactNodeViewRenderer(ImageView);
+  },
+});
+
+function InlineImageView({ node, extension }: ReactNodeViewProps) {
+  const { attachment_id: id, alt } = node.attrs as { attachment_id: string; alt: string | null };
+  const { fileAddress } = extension.options as { fileAddress: FileAddress };
+  return (
+    <NodeViewWrapper as="span" className="inline-image">
+      <img src={fileAddress(id)} alt={alt ?? ''} />
+    </NodeViewWrapper>
+  );
+}
+
+/** A small image inside a line of text, such as an icon (EDT-078). */
+export const InlineImage = DocumentNode.create<{ fileAddress: FileAddress }>({
+  name: 'inlineImage',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  draggable: true,
+  addOptions() {
+    return { fileAddress: pageFileAddress };
+  },
+  addAttributes() {
+    return {
+      attachment_id: {
+        default: null,
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-attachment-id'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-attachment-id': attrs.attachment_id }),
+      },
+      alt: { default: null },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-inline-image]' }];
+  },
+  renderHTML({ HTMLAttributes }) {
+    return ['span', { ...HTMLAttributes, 'data-inline-image': '' }];
+  },
+  addNodeView() {
+    return ReactNodeViewRenderer(InlineImageView);
   },
 });
 

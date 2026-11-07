@@ -35,6 +35,7 @@ import {
   IconPanelWarning,
   IconQuote,
   IconRule,
+  IconSpotlight,
   IconStatus,
   IconRename,
   IconTable,
@@ -51,7 +52,7 @@ import emoji from './emoji.json';
 import { today } from './inline';
 import { noActions, type EditorActions } from './keys';
 import { setTextStyle } from './marks';
-import type { PanelKind } from './palette';
+import { FIRST_PANEL_EMOJI, type PanelKind } from './palette';
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 const ITEM_ICON_SIZE = 18;
@@ -59,6 +60,8 @@ const MAX_EMOJI_RESULTS = 8;
 
 export interface InsertItem {
   id: string;
+  /** Words of a person, such as the name of a saved block. Otherwise the name is translated. */
+  label?: string;
   icon: ComponentType<{ size?: number }>;
   run: (editor: Editor, actions: EditorActions) => void;
 }
@@ -99,9 +102,17 @@ export const INSERT_ITEMS: InsertItem[] = [
   panelItem('panelSuccess', 'success', IconPanelSuccess),
   panelItem('panelWarning', 'warning', IconPanelWarning),
   panelItem('panelError', 'error', IconPanelError),
+  {
+    id: 'panelNeutral',
+    icon: IconEmoji,
+    run: (editor) =>
+      editor.chain().focus().wrapIn('panel', { kind: 'neutral', emoji: FIRST_PANEL_EMOJI }).run(),
+  },
+  { id: 'spotlight', icon: IconSpotlight, run: (editor) => editor.chain().focus().wrapIn('spotlight').run() },
   { id: 'expand', icon: IconExpand, run: (editor) => editor.chain().focus().wrapIn('expand').run() },
   { id: 'columns2', icon: IconColumns, run: (editor) => insertColumns(editor, 2) },
   { id: 'columns3', icon: IconColumns, run: (editor) => insertColumns(editor, 3) },
+  { id: 'columnsSidebar', icon: IconColumns, run: (editor) => insertColumns(editor, 2, 'sidebar-end') },
   { id: 'decision', icon: IconDecision, run: (editor) => editor.chain().focus().setNode('decision').run() },
   {
     id: 'table',
@@ -194,6 +205,27 @@ INSERT_ITEMS.push(
 
 export const TURN_INTO_ITEMS = INSERT_ITEMS.filter((item) => TURN_INTO_IDS.includes(item.id));
 
+// What a block most often turns into, first in its menu (EDT-023).
+const LIKELY_TURNS: Record<string, string[]> = {
+  paragraph: ['h2', 'bullet', 'task'],
+  heading: ['text', 'h3', 'bullet'],
+  bulletList: ['task', 'ordered', 'text'],
+  orderedList: ['bullet', 'task', 'text'],
+  taskList: ['bullet', 'ordered', 'text'],
+  blockquote: ['text', 'panelInfo', 'h2'],
+  codeBlock: ['text', 'quote', 'panelInfo'],
+};
+
+/** Turn into for this kind of block, with the likely changes first. */
+export function turnIntoItems(blockType: string): InsertItem[] {
+  const likely = LIKELY_TURNS[blockType] ?? [];
+  const rank = (item: InsertItem) => {
+    const at = likely.indexOf(item.id);
+    return at === -1 ? likely.length : at;
+  };
+  return [...TURN_INTO_ITEMS].sort((a, b) => rank(a) - rank(b));
+}
+
 // In the order of INSERT_ITEMS, so a group never falls apart. What is not here is a block.
 const ITEM_GROUPS: Record<string, string[]> = {
   text: ['text', ...HEADING_LEVELS.map((l) => `h${l}`), 'bullet', 'ordered', 'task', 'quote', 'code', 'rule'],
@@ -203,9 +235,12 @@ const ITEM_GROUPS: Record<string, string[]> = {
     'panelSuccess',
     'panelWarning',
     'panelError',
+    'panelNeutral',
+    'spotlight',
     'expand',
     'columns2',
     'columns3',
+    'columnsSidebar',
     'decision',
     'table',
   ],
@@ -237,6 +272,7 @@ export function arrangedItems(items: InsertItem[], recentIds: string[]): Arrange
 export function matchingItems(query: string, items: InsertItem[] = INSERT_ITEMS): InsertItem[] {
   const needle = query.trim().toLowerCase();
   return items.filter((item) => {
+    if (item.label) return item.label.toLowerCase().includes(needle);
     const words = `${i18n.t(`insert.${item.id}.name`)} ${i18n.t(`insert.${item.id}.keywords`)}`;
     return words.toLowerCase().includes(needle);
   });
@@ -398,14 +434,14 @@ function popupRender<Item>(label: () => string, toEntry: (item: Item) => ListEnt
 const itemEntry = (item: ArrangedItem): ListEntry => ({
   id: item.id,
   group: i18n.t(`insert.group_${item.group}`),
-  name: i18n.t(`insert.${item.id}.name`),
-  hint: i18n.t(`insert.${item.id}.hint`),
+  name: item.label ?? i18n.t(`insert.${item.id}.name`),
+  hint: item.label ? i18n.t('insert.savedHint') : i18n.t(`insert.${item.id}.hint`),
   icon: <item.icon size={ITEM_ICON_SIZE} />,
 });
 
 interface SlashOptions {
   actions: () => EditorActions;
-  items: InsertItem[];
+  items: () => InsertItem[];
   recent: () => string[];
   onUsed: (id: string) => void;
 }
@@ -415,7 +451,7 @@ export const SlashCommands = Extension.create<SlashOptions>({
   // Before our own keys, so that Escape closes the menu first.
   priority: 1100,
   addOptions() {
-    return { actions: () => noActions, items: INSERT_ITEMS, recent: () => [], onUsed: () => undefined };
+    return { actions: () => noActions, items: () => INSERT_ITEMS, recent: () => [], onUsed: () => undefined };
   },
   addProseMirrorPlugins() {
     const { actions, items, recent, onUsed } = this.options;
@@ -426,7 +462,7 @@ export const SlashCommands = Extension.create<SlashOptions>({
         allowSpaces: true,
         pluginKey: new PluginKey('slashCommands'),
         allow: ({ editor }) => !editor.isActive('codeBlock'),
-        items: ({ query }) => arrangedItems(matchingItems(query, items), recent()),
+        items: ({ query }) => arrangedItems(matchingItems(query, items()), recent()),
         command: ({ editor, range, props }) => {
           editor.chain().focus().deleteRange(range).run();
           onUsed(props.id);
@@ -515,10 +551,12 @@ export function InsertDialog({
   editor,
   actions,
   onClose,
+  onBrowse,
 }: {
   editor: Editor;
   actions: EditorActions;
   onClose: () => void;
+  onBrowse: () => void;
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
@@ -542,6 +580,9 @@ export function InsertDialog({
           }}
         />
       </Field>
+      <button type="button" className="ghost" onClick={onBrowse}>
+        {t('editor.browseAll')}
+      </button>
       <ul className="plain-list insert-list">
         {items.map((item) => (
           <li key={item.id}>

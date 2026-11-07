@@ -50,6 +50,7 @@ func (s *Server) registerRoutes() {
 	s.registerOrganisingRoutes()
 	s.registerTemplateRoutes()
 	s.registerTogetherRoutes()
+	s.registerSavedBlockRoutes()
 	s.registerIdentityRoutes()
 	s.registerAppearanceRoutes()
 	s.registerPeopleRoutes()

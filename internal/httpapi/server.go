@@ -40,6 +40,7 @@ import (
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/presence"
+	"github.com/diffluence/diffluence/internal/savedblocks"
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
@@ -87,6 +88,7 @@ type Deps struct {
 	Notify      *notify.Service
 	Mail        *mail.Service
 	Sharing     *sharing.Service
+	SavedBlocks *savedblocks.Service
 	Feed        *feed.Service
 	Analytics   *analytics.Service
 	Presence    *presence.Service

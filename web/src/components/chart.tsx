@@ -6,8 +6,12 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const WIDTH = 640;
-const HEIGHT = 280;
+const HEIGHTS = { small: 180, medium: 280, large: 400 };
 const MARGIN = 36;
+const POINT_RADIUS = 4;
+const AXIS_TEXT_INSET = 8;
+/** How far a smooth line looks ahead, as a share of the step between two points. */
+const CURVE = 0.4;
 const MAX_ROWS = 500;
 const SERIES_CLASSES = 6;
 const DASHES = ['', '6 3', '2 3', '8 3 2 3', '1 4', '10 4'];
@@ -27,8 +31,48 @@ export function parseCell(text: string): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+export type ChartTotal = 'sum' | 'average' | 'count';
+
+export interface ChartLook {
+  no_legend?: boolean | null;
+  legend_position?: string | null;
+  height?: string | null;
+  smooth?: boolean | null;
+  points?: boolean | null;
+  x_title?: string | null;
+  y_title?: string | null;
+}
+
+function totalOf(values: (number | null)[], total: ChartTotal): number | null {
+  const numbers = values.filter((v): v is number => v !== null);
+  if (total === 'count') return numbers.length;
+  if (numbers.length === 0) return null;
+  const sum = numbers.reduce((all, v) => all + v, 0);
+  return total === 'sum' ? sum : sum / numbers.length;
+}
+
+/** Rows with the same label become one, by the chosen total. */
+function totalled(data: ChartData, total: ChartTotal): ChartData {
+  const labels = [...new Set(data.labels)];
+  const series = data.series.map((s) => ({
+    name: s.name,
+    values: labels.map((label) =>
+      totalOf(
+        s.values.filter((_, i) => data.labels[i] === label),
+        total,
+      ),
+    ),
+  }));
+  return { ...data, labels, series };
+}
+
 /** Turns table rows into a chart: the first row names the series. */
-export function chartData(rows: string[][], axis: number, columns: number[] | null): ChartData {
+export function chartData(
+  rows: string[][],
+  axis: number,
+  columns: number[] | null,
+  total?: ChartTotal | null,
+): ChartData {
   const [head = [], ...body] = rows.slice(0, MAX_ROWS);
   const wanted = columns ?? head.map((_, i) => i).filter((i) => i !== axis);
   let skipped = 0;
@@ -40,19 +84,51 @@ export function chartData(rows: string[][], axis: number, columns: number[] | nu
       return value;
     }),
   }));
-  return { labels: body.map((row) => row[axis] ?? ''), series, skipped };
+  const data = { labels: body.map((row) => row[axis] ?? ''), series, skipped };
+  return total ? totalled(data, total) : data;
 }
 
-function scale(data: ChartData): (value: number) => number {
+function scale(data: ChartData, height: number): (value: number) => number {
   const values = data.series.flatMap((s) => s.values.filter((v): v is number => v !== null));
   const top = Math.max(0, ...values);
   const bottom = Math.min(0, ...values);
   const range = top - bottom || 1;
-  return (value) => HEIGHT - MARGIN - ((value - bottom) / range) * (HEIGHT - 2 * MARGIN);
+  return (value) => height - MARGIN - ((value - bottom) / range) * (height - 2 * MARGIN);
 }
 
-function Bars({ data }: { data: ChartData }) {
-  const y = scale(data);
+/** A line through points with soft corners. The curve stays between its two points. */
+export function smoothPath(points: { x: number; y: number }[]): string {
+  const [first, ...rest] = points;
+  if (!first) return '';
+  let previous = first;
+  const parts = [`M ${first.x} ${first.y}`];
+  for (const point of rest) {
+    const reach = (point.x - previous.x) * CURVE;
+    parts.push(`C ${previous.x + reach} ${previous.y} ${point.x - reach} ${point.y} ${point.x} ${point.y}`);
+    previous = point;
+  }
+  return parts.join(' ');
+}
+
+/** A point of a series. Its shape tells series apart without colour (EDT-133). */
+function Marker({ x, y, series }: { x: number; y: number; series: number }) {
+  const r = POINT_RADIUS;
+  const className = `chart-point chart-series-${series % SERIES_CLASSES}`;
+  const shapes = [
+    <circle key="c" className={className} cx={x} cy={y} r={r} />,
+    <rect key="s" className={className} x={x - r} y={y - r} width={2 * r} height={2 * r} />,
+    <path key="t" className={className} d={`M ${x} ${y - r} L ${x + r} ${y + r} L ${x - r} ${y + r} Z`} />,
+    <path
+      key="d"
+      className={className}
+      d={`M ${x} ${y - r} L ${x + r} ${y} L ${x} ${y + r} L ${x - r} ${y} Z`}
+    />,
+  ];
+  return shapes[series % shapes.length];
+}
+
+function Bars({ data, height }: { data: ChartData; height: number }) {
+  const y = scale(data, height);
   const slot = (WIDTH - 2 * MARGIN) / Math.max(1, data.labels.length);
   const bar = slot / (data.series.length + 1);
   return data.series.map((series, s) =>
@@ -71,29 +147,47 @@ function Bars({ data }: { data: ChartData }) {
   );
 }
 
-function Lines({ data, filled }: { data: ChartData; filled: boolean }) {
-  const y = scale(data);
+function Lines({
+  data,
+  filled,
+  height,
+  look,
+}: {
+  data: ChartData;
+  filled: boolean;
+  height: number;
+  look: ChartLook;
+}) {
+  const y = scale(data, height);
   const step = (WIDTH - 2 * MARGIN) / Math.max(1, data.labels.length - 1);
   return data.series.map((series, s) => {
     const points = series.values.flatMap((value, i) =>
-      value === null ? [] : [`${MARGIN + i * step},${y(value)}`],
+      value === null ? [] : [{ x: MARGIN + i * step, y: y(value) }],
     );
+    const className = `chart-line chart-series-${s % SERIES_CLASSES} ${filled ? 'filled' : ''}`;
+    const dash = DASHES[s % DASHES.length];
     return (
-      <polyline
-        key={series.name}
-        className={`chart-line chart-series-${s % SERIES_CLASSES} ${filled ? 'filled' : ''}`}
-        points={points.join(' ')}
-        strokeDasharray={DASHES[s % DASHES.length]}
-      />
+      <g key={series.name}>
+        {look.smooth ? (
+          <path className={className} d={smoothPath(points)} strokeDasharray={dash} />
+        ) : (
+          <polyline
+            className={className}
+            points={points.map((p) => `${p.x},${p.y}`).join(' ')}
+            strokeDasharray={dash}
+          />
+        )}
+        {look.points && points.map((p) => <Marker key={`${p.x}`} x={p.x} y={p.y} series={s} />)}
+      </g>
     );
   });
 }
 
-function Pie({ data }: { data: ChartData }) {
+function Pie({ data, height }: { data: ChartData; height: number }) {
   const values = (data.series[0]?.values ?? []).map((v) => Math.max(0, v ?? 0));
   const total = values.reduce((sum, v) => sum + v, 0) || 1;
-  const radius = HEIGHT / 2 - MARGIN / 2;
-  const centre = { x: WIDTH / 2, y: HEIGHT / 2 };
+  const radius = height / 2 - MARGIN / 2;
+  const centre = { x: WIDTH / 2, y: height / 2 };
   let angle = 0;
   return values.map((value, i) => {
     const start = angle;
@@ -123,38 +217,66 @@ function Pie({ data }: { data: ChartData }) {
   });
 }
 
-export function Chart({ data, kind, title }: { data: ChartData; kind: string; title: string }) {
+export function Chart({
+  data,
+  kind,
+  title,
+  look = {},
+}: {
+  data: ChartData;
+  kind: string;
+  title: string;
+  look?: ChartLook;
+}) {
   const { t } = useTranslation();
   const [showData, setShowData] = useState(false);
   const name = title || t('chart.untitled');
+  const height = HEIGHTS[look.height === 'small' || look.height === 'large' ? look.height : 'medium'];
   return (
-    <figure className="chart" role="group" aria-label={name}>
+    <figure className="chart" role="group" aria-label={name} data-legend={look.legend_position ?? undefined}>
       {title && <figcaption>{title}</figcaption>}
       <div className="block-frame">
-        <svg viewBox={`0 0 ${WIDTH} ${HEIGHT}`} role="img" aria-label={t('chart.picture', { title: name })}>
+        <svg viewBox={`0 0 ${WIDTH} ${height}`} role="img" aria-label={t('chart.picture', { title: name })}>
           {kind === 'pie' ? (
-            <Pie data={data} />
+            <Pie data={data} height={height} />
           ) : kind === 'line' || kind === 'area' ? (
-            <Lines data={data} filled={kind === 'area'} />
+            <Lines data={data} filled={kind === 'area'} height={height} look={look} />
           ) : (
-            <Bars data={data} />
+            <Bars data={data} height={height} />
+          )}
+          {look.x_title && (
+            <text className="chart-axis" x={WIDTH / 2} y={height - AXIS_TEXT_INSET} textAnchor="middle">
+              {look.x_title}
+            </text>
+          )}
+          {look.y_title && (
+            <text
+              className="chart-axis"
+              transform={`translate(${AXIS_TEXT_INSET * 2} ${height / 2}) rotate(-90)`}
+              textAnchor="middle"
+            >
+              {look.y_title}
+            </text>
           )}
         </svg>
       </div>
-      <ul className="chart-legend">
-        {data.series.map((series, s) => (
-          <li key={series.name}>
-            <span className={`chart-key chart-series-${s % SERIES_CLASSES}`} aria-hidden="true" />
-            {series.name}
-          </li>
-        ))}
-      </ul>
+      {!look.no_legend && (
+        <ul className="chart-legend">
+          {data.series.map((series, s) => (
+            <li key={series.name}>
+              <span className={`chart-key chart-series-${s % SERIES_CLASSES}`} aria-hidden="true" />
+              {series.name}
+            </li>
+          ))}
+        </ul>
+      )}
       {data.skipped > 0 && <p className="muted">{t('chart.skipped', { count: data.skipped })}</p>}
       <button type="button" className="ghost" aria-expanded={showData} onClick={() => setShowData(!showData)}>
         {t('chart.showData')}
       </button>
-      {showData && (
-        <table>
+      {/* Always there for a screen reader, and on screen on request (EDT-136). */}
+      {
+        <table className={showData ? undefined : 'visually-hidden'}>
           <thead>
             <tr>
               <th>{t('chart.label')}</th>
@@ -174,7 +296,7 @@ export function Chart({ data, kind, title }: { data: ChartData; kind: string; ti
             ))}
           </tbody>
         </table>
-      )}
+      }
     </figure>
   );
 }

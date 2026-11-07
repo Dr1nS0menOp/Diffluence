@@ -136,7 +136,7 @@ test('in a long table the button stays in reach, also from the keyboard', async 
   await expectClearOfTheTools(page);
 });
 
-test('on a narrow window the wrapped row of tools leaves the table button free', async ({ page }) => {
+test('on a narrow window the folded row of tools leaves the table button free', async ({ page }) => {
   const rows = Array.from({ length: 40 }, (_, i) => row('tableCell', `Name ${i}`, `Team ${i}`));
   const { id } = await pageWith(page, 'Narrow table', [{ type: 'table', content: rows }]);
   await page.setViewportSize({ width: 1280, height: 720 });
@@ -144,10 +144,8 @@ test('on a narrow window the wrapped row of tools leaves the table button free',
   await body(page).locator('td').nth(60).click();
   await editorSettled(page);
   const tools = page.getByRole('toolbar', { name: 'Formatting' });
-  const oneRow = (await tools.boundingBox())?.height ?? 0;
-
   await page.setViewportSize({ width: 1000, height: 720 });
-  await expect.poll(async () => (await tools.boundingBox())?.height ?? 0).toBeGreaterThan(oneRow);
+  await expect(tools.getByRole('button', { name: 'More tools' })).toBeVisible();
   await page.evaluate(() => window.scrollBy(0, 400));
 
   // Measured where it stands: clicking would first scroll the button out from under the bar.

@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useMemo, useRef, useState, type DragEvent, type MouseEvent, type ReactNode } from 'react';
+import {
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type DragEvent,
+  type MouseEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { EditorContent, useEditor } from '@tiptap/react';
+import { EditorContent, useEditor, useEditorState } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import Collaboration from '@tiptap/extension-collaboration';
 import CollaborationCaret from '@tiptap/extension-collaboration-caret';
+import { NodeSelection } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import { api, isCancelled, type Json, type UploadWatch } from '../../api';
 import { readRecentItems, rememberItem, usePerson } from '../../personal';
@@ -26,11 +37,16 @@ import {
   type FileAddress,
   type NameChoice,
 } from './attachments';
-import { continueAtEnd } from './block-commands';
+import { columnsFromDrop, continueAtEnd, type DropSide } from './block-commands';
+import { keepUnknownBlocks } from './blocks';
+import { BrowseDialog } from './browse';
+import { EmojiPicker } from './emoji-picker';
+import { SavedBlocksDialog, savedBlockItem, useSavedBlocks } from './saved-blocks';
+import { DescribeDialog, imagesWithoutWords } from './selection-tools';
 import { DrawingDialog, showNewVersion, type DrawingFile } from './drawing';
 import { BlockHandle, useBlockTracking } from './block-handle';
 import { useCodeColours } from './code';
-import { documentExtensions, type TaskToggle } from './extensions';
+import { documentExtensions, knownBlockType, type TaskToggle } from './extensions';
 import { FindBar, FindReplace } from './find';
 import { GoneLinks, linkedPages, refreshGoneLinks } from './gone-links';
 import {
@@ -40,9 +56,10 @@ import {
   MentionSuggestions,
   SlashCommands,
   TEMPLATE_ITEMS,
+  type InsertItem,
 } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
-import { convertPastedMarkdown, looksLikeMarkdown } from './paste';
+import { cleanWordHtml, convertPastedMarkdown, looksLikeMarkdown, pastedImages } from './paste';
 import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog } from './template-item';
@@ -67,6 +84,33 @@ function shownImages(root: HTMLElement): { element: HTMLImageElement; shown: Sho
       caption: element.closest('figure')?.querySelector('figcaption')?.textContent ?? '',
     },
   }));
+}
+
+/** A link into a collapsible section opens it, or it would lead to nothing to see (EDT-116). */
+function useLinksOpenSections(root: RefObject<HTMLDivElement | null>) {
+  useEffect(() => {
+    const open = () => {
+      const target = decodeURIComponent(window.location.hash.slice(1));
+      if (!target) return;
+      const element = root.current?.querySelector(`[id="${CSS.escape(target)}"]`);
+      for (
+        let section = element?.closest('details');
+        section;
+        section = section.parentElement?.closest('details')
+      ) {
+        section.open = true;
+      }
+      element?.scrollIntoView();
+    };
+    open();
+    window.addEventListener('hashchange', open);
+    return () => window.removeEventListener('hashchange', open);
+  }, [root]);
+}
+
+/** A document as this release can show it. What it does not know stays, as a note. */
+function withUnknownBlocks(document: Json, known: (type: string) => boolean): Json {
+  return keepUnknownBlocks(document as Parameters<typeof keepUnknownBlocks>[0], known) as Json;
 }
 
 /** Every collapsible section opens for printing, and goes back afterwards. */
@@ -123,6 +167,7 @@ export function DocumentView({
   onView,
   checkLinks,
   pageId,
+  language,
 }: {
   document: Json;
   plain?: boolean;
@@ -137,6 +182,8 @@ export function DocumentView({
   checkLinks?: boolean;
   /** The published page shown, so that a link to a page that does not exist yet can start it. */
   pageId?: string;
+  /** What the text is written in, for screen readers and hyphenation. */
+  language?: string;
 }) {
   const { t } = useTranslation();
   const copy = useCopy();
@@ -178,14 +225,22 @@ export function DocumentView({
               }),
             ]),
       ],
-      content: document,
+      content: withUnknownBlocks(document, knownBlockType),
       editable: false,
       injectCSS: false,
-      editorProps: { attributes: { class: 'prose', 'aria-label': t('editor.content') } },
+      editorProps: {
+        attributes: {
+          class: 'prose',
+          'aria-label': t('editor.content'),
+          ...(language ? { lang: language } : {}),
+        },
+      },
     },
     [document],
   );
+  const root = useRef<HTMLDivElement>(null);
   usePrintOpensSections();
+  useLinksOpenSections(root);
   useCodeColours(editor);
 
   useEffect(() => {
@@ -231,6 +286,7 @@ export function DocumentView({
   return (
     // The keyboard reaches links by themselves, and images through their own buttons.
     <div
+      ref={root}
       onClick={follow}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && openMark(e.target as HTMLElement)) e.preventDefault();
@@ -239,6 +295,69 @@ export function DocumentView({
       <EditorContent editor={editor} />
     </div>
   );
+}
+
+/** How much of a block counts as its edge, where a drop makes columns instead of a new line. */
+const BESIDE_EDGE_SHARE = 0.1;
+
+interface BesidePlace {
+  pos: number;
+  side: DropSide;
+  box: DOMRect;
+}
+
+interface BesideLine {
+  insetBlockStart: number;
+  insetInlineStart: number;
+  blockSize: number;
+}
+
+/** The block a drag stands at the edge of, if any. */
+function besidePlace(view: EditorView, x: number, y: number): BesidePlace | null {
+  const bounds = view.dom.getBoundingClientRect();
+  const reach = bounds.width * BESIDE_EDGE_SHARE;
+  // A drop in the text means a new place in the page, so one side counts from the margin on.
+  const isLeft = x < bounds.left;
+  const isRight = x > bounds.right - reach;
+  const runsRight = getComputedStyle(view.dom).direction !== 'rtl';
+  const side = isLeft ? (runsRight ? 'start' : 'end') : isRight ? (runsRight ? 'end' : 'start') : null;
+  const found = side && view.posAtCoords({ left: bounds.left + bounds.width / 2, top: y });
+  if (!side || !found) return null;
+  const inside = found.inside >= 0 ? found.inside : found.pos;
+  const $pos = view.state.doc.resolve(inside);
+  const pos = $pos.depth > 0 ? $pos.before(1) : inside;
+  const block = view.nodeDOM(pos);
+  return block instanceof HTMLElement ? { pos, side, box: block.getBoundingClientRect() } : null;
+}
+
+function besideLineOf(place: BesidePlace, sheet: HTMLElement): BesideLine {
+  const outer = sheet.getBoundingClientRect();
+  const x = place.side === 'start' ? place.box.left : place.box.right;
+  return {
+    insetBlockStart: place.box.top - outer.top,
+    insetInlineStart: x - outer.left,
+    blockSize: place.box.height,
+  };
+}
+
+/** The dashed line where a dropped block would land. Only our code knows these numbers. */
+function BesideMark({ line }: { line: BesideLine }) {
+  const mark = useRef<HTMLSpanElement>(null);
+  useLayoutEffect(() => {
+    if (!mark.current) return;
+    mark.current.style.insetBlockStart = `${line.insetBlockStart}px`;
+    mark.current.style.insetInlineStart = `${line.insetInlineStart}px`;
+    mark.current.style.blockSize = `${line.blockSize}px`;
+  }, [line]);
+  return <span ref={mark} className="beside-line" />;
+}
+
+/** A quiet word when images have nothing for screen readers (EDT-075). */
+function ImagesHint({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
+  const count = useEditorState({ editor, selector: (s) => imagesWithoutWords(s.editor.state.doc) });
+  if (count === 0) return null;
+  return <p className="muted images-hint">{t('editor.imagesWithoutWords', { count })}</p>;
 }
 
 /** Below this, an upload is gone before anyone could read a number (spec 024, D21). */
@@ -265,6 +384,7 @@ export function DocumentEditor({
   together,
   onReady,
   onFocusTitle,
+  language,
 }: {
   pageId: string;
   initial: Json;
@@ -285,9 +405,12 @@ export function DocumentEditor({
   onReady?: (editor: Editor) => void;
   /** Backspace at the very start of the text goes here. */
   onFocusTitle?: () => void;
+  /** What the text is written in, which the spell checker follows. */
+  language?: string;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
+  const copy = useCopy();
   const person = usePerson();
   const typingHelp = useRef(true);
   typingHelp.current = usePreferences().preferences.typing_help;
@@ -310,6 +433,13 @@ export function DocumentEditor({
   const [inserting, setInserting] = useState(false);
   const [sizingTable, setSizingTable] = useState(false);
   const [finding, setFinding] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
+  const [pickingEmoji, setPickingEmoji] = useState(false);
+  const [savingBlock, setSavingBlock] = useState(false);
+  const [describing, setDescribing] = useState(false);
+  const savedBlocks = useSavedBlocks();
+  const savedItems = useRef<InsertItem[]>([]);
+  savedItems.current = (savedBlocks.data ?? []).map(savedBlockItem);
   const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const plainPaste = useRef(false);
@@ -345,6 +475,18 @@ export function DocumentEditor({
     setUploading(null);
   };
 
+  /** Selects the image just added, and offers to describe it: screen readers need that (EDT-075). */
+  const offerDescription = () => {
+    if (!editor) return;
+    const { doc, selection } = editor.state;
+    const at = selection.from - 1;
+    if (at >= 0 && doc.nodeAt(at)?.type.name === 'image') editor.commands.setNodeSelection(at);
+    toast({
+      message: t('editor.imageNeedsWords'),
+      action: { label: t('editor.describeNow'), run: () => setDescribing(true) },
+    });
+  };
+
   const addFiles = async (files: File[]) => {
     setUploadError(null);
     if (!canAttach) {
@@ -362,6 +504,7 @@ export function DocumentEditor({
             .focus()
             .insertContentAt(editor.state.selection.to, attachmentNode(attachment))
             .run();
+          if (attachment.inline) offerDescription();
         }
       } catch (error) {
         if (!isCancelled(error)) setUploadError(error);
@@ -372,7 +515,14 @@ export function DocumentEditor({
   const add = useRef(addFiles);
   add.current = addFiles;
 
+  const [besideLine, setBesideLine] = useState<BesideLine | null>(null);
+  const dropBeside = useRef<(view: EditorView, event: globalThis.DragEvent) => boolean>(() => false);
   const pasteMarkdown = useRef<(text: string) => void>(() => undefined);
+  const takeImagesAlong = useRef((html: string) => {
+    const { files, left } = pastedImages(html);
+    if (files.length > 0) void add.current(files);
+    if (left > 0) toast({ message: t('editor.imagesLeftBehind', { count: left }) });
+  });
 
   // Extensions are made once, so they reach the latest functions through this ref.
   const actions = useRef<EditorActions>(noActions);
@@ -394,7 +544,7 @@ export function DocumentEditor({
         : []),
       SlashCommands.configure({
         actions: () => actions.current,
-        items: inTemplate ? [...INSERT_ITEMS, ...TEMPLATE_ITEMS] : INSERT_ITEMS,
+        items: () => [...INSERT_ITEMS, ...(inTemplate ? TEMPLATE_ITEMS : []), ...savedItems.current],
         recent: () => readRecentItems(person),
         onUsed: (id) => rememberItem(person, id),
       }),
@@ -406,7 +556,9 @@ export function DocumentEditor({
       TableRules.configure({ onNested: () => nestedTable.current() }),
     ],
     // A document even when empty: a string would be parsed as HTML, which our policy blocks.
-    content: together ? { type: 'doc', content: [{ type: 'paragraph' }] } : initial,
+    content: together
+      ? { type: 'doc', content: [{ type: 'paragraph' }] }
+      : withUnknownBlocks(initial, knownBlockType),
     injectCSS: false,
     editorProps: {
       attributes: {
@@ -415,9 +567,14 @@ export function DocumentEditor({
         role: 'textbox',
         'aria-multiline': 'true',
         spellcheck: 'true',
+        ...(language ? { lang: language } : {}),
       },
+      transformPastedHTML: cleanWordHtml,
       // Files are taken by the area around the editor, so a drop beside the page counts too.
-      handleDrop: (_view, event) => carriesFiles(event.dataTransfer),
+      handleDrop: (view, event) => {
+        if (carriesFiles(event.dataTransfer)) return true;
+        return dropBeside.current(view, event);
+      },
       handleKeyDown: (_view, event) => {
         plainPaste.current =
           (event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === 'v';
@@ -434,6 +591,7 @@ export function DocumentEditor({
           if (!plainPaste.current && !inCode && !formatted && looksLikeMarkdown(text)) {
             pasteMarkdown.current(text);
           }
+          takeImagesAlong.current(event.clipboardData?.getData('text/html') ?? '');
           return false;
         }
         void add.current(images);
@@ -447,6 +605,13 @@ export function DocumentEditor({
     },
   });
   pasteMarkdown.current = (text) => convertPastedMarkdown(editor, text);
+  dropBeside.current = (view, event) => {
+    setBesideLine(null);
+    const source = (view.dragging as { node?: unknown } | null)?.node;
+    const place = besidePlace(view, event.clientX, event.clientY);
+    if (!(source instanceof NodeSelection) || !place || source.$from.depth !== 0) return false;
+    return columnsFromDrop(editor, source.from, place.pos, place.side);
+  };
   const tracker = useBlockTracking(editor);
   const sheet = useRef<HTMLDivElement>(null);
   const tables = useTableTracking(editor, sheet);
@@ -468,6 +633,13 @@ export function DocumentEditor({
       else setSizingTable(true);
     },
     openTemplateItem: setTemplateItem,
+    copyBlockLink: (anchor) => {
+      const address = `${window.location.origin}/pages/${pageId}#${anchor}`;
+      void copy(address, t('editor.blockLinkCopied'));
+    },
+    openSaveBlock: () => setSavingBlock(true),
+    openEmojiPicker: () => setPickingEmoji(true),
+    openDescribe: () => setDescribing(true),
     publish: onPublish,
     save: onSave,
     focusTitle: () => {
@@ -544,7 +716,13 @@ export function DocumentEditor({
           tracker.leave();
           tables.leave();
         }}
+        onDragOver={(e) => {
+          const place = editor.view.dragging ? besidePlace(editor.view, e.clientX, e.clientY) : null;
+          setBesideLine(place && sheet.current ? besideLineOf(place, sheet.current) : null);
+        }}
+        onDragEnd={() => setBesideLine(null)}
       >
+        {besideLine && <BesideMark line={besideLine} />}
         <BlockHandle editor={editor} tracker={tracker} actions={actions.current} />
         <TableFrame editor={editor} tracker={tables} />
         {uploading && (
@@ -592,6 +770,7 @@ export function DocumentEditor({
         )}
         {header}
         <EditorContent editor={editor} />
+        <ImagesHint editor={editor} />
         <WordCount editor={editor} />
         {footer}
       </div>
@@ -615,8 +794,22 @@ export function DocumentEditor({
         <TemplateItemDialog editor={editor} what={templateItem} onClose={() => setTemplateItem(null)} />
       )}
       {inserting && (
-        <InsertDialog editor={editor} actions={actions.current} onClose={() => setInserting(false)} />
+        <InsertDialog
+          editor={editor}
+          actions={actions.current}
+          onClose={() => setInserting(false)}
+          onBrowse={() => {
+            setInserting(false);
+            setBrowsing(true);
+          }}
+        />
       )}
+      {browsing && (
+        <BrowseDialog editor={editor} actions={actions.current} onClose={() => setBrowsing(false)} />
+      )}
+      {pickingEmoji && <EmojiPicker editor={editor} onClose={() => setPickingEmoji(false)} />}
+      {savingBlock && <SavedBlocksDialog editor={editor} onClose={() => setSavingBlock(false)} />}
+      {describing && <DescribeDialog editor={editor} onClose={() => setDescribing(false)} />}
     </div>
   );
 }

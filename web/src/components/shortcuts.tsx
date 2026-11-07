@@ -25,7 +25,7 @@ export type ShortcutAction =
 interface Shortcut {
   keys: string[];
   label: string;
-  group: 'global' | 'page';
+  group: 'global' | 'page' | 'editor';
 }
 
 export const SHORTCUTS: Shortcut[] = [
@@ -140,10 +140,25 @@ export function ShortcutsProvider({ enabled, children }: { enabled: boolean; chi
   );
 }
 
+// Only for this overview: the editor handles these keys itself (keys.ts).
+const EDITOR_SHORTCUTS: Shortcut[] = [
+  { keys: ['Ctrl', 'K'], label: 'editorLink', group: 'editor' },
+  { keys: ['Ctrl', 'S'], label: 'editorSave', group: 'editor' },
+  { keys: ['Ctrl', 'Enter'], label: 'editorPublish', group: 'editor' },
+  { keys: ['/'], label: 'editorInsert', group: 'editor' },
+  { keys: ['Ctrl', 'D'], label: 'editorDuplicate', group: 'editor' },
+  { keys: ['Alt', 'Up', 'Down'], label: 'editorMove', group: 'editor' },
+  { keys: ['Ctrl', 'Shift', '.'], label: 'editorBlockMenu', group: 'editor' },
+  { keys: ['Ctrl', '\\'], label: 'editorClear', group: 'editor' },
+  { keys: ['Alt', 'F10'], label: 'editorTools', group: 'editor' },
+  { keys: ['Tab'], label: 'editorNextCell', group: 'editor' },
+  { keys: ['Shift', 'Tab'], label: 'editorPreviousCell', group: 'editor' },
+];
+
 export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState('');
-  const shown = SHORTCUTS.filter((s) =>
+  const shown = [...SHORTCUTS, ...EDITOR_SHORTCUTS].filter((s) =>
     t(`shortcuts.${s.label}`).toLowerCase().includes(filter.trim().toLowerCase()),
   );
   return (
@@ -157,7 +172,7 @@ export function ShortcutsDialog({ onClose }: { onClose: () => void }) {
         placeholder={t('shortcuts.filter')}
       />
       {shown.length === 0 && <p className="muted">{t('shortcuts.none')}</p>}
-      {(['global', 'page'] as const).map((group) => {
+      {(['global', 'page', 'editor'] as const).map((group) => {
         const rows = shown.filter((s) => s.group === group);
         if (rows.length === 0) return null;
         return (

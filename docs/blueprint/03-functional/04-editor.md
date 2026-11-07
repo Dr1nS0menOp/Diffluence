@@ -10,12 +10,12 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-004** · built · An active tool is solid accent, so its state is clear without reading.
 - **EDT-005** · built · Table tools appear only inside a table.
 - **EDT-006** · new · The tools can be pinned to the top or hidden. When hidden, a small floating bar appears over selected text. The choice is kept per person.
-- **EDT-007** · new · Tools that do not fit fold into a **More** menu at the end of the row, in a fixed order. Nothing is ever cut off.
+- **EDT-007** · built · Tools that do not fit fold into a **More** menu at the end of the row, in a fixed order. Nothing is ever cut off.
 - **EDT-008** · built · A person sets **Normal** or **Full width** for the page from the strip. The sheet shows the width readers will get.
 - **EDT-009** · built · The title field gets the focus on a new page, and Enter moves to the body. In the body, the first Backspace at the very start moves back to the title.
 - **EDT-010** · built · Hovering over the title reveals **Add emoji** and **Add header image** (PAG-123).
 - **EDT-011** · built · A word count and read time show at the bottom of the sheet on request.
-- **EDT-012** · new · The status of the page can be set above the title (PAG-054).
+- **EDT-012** · built · The status of the page can be set above the title (PAG-054).
 - **EDT-013** · built · The strip shows who else is editing, in phase 4 (COL-088).
 - **EDT-014** · built · Clicking anywhere below the end of the text puts the cursor at the end, and adds a paragraph if the last block is not text.
 
@@ -25,14 +25,14 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-016** · built · Typing after the `/` narrows the list by name and by synonyms. Arrow keys move, Enter inserts, Escape closes and leaves the typed text alone.
 - **EDT-017** · built · The menu shows a group heading, an icon, a name and a one-line description. Recently used items come first.
 - **EDT-018** · built · The menu does not open inside a code block, or when a person types an address or a date such as `1/2`.
-- **EDT-019** · new · **Plus button:** hovering over an empty line shows a plus button that opens the same menu, for people who prefer the mouse.
-- **EDT-020** · partly · **Insert menu:** a button in the tools opens the same list, grouped, with a search box. A **Browse all** entry shows every block with a preview. Built: a dialog with the same list and a search box. New: a browser with previews.
+- **EDT-019** · built · **Plus button:** hovering over an empty line shows a plus button that opens the same menu, for people who prefer the mouse.
+- **EDT-020** · partly · **Insert menu:** a button in the tools opens the same list, grouped, with a search box. A **Browse all** entry shows every block with a preview. Still open: a preview of blocks that show data of a page or a space. Their hint says what they do.
 - **EDT-021** · built · **Block handle:** hovering over any block shows a handle at its start. Dragging the handle moves the block, also into another column.
-- **EDT-022** · partly · **Block menu:** selecting the handle opens a menu for that block: turn into another type, copy link to this block, duplicate, move up, move down, delete. Built: turn into, duplicate, move up, move down, delete. New: copy link to this block.
-- **EDT-023** · partly · **Turn into:** text becomes a heading, list, quote, panel, code block or collapsible section, and back. The menu suggests the most likely changes first. Built: to text, headings, lists, quote, code, panel and section. New: and back from those, and suggestions first.
-- **EDT-024** · new · Holding Shift and selecting a second block selects everything between them. Turn into, move and delete then work on all of them.
+- **EDT-022** · built · **Block menu:** selecting the handle opens a menu for that block: turn into another type, copy link to this block, duplicate, move up, move down, delete.
+- **EDT-023** · built · **Turn into:** text becomes a heading, list, quote, panel, code block or collapsible section, and back. The menu suggests the most likely changes first.
+- **EDT-024** · built · Holding Shift and selecting a second block selects everything between them. Turn into, move and delete then work on all of them.
 - **EDT-025** · built · Everything the block handle does also works from the keyboard: a shortcut opens the block menu for the block with the cursor, and Alt with the arrows moves it.
-- **EDT-026** · new · **Block templates:** a person saves a selection as a named block and inserts it later from the slash menu. It is private unless shared.
+- **EDT-026** · built · **Block templates:** a person saves a selection as a named block and inserts it later from the slash menu. It is private unless shared.
 
 ## 4.3 Typing shortcuts
 
@@ -64,7 +64,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 
 ## 4.4 Keyboard shortcuts in the editor
 
-- **EDT-031** · partly · Built: the table below. New: the list of shortcuts (wave B), and comment and table keys.
+- **EDT-031** · built · Built: the table below.
 
 | Keys (Ctrl or Cmd) | Does |
 |---|---|
@@ -103,7 +103,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-039** · built · **Clear formatting** removes all marks from the selection.
 - **EDT-040** · built · **Alignment:** left, centre or right for paragraphs and headings. In right-to-left text the choices mirror.
 - **EDT-041** · built · **Indent** moves a paragraph one step in, up to six steps. Buttons and keyboard both work.
-- **EDT-042** · new · **Direction:** a block can be marked left-to-right or right-to-left when languages are mixed.
+- **EDT-042** · built · **Direction:** a block can be marked left-to-right or right-to-left when languages are mixed.
 - **EDT-043** · built · A hard line break comes from Shift Enter.
 - **EDT-044** · built · A **Heading anchor** is created for each heading from its text, stable across small edits, and used for links to a heading.
 
@@ -112,9 +112,9 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-045** · built · Bullet, numbered and task lists can be nested to any depth.
 - **EDT-046** · built · A numbered list can start at any number.
 - **EDT-047** · built · Bullets and numbers change style by level, for easier reading.
-- **EDT-048** · new · Dragging a list item moves it with everything nested below it.
+- **EDT-048** · built · Dragging a list item moves it with everything nested below it.
 - **EDT-049** · phase 4 · A task can have a person and a due date, typed with `@` and `//` (chapter 7).
-- **EDT-050** · new · In reading mode, a person with *edit* can tick a task without opening the editor. The change is a small version with no notification.
+- **EDT-050** · built · In reading mode, a person with *edit* can tick a task without opening the editor. The change is a small version with no notification.
 - **EDT-051** · built · An overdue open task shows its date in the danger colour.
 - **EDT-052** · built · Converting a list to a task list, and back, keeps its text and nesting.
 
@@ -125,7 +125,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-055** · built · The dialog also has a text field, for the words that show.
 - **EDT-056** · built · The dialog searches pages while typing, shows recent pages first and offers them as links. The link then points to the page id, so it survives a rename or move.
 - **EDT-057** · built · A link to a page shows the current title automatically, unless the writer typed their own words.
-- **EDT-058** · partly · A link can point to a heading or a block in the same or another page. Still open: any block without placing an anchor in it first
+- **EDT-058** · partly · A link can point to a heading or a block in the same or another page. Still open: a block without any text, such as an image, which has nothing to hold an anchor.
 - **EDT-059** · built · Links to pages the reader may not see stay as plain words with no title leak. The address shows nothing about the page.
 - **EDT-060** · built · Links to deleted pages show as struck through, with an explanation on hover.
 - **EDT-061** · built · Addresses that are typed or pasted become links on their own, and open in a new tab with `noopener`.
@@ -142,14 +142,14 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-069** · built · An image is always an attachment of the page. External images are refused, because they would tell a third party who is reading.
 - **EDT-070** · built · Only PNG, JPEG, GIF and WebP show as images, detected from the content.
 - **EDT-071** · built · Images get in by the tools, drag and drop, or paste.
-- **EDT-072** · partly · **Size:** drag a corner, or type a width. Presets are small, medium, large and original. The reader never gets more than the width of the column. Built: the presets. New: dragging a corner and typing a width.
-- **EDT-073** · partly · **Alignment and wrap:** left, centre or right, with or without text flowing around it. Built: alignment. New: text flowing around it.
+- **EDT-072** · built · **Size:** drag a corner, or type a width. Presets are small, medium, large and original. The reader never gets more than the width of the column.
+- **EDT-073** · built · **Alignment and wrap:** left, centre or right, with or without text flowing around it.
 - **EDT-074** · partly · **Caption:** a line of text under the image with simple formatting. Built: a plain caption. New: formatting in it.
-- **EDT-075** · partly · **Alt text:** a field for a description, offered when an image is added, because screen readers need it. A page with images without alt text gets a quiet hint in the editor. Built: the field. New: asking for it when an image is added, and the hint.
-- **EDT-076** · new · **Border:** none, thin or medium in a colour from the palette.
-- **EDT-077** · new · **Link:** an image can link to a page or an address.
-- **EDT-078** · new · **Inline image:** a small image can sit in a line of text, such as an icon.
-- **EDT-079** · new · **Paste from a web page:** the image is downloaded by the browser where possible and stored as an attachment, or a clear note says it could not be taken along.
+- **EDT-075** · built · **Alt text:** a field for a description, offered when an image is added, because screen readers need it. A page with images without alt text gets a quiet hint in the editor.
+- **EDT-076** · built · **Border:** none, thin or medium in a colour from the palette.
+- **EDT-077** · built · **Link:** an image can link to a page or an address.
+- **EDT-078** · built · **Inline image:** a small image can sit in a line of text, such as an icon.
+- **EDT-079** · built · **Paste from a web page:** the image is downloaded by the browser where possible and stored as an attachment, or a clear note says it could not be taken along.
 - **EDT-080** · partly · Selecting an image shows a small bar with these options, and Delete. Deleting it from the page does not delete the attachment. Built: the options, in the row of tools. New: a bar at the image.
 - **EDT-081** · built · If the attachment no longer exists, the block shows a clear placeholder, not a broken picture.
 - **EDT-082** · later · Basic cropping and rotating in the browser, stored as a new version of the attachment.
@@ -182,64 +182,64 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 
 - **EDT-104** · built · A code block has a language, syntax highlighting and always reads left-to-right.
 - **EDT-105** · built · A language picker with search, with the languages of this page first. **Plain text** is one of them. About 190 languages, which load when needed.
-- **EDT-106** · new · The language can be detected, and the writer can change it.
-- **EDT-107** · partly · **Line numbers** can be on or off, with a starting number. Built: on and off. New: a starting number.
+- **EDT-106** · built · The language can be detected, and the writer can change it.
+- **EDT-107** · built · **Line numbers** can be on or off, with a starting number.
 - **EDT-108** · built · **Wrap long lines** can be on or off.
 - **EDT-109** · built · **Copy button:** a reader copies a block with one click.
 - **EDT-110** · built · **Title:** an optional line above the block, such as a file name.
-- **EDT-111** · new · **Fold:** a long block can start folded with a control to open it.
-- **EDT-112** · partly · Tab inside a code block inserts spaces, and selecting several lines indents them all. A shortcut leaves the block, so nobody is trapped. Built: Tab inserts spaces and Escape leads out. New: indenting several lines.
+- **EDT-111** · built · **Fold:** a long block can start folded with a control to open it.
+- **EDT-112** · built · Tab inside a code block inserts spaces, and selecting several lines indents them all. A shortcut leaves the block, so nobody is trapped.
 - **EDT-113** · built · Pasting code into a code block keeps it exactly as it is.
 
 ## 4.11 Blocks that structure a page
 
 - **EDT-114** · built · Quote and horizontal rule.
-- **EDT-115** · partly · **Panel:** a coloured box with an icon, for info, note, success, warning and error, or a neutral one with a chosen emoji and colour. It holds any block except another panel. Built: the five kinds. New: a neutral panel with a chosen emoji and colour.
-- **EDT-116** · partly · **Collapsible section:** a title and hidden content. Readers open it with a click or the keyboard. It remembers nothing, and starts closed unless the writer chose open. It opens by itself when printing, exporting or following a link into it. Built: all of it for readers, and find in the browser. New: opening for print, export and links.
+- **EDT-115** · built · **Panel:** a coloured box with an icon, for info, note, success, warning and error, or a neutral one with a chosen emoji and colour. It holds any block except another panel.
+- **EDT-116** · built · **Collapsible section:** a title and hidden content. Readers open it with a click or the keyboard. It remembers nothing, and starts closed unless the writer chose open. It opens by itself when printing, exporting or following a link into it.
 - **EDT-117** · built · Collapsible sections can be nested.
-- **EDT-118** · partly · **Columns:** two to five columns, each holding any block. Preset splits include equal, wide left, wide right and a narrow sidebar column. Changing the number keeps the content. Built: two to five columns, equal, wide first, wide last, and keeping the content. New: a narrow sidebar split.
-- **EDT-119** · new · Columns are also made by dragging a block beside another. A dashed line shows where it will land.
-- **EDT-120** · new · **Column block width:** normal, wide or full.
+- **EDT-118** · built · **Columns:** two to five columns, each holding any block. Preset splits include equal, wide left, wide right and a narrow sidebar column. Changing the number keeps the content.
+- **EDT-119** · built · Columns are also made by dragging a block beside another. A dashed line shows where it will land.
+- **EDT-120** · built · **Column block width:** normal, wide or full.
 - **EDT-121** · built · On narrow screens columns stack in reading order.
-- **EDT-122** · partly · **Decision:** a block that records a decision with a clear mark. It can have a person and a date. A report lists decisions across pages (BLK-037). Built: the block. New: a person and a date, and the report.
-- **EDT-123** · new · **Spotlight:** a wide coloured band for an important message, with a heading, text and an optional button link.
+- **EDT-122** · built · **Decision:** a block that records a decision with a clear mark. It can have a person and a date. A report lists decisions across pages (BLK-037).
+- **EDT-123** · built · **Spotlight:** a wide coloured band for an important message, with a heading, text and an optional button link.
 
 ## 4.12 Small items in a line of text
 
 - **EDT-124** · built · **Status mark:** a short coloured word in a line, with a palette of six colours. Typing changes the word.
-- **EDT-125** · partly · **Date:** a date in a soft box, chosen from a calendar. It shows in the reader's format. A date in a task sets its due date. Built: the date and the calendar field. New: a date in a task setting its due date.
+- **EDT-125** · built · **Date:** a date in a soft box, chosen from a calendar. It shows in the reader's format. A date in a task sets its due date.
 - **EDT-126** · phase 4 · **Mention:** `@` opens a list of people and groups the person may see (COL-029).
-- **EDT-127** · partly · **Emoji:** `:` opens a list with search, and a toolbar button shows a picker with groups and recent emoji. Emoji are standard Unicode characters, so no images are needed. Built: `:` with a list, and search. New: a picker with groups and recent emoji.
+- **EDT-127** · built · **Emoji:** `:` opens a list with search, and a toolbar button shows a picker with groups and recent emoji. Emoji are standard Unicode characters, so no images are needed.
 - **EDT-128** · later · **Own emoji:** administrators upload small pictures that everyone can use. They are served only to people who are logged in.
 - **EDT-129** · built · **Page link tag:** the inline form of EDT-065.
 
 ## 4.13 Charts
 
-- **EDT-130** · new · A table can get a chart below it: bar, line, area or pie.
-- **EDT-131** · new · The chart stays linked to its table and follows every change.
-- **EDT-132** · new · Options: which column is the axis, which columns are the data, how to total repeated values, title, axis titles, legend on or off and its position, height, smooth lines, data points.
-- **EDT-133** · new · Colours come from the chart palette with light and dark versions. Series are also told apart by shape or pattern, not by colour alone.
-- **EDT-134** · new · Removing a chart leaves the table. Removing a table asks what to do with its chart.
-- **EDT-135** · new · A table can be hidden by placing it in a collapsible section, and the chart stays.
-- **EDT-136** · new · Every chart can also be read as a table by screen readers.
+- **EDT-130** · built · A table can get a chart below it: bar, line, area or pie.
+- **EDT-131** · built · The chart stays linked to its table and follows every change.
+- **EDT-132** · built · Options: which column is the axis, which columns are the data, how to total repeated values, title, axis titles, legend on or off and its position, height, smooth lines, data points.
+- **EDT-133** · built · Colours come from the chart palette with light and dark versions. Series are also told apart by shape or pattern, not by colour alone.
+- **EDT-134** · built · Removing a chart leaves the table. Removing a table asks what to do with its chart.
+- **EDT-135** · built · A table can be hidden by placing it in a collapsible section, and the chart stays.
+- **EDT-136** · built · Every chart can also be read as a table by screen readers.
 
 ## 4.14 Paste and drop
 
 - **EDT-137** · built · Pasted content goes through the same allow-list as everything else. Nothing unknown gets in.
-- **EDT-138** · partly · Formatting from Word and web pages is cleaned up. Built: what the allow-list keeps. New: lists, tables, headings and links from Word and Google Docs arrive as our blocks.
+- **EDT-138** · partly · Formatting from Word and web pages is cleaned up. Still open: a real Word and Google Docs file: this was tried on samples of their HTML, and nested lists arrive flat.
 - **EDT-139** · built · **Paste as plain text** with Ctrl Shift V.
 - **EDT-140** · built · Pasted Markdown is recognised and turned into blocks. An undo restores the plain text.
 - **EDT-141** · built · Files dropped anywhere in the editor, also beside the page, become part of the document. Several at once are kept in order (chapter 6).
 - **EDT-142** · built · A pasted image becomes an attachment.
-- **EDT-143** · new · A copied block from another Diffluence page keeps its blocks and marks. Attachments stay linked if the reader may see them, or are copied along.
+- **EDT-143** · partly · A copied block from another Diffluence page keeps its blocks and marks. Attachments stay linked if the reader may see them, or are copied along. Still open: attachments of another page. Blocks and marks come along through the clipboard, and a file keeps pointing at its own page.
 
 ## 4.15 Find, undo and the rest
 
 - **EDT-144** · built · **Find** opens a bar at the top of the sheet. It marks all matches, shows how many, and moves with Enter.
 - **EDT-145** · built · **Replace** replaces one or all matches. Options: match case, whole word.
 - **EDT-146** · built · Undo and redo work across all edits in the session.
-- **EDT-147** · partly · The browser's spell checker is on, and respects the language of the page. Built: the spell checker is on. New: the language of the page, which needs EDT-148.
-- **EDT-148** · new · **Page language:** a page can state its language, which sets the spell checker, the hyphenation and what screen readers pronounce.
+- **EDT-147** · built · The browser's spell checker is on, and respects the language of the page.
+- **EDT-148** · built · **Page language:** a page can state its language, which sets the spell checker, the hyphenation and what screen readers pronounce.
 - **EDT-149** · partly · **Comment while editing:** selecting text in the editor allows an inline comment. It stays with the draft until publishing. Built: on a page that was published before. New: on a page that never was.
 - **EDT-150** · new · A long page keeps typing smooth: 100,000 words stay usable, and the tools do not freeze.
 - **EDT-151** · built · **Word count** counts the selection when there is one.
@@ -251,8 +251,8 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-154** · built · A document is at most 5 MiB and 100 levels deep.
 - **EDT-155** · built · Every new block in this chapter is added to that allow-list with tests, and to Markdown export, comparison and search.
 - **EDT-156** · built · Colours, sizes and alignment are stored as names from a short list, never as free values, so no document can carry styles.
-- **EDT-157** · new · An older document always opens in a newer release, upgraded on read.
-- **EDT-158** · new · Blocks that a release does not know, for example from a newer linked instance, show as a clear placeholder and are kept unchanged.
+- **EDT-157** · built · An older document always opens in a newer release, upgraded on read.
+- **EDT-158** · built · Blocks that a release does not know, for example from a newer linked instance, show as a clear placeholder and are kept unchanged.
 
 ## 4.x After the product owner's first test (spec 017)
 

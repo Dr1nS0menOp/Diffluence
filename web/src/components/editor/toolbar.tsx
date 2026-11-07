@@ -1,6 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // The row of tools: one Tab stop, with arrow keys inside it (ARIA toolbar pattern).
-import { useLayoutEffect, useRef, type FocusEvent, type KeyboardEvent, type RefObject } from 'react';
+import {
+  useLayoutEffect,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+  type ReactNode,
+  type RefObject,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
@@ -11,8 +19,10 @@ import {
   IconBold,
   IconBullet,
   IconClear,
+  IconChevronDown,
   IconCode,
   IconCodeBlock,
+  IconEmoji,
   IconFullWidth,
   IconHighlight,
   IconIndent,
@@ -34,17 +44,18 @@ import {
   IconUnderline,
   IconUndo,
 } from '../icons';
-import { Menu, MenuItem } from '../menu';
+import { Menu, MenuItem, MenuSeparator } from '../menu';
 import { toggleList } from './block-commands';
 import type { EditorActions } from './keys';
-import { indentBlock, setAlignment, setTextStyle } from './marks';
+import { indentBlock, setAlignment, setDirection, setTextStyle } from './marks';
 import { MARK_COLORS, TEXT_COLORS } from './palette';
 import { SelectionTools } from './selection-tools';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
+import { useToolFolding } from './tool-fold';
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
 // Everything that can take focus in the row, except what sits in an open menu.
-const CONTROLS = 'button:not(:disabled), select, input';
+const CONTROLS = 'button:not(:disabled), select, input:not([hidden])';
 
 function controlsIn(root: HTMLElement | null): HTMLElement[] {
   const all = Array.from(root?.querySelectorAll<HTMLElement>(CONTROLS) ?? []);
@@ -160,7 +171,7 @@ function InlineTools({ editor }: { editor: Editor }) {
   );
 }
 
-function MoreFormatting({ editor }: { editor: Editor }) {
+function MoreFormatting({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const { t } = useTranslation();
   const chain = () => editor.chain().focus();
   return (
@@ -178,6 +189,9 @@ function MoreFormatting({ editor }: { editor: Editor }) {
       </MenuItem>
       <MenuItem onClick={() => chain().unsetAllMarks().run()}>
         <IconClear size={TOOL_ICON_SIZE} /> {t('editor.clearFormatting')}
+      </MenuItem>
+      <MenuItem onClick={actions.openEmojiPicker}>
+        <IconEmoji size={TOOL_ICON_SIZE} /> {t('editor.emojiPicker')}
       </MenuItem>
     </Menu>
   );
@@ -262,9 +276,15 @@ function AlignMenu({ editor }: { editor: Editor }) {
     editor,
     selector: (s) => {
       const block = s.editor.isActive('heading') ? 'heading' : 'paragraph';
-      return (s.editor.getAttributes(block).align as string | null | undefined) ?? null;
+      const attrs = s.editor.getAttributes(block) as { align?: string | null; dir?: string | null };
+      return { align: attrs.align ?? null, dir: attrs.dir ?? null };
     },
   });
+  const directions = [
+    { value: null, label: t('editor.directionPage') },
+    { value: 'ltr', label: t('editor.directionLtr') },
+    { value: 'rtl', label: t('editor.directionRtl') },
+  ] as const;
   const options = [
     { value: null, label: t('editor.alignStart'), icon: <IconAlignStart size={TOOL_ICON_SIZE} /> },
     { value: 'center', label: t('editor.alignCenter'), icon: <IconAlignCenter size={TOOL_ICON_SIZE} /> },
@@ -281,10 +301,21 @@ function AlignMenu({ editor }: { editor: Editor }) {
         <MenuItem
           key={option.label}
           role="menuitemradio"
-          aria-checked={current === option.value}
+          aria-checked={current.align === option.value}
           onClick={() => setAlignment(editor, option.value)}
         >
           {option.icon} {option.label}
+        </MenuItem>
+      ))}
+      <MenuSeparator />
+      {directions.map((option) => (
+        <MenuItem
+          key={option.label}
+          role="menuitemradio"
+          aria-checked={current.dir === option.value}
+          onClick={() => setDirection(editor, option.value)}
+        >
+          {option.label}
         </MenuItem>
       ))}
     </Menu>
@@ -362,8 +393,119 @@ export function Toolbar({
 }) {
   const { t } = useTranslation();
   const root = useRef<HTMLDivElement>(null);
+
+  const [showsMore, setShowsMore] = useState(false);
   const roving = useRovingFocus(root, () => editor.commands.focus());
   const chain = () => editor.chain().focus();
+  // In the order of the row, which is also the order in which they fold back from the end.
+  const groups: { id: string; tools: ReactNode }[] = [
+    { id: 'style', tools: <TextStyle editor={editor} /> },
+    { id: 'inline', tools: <InlineTools editor={editor} /> },
+    {
+      id: 'colour',
+      tools: (
+        <>
+          <MoreFormatting editor={editor} actions={actions} />
+          <TextColorMenu editor={editor} />
+          <HighlightMenu editor={editor} />
+          <ToolSeparator />
+        </>
+      ),
+    },
+    {
+      id: 'layout',
+      tools: (
+        <>
+          <AlignMenu editor={editor} />
+          <Tool editor={editor} label={t('editor.outdent')} run={() => indentBlock(editor, 'out')}>
+            <IconOutdent size={TOOL_ICON_SIZE} />
+          </Tool>
+          <Tool editor={editor} label={t('editor.indent')} run={() => indentBlock(editor, 'in')}>
+            <IconIndent size={TOOL_ICON_SIZE} />
+          </Tool>
+          <ToolSeparator />
+        </>
+      ),
+    },
+    {
+      id: 'blocks',
+      tools: (
+        <>
+          <BlockTools editor={editor} />
+          <ToolSeparator />
+        </>
+      ),
+    },
+    {
+      id: 'insert',
+      tools: (
+        <>
+          <Tool editor={editor} label={t('editor.link')} active="link" run={actions.openLink}>
+            <IconLink size={TOOL_ICON_SIZE} />
+          </Tool>
+          {canAttach && (
+            <Tool editor={editor} label={t('editor.attach')} run={actions.pickFiles}>
+              <IconAttach size={TOOL_ICON_SIZE} />
+            </Tool>
+          )}
+          <Tool editor={editor} label={t('editor.table')} run={actions.openTableSize}>
+            <IconTable size={TOOL_ICON_SIZE} />
+          </Tool>
+
+          <Tool editor={editor} label={t('editor.insert')} run={onInsert}>
+            <IconPlus size={TOOL_ICON_SIZE} />
+          </Tool>
+        </>
+      ),
+    },
+    {
+      id: 'find',
+      tools: (
+        <>
+          <Tool editor={editor} label={t('editor.find')} run={actions.openFind}>
+            <IconSearch size={TOOL_ICON_SIZE} />
+          </Tool>
+          <ToolSeparator />
+        </>
+      ),
+    },
+    {
+      id: 'history',
+      tools: (
+        <>
+          <Tool editor={editor} label={t('editor.undo')} run={() => chain().undo().run()}>
+            <IconUndo size={TOOL_ICON_SIZE} />
+          </Tool>
+          <Tool editor={editor} label={t('editor.redo')} run={() => chain().redo().run()}>
+            <IconRedo size={TOOL_ICON_SIZE} />
+          </Tool>
+        </>
+      ),
+    },
+    ...(onFullWidth
+      ? [
+          {
+            id: 'width',
+            tools: (
+              <>
+                <ToolSeparator />
+                <Tool
+                  editor={editor}
+                  label={t('editor.fullWidth')}
+                  pressed={fullWidth ?? false}
+                  run={onFullWidth}
+                >
+                  <IconFullWidth size={TOOL_ICON_SIZE} />
+                </Tool>
+              </>
+            ),
+          },
+        ]
+      : []),
+  ];
+  const folded = useToolFolding(root, groups.length);
+  const shown = groups.slice(0, groups.length - folded);
+  const hidden = groups.slice(groups.length - folded);
   return (
     <div
       ref={root}
@@ -373,68 +515,51 @@ export function Toolbar({
       onFocus={roving.onFocus}
       onKeyDown={roving.onKeyDown}
     >
-      <TextStyle editor={editor} />
-      <InlineTools editor={editor} />
-      <MoreFormatting editor={editor} />
-      <TextColorMenu editor={editor} />
-      <HighlightMenu editor={editor} />
-      <ToolSeparator />
-      <AlignMenu editor={editor} />
-      <Tool editor={editor} label={t('editor.outdent')} run={() => indentBlock(editor, 'out')}>
-        <IconOutdent size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.indent')} run={() => indentBlock(editor, 'in')}>
-        <IconIndent size={TOOL_ICON_SIZE} />
-      </Tool>
-      <ToolSeparator />
-      <BlockTools editor={editor} />
-      <ToolSeparator />
-      <Tool editor={editor} label={t('editor.link')} active="link" run={actions.openLink}>
-        <IconLink size={TOOL_ICON_SIZE} />
-      </Tool>
+      {shown.map((group) => (
+        <span key={group.id} className="tool-group">
+          {group.tools}
+        </span>
+      ))}
+      {hidden.length > 0 && (
+        <span className="tool-more">
+          <button
+            type="button"
+            className={showsMore ? 'tool on' : 'tool'}
+            aria-label={t('editor.moreTools')}
+            title={t('editor.moreTools')}
+            aria-expanded={showsMore}
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => setShowsMore(!showsMore)}
+          >
+            <IconChevronDown size={TOOL_ICON_SIZE} />
+          </button>
+          {showsMore && (
+            <span className="tool-more-panel" role="group" aria-label={t('editor.moreTools')}>
+              {hidden.map((group) => (
+                <span key={group.id} className="tool-fold">
+                  {group.tools}
+                </span>
+              ))}
+            </span>
+          )}
+        </span>
+      )}
       {canAttach && (
-        <>
-          <Tool editor={editor} label={t('editor.attach')} run={actions.pickFiles}>
-            <IconAttach size={TOOL_ICON_SIZE} />
-          </Tool>
-          <input
-            ref={fileInput}
-            type="file"
-            multiple
-            hidden
-            aria-label={t('editor.attach')}
-            onChange={(e) => {
-              onFiles(Array.from(e.target.files ?? []));
-              e.target.value = '';
-            }}
-          />
-        </>
+        <input
+          ref={fileInput}
+          type="file"
+          multiple
+          hidden
+          aria-label={t('editor.attach')}
+          onChange={(e) => {
+            onFiles(Array.from(e.target.files ?? []));
+            e.target.value = '';
+          }}
+        />
       )}
-      <Tool editor={editor} label={t('editor.table')} run={actions.openTableSize}>
-        <IconTable size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.insert')} run={onInsert}>
-        <IconPlus size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.find')} run={actions.openFind}>
-        <IconSearch size={TOOL_ICON_SIZE} />
-      </Tool>
-      <ToolSeparator />
-      <Tool editor={editor} label={t('editor.undo')} run={() => chain().undo().run()}>
-        <IconUndo size={TOOL_ICON_SIZE} />
-      </Tool>
-      <Tool editor={editor} label={t('editor.redo')} run={() => chain().redo().run()}>
-        <IconRedo size={TOOL_ICON_SIZE} />
-      </Tool>
-      {onFullWidth && (
-        <>
-          <ToolSeparator />
-          <Tool editor={editor} label={t('editor.fullWidth')} pressed={fullWidth ?? false} run={onFullWidth}>
-            <IconFullWidth size={TOOL_ICON_SIZE} />
-          </Tool>
-        </>
-      )}
-      <SelectionTools editor={editor} actions={actions} />
+      <span className="tool-side">
+        <SelectionTools editor={editor} actions={actions} />
+      </span>
     </div>
   );
 }
