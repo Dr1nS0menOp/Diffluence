@@ -125,6 +125,9 @@ Status: decided by the product owner (2026-11-05). Context: after their first te
 **ADR-033: Who may invite, and what waits**
 Status: decided by the product owner (2026-11-06). Decision: inviting someone without an account needs a role that allows it, and an administrator approves every invitation. Searching inside attachments and S3 storage wait for later. PdfCraft stays at 18.7 MiB packed and 52.6 MiB unpacked, and databases are an own grid. Consequences: an ordinary member can never bring in an outsider alone.
 
+**ADR-034: A quieter look, better settings, and roles you make yourself**
+Status: decided by the product owner (2026-11-07), to build when blueprint 03 is done. Context: after testing, the function was right, but the look and the settings fell short. Decision: the direction Stil replaces the look of Helder: white and blue, hardly any lines or boxes, and the sidebar nearly always in view, also on the home page. Settings of a space and of the instance use the sidebar for their sections, with groups that fold and a search, and the large area on the right to change them. Lists of people filter by dropdowns. Permissions stop being a matrix of ticks: an administrator makes roles, gives each role fine-grained permissions, and gives roles to people and groups. Consequences: `docs/design/README.md` and its pictures change, and the Branches guide lines go. Roles touch `permissions.Evaluate`, the SQL and the matrix test, so they get their own study first, in blueprint 05. Existing grants must become roles without anyone gaining or losing access. Behaviour and structure may follow familiar wikis, but the look stays our own (02). Supersedes: the look in ADR-021, and the Branches tree.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

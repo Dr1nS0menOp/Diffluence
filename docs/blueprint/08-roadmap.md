@@ -73,6 +73,15 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 - **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
 - **S3 storage.** It needs a client module, chosen when the time comes.
 
+## After blueprint 03: look, settings and roles (ADR-034)
+
+In this order, each with its own study:
+
+1. **Roles you make yourself:** an administrator makes a role, gives it fine-grained permissions, and gives it to people and groups, per space and for the instance. It replaces the matrix of ticks. Existing grants become roles without changing who can do what.
+2. **Settings:** groups in the sidebar that fold, a search, and the large area on the right. Care and System health move under System. People lists filter by dropdowns. The People screen of a space is rebuilt.
+3. **The look of Stil:** the sidebar also on the home page, parts of it that fold and can be made larger, no guide lines in the tree, tidier filters, labels without an outline.
+4. **Automation for the instance:** rules that stay per space, plus rules for the instance where an administrator chooses which spaces they touch.
+
 ## Enterprise document features
 
 The product owner counts these as basic enterprise features (2026-11-06). Each is a clean-room build, as `02-clean-room-and-licensing.md` describes: the products below are named only to say which behaviour is meant. We read their public pages for behaviour, write our own spec, and copy no text, workflow, icon or layout. Each starts with its own study. No phase is chosen yet. The sources are in `03-functional/sources.md`.
