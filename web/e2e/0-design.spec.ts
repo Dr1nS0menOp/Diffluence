@@ -1202,6 +1202,10 @@ test.describe('the look of every kind of screen', () => {
       expect(watched.ok(), await watched.text()).toBeTruthy();
       await page.goto('/me/watching');
       await expect(page.getByRole('link', { name: 'Team agreements' })).toBeVisible();
+      // Pages from earlier tests are watched by a background job, which a slow machine finishes later,
+      // so the picture shows only what this test watches.
+      await page.getByPlaceholder('Filter by name').fill('Team agreements');
+      await expect(page.getByRole('button', { name: 'Stop watching' })).toHaveCount(1);
       await picture(page, 'watching', [page.locator('time')]);
       await page.context().close();
     });
