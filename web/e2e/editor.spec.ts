@@ -106,9 +106,13 @@ test('tables, links, and a pasted address stay safe', async ({ page }) => {
     await d.dismiss();
   });
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  // Check the page as readers get it, not the editor that is still closing.
+  await expect(page.locator('.prose.editing')).toHaveCount(0);
   await expect(page.locator('.prose')).toContainText('<img src=x onerror=alert(1)>');
   expect(alerted).toBe(false);
-  await expect(page.locator('.prose img')).toHaveCount(0);
+  // The sort buttons in a table head bring the editor's own empty helper images, which have no source.
+  await expect(page.locator('.prose img:not(.ProseMirror-separator)')).toHaveCount(0);
+  await expect(page.locator('.prose img[src]')).toHaveCount(0);
 });
 
 test('drafts survive a reload, and history compares and restores', async ({ page }) => {
