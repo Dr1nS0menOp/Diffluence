@@ -231,6 +231,7 @@ test('a block moves with the menu and with Alt and the arrows, and Undo reverses
   await page.getByRole('menuitem', { name: 'Move down' }).click();
   await expect(lines).toHaveText(['second', 'first']);
 
+  await editorSettled(page);
   await page.keyboard.press('Control+d');
   await expect(lines).toHaveCount(3);
 });
