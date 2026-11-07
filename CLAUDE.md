@@ -80,4 +80,4 @@ Modules talk through their exported Go API and events, never through each other'
 Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · the design standard followed and new pictures looked at · docs and changelog updated, and the status lines in `docs/blueprint/03-functional/` · `make check` and `scripts/e2e` green · a plain-language "How to test" checklist in the PR · a handoff note written.
 
 ## End of every session
-Write `docs/handoff/YYYY-MM-DD-<topic>.md`: what was done, what is unfinished, what is next, and anything the product owner must decide.
+Write your full report and research notes to `docs/reports/YYYY-MM-DD-<topic>.md` (see its README for what never goes there). Then write `docs/handoff/YYYY-MM-DD-<topic>.md`: what was done, what is unfinished, what is next, and anything the product owner must decide.

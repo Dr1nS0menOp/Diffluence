@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<title>Diffluence: drie ontwerprichtingen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root { --font: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; font-family: var(--font); }
+button, input, select { font: inherit; color: inherit; }
+a { color: inherit; text-decoration: none; }
+
+/* The bar of this presentation, not part of any design. */
+.pick { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; padding: 10px 16px; background: #0d1117; color: #e8edf5; font-size: 13px; }
+.pick b { font-weight: 600; }
+.pick .group { display: flex; gap: 4px; align-items: center; }
+.pick button { border: 0; background: #232b38; color: #cfd8e5; padding: 6px 11px; border-radius: 6px; cursor: pointer; }
+.pick button[aria-pressed=true] { background: #4c8dff; color: #fff; }
+.note { background: #fff8e6; color: #5c4300; font-size: 13px; padding: 8px 16px; border-block-end: 1px solid #efe0b5; }
+
+/* Each direction sets these. */
+.app {
+  --bg: #fff; --side: #f7f8fa; --ink: #1f2a3a; --strong: #101827; --muted: #5f6b7e; --line: #e6e9ef;
+  --accent: #2563d9; --tint: #e8f0fd; --hover: #eef1f6; --on-accent: #fff; --card: #fff; --radius: 6px;
+  --shadow: none; --top: #fff; --topink: #1f2a3a;
+  height: calc(100vh - 86px); min-height: 620px; display: flex; flex-direction: column;
+  background: var(--bg); color: var(--ink); font-size: 14px; overflow: hidden;
+}
+.app.dark { --bg: #12161d; --side: #181e27; --ink: #dbe2ec; --strong: #f3f6fb; --muted: #9aa7ba; --line: #2a3340; --tint: #1d3152; --hover: #222a36; --accent: #7fb0f5; --on-accent: #0b1420; --card: #181e27; --top: #12161d; --topink: #dbe2ec; }
+
+.app.B { --bg: #f3f1ec; --side: #f3f1ec; --ink: #2b2a33; --strong: #17161d; --muted: #6d6a75; --line: #e7e3da; --accent: #5b46d6; --tint: #ece8fd; --hover: #e9e5dc; --card: #fff; --radius: 12px; --shadow: 0 1px 2px rgb(40 30 10 / 6%), 0 6px 20px rgb(40 30 10 / 6%); --top: #f3f1ec; --topink: #2b2a33; }
+.app.B.dark { --bg: #15141a; --side: #15141a; --ink: #e3e1ea; --strong: #f7f6fb; --muted: #a09dab; --line: #2c2a35; --accent: #a99bff; --tint: #2b2650; --hover: #24222c; --card: #1e1c25; --on-accent: #120f26; --top: #15141a; --topink: #e3e1ea; }
+
+.app.C { --bg: #fff; --side: #fbfcfd; --ink: #1c2530; --strong: #0d1520; --muted: #5d6877; --line: #e4e7ec; --accent: #0f7f76; --tint: #dff3f0; --hover: #eff2f5; --radius: 4px; --top: #122a33; --topink: #e4f1f1; }
+.app.C.dark { --bg: #10151a; --side: #151b21; --ink: #d8e0e6; --strong: #f1f5f7; --muted: #94a2ae; --line: #27313a; --accent: #52cbbd; --tint: #143a37; --hover: #1e262e; --on-accent: #06211e; --card: #151b21; --top: #0b1f26; --topink: #d8e8e8; }
+
+/* Top bar */
+.top { display: flex; align-items: center; gap: 6px; height: 52px; padding-inline: 14px; background: var(--top); color: var(--topink); border-block-end: 1px solid var(--line); flex: none; }
+.B .top { border: 0; }
+.C .top { border: 0; height: 46px; }
+.logo { display: flex; gap: 8px; align-items: center; font-weight: 700; font-size: 16px; margin-inline-end: 12px; }
+.logo i { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); display: grid; place-items: center; color: var(--on-accent); font-style: normal; font-size: 15px; }
+.top a.nav { padding: 6px 10px; border-radius: var(--radius); }
+.top a.nav:hover { background: color-mix(in srgb, currentColor 10%, transparent); }
+.create { background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--radius); padding: 7px 14px; font-weight: 600; margin-inline-start: 6px; }
+.grow { flex: 1; }
+.search { border: 1px solid color-mix(in srgb, currentColor 22%, transparent); background: transparent; border-radius: var(--radius); padding: 6px 12px; inline-size: 240px; color: inherit; }
+.B .search { border: 0; background: var(--card); box-shadow: var(--shadow); border-radius: 999px; }
+.me { width: 30px; height: 30px; border-radius: 50%; background: #b5541c; color: #fff; display: grid; place-items: center; font-weight: 600; font-size: 13px; margin-inline-start: 8px; }
+
+.body { flex: 1; display: flex; min-height: 0; }
+.B .body { gap: 14px; padding: 0 14px 14px; }
+
+/* Icon rail, direction C only */
+.rail { display: none; flex-direction: column; gap: 4px; inline-size: 56px; background: var(--top); color: var(--topink); padding: 10px 8px; flex: none; }
+.C .rail { display: flex; }
+.rail button { border: 0; background: transparent; color: inherit; block-size: 40px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; opacity: .75; }
+.rail button.on { background: color-mix(in srgb, #fff 16%, transparent); opacity: 1; }
+
+/* Sidebar */
+.side { inline-size: var(--side-w, 272px); flex: none; background: var(--side); border-inline-end: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0; position: relative; }
+.B .side { background: var(--card); border: 0; border-radius: 16px; box-shadow: var(--shadow); }
+.drag { position: absolute; inset-block: 0; inset-inline-end: -3px; inline-size: 6px; cursor: col-resize; z-index: 2; }
+.drag:hover { background: var(--accent); opacity: .5; }
+.sidehead { display: flex; align-items: center; gap: 10px; padding: 14px 14px 8px; font-weight: 650; color: var(--strong); }
+.animal { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; flex: none; background: #f0dcc4; color: #7a4a19; font-size: 12px; font-weight: 700; }
+.B .animal { border-radius: 50%; }
+.animal.b { background: #d9e6d3; color: #3e6135; }
+.animal.c { background: #d7e3f6; color: #2d548f; }
+.animal.d { background: #f3d9e0; color: #8a3550; }
+.sec { display: flex; flex-direction: column; min-height: 0; }
+.sec.fill { flex: 1; }
+.sechead { display: flex; align-items: center; gap: 4px; padding: 10px 14px 4px; font-size: 12px; font-weight: 650; color: var(--muted); cursor: pointer; user-select: none; }
+.sechead .chev { transition: transform .15s; display: inline-block; }
+.sec.shut .chev { transform: rotate(-90deg); }
+.sec.shut .secbody { display: none; }
+.sechead .tools { margin-inline-start: auto; display: flex; gap: 2px; }
+.tool { border: 0; background: transparent; color: var(--muted); width: 24px; height: 24px; border-radius: 5px; display: grid; place-items: center; cursor: pointer; }
+.tool:hover, .tool.on { background: var(--hover); color: var(--ink); }
+.secbody { overflow: auto; padding: 2px 8px 6px; flex: 1; min-height: 0; }
+.split { block-size: 7px; cursor: row-resize; position: relative; flex: none; }
+.split::after { content: ''; position: absolute; inset-inline: 12px; inset-block-start: 3px; block-size: 1px; background: var(--line); }
+.split:hover::after { background: var(--accent); block-size: 2px; }
+.item { display: flex; align-items: center; gap: 9px; padding: 6px 8px; border-radius: var(--radius); cursor: pointer; color: var(--ink); }
+.item:hover { background: var(--hover); }
+.item.on { background: var(--tint); color: var(--accent); font-weight: 600; }
+.item svg { flex: none; opacity: .75; }
+.item.sub { padding-inline-start: 26px; }
+.item.sub2 { padding-inline-start: 44px; }
+.twist { width: 14px; color: var(--muted); font-size: 10px; text-align: center; flex: none; margin-inline-start: -4px; }
+.filter { margin: 2px 6px 6px; display: none; }
+.filter.open { display: block; }
+.filter input { inline-size: 100%; border: 0; background: var(--hover); border-radius: var(--radius); padding: 6px 10px; }
+.chips { display: flex; gap: 4px; margin-block-start: 6px; flex-wrap: wrap; }
+.chip { border: 0; background: transparent; color: var(--muted); font-size: 12px; padding: 3px 8px; border-radius: 999px; cursor: pointer; }
+.chip.on { background: var(--tint); color: var(--accent); font-weight: 600; }
+.group-title { padding: 12px 8px 4px; font-size: 11.5px; letter-spacing: .03em; text-transform: uppercase; color: var(--muted); font-weight: 650; }
+.back { display: flex; gap: 6px; align-items: center; color: var(--muted); padding: 12px 14px 4px; font-size: 13px; cursor: pointer; }
+
+/* Main */
+main { flex: 1; overflow: auto; min-width: 0; padding: 30px 40px 60px; }
+.B main { background: var(--card); border-radius: 16px; box-shadow: var(--shadow); }
+.wrap { max-inline-size: 880px; margin-inline: auto; }
+.wrap.wide { max-inline-size: 1040px; }
+h1 { color: var(--strong); font-size: 28px; margin: 0 0 6px; letter-spacing: -.01em; }
+.B h1 { font-size: 31px; }
+.C h1 { font-size: 23px; }
+h2 { color: var(--strong); font-size: 17px; margin: 28px 0 10px; }
+p.sub { color: var(--muted); margin: 0 0 18px; }
+.B main input.field { background: var(--bg); }
+.crumb { color: var(--muted); font-size: 13px; margin-block-end: 16px; display: flex; justify-content: space-between; align-items: center; }
+.btn { border: 1px solid var(--line); background: var(--card); border-radius: var(--radius); padding: 7px 13px; cursor: pointer; }
+.B .btn { border-color: transparent; background: var(--hover); }
+.btn.primary { background: var(--accent); color: var(--on-accent); border-color: transparent; font-weight: 600; }
+.btn.flat { border-color: transparent; background: transparent; color: var(--muted); }
+.row { display: flex; gap: 8px; align-items: center; }
+.between { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+
+.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; }
+.B .card { border: 0; background: var(--bg); box-shadow: none; }
+.C .card { padding: 11px; }
+.card b { color: var(--strong); display: block; }
+.card small { color: var(--muted); }
+.feed { display: flex; flex-direction: column; }
+.feed div { display: flex; gap: 10px; align-items: center; padding: 9px 0; }
+.feed small { color: var(--muted); margin-inline-start: auto; }
+
+.labels { margin-block-start: 26px; display: flex; gap: 14px; align-items: center; font-size: 13px; color: var(--muted); flex-wrap: wrap; }
+.labels a { color: var(--accent); }
+.labels a::before { content: '#'; opacity: .6; }
+.labels .add { color: var(--muted); cursor: text; }
+.labels .add::before { content: '+ '; }
+.prose { font-size: 15.5px; line-height: 1.65; }
+.prose p { margin: 0 0 12px; }
+
+.person { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--radius); }
+.person:hover { background: var(--hover); }
+.person .who { flex: 1; min-width: 0; }
+.person .who b { color: var(--strong); display: block; font-weight: 600; }
+.person .who small { color: var(--muted); }
+.face { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 600; flex: none; }
+.role { border: 0; background: var(--hover); border-radius: 999px; padding: 4px 10px; }
+.via { color: var(--muted); font-size: 12.5px; inline-size: 130px; }
+.tabs { display: flex; gap: 18px; border-block-end: 1px solid var(--line); margin-block-end: 12px; }
+.tabs a { padding: 8px 2px; color: var(--muted); cursor: pointer; }
+.tabs a.on { color: var(--accent); box-shadow: inset 0 -2px var(--accent); font-weight: 600; }
+.peoplegrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px; }
+
+.setting { display: flex; justify-content: space-between; gap: 24px; padding: 14px 0; align-items: center; }
+.setting + .setting { border-block-start: 1px solid var(--line); }
+.B .setting + .setting { border: 0; }
+.setting b { color: var(--strong); font-weight: 600; display: block; }
+.setting small { color: var(--muted); }
+.panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 2px 18px; margin-block-end: 18px; }
+.B .panel { border: 0; background: var(--bg); }
+.A .panel { border: 0; padding: 0; }
+.toggle { inline-size: 38px; block-size: 22px; border-radius: 999px; background: var(--line); position: relative; flex: none; cursor: pointer; border: 0; }
+.toggle::after { content: ''; position: absolute; inset-block-start: 3px; inset-inline-start: 3px; inline-size: 16px; block-size: 16px; border-radius: 50%; background: #fff; transition: inset-inline-start .15s; }
+.toggle.on { background: var(--accent); }
+.toggle.on::after { inset-inline-start: 19px; }
+.field { border: 1px solid var(--line); background: var(--bg); border-radius: var(--radius); padding: 7px 10px; inline-size: 240px; }
+.B .field { background: var(--card); border-color: transparent; }
+.spacepick { display: flex; flex-wrap: wrap; gap: 6px; margin-block-start: 8px; }
+.spacepick span { display: inline-flex; gap: 6px; align-items: center; background: var(--tint); color: var(--accent); padding: 3px 10px 3px 4px; border-radius: 999px; font-size: 13px; }
+.spacepick .animal { width: 20px; height: 20px; font-size: 9px; border-radius: 50%; }
+.radio { display: flex; gap: 14px; margin-block-start: 8px; }
+.radio label { display: flex; gap: 5px; align-items: center; }
+
+.leaf { font-size: 16px; line-height: 1; color: var(--muted); inline-size: 14px; text-align: center; flex: none; margin-inline-start: -4px; }
+.facts { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; color: var(--muted); font-size: 13px; margin-block-end: 22px; }
+.facts span { display: inline-flex; gap: 5px; align-items: center; }
+.facts i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+main { position: relative; }
+.toolrail { position: sticky; float: inline-end; inset-block-start: 40%; display: flex; flex-direction: column; gap: 2px; padding: 6px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); margin-inline-end: -78px; }
+.toolrail button { border: 0; background: transparent; color: var(--muted); width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; cursor: pointer; }
+.toolrail button:hover { background: var(--hover); color: var(--ink); }
+.why { position: fixed; inset-block-end: 14px; inset-inline-end: 14px; max-inline-size: 330px; background: #0d1117; color: #e8edf5; padding: 12px 14px; border-radius: 10px; font-size: 13px; line-height: 1.45; box-shadow: 0 8px 30px rgb(0 0 0 / 35%); }
+.why b { display: block; margin-block-end: 3px; }
+</style>
+</head>
+<body>
+<div class="pick">
+  <b>Diffluence</b>
+  <div class="group" id="designs"></div>
+  <div class="group" id="screens"></div>
+  <div class="group"><button id="theme" aria-pressed="false">Donker</button></div>
+</div>
+<div class="note">Dit zijn voorbeelden, geen werkende app. Klik in de zijbalk op een kop om een deel in of uit te klappen, sleep de lijn tussen delen of de rand van de zijbalk om groter te maken, en gebruik het trechter-icoon bij Pages voor de filters.</div>
+<div id="app"></div>
+<div class="why" id="why"></div>
+
+<script>
+const icon = (d, s = 16) => `<svg width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${d}</svg>`;
+const I = {
+  home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/>',
+  people: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5M16 5a3.5 3.5 0 0 1 0 6.5M18 14.8c2 .7 3.2 2.5 3.5 5.2"/>',
+  blog: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/>',
+  file: '<path d="M20 11l-8.5 8.5a5 5 0 0 1-7-7L13 4a3.3 3.3 0 0 1 4.7 4.7L9.3 17a1.7 1.7 0 0 1-2.4-2.4L14.5 7"/>',
+  archive: '<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V9M10 13h4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/>',
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  funnel: '<path d="M4 5h16l-6 7.5V19l-4-2v-4.5z"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  star: '<path d="M12 3.5l2.7 5.6 6 .8-4.4 4.2 1.1 6.1-5.4-3-5.4 3 1.1-6.1L3.3 9.9l6-.8z"/>',
+  check: '<path d="M4 12.5l5 5L20 6.5"/>',
+  grid: '<rect x="4" y="4" width="7" height="7" rx="1"/><rect x="13" y="4" width="7" height="7" rx="1"/><rect x="4" y="13" width="7" height="7" rx="1"/><rect x="13" y="13" width="7" height="7" rx="1"/>',
+  page: '<path d="M6 3h8l5 5v13H6z"/><path d="M14 3v5h5"/>',
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
+  bolt: '<path d="M13 3L5 14h6l-1 7 8-11h-6z"/>',
+  back: '<path d="M15 5l-7 7 7 7"/>',
+  palette: '<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-1 2-2s-1-2 0-3 3 0 5-1 2-3 2-4c0-4.5-4-8-9-8z"/><circle cx="8" cy="11" r="1"/><circle cx="12" cy="8" r="1"/><circle cx="16" cy="10" r="1"/>',
+};
+const designs = {
+  A: { name: 'A: Stil', why: 'Dichtst bij wat er nu staat. Wit en blauw, bijna geen lijnen of kaders, instellingen als kale rijen. Rustig en snel te bouwen.' },
+  B: { name: 'B: Zacht', why: 'Warm en vriendelijk. Zwevende panelen op een warme achtergrond, ronde hoeken, paars accent. De dieren komen hier het best tot hun recht.' },
+  C: { name: 'C: Compact', why: 'Voor veel inhoud op één scherm. Donkere icoonbalk links voor snel wisselen, groenblauw accent, strakke rijen. Het zakelijkst.' },
+};
+const screens = { home: 'Startpagina', page: 'Pagina', people: 'People in een space', space: 'Space-instellingen', admin: 'Beheer' };
+const state = { design: 'A', screen: 'home', dark: false };
+
+const item = (i, t, on, cls = '') => `<div class="item ${on ? 'on' : ''} ${cls}">${i ? icon(I[i]) : ''}<span>${t}</span></div>`;
+const section = (title, body, opts = {}) => `<div class="sec ${opts.fill ? 'fill' : ''}"><div class="sechead" data-toggle><span class="chev">▾</span>${title}${opts.tools ? `<span class="tools">${opts.tools}</span>` : ''}</div><div class="secbody" ${opts.h ? `style="block-size:${opts.h}px;flex:none"` : ''}>${body}</div></div>`;
+const leaf = (t, on, cls = '') => `<div class="item ${on ? 'on' : ''} ${cls}"><span class="leaf">·</span>${icon(I.page, 14)}<span>${t}</span></div>`;
+const branch = (t) => `<div class="item"><span class="twist">▾</span>${icon(I.archive, 14)}<span>${t}</span></div>`;
+const tree = () => `
+  ${leaf('Start here', false)}
+  ${branch('Writing a page')}
+  ${leaf('Blocks', false, 'sub')}${leaf('Tables', true, 'sub')}${leaf('Images and files', false, 'sub')}${leaf('Code', false, 'sub')}
+  ${leaf('Working together', false)}${leaf('Keeping things in order', false)}
+  ${branch('Team handbook')}
+  ${leaf('Team budget', false, 'sub')}${leaf('Holidays', false, 'sub')}
+  ${leaf('A wide page', false)}${leaf('A long read', false)}`;
+const filter = `<div class="filter" id="filter"><input placeholder="Filter pages"><div class="chips"><button class="chip on">Tree</button><button class="chip">Recent</button><button class="chip">Mine</button><button class="chip">Drafts</button></div></div>`;
+const spaceSide = (current) => `
+  <div class="sidehead"><span class="animal">OW</span><span>Welcome to Diffluence</span></div>
+  ${section('Space', ['home:Home', 'info:Overview', 'people:People', 'blog:Blog', 'file:Files', 'archive:Archive'].map((x) => { const [i, t] = x.split(':'); return item(i, t, t === current); }).join(''), { h: 150 })}
+  <div class="split" data-split></div>
+  ${section('Pages', filter + tree(), { fill: true, tools: `<button class="tool" data-filter title="Filter">${icon(I.funnel, 14)}</button><button class="tool" title="New page">${icon(I.plus, 14)}</button>` })}
+  <div style="padding:6px 8px;border-block-start:1px solid var(--line)">${item('gear', 'Space settings', false).replace('class="item', 'data-go="space" class="item')}</div>`;
+const homeSide = `
+  ${section('You', item('home', 'For you', true) + item('clock', 'Recent', false) + item('star', 'Favourites', false) + item('check', 'Tasks', false) + item('page', 'Drafts', false))}
+  <div class="split" data-split></div>
+  ${section('Spaces', `<div class="item"><span class="animal" style="width:22px;height:22px;font-size:9px">OW</span>Welcome to Diffluence</div><div class="item"><span class="animal b" style="width:22px;height:22px;font-size:9px">EL</span>Engineering</div><div class="item"><span class="animal c" style="width:22px;height:22px;font-size:9px">WH</span>People team</div><div class="item"><span class="animal d" style="width:22px;height:22px;font-size:9px">FX</span>Marketing</div>${item('grid', 'All spaces', false)}`, { fill: true, tools: `<button class="tool" title="New space">${icon(I.plus, 14)}</button>` })}`;
+const spaceSettingsSide = `
+  <div class="back" data-go="page">${icon(I.back, 14)} Back to the space</div>
+  <div class="sidehead"><span class="animal">OW</span><span>Space settings</span></div>
+  <div class="secbody">
+    <div class="group-title">General</div>${item('info', 'Details', true)}${item('palette', 'Look and home page', false)}${item('page', 'Features', false)}
+    <div class="group-title">Who can do what</div>${item('people', 'People and roles', false)}${item('lock', 'Permissions', false)}${item('', 'Guests', false)}
+    <div class="group-title">Content</div>${item('', 'Content', false)}${item('', 'Templates', false)}${item('', 'Labels and statuses', false)}${item('', 'Archive and trash', false)}
+    <div class="group-title">Automation</div>${item('bolt', 'Rules', false)}
+    <div class="group-title">Danger</div>${item('', 'Delete or archive', false)}
+  </div>`;
+const adminSide = `
+  <div class="sidehead">Administration</div>
+  <div style="padding:0 10px 4px"><input class="field" style="inline-size:100%" placeholder="Find a setting"></div>
+  <div class="secbody">
+    <div class="group-title">Overview</div>${item('home', 'Summary', false)}
+    <div class="group-title">People and access</div>${item('', 'Users', false)}${item('', 'Invitations', false)}${item('', 'Groups', false)}${item('', 'Permissions', false)}${item('', 'Provisioning', false)}
+    <div class="group-title">Content</div>${item('', 'Spaces', false)}${item('', 'Templates', false)}${item('', 'Organising', false)}${item('', 'Export and publishing', false)}
+    <div class="group-title">Automation</div>${item('bolt', 'Automation', true)}${item('', 'Webhooks', false)}${item('', 'Outgoing calls', false)}
+    <div class="group-title">Look</div>${item('', 'Look', false)}
+    <div class="group-title">System</div>${item('', 'System health', false)}${item('', 'Care', false)}${item('', 'Mail', false)}${item('', 'Settings', false)}${item('', 'Audit log', false)}${item('', 'Insights and analytics', false)}
+  </div>`;
+
+const toggle = (on) => `<button class="toggle ${on ? 'on' : ''}" data-switch aria-label="Switch"></button>`;
+const setting = (t, d, c) => `<div class="setting"><div><b>${t}</b><small>${d}</small></div>${c}</div>`;
+const people = [['Sam Rivera', 'Product', '#7a4fd0', 'Administrator', 'Directly'], ['Noor Haddad', 'Engineering', '#0f7f76', 'Editor', 'Group: Engineering'], ['Lena Vos', 'Support', '#c2571a', 'Editor', 'Directly'], ['Tom Becker', 'Sales', '#2563d9', 'Viewer', 'Everyone'], ['Mira Sato', 'Guest', '#b02a5b', 'Viewer', 'Invited guest']];
+const initials = (n) => n.split(' ').map((p) => p[0]).join('');
+const personRow = ([n, j, c, r, v]) => `<div class="person"><span class="face" style="background:${c}">${initials(n)}</span><div class="who"><b>${n}</b><small>${j}</small></div><span class="via">${v}</span><select class="role"><option>${r}</option></select></div>`;
+const personCard = ([n, j, c, r]) => `<div class="card"><div class="row"><span class="face" style="background:${c}">${initials(n)}</span><div><b>${n}</b><small>${j}</small></div></div><div class="between" style="margin-block-start:10px"><small>${r}</small><button class="btn flat">Change</button></div></div>`;
+
+const main = {
+  home: () => `<div class="wrap wide"><h1>Good morning, Sam</h1><p class="sub">Here is what changed while you were away.</p>
+    <h2>Your spaces</h2><div class="cards">
+      <div class="card"><div class="row"><span class="animal">OW</span><div><b>Welcome to Diffluence</b><small>18 pages</small></div></div></div>
+      <div class="card"><div class="row"><span class="animal b">EL</span><div><b>Engineering</b><small>246 pages</small></div></div></div>
+      <div class="card"><div class="row"><span class="animal c">WH</span><div><b>People team</b><small>64 pages</small></div></div></div></div>
+    <h2>Recent activity</h2><div class="feed">
+      <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#0f7f76">NH</span>Noor changed <a style="color:var(--accent)">Release checklist</a><small>10 minutes ago</small></div>
+      <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#c2571a">LV</span>Lena commented on <a style="color:var(--accent)">Holidays</a><small>1 hour ago</small></div>
+      <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#2563d9">TB</span>Tom published <a style="color:var(--accent)">Team budget</a><small>Yesterday</small></div></div></div>`,
+  page: () => `<div class="wrap"><div class="crumb"><span>Welcome to Diffluence / Writing a page</span><span class="row"><button class="btn">Edit</button><button class="btn">Share</button></span></div>
+    <div class="toolrail"><button title="Comments">${icon(I.blog)}</button><button title="Details">${icon(I.info)}</button><button title="Contents">${icon(I.grid)}</button></div><h1>Tables</h1><div class="facts"><span>By Noor Haddad</span><span><i></i>In progress</span><span>${icon(I.clock, 14)}4 min</span><span>${icon(I.star, 14)}12</span></div>
+    <div class="prose"><p>A table holds numbers and short facts. Click in a table to see its tools, and drag its edge to make it wider.</p><p>Labels sit under the page as plain words. They need no box: they are links, and only adding one looks like a field when you click it.</p></div>
+    <div class="labels"><a>handbook</a><a>tables</a><a>example</a><span class="add">Add label</span></div></div>`,
+  people: () => `<div class="wrap"><div class="between"><div><h1>People</h1><p class="sub">5 people can reach this space.</p></div><button class="btn primary">Add people</button></div>
+    <div class="tabs"><a class="on">Everyone</a><a>Administrators</a><a>Groups</a><a>Guests</a></div>
+    <input class="field" style="inline-size:100%;margin-block-end:10px" placeholder="Find a person">
+    ${state.design === 'B' ? `<div class="peoplegrid">${people.map(personCard).join('')}</div>` : people.map(personRow).join('')}</div>`,
+  space: () => `<div class="wrap"><h1>Details</h1><p class="sub">What this space is called and what it is for.</p>
+    <div class="panel">
+      ${setting('Name', 'Shown in the sidebar and in search.', '<input class="field" value="Welcome to Diffluence">')}
+      ${setting('Key', 'Part of the address of this space.', '<input class="field" value="WELCOME">')}
+      ${setting('Animal', 'Every space has its own.', '<span class="row"><span class="animal">OW</span><button class="btn">Change</button></span>')}
+    </div><h2>Features</h2><div class="panel">
+      ${setting('Blog', 'News for this space.', toggle(true))}
+      ${setting('Files screen', 'A list of all files.', toggle(true))}
+      ${setting('Approval before publishing', 'Pages need a yes first.', toggle(false))}
+    </div><div class="row"><button class="btn primary">Save</button><button class="btn flat">Cancel</button></div></div>`,
+  admin: () => `<div class="wrap"><div class="between"><div><h1>Automation</h1><p class="sub">Rules for the whole instance. Each space keeps its own rules too.</p></div><button class="btn primary">New rule</button></div>
+    <div class="panel">
+      ${setting('Archive pages nobody opened for a year', 'When: every night. Then: archive and tell the owner.', toggle(true))}
+      <div style="padding-block-end:14px"><small style="color:var(--muted)">Applies to</small>
+        <div class="radio"><label><input type="radio" name="scope"> All spaces</label><label><input type="radio" name="scope" checked> Chosen spaces</label></div>
+        <div class="spacepick"><span><i class="animal b" style="font-style:normal">EL</i>Engineering</span><span><i class="animal c" style="font-style:normal">WH</i>People team</span><button class="btn flat">+ Add a space</button></div></div>
+    </div><div class="panel">
+      ${setting('Add the label review to new policies', 'When: a page is published below Policies.', toggle(false))}
+      <div style="padding-block-end:14px"><small style="color:var(--muted)">Applies to</small><div class="radio"><label><input type="radio" name="scope2" checked> All spaces</label><label><input type="radio" name="scope2"> Chosen spaces</label></div></div>
+    </div></div>`,
+};
+const side = { home: homeSide, page: spaceSide(''), people: spaceSide('People'), space: spaceSettingsSide, admin: adminSide };
+
+function render() {
+  document.getElementById('designs').innerHTML = Object.entries(designs).map(([k, d]) => `<button aria-pressed="${state.design === k}" data-design="${k}">${d.name}</button>`).join('');
+  document.getElementById('screens').innerHTML = Object.entries(screens).map(([k, t]) => `<button aria-pressed="${state.screen === k}" data-screen="${k}">${t}</button>`).join('');
+  document.getElementById('theme').setAttribute('aria-pressed', state.dark);
+  document.getElementById('why').innerHTML = `<b>${designs[state.design].name}</b>${designs[state.design].why}`;
+  document.getElementById('app').innerHTML = `<div class="app ${state.design} ${state.dark ? 'dark' : ''}">
+    <div class="top"><span class="logo"><i>Y</i>Diffluence</span><a class="nav" data-go="home">Home</a><a class="nav">Spaces</a><a class="nav" data-go="people">People</a><a class="nav">Recent</a><button class="create">+ Create</button><span class="grow"></span><input class="search" placeholder="Search pages"><a class="nav" data-go="admin">${icon(I.gear)}</a><span class="me">S</span></div>
+    <div class="body"><nav class="rail"><button class="${state.screen === 'home' ? 'on' : ''}" data-go="home" title="Home">${icon(I.home, 20)}</button><button class="${state.screen === 'page' ? 'on' : ''}" data-go="page" title="Pages">${icon(I.page, 20)}</button><button class="${state.screen === 'people' ? 'on' : ''}" data-go="people" title="People">${icon(I.people, 20)}</button><button title="Tasks">${icon(I.check, 20)}</button><span class="grow"></span><button class="${state.screen === 'admin' ? 'on' : ''}" data-go="admin" title="Administration">${icon(I.gear, 20)}</button></nav>
+    <aside class="side">${side[state.screen]}<div class="drag" data-drag></div></aside><main>${main[state.screen]()}</main></div></div>`;
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-design],[data-screen],[data-go],[data-filter],[data-switch],[data-toggle],#theme');
+  if (!t) return;
+  if (t.dataset.design) state.design = t.dataset.design;
+  else if (t.dataset.screen) state.screen = t.dataset.screen;
+  else if (t.dataset.go) state.screen = t.dataset.go;
+  else if (t.id === 'theme') state.dark = !state.dark;
+  else if ('filter' in t.dataset) { e.stopPropagation(); t.classList.toggle('on'); document.getElementById('filter').classList.toggle('open'); return; }
+  else if ('switch' in t.dataset) { t.classList.toggle('on'); return; }
+  else if ('toggle' in t.dataset) { t.parentElement.classList.toggle('shut'); return; }
+  render();
+});
+document.addEventListener('mousedown', (e) => {
+  const edge = e.target.closest('[data-drag]');
+  const split = e.target.closest('[data-split]');
+  if (!edge && !split) return;
+  e.preventDefault();
+  const aside = document.querySelector('.side');
+  const above = split && split.previousElementSibling.querySelector('.secbody');
+  const startX = e.clientX; const startY = e.clientY;
+  const startW = aside.offsetWidth; const startH = above ? above.offsetHeight : 0;
+  const move = (m) => {
+    if (edge) aside.style.setProperty('--side-w', `${Math.min(460, Math.max(210, startW + m.clientX - startX))}px`);
+    else { above.style.blockSize = `${Math.min(420, Math.max(50, startH + m.clientY - startY))}px`; above.style.flex = 'none'; }
+  };
+  const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); };
+  document.addEventListener('mousemove', move);
+  document.addEventListener('mouseup', up);
+});
+render();
+</script>
+</body>
+</html>
