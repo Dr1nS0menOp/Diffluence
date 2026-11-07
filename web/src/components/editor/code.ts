@@ -204,6 +204,11 @@ function codeView({ node: initial, editor }: NodeViewRendererProps) {
     if (attrs.line_numbers) renderLineNumbers(numbers, node.textContent, attrs.line_start ?? 1);
     // Hidden text cannot be edited, so a block only folds for readers (spec 027, D19).
     if (!editor.isEditable && attrs.folded && !opened) fold();
+    else if (editor.isEditable && unfold.isConnected) show();
+  };
+  const show = () => {
+    body.hidden = false;
+    unfold.remove();
   };
   const fold = () => {
     if (unfold.isConnected) return;
@@ -216,12 +221,19 @@ function codeView({ node: initial, editor }: NodeViewRendererProps) {
   unfold.type = 'button';
   unfold.addEventListener('click', () => {
     opened = true;
-    body.hidden = false;
-    unfold.remove();
+    show();
   });
   render();
+  // Whether the editor may be edited can still change after this view is drawn, while the editor
+  // mounts or switches mode, so the fold is decided again then. A reader once saw an open block here.
+  editor.on('create', render);
+  editor.on('update', render);
 
   return {
+    destroy() {
+      editor.off('create', render);
+      editor.off('update', render);
+    },
     dom: frame,
     contentDOM: code,
     update(updated: ProseNode) {
