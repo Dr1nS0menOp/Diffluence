@@ -43,7 +43,7 @@ A space is the unit of ownership: it holds a tree of pages, a blog, files and it
 - **SPC-028** · built · A **More** button by the space name opens: Watch this space, Copy link, Export, Space settings.
 - **SPC-029** · built · The sidebar has a filter on page titles. Typing narrows the tree to matching rows with their parents, and matching words are marked.
 - **SPC-030** · built · A view switch offers **Tree**, **Last visited by me**, **Last updated** and **A to Z**. The chosen view stays. Only the tree can be rearranged, and the other views say so.
-- **SPC-031** · new · A long tree loads branches as they open, so a space with 50,000 pages still opens at once.
+- **SPC-031** · built · A long tree loads branches as they open, so a space with 50,000 pages still opens at once.
 - **SPC-082** · built · A fixed **Home** row sits above Overview and the tree. It is marked while the home page is open.
 - **SPC-083** · built · The home page is not a row of the tree, the flat views or the filter. Its children are the top rows, followed by pages without a parent.
 - **SPC-084** · built · On the home page the breadcrumbs end in **Home**.

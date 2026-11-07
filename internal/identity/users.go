@@ -477,6 +477,23 @@ func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry,
 	return out, err
 }
 
+// PeopleByName finds people by the words of their name, through the index. It is for the
+// search box, which runs on every pause in typing: Directory reads every person.
+func (s *Service) PeopleByName(ctx context.Context, words string, limit int) ([]DirectoryEntry, error) {
+	rows, err := s.pool.Query(ctx, `SELECT 'user', id, display_name, email FROM users
+		WHERE to_tsvector('simple', display_name) @@ to_tsquery('simple', $1)
+		  AND status = 'active' AND type <> 'service' AND anonymised_at IS NULL
+		ORDER BY lower(display_name) LIMIT $2`, words, limit)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (DirectoryEntry, error) {
+		var e DirectoryEntry
+		err := r.Scan(&e.Type, &e.ID, &e.Name, &e.Detail)
+		return e, err
+	})
+}
+
 // DisplayNames gives today's names of people and groups, for a mention.
 func DisplayNames(ctx context.Context, q db.Querier, ids []uuid.UUID) (map[uuid.UUID]string, error) {
 	out := map[uuid.UUID]string{}

@@ -12,9 +12,10 @@ The goal from blueprint 01: thousands of users per instance, and pages under 300
 | Count of notifications | 1 per 30 seconds | about 17 |
 | Presence on an open page | 1 per 20 seconds | about 25 |
 | Writing: autosave, publish, comments | Small part of the people | about 5 |
-| **Total** | | **about 130** |
+| Search: the box while typing, and results (spec 028) | 200 people searching, a search each 20 seconds | about 50 |
+| **Total** | | **about 180** |
 
-That is more than twice the old figure, and still not much: one node handles over 1,000 simple requests a second. So **three nodes remain a matter of redundancy, not capacity**. Requests are not the limit. What each request costs in PostgreSQL is.
+Without search that is about 130, more than twice the old figure, and still not much: one node handles over 1,000 simple requests a second. So **three nodes remain a matter of redundancy, not capacity**. Requests are not the limit. What each request costs in PostgreSQL is.
 
 **A page view is about 20 queries.** The session, the person and their groups, the page, its space with all grants, its restrictions, the version, breadcrumbs, marks, names, then the same permission facts again for the buttons, and two writes for the recent list. At 85 views-related requests a second that is well over 1,000 small queries a second on one primary. PostgreSQL does that, on indexes, with a warm cache. It is also the first thing to trim.
 
@@ -50,7 +51,7 @@ With a commit of a few milliseconds that door passes a few hundred changes a sec
 
 ### The tree, the lists, the directory
 
-- **ARC-204** · phase 3 · The tree loads per branch (SPC-031). It changes the filter, which then needs the server, and `reveal`. Measure first: 50,000 rows of about 200 bytes is 10 MB before compression.
+- **ARC-204** · built · The tree loads per branch (SPC-031), and the filter and flat views run on the server (spec 028). Dialogs that list all pages still use the whole tree, only when they open.
 - **ARC-205** · phase 3 · `perm_visible_pages` is inlined by the planner, so a query can start from its own rows. `perm_hidden_pages` scans all view restrictions for each query. Restrictions are few in normal use, and the matrix test must stay the judge of any faster form. A table of who sees what, kept up to date, is the known answer, and costs a rewrite on each group change. It is the last resort.
 - **ARC-206** · phase 3 · Counts in the directory and the overview are worked out per person, because a hidden page must not count. If that gets slow, the fallback is to show a count only up to a limit.
 
@@ -105,8 +106,8 @@ Written after the self-test of spec 025 and ADR-036. Section 8.1 assumed 10 perc
 
 ### Staying up under too much load
 
-- **ARC-233** · phase 3 · Work has an order: **saving comes first, then reading, then search and reports.** Each class has its own share of the connections, so a flood of searches can never take the connection a save needs.
-- **ARC-234** · phase 3 · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost.
+- **ARC-233** · partly · Work has an order: **saving comes first, then reading, then search and reports.** Each class has its own share of the connections, so a flood of searches can never take the connection a save needs. Built: the share for search, one connection in four (spec 028). Still open: the other classes.
+- **ARC-234** · partly · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost. Built: for search. Still open: the other classes.
 - **ARC-235** · phase 3 · `/readyz` tells the truth under load: a node with a full pool or a long queue says so, so a load balancer can send people elsewhere. It stays separate from `/livez`, so a busy node is not restarted (ARC-009).
 - **ARC-236** · phase 3 · Logins have their own limit on how many hash at once per node, so a morning rush waits briefly and leaves the rest of the node alone.
 - **ARC-237** · later · If writes come near what the audit lock passes, events are chained after the commit (ARC-203). That needs a measurement and the product owner's agreement, because it changes ADR-013.

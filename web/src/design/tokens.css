@@ -62,6 +62,7 @@
   --size-bars: calc(var(--size-topbar) + var(--size-editbar) + var(--size-tool) + 2 * var(--space-1-5));
   --size-sidebar: 18rem;
   --size-search: 15rem;
+  --size-search-main: 40rem;
   --size-summary: 26rem;
   --size-login: 24rem;
   --size-menu: 14rem;

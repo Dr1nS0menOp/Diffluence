@@ -8,17 +8,30 @@
   stroke: var(--color-on-accent);
 }
 
+/* Three parts: search takes the middle, and the outer parts weigh the same when they fit. */
 .top {
   position: sticky;
   inset-block-start: 0;
   z-index: var(--layer-bar);
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, var(--size-search-main)) minmax(max-content, 1fr);
   align-items: center;
   gap: var(--space-4-5);
   min-block-size: var(--size-topbar);
   padding: var(--space-2-5) var(--space-5);
   border-block-end: 1px solid var(--color-line);
   background: var(--color-surface);
+}
+
+.top-start,
+.top-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4-5);
+}
+
+.top-end {
+  justify-content: flex-end;
 }
 
 .brand {
@@ -77,10 +90,8 @@
 .top-search {
   position: relative;
   display: flex;
-  flex-shrink: 1;
   align-items: center;
   min-inline-size: 0;
-  margin-inline-start: auto;
   color: var(--color-muted);
 }
 
@@ -91,10 +102,14 @@
 }
 
 .top-search > input {
-  flex-shrink: 1;
-  inline-size: var(--size-search);
+  flex: 1;
   min-inline-size: 0;
   padding-inline-start: var(--space-8);
+  background: var(--color-side);
+}
+
+.top-search > input:focus {
+  background: var(--color-surface);
 }
 
 .search-chip {
@@ -139,9 +154,9 @@
 .quick-panel {
   position: absolute;
   inset-block-start: calc(100% + var(--space-1));
-  inset-inline-end: 0;
+  inset-inline-start: 0;
   z-index: var(--layer-menu);
-  inline-size: min(var(--size-quick-search), 92vw);
+  inline-size: max(100%, min(var(--size-quick-search), 92vw));
   max-block-size: 70vh;
   padding: var(--space-1-5);
   overflow-y: auto;
@@ -259,6 +274,10 @@
 .tree-controls select {
   inline-size: 100%;
   font-size: var(--text-small);
+}
+
+.tree-more {
+  margin-inline-start: var(--space-6);
 }
 
 .tree-hint {
@@ -1103,8 +1122,19 @@ span.twist {
 @media (max-width: 50rem) {
   .top {
     position: static;
+    display: flex;
     flex-wrap: wrap;
     gap: var(--space-2);
+  }
+
+  .top-start {
+    flex-wrap: wrap;
+    gap: var(--space-2);
+  }
+
+  .top-end {
+    gap: var(--space-2);
+    margin-inline-start: auto;
   }
 
   .top-nav {
@@ -1112,13 +1142,8 @@ span.twist {
   }
 
   .top-search {
+    flex-basis: 100%;
     order: 1;
-    inline-size: 100%;
-    margin-inline-start: 0;
-  }
-
-  .top-search > input {
-    inline-size: 100%;
   }
 
   .quick-panel {

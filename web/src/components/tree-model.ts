@@ -86,20 +86,24 @@ export function revealPage(memory: BranchMemory, ancestors: Set<string>): Branch
 
 /** Every branch closed, whatever was open before. */
 export function collapseEverything(nodes: TreeNode[]): BranchMemory {
-  const parents = new Set(nodes.flatMap((n) => (n.parent_id ? [n.parent_id] : [])));
+  const parents = new Set(
+    nodes.flatMap((n) => [...(n.parent_id ? [n.parent_id] : []), ...(n.has_children ? [n.id] : [])]),
+  );
   return { opened: [], collapsed: [...parents] };
 }
 
-/** The pages that match, and their parents so a match keeps its place in the tree. */
-export function filterTree(nodes: TreeNode[], text: string): Set<string> {
-  const wanted = text.trim().toLowerCase();
-  const kept = new Set<string>();
-  for (const n of nodes) {
-    if (!n.title.toLowerCase().includes(wanted)) continue;
-    kept.add(n.id);
-    ancestorsOf(nodes, n.id).forEach((id) => kept.add(id));
-  }
-  return kept;
+/**
+ * A branch can only start open when its rows came along. A branch the reader opened, or
+ * the way to the current page, opens anyway, and its rows follow.
+ */
+export function showsBranch(
+  memory: BranchMemory,
+  branch: Branch,
+  depth: number,
+  ancestors: Set<string>,
+): boolean {
+  if (!isBranchOpen(memory, branch.id, depth, ancestors)) return false;
+  return branch.children.length > 0 || memory.opened.includes(branch.id) || ancestors.has(branch.id);
 }
 
 export interface TitlePart {
@@ -124,17 +128,6 @@ export function matchParts(title: string, text: string): TitlePart[] {
 }
 
 export type TreeView = 'tree' | 'visited' | 'updated' | 'alphabet';
-
-const newest = (a: string | null, b: string | null) => (b ?? '').localeCompare(a ?? '');
-
-/** The flat views: a list of pages in another order. Unvisited pages stay out of "visited". */
-export function flatPages(nodes: TreeNode[], view: TreeView): TreeNode[] {
-  if (view === 'visited') {
-    return nodes.filter((n) => n.visited_at).sort((a, b) => newest(a.visited_at, b.visited_at));
-  }
-  if (view === 'updated') return [...nodes].sort((a, b) => newest(a.updated_at, b.updated_at));
-  return [...nodes].sort((a, b) => a.title.localeCompare(b.title));
-}
 
 /** Lets a dragged row reach the Spaces menu in the top bar. */
 export const PAGE_DRAG_TYPE = 'application/x-diffluence-page';

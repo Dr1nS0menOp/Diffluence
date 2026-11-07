@@ -7,7 +7,8 @@ import { suggestKey } from './create';
 import { contentsOf, countWords, headingsOf, readingMinutes, slidesOf, slugify } from './editor/outline';
 import { addSearch, readSearches, rowsOf } from './quick-search';
 import { orderSpaces, withCurrent } from './space-strip';
-import { buildTree, collapseEverything, filterTree, flatPages, matchParts, typeAheadRow } from './tree-model';
+import { buildTree, collapseEverything, matchParts, showsBranch, typeAheadRow } from './tree-model';
+import { branchesToLoad, levelsThatGoOn, mergeParts } from './tree-data';
 import { dayText, isKnownTimeZone, localTimeIn, momentText, relativeText, type DateChoice } from '../dates';
 
 const heading = (level: number, text: string) => ({
@@ -90,12 +91,6 @@ const node = (id: string, parent: string | null, title: string, extra: Partial<T
 describe('the tree', () => {
   const nodes = [node('a', null, 'Handbook'), node('b', 'a', 'People'), node('c', 'b', 'Holiday plan')];
 
-  it('keeps a match together with its parents', () => {
-    expect([...filterTree(nodes, 'holiday')].sort()).toEqual(['a', 'b', 'c']);
-    expect([...filterTree(nodes, 'people')].sort()).toEqual(['a', 'b']);
-    expect(filterTree(nodes, 'nothing').size).toBe(0);
-  });
-
   it('marks every matching part of a title, ignoring case', () => {
     expect(matchParts('Plan a plan', 'PLAN')).toEqual([
       { text: 'Plan', hit: true },
@@ -120,19 +115,42 @@ describe('the tree', () => {
     expect(collapseEverything(nodes).collapsed.sort()).toEqual(['a', 'b']);
   });
 
-  it('lists only visited pages, newest first', () => {
-    const list = [
-      node('a', null, 'Old', { visited_at: '2026-01-01T00:00:00Z' }),
-      node('b', null, 'Never'),
-      node('c', null, 'New', { visited_at: '2026-02-01T00:00:00Z' }),
-    ];
-    expect(flatPages(list, 'visited').map((n) => n.title)).toEqual(['New', 'Old']);
+  it('closes a branch whose rows have not come yet', () => {
+    const closed = node('z', null, 'Waiting', { has_children: true });
+    expect(collapseEverything([closed]).collapsed).toEqual(['z']);
   });
 
-  it('sorts from A to Z without changing the list it was given', () => {
-    const list = [node('a', null, 'Zebra'), node('b', null, 'Apple')];
-    expect(flatPages(list, 'alphabet').map((n) => n.title)).toEqual(['Apple', 'Zebra']);
-    expect(list[0]?.title).toBe('Zebra');
+  it('keeps a branch without its rows closed, until the reader opens it', () => {
+    const branch = { ...node('a', null, 'Large', { has_children: true }), children: [] };
+    expect(showsBranch({ opened: [], collapsed: [] }, branch, 0, new Set())).toBe(false);
+    expect(showsBranch({ opened: ['a'], collapsed: [] }, branch, 0, new Set())).toBe(true);
+    expect(showsBranch({ opened: [], collapsed: [] }, branch, 5, new Set(['a']))).toBe(true);
+  });
+
+  it('asks only for the opened branches that the start did not bring', () => {
+    const start = { pages: [node('a', null, 'Top'), node('b', 'a', 'Below')], more: [] };
+    expect(branchesToLoad(['a', 'c'], start)).toEqual(['c']);
+  });
+
+  it('holds each row once, and the newest word on it', () => {
+    const old = { pages: [node('a', null, 'Old title')], more: [] };
+    const fresh = { pages: [node('a', null, 'New title')], more: [] };
+    expect(mergeParts([old, undefined, fresh]).map((n) => n.title)).toEqual(['New title']);
+  });
+
+  it('knows how far each level has come', () => {
+    const first = { pages: [], more: [{ parent_id: 'a', offset: 200 }] };
+    const next = {
+      pages: [],
+      more: [
+        { parent_id: 'a', offset: 400 },
+        { parent_id: null, offset: 200 },
+      ],
+    };
+    expect(levelsThatGoOn([first, next])).toEqual([
+      { parent: 'a', offset: 400 },
+      { parent: null, offset: 200 },
+    ]);
   });
 
   it('jumps to the next row that starts with the letters, and goes round', () => {

@@ -449,16 +449,8 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err := comments.ReleaseEditorsOnly(ctx, tx, p.ID, doc); err != nil {
 		return p, err
 	}
-	// Attachment names were not indexed while the page had no search row yet.
-	rows, err := tx.Query(ctx, "SELECT filename FROM attachments WHERE page_id = $1 AND status = 'active'", p.ID)
-	if err != nil {
-		return p, err
-	}
-	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return p, err
-	}
-	if err := search.SetAttachmentNames(ctx, tx, p.ID, names); err != nil {
+	// File names and labels were not indexed while the page had no search row yet.
+	if err := search.RefreshNames(ctx, tx, p.ID); err != nil {
 		return p, err
 	}
 	details := map[string]any{"version": number}
@@ -653,6 +645,9 @@ type Node struct {
 	UpdatedAt     time.Time  `json:"updated_at"`
 	UpdatedByName string     `json:"updated_by_name"`
 	VisitedAt     *time.Time `json:"visited_at"`
+	// HasChildren says that this person gets rows below this one. The whole tree of a
+	// space leaves it out: its rows show that by themselves.
+	HasChildren bool `json:"has_children"`
 }
 
 // Tree returns the pages of a space the user may see, in order.

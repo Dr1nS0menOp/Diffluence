@@ -416,6 +416,21 @@ export interface TreeNode {
   owner_name: string;
   stage_text: string;
   stage_color: string;
+  /** Rows this person gets below this one. Only the parts of a tree say this. */
+  has_children?: boolean;
+}
+
+/** A part of a tree, and the levels that go on past it. */
+export interface TreeParts {
+  pages: TreeNode[];
+  more: { parent_id: string | null; offset: number }[];
+}
+
+/** What a filter or a flat view found, with the rows above the matches. */
+export interface TreeFound {
+  pages: TreeNode[];
+  matches: string[];
+  capped: boolean;
 }
 
 export interface PageLook {
@@ -595,6 +610,8 @@ export interface SearchAnswer {
   total: number;
   capped: boolean;
   suggestion: string;
+  /** The search gave up: no results then means "not known", never "nothing there". */
+  timed_out: boolean;
 }
 
 export interface ListedPage {

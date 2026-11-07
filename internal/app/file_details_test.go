@@ -341,8 +341,11 @@ func TestSearchFindsAPageByTheLabelOfItsFileAndOnlyWhatMayBeSeen(t *testing.T) {
 	owner.restrict(hidden, "view", owner.id)
 	owner.ok("DELETE", "/api/v1/attachments/"+gone, nil)
 
-	if got := titlesIn(viewer.ok("GET", "/api/v1/search?label=contract", nil), "results"); len(got) != 1 || got[0] != "Open" {
-		t.Fatalf("found: %v", got)
+	// Only a filter, and words with a filter, take two ways through search: both must hold.
+	for _, query := range []string{"label=contract", "q=x&label=contract"} {
+		if got := titlesIn(viewer.ok("GET", "/api/v1/search?"+query, nil), "results"); len(got) != 1 || got[0] != "Open" {
+			t.Fatalf("%s found: %v", query, got)
+		}
 	}
 }
 

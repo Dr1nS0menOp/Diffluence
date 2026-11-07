@@ -19,15 +19,31 @@ These numbers hold for this machine and these limits, not for yours. Use them to
 | What | Tried | Result | How it fails | What to set |
 |---|---|---|---|---|
 | Reading a page, with the bell | 50, 200, 800 readers | 758 requests a second at 800 readers, p95 1.03 s, no errors. At 200 readers: 326 a second, p95 19 ms | Slower, no errors | The goal of 130 a second for 5,000 people is met for this kind of request |
-| Search on a word in every page | 5, 20 people | **About 3.5 searches a second.** At 20 people each search takes 4.5 s | Slower, no errors. All other database work waits with it | Give PostgreSQL more CPU. This is the first thing that gives way |
+| Search on a word in every page | 5, 20 people | **About 3.5 searches a second.** At 20 people each search takes 4.5 s | Slower, no errors. All other database work waits with it | Fixed in spec 028: see below |
 | Search on a rare word | 5, 20 people | 16 a second, p95 52 ms. Ceiling not reached | | |
 | Mixed readers with search and feed | 50 readers | p95 7.2 s, all from the search above | Slower | As above |
-| The page tree of 50,000 pages | 5, 20, 60 people | **19 MB per load**, 4 loads a second, 13 s each at 60 people, 567 MB of memory at 20 | Slower, no errors. Not measured in a browser | Keep spaces far below this. Turn on compression at the proxy. SPC-031 is the real answer |
+| The page tree of 50,000 pages | 5, 20, 60 people | **19 MB per load**, 4 loads a second, 13 s each at 60 people, 567 MB of memory at 20 | Slower, no errors. Not measured in a browser | Fixed in spec 028 (SPC-031): see below |
 | Open page, feed, overview | One person, 50,000 pages | 9 ms, 88 ms, 119 ms | | |
 | Publishing | 6 at once | 143 pages a second on an empty space, 70 at 50,000 pages, p95 121 ms | Slower | |
 | Connections that say nothing | 500, 2,000, 8,000 held | All dropped after 10 seconds, others not disturbed, 154 MB. Ceiling not reached at 8,000 | | A proxy still comes first |
 | Upload | 64 MB, and past the limit | 64 MB in 1.9 s, memory did not grow. Past the limit the connection is closed early | | Set the limit in the console |
 | Export of 50,000 pages | Text, HTML | 5 and 6 seconds, 237 MB at most | | |
+
+## Search, reading and saving at once (spec 028)
+
+Measured on 7 November 2026, with the same caps, 50,000 pages, 5,000 people, 52,000 files and 20,000 comments. Reading is the mix of blueprint 04.8. The model is 130 reads, 2 saves, 40 searches while typing and 10 results pages a second: about 5,000 people, 10% active, 40% of the time in search.
+
+| What | Result | How it fails | What to set |
+|---|---|---|---|
+| The model, PostgreSQL 1.5 CPUs | Reading p95 168 ms, nothing failed. Search p95 1.0 s, 1 to 3% told it is busy | Search waits for its share of the connections, then answers 503 with `Retry-After` | Give PostgreSQL at least 2.5 CPUs for this many people |
+| The model, PostgreSQL 2.5 CPUs | Search p95 44 ms, typing p95 32 ms, reading p95 19 ms, nothing failed | | |
+| Twice the search, PostgreSQL 2.5 CPUs | Reading p95 87 ms, nothing failed. 5 to 10% of searches busy | Search, not reading | A standby for search (ARC-229) |
+| The newest pages hold none of the words | Each search 32 ms in the database. At 1.5 CPUs, 56% of searches busy | As above | As above |
+| Opening the tree of 31,000 pages | 26 ms and 0.08 MB, against 275 ms and 13 MB | Show more past 200 rows a level | |
+| Comments as the only filter, a common word | 678 ms | Slow, alone | |
+| A wildcard inside a word | 219 ms | Slow, alone | |
+
+Search can never take more than one connection in four, so a flood of searches leaves the rest for reading and saving. It shares the CPU of PostgreSQL, though: under a flood, reading slows. A standby takes that away.
 
 ## What stops everything
 

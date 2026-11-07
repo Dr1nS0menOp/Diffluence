@@ -3,6 +3,16 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: search that carries the load, and a tree that loads by branch (spec 028)
+- A search no longer reads every match. A common word in 50,000 pages went from seconds to tens of milliseconds, also with reading and publishing going on
+- The order is new: the title as typed, every word in the title, then the rest, each with the newest first. Nothing is left out, however old
+- The search box stands in the middle of the top bar
+- Results go on past the total, which now says "More than" sooner. A plain word also finds labels, and a word that only a comment holds gets its own section
+- A search that runs out of time says so, instead of showing nothing. When search is very busy it says that too, and reading and saving keep their connections
+- In the box, files are found by the words of their name, so `port` no longer finds `report.pdf` there. The Files screen still looks inside names
+- A large tree opens at once: it loads the start, the way to the open page, and branches as they open. The filter and the flat views ask the server
+- Upgrade impact: one migration, about 16 seconds for 50,000 pages on a small machine, and no other step
+
 
 ### Added: the rest of the editor (wave Q)
 - Tools that do not fit fold into More, so a narrow window no longer covers the first line of the page

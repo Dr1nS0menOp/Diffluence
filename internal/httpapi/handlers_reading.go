@@ -270,14 +270,12 @@ func (s *Server) quickPeople(r *http.Request, c identity.Caller, text string) ([
 	if err != nil || !allowed {
 		return out, err
 	}
-	entries, err := s.deps.Identity.Directory(r.Context(), text)
+	entries, err := s.deps.Identity.PeopleByName(r.Context(), search.Prefixes(text), quickGroupSize)
 	if err != nil {
 		return out, err
 	}
 	for _, e := range entries {
-		if e.Type == "user" && len(out) < quickGroupSize {
-			out = append(out, quickPerson{ID: e.ID, Name: e.Name})
-		}
+		out = append(out, quickPerson{ID: e.ID, Name: e.Name})
 	}
 	return out, nil
 }
@@ -295,7 +293,7 @@ func (s *Server) handleQuickSearch(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusOK, out)
 		return
 	}
-	found, err := s.deps.Search.Search(r.Context(), c.UserID, search.Query{Text: text, SpaceID: spaceID, Limit: 2 * quickGroupSize})
+	found, err := s.deps.Search.Search(r.Context(), c.UserID, search.Query{Text: text, SpaceID: spaceID, Limit: 2 * quickGroupSize, Quick: true})
 	for _, result := range found.Results {
 		if result.Kind == pages.KindPost {
 			out.Posts = append(out.Posts, result)

@@ -17,19 +17,25 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/db"
 )
 
 const (
 	// maxBodyBytes keeps the text below PostgreSQL's 1 MiB tsvector limit.
 	maxBodyBytes = 400_000
-	// totalLimit: an exact count over a large instance costs more than it tells.
-	totalLimit = 1000
+	// totalLimit: an exact count over a large instance costs more than it tells. Past it a
+	// search says "more than", and goes on as far as a person keeps asking.
+	totalLimit = 200
 	// maxSpellingTitles bounds the words a spelling suggestion looks at.
 	maxSpellingTitles = 5000
 	maxSpellingEdits  = 2
 	defaultLimit      = 25
 	maxLimit          = 100
+	// slotPatience is how long a search waits for its turn.
+	slotPatience = time.Second
+	// searchShare: one connection in this many can search at the same time.
+	searchShare = 4
 	// queryCanceled is PostgreSQL's code for a statement that ran out of time.
 	queryCanceled = "57014"
 )
@@ -56,10 +62,10 @@ func Index(ctx context.Context, q db.Querier, pageID uuid.UUID, title, body stri
 	return err
 }
 
-// SetAttachmentNames updates the attachment names of a page in the index.
-func SetAttachmentNames(ctx context.Context, q db.Querier, pageID uuid.UUID, names []string) error {
-	_, err := q.Exec(ctx, "UPDATE search_documents SET attachment_names = $2, updated_at = now() WHERE page_id = $1",
-		pageID, truncate(strings.Join(names, " "), maxBodyBytes))
+// RefreshNames puts the names of the files and the labels of a page in the index.
+func RefreshNames(ctx context.Context, q db.Querier, pageID uuid.UUID) error {
+	_, err := q.Exec(ctx, "UPDATE search_documents SET attachment_names = left(search_names($1), $2), updated_at = now() WHERE page_id = $1",
+		pageID, maxBodyBytes)
 	return err
 }
 
@@ -107,6 +113,8 @@ type Query struct {
 	// MayNamePeople lets author: in the search box match names. It follows "view
 	// profiles", and otherwise the field is ignored.
 	MayNamePeople bool
+	// Quick is the box while typing: titles only, so no snippets, count or spelling.
+	Quick bool
 }
 
 // Crumb is one step of the way to a result.
@@ -141,15 +149,43 @@ type Results struct {
 	Total      int      `json:"total"`
 	Capped     bool     `json:"capped"`
 	Suggestion string   `json:"suggestion"`
+	// TimedOut says that the search gave up. No results then means "not known", never
+	// "nothing there".
+	TimedOut bool `json:"timed_out"`
 }
 
 // Service runs searches.
 type Service struct {
 	pool *pgxpool.Pool
+	// slots is the share of the connections for search. However many search at once, the
+	// rest stays free for saving and reading (ARC-233). The share is small because the
+	// limit is CPU: a search takes milliseconds, so few at a time still answer many.
+	slots    chan struct{}
+	patience time.Duration
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func NewService(pool *pgxpool.Pool) *Service {
+	share := max(int(pool.Config().MaxConns)/searchShare, 1)
+	return &Service{pool: pool, slots: make(chan struct{}, share), patience: slotPatience}
+}
+
+// enter waits a moment for a slot. A queue that grows without end helps nobody: past
+// this the answer is that it is busy, at once, which the person can act on (ARC-234).
+func (s *Service) enter(ctx context.Context) error {
+	timer := time.NewTimer(s.patience)
+	defer timer.Stop()
+	select {
+	case s.slots <- struct{}{}:
+		return nil
+	case <-timer.C:
+		return apperr.Busy("Search is very busy right now. Try again in a moment.")
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (s *Service) leave() { <-s.slots }
 
 func optTime(t time.Time) *time.Time {
 	if t.IsZero() {
@@ -164,15 +200,6 @@ func optID(id uuid.UUID) *uuid.UUID {
 	}
 	return &id
 }
-
-// mentionedNames is the words of a page with the names of those it mentions. The names
-// come from page_mentions at search time: the index holds no names, so it follows a
-// rename and a person can be anonymised (spec 010, D6).
-const mentionedNames = `SELECT m.page_id, to_tsvector('simple', string_agg(COALESCE(u.display_name, g.name, ''), ' ')) AS tsv
-	FROM page_mentions m
-	LEFT JOIN users u ON u.id = m.user_id
-	LEFT JOIN groups g ON g.id = m.user_id
-	GROUP BY m.page_id`
 
 // searchFilters is shared by the results and their count. A kind of template can
 // never get here: perm_visible_pages leaves it out.
@@ -198,31 +225,29 @@ const searchFilters = `
 	       JOIN users u ON position(lower(a) IN lower(u.display_name)) > 0 WHERE u.id = p.updated_by OR u.id = p.created_by))
 	  AND ($15::text[] IS NULL OR NOT EXISTS (SELECT 1 FROM unnest($15::text[]) w WHERE NOT (d.title || ' ' || d.body) ~* w))`
 
-// Two versions of the same search: one with words, one with filters alone.
+// A search with filters alone has no words to pick by, and is read in one go.
 const (
-	withWords = `FROM to_tsquery('simple', $2) AS q(query)
-	JOIN LATERAL (
-		SELECT x.page_id FROM search_documents x WHERE x.tsv @@ q.query
-		UNION
-		SELECT n.page_id FROM (` + mentionedNames + `) n
-		JOIN search_documents x ON x.page_id = n.page_id WHERE (x.tsv || n.tsv) @@ q.query
-	) h ON true
-	JOIN search_documents d ON d.page_id = h.page_id` + searchFilters
 	withoutWords = `FROM (SELECT $2::text) AS q(query)
 	JOIN search_documents d ON true` + searchFilters
 
 	resultColumns = `SELECT p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
 		p.archived_at IS NOT NULL OR s.status <> 'active', `
-	headline     = `ts_headline('simple', d.body, q.query, 'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "')`
-	resultEnd    = `, p.updated_at, p.updated_by `
-	orderByWords = ` ORDER BY CASE WHEN $16 THEN p.updated_at END DESC NULLS LAST, ts_rank(d.tsv, q.query) DESC, p.updated_at DESC, p.id LIMIT $17 OFFSET $18`
-	orderByDate  = ` ORDER BY CASE WHEN $16 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $17 OFFSET $18`
+	headlineOptions = `'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'`
+	resultEnd       = `, p.updated_at, p.updated_by `
+	orderByDate     = ` ORDER BY CASE WHEN $16 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $17 OFFSET $18`
 
-	wordsSQL      = resultColumns + headline + resultEnd + withWords + orderByWords
 	filtersSQL    = resultColumns + "left(d.body, 200)" + resultEnd + withoutWords + orderByDate
-	wordsCount    = `SELECT count(*) FROM (SELECT 1 ` + withWords + ` LIMIT $16) c`
 	filtersCount  = `SELECT count(*) FROM (SELECT 1 ` + withoutWords + ` LIMIT $16) c`
 	statementTime = "SET LOCAL statement_timeout = 3000"
+	// wordSettings go in one round trip. A cached plan cannot know how common a word is,
+	// and the right plan for a word in every page is the wrong one for a word in ten. A
+	// search is short and many run at once, so workers only take CPU from everyone else.
+	wordSettings = statementTime + `; SET LOCAL plan_cache_mode = force_custom_plan;
+		SET LOCAL max_parallel_workers_per_gather = 0`
+	// pickSettings: the planner does not count what it costs to unpack the words of a row.
+	// For a word in a fifth of the pages it reads them all, 175 ms against 13 ms through the
+	// index. Only for picking: on the small tables before it, a scan is the right plan.
+	pickSettings = "SET LOCAL enable_seqscan = off"
 )
 
 // KindComment asks for comments instead of pages (ORG-024).
@@ -259,14 +284,20 @@ func nilIfEmpty[T any](list []T) []T {
 }
 
 func filterArgs(userID uuid.UUID, q Query, parsed Parsed) []any {
-	labels := append(slices.Clone(q.Labels), parsed.Labels...)
-	var authors []string
-	if q.MayNamePeople {
-		authors = parsed.Authors
-	}
 	return []any{userID, parsed.TSQuery, optID(q.SpaceID), optID(q.AuthorID), optTime(q.Since), optTime(q.Until), q.IncludeArchived,
-		nilIfEmpty(q.Kinds), nilIfEmpty(labels), nilIfEmpty(q.Contributors), q.Stage, optID(q.Below),
-		nilIfEmpty(parsed.Spaces), nilIfEmpty(authors), nilIfEmpty(parsed.Patterns)}
+		nilIfEmpty(q.Kinds), nilIfEmpty(allLabels(q, parsed)), nilIfEmpty(q.Contributors), q.Stage, optID(q.Below),
+		nilIfEmpty(parsed.Spaces), nilIfEmpty(allowedAuthors(q, parsed)), nilIfEmpty(parsed.Patterns)}
+}
+
+func allLabels(q Query, parsed Parsed) []string {
+	return append(slices.Clone(q.Labels), parsed.Labels...)
+}
+
+func allowedAuthors(q Query, parsed Parsed) []string {
+	if q.MayNamePeople {
+		return parsed.Authors
+	}
+	return nil
 }
 
 func hasFilters(q Query, parsed Parsed) bool {
@@ -282,8 +313,15 @@ func scanResults(rows pgx.Rows) ([]Result, error) {
 	})
 }
 
-// run does the two queries. Wildcards have no index, so they get a time limit, and
-// running out of it simply finds nothing: a search never gives an error (ORG-032).
+// timedOut is PostgreSQL saying that a statement ran out of time.
+func timedOut(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == queryCanceled
+}
+
+// run does the two queries of a search without a way to pick rows first. Running out of
+// time gives no error, because a search never does (ORG-032), but it does not pass for
+// an empty answer either: TimedOut says so.
 func (s *Service) run(ctx context.Context, sqlText, countText string, args, page []any, scan func(pgx.Rows) ([]Result, error)) (Results, error) {
 	out := Results{Results: []Result{}}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -305,9 +343,8 @@ func (s *Service) run(ctx context.Context, sqlText, countText string, args, page
 		out.Capped = total > totalLimit
 		return nil
 	})
-	var pgErr *pgconn.PgError
-	if errors.As(err, &pgErr) && pgErr.Code == queryCanceled {
-		return Results{Results: []Result{}}, nil
+	if timedOut(err) {
+		return Results{Results: []Result{}, TimedOut: true}, nil
 	}
 	if out.Results == nil {
 		out.Results = []Result{}
@@ -350,6 +387,10 @@ func (s *Service) addBreadcrumbs(ctx context.Context, list []Result) error {
 
 // Search returns the pages the user may view that match the query.
 func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Results, error) {
+	if err := s.enter(ctx); err != nil {
+		return Results{Results: []Result{}}, err
+	}
+	defer s.leave()
 	parsed := Parse(q.Text, q.TitlesOnly)
 	if q.Limit <= 0 || q.Limit > maxLimit {
 		q.Limit = defaultLimit
@@ -357,25 +398,28 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Result
 	if slices.Contains(q.Kinds, KindComment) {
 		return s.searchComments(ctx, userID, q, parsed)
 	}
-	args := filterArgs(userID, q, parsed)
-	sqlText, countText := wordsSQL, wordsCount
-	if parsed.TSQuery == "" {
-		if !hasFilters(q, parsed) {
-			return Results{Results: []Result{}}, nil
-		}
-		sqlText, countText = filtersSQL, filtersCount
+	out, err := s.searchWithoutPicking(ctx, userID, q, parsed)
+	if parsed.TSQuery != "" {
+		out, err = s.searchWords(ctx, userID, q, parsed)
 	}
-	out, err := s.run(ctx, sqlText, countText, args, []any{q.ByDate, q.Limit, max(q.Offset, 0)}, scanResults)
 	if err != nil {
 		return out, err
 	}
 	if err := s.addBreadcrumbs(ctx, out.Results); err != nil {
 		return out, err
 	}
-	if out.Total == 0 && parsed.TSQuery != "" {
+	if out.Total == 0 && !out.TimedOut && parsed.TSQuery != "" && !q.Quick {
 		out.Suggestion, err = s.spelling(ctx, userID, q.Text)
 	}
 	return out, err
+}
+
+// searchWithoutPicking lists what filters alone find.
+func (s *Service) searchWithoutPicking(ctx context.Context, userID uuid.UUID, q Query, parsed Parsed) (Results, error) {
+	if parsed.TSQuery != "" || !hasFilters(q, parsed) {
+		return Results{Results: []Result{}}, nil
+	}
+	return s.run(ctx, filtersSQL, filtersCount, filterArgs(userID, q, parsed), []any{q.ByDate, q.Limit, max(q.Offset, 0)}, scanResults)
 }
 
 func scanComments(rows pgx.Rows) ([]Result, error) {
@@ -405,8 +449,11 @@ func (s *Service) searchComments(ctx context.Context, userID uuid.UUID, q Query,
 // spelling looks for a similar word in titles the person may see, and nowhere else:
 // a word from all text would reveal what is on hidden pages (spec 011, D20).
 func (s *Service) spelling(ctx context.Context, userID uuid.UUID, text string) (string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT p.title FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id
-		WHERE p.status = 'published' ORDER BY p.updated_at DESC LIMIT $2`, userID, maxSpellingTitles)
+	rows, err := s.pool.Query(ctx, `SELECT w.title FROM search_pages w
+		WHERE w.published AND NOT w.archived AND w.kind <> 'template'
+		  AND w.space_id IN (SELECT g.space_id FROM perm_spaces($1, 'space.view') g)
+		  AND w.page_id NOT IN (SELECT h.page_id FROM perm_hidden_pages($1) h)
+		ORDER BY w.updated_at DESC, w.page_id DESC LIMIT $2`, userID, maxSpellingTitles)
 	if err != nil {
 		return "", err
 	}

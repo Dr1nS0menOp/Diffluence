@@ -42,6 +42,8 @@ func (s *Server) registerContentRoutes() {
 	r.HandleFunc("POST "+spacesPath+"/{id}/unarchive", Object("space.administer"), s.handleSpaceUnarchive)
 	r.HandleFunc("DELETE "+spacesPath+"/{id}", Object("space.administer"), s.handleSpaceDelete)
 	r.HandleFunc("GET "+spacesPath+"/{id}/tree", Object("space.view"), s.handleTree)
+	r.HandleFunc("GET "+spacesPath+"/{id}/tree/branches", Object("space.view"), s.handleTreeBranches)
+	r.HandleFunc("GET "+spacesPath+"/{id}/tree/find", Object("space.view"), s.handleTreeFind)
 	r.HandleFunc("GET "+spacesPath+"/{id}/grants", Object("space.manage_access"), s.handleGrants)
 	r.HandleFunc("PUT "+spacesPath+"/{id}/grants", Object("space.manage_access"), s.handleGrantsSet)
 	r.HandleFunc("POST "+spacesPath+"/{id}/preset", Object("space.administer"), s.handlePreset)
@@ -121,9 +123,15 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 		status = http.StatusConflict
 	case apperr.KindTooLarge:
 		status = http.StatusRequestEntityTooLarge
+	case apperr.KindBusy:
+		status = http.StatusServiceUnavailable
+		w.Header().Set("Retry-After", busyRetrySeconds)
 	}
 	writeError(w, status, e.Code, e.Message)
 }
+
+// busyRetrySeconds is how soon a refused request can come back.
+const busyRetrySeconds = "2"
 
 // pathID reads a UUID from the path. A malformed id is simply "not found".
 func pathID(w http.ResponseWriter, r *http.Request, name string) (uuid.UUID, bool) {
@@ -273,6 +281,62 @@ func (s *Server) handleTree(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"pages": tree})
+}
+
+// handleTreeBranches gives the start of a tree, the way to one page, or the branches
+// that were opened, by what the address asks.
+func (s *Server) handleTreeBranches(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	q, c := r.URL.Query(), s.caller(r)
+	around, err := optionalID(q.Get("around"))
+	parents := make([]uuid.UUID, 0, len(q["parent"]))
+	for _, value := range q["parent"] {
+		parent, bad := uuid.Parse(value)
+		if bad != nil {
+			err = bad
+			break
+		}
+		parents = append(parents, parent)
+	}
+	offset := 0
+	if v := q.Get("offset"); v != "" && err == nil {
+		offset, err = strconv.Atoi(v)
+	}
+	if err != nil || offset < 0 {
+		writeError(w, http.StatusBadRequest, "bad_request", "A part of the tree was asked for in a way that is not valid.")
+		return
+	}
+	var part pages.Branches
+	switch {
+	case around != uuid.Nil:
+		part, err = s.deps.Pages.TreeAround(r.Context(), c, id, around)
+	case len(parents) > 0 || offset > 0:
+		part, err = s.deps.Pages.TreeBranches(r.Context(), c, id, parents, offset)
+	default:
+		part, err = s.deps.Pages.TreeStart(r.Context(), c, id)
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, part)
+}
+
+func (s *Server) handleTreeFind(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	q := r.URL.Query()
+	found, err := s.deps.Pages.TreeFind(r.Context(), s.caller(r), id, q.Get("q"), q.Get("view"))
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, found)
 }
 
 func (s *Server) handleGrants(w http.ResponseWriter, r *http.Request) {

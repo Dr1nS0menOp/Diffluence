@@ -102,25 +102,61 @@ type Found struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// Find looks for files by name or label on pages the user may see. A zero spaceID means
-// every space. Files in archived spaces stay out of quick search (SPC-069).
+// fileMatches is how many files by that word count as few: those are sorted as they
+// are. More than that means a common word, and the newest files settle it at once.
+const fileMatches = 500
+
+// recentFiles is how many of the newest files a common word looks through.
+const recentFiles = "2000"
+
+// fileWords matches the index on attachments: the words of a name, split at its signs.
+const fileWords = `to_tsvector('simple', translate(a.filename, '-_.()[]', '       ')) @@ to_tsquery('simple', $2)`
+
+const fileRows = `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
+	FROM attachments a
+	JOIN pages p ON p.id = a.page_id
+	JOIN spaces sp ON sp.id = a.space_id
+	WHERE a.status = 'active' AND sp.status = 'active' AND ($3::uuid IS NULL OR a.space_id = $3)
+	  AND EXISTS (SELECT 1 FROM perm_listed_pages($1) v WHERE v.page_id = a.page_id) AND `
+
+// Find looks for files by the words of their name, or a label, on pages the user may see.
+// A zero spaceID means every space. Files in archived spaces stay out of quick search
+// (SPC-069). It runs while someone types, so it never reads all files (spec 028).
 func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spaceID uuid.UUID, limit int) ([]Found, error) {
 	var within *uuid.UUID
 	if spaceID != uuid.Nil {
 		within = &spaceID
 	}
-	rows, err := s.pool.Query(ctx, `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
-		FROM attachments a
-		JOIN perm_listed_pages($1) v ON v.page_id = a.page_id
-		JOIN pages p ON p.id = a.page_id
-		JOIN spaces sp ON sp.id = a.space_id
-		WHERE a.status = 'active' AND sp.status = 'active' AND (position(lower($2) IN lower(a.filename)) > 0
-			OR EXISTS (SELECT 1 FROM attachment_labels l WHERE l.attachment_id = a.id AND l.label = lower($2)))
-		  AND ($3::uuid IS NULL OR a.space_id = $3)
-		ORDER BY a.updated_at DESC, a.id LIMIT $4`, c.UserID, text, within, limit)
+	words := search.Prefixes(text)
+	rows, err := s.pool.Query(ctx, `SELECT a.id FROM attachments a WHERE a.status = 'active' AND `+fileWords+`
+		UNION SELECT l.attachment_id FROM attachment_labels l WHERE l.label = lower($1) LIMIT $3`, text, words, fileMatches+1)
 	if err != nil {
 		return nil, err
 	}
+	few, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return nil, err
+	}
+	if len(few) > fileMatches {
+		// A common word: the newest files hold enough of them, and only those are read.
+		rows, err = s.pool.Query(ctx, fileRows+`a.id IN (SELECT a.id FROM (SELECT * FROM attachments ORDER BY updated_at DESC, id LIMIT `+recentFiles+`) a
+			WHERE `+fileWords+`) ORDER BY a.updated_at DESC, a.id LIMIT $4`, c.UserID, words, within, limit)
+		if err != nil {
+			return nil, err
+		}
+		found, err := collectFound(rows)
+		if err != nil || len(found) == limit {
+			return found, err
+		}
+	}
+	rows, err = s.pool.Query(ctx, fileRows+`a.id = ANY($2) ORDER BY a.updated_at DESC, a.id LIMIT $4`, c.UserID, few, within, limit)
+	if err != nil {
+		return nil, err
+	}
+	return collectFound(rows)
+}
+
+func collectFound(rows pgx.Rows) ([]Found, error) {
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Found, error) {
 		var f Found
 		err := r.Scan(&f.ID, &f.Filename, &f.PageID, &f.PageTitle, &f.SpaceName, &f.UpdatedAt)
@@ -163,15 +199,7 @@ func (s *Service) pageSpace(ctx context.Context, q db.Querier, pageID uuid.UUID)
 }
 
 func (s *Service) reindexNames(ctx context.Context, tx pgx.Tx, pageID uuid.UUID) error {
-	rows, err := tx.Query(ctx, "SELECT filename FROM attachments WHERE page_id = $1 AND status = 'active' ORDER BY filename", pageID)
-	if err != nil {
-		return err
-	}
-	names, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return err
-	}
-	return search.SetAttachmentNames(ctx, tx, pageID, names)
+	return search.RefreshNames(ctx, tx, pageID)
 }
 
 // incoming is a file in storage that no page holds yet.

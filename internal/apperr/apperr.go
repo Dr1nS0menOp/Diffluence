@@ -16,6 +16,7 @@ const (
 	KindForbidden
 	KindConflict
 	KindTooLarge
+	KindBusy
 )
 
 // Denied describes a refused action, so it can be audited after the
@@ -60,6 +61,11 @@ func Conflict(code, message string) *Error {
 // TooLarge means the input exceeded a limit.
 func TooLarge(message string) *Error {
 	return &Error{Kind: KindTooLarge, Code: "too_large", Message: message}
+}
+
+// Busy means there is too much work right now, and the same request can work in a moment.
+func Busy(message string) *Error {
+	return &Error{Kind: KindBusy, Code: "busy", Message: message}
 }
 
 // As extracts an *Error from err.

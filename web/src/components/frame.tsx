@@ -1,24 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type PointerEvent,
-  type ReactNode,
-} from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  api,
-  ApiError,
-  type PageDetail,
-  type PageSummary,
-  type Shortcut,
-  type Space,
-  type TreeNode,
-} from '../api';
+import { api, ApiError, type PageDetail, type PageSummary, type Shortcut, type Space } from '../api';
 import { Link, match, useLocation } from '../router';
 import { usePreferences } from '../preferences';
 import { CopyDialog, MoveDialog } from '../views/move-dialogs';
@@ -295,14 +279,9 @@ function Sidebar({
   const [adding, setAdding] = useState<{ parent: string | null } | null>(null);
   const [addingLink, setAddingLink] = useState(false);
   const [rowDialog, setRowDialog] = useState<{ page: PageSummary; dialog: RowDialog } | null>(null);
-  const tree = useQuery({
-    queryKey: ['tree', space.id],
-    queryFn: () => api.get<{ pages: TreeNode[] }>(`/spaces/${space.id}/tree`),
-  });
   const canCreate = space.can?.['page.create'] ?? false;
   // The home page has its own row above the tree, so its children are the top rows.
   const home = space.home_page_id;
-  const rows = useMemo(() => tree.data?.pages.filter((n) => n.id !== home), [tree.data, home]);
   return (
     <aside className="sidebar">
       <SpaceStrip current={space} />
@@ -322,21 +301,17 @@ function Sidebar({
         </button>
       </div>
       <SpaceLinks space={space} current={current} />
-      {tree.isPending && <Loading />}
-      <ErrorNote error={tree.error} />
-      {rows && (
-        <PagesSection
-          key={space.id}
-          spaceId={space.id}
-          nodes={rows}
-          current={current === home ? undefined : current}
-          canMove={canCreate}
-          onAdd={canCreate ? (id) => setAdding({ parent: id }) : undefined}
-          onAddRoot={canCreate ? () => setAdding({ parent: parent ?? home }) : undefined}
-          onAddLink={canCreate ? () => setAddingLink(true) : undefined}
-          onDialog={(page, dialog) => setRowDialog({ page, dialog })}
-        />
-      )}
+      <PagesSection
+        key={space.id}
+        spaceId={space.id}
+        home={home}
+        current={current === home ? undefined : current}
+        canMove={canCreate}
+        onAdd={canCreate ? (id) => setAdding({ parent: id }) : undefined}
+        onAddRoot={canCreate ? () => setAdding({ parent: parent ?? home }) : undefined}
+        onAddLink={canCreate ? () => setAddingLink(true) : undefined}
+        onDialog={(page, dialog) => setRowDialog({ page, dialog })}
+      />
       {space.can?.['space.manage_access'] && (
         <nav className="sidebar-foot" aria-label={t('space.settings')}>
           {space.can['space.administer'] && (

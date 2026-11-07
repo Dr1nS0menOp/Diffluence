@@ -175,6 +175,10 @@ function Filters({
   );
 }
 
+/** With fewer page results than this, comments get a place of their own. */
+const COMMENTS_BELOW = 25;
+const COMMENTS_SHOWN = 5;
+
 function ContentResults({ params }: { params: URLSearchParams }) {
   const { t } = useTranslation();
   const query = params.toString();
@@ -186,7 +190,9 @@ function ContentResults({ params }: { params: URLSearchParams }) {
       api.get<SearchAnswer>(`/search?${query}&limit=${RESULTS_PER_LOAD}&offset=${pageParam}`),
     getNextPageParam: (last, all) => {
       const loaded = all.reduce((sum, p) => sum + p.results.length, 0);
-      return last.results.length === RESULTS_PER_LOAD && loaded < last.total ? loaded : undefined;
+      return last.results.length === RESULTS_PER_LOAD && (last.capped || loaded < last.total)
+        ? loaded
+        : undefined;
     },
     enabled: params.get('q')?.trim() !== undefined || hasFilter,
   });
@@ -196,9 +202,12 @@ function ContentResults({ params }: { params: URLSearchParams }) {
     <>
       {q.isFetching && <Loading />}
       <ErrorNote error={q.error} />
-      {first && (
+      {first?.timed_out && <p role="alert">{t('search.timedOut')}</p>}
+      {first && !first.timed_out && (
         <p role="status" className="muted">
-          {first.capped ? t('search.totalCapped') : t('search.total', { count: first.total })}
+          {first.capped
+            ? t('search.totalCapped', { count: first.total })
+            : t('search.total', { count: first.total })}
         </p>
       )}
       {first?.suggestion && (
@@ -207,7 +216,7 @@ function ContentResults({ params }: { params: URLSearchParams }) {
           <Link href={`/search?q=${encodeURIComponent(first.suggestion)}`}>{first.suggestion}</Link>
         </p>
       )}
-      {first && results.length === 0 && (
+      {first && !first.timed_out && results.length === 0 && (
         <p>{hasFilter ? t('search.noResultsFiltered') : t('search.noResults')}</p>
       )}
       <ol className="results">
@@ -220,7 +229,37 @@ function ContentResults({ params }: { params: URLSearchParams }) {
           {t('common.more')}
         </button>
       )}
+      {first && !first.capped && first.total < COMMENTS_BELOW && <CommentResults params={params} />}
     </>
+  );
+}
+
+/** A word that lives in a comment must not end in "nothing found". */
+function CommentResults({ params }: { params: URLSearchParams }) {
+  const { t } = useTranslation();
+  const text = params.get('q')?.trim() ?? '';
+  const searched = params.has('kind') || text === '';
+  const q = useQuery({
+    queryKey: ['search-comments', params.toString()],
+    queryFn: () => {
+      const query = new URLSearchParams(params);
+      query.set('kind', 'comment');
+      query.set('limit', String(COMMENTS_SHOWN));
+      return api.get<SearchAnswer>(`/search?${query.toString()}`);
+    },
+    enabled: !searched,
+  });
+  const found = q.data?.results ?? [];
+  if (found.length === 0) return <ErrorNote error={q.error} />;
+  return (
+    <section>
+      <h2>{t('search.inComments')}</h2>
+      <ol className="results">
+        {found.map((r) => (
+          <ResultRow key={r.comment_id ?? r.page_id} result={r} />
+        ))}
+      </ol>
+    </section>
   );
 }
 

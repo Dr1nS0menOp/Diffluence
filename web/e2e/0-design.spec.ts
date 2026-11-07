@@ -375,6 +375,9 @@ test.describe('the look of every kind of screen', () => {
 
   test('the table button and its menu', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
+    // Tall enough that the table needs no scroll. Scrolled, a field ends under the sticky bar,
+    // and axe then counts only buttons as cover: whether it passes depends on the gaps between them.
+    await page.setViewportSize({ width: 1280, height: 1400 });
     await page.goto(`/pages/${blocksPageId}/edit`);
     await page.locator('.prose.editing td').first().click();
     await editorSettled(page);

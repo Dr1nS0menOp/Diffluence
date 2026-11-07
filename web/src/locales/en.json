@@ -219,6 +219,8 @@
   },
   "tree": {
     "filter": "Filter pages",
+    "showMore": "Show more pages",
+    "capped": "There are more pages. Type more of the title to find them.",
     "view": "Order of the pages",
     "view_tree": "Tree",
     "view_visited": "Last visited by me",
@@ -1788,7 +1790,9 @@
   "search": {
     "title": "Search",
     "results": "Results",
-    "noResults": "Nothing found.",
+    "noResults": "Nothing found in pages.",
+    "inComments": "In comments",
+    "timedOut": "This search took too long, so it says nothing about what exists. Try again, or narrow it down.",
     "anySpace": "All spaces",
     "since": "Changed since",
     "hint": "Type at least one word.",
@@ -1825,7 +1829,7 @@
     "includeArchived": "Include archived pages",
     "total_one": "{{count}} result",
     "total_other": "{{count}} results",
-    "totalCapped": "1,000 results or more",
+    "totalCapped": "More than {{count}} results",
     "didYouMean": "Did you mean",
     "noResultsFiltered": "Nothing found. Try removing a filter.",
     "tab_content": "Content",

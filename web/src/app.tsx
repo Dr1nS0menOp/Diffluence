@@ -122,30 +122,34 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
         {t('app.skip')}
       </a>
       <header className="top">
-        <Link href="/" className="brand">
-          {appearance?.logo ? <img src={appearance.logo} alt="" className="brand-logo" /> : <Logo />}{' '}
-          {appearance?.name || t('app.name')}
-        </Link>
-        <nav aria-label={t('nav.mainMenu')} className="top-nav">
-          <Link href="/" className="nav-link" aria-current={pathname === '/' ? 'page' : undefined}>
-            {t('nav.home')}
+        <div className="top-start">
+          <Link href="/" className="brand">
+            {appearance?.logo ? <img src={appearance.logo} alt="" className="brand-logo" /> : <Logo />}{' '}
+            {appearance?.name || t('app.name')}
           </Link>
-          <SpacesMenu />
-          <Link
-            href="/people"
-            className="nav-link"
-            aria-current={pathname === '/people' ? 'page' : undefined}
-          >
-            {t('nav.people')}
-          </Link>
-          <RecentMenu />
-          <FavouritesMenu />
-          <CreateButton me={me} onCreate={setCreating} />
-        </nav>
+          <nav aria-label={t('nav.mainMenu')} className="top-nav">
+            <Link href="/" className="nav-link" aria-current={pathname === '/' ? 'page' : undefined}>
+              {t('nav.home')}
+            </Link>
+            <SpacesMenu />
+            <Link
+              href="/people"
+              className="nav-link"
+              aria-current={pathname === '/people' ? 'page' : undefined}
+            >
+              {t('nav.people')}
+            </Link>
+            <RecentMenu />
+            <FavouritesMenu />
+            <CreateButton me={me} onCreate={setCreating} />
+          </nav>
+        </div>
         <QuickSearch space={space} />
-        <NotificationBell />
-        <HelpMenu />
-        <AccountMenu me={me} onLogout={() => void logout()} />
+        <div className="top-end">
+          <NotificationBell />
+          <HelpMenu />
+          <AccountMenu me={me} onLogout={() => void logout()} />
+        </div>
       </header>
       <SiteNotes me={me} />
       {children}

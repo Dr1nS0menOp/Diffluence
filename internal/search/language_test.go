@@ -45,7 +45,7 @@ func TestSearchLanguage(t *testing.T) {
 
 func TestFieldsBecomeFilters(t *testing.T) {
 	got := Parse(`plan label:hr space:ENG author:"Anna Visser" label:legal`, false)
-	want := Parsed{TSQuery: "'plan'", Labels: []string{"hr", "legal"}, Spaces: []string{"eng"}, Authors: []string{"Anna Visser"}}
+	want := Parsed{AnyTerm: "'plan'", TSQuery: "'plan'", Labels: []string{"hr", "legal"}, Spaces: []string{"eng"}, Authors: []string{"Anna Visser"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}

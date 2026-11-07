@@ -24,6 +24,11 @@ type Parsed struct {
 	Labels   []string
 	Spaces   []string
 	Authors  []string
+	// AnyTerm holds each typed word as an alternative, to look for names of people
+	// mentioned. Empty for a search with no words.
+	AnyTerm string
+	// Plain is typed words without any of the language, so the text can also be a title.
+	Plain bool
 }
 
 type tokenKind int
@@ -132,6 +137,8 @@ type parser struct {
 	weight string
 	out    *Parsed
 	failed bool
+	// anyTerms are the words seen, for Parsed.AnyTerm.
+	anyTerms []string
 }
 
 func (p *parser) next() (token, bool) {
@@ -147,6 +154,7 @@ func (p *parser) term(word string) string {
 		return ""
 	}
 	p.terms++
+	p.anyTerms = append(p.anyTerms, "'"+strings.ToLower(word)+"'")
 	return "'" + strings.ToLower(word) + "'" + weightSuffix("", p.weight)
 }
 
@@ -165,6 +173,7 @@ func (p *parser) wildcard(word string) string {
 		return ""
 	}
 	p.terms++
+	p.anyTerms = append(p.anyTerms, "'"+stem+"':*")
 	onlyEnd := head == len(word)-1 && word[head] == '*'
 	if !onlyEnd && len(p.out.Patterns) < maxWildcards {
 		p.out.Patterns = append(p.out.Patterns, wildcardPattern(word))
@@ -341,12 +350,30 @@ func plainWords(input, weight string) string {
 	if len(fields) == 0 {
 		return ""
 	}
+	return strings.Join(plainTerms(fields, weight), " & ")
+}
+
+// Prefixes reads typed text as plain words, for what has no search language of its own.
+func Prefixes(input string) string { return plainWords(input, "") }
+
+// plainTerms writes typed words, with the last one also as a prefix.
+func plainTerms(fields []string, weight string) []string {
 	terms := make([]string, len(fields))
 	for i, f := range fields {
 		terms[i] = "'" + strings.ToLower(f) + "'" + weightSuffix("", weight)
 	}
-	terms[len(terms)-1] = "'" + strings.ToLower(fields[len(fields)-1]) + "'" + weightSuffix("*", weight)
-	return strings.Join(terms, " & ")
+	last := len(fields) - 1
+	terms[last] = "'" + strings.ToLower(fields[last]) + "'" + weightSuffix("*", weight)
+	return terms
+}
+
+func parsedPlain(input, weight string) Parsed {
+	query := plainWords(input, weight)
+	if query == "" {
+		return Parsed{Plain: true}
+	}
+	fields := words(input)
+	return Parsed{TSQuery: query, Plain: true, AnyTerm: strings.Join(plainTerms(fields[:min(len(fields), maxTerms)], ""), " | ")}
 }
 
 // Parse reads the search language. It never fails: what cannot be understood falls
@@ -358,14 +385,15 @@ func Parse(input string, titlesOnly bool) Parsed {
 	}
 	tokens := tokenize(input)
 	if isPlainWords(tokens, input) {
-		return Parsed{TSQuery: plainWords(input, weight)}
+		return parsedPlain(input, weight)
 	}
 	out := Parsed{}
 	p := &parser{tokens: tokens, weight: weight, out: &out}
 	query := p.or()
 	if p.failed || p.at < len(tokens) {
-		return Parsed{TSQuery: plainWords(input, weight)}
+		return parsedPlain(input, weight)
 	}
 	out.TSQuery = query
+	out.AnyTerm = strings.Join(p.anyTerms, " | ")
 	return out
 }

@@ -221,6 +221,8 @@ GET /api/v1/spaces/{id}/statuses                               object:space.view
 GET /api/v1/spaces/{id}/templates                              object:page.create
 GET /api/v1/spaces/{id}/trash                                  object:space.administer
 GET /api/v1/spaces/{id}/tree                                   object:space.view
+GET /api/v1/spaces/{id}/tree/branches                          object:space.view
+GET /api/v1/spaces/{id}/tree/find                              object:space.view
 GET /api/v1/spaces/{id}/watch                                  object:space.view
 GET /api/v1/spaces/{id}/webhooks                               object:space.administer
 GET /api/v1/start                                              authenticated

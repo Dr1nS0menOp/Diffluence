@@ -9772,6 +9772,60 @@
         "x-access": "object:space.view"
       }
     },
+    "/api/v1/spaces/{id}/tree/branches": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/tree/branches",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      }
+    },
+    "/api/v1/spaces/{id}/tree/find": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/tree/find",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      }
+    },
     "/api/v1/spaces/{id}/unarchive": {
       "post": {
         "operationId": "post /api/v1/spaces/{id}/unarchive",

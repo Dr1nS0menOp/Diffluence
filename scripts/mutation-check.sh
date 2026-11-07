@@ -105,8 +105,22 @@ mutate "a replaced font file stays on disk" internal/settings/font.go \
   's.replace("if found {", "if false && found {")' $app
 mutate "publishing skips the check" internal/pages/versions.go \
   's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion")' $app
-mutate "search ignores permissions" internal/search/search.go \
-  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = p.id\n")' $app
+mutate "search ignores permissions" internal/search/words.go \
+  's.replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "")' $app -run TestAWrongRowOfTheSearchTableShowsNothing
+mutate "a hidden page counts in a search" internal/search/words.go \
+  's.replace("const notHidden = ` AND w.page_id NOT IN (SELECT unnest(@hidden::uuid[]))`", "const notHidden = ``")' $app -run TestARestrictionCountsAtOnceInSearch
+mutate "a space nobody gave counts in a search" internal/search/words.go \
+  's.replace("FROM perm_spaces(@user, \x27space.view\x27) g JOIN spaces s", "FROM (SELECT id AS space_id FROM spaces) g JOIN spaces s")' $app -run TestLosingASpaceCountsAtOnceInSearch
+mutate "the search table misses the archive" internal/db/migrations/0028_search_pages.sql \
+  's.replace("published = EXCLUDED.published, archived = EXCLUDED.archived,", "published = EXCLUDED.published,")' $app -run TestTheSearchTableFollowsThePage
+mutate "the search table misses the trash" internal/db/migrations/0028_search_pages.sql \
+  's.replace("published = EXCLUDED.published, archived = EXCLUDED.archived,", "archived = EXCLUDED.archived,")' $app -run TestTheSearchTableFollowsThePage
+mutate "a hidden child shows as a branch" internal/pages/branches.go \
+  's.replace("EXISTS (SELECT 1 FROM pages c WHERE c.parent_id = p.id AND ` + listed(\"c\") + `)", "EXISTS (SELECT 1 FROM pages c WHERE c.parent_id = p.id)")' $app -run TestAHiddenChildLeavesNoTraceInTheTree
+mutate "the tree picks hidden rows and the rule has to stop them" internal/pages/branches.go \
+  's.replace("AND ` + alias + `.id NOT IN (SELECT unnest(@hidden::uuid[]))`", "AND @hidden::uuid[] IS NOT NULL`")' $app -run TestAHiddenChildLeavesNoTraceInTheTree
+mutate "the rows of a tree skip the rule" internal/pages/branches.go \
+  's.replace("JOIN (SELECT v.page_id FROM perm_listed_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "JOIN (SELECT unnest(@ids::uuid[]) AS page_id) v ON v.page_id = p.id")' $app -run TestAHiddenChildLeavesNoTraceInTheTree
 mutate "export ignores permissions" internal/pages/export.go \
   's.replace("JOIN perm_visible_pages($1) vis ON vis.page_id = p.id\n", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) vis ON vis.page_id = p.id\n")' $app
 mutate "moves can drop restrictions" internal/pages/tree.go \
@@ -174,7 +188,7 @@ mutate "the directory counts hidden pages" internal/spaces/directory.go \
 mutate "quick search shows people to everyone" internal/httpapi/handlers_reading.go \
   's.replace("if err != nil || !allowed {", "if err != nil || (!allowed && len(text) < 0) {")' $app -run TestQuickSearch
 mutate "quick search shows hidden files" internal/attachments/attachments.go \
-  's.replace("JOIN perm_listed_pages($1) v ON v.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestQuickSearch
+  's.replace("AND EXISTS (SELECT 1 FROM perm_listed_pages($1) v WHERE v.page_id = a.page_id) AND ", "AND $1::uuid IS NOT NULL AND ")' $app -run TestQuickSearch
 mutate "a row menu counts as a visit" internal/pages/details.go \
   's.replace("out.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, p)\n\tout.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err")' $app -run TestOpeningARowMenu
 
@@ -189,7 +203,7 @@ mutate "SQL: templates show in lists" internal/db/migrations/0008_organising.sql
 mutate "a label reveals hidden pages" internal/pages/labels.go \
   's.replace("JOIN perm_listed_pages($1) v ON v.page_id = l.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestLabelsAreCleanedAndNeverRevealHiddenPages
 mutate "a spelling suggestion uses hidden titles" internal/search/search.go \
-  's.replace("SELECT p.title FROM pages p JOIN perm_listed_pages($1) v ON v.page_id = p.id", "SELECT p.title FROM pages p JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestSearchFiltersNeverRevealHiddenPages
+  's.replace("AND w.page_id NOT IN (SELECT h.page_id FROM perm_hidden_pages($1) h)", "")' $app -run TestSearchFiltersNeverRevealHiddenPages
 mutate "a move skips hidden pages" internal/pages/move.go \
   's.replace("if hidden {\n", "if hidden && len(tree) < 0 {\n")' $app -run TestMoveBetweenSpacesIsRefusedWhenItWouldTouchTooMuch
 mutate "a restore drops a restriction" internal/pages/archive.go \
@@ -344,8 +358,8 @@ mutate "a silent update reaches watchers" internal/notify/fanout.go \
 
 mutate "a stored mention keeps the name" internal/document/attrs.go \
   's.replace("out[\"kind\"] = MentionUser\n\t}\n\treturn nil", "out[\"kind\"] = MentionUser\n\t}\n\tout[\"label\"] = in[\"label\"]\n\treturn nil")' $app -run TestAMentionStoresTheIdAndNeverTheName
-mutate "search does not find a mentioned person" internal/search/search.go \
-  's.replace("WHERE (x.tsv || n.tsv) @@ q.query", "WHERE x.tsv @@ q.query")' $app -run TestAMentionStoresTheIdAndNeverTheName
+mutate "search does not find a mentioned person" internal/search/words.go \
+  's.replace("WHERE (x.tsv || n.tsv) @@ to_tsquery", "WHERE x.tsv @@ to_tsquery")' $app -run TestAMentionStoresTheIdAndNeverTheName
 mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
   's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
@@ -617,7 +631,9 @@ mutate "a reader changes the labels of a file" internal/attachments/details.go \
   's.replace("return a, s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.AttachmentAdd, uuid.Nil)", "return a, nil")' $app -run TestFileLabelsFollowTheRulesOfLabels
 mutate "a file label gets around the fixed list" internal/attachments/details.go \
   's.replace("if refused {", "if refused \x26\x26 raw == \"\" {")' $app -run TestFileLabelsFollowTheRulesOfLabels
-mutate "search finds a page by the label of a trashed file" internal/search/search.go \
+mutate "search finds a page by the label of a trashed file" internal/search/words.go \
+  's.replace("fa.status = \x27active\x27 AND ", "")' $app -run TestSearchFindsAPageByTheLabelOfItsFileAndOnlyWhatMayBeSeen
+mutate "a filter alone finds a page by the label of a trashed file" internal/search/search.go \
   's.replace("fa.status = \x27active\x27 AND ", "")' $app -run TestSearchFindsAPageByTheLabelOfItsFileAndOnlyWhatMayBeSeen
 mutate "the Files screen shows what is hidden" internal/attachments/versions.go \
   's.replace("JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id", "JOIN (SELECT $1::uuid AS u) vp ON true")' $app -run TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen

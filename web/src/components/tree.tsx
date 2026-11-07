@@ -12,7 +12,7 @@ import {
 } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Page, type PageSummary, type TreeNode } from '../api';
+import { api, type Page, type PageSummary, type TreeFound, type TreeNode } from '../api';
 import { BulkMoveDialog } from '../views/move-dialogs';
 import { Link } from '../router';
 import { usePreferences } from '../preferences';
@@ -47,21 +47,21 @@ import {
   buildTree,
   collapseBranch,
   collapseEverything,
-  filterTree,
-  flatPages,
-  isBranchOpen,
   matchParts,
   openBranch,
   PAGE_DRAG_TYPE,
   rangeOfRows,
   readBranchMemory,
   revealPage,
+  showsBranch,
   toggleRow,
   typeAheadRow,
   type Branch,
   type BranchMemory,
   type TreeView,
 } from './tree-model';
+import { useDelayed } from './quick-search';
+import { useTreeParts, type MoreRows } from './tree-data';
 import { ErrorNote, Loading, RelativeTime } from './ui';
 
 const ROW_ICON_SIZE = 16;
@@ -430,9 +430,25 @@ function FlatList({ nodes, row }: { nodes: TreeNode[]; row: (node: TreeNode) => 
   );
 }
 
+/** The button that brings the next rows of a level. */
+function MoreRowsButton({ rows, onMore }: { rows: MoreRows | undefined; onMore: (rows: MoreRows) => void }) {
+  const { t } = useTranslation();
+  if (!rows) return null;
+  return (
+    <li>
+      <button type="button" className="ghost tree-more" onClick={() => onMore(rows)}>
+        {t('tree.showMore')}
+      </button>
+    </li>
+  );
+}
+
 export function PageTree({
   spaceId,
-  nodes,
+  nodes: loaded,
+  found,
+  more,
+  onMore,
   current,
   canMove,
   filter,
@@ -446,6 +462,10 @@ export function PageTree({
 }: {
   spaceId: string;
   nodes: TreeNode[];
+  /** What the server found, while a filter or a flat view is on. */
+  found: TreeFound | undefined;
+  more: MoreRows[];
+  onMore: (rows: MoreRows) => void;
   current?: string;
   canMove: boolean;
   filter: string;
@@ -464,9 +484,9 @@ export function PageTree({
   const card = useRowCard(preferences.hover_cards);
   const root = useRef<HTMLElement>(null);
   const filtering = filter.trim() !== '';
-  const kept = useMemo(() => (filtering ? filterTree(nodes, filter) : null), [nodes, filter, filtering]);
-  const tree = useMemo(() => buildTree(kept ? nodes.filter((n) => kept.has(n.id)) : nodes), [nodes, kept]);
-  const ancestors = useMemo(() => ancestorsOf(nodes, current), [nodes, current]);
+  const nodes = found?.pages ?? loaded;
+  const tree = useMemo(() => buildTree(nodes), [nodes]);
+  const ancestors = useMemo(() => ancestorsOf(loaded, current), [loaded, current]);
   const [dragging, setDragging] = useState<string | null>(null);
   const [target, setTarget] = useState<string | null>(null);
   const [focusRow, setFocusRow] = useState<string | undefined>();
@@ -475,9 +495,10 @@ export function PageTree({
   const anchor = useRef('');
 
   // Going to a page reveals it, also in a collapsed branch. Only a new page does:
-  // collapsing the branch you are in must stay possible.
+  // collapsing the branch you are in must stay possible. The tree comes in parts, so this
+  // waits until the row of the page is there: before that its parents are not known.
   const [revealedPage, setRevealedPage] = useState<string | undefined>();
-  if (current !== revealedPage) {
+  if (current !== revealedPage && (current === undefined || loaded.some((n) => n.id === current))) {
     setRevealedPage(current);
     onMemory(revealPage(memory, ancestors));
   }
@@ -489,7 +510,10 @@ export function PageTree({
   });
 
   const draggable = canMove && !filtering && view === 'tree';
-  const flat = view === 'tree' ? [] : flatPages(nodes, view).filter((n) => !kept || kept.has(n.id));
+  const flat = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n]));
+    return view === 'tree' ? [] : (found?.matches ?? []).flatMap((id) => byId.get(id) ?? []);
+  }, [nodes, found, view]);
   const firstRow = view === 'tree' ? tree[0]?.id : flat[0]?.id;
   const tabRow = focusRow && nodes.some((n) => n.id === focusRow) ? focusRow : (current ?? firstRow);
   const visibleRows = () =>
@@ -509,7 +533,7 @@ export function PageTree({
   };
   const openSoon = (branch: Branch, isOpen: boolean) => {
     clearTimeout(openTimer.current);
-    if (isOpen || branch.children.length === 0) return;
+    if (isOpen || (branch.children.length === 0 && !branch.has_children)) return;
     openTimer.current = setTimeout(() => onMemory(openBranch(memory, branch.id)), OPEN_WHILE_DRAGGING_MS);
   };
   const finish = (e: DragEvent, parent: string | null, before: string | null) => {
@@ -587,11 +611,11 @@ export function PageTree({
     onPick: pick,
   });
 
-  const render = (list: Branch[], depth: number): ReactNode => (
+  const render = (list: Branch[], depth: number, parent: string | null): ReactNode => (
     <ul>
       {list.map((b) => {
-        const expanded = filtering || isBranchOpen(memory, b.id, depth, ancestors);
-        const hasChildren = b.children.length > 0;
+        const expanded = filtering || showsBranch(memory, b, depth, ancestors);
+        const hasChildren = b.children.length > 0 || (b.has_children ?? false);
         return (
           <li key={b.id}>
             {draggable && (
@@ -655,16 +679,17 @@ export function PageTree({
               <RowMarks node={b} />
               <RowTools {...rowProps(b)} />
             </div>
-            {hasChildren && expanded && render(b.children, depth + 1)}
+            {hasChildren && expanded && render(b.children, depth + 1, b.id)}
           </li>
         );
       })}
+      {!found && <MoreRowsButton rows={more.find((m) => m.parent === parent)} onMore={onMore} />}
     </ul>
   );
 
   const nothing = view === 'tree' ? tree.length === 0 : flat.length === 0;
 
-  if (nodes.length === 0) return <p className="muted">{t('space.emptyTree')}</p>;
+  if (nodes.length === 0 && !found) return <p className="muted">{t('space.emptyTree')}</p>;
   return (
     <nav
       ref={root}
@@ -674,8 +699,9 @@ export function PageTree({
       onDragOver={scrollNearEdge}
     >
       {nothing && <p className="muted">{filtering ? t('tree.noMatch') : t('tree.emptyView')}</p>}
-      {view === 'tree' ? render(tree, 0) : <FlatList nodes={flat} row={rowProps} />}
+      {view === 'tree' ? render(tree, 0, null) : <FlatList nodes={flat} row={rowProps} />}
       {view !== 'tree' && !nothing && <p className="muted tree-hint">{t('tree.viewHint')}</p>}
+      {found?.capped && <p className="muted tree-hint">{t('tree.capped')}</p>}
       {move.error && <ErrorNote error={move.error} />}
       {card.card && (
         <RowCard
@@ -737,7 +763,7 @@ function SelectionBar({
 /** The heading, tools, filter and tree of a space's sidebar. */
 export function PagesSection({
   spaceId,
-  nodes,
+  home,
   current,
   canMove,
   onAdd,
@@ -746,7 +772,8 @@ export function PagesSection({
   onDialog,
 }: {
   spaceId: string;
-  nodes: TreeNode[];
+  /** The home page has its own row above the tree. */
+  home: string | null;
   current?: string;
   canMove: boolean;
   onAdd?: (parent: string) => void;
@@ -760,6 +787,24 @@ export function PagesSection({
   const [filter, setFilter] = useState('');
   const [selection, setSelection] = useState<string[] | null>(null);
   const view = TREE_VIEWS.find((v) => v === preferences.tree_view) ?? 'tree';
+  const parts = useTreeParts(spaceId, current, memory.opened);
+  const nodes = useMemo(() => parts.nodes.filter((n) => n.id !== home), [parts.nodes, home]);
+  const typed = useDelayed(filter.trim());
+  const findPages = typed !== '' || view !== 'tree';
+  const found = useQuery({
+    queryKey: ['tree', spaceId, 'find', typed, view],
+    queryFn: () => {
+      const params = new URLSearchParams({ q: typed, view });
+      return api.get<TreeFound>(`/spaces/${spaceId}/tree/find?${params.toString()}`);
+    },
+    enabled: findPages,
+    // The rows stay while the next ones load.
+    placeholderData: (previous) => previous,
+  });
+  const shown = useMemo(() => {
+    if (!findPages || !found.data) return undefined;
+    return { ...found.data, pages: found.data.pages.filter((n) => n.id !== home) };
+  }, [findPages, found.data, home]);
   const showCurrent = () => {
     setFilter('');
     if (view !== 'tree') update({ tree_view: 'tree' });
@@ -852,9 +897,14 @@ export function PagesSection({
           ))}
         </select>
       </div>
+      {parts.isPending && <Loading />}
+      <ErrorNote error={parts.error ?? found.error} />
       <PageTree
         spaceId={spaceId}
         nodes={nodes}
+        found={shown}
+        more={parts.more}
+        onMore={parts.showMore}
         current={current}
         canMove={canMove}
         filter={filter}
