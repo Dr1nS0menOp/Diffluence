@@ -64,7 +64,7 @@ With a commit of a few milliseconds that door passes a few hundred changes a sec
 
 - **ARC-207** · built · An odd number of NATS servers, normally three. An even number costs more and survives no more. Built as advice in `docs/operations/install.md`.
 - **ARC-208** · built · API nodes scale by adding more, as they hold nothing. Workers scale by adding more, as they claim work through the database. Built: `deploy/helm/diffluence`, with API and worker pods.
-- **ARC-209** · built · PostgreSQL scales up, not out. One instance serves one organisation (ADR-008), so a single primary is the design, and sharding is not. Built as advice in `docs/operations/install.md`.
+- **ARC-209** · built · PostgreSQL scales up, not out. One instance serves one organisation (ADR-008), so a single primary for writes is the design, and sharding is not. Reads can move out (ARC-228). Built as advice in `docs/operations/install.md`.
 - **ARC-210** · phase 3 · The login limiter counts per node, so an attacker gets as many tries as there are nodes. With three nodes that is still slow, and Argon2 makes each try expensive. A shared counter in PostgreSQL is the next step if a test shows a need.
 
 ## 8.4 What memory and CPU go to
@@ -72,3 +72,61 @@ With a commit of a few milliseconds that door passes a few hundred changes a sec
 - **ARC-211** · built · Password hashing with Argon2id is the heaviest thing a request does, by design, and is limited per login.
 - **ARC-212** · built · Exports and imports stream, so memory does not grow with the size of a space. Keep that for every new format.
 - **ARC-213** · built · A worker that builds a PDF or a site must not hold a whole space in memory. Build per page, and write to a file.
+
+## 8.5 The worst case, and room to grow
+
+Written after the self-test of spec 025 and ADR-036. Section 8.1 assumed 10 percent of the people active, and left out search. These numbers are worked out from that table and from `docs/operations/limits.md`. None of them was measured at this size.
+
+| | Normal: 500 active | Worst: 5,000 active | Worst, with 4 times the database work |
+|---|---|---|---|
+| Requests a second | about 130 | about 1,300 | about 1,300 |
+| Small queries a second | about 1,000 | 10,000 or more | 40,000 or more |
+| Searches a second, while typing | 50 to 80 | 500 to 800 | 500 to 800 |
+| Writes a second | about 5 | about 50 | about 200 |
+
+**The aim:** future features will ask more of the database, so the design leaves room for **four times today's database work**, with the same people. A feature must fit in that room, or bring its own way of carrying its load.
+
+**What the worst case teaches:**
+
+1. Search is the heaviest thing people do, and it was missing from the load table.
+2. One primary cannot carry every read. Reads have to be able to leave it.
+3. A full pool of connections stops everything, also what needed one quick query.
+4. When the app is overloaded it queues until all is slow, and it still says it is ready.
+5. A burst of logins costs far more than a burst of page views, by design.
+6. At 200 writes a second the audit lock (ARC-201) comes near what it can pass.
+
+### Keeping load off the primary
+
+- **ARC-228** · phase 3 · Reads can go to a standby. The code names each read as *must be current* or *may lag*. Permission checks, sessions and a person's own just-saved work stay on the primary. Lists, reports, feeds and analytics may lag, by a limit that is set and watched. Past that limit they go back to the primary.
+- **ARC-229** · phase 3 · Search leaves the primary, to a standby or to its own engine (ADR-035). Whichever it is, a permission change counts at once: results are checked against current permissions before they are shown. This changes ARC-186.
+- **ARC-230** · phase 3 · Heavy reads never run on the primary at a large size: analytics, reports, exports and the care report go to a standby, or to tables a job fills.
+- **ARC-231** · phase 3 · What many requests ask for is kept in memory for a short time: a person's groups, a space and its grants, the first level of a tree. An event ends the entry at once, and a short maximum age covers a lost event. A cached permission may never outlive its change by more than that age, which is stated and tested.
+- **ARC-232** · later · Tables that only grow are split by month: audit, page views, notifications, the outbox. Old parts can move to cheaper storage and be dropped by a retention rule. Do this before such a table slows its own queries, not after. The audit chain must stay verifiable across the parts.
+
+### Staying up under too much load
+
+- **ARC-233** · phase 3 · Work has an order: **saving comes first, then reading, then search and reports.** Each class has its own share of the connections, so a flood of searches can never take the connection a save needs.
+- **ARC-234** · phase 3 · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost.
+- **ARC-235** · phase 3 · `/readyz` tells the truth under load: a node with a full pool or a long queue says so, so a load balancer can send people elsewhere. It stays separate from `/livez`, so a busy node is not restarted (ARC-009).
+- **ARC-236** · phase 3 · Logins have their own limit on how many hash at once per node, so a morning rush waits briefly and leaves the rest of the node alone.
+- **ARC-237** · later · If writes come near what the audit lock passes, events are chained after the commit (ARC-203). That needs a measurement and the product owner's agreement, because it changes ADR-013.
+
+### Keeping the room
+
+- **ARC-238** · phase 3 · Every feature has a **load budget**. Its spec states the queries per request, the writes per action, and which class of ARC-233 it belongs to. A feature that goes past its budget gets a cache, a job or a table of its own before it lands.
+- **ARC-239** · phase 3 · The query count of the main screens is a test: opening a page, the tree, search and the bell. A change that adds queries fails, unless the budget is changed on purpose.
+- **ARC-240** · phase 3 · Each release runs the load test at a fixed size, and `docs/operations/limits.md` keeps the numbers, so a slow decline shows up. A run of the worst case needs real servers, so it is done when those are available. Until then, the documents do not claim it.
+- **ARC-241** · phase 3 · The install guide gives sizes for each number of people, and says which were measured and which are estimates.
+
+### When to do what
+
+Nothing here is built ahead of need, but the code keeps the door open from now on: a read says what it needs, and a feature states its budget.
+
+| Sign | Step |
+|---|---|
+| Any size | Load budget, query test, order of work, honest `/readyz` (ARC-233 to 235, 238, 239) |
+| Search slows other work | Search leaves the primary (ARC-229) |
+| The primary's CPU stays above half at busy hours | Reads and heavy reads to standbys (ARC-228, ARC-230) |
+| The same reads dominate | Short cache (ARC-231) |
+| A growing table slows its own queries | Split by month (ARC-232) |
+| Writes near the audit limit | Chain after commit (ARC-237) |

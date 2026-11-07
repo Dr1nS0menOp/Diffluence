@@ -73,6 +73,10 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 - **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
 - **S3 storage.** It needs a client module, chosen when the time comes.
 
+## Carrying the load (ADR-035, ADR-036)
+
+Search comes first, then protection against too much load: the order of work, a limit on what waits, an honest `/readyz`, and a load budget per feature (ARC-233 to ARC-236, ARC-238, ARC-239). The rest of `04-architecture/08-scaling.md` section 8.5 follows the signs listed there.
+
 ## After blueprint 03: look, settings and roles (ADR-034)
 
 In this order, each with its own study:

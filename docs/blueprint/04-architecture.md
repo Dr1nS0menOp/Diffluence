@@ -62,11 +62,11 @@ In a small installation, `api`, `worker` and NATS are one process. draw.io and t
 | [5. The API and its edge](04-architecture/05-api-and-security-edge.md) | Conventions, access rules, middleware, headers, limits | 31 |
 | [6. Live updates and caching](04-architecture/06-real-time-and-caching.md) | Polling or push, and what may be cached | 14 |
 | [7. Data and storage](04-architecture/07-data-and-storage.md) | PostgreSQL, PgBouncer, what grows, search, files | 25 |
-| [8. Scaling](04-architecture/08-scaling.md) | The load worked out, what hurts first, topology | 17 |
+| [8. Scaling](04-architecture/08-scaling.md) | The load worked out, what hurts first, topology, the worst case and room for four times the database work | 31 |
 | [9. Failures, upgrades and trade-offs](04-architecture/09-failures-and-trade-offs.md) | What breaks and what people see, secrets, every trade-off, risks | 14 |
 | [Sources](04-architecture/sources.md) | What was read | |
 
-In total 227 lines.
+In total 241 lines.
 
 ## The principles
 
