@@ -18,7 +18,7 @@
 - **ORG-011** · built · Results never include anything the person may not see. Search is part of the permission tests.
 - **ORG-012** · built · The last word also matches as a prefix.
 - **ORG-013** · built · Publishing updates the search index in the same transaction, so a page is never found with stale content or permissions.
-- **ORG-014** · built · Dutch and English behave alike, because no stemming is applied.
+- **ORG-014** · built · Dutch and English behave alike: a word also finds its common forms, such as `plans` for `plan`, through the same endings in both languages, not a dictionary per language. Quoted words are found as typed (ADR-037, spec 029).
 - **ORG-015** · partly · Filters added: content type, label, contributor (wrote, edited or commented), status, below a page, titles only. Still open: a control for "below a page", which works through the address.
 - **ORG-016** · built · A filter on date offers last day, week, month, year, or a range.
 - **ORG-017** · partly · Several people or labels in a filter mean **or**. Still open: several people, which work through the address.

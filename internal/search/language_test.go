@@ -8,31 +8,37 @@ import (
 	"testing"
 )
 
+// f is a word with its forms, as Parse writes it.
+func f(word, suffix string) string { return formsTerm(word, suffix) }
+
 func TestSearchLanguage(t *testing.T) {
 	cases := []struct {
 		input string
 		want  string
 	}{
-		{"plan", "'plan':*"},
-		{"plan budget", "'plan' & 'budget':*"},
+		{"plan", f("plan", ":*")},
+		{"plan budget", f("plan", "") + " & " + f("budget", ":*")},
+		// Quotes ask for the words as typed.
 		{`"open plan"`, "'open' <-> 'plan'"},
-		{"plan AND budget", "'plan' & 'budget'"},
-		{"plan OR budget", "'plan' | 'budget'"},
-		{"plan or budget", "'plan' & 'or' & 'budget':*"},
-		{"NOT draft", "!('draft')"},
-		{"(plan OR budget) AND 2026", "('plan' | 'budget') & '2026'"},
+		{"plan AND budget", f("plan", "") + " & " + f("budget", "")},
+		{"plan OR budget", f("plan", "") + " | " + f("budget", "")},
+		{"plan or budget", f("plan", "") + " & " + f("or", "") + " & " + f("budget", ":*")},
+		{"NOT draft", "!(" + f("draft", "") + ")"},
+		// A number has no other forms.
+		{"(plan OR budget) AND 2026", "(" + f("plan", "") + " | " + f("budget", "") + ") & '2026'"},
 		{"plan*", "'plan':*"},
+		// A field holds what was typed after it, as typed.
 		{"title:plan", "'plan':A"},
 		{`title:"open plan"`, "'open':A <-> 'plan':A"},
-		{"foo:bar", "'foo' & 'bar':*"},
-		{"pl*n budget", "'pl':* & 'budget'"},
-		{"*plan", "'plan'"},
+		{"foo:bar", f("foo", "") + " & " + f("bar", ":*")},
+		{"pl*n budget", "'pl':* & " + f("budget", "")},
+		{"*plan", f("plan", "")},
 		// What cannot be read falls back to plain words.
-		{"(plan", "'plan':*"},
-		{"plan AND", "'plan' & 'and':*"},
-		{"plan)", "'plan':*"},
-		{"NOT", "'not':*"},
-		{`"unfinished quote`, "'unfinished' & 'quote':*"},
+		{"(plan", f("plan", ":*")},
+		{"plan AND", f("plan", "") + " & " + f("and", ":*")},
+		{"plan)", f("plan", ":*")},
+		{"NOT", f("not", ":*")},
+		{`"unfinished quote`, f("unfinished", "") + " & " + f("quote", ":*")},
 		{"!!! :: &&", ""},
 		{"", ""},
 	}
@@ -45,7 +51,7 @@ func TestSearchLanguage(t *testing.T) {
 
 func TestFieldsBecomeFilters(t *testing.T) {
 	got := Parse(`plan label:hr space:ENG author:"Anna Visser" label:legal`, false)
-	want := Parsed{AnyTerm: "'plan'", TSQuery: "'plan'", Labels: []string{"hr", "legal"}, Spaces: []string{"eng"}, Authors: []string{"Anna Visser"}}
+	want := Parsed{AnyTerm: "'plan'", TSQuery: f("plan", ""), Labels: []string{"hr", "legal"}, Spaces: []string{"eng"}, Authors: []string{"Anna Visser"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("got %+v, want %+v", got, want)
 	}
@@ -63,10 +69,10 @@ func TestWildcardsInsideAWordAreChecked(t *testing.T) {
 }
 
 func TestTitlesOnlyLimitsEveryTerm(t *testing.T) {
-	if got := Parse("plan budget", true).TSQuery; got != "'plan':A & 'budget':*A" {
+	if got := Parse("plan budget", true).TSQuery; got != f("plan", ":A")+" & "+f("budget", ":*A") {
 		t.Fatalf("got %q", got)
 	}
-	if got := Parse(`"open plan" OR budget`, true).TSQuery; got != "'open':A <-> 'plan':A | 'budget':A" {
+	if got := Parse(`"open plan" OR budget`, true).TSQuery; got != "'open':A <-> 'plan':A | "+f("budget", ":A") {
 		t.Fatalf("got %q", got)
 	}
 }

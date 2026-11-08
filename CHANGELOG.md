@@ -10,6 +10,12 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - The user list names the spaces of each guest, and a person's screen shows their groups, spaces and how many pages they own, without titles
 - The administration warns when the disk for files has less than a tenth free
 - Upgrade impact: none
+### Changed: word forms and file names in search (spec 029)
+- A word also finds its common forms: `plans` finds `plan`, `policy` finds `policies`, in English and Dutch alike. Words in quotes are found as typed, and numbers have no other forms
+- The Files screen finds a name the way the search box does: whole words and the start of a word, so `rep` finds `report.pdf` and `port` does not
+- The install guide says how large the database must be: about 2.5 CPUs for 5,000 people
+- A new test holds that a good login never buys extra password guesses from the same address
+- Upgrade impact: none. A search may find more pages than before, because of the word forms
 
 ### Changed: search that carries the load, and a tree that loads by branch (spec 028)
 - A search no longer reads every match. A common word in 50,000 pages went from seconds to tens of milliseconds, also with reading and publishing going on

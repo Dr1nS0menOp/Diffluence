@@ -21,6 +21,7 @@ import (
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/search"
 )
 
 const (
@@ -347,12 +348,12 @@ func (s *Service) SpaceFiles(ctx context.Context, c identity.Caller, spaceID uui
 		uploader = &f.Uploader
 	}
 	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+visibleFilesSQL+`
-		AND ($3 = '' OR position(lower($3) IN lower(a.filename)) > 0)
+		AND ($3 = '' OR `+fileNameWords+`)
 		AND ($4 = '' OR `+fileKindSQL+` = $4)
 		AND ($5 = '' OR EXISTS (SELECT 1 FROM attachment_labels l WHERE l.attachment_id = a.id AND l.label = lower($5)))
 		AND ($6::uuid IS NULL OR a.created_by = $6)
 		ORDER BY a.updated_at DESC, a.id LIMIT $7 OFFSET $8`,
-		c.UserID, spaceID, f.Name, f.Kind, f.Label, uploader, filesPageSize, max(f.Offset, 0))
+		c.UserID, spaceID, search.Prefixes(f.Name), f.Kind, f.Label, uploader, filesPageSize, max(f.Offset, 0))
 	if err != nil {
 		return nil, err
 	}

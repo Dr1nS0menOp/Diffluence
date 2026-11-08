@@ -112,6 +112,10 @@ const recentFiles = "2000"
 // fileWords matches the index on attachments: the words of a name, split at its signs.
 const fileWords = `to_tsvector('simple', translate(a.filename, '-_.()[]', '       ')) @@ to_tsquery('simple', $2)`
 
+// fileNameWords is the same match for the Files screen, so a name is found the same way
+// everywhere: whole words, and the start of the last word typed (ADR-037).
+const fileNameWords = `to_tsvector('simple', translate(a.filename, '-_.()[]', '       ')) @@ to_tsquery('simple', $3)`
+
 const fileRows = `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
 	FROM attachments a
 	JOIN pages p ON p.id = a.page_id

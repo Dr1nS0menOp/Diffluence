@@ -728,6 +728,14 @@ mutate "the content screen ignores the last day of a change" internal/pages/cont
   's.replace("p.updated_at < $20::timestamptz + interval '"'"'1 day'"'"'", "p.updated_at < $20::timestamptz")' $app -run TestContentFiltersByTheDayOfChangeAndOfCreation
 mutate "the reach of a person counts pages of others" internal/identity/lifecycle.go \
   's.replace("FROM pages p WHERE COALESCE(p.owner_id, p.created_by) = $1 AND p.status", "FROM pages p WHERE p.status")' $app -run TestAnAdministratorSeesTheReachOfAPersonButNoTitles
+mutate "a good login gives back more than its own try" internal/httpapi/handlers.go \
+  's.replace("\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByAllIPs.giveBack(allAddressesKey)", "\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByAllIPs.giveBack(allAddressesKey)")' $app -run TestOwnGoodLoginsDoNotBuyGuessesOnOtherAccounts
+mutate "a word asks for no other forms" internal/search/forms.go \
+  's.replace("\tall := forms(strings.ToLower(word))", "\tall := []string{strings.ToLower(word)}")' $app -run TestSearchFindsWordFormsAndKeepsTheExactTitleFirst
+mutate "quotes ask for other forms too" internal/search/language.go \
+  's.replace("parts = append(parts, p.exactTerm(word))", "parts = append(parts, p.term(word))")' $app -run TestSearchFindsWordFormsAndKeepsTheExactTitleFirst
+mutate "the Files screen ignores the name" internal/attachments/versions.go \
+  's.replace("`+fileNameWords+`", "true")' $app -run TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen
 
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

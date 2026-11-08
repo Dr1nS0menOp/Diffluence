@@ -379,6 +379,12 @@ func TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen(t *testing.T) {
 		"label=layoffs":         nil,
 		"uploader=" + editor.id: {"picture.png"},
 		"q=note&kind=image":     nil,
+		// A name is found as in the search box: whole words and word starts, not inside a word.
+		"q=rep":    {"report.docx"},
+		"q=report": {"report.docx"},
+		"q=port":   nil,
+		"q=notes":  {"notes.txt"},
+		"q=secret": nil,
 	} {
 		if got := names(query); !slices.Equal(got, want) {
 			t.Fatalf("%q: %v", query, got)

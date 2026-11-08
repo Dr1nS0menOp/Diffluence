@@ -148,14 +148,29 @@ func (p *parser) next() (token, bool) {
 	return p.tokens[p.at], true
 }
 
-// term writes one word. A word past the limit is left out.
+// term writes one word with its common forms. A word past the limit is left out.
 func (p *parser) term(word string) string {
-	if p.terms >= maxTerms {
+	if !p.count(word) {
 		return ""
+	}
+	return formsTerm(word, weightSuffix("", p.weight))
+}
+
+// exactTerm writes one word as typed: quotes ask for these words and no other forms.
+func (p *parser) exactTerm(word string) string {
+	if !p.count(word) {
+		return ""
+	}
+	return "'" + strings.ToLower(word) + "'" + weightSuffix("", p.weight)
+}
+
+func (p *parser) count(word string) bool {
+	if p.terms >= maxTerms {
+		return false
 	}
 	p.terms++
 	p.anyTerms = append(p.anyTerms, "'"+strings.ToLower(word)+"'")
-	return "'" + strings.ToLower(word) + "'" + weightSuffix("", p.weight)
+	return true
 }
 
 func weightSuffix(prefix, weight string) string {
@@ -230,7 +245,7 @@ func (p *parser) wordPiece(text string) string {
 func (p *parser) phrase(text string) string {
 	var parts []string
 	for _, word := range words(text) {
-		parts = append(parts, p.term(word))
+		parts = append(parts, p.exactTerm(word))
 	}
 	return join(parts, " <-> ")
 }
@@ -360,10 +375,10 @@ func Prefixes(input string) string { return plainWords(input, "") }
 func plainTerms(fields []string, weight string) []string {
 	terms := make([]string, len(fields))
 	for i, f := range fields {
-		terms[i] = "'" + strings.ToLower(f) + "'" + weightSuffix("", weight)
+		terms[i] = formsTerm(f, weightSuffix("", weight))
 	}
 	last := len(fields) - 1
-	terms[last] = "'" + strings.ToLower(fields[last]) + "'" + weightSuffix("*", weight)
+	terms[last] = formsTerm(fields[last], weightSuffix("*", weight))
 	return terms
 }
 

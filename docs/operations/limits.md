@@ -45,6 +45,18 @@ Measured on 7 November 2026, with the same caps, 50,000 pages, 5,000 people, 52,
 
 Search can never take more than one connection in four, so a flood of searches leaves the rest for reading and saving. It shares the CPU of PostgreSQL, though: under a flood, reading slows. A standby takes that away.
 
+### Word forms (spec 029)
+
+Since spec 029 each word also asks for its common forms, such as `plans` for `plan`. Measured on 7 November 2026 in PostgreSQL alone, at 1.5 CPUs, on 50,000 synthetic documents of 120 words each with a GIN index. This was not the full setup of spec 028: the application and the load model were not part of it.
+
+| Query | As typed | With its forms |
+|---|---|---|
+| A word in every document, as a prefix | about 10 ms | about 10 ms |
+| A rare word | 0.2 to 0.4 ms | 0.1 to 0.2 ms |
+| Two words, the newest ten | 0.3 ms | 0.6 ms |
+
+The forms cost the index little. A full run with the setup of spec 028 is still open.
+
 ## What stops everything
 
 | What | Result | What to do |

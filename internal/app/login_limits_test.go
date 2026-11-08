@@ -30,9 +30,30 @@ func newEnvBehindProxy(t *testing.T) *env {
 
 func (e *env) loginFrom(address, password string) int {
 	e.t.Helper()
-	body, _ := json.Marshal(map[string]string{"email": "anna@example.com", "password": password})
+	return e.loginAs(address, "anna@example.com", password)
+}
+
+func (e *env) loginAs(address, email, password string) int {
+	e.t.Helper()
+	body, _ := json.Marshal(map[string]string{"email": email, "password": password})
 	resp, _ := e.do(e.client(), "POST", "/api/v1/auth/login", string(body), "X-Forwarded-For", address)
 	return resp.StatusCode
+}
+
+// One account of your own must not buy extra guesses on the accounts of others from the same address.
+func TestOwnGoodLoginsDoNotBuyGuessesOnOtherAccounts(t *testing.T) {
+	e := newEnvBehindProxy(t)
+	checked := 0
+	for i := range 80 {
+		if e.loginAs("198.51.100.9", fmt.Sprintf("someone%d@example.com", i), "wrong password here") == http.StatusUnauthorized {
+			checked++
+		}
+		e.loginFrom("198.51.100.9", adminPassword)
+	}
+	// A good login only returns its own attempt, so the wrong ones stop where they would without it.
+	if checked > 50 {
+		t.Fatalf("%d wrong passwords on other accounts were checked from one address, want at most 50", checked)
+	}
 }
 
 func TestWrongPasswordsFromOneAddressDoNotLockOutThePerson(t *testing.T) {
