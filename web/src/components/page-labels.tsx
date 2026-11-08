@@ -79,6 +79,9 @@ export function LabelBar({ page }: { page: PageSummary & { labels?: string[] } }
         {labels.map((label) => (
           <li key={label}>
             <Link href={`/labels/${encodeURIComponent(label)}`} className="label">
+              <span className="label-mark" aria-hidden="true">
+                #
+              </span>
               {label}
             </Link>
             {editable && (
@@ -98,6 +101,7 @@ export function LabelBar({ page }: { page: PageSummary & { labels?: string[] } }
         <div className="label-box">
           <input
             role="combobox"
+            className="label-input"
             aria-label={t('organise.addLabel')}
             aria-autocomplete="list"
             aria-expanded={open}

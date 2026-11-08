@@ -143,6 +143,9 @@ func (s *Service) matchTrigger(ctx context.Context, trigger string, event uuid.U
 		if r.SpaceID != nil && slices.Contains(instanceOnlyTriggers, trigger) {
 			continue
 		}
+		if !r.Definition.reaches(space) {
+			continue
+		}
 		if err := s.start(ctx, r, event, rc); err != nil {
 			return err
 		}

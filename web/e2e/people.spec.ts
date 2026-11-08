@@ -390,7 +390,7 @@ test('everyone who can view a space sees who has access, and the export is safe'
   const as = await browserAs(browser, email);
   await as.goto(`/spaces/${space.key}/people`);
   await checkAccessibility(as);
-  await expect(as.getByRole('table')).toContainText(email.split('@')[0] ?? '');
+  await expect(as.locator('.member-list')).toContainText(email.split('@')[0] ?? '');
   await as.context().close();
 });
 
@@ -553,7 +553,7 @@ test('a new space starts with a text and the access chosen', async ({ page, brow
   await createUser(browser, email);
   const as = await browserAs(browser, email);
   await as.goto('/spaces');
-  await expect(as.getByRole('link', { name })).toBeVisible();
+  await expect(as.locator('#main').getByRole('link', { name })).toBeVisible();
   await as.context().close();
 });
 
@@ -681,10 +681,5 @@ test('the account stays in reach in a full top bar', async ({ page }) => {
   const account = await page.getByRole('button', { name: 'Account' }).boundingBox();
   const width = page.viewportSize()?.width ?? 0;
   expect((account?.x ?? width) + (account?.width ?? 0)).toBeLessThanOrEqual(width);
-  await expect(page.locator('.search-chip-remove')).toBeInViewport({ ratio: 1 });
-  const chip = await page.locator('.search-chip').boundingBox();
-  const remove = await page.locator('.search-chip-remove').boundingBox();
-  expect((remove?.x ?? width) + (remove?.width ?? 0)).toBeLessThanOrEqual(
-    (chip?.x ?? 0) + (chip?.width ?? 0),
-  );
+  await expect(page.getByRole('combobox', { name: 'Search' })).toBeInViewport({ ratio: 1 });
 });

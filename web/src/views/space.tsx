@@ -3,12 +3,13 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Category, type PageRef, type Shortcut, type Space, type TrashItem } from '../api';
-import { Link, navigate } from '../router';
+import { Link, navigate, useLocation } from '../router';
 import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
-import { IconArrowDown, IconArrowUp } from '../components/icons';
-import { ConfirmButton, ErrorNote, Field, Loading } from '../components/ui';
+import { IconArrowDown, IconArrowUp, IconChevronLeft } from '../components/icons';
+import { SettingsFrame, type SettingsGroup } from '../components/settings-frame';
+import { ConfirmButton, ErrorNote, Field, Loading, SpaceBadge } from '../components/ui';
 import { useDates } from '../dates';
 import { ExportSection, ImportSection, PDFDesignSection } from './exchange';
 import { moved } from './lists';
@@ -22,6 +23,26 @@ import {
   SpaceLinksSection,
   StatusesSection,
 } from './space-organise';
+
+const SPACE_SECTIONS = [
+  'details',
+  'key',
+  'features',
+  'links',
+  'shortcuts',
+  'categories',
+  'people',
+  'statuses',
+  'labels',
+  'placeholders',
+  'rules',
+  'import',
+  'export',
+  'pdf',
+  'danger',
+] as const;
+type SpaceSection = (typeof SPACE_SECTIONS)[number];
+const BACK_ICON_SIZE = 16;
 
 function useSpaceByKey(key: string) {
   return useQuery(spaceByKeyQuery(key));
@@ -198,6 +219,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const q = useSpaceByKey(spaceKey);
+  const current = useLocation().searchParams.get('section') ?? 'details';
   const [form, setForm] = useState<{ name: string; description: string; icon: string } | null>(null);
   const space = q.data;
   useEffect(() => {
@@ -229,12 +251,85 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
     );
   }
   if (!space || !form) return <Loading />;
+  const section = SPACE_SECTIONS.includes(current as SpaceSection) ? (current as SpaceSection) : 'details';
+  const base = `/spaces/${space.key}`;
+  const item = (id: SpaceSection, label: string) => ({ id, label, href: `${base}/settings?section=${id}` });
+  const away = (id: string, label: string, href: string) => ({ id, label, href });
+  const groups: SettingsGroup[] = [
+    {
+      id: 'general',
+      title: t('spaceSettings.groupGeneral'),
+      items: [
+        item('details', t('space.details')),
+        item('key', t('spaceSettings.key')),
+        item('features', t('spaceSettings.features')),
+        item('links', t('spaceSettings.keepTidy')),
+        item('shortcuts', t('shortcutLinks.title')),
+        item('categories', t('admin.categories')),
+      ],
+    },
+    {
+      id: 'access',
+      title: t('spaceSettings.groupAccess'),
+      items: [
+        item('people', t('spaceSettings.owners')),
+        away('permissions', t('access.open'), `${base}/access`),
+        away('audit', t('access.auditTitle'), `${base}/audit`),
+      ],
+    },
+    {
+      id: 'content',
+      title: t('spaceSettings.groupContent'),
+      items: [
+        item('statuses', t('spaceSettings.statuses')),
+        item('labels', t('organise.labels')),
+        item('placeholders', t('space.placeholders')),
+        away('content', t('content.title'), `${base}/content`),
+        away('trash', t('space.trash'), `${base}/trash`),
+      ],
+    },
+    {
+      id: 'automation',
+      title: t('spaceSettings.groupAutomation'),
+      items: [
+        item('rules', t('spaceSettings.rules')),
+        away('automation', t('admin.automation'), `${base}/settings/automation`),
+        away('webhooks', t('admin.webhooks'), `${base}/settings/webhooks`),
+      ],
+    },
+    {
+      id: 'exchange',
+      title: t('spaceSettings.groupExchange'),
+      items: [
+        item('import', t('space.import')),
+        item('export', t('exchange.export')),
+        item('pdf', t('exchange.pdfDesign')),
+        away('sites', t('sites.title'), `${base}/sites`),
+      ],
+    },
+    {
+      id: 'danger',
+      title: t('spaceSettings.groupDanger'),
+      items: [item('danger', t('spaceSettings.archiveOrDelete'))],
+    },
+  ];
+  const label = groups.flatMap((g) => g.items).find((i) => i.id === section)?.label ?? t('space.settings');
   return (
-    <Frame space={space}>
-      <h1>{t('space.settings')}</h1>
-      <section>
-        <h2>{t('space.details')}</h2>
+    <SettingsFrame
+      title={t('space.settings')}
+      head={<SettingsBack space={space} />}
+      groups={groups}
+      current={section}
+    >
+      {space.status === 'archived' && (
+        <p role="status" className="note">
+          {t('space.archived')}
+        </p>
+      )}
+      <h1>{label}</h1>
+      {section === 'details' && (
         <form
+          className="settings-form"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
             save.mutate();
@@ -261,52 +356,55 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
             {t('common.save')}
           </button>
         </form>
-      </section>
-      <SpaceLinksSection space={space} />
-      <PlaceholdersSection space={space} />
-      <KeySection space={space} />
-      <PeopleSection space={space} />
-      <FeaturesSection space={space} />
-      <StatusesSection space={space} />
-      <LabelsSection space={space} />
-      <RulesSection space={space} />
-      <ShortcutsSection space={space} />
-      <section>
-        <h2>{t('space.permissions')}</h2>
-        <p>
-          <Link href={`/spaces/${space.key}/access`}>{t('access.open')}</Link>
-        </p>
-        <p>
-          <Link href={`/spaces/${space.key}/audit`}>{t('access.auditTitle')}</Link>
-        </p>
-      </section>
-      <CategoriesSection space={space} />
-      <ImportSection space={space} />
-      <ExportSection space={space} />
-      <PDFDesignSection space={space} />
-      <section>
-        <h2>{t('sites.title')}</h2>
-        <p>
-          <Link href={`/spaces/${space.key}/sites`}>{t('sites.open')}</Link>
-        </p>
-      </section>
-      <section>
-        <h2>{t('common.actions')}</h2>
-        <ErrorNote error={archive.error ?? remove.error} />
-        <div className="row">
-          {space.status === 'archived' ? (
-            <button type="button" onClick={() => archive.mutate('unarchive')}>
-              {t('space.unarchive')}
-            </button>
-          ) : (
-            <button type="button" onClick={() => archive.mutate('archive')}>
-              {t('space.archive')}
-            </button>
-          )}
-          <DeleteSpaceButton space={space} onDelete={() => remove.mutate()} />
-        </div>
-      </section>
-    </Frame>
+      )}
+      {section === 'key' && <KeySection space={space} />}
+      {section === 'features' && <FeaturesSection space={space} />}
+      {section === 'links' && <SpaceLinksSection space={space} />}
+      {section === 'shortcuts' && <ShortcutsSection space={space} />}
+      {section === 'categories' && <CategoriesSection space={space} />}
+      {section === 'people' && <PeopleSection space={space} />}
+      {section === 'statuses' && <StatusesSection space={space} />}
+      {section === 'labels' && <LabelsSection space={space} />}
+      {section === 'placeholders' && <PlaceholdersSection space={space} />}
+      {section === 'rules' && <RulesSection space={space} />}
+      {section === 'import' && <ImportSection space={space} />}
+      {section === 'export' && <ExportSection space={space} />}
+      {section === 'pdf' && <PDFDesignSection space={space} />}
+      {section === 'danger' && (
+        <section>
+          <ErrorNote error={archive.error ?? remove.error} />
+          <div className="row">
+            {space.status === 'archived' ? (
+              <button type="button" onClick={() => archive.mutate('unarchive')}>
+                {t('space.unarchive')}
+              </button>
+            ) : (
+              <button type="button" onClick={() => archive.mutate('archive')}>
+                {t('space.archive')}
+              </button>
+            )}
+            <DeleteSpaceButton space={space} onDelete={() => remove.mutate()} />
+          </div>
+        </section>
+      )}
+    </SettingsFrame>
+  );
+}
+
+/** The top of the settings sidebar: the space, and the way back to it. */
+function SettingsBack({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <Link href={`/spaces/${space.key}`} className="side-link settings-back">
+        <IconChevronLeft size={BACK_ICON_SIZE} /> {t('spaceSettings.back')}
+      </Link>
+      <div className="sidebar-head">
+        <span className="space-link">
+          <SpaceBadge space={space} /> {space.name}
+        </span>
+      </div>
+    </>
   );
 }
 

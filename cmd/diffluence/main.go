@@ -200,6 +200,7 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 	fs := flag.NewFlagSet("user create-admin", flag.ContinueOnError)
 	email := fs.String("email", "", "email address (required)")
 	name := fs.String("name", "", "display name (required)")
+	organisation := fs.String("organisation", "", "name of the company or person this instance is for (optional)")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -244,6 +245,13 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 		return err
 	}
 	fmt.Fprintf(stdout, "administrator %s created (id %s)\n", u.Email, u.ID)
+	if *organisation == "" {
+		return nil
+	}
+	if err := settings.NewService(pool, nil).SetOrganisationName(ctx, identity.SystemCaller("cli"), *organisation); err != nil {
+		return fmt.Errorf("the administrator exists, but the organisation name was refused: %w", err)
+	}
+	fmt.Fprintf(stdout, "organisation: %s\n", *organisation)
 	return nil
 }
 

@@ -217,7 +217,9 @@ test('a folder shows its pages, a link entry leaves the space', async ({ page })
   await dialog.getByLabel('Title').fill('Our shop');
   await dialog.getByLabel('Address').fill('https://example.com/shop');
   await dialog.getByRole('button', { name: 'Create' }).click();
-  const entry = page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Our shop' });
+  const tree = page.getByRole('navigation', { name: 'Pages' });
+  await tree.getByRole('button', { name: 'Group', exact: true }).click();
+  const entry = tree.getByRole('link', { name: 'Our shop' });
   await expect(entry).toHaveAttribute('href', 'https://example.com/shop');
   await expect(entry).toHaveAttribute('target', '_blank');
 });
@@ -237,9 +239,9 @@ test('moving to another space shows what changes first', async ({ page }) => {
   await dialog.getByRole('button', { name: 'Move' }).click();
   await expect(dialog).toHaveCount(0);
   await page.reload();
-  await expect(
-    page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Luggage' }),
-  ).toBeVisible();
+  const tree = page.getByRole('navigation', { name: 'Pages' });
+  await tree.getByRole('button', { name: 'Traveller', exact: true }).click();
+  await expect(tree.getByRole('link', { name: 'Luggage' })).toBeVisible();
   await expect(page.locator('.crumbs')).toContainText('To there');
   expect(to.id).not.toBe(from.id);
 });
@@ -407,7 +409,7 @@ test('the search language and its filters live in the address', async ({ page })
 
 test('changing a key: the old address still leads there', async ({ page }) => {
   const space = await newSpace(page, 'Rekeyed');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=key`);
   const key = unique('NEW');
   await page.getByRole('textbox', { name: 'Key', exact: true }).fill(key);
   await page.getByRole('textbox', { name: 'Key', exact: true }).press('Enter');
@@ -418,7 +420,7 @@ test('changing a key: the old address still leads there', async ({ page }) => {
 
 test('deleting a space asks for its key', async ({ page }) => {
   const space = await newSpace(page, 'Doomed space');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=danger`);
   await page.getByRole('button', { name: 'Delete space' }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete space' });
   await expect(dialog.getByRole('button', { name: 'Delete space' })).toBeDisabled();

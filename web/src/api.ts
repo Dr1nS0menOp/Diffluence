@@ -145,6 +145,10 @@ export interface Preferences {
   show_presence: boolean;
   typing_help: boolean;
   sidebar_width: number;
+  /** Parts of the sidebar folded shut; the server sends null for none. */
+  sidebar_shut: string[] | null;
+  /** Height in rem of the links of a space, or 0 for their own height. */
+  sidebar_links_height: number;
   tree_view: string;
   language: string;
   time_zone: string;
@@ -217,6 +221,8 @@ export interface Holder {
   role: string;
   source: string;
   via: string;
+  /** A person who is a guest of the instance. */
+  guest: boolean;
 }
 
 export interface GrantPreview {

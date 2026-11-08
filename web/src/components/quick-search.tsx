@@ -4,16 +4,18 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { api, type ListedPage, type QuickResults, type Space } from '../api';
+import { api, type ListedPage, type QuickResults } from '../api';
 import { personalKey, usePerson } from '../personal';
 import { navigate } from '../router';
-import { IconClose, IconSearch } from './icons';
+import { IconSearch } from './icons';
+import { SearchFilterBar } from './search-filter-bar';
+import { NO_FILTERS, queryWith, resultsAddress, type SearchFilters } from './search-filters';
 import { useDates } from '../dates';
+import { appearanceQuery } from '../appearance';
 
 const MAX_SEARCHES = 8;
 const PAUSE_MS = 200;
 const RECENT_PAGES_SHOWN = 5;
-const CHIP_ICON_SIZE = 14;
 
 export interface QuickRow {
   id: string;
@@ -99,7 +101,8 @@ export function useDelayed(value: string): string {
   return delayed;
 }
 
-export function QuickSearch({ space }: { space: Space | null }) {
+/** The search box. It searches every space; filters narrow it on request (spec 033). */
+export function QuickSearch() {
   const { t } = useTranslation();
   const dates = useDates();
   const searchesKey = personalKey(usePerson(), 'searches');
@@ -109,17 +112,13 @@ export function QuickSearch({ space }: { space: Space | null }) {
   const [text, setText] = useState('');
   const [open, setOpen] = useState(false);
   const [marked, setMarked] = useState(-1);
-  const [chipRemoved, setChipRemoved] = useState(false);
+  const [filters, setFilters] = useState<SearchFilters>(NO_FILTERS);
+  // A name, not markup: it only ever goes into an attribute as text.
+  const organisation = useQuery(appearanceQuery).data?.organisation.trim() ?? '';
   const [searches, setSearches] = useState(() => readSearches(localStorage.getItem(searchesKey)));
   const typed = useDelayed(text.trim());
-  const within = space && !chipRemoved ? space : null;
-
-  // The chip comes back in the next space. A person only removes it for this one.
-  const [chipSpace, setChipSpace] = useState(space?.id);
-  if (space?.id !== chipSpace) {
-    setChipSpace(space?.id);
-    setChipRemoved(false);
-  }
+  // The quick list reads the same words of the syntax as the results page.
+  const query = queryWith(typed, filters);
 
   const recent = useQuery({
     queryKey: ['/me/recent'],
@@ -127,12 +126,8 @@ export function QuickSearch({ space }: { space: Space | null }) {
     enabled: open && typed === '',
   });
   const results = useQuery({
-    queryKey: ['quick', typed, within?.id],
-    queryFn: () => {
-      const params = new URLSearchParams({ q: typed });
-      if (within) params.set('space_id', within.id);
-      return api.get<QuickResults>(`/search/quick?${params.toString()}`);
-    },
+    queryKey: ['quick', query],
+    queryFn: () => api.get<QuickResults>(`/search/quick?${new URLSearchParams({ q: query }).toString()}`),
     enabled: open && typed !== '',
     // The rows stay while the next ones load. The key keeps an old answer from
     // ever replacing a newer one.
@@ -191,9 +186,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
     const next = addSearch(searches, query);
     setSearches(next);
     localStorage.setItem(searchesKey, JSON.stringify(next));
-    const params = new URLSearchParams({ q: query });
-    if (within) params.set('space_id', within.id);
-    navigate(`/search?${params.toString()}`);
+    navigate(resultsAddress(query, filters));
   };
 
   const close = () => {
@@ -243,10 +236,6 @@ export function QuickSearch({ space }: { space: Space | null }) {
       e.preventDefault();
       if (open) close();
       else setText('');
-    } else if (e.key === 'Tab') {
-      close();
-    } else if (e.key === 'Backspace' && text === '' && within) {
-      setChipRemoved(true);
     }
   };
 
@@ -257,25 +246,16 @@ export function QuickSearch({ space }: { space: Space | null }) {
       ref={root}
       role="search"
       className="top-search"
+      // Leaving the box and its panel with Tab or a click closes the panel.
+      onBlur={(e) => {
+        if (!root.current?.contains(e.relatedTarget as Node | null)) close();
+      }}
       onSubmit={(e) => {
         e.preventDefault();
         choose(rows[marked]);
       }}
     >
       <IconSearch size={18} />
-      {within && (
-        <span className="search-chip">
-          <span className="search-chip-name">{within.name}</span>
-          <button
-            type="button"
-            className="search-chip-remove"
-            aria-label={t('search.removeChip', { name: within.name })}
-            onClick={() => setChipRemoved(true)}
-          >
-            <IconClose size={CHIP_ICON_SIZE} />
-          </button>
-        </span>
-      )}
       <input
         ref={input}
         id="quick-search"
@@ -287,7 +267,7 @@ export function QuickSearch({ space }: { space: Space | null }) {
         aria-expanded={showPanel}
         aria-controls={listId}
         aria-activedescendant={markedRow ? `${listId}-${markedRow.id}` : undefined}
-        placeholder={t('nav.searchPlaceholder')}
+        placeholder={organisation ? t('nav.searchIn', { name: organisation }) : t('nav.searchPlaceholder')}
         value={text}
         onChange={(e) => {
           setText(e.target.value);
@@ -301,40 +281,43 @@ export function QuickSearch({ space }: { space: Space | null }) {
       <span role="status" className="visually-hidden">
         {open && typed !== '' && results.data ? t('search.quickCount', { count: rows.length - 1 }) : ''}
       </span>
-      <div
-        id={listId}
-        role="listbox"
-        aria-label={t('nav.search')}
-        className="quick-panel"
-        hidden={!showPanel}
-      >
-        {results.isError && <p className="quick-note">{t('search.quickFailed')}</p>}
-        {groups.map((group) => (
-          <div key={group} role="group" aria-label={group || t('search.allResultsGroup')}>
-            {group && (
-              <div className="quick-group" aria-hidden="true">
-                {group}
-              </div>
-            )}
-            {rows.map((row, index) =>
-              row.group === group ? (
-                <div
-                  key={row.id}
-                  id={`${listId}-${row.id}`}
-                  role="option"
-                  aria-selected={index === marked}
-                  className={index === marked ? 'quick-row marked' : 'quick-row'}
-                  // The input must keep focus, or the panel closes before the click lands.
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => choose(row)}
-                >
-                  <span className="quick-title">{row.title}</span>
-                  {row.detail && <span className="quick-detail">{row.detail}</span>}
+      <div className="quick-drop" hidden={!open}>
+        <SearchFilterBar filters={filters} onChange={setFilters} />
+        <div
+          id={listId}
+          role="listbox"
+          aria-label={t('nav.search')}
+          className="quick-panel"
+          hidden={!showPanel}
+        >
+          {results.isError && <p className="quick-note">{t('search.quickFailed')}</p>}
+          {groups.map((group) => (
+            <div key={group} role="group" aria-label={group || t('search.allResultsGroup')}>
+              {group && (
+                <div className="quick-group" aria-hidden="true">
+                  {group}
                 </div>
-              ) : null,
-            )}
-          </div>
-        ))}
+              )}
+              {rows.map((row, index) =>
+                row.group === group ? (
+                  <div
+                    key={row.id}
+                    id={`${listId}-${row.id}`}
+                    role="option"
+                    aria-selected={index === marked}
+                    className={index === marked ? 'quick-row marked' : 'quick-row'}
+                    // The input must keep focus, or the panel closes before the click lands.
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => choose(row)}
+                  >
+                    <span className="quick-title">{row.title}</span>
+                    {row.detail && <span className="quick-detail">{row.detail}</span>}
+                  </div>
+                ) : null,
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </form>
   );

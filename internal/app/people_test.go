@@ -319,6 +319,21 @@ func TestSettingsAreCheckedPerSection(t *testing.T) {
 	}
 }
 
+func TestTheOrganisationNameIsPlainTextOfOneLine(t *testing.T) {
+	e := newEnv(t)
+	root := admin(e)
+	if got := root.ok("GET", "/api/v1/appearance", nil)["organisation"]; got != "" {
+		t.Fatalf("without a name the search box says only Search: %v", got)
+	}
+	root.ok("PUT", "/api/v1/admin/settings/look", map[string]any{"organisation_name": "Acme & Sons"})
+	if got := root.ok("GET", "/api/v1/appearance", nil)["organisation"]; got != "Acme & Sons" {
+		t.Fatalf("organisation %v", got)
+	}
+	root.want(400, "PUT", "/api/v1/admin/settings/look", map[string]any{"organisation_name": "<b>Acme</b>"})
+	root.want(400, "PUT", "/api/v1/admin/settings/look", map[string]any{"organisation_name": "Two\nlines"})
+	root.want(400, "PUT", "/api/v1/admin/settings/look", map[string]any{"organisation_name": strings.Repeat("a", 201)})
+}
+
 func TestAnAccentMustKeepContrastInBothThemes(t *testing.T) {
 	e := newEnv(t)
 	root := admin(e)
@@ -853,6 +868,20 @@ func TestWhoHasAccessShowsHowAndExportsSafely(t *testing.T) {
 	viewer.want(403, "GET", "/api/v1/spaces/"+space+"/access", nil)
 	if !has(namesIn(viewer.ok("GET", "/api/v1/spaces/"+space+"/people", nil)), "Team") {
 		t.Fatal("someone who can view may see who has access")
+	}
+
+	visitor := e.user("visitor@example.com", identity.PermUseProduct)
+	if _, err := e.app.Pool().Exec(t.Context(), "UPDATE users SET type = 'guest' WHERE id = $1", visitor.id); err != nil {
+		t.Fatal(err)
+	}
+	root.grant(space, "user", visitor.id, permissions.TemplateViewer)
+	guests := map[string]bool{}
+	for _, item := range viewer.ok("GET", "/api/v1/spaces/"+space+"/people", nil)["people"].([]any) {
+		row := item.(map[string]any)
+		guests[row["name"].(string)] = row["guest"] == true
+	}
+	if len(guests) < 2 || !guests["Test visitor@example.com"] || guests["Team"] {
+		t.Fatalf("the people of a space say who is a guest, and only that: %v", guests)
 	}
 
 	out := root.want(200, "GET", "/api/v1/spaces/"+space+"/access.csv", nil)

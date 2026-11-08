@@ -45,10 +45,9 @@ describe('branches', () => {
   const nothing = { opened: [], collapsed: [] };
   const noAncestors = new Set<string>();
 
-  it('start open near the top, so the shape of a space shows', () => {
-    expect(isBranchOpen(nothing, 'a', 0, noAncestors)).toBe(true);
-    expect(isBranchOpen(nothing, 'a', 1, noAncestors)).toBe(true);
-    expect(isBranchOpen(nothing, 'a', 2, noAncestors)).toBe(false);
+  it('start folded from the first level, so the top pages of a space show at once', () => {
+    expect(isBranchOpen(nothing, 'a', 0, noAncestors)).toBe(false);
+    expect(isBranchOpen(nothing, 'a', 1, noAncestors)).toBe(false);
   });
   it('open deep down on the way to the current page', () => {
     expect(isBranchOpen(nothing, 'a', 5, new Set(['a']))).toBe(true);

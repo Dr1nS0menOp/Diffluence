@@ -3,91 +3,19 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, NIL_ID, type Grant, type GrantPreview, type Holder, type Space, type Subject } from '../api';
+import { api, NIL_ID, type Grant, type Holder, type Space } from '../api';
 import { useDates } from '../dates';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { PersonName } from '../components/person';
 import { SubjectPicker } from '../components/picker';
 import { Tabs } from '../components/tabs';
 import { Dialog, ErrorNote, Loading } from '../components/ui';
+import { SpacePeople } from './space-people';
+import { PreviewText, TEMPLATES, templateOf, useGrantChange, type Change, type Grants } from './space-grants';
 
-const TEMPLATES = ['viewer', 'editor', 'manager', 'space_admin'];
 const ACCESS_TABS = ['grants', 'people'] as const;
 type AccessTab = (typeof ACCESS_TABS)[number];
 const AUDIT_ID_LENGTH = 8;
-
-interface NamedSet {
-  id: string;
-  name: string;
-  permissions: string[];
-}
-
-interface Grants {
-  grants: Grant[];
-  all_permissions: string[];
-  templates: Record<string, string[]>;
-  sets: NamedSet[];
-}
-
-interface Change {
-  subject: Subject;
-  permissions: string[];
-}
-
-const sameSet = (a: string[], b: string[]) => [...a].sort().join() === [...b].sort().join();
-
-function templateOf(perms: string[], grants: Grants): string {
-  const named = TEMPLATES.find((n) => sameSet(grants.templates[n] ?? [], perms));
-  return named ?? grants.sets.find((s) => sameSet(s.permissions, perms))?.id ?? 'custom';
-}
-
-/** Saves a change after showing what it does. It only asks when someone loses view. */
-function useGrantChange(space: Space) {
-  const client = useQueryClient();
-  const [asking, setAsking] = useState<{ change: Change; preview: GrantPreview } | null>(null);
-  const [lastPreview, setLastPreview] = useState<GrantPreview | null>(null);
-  const save = useMutation({
-    mutationFn: (change: Change) => api.put(`/spaces/${space.id}/grants`, change),
-    onSettled: async () => {
-      await client.invalidateQueries({ queryKey: ['grants', space.id] });
-      await client.invalidateQueries({ queryKey: ['space-access', space.id] });
-    },
-  });
-  const check = useMutation({
-    mutationFn: (change: Change) => api.post<GrantPreview>(`/spaces/${space.id}/grants/preview`, change),
-    onSuccess: (preview, change) => {
-      if (preview.loses_view) {
-        setAsking({ change, preview });
-        return;
-      }
-      setLastPreview(preview);
-      save.mutate(change);
-    },
-  });
-  return {
-    change: (next: Change) => check.mutate(next),
-    confirm: () => {
-      if (asking) save.mutate(asking.change);
-      setAsking(null);
-    },
-    cancel: () => setAsking(null),
-    asking,
-    lastPreview,
-    error: check.error ?? save.error,
-  };
-}
-
-function PreviewText({ preview }: { preview: GrantPreview }) {
-  const { t } = useTranslation();
-  const list = (names: string[]) => names.map((n) => t(`permissions.${n.replace('.', '_')}`)).join(', ');
-  return (
-    <>
-      {preview.gains.length > 0 && <p>{t('access.gains', { list: list(preview.gains) })}</p>}
-      {preview.loses.length > 0 && <p>{t('access.loses', { list: list(preview.loses) })}</p>}
-      <p className="muted">{t('access.people', { count: preview.people })}</p>
-    </>
-  );
-}
 
 function GrantRow({
   grant,
@@ -477,31 +405,8 @@ export function SpaceAccessView({ spaceKey }: { spaceKey: string }) {
   );
 }
 
-function SpacePeopleList({ space }: { space: Space }) {
-  const q = useQuery({
-    queryKey: ['space-people', space.id],
-    queryFn: () => api.get<{ people: Holder[] }>(`/spaces/${space.id}/people`),
-  });
-  return (
-    <>
-      <ErrorNote error={q.error} />
-      {q.data && <HolderTable people={q.data.people} />}
-    </>
-  );
-}
-
 export function SpacePeopleView({ spaceKey }: { spaceKey: string }) {
-  const { t } = useTranslation();
-  return (
-    <SpaceScreen spaceKey={spaceKey}>
-      {(space) => (
-        <>
-          <h1>{t('access.peopleTitle')}</h1>
-          <SpacePeopleList space={space} />
-        </>
-      )}
-    </SpaceScreen>
-  );
+  return <SpaceScreen spaceKey={spaceKey}>{(space) => <SpacePeople space={space} />}</SpaceScreen>;
 }
 
 interface SpaceEvent {

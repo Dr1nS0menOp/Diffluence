@@ -2,8 +2,8 @@
 // What the page tree works out, without any screen: branches, filters, order.
 import type { TreeNode } from '../api';
 
-/** Branches this close to the top start open, so the shape of a space shows at once. */
-const OPEN_DEPTH = 2;
+/** The tree starts folded from the first level: the top pages show, their branches shut (ADR-034, spec 033). */
+const OPEN_DEPTH = 0;
 
 export interface Branch extends TreeNode {
   children: Branch[];

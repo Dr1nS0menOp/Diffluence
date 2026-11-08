@@ -8,7 +8,7 @@ import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './per
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
 import { NewDatabaseDialog, NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
-import { SpaceShell, useCreateTarget, useCurrentSpace } from './components/frame';
+import { SpaceShell, useCreateTarget } from './components/frame';
 import { IconChevronDown, IconPlus, Logo } from './components/icons';
 import { Menu, MenuItem } from './components/menu';
 import { TemplateGallery } from './components/template-gallery';
@@ -50,6 +50,7 @@ import { UnsubscribeView } from './views/unsubscribe';
 import { PageInsightsView, SpaceInsightsView } from './views/insights';
 import { RulesView, RuleView } from './views/rules';
 import { WebhooksView } from './views/webhooks';
+import { HomeFrame } from './components/home-frame';
 
 type Creating = 'page' | 'template' | 'post' | 'database' | 'space' | null;
 
@@ -101,7 +102,6 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
   const client = useQueryClient();
   const { pathname } = useLocation();
   const target = useCreateTarget();
-  const { space } = useCurrentSpace();
   const [creating, setCreating] = useState<Creating>(null);
   const appearance = useQuery(appearanceQuery).data;
   // Someone can leave without logging out, so the next person clears what they left.
@@ -144,7 +144,7 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
             <CreateButton me={me} onCreate={setCreating} />
           </nav>
         </div>
-        <QuickSearch space={space} />
+        <QuickSearch />
         <div className="top-end">
           <NotificationBell />
           <HelpMenu />
@@ -185,9 +185,9 @@ function Routes({ me }: { me: Me }) {
   let m;
   if (pathname === '/') {
     return (
-      <Plain>
+      <HomeFrame>
         <StartScreen me={me} />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/search', pathname))) {
@@ -269,37 +269,37 @@ function Routes({ me }: { me: Me }) {
   }
   if ((m = match('/me/watching', pathname))) {
     return (
-      <Plain width="reading">
+      <HomeFrame width="reading">
         <WatchingView />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/tasks', pathname))) {
     return (
-      <Plain width="reading">
+      <HomeFrame width="reading">
         <TasksView />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/recent', pathname))) {
     return (
-      <Plain width="reading">
+      <HomeFrame width="reading">
         <RecentView />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/favourites', pathname))) {
     return (
-      <Plain width="reading">
+      <HomeFrame width="reading">
         <FavouritesView />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/spaces', pathname))) {
     return (
-      <Plain>
+      <HomeFrame>
         <DirectoryView me={me} />
-      </Plain>
+      </HomeFrame>
     );
   }
   if ((m = match('/labels', pathname))) {

@@ -32,7 +32,8 @@
   "nav": {
     "home": "Home",
     "search": "Search",
-    "searchPlaceholder": "Search pages…",
+    "searchPlaceholder": "Search",
+    "searchIn": "Search in {{name}}",
     "admin": "Administration",
     "profile": "Your account",
     "logout": "Log out",
@@ -230,6 +231,7 @@
     "noMatch": "No page has that in its title.",
     "emptyView": "You have not visited a page here yet.",
     "collapseAll": "Collapse all",
+    "showFilters": "Filter the tree",
     "showCurrent": "Show the current page",
     "rowMenu": "Actions for {{title}}",
     "openNewTab": "Open in new tab",
@@ -602,8 +604,15 @@
     "oidc_account_exists": "An account with this email address already exists. Log in with your password, or ask an administrator.",
     "oidc_no_account": "You do not have an account here. Ask an administrator."
   },
+  "settings": {
+    "jump": "Jump to a setting",
+    "nothing": "No setting has that name."
+  },
   "home": {
     "spaces": "Spaces",
+    "you": "For you",
+    "forYou": "Home",
+    "allSpaces": "All spaces",
     "noSpaces": "There are no spaces you can see yet.",
     "newSpace": "New space",
     "recent": "Recently viewed",
@@ -638,6 +647,8 @@
     "strip": "Your spaces",
     "overview": "Overview",
     "links": "Space links",
+    "part": "This space",
+    "partHeight": "Height of the space links",
     "opensNewTab": "(opens in a new tab)",
     "sidebarWidth": "Width of the sidebar",
     "description": "Description",
@@ -664,6 +675,10 @@
     "placeholdersHelp": "Links on these pages lead to a title nobody has started. Follow one to start it."
   },
   "permissions": {
+    "global_administrator": "Administrator",
+    "global_system_administrator": "System administrator",
+    "global_create_space": "May create spaces",
+    "global_invite_people": "May invite people",
     "subject": "Who",
     "allMembers": "All members",
     "allGuests": "All guests",
@@ -1790,6 +1805,20 @@
     "restricted": "A restricted page"
   },
   "search": {
+    "wordSpace": "Space: {{name}}",
+    "wordLabel": "Label: {{label}}",
+    "wordPerson": "By: {{name}}",
+    "removeWord": "Remove {{word}}",
+    "filter_spaces": "Spaces",
+    "filter_kind": "Type",
+    "filter_labels": "Labels",
+    "filter_people": "People",
+    "filter_within": "Date",
+    "clearFilters": "Clear filters",
+    "allSpaces": "All spaces",
+    "addLabelFilter": "Type a label and press Enter",
+    "findSpace": "Find a space",
+    "addPersonFilter": "Written or changed by",
     "title": "Search",
     "results": "Results",
     "noResults": "Nothing found in pages.",
@@ -1871,6 +1900,13 @@
     "noPassword": "This account logs in through your identity provider."
   },
   "admin": {
+    "space": "Space",
+    "group_overview": "Overview",
+    "group_people": "People and access",
+    "group_content": "Content",
+    "group_automation": "Automation",
+    "group_look": "Look",
+    "group_system": "System",
     "spacePages": "Pages",
     "spaceStorage": "Storage",
     "spaceActivity": "Last activity",
@@ -2105,6 +2141,18 @@
     "stay": "Stay logged in"
   },
   "people": {
+    "aGroup": "A group",
+    "everyoneOfAKind": "Everyone of this kind",
+    "roleOf": "Role of {{name}}",
+    "addPeople": "Add people",
+    "canReach_one": "{{count}} entry can reach this space.",
+    "canReach_other": "{{count}} entries can reach this space.",
+    "findInSpace": "Find a person or group",
+    "noneHere": "Nobody here.",
+    "tab_everyone": "Everyone",
+    "tab_admins": "Administrators",
+    "tab_groups": "Groups",
+    "tab_guests": "Guests",
     "title": "People",
     "filter": "Filter by name, title or department",
     "group": "Group",
@@ -2290,6 +2338,8 @@
   },
   "instance": {
     "title": "Look of this instance",
+    "organisationName": "Name of the organisation",
+    "organisationHelp": "A company name or a personal name. The search box says Search in this name.",
     "instanceName": "Name",
     "logo": "Logo",
     "logoHelp": "PNG, JPEG or WebP. SVG is refused, because it can carry scripts.",
@@ -2532,6 +2582,14 @@
     "fieldOptionsHelp": "One choice per line."
   },
   "spaceSettings": {
+    "groupGeneral": "General",
+    "groupAccess": "Who can do what",
+    "groupContent": "Content",
+    "groupAutomation": "Automation",
+    "groupExchange": "Import and export",
+    "groupDanger": "Archive or delete",
+    "archiveOrDelete": "Archive or delete the space",
+    "back": "Back to the space",
     "keepTidy": "Keep it tidy",
     "key": "Space key",
     "keyHelp": "The old key keeps working as a redirect, and stays taken until you release it.",
@@ -2619,6 +2677,13 @@
     "lost": "The copy loses the restriction of: {{titles}}"
   },
   "rules2": {
+    "where": "Where this rule acts",
+    "everySpace": "In every space",
+    "chosenSpaces": "Only in chosen spaces",
+    "removeSpace": "Remove {{name}}",
+    "addSpace": "Add a space",
+    "pickSpace": "Choose a space",
+    "noSpaceYet": "Until you choose a space, this rule acts in every space.",
     "title": "Automation",
     "started": "The rule is running.",
     "runOne": "Run {{name}}",

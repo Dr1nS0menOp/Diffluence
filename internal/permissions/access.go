@@ -50,6 +50,8 @@ type Holder struct {
 	Source string `json:"source"`
 	// Via is the name of the group.
 	Via string `json:"via"`
+	// Guest is true for a person who is a guest of the instance, as their profile shows.
+	Guest bool `json:"guest"`
 }
 
 // Holders lists who holds access to a space, for anyone who can view it (SPC-058).
@@ -80,7 +82,32 @@ func (s *Service) holders(ctx context.Context, spaceID uuid.UUID) ([]Holder, err
 		}
 		out = append(out, Holder{Subject: e.Subject, Name: e.Name, Role: RoleOf(e.Permissions), Source: source})
 	}
-	return out, nil
+	return out, s.markGuests(ctx, out)
+}
+
+// markGuests sets Guest on the people who are guests, in one query.
+func (s *Service) markGuests(ctx context.Context, holders []Holder) error {
+	people := []uuid.UUID{}
+	for _, h := range holders {
+		if h.Subject.Type == SubjectUser {
+			people = append(people, h.Subject.ID)
+		}
+	}
+	if len(people) == 0 {
+		return nil
+	}
+	rows, err := s.pool.Query(ctx, "SELECT id FROM users WHERE id = ANY($1) AND type = 'guest'", people)
+	if err != nil {
+		return err
+	}
+	guests, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return err
+	}
+	for i := range holders {
+		holders[i].Guest = holders[i].Subject.Type == SubjectUser && slices.Contains(guests, holders[i].Subject.ID)
+	}
+	return nil
 }
 
 // AccessDetail lists each person with access and how they got it, for those who

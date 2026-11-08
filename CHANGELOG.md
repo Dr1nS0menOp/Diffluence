@@ -12,6 +12,17 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - Asking again through the identity provider now checks that the provider really asked
 - Blueprints 05 and 06 show what is built, checked against the code and the tests
 - Upgrade impact: one migration. To protect the PDF helper, set a long `DIFFLUENCE_PDF_PASSWORD` in `.env` and restart both. Without it, everything works as before
+### Changed: a quieter look, and settings in the sidebar (spec 033, ADR-034)
+- The look is calmer: fewer lines and boxes, tables as rows, labels as plain links, and no guide lines in the page tree
+- The sidebar shows on the home page and the other personal screens too. Its parts fold and the space part can be made taller; both follow you to other devices
+- The page tree follows the links of a space directly, starts folded from the first level, and keeps its tools and filter in a quiet row of icons
+- The search box says Search in the name of your organisation, given with `diffluence user create-admin --organisation` or under Administration, Look
+- The search box always searches every space. Clicking it unfolds filters for spaces, type, labels, people and date, which write the same words a query can hold, such as space:ENG; the results page shows and keeps them
+- Space settings and the administration show their sections in the sidebar, in groups that fold, with a way to jump to one. Care and System health sit under System
+- The People screen of a space shows pictures, guests, how someone got in, and a role that those who manage access change in the row
+- The user list filters by role and by space
+- A rule of the instance can act in chosen spaces only
+- Upgrade impact: none. Links to space settings still work and open the first section
 ### Security: master.key can be replaced (spec 034)
 - `diffluence key add`, `promote`, `reseal`, `check` and `retire` replace `master.key` while Diffluence keeps running. Every stored file and secret is sealed again with the new key, and the old key is removed only when a check proves nothing needs it
 - `diffluence key check` proves that every stored file and secret opens, and names what does not, without showing its content. `--deep` reads every byte

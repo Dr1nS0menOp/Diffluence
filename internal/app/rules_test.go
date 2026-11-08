@@ -417,6 +417,86 @@ func TestOnlyAdministratorsManageRules(t *testing.T) {
 	reader.want(403, "GET", "/api/v1/admin/rules", nil)
 }
 
+func instanceRule(u *user, name string, spaces []string, definition map[string]any) string {
+	u.e.t.Helper()
+	definition["spaces"] = spaces
+	body := map[string]any{"name": name, "enabled": true, "definition": definition}
+	status, out := u.do("POST", "/api/v1/admin/rules", body)
+	if status != 201 {
+		u.e.t.Fatalf("an instance rule was refused: %d %s", status, out)
+	}
+	var made map[string]any
+	if err := json.Unmarshal([]byte(out), &made); err != nil {
+		u.e.t.Fatal(err)
+	}
+	return made["id"].(string)
+}
+
+func TestAnInstanceRuleActsOnlyInTheSpacesItWasGiven(t *testing.T) {
+	e := newEnv(t)
+	owner, reader, chosen, inChosen := ruleTeam(t, e)
+	other, _ := owner.space("OTH")
+	owner.grant(other, "user", reader.id, permissions.TemplateViewer)
+	inOther := owner.page(other, nil, "Elsewhere", "x")
+	id := instanceRule(owner, "Tag in chosen spaces", []string{chosen}, onComment(map[string]any{"type": "add_label", "label": "seen"}))
+	reader.comment(inOther, "hello")
+	reader.comment(inChosen, "hello")
+	e.settle()
+	if got := labelsOf(owner, inOther); len(got) != 0 {
+		t.Fatalf("the rule acted outside its spaces: %v", got)
+	}
+	if got := labelsOf(owner, inChosen); len(got) != 1 || got[0] != "seen" {
+		t.Fatalf("labels in the chosen space %v", got)
+	}
+	spaces := owner.ok("GET", "/api/v1/rules/"+id, nil)["definition"].(map[string]any)["spaces"].([]any)
+	if len(spaces) != 1 || spaces[0] != chosen {
+		t.Fatalf("spaces %v", spaces)
+	}
+}
+
+func TestAFindStepOfAnInstanceRuleLooksOnlyInItsSpaces(t *testing.T) {
+	e := newEnv(t)
+	owner, _, chosen, inChosen := ruleTeam(t, e)
+	other, _ := owner.space("OTH")
+	inOther := owner.page(other, nil, "Elsewhere", "x")
+	e.sql("UPDATE pages SET updated_at = now() - interval '400 days' WHERE id = ANY($1)", []string{inChosen, inOther})
+	id := instanceRule(owner, "Old pages in chosen spaces", []string{chosen}, map[string]any{
+		"trigger": map[string]any{"kind": "schedule", "every": "daily", "at": "09:00"},
+		"actions": []map[string]any{{"type": "find_pages", "older_days": 365}, {"type": "add_label", "label": "stale"}}})
+	e.sql("UPDATE automation_rules SET next_run_at = now() - interval '1 minute' WHERE id = $1", id)
+	if err := e.app.Automation().RunSchedules(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	e.settle()
+	if got := labelsOf(owner, inChosen); len(got) != 1 {
+		t.Fatalf("the old page in the chosen space has %v", got)
+	}
+	if got := labelsOf(owner, inOther); len(got) != 0 {
+		t.Fatalf("the lookup went outside its spaces: %v", got)
+	}
+}
+
+func TestAnInstanceRuleWithoutSpacesActsEverywhere(t *testing.T) {
+	e := newEnv(t)
+	owner, reader, _, page := ruleTeam(t, e)
+	instanceRule(owner, "Tag everywhere", nil, onComment(map[string]any{"type": "add_label", "label": "seen"}))
+	reader.comment(page, "hello")
+	e.settle()
+	if got := labelsOf(owner, page); len(got) != 1 {
+		t.Fatalf("labels %v", got)
+	}
+}
+
+func TestOnlyAnInstanceRuleChoosesSpacesAndOnlyRealOnes(t *testing.T) {
+	e := newEnv(t)
+	owner, _, space, _ := ruleTeam(t, e)
+	definition := onComment(map[string]any{"type": "add_label", "label": "x"})
+	definition["spaces"] = []string{space}
+	owner.want(400, "POST", "/api/v1/spaces/"+space+"/rules", map[string]any{"name": "Scoped", "definition": definition})
+	definition["spaces"] = []string{uuid.NewString()}
+	owner.want(400, "POST", "/api/v1/admin/rules", map[string]any{"name": "Nowhere", "definition": definition})
+}
+
 func TestAChosenAccountMustBeAServiceAccount(t *testing.T) {
 	e := newEnv(t)
 	owner, reader, space, _ := ruleTeam(t, e)

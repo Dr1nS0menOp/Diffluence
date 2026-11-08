@@ -26,6 +26,13 @@ async function deepTree(page: Page) {
 
 const tree = (page: Page) => page.getByRole('navigation', { name: 'Pages' });
 
+/** The tree starts folded from the first level (spec 033), so the first two levels are opened by hand. */
+async function openToLevelThree(page: Page) {
+  await tree(page).getByRole('button', { name: 'Level one', exact: true }).click();
+  await tree(page).getByRole('button', { name: 'Level two', exact: true }).click();
+  await expect(tree(page).getByRole('link', { name: 'Level three' })).toBeVisible();
+}
+
 test.beforeEach(async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
 });
@@ -33,7 +40,7 @@ test.beforeEach(async ({ page }) => {
 test('a branch that did not come with the start loads when it opens', async ({ page }) => {
   const { space, one } = await deepTree(page);
   await page.goto(`/pages/${one}`);
-  await expect(tree(page).getByRole('link', { name: 'Level three' })).toBeVisible();
+  await openToLevelThree(page);
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toHaveCount(0);
   const asked = page.waitForRequest((r) => r.url().includes(`/spaces/${space.id}/tree/branches?parent=`));
   await tree(page).getByRole('button', { name: 'Level three', exact: true }).click();
@@ -52,6 +59,7 @@ test('the filter finds a page the tree has not loaded', async ({ page }) => {
   const { one } = await deepTree(page);
   await page.goto(`/pages/${one}`);
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByRole('searchbox', { name: 'Filter pages' }).fill('five');
   await expect(tree(page).getByRole('link', { name: 'Level five' })).toBeVisible();
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toBeVisible();
@@ -62,6 +70,7 @@ test('the filter finds a page the tree has not loaded', async ({ page }) => {
 test('a new page shows up in a branch that was loaded by hand', async ({ page }) => {
   const { space, one, four } = await deepTree(page);
   await page.goto(`/pages/${one}`);
+  await openToLevelThree(page);
   await tree(page).getByRole('button', { name: 'Level three', exact: true }).click();
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toBeVisible();
   await tree(page).getByRole('button', { name: 'Level four', exact: true }).click();

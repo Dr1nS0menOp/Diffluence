@@ -463,7 +463,7 @@ test.describe('the look of every kind of screen', () => {
   test('SpaceSettingsView: space settings', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/settings');
-    await expect(page.getByRole('heading', { name: 'Permissions' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Details', level: 1 })).toBeVisible();
     await picture(page, 'space-settings');
     await page.context().close();
   });
@@ -644,7 +644,8 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/people');
     await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Everyone' })).toBeVisible();
+    await expect(page.locator('.member-row').first()).toBeVisible();
     await picture(page, 'space-people');
     await page.context().close();
   });
@@ -742,7 +743,7 @@ test.describe('the look of every kind of screen', () => {
   test('DirectoryView: all spaces', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces');
-    await expect(page.getByRole('link', { name: 'Engineering Handbook' })).toBeVisible();
+    await expect(page.locator('#main').getByRole('link', { name: 'Engineering Handbook' })).toBeVisible();
     await picture(page, 'directory', [page.locator('time')]);
     await page.context().close();
   });
@@ -788,6 +789,23 @@ test.describe('the look of every kind of screen', () => {
     await page.keyboard.type('week');
     await expect(page.getByRole('option', { name: /Your first week/ })).toBeVisible();
     await picture(page, 'quick-search');
+    await page.context().close();
+  });
+
+  test('the filters of the search box', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/');
+    await page.getByRole('combobox', { name: 'Search' }).click();
+    const filters = page.getByRole('group', { name: 'Filters' });
+    await filters.getByRole('button', { name: 'Type' }).click();
+    await filters.getByRole('button', { name: 'Blog posts' }).click();
+    await filters.getByRole('button', { name: 'Spaces' }).click();
+    await filters.getByRole('button', { name: 'Engineering Handbook' }).click();
+    await expect(filters.getByRole('button', { name: 'Engineering Handbook' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await picture(page, 'quick-search-filters');
     await page.context().close();
   });
 

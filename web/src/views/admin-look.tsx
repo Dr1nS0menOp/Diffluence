@@ -13,6 +13,7 @@ const BANNER_LEVELS = ['info', 'warning'];
 
 interface Look {
   instance_name: string;
+  organisation_name: string;
   accent_light: string;
   accent_dark: string;
   login_welcome: string;
@@ -76,6 +77,13 @@ function LookForm() {
           <Field label={t('instance.instanceName')}>
             <input value={form.instance_name} onChange={(e) => set({ instance_name: e.target.value })} />
           </Field>
+          <Field label={t('instance.organisationName')}>
+            <input
+              value={form.organisation_name ?? ''}
+              onChange={(e) => set({ organisation_name: e.target.value })}
+            />
+          </Field>
+          <p className="muted">{t('instance.organisationHelp')}</p>
           <h3>{t('instance.accent')}</h3>
           <p className="muted">{t('instance.accentHelp')}</p>
           <ColourField

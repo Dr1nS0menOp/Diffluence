@@ -84,9 +84,16 @@ type UserFilter struct {
 	GroupID    uuid.UUID
 	// IdleDays keeps people who have not logged in for this many days.
 	IdleDays int
-	Limit    int
-	Offset   int
+	// Role keeps people who hold this global permission, directly or through a group.
+	Role string
+	// SpaceID keeps people who can view this space.
+	SpaceID uuid.UUID
+	Limit   int
+	Offset  int
 }
+
+// FilterRoles are the global permissions the user list can filter on.
+var FilterRoles = []string{PermAdministrator, PermSystemAdministrator, PermCreateSpace, PermInvitePeople}
 
 // ListUsers returns users, and how many match in total.
 func (s *Service) ListUsers(ctx context.Context, f UserFilter) ([]UserDetail, int, error) {
@@ -101,17 +108,23 @@ func (s *Service) ListUsers(ctx context.Context, f UserFilter) ([]UserDetail, in
 		AND ($6 = '' OR u.status = $6)
 		AND ($7 = '' OR u.source = $7)
 		AND ($8::uuid IS NULL OR u.id IN (SELECT m.user_id FROM group_members m WHERE m.group_id = $8))
-		AND ($9 = 0 OR u.last_login_at IS NULL OR u.last_login_at < now() - make_interval(days => $9))`
+		AND ($9 = 0 OR u.last_login_at IS NULL OR u.last_login_at < now() - make_interval(days => $9))
+		AND ($10 = '' OR perm_has_global(u.id, $10))
+		AND ($11::uuid IS NULL OR $11 IN (SELECT ps.space_id FROM perm_spaces(u.id, 'space.view') ps))`
 	var group *uuid.UUID
 	if f.GroupID != uuid.Nil {
 		group = &f.GroupID
 	}
-	args := []any{f.Text, f.Email, f.Username, f.ExternalID, f.Type, f.Status, f.Source, group, f.IdleDays}
+	var space *uuid.UUID
+	if f.SpaceID != uuid.Nil {
+		space = &f.SpaceID
+	}
+	args := []any{f.Text, f.Email, f.Username, f.ExternalID, f.Type, f.Status, f.Source, group, f.IdleDays, f.Role, space}
 	var total int
 	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM users u"+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
-	rows, err := s.pool.Query(ctx, userDetailSQL+where+" ORDER BY lower(u.display_name), u.id LIMIT $10 OFFSET $11",
+	rows, err := s.pool.Query(ctx, userDetailSQL+where+" ORDER BY lower(u.display_name), u.id LIMIT $12 OFFSET $13",
 		append(args, f.Limit, max(f.Offset, 0))...)
 	if err != nil {
 		return nil, 0, err

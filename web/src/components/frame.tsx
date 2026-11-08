@@ -31,6 +31,7 @@ import {
 } from './icons';
 import { Menu, MenuItem, MenuLink } from './menu';
 import { useShortcut } from './shortcuts';
+import { SidebarPart } from './sidebar-part';
 import { SpaceStrip } from './space-strip';
 import { useCopy } from './toast';
 import { PagesSection, type RowDialog } from './tree';
@@ -300,7 +301,9 @@ function Sidebar({
           <IconChevronLeft size={MENU_ICON_SIZE} />
         </button>
       </div>
-      <SpaceLinks space={space} current={current} />
+      <SidebarPart name="space" title={t('space.part')} resizable>
+        <SpaceLinks space={space} current={current} />
+      </SidebarPart>
       <PagesSection
         key={space.id}
         spaceId={space.id}

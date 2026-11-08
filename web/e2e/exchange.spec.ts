@@ -94,7 +94,7 @@ test('choosing pages says how many, and nothing chosen says why it cannot start'
 test('an import shows its report first, runs when asked, and can be undone', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
   const space = await newSpace(page, 'Imports');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=import`);
   await page
     .locator('label.file-picker', { hasText: 'Import' })
     .locator('input')

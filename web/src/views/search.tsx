@@ -7,6 +7,7 @@ import { Link, navigate, useLocation } from '../router';
 import { StageMark } from '../components/page-marks';
 import { SubjectPicker } from '../components/picker';
 import { ErrorNote, Loading } from '../components/ui';
+import { NO_FILTERS, queryWith, splitQuery } from '../components/search-filters';
 
 const RESULTS_PER_LOAD = 25;
 const TABS = ['content', 'people', 'spaces'] as const;
@@ -304,6 +305,64 @@ function SpaceResults({ text, spaces }: { text: string; spaces: Space[] }) {
   );
 }
 
+/** The filter words in the query, as chips that take a word out again (spec 033). */
+function QueryWords({
+  text,
+  spaces,
+  onChange,
+}: {
+  text: string;
+  spaces: Space[];
+  onChange: (next: string) => void;
+}) {
+  const { t } = useTranslation();
+  const words = splitQuery(text);
+  const shown = [
+    ...words.spaces.map((key) => ({
+      kind: 'spaces' as const,
+      value: key,
+      label: t('search.wordSpace', { name: spaces.find((s) => s.key.toUpperCase() === key)?.name ?? key }),
+    })),
+    ...words.labels.map((value) => ({
+      kind: 'labels' as const,
+      value,
+      label: t('search.wordLabel', { label: value }),
+    })),
+    ...words.people.map((value) => ({
+      kind: 'people' as const,
+      value,
+      label: t('search.wordPerson', { name: value }),
+    })),
+  ];
+  if (shown.length === 0) return null;
+  return (
+    <ul className="chip-list" aria-label={t('search.filters')}>
+      {shown.map((w) => (
+        <li key={w.kind + w.value} className="chip">
+          {w.label}
+          <button
+            type="button"
+            className="ghost"
+            aria-label={t('search.removeWord', { word: w.label })}
+            onClick={() =>
+              onChange(
+                queryWith(words.text, {
+                  ...NO_FILTERS,
+                  spaces: w.kind === 'spaces' ? words.spaces.filter((v) => v !== w.value) : words.spaces,
+                  labels: w.kind === 'labels' ? words.labels.filter((v) => v !== w.value) : words.labels,
+                  people: w.kind === 'people' ? words.people.filter((v) => v !== w.value) : words.people,
+                }),
+              )
+            }
+          >
+            {t('common.remove')}
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function SearchView() {
   const { t } = useTranslation();
   const { searchParams } = useLocation();
@@ -356,6 +415,7 @@ export function SearchView() {
           </button>
         ))}
       </div>
+      <QueryWords text={text} spaces={list} onChange={(next) => set('q', next)} />
       {tab === 'content' && <Filters address={searchParams} spaces={list} onSet={set} />}
       {!searching && <p className="muted">{t('search.hint')}</p>}
       {tab === 'content' && searching && <ContentResults params={params} />}

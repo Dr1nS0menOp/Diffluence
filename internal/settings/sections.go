@@ -3,6 +3,7 @@
 package settings
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -109,15 +110,18 @@ type Retention struct {
 // Look is how the instance presents itself. An accent is a pair: no single colour
 // passes on both our light and our dark surfaces (spec 013, D6).
 type Look struct {
-	InstanceName string     `json:"instance_name"`
-	AccentLight  string     `json:"accent_light"`
-	AccentDark   string     `json:"accent_dark"`
-	LoginWelcome string     `json:"login_welcome"`
-	TermsURL     string     `json:"terms_url"`
-	BannerText   string     `json:"banner_text"`
-	BannerLevel  string     `json:"banner_level"`
-	BannerEnds   *time.Time `json:"banner_ends"`
-	WelcomePage  string     `json:"welcome_page"`
+	InstanceName string `json:"instance_name"`
+	// OrganisationName is the company or person this instance is for, given at the first
+	// setup. The search box says "Search in" it (spec 033).
+	OrganisationName string     `json:"organisation_name"`
+	AccentLight      string     `json:"accent_light"`
+	AccentDark       string     `json:"accent_dark"`
+	LoginWelcome     string     `json:"login_welcome"`
+	TermsURL         string     `json:"terms_url"`
+	BannerText       string     `json:"banner_text"`
+	BannerLevel      string     `json:"banner_level"`
+	BannerEnds       *time.Time `json:"banner_ends"`
+	WelcomePage      string     `json:"welcome_page"`
 }
 
 // Defaults of the sections.
@@ -205,6 +209,9 @@ func (r Retention) validate() error {
 func (l Look) validate() error {
 	if name, ok := cleanLine(l.InstanceName, maxShortText); !ok || strings.ContainsAny(name, "<>") {
 		return apperr.Invalid("The name is one line of at most 200 characters.")
+	}
+	if name, ok := cleanLine(l.OrganisationName, maxShortText); !ok || strings.ContainsAny(name, "<>") {
+		return apperr.Invalid("The name of the organisation is one line of at most 200 characters, without < or >.")
 	}
 	if _, ok := cleanLine(l.LoginWelcome, maxWelcomeText); !ok {
 		return apperr.Invalid("The welcome text is one line of at most 500 characters.")
@@ -313,6 +320,22 @@ func (s *Service) SetSection(ctx context.Context, c identity.Caller, name string
 		return err
 	})
 	return v, err
+}
+
+// SetOrganisationName stores the name of the organisation, as the first setup gives it,
+// and keeps the rest of the look as it is.
+func (s *Service) SetOrganisationName(ctx context.Context, c identity.Caller, name string) error {
+	look := Look{}
+	if err := s.ReadSection(ctx, SectionLook, &look); err != nil {
+		return err
+	}
+	look.OrganisationName = name
+	body, err := json.Marshal(look)
+	if err != nil {
+		return err
+	}
+	_, err = s.SetSection(ctx, c, SectionLook, bytes.NewReader(body))
+	return err
 }
 
 // ResetLook returns everything about the look to the defaults.

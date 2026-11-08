@@ -23,6 +23,8 @@ interface AccentColours {
 export interface Appearance {
   font: ImportedFont | null;
   name: string;
+  /** The company or person this instance is for, or empty. Plain text. */
+  organisation: string;
   accent: { light: AccentColours; dark: AccentColours } | null;
   login_welcome: string;
   terms_url: string;

@@ -405,7 +405,16 @@ func (s *Service) oneStep(ctx context.Context, r *run, index int, a Action, page
 	return err
 }
 
-// find runs a lookup as the account: pages it cannot see do not exist for it.
+// spacesOf gives the chosen spaces as a list SQL can take, never nil.
+func spacesOf(d Definition) []uuid.UUID {
+	if d.Spaces == nil {
+		return []uuid.UUID{}
+	}
+	return d.Spaces
+}
+
+// find runs a lookup as the account: pages it cannot see do not exist for it, and a
+// rule of the instance looks only in its chosen spaces.
 func (s *Service) find(ctx context.Context, r *run, a Action) error {
 	var before *time.Time
 	if a.OlderDays > 0 {
@@ -417,7 +426,8 @@ func (s *Service) find(ctx context.Context, r *run, a Action) error {
 			AND ($3 = '' OR EXISTS (SELECT 1 FROM page_labels l WHERE l.page_id = p.id AND l.label = lower($3)))
 			AND ($4 = '' OR p.title ILIKE '%' || $4 || '%')
 			AND ($5::timestamptz IS NULL OR p.updated_at < $5)
-		ORDER BY p.updated_at, p.id LIMIT $6`, r.rule.AccountID, r.rule.SpaceID, a.Label, a.Title, before, maxLookupPages)
+			AND (cardinality($7::uuid[]) = 0 OR p.space_id = ANY($7))
+		ORDER BY p.updated_at, p.id LIMIT $6`, r.rule.AccountID, r.rule.SpaceID, a.Label, a.Title, before, maxLookupPages, spacesOf(r.rule.Definition))
 	if err != nil {
 		return err
 	}

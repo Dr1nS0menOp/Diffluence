@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"slices"
 	"strings"
 	"time"
 
@@ -46,6 +47,7 @@ const (
 	maxNameRunes        = 200
 	hookTokenBytes      = 32
 	maxRulesListed      = 500
+	maxRuleSpaces       = 500
 	failureNoticeSpacer = time.Hour
 )
 
@@ -228,10 +230,20 @@ func (s *Service) Manual(ctx context.Context, c identity.Caller, pageID uuid.UUI
 		return nil, err
 	}
 	list, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (Rule, error) { return scanRule(row) })
-	if list == nil {
-		list = []Rule{}
+	if err != nil {
+		return nil, err
 	}
-	return list, err
+	var space uuid.UUID
+	if err := s.Pool.QueryRow(ctx, "SELECT space_id FROM pages WHERE id = $1", pageID).Scan(&space); err != nil {
+		return nil, err
+	}
+	out := []Rule{}
+	for _, r := range list {
+		if r.Definition.reaches(&space) {
+			out = append(out, r)
+		}
+	}
+	return out, nil
 }
 
 func (s *Service) account(ctx context.Context, c identity.Caller, in Input) (uuid.UUID, error) {
@@ -258,6 +270,31 @@ func cleanName(name string) (string, error) {
 		return "", apperr.Invalid("A rule needs a name of at most 200 characters.")
 	}
 	return name, nil
+}
+
+// checkSpaces refuses spaces on a rule of a space, and spaces that do not exist, so a
+// rule of the instance never quietly reaches nowhere.
+func (s *Service) checkSpaces(ctx context.Context, spaceID *uuid.UUID, d *Definition) error {
+	if len(d.Spaces) == 0 {
+		d.Spaces = nil
+		return nil
+	}
+	if spaceID != nil {
+		return apperr.Invalid("Only a rule of the whole instance chooses spaces.")
+	}
+	slices.SortFunc(d.Spaces, func(a, b uuid.UUID) int { return strings.Compare(a.String(), b.String()) })
+	d.Spaces = slices.Compact(d.Spaces)
+	if len(d.Spaces) > maxRuleSpaces {
+		return apperr.Invalid("A rule chooses at most 500 spaces.")
+	}
+	var found int
+	if err := s.Pool.QueryRow(ctx, "SELECT count(*) FROM spaces WHERE id = ANY($1)", d.Spaces).Scan(&found); err != nil {
+		return err
+	}
+	if found != len(d.Spaces) {
+		return apperr.Invalid("One of the chosen spaces does not exist.")
+	}
+	return nil
 }
 
 func (s *Service) mayEnable(ctx context.Context, r Rule) error {
@@ -304,6 +341,9 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID *uuid.U
 	if err != nil {
 		return Rule{}, err
 	}
+	if err := s.checkSpaces(ctx, spaceID, &in.Definition); err != nil {
+		return Rule{}, err
+	}
 	r := Rule{ID: ids.New(), SpaceID: spaceID, Name: name, Enabled: in.Enabled, Definition: in.Definition, OwnerID: c.UserID, AccountID: account}
 	if r.Enabled {
 		if err := s.mayEnable(ctx, r); err != nil {
@@ -343,6 +383,9 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 	}
 	if in.AccountID == nil {
 		account = r.AccountID
+	}
+	if err := s.checkSpaces(ctx, r.SpaceID, &in.Definition); err != nil {
+		return r, err
 	}
 	r.Enabled, r.Definition, r.AccountID = in.Enabled, in.Definition, account
 	if r.Enabled {

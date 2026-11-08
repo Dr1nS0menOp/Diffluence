@@ -40,6 +40,7 @@ export const IconLock = line('M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z');
 export const IconLockOpen = line('M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6z');
 export const IconPlus = line('M12 5v14M5 12h14');
 export const IconSearch = line('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4');
+export const IconFilter = line('M4 5h16l-6 7.5V19l-4-2v-4.5z');
 export const IconChevronDown = line('M6 9l6 6 6-6');
 export const IconChevronRight = line('M9 6l6 6-6 6');
 export const IconChevronLeft = line('M15 6l-6 6 6 6');

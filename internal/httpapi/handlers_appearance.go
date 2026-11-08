@@ -63,7 +63,7 @@ func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	out := map[string]any{"font": nil, "name": look.InstanceName, "accent": settings.DerivedAccent(look.AccentLight, look.AccentDark),
+	out := map[string]any{"font": nil, "name": look.InstanceName, "organisation": look.OrganisationName, "accent": settings.DerivedAccent(look.AccentLight, look.AccentDark),
 		"login_welcome": look.LoginWelcome, "terms_url": look.TermsURL, "banner": activeBanner(look), "welcome_page": look.WelcomePage,
 		"help_url": general.HelpURL, "maintenance": maintenance, "logo": "", "mail_ready": s.deps.Identity.MailReady(),
 		"self_signup": features.SelfSignup}

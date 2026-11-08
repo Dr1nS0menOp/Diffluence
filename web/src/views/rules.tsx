@@ -29,6 +29,8 @@ export interface Definition {
   trigger: { kind: string; every?: string; at?: string };
   conditions?: Condition;
   actions: RuleAction[];
+  /** For a rule of the instance: the spaces it acts in, or none for every space. */
+  spaces?: string[];
 }
 interface Problem {
   step: number;
@@ -472,6 +474,80 @@ function ActionFields({ action, onChange }: { action: RuleAction; onChange: (nex
   );
 }
 
+/** Where a rule of the instance acts: in every space, or in the spaces chosen (spec 033). */
+function ScopePart({
+  definition,
+  onChange,
+}: {
+  definition: Definition;
+  onChange: (next: Definition) => void;
+}) {
+  const { t } = useTranslation();
+  const spaces = useQuery({
+    queryKey: ['admin-spaces'],
+    queryFn: () => api.get<{ spaces: Space[] }>('/admin/spaces'),
+  });
+  const chosen = definition.spaces ?? [];
+  const [choosing, setChoosing] = useState(chosen.length > 0);
+  const set = (next: string[]) => onChange({ ...definition, spaces: next });
+  const nameOf = (id: string) => spaces.data?.spaces.find((s) => s.id === id)?.name ?? id;
+  const left = (spaces.data?.spaces ?? []).filter((s) => !chosen.includes(s.id));
+  return (
+    <section>
+      <h2>{t('rules2.where')}</h2>
+      <fieldset className="choice-row">
+        <legend className="visually-hidden">{t('rules2.where')}</legend>
+        <label className="check">
+          <input
+            type="radio"
+            name="rule-scope"
+            checked={!choosing}
+            onChange={() => {
+              setChoosing(false);
+              set([]);
+            }}
+          />
+          {t('rules2.everySpace')}
+        </label>
+        <label className="check">
+          <input type="radio" name="rule-scope" checked={choosing} onChange={() => setChoosing(true)} />
+          {t('rules2.chosenSpaces')}
+        </label>
+      </fieldset>
+      {choosing && (
+        <>
+          <ul className="chip-list">
+            {chosen.map((id) => (
+              <li key={id} className="chip">
+                {nameOf(id)}
+                <button
+                  type="button"
+                  className="ghost"
+                  aria-label={t('rules2.removeSpace', { name: nameOf(id) })}
+                  onClick={() => set(chosen.filter((s) => s !== id))}
+                >
+                  {t('common.remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <Field label={t('rules2.addSpace')}>
+            <select value="" onChange={(e) => e.target.value && set([...chosen, e.target.value])}>
+              <option value="">{t('rules2.pickSpace')}</option>
+              {left.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          {chosen.length === 0 && <p className="muted">{t('rules2.noSpaceYet')}</p>}
+        </>
+      )}
+    </section>
+  );
+}
+
 function TriggerPart({
   definition,
   problems,
@@ -774,6 +850,7 @@ function RuleForm({ rule }: { rule: Rule }) {
         <Field label={t('common.name')}>
           <input value={name} onChange={(e) => setName(e.target.value)} required />
         </Field>
+        {!rule.space_id && <ScopePart definition={definition} onChange={setDefinition} />}
         <TriggerPart definition={definition} problems={rule.problems} onChange={setDefinition} />
         <ConditionPart definition={definition} problems={rule.problems} onChange={setDefinition} />
         <ActionPart definition={definition} problems={rule.problems} onChange={setDefinition} />

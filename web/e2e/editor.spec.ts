@@ -325,6 +325,10 @@ test('a branch of the tree collapses, and stays collapsed while you read on', as
   const tree = page.getByRole('navigation', { name: 'Pages' });
   const toggle = tree.getByRole('button', { name: 'Parent', exact: true });
 
+  // The tree starts folded from the first level (spec 033).
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(tree.getByRole('link', { name: 'Child' })).toHaveCount(0);
+  await toggle.click();
   await expect(tree.getByRole('link', { name: 'Child' })).toBeVisible();
   await expect(toggle).toHaveAttribute('aria-expanded', 'true');
   await toggle.click();
@@ -348,7 +352,10 @@ test('going to a page reveals it, also inside a collapsed branch', async ({ page
   const child = await publishedPage(page, space.id, 'Inner', 'c', parent);
   await page.goto(`/pages/${parent}`);
   const tree = page.getByRole('navigation', { name: 'Pages' });
-  await tree.getByRole('button', { name: 'Outer', exact: true }).click();
+  await expect(tree.getByRole('button', { name: 'Outer', exact: true })).toHaveAttribute(
+    'aria-expanded',
+    'false',
+  );
   await expect(tree.getByRole('link', { name: 'Inner' })).toHaveCount(0);
 
   await page.goto(`/pages/${child}`);
@@ -453,7 +460,7 @@ test('search finds a page and marks the word', async ({ page }) => {
 
 test('export and import through the settings page', async ({ page }) => {
   const space = await newSpace(page, 'Import space');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=import`);
   await page.getByLabel('Import a file').setInputFiles({
     name: 'Imported note.md',
     mimeType: 'text/markdown',
@@ -461,10 +468,12 @@ test('export and import through the settings page', async ({ page }) => {
   });
   await page.getByRole('button', { name: 'Import', exact: true }).click({ timeout: 20_000 });
   await expect(page.getByText('The import is done.')).toBeVisible({ timeout: 20_000 });
+  await checkAccessibility(page);
+  // Settings have their own sidebar; the tree shows on the space itself.
+  await page.goto(`/spaces/${space.key}`);
   await expect(
     page.getByRole('navigation', { name: 'Pages' }).getByRole('link', { name: 'Imported note' }),
   ).toBeVisible();
-  await checkAccessibility(page);
 
   const res = await page.request.get(`/api/v1/spaces/${space.id}/export.zip`);
   expect(res.status()).toBe(200);

@@ -202,8 +202,8 @@ test('a title without spaces stays inside the window', async ({ page }) => {
 
 test('the colours of a page status have names', async ({ page }) => {
   const space = await newSpace(page, 'Status colours');
-  await page.goto(`/spaces/${space.key}/settings`);
-  await expect(page.getByRole('heading', { name: 'Page statuses' })).toBeVisible();
+  await page.goto(`/spaces/${space.key}/settings?section=statuses`);
+  await expect(page.getByRole('heading', { name: 'Page statuses', level: 1 })).toBeVisible();
   const options = await page.locator('main option').allTextContents();
   expect(options.filter((text) => text.startsWith('editor.'))).toEqual([]);
 });

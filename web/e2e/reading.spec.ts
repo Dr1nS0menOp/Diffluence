@@ -94,7 +94,10 @@ test('the top bar menus show where a person has been', async ({ page }) => {
   await page.getByRole('menuitem', { name: 'All favourites' }).click();
   await expect(page.getByRole('heading', { name: 'Favourites', level: 1 })).toBeVisible();
 
-  await page.getByRole('button', { name: 'Spaces', exact: true }).click();
+  // Other tests visit spaces too, so this one is visited last, just before the menu opens.
+  await page.goto(`/spaces/${space.key}`);
+  // The sidebar of the personal screens has a part named Spaces too.
+  await page.getByRole('banner').getByRole('button', { name: 'Spaces', exact: true }).click();
   await expect(page.getByRole('menuitem', { name: 'Menu space' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'All spaces' }).click();
   await expect(page).toHaveURL(/\/spaces$/);
@@ -137,28 +140,50 @@ test('quick search works from the keyboard alone', async ({ page }) => {
   await expect(box).toHaveAttribute('aria-expanded', 'false');
 });
 
-test('inside a space a chip limits quick search, and Backspace removes it', async ({ page }) => {
-  const word = unique('chipword');
-  const here = await newSpace(page, 'Chip space');
-  const other = await newSpace(page, 'Other chip space');
-  const id = await publishedPage(page, here.id, 'Here', 'text');
+test('the search box searches every space, and its filters narrow it like words of the query', async ({
+  page,
+}) => {
+  const word = unique('filterword');
+  const hereName = unique('Filter space');
+  const here = await newSpace(page, hereName);
+  const other = await newSpace(page, 'Other filter space');
+  const id = await publishedPage(page, here.id, `${word} here`, 'text');
   await publishedPage(page, other.id, `${word} elsewhere`, 'text');
   await page.goto(`/pages/${id}`);
 
+  // Inside a space the box still searches everywhere: there is no chip.
   const box = page.getByRole('combobox', { name: 'Search' });
   await box.click();
-  await expect(page.locator('.search-chip')).toContainText('Chip space');
-  await box.fill(word);
-  await expect(page.getByRole('option', { name: `All results for "${word}"` })).toBeVisible();
-  await expect(page.getByRole('option', { name: new RegExp(`${word} elsewhere`) })).toHaveCount(0);
-
-  await box.fill('');
-  await page.keyboard.press('Backspace');
-  await expect(page.locator('.search-chip')).toHaveCount(0);
   await box.fill(word);
   await expect(page.getByRole('option', { name: new RegExp(`${word} elsewhere`) })).toBeVisible();
-});
+  await expect(page.getByRole('option', { name: new RegExp(`${word} here`) })).toBeVisible();
 
+  // The filters unfold with the panel and are buttons; choosing a space narrows the list.
+  const filters = page.getByRole('group', { name: 'Filters' });
+  const spaces = filters.getByRole('button', { name: 'Spaces', exact: true });
+  await spaces.click();
+  await expect(spaces).toHaveAttribute('aria-expanded', 'true');
+  // Any space can be found by name, also beyond the few the panel shows at first.
+  await filters.getByRole('searchbox', { name: 'Find a space' }).fill(hereName);
+  await page.keyboard.press('Enter');
+  await expect(filters.getByRole('button', { name: hereName, exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await expect(page.getByRole('option', { name: new RegExp(`${word} elsewhere`) })).toHaveCount(0);
+  await expect(page.getByRole('option', { name: new RegExp(`${word} here`) })).toBeVisible();
+
+  // The results page gets the same words and keeps them as a filter it shows.
+  await box.focus();
+  await page.keyboard.press('Enter');
+  await expect(page).toHaveURL(/\/search\?q=/);
+  await expect(page.getByRole('searchbox', { name: 'Search' })).toHaveValue(
+    new RegExp(`${word} space:${here.key}`),
+  );
+  await expect(page.getByRole('listitem').filter({ hasText: `Space: ${hereName}` })).toBeVisible();
+  await expect(page.getByRole('link', { name: `${word} elsewhere` })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: `${word} here` })).toBeVisible();
+});
 test('the tree filters, keeps parents, and marks what matches', async ({ page }) => {
   const space = await newSpace(page, 'Filter space');
   const parent = await publishedPage(page, space.id, 'Handbook', 'x');
@@ -167,6 +192,7 @@ test('the tree filters, keeps parents, and marks what matches', async ({ page })
   await page.goto(`/pages/${child}`);
 
   const tree = page.getByRole('navigation', { name: 'Pages' });
+  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByLabel('Filter pages').fill('holiday');
   await expect(tree.getByRole('link', { name: 'Holiday plan' })).toBeVisible();
   await expect(tree.getByRole('link', { name: 'Handbook' })).toBeVisible();
@@ -267,7 +293,7 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
   page,
 }) => {
   const space = await newSpace(page, 'Shortcut space');
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=shortcuts`);
   const shortcuts = page.locator('section', { has: page.getByRole('heading', { name: 'Shortcuts' }) });
   await shortcuts.getByLabel('Label', { exact: true }).fill('Runbook');
   await shortcuts.getByPlaceholder(/Address/).fill(`/pages/${space.home_page_id}`);
@@ -277,7 +303,10 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
   await shortcuts.getByPlaceholder(/Address/).fill('https://status.example.com');
   await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();
   await page.getByRole('button', { name: 'Move Status up' }).click();
+  await expect(page.getByRole('button', { name: 'Move Status up' })).toBeDisabled();
 
+  // Settings have their own sidebar; the shortcuts show on the space itself.
+  await page.goto(`/spaces/${space.key}`);
   const links = page.getByRole('navigation', { name: 'Space links' });
   await expect(
     links
@@ -289,6 +318,7 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
   await expect(outside).toHaveAttribute('target', '_blank');
   await expect(outside).toHaveAttribute('rel', /noopener/);
 
+  await page.goto(`/spaces/${space.key}/settings?section=shortcuts`);
   await shortcuts.getByLabel('Label', { exact: true }).fill('Bad');
   await shortcuts.getByPlaceholder(/Address/).fill('javascript:alert(1)');
   await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();

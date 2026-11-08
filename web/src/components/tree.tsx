@@ -38,6 +38,7 @@ import {
   IconStar,
   IconTask,
   IconTrash,
+  IconFilter,
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuSeparator } from './menu';
 import { personalKey, usePerson } from '../personal';
@@ -785,8 +786,11 @@ export function PagesSection({
   const { preferences, update } = usePreferences();
   const [memory, setMemory] = useBranchMemory(spaceId);
   const [filter, setFilter] = useState('');
+  // The filters stay out of sight until asked for, and stay open while they do something.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selection, setSelection] = useState<string[] | null>(null);
   const view = TREE_VIEWS.find((v) => v === preferences.tree_view) ?? 'tree';
+  const showFilters = filtersOpen || filter !== '' || view !== 'tree';
   const parts = useTreeParts(spaceId, current, memory.opened);
   const nodes = useMemo(() => parts.nodes.filter((n) => n.id !== home), [parts.nodes, home]);
   const typed = useDelayed(filter.trim());
@@ -814,89 +818,102 @@ export function PagesSection({
     });
   };
   return (
-    <>
-      <div className="sidebar-section">
-        {t('space.pages')}
-        <span className="sidebar-tools">
+    <section className="pages-part" aria-label={t('space.pages')}>
+      {/* The tools stay quiet above the tree, without a heading of their own (spec 033). */}
+      <div className="tree-tools">
+        <button
+          type="button"
+          className="node-add always"
+          aria-label={t('tree.showFilters')}
+          title={t('tree.showFilters')}
+          aria-expanded={showFilters}
+          onClick={() => {
+            if (showFilters) setFilter('');
+            setFiltersOpen(!showFilters);
+          }}
+        >
+          <IconFilter size={ROW_ICON_SIZE} />
+        </button>
+        <button
+          type="button"
+          className="node-add always"
+          aria-label={t('tree.collapseAll')}
+          title={t('tree.collapseAll')}
+          onClick={() => setMemory(collapseEverything(nodes))}
+        >
+          <IconCollapse size={ROW_ICON_SIZE} />
+        </button>
+        {current && (
           <button
             type="button"
             className="node-add always"
-            aria-label={t('tree.collapseAll')}
-            title={t('tree.collapseAll')}
-            onClick={() => setMemory(collapseEverything(nodes))}
+            aria-label={t('tree.showCurrent')}
+            title={t('tree.showCurrent')}
+            onClick={showCurrent}
           >
-            <IconCollapse size={ROW_ICON_SIZE} />
+            <IconLocate size={ROW_ICON_SIZE} />
           </button>
-          {current && (
-            <button
-              type="button"
-              className="node-add always"
-              aria-label={t('tree.showCurrent')}
-              title={t('tree.showCurrent')}
-              onClick={showCurrent}
-            >
-              <IconLocate size={ROW_ICON_SIZE} />
-            </button>
-          )}
-          {onAddRoot && (
-            <button
-              type="button"
-              className="node-add always"
-              aria-label={t('space.newPage')}
-              title={t('space.newPage')}
-              onClick={onAddRoot}
-            >
-              <IconPlus size={ROW_ICON_SIZE} />
-            </button>
-          )}
-          {onAddLink && (
-            <button
-              type="button"
-              className="node-add always"
-              aria-label={t('tree.addLink')}
-              title={t('tree.addLink')}
-              onClick={onAddLink}
-            >
-              <IconLink size={ROW_ICON_SIZE} />
-            </button>
-          )}
-          {canMove && (
-            <button
-              type="button"
-              className="node-add always"
-              aria-label={t('tree.select')}
-              title={t('tree.select')}
-              aria-pressed={selection !== null}
-              onClick={() => setSelection(selection === null ? [] : null)}
-            >
-              <IconTask size={ROW_ICON_SIZE} />
-            </button>
-          )}
-        </span>
+        )}
+        {onAddRoot && (
+          <button
+            type="button"
+            className="node-add always"
+            aria-label={t('space.newPage')}
+            title={t('space.newPage')}
+            onClick={onAddRoot}
+          >
+            <IconPlus size={ROW_ICON_SIZE} />
+          </button>
+        )}
+        {onAddLink && (
+          <button
+            type="button"
+            className="node-add always"
+            aria-label={t('tree.addLink')}
+            title={t('tree.addLink')}
+            onClick={onAddLink}
+          >
+            <IconLink size={ROW_ICON_SIZE} />
+          </button>
+        )}
+        {canMove && (
+          <button
+            type="button"
+            className="node-add always"
+            aria-label={t('tree.select')}
+            title={t('tree.select')}
+            aria-pressed={selection !== null}
+            onClick={() => setSelection(selection === null ? [] : null)}
+          >
+            <IconTask size={ROW_ICON_SIZE} />
+          </button>
+        )}
       </div>
-      <div className="tree-controls">
-        <input
-          type="search"
-          value={filter}
-          aria-label={t('tree.filter')}
-          placeholder={t('tree.filter')}
-          onChange={(e) => setFilter(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') setFilter('');
-          }}
-        />
-        <select
-          aria-label={t('tree.view')}
-          value={view}
-          onChange={(e) => update({ tree_view: e.target.value })}
-        >
-          {TREE_VIEWS.map((v) => (
-            <option key={v} value={v}>
-              {t(`tree.view_${v}`)}
-            </option>
-          ))}
-        </select>
-      </div>
+      {showFilters && (
+        <div className="tree-controls">
+          <input
+            type="search"
+            value={filter}
+            aria-label={t('tree.filter')}
+            placeholder={t('tree.filter')}
+            onChange={(e) => setFilter(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setFilter('');
+            }}
+          />
+          <select
+            aria-label={t('tree.view')}
+            value={view}
+            onChange={(e) => update({ tree_view: e.target.value })}
+          >
+            {TREE_VIEWS.map((v) => (
+              <option key={v} value={v}>
+                {t(`tree.view_${v}`)}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
       {parts.isPending && <Loading />}
       <ErrorNote error={parts.error ?? found.error} />
       <PageTree
@@ -919,6 +936,6 @@ export function PagesSection({
       {selection !== null && (
         <SelectionBar spaceId={spaceId} picked={selection} onDone={() => setSelection(null)} />
       )}
-    </>
+    </section>
   );
 }

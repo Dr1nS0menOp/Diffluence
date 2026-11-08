@@ -22,6 +22,8 @@ const (
 	minSidebarWidth     = 14
 	defaultSidebarWidth = 18
 	maxSidebarWidth     = 32
+	minSidebarPart      = 4
+	maxSidebarPart      = 40
 )
 
 var (
@@ -31,6 +33,8 @@ var (
 	dateFormats = []string{"short", "medium", "long", "iso"}
 	// Empty is what a client sends that does not know this setting yet.
 	startScreens = []string{"", "company", "personal"}
+	// sidebarParts are the parts of the sidebar that fold: of a space, and of the home page.
+	sidebarParts = []string{"space", "you", "spaces"}
 )
 
 // Preferences are personal settings that follow a person to other devices. They
@@ -58,6 +62,11 @@ type Preferences struct {
 	HideFollows bool `json:"hide_follows"`
 	// TypingHelp turns what people type, such as :) and ->, into the real character.
 	TypingHelp bool `json:"typing_help"`
+	// SidebarShut names the parts of the sidebar this person folded shut (spec 033).
+	SidebarShut []string `json:"sidebar_shut"`
+	// SidebarLinksHeight is the height in rem this person dragged the links of a space
+	// to, or 0 for as tall as they are.
+	SidebarLinksHeight int `json:"sidebar_links_height"`
 }
 
 // DefaultPreferences is what someone has who never chose anything.
@@ -82,6 +91,13 @@ func (p Preferences) validate() error {
 		return apperr.Invalid("That is not a date format.")
 	case p.FirstDay != 0 && p.FirstDay != 1 && p.FirstDay != 6:
 		return apperr.Invalid("A week starts on Saturday, Sunday or Monday.")
+	case p.SidebarLinksHeight != 0 && (p.SidebarLinksHeight < minSidebarPart || p.SidebarLinksHeight > maxSidebarPart):
+		return apperr.Invalid("A part of the sidebar is between 4 and 40 high.")
+	}
+	for _, part := range p.SidebarShut {
+		if !slices.Contains(sidebarParts, part) {
+			return apperr.Invalid("That is not a part of the sidebar.")
+		}
 	}
 	if p.TimeZone == "" {
 		return nil // the time zone of the browser

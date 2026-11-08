@@ -808,6 +808,17 @@ mutate "ending one person's sessions ends everyone's" internal/identity/factors.
   's.replace("query, args = \"DELETE FROM sessions WHERE user_id = $1\", []any{id}", "query, args = \"DELETE FROM sessions\", []any{}")' $app -run TestAnOperatorEndsTheSessionsOfOnePersonOrOfEveryone
 mutate "a step-up through the provider takes an old login" internal/sso/sso.go \
   's.replace("if f.FreshAfter != 0 && c.AuthTime < f.FreshAfter {", "if false && c.AuthTime < f.FreshAfter {")' $app -run TestAStepUpThroughTheProviderNeedsALoginAfterItStarted
+# Spec 033: a rule of the instance acts only in its chosen spaces, the user list filters, and guests show.
+mutate "a chosen space does not narrow a rule" internal/automation/definition.go \
+  's.replace("return len(d.Spaces) == 0 || space == nil || slices.Contains(d.Spaces, *space)", "return true")' $app -run TestAnInstanceRuleActsOnlyInTheSpacesItWasGiven
+mutate "a rule of a space chooses spaces" internal/automation/service.go \
+  's.replace("\tif spaceID != nil {\n\t\treturn apperr.Invalid(\"Only a rule of the whole instance chooses spaces.\")", "\tif spaceID != nil && false {\n\t\treturn apperr.Invalid(\"Only a rule of the whole instance chooses spaces.\")")' $app -run TestOnlyAnInstanceRuleChoosesSpacesAndOnlyRealOnes
+mutate "a lookup looks outside the chosen spaces" internal/automation/run.go \
+  's.replace("AND (cardinality($7::uuid[]) = 0 OR p.space_id = ANY($7))", "AND (cardinality($7::uuid[]) >= 0)")' $app -run TestAFindStepOfAnInstanceRuleLooksOnlyInItsSpaces
+mutate "the user list ignores the space" internal/identity/users.go \
+  's.replace("AND ($11::uuid IS NULL OR $11 IN (SELECT ps.space_id FROM perm_spaces(u.id, '"'"'space.view'"'"') ps))", "AND ($11::uuid IS NULL OR true)")' $app -run TestTheUserListFiltersByRoleAndBySpace
+mutate "a guest is not marked" internal/permissions/access.go \
+  's.replace("holders[i].Guest = holders[i].Subject.Type == SubjectUser && slices.Contains(guests, holders[i].Subject.ID)", "holders[i].Guest = len(guests) < 0")' $app -run TestWhoHasAccessShowsHowAndExportsSafely
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

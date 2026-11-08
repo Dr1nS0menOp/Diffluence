@@ -24,6 +24,7 @@ test('the home page is marked as home, and is not a row of the tree', async ({ p
   await expect(page.getByRole('button', { name: 'Show the current page' })).toHaveCount(0);
   await expect(tree.locator('a[data-row]').first()).toHaveAttribute('tabindex', '0');
 
+  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByLabel('Filter pages').fill(name);
   await expect(tree).toContainText('No page has that in its title.');
   await page.getByLabel('Filter pages').fill('');
@@ -120,6 +121,8 @@ test('an administrator adds the example space, and every page of it works', asyn
     'A long read',
     'Only the owner edits this',
   ];
+  // The tree starts folded; Blocks to Code live under Writing a page.
+  await tree.getByRole('button', { name: 'Writing a page', exact: true }).click();
   for (const title of titles) {
     await tree.getByRole('link', { name: title, exact: true }).click();
     await expect(page.getByRole('heading', { level: 1, name: title })).toBeVisible();

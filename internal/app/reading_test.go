@@ -75,12 +75,22 @@ func TestPreferencesFollowThePersonAndRefuseUnknownValues(t *testing.T) {
 		return body
 	}
 	anna.ok("PUT", "/api/v1/me/preferences", valid("theme", "light"))
+	folded := valid("sidebar_shut", []string{"you", "space"})
+	folded["sidebar_links_height"] = 12
+	anna.ok("PUT", "/api/v1/me/preferences", folded)
+	kept := anna.ok("GET", "/api/v1/me/preferences", nil)
+	if shut, _ := kept["sidebar_shut"].([]any); len(shut) != 2 || kept["sidebar_links_height"] != float64(12) {
+		t.Fatalf("the parts of the sidebar were not kept: %v", kept)
+	}
 	for name, body := range map[string]map[string]any{
 		"theme":     valid("theme", "neon"),
 		"narrow":    valid("sidebar_width", 13),
 		"wide":      valid("sidebar_width", 33),
 		"tree view": valid("tree_view", "secret"),
 		"unknown":   valid("something", true),
+		"shut part": valid("sidebar_shut", []string{"secret"}),
+		"tiny part": valid("sidebar_links_height", 2),
+		"huge part": valid("sidebar_links_height", 99),
 	} {
 		if status, out := anna.do("PUT", "/api/v1/me/preferences", body); status != 400 {
 			t.Errorf("%s: got %d: %s", name, status, out)

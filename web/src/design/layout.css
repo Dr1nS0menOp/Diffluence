@@ -101,64 +101,36 @@
   pointer-events: none;
 }
 
+/* Stil: a soft, rounded field that turns white with an accent edge while in use. */
 .top-search > input {
   flex: 1;
   min-inline-size: 0;
+  min-block-size: var(--size-control);
   padding-inline-start: var(--space-8);
+  border-radius: var(--radius-card);
   background: var(--color-side);
 }
 
-.top-search > input:focus {
+.top-search > input:hover {
   background: var(--color-surface);
 }
 
-.search-chip {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: var(--space-0-5);
-  max-inline-size: var(--size-search);
-  margin-inline-end: var(--space-1);
-  padding-inline: var(--space-2) var(--space-0-5);
-  overflow: hidden;
-  border-radius: var(--radius);
-  background: var(--color-accent-tint);
-  color: var(--color-accent);
-  font-size: var(--text-small);
-  white-space: nowrap;
+.top-search > input:focus {
+  border-color: var(--color-accent);
+  background: var(--color-surface);
 }
 
-.top-search:has(.search-chip) > svg {
-  display: none;
-}
-
-.top-search:has(.search-chip) > input {
-  padding-inline-start: var(--space-2-5);
-}
-
-.search-chip-name {
-  min-inline-size: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.search-chip-remove {
-  flex: none;
-  min-block-size: var(--size-twist);
-  inline-size: var(--size-twist);
-  padding: 0;
-  background: none;
-  color: inherit;
-}
-
-.quick-panel {
+/* The search box always searches every space. Below it one panel unfolds: the filters as
+   buttons, then the results (spec 033). */
+.quick-drop {
   position: absolute;
   inset-block-start: calc(100% + var(--space-1));
   inset-inline-start: 0;
   z-index: var(--layer-menu);
+  display: flex;
+  flex-direction: column;
   inline-size: max(100%, min(var(--size-quick-search), 92vw));
   max-block-size: 70vh;
-  padding: var(--space-1-5);
   overflow-y: auto;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
@@ -167,6 +139,57 @@
   color: var(--color-ink);
 }
 
+.quick-drop[hidden] {
+  display: none;
+}
+
+.quick-panel {
+  padding: var(--space-1-5);
+}
+
+.quick-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2) var(--space-1);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.filter-row,
+.filter-choices {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1-5);
+}
+
+.filter-button,
+.filter-choice {
+  min-block-size: var(--size-twist);
+  padding: var(--space-0-5) var(--space-2-5);
+  border-radius: var(--radius-card);
+  font-size: var(--text-small);
+  font-weight: var(--weight-regular);
+}
+
+.filter-button[aria-expanded='true'],
+.filter-choice[aria-pressed='true'] {
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+}
+
+.filter-count {
+  min-inline-size: var(--space-4);
+  border-radius: var(--radius-card);
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  font-size: var(--text-caption);
+}
+
+.filter-input {
+  min-block-size: var(--size-twist);
+  font-size: var(--text-small);
+}
 .quick-group {
   padding: var(--space-1-5) var(--space-2) var(--space-0-5);
   color: var(--color-muted);
@@ -309,7 +332,6 @@
   block-size: calc(100vh - var(--size-topbar));
   padding: var(--space-4) var(--space-3);
   overflow-y: auto;
-  border-inline-end: 1px solid var(--color-line);
   background: var(--color-side);
 }
 
@@ -319,7 +341,6 @@
   align-items: center;
   gap: var(--space-1);
   padding-block-end: var(--space-2);
-  border-block-end: 1px solid var(--color-line);
 }
 
 .space-strip ul {
@@ -410,11 +431,11 @@
 
 .sidebar-foot {
   display: flex;
+  flex: none;
   flex-direction: column;
   gap: var(--space-0-5);
   margin-block-start: auto;
   padding-block-start: var(--space-2);
-  border-block-start: 1px solid var(--color-line);
 }
 
 .side-link {
@@ -495,7 +516,7 @@
   margin-block-start: var(--space-4);
 }
 
-/* The page tree. The guide line is what shows a branch. */
+/* The page tree. Indenting shows a branch; there are no guide lines (ADR-034). */
 .tree ul {
   margin: 0;
   padding: 0;
@@ -505,7 +526,6 @@
 .tree ul ul {
   margin-inline-start: var(--tree-indent);
   padding-inline-start: var(--tree-gutter);
-  border-inline-start: 1.5px solid var(--color-guide);
 }
 
 .node {
@@ -1335,8 +1355,8 @@ span.twist {
 
 .tiles div {
   padding: var(--space-3);
-  border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
+  background: var(--color-side);
 }
 
 .tiles dt {
@@ -1383,4 +1403,188 @@ span.twist {
   gap: var(--space-1);
   border: 0;
   padding: 0;
+}
+
+/* A part of the sidebar: a heading that folds it, and for the links of a space a handle to size it (spec 033). */
+/* A part never shrinks below what it holds, so parts cannot run over each other; the sidebar scrolls instead. */
+.sidebar-part {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.sidebar-part-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+/* A heading that folds reads like the rows below it: at the start, not centred like a button. */
+.sidebar-part-toggle {
+  justify-content: flex-start;
+  min-block-size: var(--size-twist);
+  padding: var(--space-0-5) var(--space-2);
+  text-align: start;
+  background: none;
+  color: var(--color-muted);
+  font-size: var(--text-label);
+}
+
+.sidebar-part-toggle:hover {
+  background: var(--color-subtle);
+  color: var(--color-ink);
+}
+
+.part-chevron {
+  transition: transform var(--motion-fast);
+}
+
+.part-chevron.shut {
+  transform: rotate(-90deg);
+}
+
+:dir(rtl) .part-chevron.shut {
+  transform: rotate(90deg);
+}
+
+.sidebar-part-body[data-sized] {
+  block-size: var(--part-height);
+  overflow-y: auto;
+}
+
+.sidebar-part-handle {
+  flex: none;
+  block-size: var(--size-edge);
+  border-radius: var(--radius);
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.sidebar-part-handle:hover,
+.sidebar-part-handle:focus-visible {
+  background: var(--color-accent);
+}
+
+/* A long space name in the sidebar of the home page stays on one line. */
+.side-link-text {
+  min-inline-size: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Settings: the sections live in the sidebar, the large area changes them (ADR-034, spec 033). */
+.settings-sidebar {
+  gap: var(--space-2);
+}
+
+.settings-back {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+.settings-jump {
+  inline-size: 100%;
+  font-size: var(--text-small);
+}
+
+.settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.settings-group {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.settings-area > h1 {
+  margin-block-end: var(--space-2);
+}
+
+/* The page title already names the section, so its own first heading only speaks to screen readers. */
+.settings-area > h1 + section > h2:first-child {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.settings-form {
+  max-inline-size: var(--size-reading);
+}
+
+.settings-title {
+  margin: 0;
+  padding-inline: var(--space-2);
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+/* The People screen of a space: rows with a picture, how they got in, and their role. */
+.member-list {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-1);
+  border-radius: var(--radius);
+}
+
+.member-row:hover {
+  background: var(--color-side);
+}
+
+.member-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
+.member-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+.role-choice {
+  flex: none;
+  min-inline-size: var(--size-filter-field);
+}
+
+.role-name {
+  flex: none;
+  color: var(--color-muted);
+}
+
+/* The tree of a space follows the space part directly, without a heading; its tools are a quiet row of icons. */
+.pages-part {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.tree-tools {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-0-5);
+  color: var(--color-muted);
 }

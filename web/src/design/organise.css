@@ -31,6 +31,10 @@
 }
 
 .label-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
   margin-block-start: var(--space-6);
 }
 
@@ -49,17 +53,20 @@
   gap: var(--space-0-5);
 }
 
+/* A label on a page is a plain link, without a box (ADR-034). */
 .label {
-  padding-inline: var(--space-1-5);
-  border-radius: var(--radius);
-  background: var(--color-subtle);
-  color: var(--color-ink);
+  color: var(--color-accent);
   font-size: var(--text-small);
   text-decoration: none;
 }
 
+/* The mark is decoration in its own element, so it is not part of the name a screen reader hears. */
+.label-mark {
+  color: var(--color-muted);
+}
+
 .label:hover {
-  background: var(--color-subtle-hover);
+  text-decoration: underline;
 }
 
 .label-remove {
@@ -72,7 +79,21 @@
 
 .label-box {
   position: relative;
-  margin-block-start: var(--space-2);
+}
+
+/* Adding a label reads as quiet words until it is used, then it is a field. */
+.label-input {
+  min-block-size: 0;
+  padding-block: var(--space-0-5);
+  border-color: transparent;
+  background: none;
+  font-size: var(--text-small);
+}
+
+.label-input:hover,
+.label-input:focus {
+  border-color: var(--color-field);
+  background: var(--color-surface);
 }
 
 .label-options {
@@ -297,4 +318,34 @@ fieldset.choices legend {
   min-block-size: 0;
   block-size: 1rem;
   accent-color: var(--color-accent);
+}
+
+/* Where a rule of the instance acts: every space, or the chosen ones as chips (spec 033). */
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  border: none;
+}
+
+.chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-inline: var(--space-2) var(--space-0-5);
+  border-radius: var(--radius-card);
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+  font-size: var(--text-small);
 }

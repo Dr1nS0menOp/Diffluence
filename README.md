@@ -17,10 +17,10 @@ Needs Docker with the Compose plugin.
 ```sh
 sh scripts/setup-secrets.sh
 docker compose up -d --build --wait
-printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name "You"
+printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name "You" --organisation "Your team"
 ```
 
-Then open http://localhost:8080. For a real installation, read [the install guide](docs/operations/install.md).
+Then open http://localhost:8080. `--organisation` is optional: the name of your company, or your own name, which the search box shows as "Search in Your team". It can be changed later under Administration, Look. For a real installation, read [the install guide](docs/operations/install.md).
 
 ## Documentation
 

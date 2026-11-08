@@ -15,6 +15,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   show_presence: true,
   typing_help: true,
   sidebar_width: 18,
+  sidebar_shut: null,
+  sidebar_links_height: 0,
   tree_view: 'tree',
   language: 'en',
   time_zone: '',

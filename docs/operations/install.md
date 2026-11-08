@@ -12,7 +12,7 @@ sh scripts/setup-secrets.sh                 # creates ./secrets, never overwrite
 export DIFFLUENCE_PUBLIC_URL=https://wiki.example.com
 docker compose up -d --build --wait
 printf '%s\n' 'a long password' | docker compose exec -T diffluence \
-  diffluence user create-admin --email you@example.com --name "You"
+  diffluence user create-admin --email you@example.com --name "You" --organisation "Your team"
 ```
 
 `DIFFLUENCE_PUBLIC_URL` must be the address people type in their browser. It drives secure cookies, cross-site protection, passkeys and the OIDC redirect. It is also what decides whether the session cookie gets the `__Host-` prefix, so **https is required in production**.

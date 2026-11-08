@@ -128,6 +128,15 @@ type Definition struct {
 	Trigger    Trigger    `json:"trigger"`
 	Conditions *Condition `json:"conditions,omitempty"`
 	Actions    []Action   `json:"actions"`
+	// Spaces narrows a rule of the instance to these spaces; empty means every space.
+	// A rule of a space never has any (spec 033).
+	Spaces []uuid.UUID `json:"spaces,omitempty"`
+}
+
+// reaches says whether the rule acts on something in this space. An event without a
+// space, such as a new group member, is not narrowed by spaces.
+func (d Definition) reaches(space *uuid.UUID) bool {
+	return len(d.Spaces) == 0 || space == nil || slices.Contains(d.Spaces, *space)
 }
 
 // Problem is something a person must fix before a rule can be turned on. Step is the

@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -343,6 +344,30 @@ func TestTheUserListNamesTheSpacesOfAGuestOnly(t *testing.T) {
 		t.Fatalf("members show no list: %v", got)
 	}
 	owner.want(403, "GET", "/api/v1/admin/users", nil)
+}
+
+func TestTheUserListFiltersByRoleAndBySpace(t *testing.T) {
+	e := newEnv(t)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	_, _, _, space := e.team("ENG")
+	e.user("outsider@example.com", identity.PermUseProduct)
+
+	emails := func(query string) []string {
+		out := []string{}
+		for _, u := range admin.ok("GET", "/api/v1/admin/users?"+query, nil)["users"].([]any) {
+			out = append(out, u.(map[string]any)["email"].(string))
+		}
+		return out
+	}
+	if got := emails("role=administrator"); len(got) != 1 || got[0] != "admin@example.com" {
+		t.Fatalf("administrators: %v", got)
+	}
+	inSpace := emails("space_id=" + space)
+	if !slices.Contains(inSpace, "owner@example.com") || !slices.Contains(inSpace, "editor@example.com") || slices.Contains(inSpace, "outsider@example.com") {
+		t.Fatalf("people who reach the space: %v", inSpace)
+	}
+	admin.want(400, "GET", "/api/v1/admin/users?role=anything", nil)
+	admin.want(400, "GET", "/api/v1/admin/users?space_id=not-an-id", nil)
 }
 
 func TestAnAdministratorSeesTheReachOfAPersonButNoTitles(t *testing.T) {

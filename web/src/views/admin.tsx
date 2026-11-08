@@ -39,6 +39,7 @@ import { PermissionsTab, RulesTab } from './admin-rules';
 import { StorageLimitDialog } from './admin-storage';
 import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
 import { SettingsSearch, SummaryTab } from './admin-summary';
+import { SettingsFrame } from '../components/settings-frame';
 
 const TABS = [
   'summary',
@@ -64,7 +65,18 @@ const TABS = [
   'outgoing',
   'webhooks',
 ] as const;
-const USER_FILTERS = ['type', 'status', 'source', 'group_id', 'idle_days'] as const;
+/** The administration in categories (ADR-034). Every tab sits in exactly one. */
+const ADMIN_GROUPS: { id: string; tabs: (typeof TABS)[number][] }[] = [
+  { id: 'overview', tabs: ['summary'] },
+  { id: 'people', tabs: ['users', 'invitations', 'groups', 'permissions', 'scim'] },
+  { id: 'content', tabs: ['spaces', 'templates', 'organising', 'rules', 'export'] },
+  { id: 'automation', tabs: ['automation', 'webhooks', 'outgoing'] },
+  { id: 'look', tabs: ['look'] },
+  { id: 'system', tabs: ['system', 'care', 'settings', 'mail', 'audit', 'insights', 'analytics'] },
+];
+const USER_FILTERS = ['type', 'status', 'source', 'role', 'space_id', 'group_id', 'idle_days'] as const;
+/** The global permissions the server can filter people on. */
+const USER_ROLES = ['administrator', 'system_administrator', 'create_space', 'invite_people'];
 const USER_TYPES = ['member', 'guest'];
 const USER_STATUSES = ['active', 'disabled'];
 const USER_SOURCES = ['local', 'oidc', 'scim'];
@@ -318,6 +330,10 @@ function UserFilters({
     queryKey: ['admin-groups'],
     queryFn: () => api.get<{ groups: Group[] }>('/admin/groups'),
   });
+  const spaces = useQuery({
+    queryKey: ['admin-spaces'],
+    queryFn: () => api.get<{ spaces: Space[] }>('/admin/spaces'),
+  });
   return (
     <div className="row filters">
       <FilterSelect
@@ -340,6 +356,20 @@ function UserFilters({
         options={USER_SOURCES}
         name={(o) => t(`admin.source_${o}`)}
         onChange={(v) => set('source', v)}
+      />
+      <FilterSelect
+        label={t('admin.role')}
+        value={values.role}
+        options={USER_ROLES}
+        name={(o) => t(`permissions.global_${o}`)}
+        onChange={(v) => set('role', v)}
+      />
+      <FilterSelect
+        label={t('admin.space')}
+        value={values.space_id}
+        options={spaces.data?.spaces.map((s) => s.id) ?? []}
+        name={(o) => spaces.data?.spaces.find((s) => s.id === o)?.name ?? ''}
+        onChange={(v) => set('space_id', v)}
       />
       <FilterSelect
         label={t('admin.groups')}
@@ -1438,49 +1468,40 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
     );
   }
   return (
-    <div className="split">
-      <aside className="sidebar">
-        <SettingsSearch />
-        <nav aria-label={t('admin.title')}>
-          {TABS.map((name) => (
-            <Link
-              key={name}
-              href={`/admin/${name}`}
-              className="side-link"
-              aria-current={name === tab ? 'page' : undefined}
-            >
-              {t(`admin.${name}`)}
-            </Link>
-          ))}
-        </nav>
-      </aside>
-      <main id="main" className="content">
-        <div className="column wide">
-          <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
-          {tab === 'summary' && <SummaryTab />}
-          {tab === 'users' && <UsersTab />}
-          {tab === 'invitations' && <InvitationsTab />}
-          {tab === 'permissions' && <PermissionsTab />}
-          {tab === 'rules' && <RulesTab />}
-          {tab === 'look' && <LookTab />}
-          {tab === 'care' && <CareTab me={me} />}
-          {tab === 'groups' && <GroupsTab />}
-          {tab === 'spaces' && <SpacesTab />}
-          {tab === 'templates' && <TemplatesTab />}
-          {tab === 'organising' && <OrganisingTab />}
-          {tab === 'export' && <ExportTab />}
-          {tab === 'audit' && <AuditTab />}
-          {tab === 'settings' && <SettingsTab />}
-          {tab === 'mail' && <MailTab />}
-          {tab === 'scim' && <ScimTab />}
-          {tab === 'system' && <SystemTab />}
-          {tab === 'insights' && <InsightsTab />}
-          {tab === 'analytics' && <AnalyticsTab />}
-          {tab === 'automation' && <RuleList spaceId={null} />}
-          {tab === 'outgoing' && <OutgoingTab />}
-          {tab === 'webhooks' && <WebhookList path="/admin/webhooks" />}
-        </div>
-      </main>
-    </div>
+    <SettingsFrame
+      title={t('admin.title')}
+      head={<p className="settings-title">{t('admin.title')}</p>}
+      search={<SettingsSearch />}
+      groups={ADMIN_GROUPS.map((group) => ({
+        id: group.id,
+        title: t(`admin.group_${group.id}`),
+        items: group.tabs.map((name) => ({ id: name, label: t(`admin.${name}`), href: `/admin/${name}` })),
+      }))}
+      current={tab}
+    >
+      <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
+      {tab === 'summary' && <SummaryTab />}
+      {tab === 'users' && <UsersTab />}
+      {tab === 'invitations' && <InvitationsTab />}
+      {tab === 'permissions' && <PermissionsTab />}
+      {tab === 'rules' && <RulesTab />}
+      {tab === 'look' && <LookTab />}
+      {tab === 'care' && <CareTab me={me} />}
+      {tab === 'groups' && <GroupsTab />}
+      {tab === 'spaces' && <SpacesTab />}
+      {tab === 'templates' && <TemplatesTab />}
+      {tab === 'organising' && <OrganisingTab />}
+      {tab === 'export' && <ExportTab />}
+      {tab === 'audit' && <AuditTab />}
+      {tab === 'settings' && <SettingsTab />}
+      {tab === 'mail' && <MailTab />}
+      {tab === 'scim' && <ScimTab />}
+      {tab === 'system' && <SystemTab />}
+      {tab === 'insights' && <InsightsTab />}
+      {tab === 'analytics' && <AnalyticsTab />}
+      {tab === 'automation' && <RuleList spaceId={null} />}
+      {tab === 'outgoing' && <OutgoingTab />}
+      {tab === 'webhooks' && <WebhookList path="/admin/webhooks" />}
+    </SettingsFrame>
   );
 }

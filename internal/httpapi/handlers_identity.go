@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
@@ -383,9 +384,19 @@ func (s *Server) handleUsers(w http.ResponseWriter, r *http.Request) {
 		badBody(w)
 		return
 	}
+	space, err := optionalID(q.Get("space_id"))
+	if err != nil {
+		badBody(w)
+		return
+	}
+	role := q.Get("role")
+	if role != "" && !slices.Contains(identity.FilterRoles, role) {
+		badBody(w)
+		return
+	}
 	list, total, err := s.deps.Identity.ListUsers(r.Context(), identity.UserFilter{Text: q.Get("q"), Type: q.Get("type"),
 		Status: q.Get("status"), Source: q.Get("source"), GroupID: group, IdleDays: queryInt(r, "idle_days"),
-		Limit: queryInt(r, "limit"), Offset: queryInt(r, "offset")})
+		Role: role, SpaceID: space, Limit: queryInt(r, "limit"), Offset: queryInt(r, "offset")})
 	if err != nil {
 		s.fail(w, r, err)
 		return

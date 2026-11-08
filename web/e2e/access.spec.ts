@@ -125,13 +125,13 @@ test('space settings: details, roles, archive', async ({ page }) => {
   await checkAccessibility(page);
   await page.getByRole('button', { name: /Team space/ }).click();
   await expect(page.getByRole('row', { name: /All members/ })).toBeVisible();
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=danger`);
   await checkAccessibility(page);
-  await page.getByRole('button', { name: 'Archive' }).click();
+  await page.getByRole('button', { name: 'Archive', exact: true }).click();
   await expect(page.getByText('This space is archived and read-only.')).toBeVisible();
   await page.goto(`/pages/${space.home_page_id}`);
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toHaveCount(0);
-  await page.goto(`/spaces/${space.key}/settings`);
+  await page.goto(`/spaces/${space.key}/settings?section=danger`);
   await page.getByRole('button', { name: 'Unarchive' }).click();
   await expect(page.getByText('This space is archived and read-only.')).toHaveCount(0);
 });

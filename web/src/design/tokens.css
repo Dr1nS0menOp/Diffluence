@@ -61,7 +61,6 @@
   --size-editbar: 52px;
   --size-bars: calc(var(--size-topbar) + var(--size-editbar) + var(--size-tool) + 2 * var(--space-1-5));
   --size-sidebar: 18rem;
-  --size-search: 15rem;
   --size-search-main: 40rem;
   --size-summary: 26rem;
   --size-login: 24rem;
@@ -94,6 +93,7 @@
 
   /* Set per person, per page or per table at run time. */
   --sidebar-width: var(--size-sidebar);
+  --part-height: auto;
   --header-position: 50%;
   --table-stretch: 0;
 

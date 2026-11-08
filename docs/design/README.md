@@ -2,7 +2,7 @@
 
 This is how Diffluence looks and behaves, and how that stays true for every future change. It binds every build session: `CLAUDE.md` makes it a hard rule, and `make check` and the browser tests enforce most of it.
 
-Status: agreed with the product owner, 2026-11-04 (ADR-021).
+Status: agreed with the product owner, 2026-11-04 (ADR-021). The look changed to **Stil** on 2026-11-07 (ADR-034, spec 033); where this document and ADR-034 differ, ADR-034 wins.
 
 ## The decision
 
@@ -10,9 +10,9 @@ After ten designs, three iterations and a final choice, the product owner decide
 
 | Part | Decision |
 | --- | --- |
-| Style and layout | **Helder**: calm, white and blue, a clear top bar, a sidebar per space, one centred reading column that scales with the window (ADR-030). |
+| Style and layout | **Stil** (ADR-034), which replaced the look of Helder: white and blue, hardly any lines or boxes, a clear top bar, the sidebar nearly always in view (also on the personal screens), one centred reading column that scales with the window (ADR-030). |
 | Editor | **Rail**: a strip with the page's fate at the top, the tools in a row below it, and an open sheet with no boxes. |
-| Page tree | **Branches**: guide lines that show the structure, and every branch can be collapsed. |
+| Page tree | Indenting shows the structure, without guide lines (ADR-034, which replaced Branches). Every branch can be collapsed. |
 | Font | The **system font**. A font can be imported in the settings. |
 
 Rail kept the global navigation visible while editing. In Helder that means: **the top bar stays**. After their first test the product owner asked to keep the pages in view as well, so **the sidebar stays too**, as far as there is room (ADR-030).
@@ -65,7 +65,7 @@ The colours that carry the look:
 | `--color-accent-tint` | `#E4EDFA` | Background of the current item |
 | `--color-side` | `#F5F7FA` | Sidebar, toolbar |
 | `--color-line` | `#DDE2EA` | Dividers |
-| `--color-guide` | `#B9C6D8` | Branches of the tree |
+| `--color-guide` | `#B9C6D8` | Quiet outlines, such as the edge of a table in a page. No longer the tree |
 | `--color-lozenge` | `#FBEFD5` | Status marks such as Restricted |
 | `--color-text-*` | 12 names | What a writer can choose for text. Each passes 4.5:1 on the page, in both themes |
 | `--color-mark-*` | 6 names | Highlights, panels, status marks and table cells. Normal text on each passes 4.5:1 |
@@ -74,18 +74,19 @@ Need a value that is not there? Use the nearest token. If none fits, add one to 
 
 ## The frame of a screen
 
-Every screen is one of these. Do not invent a fifth.
+Every screen is one of these. Do not invent another.
 
 | Frame | Used for | Built from |
 | --- | --- | --- |
 | **Plain** | Start screen, search, your account | Top bar, `Plain` in `app.tsx` (wide, or `reading`) |
 | **Space** | Everything inside a space | Top bar, `Frame` or `SpaceShell` in `components/frame.tsx`: sidebar and a centred `.column` |
-| **Admin** | The admin console | Top bar, sidebar with `.side-link` items, `.column.wide` |
+| **Settings** | The administration, and the settings of a space | Top bar, `SettingsFrame` in `components/settings-frame.tsx`: the sections in the sidebar in groups that fold, with a way to jump to one, and the large area that changes them. One section at a time, at its own address (`?section=`) |
+| **Personal** | Home, Recent, Favourites, Tasks, Watching, all spaces | Top bar, `HomeFrame` in `components/home-frame.tsx`: a sidebar with your own places and your spaces, beside a `.column` |
 | **Focus** | The editor | Top bar, sidebar, `main.focus`: `SpaceShell` with `focus`, and no reading column around it |
 
 The login page stands alone: one card on the sidebar colour.
 
-**Top bar:** logo and name, Home, Spaces, Recent, Favourites and Create, then search in the middle, then the bell, help and the account menu on the far side. Search is the main element of the bar, because people spend much of their time there (ADR-035): it takes the room there is, up to `--size-search-main`, and is never pushed to a corner. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox with one panel below it, and a chip shows when it stays inside a space.
+**Top bar:** logo and name, Home, Spaces, Recent, Favourites and Create, then search in the middle, then the bell, help and the account menu on the far side. Search is the main element of the bar, because people spend much of their time there (ADR-035): it takes the room there is, up to `--size-search-main`, and is never pushed to a corner. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox, and it always searches every space: there is no chip that keeps it inside one (spec 033). Clicking it unfolds one panel: first the filters as buttons (Spaces, Type, Labels, People, Date), each with a small chooser below the row, then the results; the space chooser has a field that finds any space by name. Chosen spaces, labels and people become words of the search syntax (`space:`, `label:`, `author:`), so a typed query and the buttons mean the same thing; type and date travel as the parameters the results page reads. The results page shows those words as chips that take a word out again.
 
 **A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. The column scales: `--size-page` is at least `--size-reading`, 64 percent of the room, and at most `--size-reading-max`. Full width takes all the room. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
 
@@ -134,16 +135,23 @@ Use these. Reuse beats a new variant.
 | A menu in something that scrolls | `Menu` with `floating` |
 | A page in a list | `PageMark`, which shows its emoji |
 
+## Settings and lists (ADR-034)
+
+- Settings of a space and of the instance use the **Settings** frame. The sidebar holds the sections in groups that fold, and **Jump to a setting** narrows them; the administration's own search also finds settings inside a section. The large area shows one section, with its name as the page title.
+- The administration has these groups: Overview; People and access; Content; Automation; Look; System. Care and System health sit under System. A new tab goes into exactly one group.
+- Tables of the app show rows, not boxes: a line under each row, a quiet heading, no cell borders. Tables inside a page keep their own rules.
+- Lists of people show a picture, the name, how they got in and the role. Someone who may change a role picks it in the row. Long lists filter with dropdowns above them.
+- A rule of the instance says where it acts: in every space, or only in the chosen spaces, shown as chips.
 ## The page tree
 
 - A branch has a chevron and can be collapsed; a page without children has a page icon.
-- Guide lines show the branches. They are the signature of this design: keep them.
-- The two levels nearest the top start open, so the shape of a space shows at once.
+- Indenting shows the branches; there are no guide lines (ADR-034).
+- The tree starts folded from the first level: the top pages show, with their branches shut, so the shape of a space shows at once (spec 033).
 - What a reader collapses stays collapsed, per space, across pages and reloads.
 - Going to a page reveals it, also when it sits in a collapsed branch.
 - The current page has the tint, and shows the add button. Other rows show it on hover or focus.
 - The sidebar itself can be put away, and starts hidden on narrow screens. Its width is a preference.
-- The sidebar from top to bottom: the strip of spaces, the name of the space, Home, Overview, People, the shortcuts of the space, then a filter, a choice of view and the tree. The flat views have no guide lines, and say that the tree is where pages are arranged.
+- The sidebar from top to bottom: the strip of spaces, the name of the space, the part **This space** (Home, Overview, People, Blog, Files, Archive and the shortcuts), then the tree itself, without a heading of its own. The part folds shut from its heading and can be made taller or shorter by its handle, by mouse or arrow keys; both are kept per person (`SidebarPart`). The tools of the tree (filter, collapse, show the current page, new page, link, select) are a quiet row of icons above it. The filter and the choice of view sit behind the filter icon, and stay open while they do something. No part of the sidebar ever shrinks to run over another: the sidebar scrolls instead. The flat views say that the tree is where pages are arranged.
 - The home page is not a row of the tree. It has the fixed Home row, which is marked while it is open, and its children are the top rows. On the home page the breadcrumbs end in Home.
 - The strip of spaces scrolls sideways on its own, in the order of the Spaces menu, with the current space marked.
 - The tree is a `nav` with links and the keys of the tree pattern, so it is one Tab stop plus the buttons of the focused row.
@@ -183,7 +191,7 @@ A comparison looks like the page. What was added sits on green, what was removed
 
 - **Status** is always a word and a colour, in the style of a status mark in a document. It sits at the end of the byline.
 - **Verified and Approved** have an icon and a word.
-- **Labels** sit at the bottom of a page, as small quiet tags. Each has its own remove button, of at least 24 pixels.
+- **Labels** sit at the bottom of a page as plain links with a quiet `#`, without a box (ADR-034). Each has its own remove button, of at least 24 pixels. Adding one reads as quiet words until hovered or used, and then it is a field.
 - **Notes on a page**, such as archived, scheduled and approval, use `.note` under the byline. Past review is a muted line, for editors only.
 - **The publish arrow** sits beside Publish, in the same colour, with a small gap.
 - **Fields and instruction text** in a template: a field has a dashed border, instruction text is muted and italic.
