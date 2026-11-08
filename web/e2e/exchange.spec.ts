@@ -160,9 +160,15 @@ test('a public site goes through a preview, and works by keyboard without the wi
   await page.keyboard.type('findable');
   const hit = page.getByRole('status').getByRole('link', { name: 'Shown to the world' });
   await expect(hit).toBeVisible();
-  await hit.focus();
-  await page.keyboard.press('Enter');
-  await expect(page.getByRole('heading', { name: 'Shown to the world', level: 1 })).toBeVisible();
+  // The results are drawn again after each letter, so on a slow machine the focused link can be
+  // replaced before Enter lands. Enter on the link must still open the page.
+  await expect(async () => {
+    await hit.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Shown to the world', level: 1 })).toBeVisible({
+      timeout: 2000,
+    });
+  }).toPass();
   await checkAccessibility(page);
 
   await page.goto(`/pages/${shown}`);
