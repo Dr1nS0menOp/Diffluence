@@ -56,6 +56,19 @@ Since spec 029 each word also asks for its common forms, such as `plans` for `pl
 | Two words, the newest ten | 0.3 ms | 0.6 ms |
 
 The forms cost the index little. A full run with the setup of spec 028 is still open.
+## An order of work under too much load (spec 031)
+
+Measured on 8 November 2026, 50,000 pages, the same caps: the app 2 CPUs and 1.5 GB, PostgreSQL 1.5 CPUs and 2 GB, the load tool 0.5 CPU and 512 MB, a pool of 20. "Before" is main before spec 031, "after" is with it, on the same data, one after the other. Another build ran on the machine at the same time, the same for both. Each row is one run of 40 seconds, so take differences of a few percent as noise.
+
+| What | Before | After | How it fails now |
+|---|---|---|---|
+| The model of spec 028 | Reading p95 146 ms, saving p95 278 ms, search p95 1.0 s, nothing failed | Reading p95 31 ms, saving p95 100 ms, search p95 100 ms, 1% of quick searches busy | |
+| 600 page views a second, 2 saves | Served 378 a second, the load tool dropped 8,700 it could not send. Reading p95 2.7 s, saving p95 417 ms. `/readyz` ready the whole time | Served 599 a second. 30% of reads answered busy at once, the rest p95 303 ms. Saving p95 186 ms, none failed. `/readyz` busy in 34 of 38 checks | Reading past its share: 503 with `Retry-After: 2` |
+| 400 page views, 150 quick searches, 40 results pages a second, 2 saves | Reading p95 3.3 s, 84 to 90% of searches busy after waiting a second, saving p95 500 ms | Reading p95 338 ms with 14% busy, 89% of searches busy at once, saving p95 196 ms, none failed. `/readyz` busy in 28 of 38 checks | Search first, then reading |
+
+Saving never failed in any run, and got faster under every flood. The memo of permission facts (ARC-197) is in the "after" numbers as well, so the model got faster for that reason too.
+
+**What to know when you run behind a load balancer.** A node says `busy` on `/readyz` while its queues are long. With several nodes the balancer sends people to a node with room. If every node is busy at once, a balancer that only uses ready nodes may have none left, and Kubernetes then sends nobody anywhere. Give the balancer a rule for that case, such as keeping all nodes when none is ready, or let your readiness probe tolerate a few failures in a row.
 
 ## What stops everything
 

@@ -126,6 +126,8 @@ type Server struct {
 	requests      *metrics.Requests
 	// markdownBusy holds a place for every paste being converted.
 	markdownBusy chan struct{}
+	// admission keeps the order of work when the database is full (ARC-233).
+	admission *admission
 }
 
 // New builds the API.
@@ -143,6 +145,7 @@ func New(d Deps) (*Server, error) {
 
 		loginByAllIPs: newLimiter(100, loginWindow),
 		markdownBusy:  make(chan struct{}, markdownSlots),
+		admission:     newAdmission(poolSize(d)),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
@@ -165,9 +168,11 @@ func New(d Deps) (*Server, error) {
 		withMetrics(s.requests),
 		withClientIP(d.Config.TrustedProxies),
 		withLogAndRecover(d.Log),
+		s.admission.middleware,
 		withSecurityHeaders(d.Config.SecureCookies()),
 		cop.Handler,
 		s.withAuthentication,
+		withPermissionMemo,
 		s.withMaintenance,
 	)
 	return s, nil
@@ -308,6 +313,25 @@ func (s *Server) enforceKind(a Access, h http.Handler) http.Handler {
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
 	s.deps.Log.Error("request failed", "error", err, "request_id", RequestIDFrom(r.Context()))
 	writeError(w, http.StatusInternalServerError, "internal_error", "Something went wrong.")
+}
+
+// defaultPoolSize is used when there is no pool to measure, as in some tests.
+const defaultPoolSize = 20
+
+func poolSize(d Deps) int {
+	if d.Pool == nil {
+		return defaultPoolSize
+	}
+	return int(d.Pool.Config().MaxConns)
+}
+
+// ready adds the queues of this node to the checks of the app: a node with a long
+// queue says busy, so a load balancer sends people elsewhere (ARC-235).
+func (s *Server) ready(ctx context.Context) error {
+	if s.admission.overloaded() {
+		return ReadyError("busy")
+	}
+	return s.deps.Ready(ctx)
 }
 
 // HealthOnly serves just /livez and /readyz, for processes with role=worker.

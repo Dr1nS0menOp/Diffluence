@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -43,6 +44,7 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if !strings.Contains(url, "pool_max_conns") {
 		cfg.MaxConns = defaultMaxConns
 	}
+	cfg.ConnConfig.Tracer = &queryCounter{}
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
@@ -55,6 +57,26 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		return nil, fmt.Errorf("db: cannot reach database: %w", err)
 	}
 	return pool, nil
+}
+
+// queryCounter counts the queries of a pool, for the query budgets of the main screens
+// (ARC-239) and for /metrics.
+type queryCounter struct{ n atomic.Int64 }
+
+func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
+	q.n.Add(1)
+	return ctx
+}
+
+func (*queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+
+// Queries returns how many queries a pool made by Open has sent since it started.
+// A pool made another way counts nothing.
+func Queries(pool *pgxpool.Pool) int64 {
+	if counter, ok := pool.Config().ConnConfig.Tracer.(*queryCounter); ok {
+		return counter.n.Load()
+	}
+	return 0
 }
 
 // GrantApp gives the application role exactly what it needs, after migrations ran

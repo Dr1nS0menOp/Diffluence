@@ -3,6 +3,15 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: an order of work when the database is full (spec 031)
+- Saving comes first, then reading, then search and reports. Each has its own share of the database connections, so a flood of searches or page views cannot take the room a save needs
+- When a share is full and too many wait, the answer comes at once: 503 with `Retry-After`, and the screen says Diffluence is very busy. Text being written stays in the browser
+- `/readyz` says `busy` when every connection is taken or a queue is long, so a load balancer can send people elsewhere. `/livez` does not change
+- Each node hashes at most half as many passwords at once as it has cores, so a rush of logins leaves the rest alone
+- A page view reuses the permission facts it loaded: opening a page costs 25 queries instead of 30, a space 11 instead of 36
+- The main screens have a query budget that a test enforces, and `/metrics` counts queries as `diffluence_db_queries_total`
+- Upgrade impact: none. A load balancer that checks `/readyz` now also takes a busy node out for a moment
+
 ### Added: smaller things for the people who keep an instance tidy (spec 030)
 - The lock beside a page title is open or closed, so a restricted page shows at a glance
 - The spaces in the administration filter by name, pages, storage and months without a change

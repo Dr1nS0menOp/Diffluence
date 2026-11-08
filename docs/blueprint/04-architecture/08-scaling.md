@@ -19,7 +19,7 @@ Without search that is about 130, more than twice the old figure, and still not 
 
 **A page view is about 20 queries.** The session, the person and their groups, the page, its space with all grants, its restrictions, the version, breadcrumbs, marks, names, then the same permission facts again for the buttons, and two writes for the recent list. At 85 views-related requests a second that is well over 1,000 small queries a second on one primary. PostgreSQL does that, on indexes, with a warm cache. It is also the first thing to trim.
 
-- **ARC-197** · phase 3 · `Get` loads permission facts once and reuses them for the buttons, which removes a third of its queries.
+- **ARC-197** · built · `Get` loads permission facts once and reuses them for the buttons, which removes a third of its queries. Built as a memo per read request: opening a page went from 30 queries to 25, a space from 36 to 11 (spec 031). A write gets no memo, so a grant it makes counts at once.
 - **ARC-198** · built · The recent list writes at most once a minute per person and page, and trims in a task instead of on each view. Going back to another page still writes at once, so the order stays right (spec 021 D8).
 - **ARC-199** · built · The k6 test uses the real pattern of the frontend, with polling, and real spaces of 50,000 pages, not one small page in a loop. The run is in `docs/operations/limits.md` (spec 025).
 - **ARC-200** · built · Targets per query go in the test: tree, search, feed, directory. At full size the page and the bell meet them, and the tree and search on a common word do not (`docs/operations/limits.md`).
@@ -106,16 +106,16 @@ Written after the self-test of spec 025 and ADR-036. Section 8.1 assumed 10 perc
 
 ### Staying up under too much load
 
-- **ARC-233** · partly · Work has an order: **saving comes first, then reading, then search and reports.** Each class has its own share of the connections, so a flood of searches can never take the connection a save needs. Built: the share for search, one connection in four (spec 028). Still open: the other classes.
-- **ARC-234** · partly · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost. Built: for search. Still open: the other classes.
-- **ARC-235** · phase 3 · `/readyz` tells the truth under load: a node with a full pool or a long queue says so, so a load balancer can send people elsewhere. It stays separate from `/livez`, so a busy node is not restarted (ARC-009).
-- **ARC-236** · phase 3 · Logins have their own limit on how many hash at once per node, so a morning rush waits briefly and leaves the rest of the node alone.
+- **ARC-233** · built · Work has an order: **saving comes first, then reading, then search and reports.** Each class has its own share of the connections, so a flood of searches can never take the connection a save needs. Built: three classes, sorted before the first query of a request. Saving may use the whole pool, reading leaves a quarter for saving, and search and reports use a quarter that also counts as reading (spec 031). The classes count requests, which stand in for connections because nearly every handler holds one at a time.
+- **ARC-234** · built · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost. Built for every class: saving waits up to 15 s, reading 3 s, search and reports 1 s, each with a limit on how many wait (spec 031). The screen shows the message of the refusal.
+- **ARC-235** · built · `/readyz` tells the truth under load: a node with a full pool or a long queue says so, so a load balancer can send people elsewhere. It stays separate from `/livez`, so a busy node is not restarted (ARC-009). Built: the answer is `busy` when every connection is taken, checked before the ping, or when saving or reading has more than half its limit waiting (spec 031).
+- **ARC-236** · built · Logins have their own limit on how many hash at once per node, so a morning rush waits briefly and leaves the rest of the node alone. Built: half the cores, at least one (spec 031).
 - **ARC-237** · later · If writes come near what the audit lock passes, events are chained after the commit (ARC-203). That needs a measurement and the product owner's agreement, because it changes ADR-013.
 
 ### Keeping the room
 
-- **ARC-238** · phase 3 · Every feature has a **load budget**. Its spec states the queries per request, the writes per action, and which class of ARC-233 it belongs to. A feature that goes past its budget gets a cache, a job or a table of its own before it lands.
-- **ARC-239** · phase 3 · The query count of the main screens is a test: opening a page, the tree, search and the bell. A change that adds queries fails, unless the budget is changed on purpose.
+- **ARC-238** · built · Every feature has a **load budget**. Its spec states the queries per request, the writes per action, and which class of ARC-233 it belongs to. A feature that goes past its budget gets a cache, a job or a table of its own before it lands. Built: a section in the spec template, `docs/specs/README.md` (spec 031).
+- **ARC-239** · built · The query count of the main screens is a test: opening a page, the tree, search and the bell. A change that adds queries fails, unless the budget is changed on purpose. Built: `internal/app/query_budget_test.go`, which also counts the summary of a page and a space, through a counter on the pool that is the metric `diffluence_db_queries_total` as well (spec 031).
 - **ARC-240** · phase 3 · Each release runs the load test at a fixed size, and `docs/operations/limits.md` keeps the numbers, so a slow decline shows up. A run of the worst case needs real servers, so it is done when those are available. Until then, the documents do not claim it.
 - **ARC-241** · phase 3 · The install guide gives sizes for each number of people, and says which were measured and which are estimates.
 

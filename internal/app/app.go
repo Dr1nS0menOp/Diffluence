@@ -335,6 +335,11 @@ func (a *App) Ready(ctx context.Context) error {
 	if a.draining.Load() {
 		return httpapi.ReadyError("draining")
 	}
+	// A ping on a full pool waits for a connection and then fails, which would name the
+	// wrong cause. A pool with every connection taken is busy, not gone (ARC-235).
+	if stat := a.pool.Stat(); stat.AcquiredConns() >= stat.MaxConns() {
+		return httpapi.ReadyError("busy")
+	}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 	if err := a.pool.Ping(ctx); err != nil {

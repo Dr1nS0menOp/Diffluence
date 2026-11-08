@@ -737,6 +737,27 @@ mutate "quotes ask for other forms too" internal/search/language.go \
 mutate "the Files screen ignores the name" internal/attachments/versions.go \
   's.replace("`+fileNameWords+`", "true")' $app -run TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen
 
+# Spec 031: the order of work, readiness, hashing and reuse of permission facts.
+mutate "a save waits behind reading" internal/httpapi/admission.go \
+  's.replace("\tif !isRead(r) {\n\t\treturn classSave\n\t}", "\tif r.Method == \"\" {\n\t\treturn classSave\n\t}")' ./internal/httpapi/ -run TestEachRequestHasTheRightClass
+mutate "reading takes the reserve of saving" internal/httpapi/admission.go \
+  's.replace("read := max(poolSize-quarter, 1)", "read := max(poolSize, 1)")' ./internal/httpapi/ -run TestReadingLeavesAQuarterOfThePoolForSaving
+mutate "search does not count against reading" internal/httpapi/admission.go \
+  's.replace("\t\t\ttaken = append(taken, a.gates[classRead])\n", "")' ./internal/httpapi/ -run TestSearchNeverTakesTheReserveOfSaving
+mutate "the queue has no end" internal/httpapi/admission.go \
+  's.replace("if g.waiting.Add(1) > g.maxWaiting {", "if g.waiting.Add(1) < 0 {")' ./internal/httpapi/ -run TestPastTheWaitingLimitTheAnswerComesAtOnce
+mutate "probes wait in line" internal/httpapi/admission.go \
+  's.replace("\t\t\tif r.URL.Path == path {\n\t\t\t\tnext.ServeHTTP(w, r)\n\t\t\t\treturn\n\t\t\t}", "\t\t\t_ = path")' ./internal/httpapi/ -run TestProbesAndMetricsNeverWait
+mutate "a long queue is not reported" internal/httpapi/admission.go \
+  's.replace("if g.waiting.Load() > g.maxWaiting/2 {", "if g.waiting.Load() < 0 {")' ./internal/httpapi/ -run TestReadinessSaysBusyWhenAQueueIsLong
+mutate "a write reuses old permission facts" internal/httpapi/admission.go \
+  's.replace("\t\tif isRead(r) {\n\t\t\tr = r.WithContext(permissions.WithMemo", "\t\tif true {\n\t\t\tr = r.WithContext(permissions.WithMemo")' ./internal/httpapi/ -run TestOnlyAReadReusesPermissionFacts
+mutate "a full pool looks ready" internal/app/app.go \
+  's.replace("if stat := a.pool.Stat(); stat.AcquiredConns() >= stat.MaxConns() {", "if stat := a.pool.Stat(); stat.AcquiredConns() > stat.MaxConns() {")' $app -run TestAFullPoolIsBusyNotAGoneDatabase
+mutate "hashes run without a limit" internal/identity/password.go \
+  's.replace("\thashSlots <- struct{}{}\n\tdefer func() { <-hashSlots }()\n", "")' ./internal/identity/ -run TestNoMoreHashesRunAtOnceThanTheLimit
+mutate "a memo mixes up people" internal/permissions/memo.go \
+  's.replace("\tu, ok := m.users[id]\n\treturn u, ok", "\tfor _, u := range m.users {\n\t\treturn u, true\n\t}\n\treturn UserFacts{}, false")' ./internal/permissions/ -run TestTheMemoKeepsEachPersonsOwnFactsAndLivesOneContext
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

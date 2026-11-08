@@ -19,6 +19,11 @@ What it does, step by step, from the user's point of view. No implementation det
 ## Permissions and audit
 Who may do it (05). Which audit events and outbox events it produces.
 
+## Load budget
+Queries per request and writes per action, and the class of work: saving, reading, or
+search and reports (blueprint 04, ARC-233 and ARC-238). A main screen that changes gets a
+new budget in `internal/app/query_budget_test.go`, with the reason here.
+
 ## Acceptance criteria
 - [ ] Testable statements. Claude turns each into an automated test.
 

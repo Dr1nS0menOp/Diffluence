@@ -22,7 +22,7 @@ func (s *Server) registerRoutes() {
 	r := s.router
 	// Public: probes from Docker/Kubernetes/load balancers carry no session.
 	r.HandleFunc("GET /livez", Public, handleLivez)
-	r.HandleFunc("GET /readyz", Public, readyzHandler(s.deps.Ready, s.deps.Log))
+	r.HandleFunc("GET /readyz", Public, readyzHandler(s.ready, s.deps.Log))
 	// Public because a scraper has no session: the handler checks its own token.
 	r.HandleFunc("GET /metrics", Public, s.handleMetrics)
 	// Public: this is how a session is obtained. Rate limited and audited.

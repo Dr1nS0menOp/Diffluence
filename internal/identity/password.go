@@ -8,6 +8,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"unicode/utf8"
 
@@ -26,6 +27,19 @@ type Params struct {
 
 // DefaultParams follow the OWASP Password Storage Cheat Sheet minimum for Argon2id.
 var DefaultParams = Params{Memory: 19 * 1024, Time: 2, Threads: 1, SaltLen: 16, KeyLen: 32}
+
+// hashSlots limits how many hashes run at once on this node (ARC-236). Argon2id is meant
+// to be expensive, so a rush of logins would otherwise take every core and leave nothing
+// for the rest of the node. It is per process on purpose: the limit is the CPU of this
+// machine, which no caller owns.
+var hashSlots = make(chan struct{}, max(runtime.NumCPU()/2, 1))
+
+// hashKey runs Argon2id when a slot is free.
+func hashKey(pw string, salt []byte, p Params, keyLen uint32) []byte {
+	hashSlots <- struct{}{}
+	defer func() { <-hashSlots }()
+	return argon2.IDKey([]byte(pw), salt, p.Time, p.Memory, p.Threads, keyLen)
+}
 
 // Password length limits. The upper bound stops hashing from becoming a DoS vector.
 const (
@@ -57,7 +71,7 @@ func HashPassword(pw string, p Params) (string, error) {
 	}
 	salt := make([]byte, p.SaltLen)
 	_, _ = rand.Read(salt) // crypto/rand.Read never fails on supported platforms
-	key := argon2.IDKey([]byte(pw), salt, p.Time, p.Memory, p.Threads, p.KeyLen)
+	key := hashKey(pw, salt, p, p.KeyLen)
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, p.Memory, p.Time, p.Threads,
 		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
 }
@@ -72,7 +86,7 @@ func VerifyPassword(encoded, pw string, current Params) (ok, needsRehash bool, e
 	if len(pw) > MaxPasswordBytes {
 		return false, false, nil
 	}
-	got := argon2.IDKey([]byte(pw), salt, p.Time, p.Memory, p.Threads, uint32(len(key)))
+	got := hashKey(pw, salt, p, uint32(len(key)))
 	ok = subtle.ConstantTimeCompare(got, key) == 1
 	needsRehash = p.Memory < current.Memory || p.Time < current.Time || p.Threads < current.Threads ||
 		uint32(len(key)) < current.KeyLen || uint32(len(salt)) < current.SaltLen

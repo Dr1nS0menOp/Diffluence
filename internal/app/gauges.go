@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/metrics"
 )
 
@@ -31,6 +32,7 @@ func (a *App) Gauges(ctx context.Context) []metrics.Gauge {
 		{Name: "diffluence_db_pool_acquired_connections", Help: "Database connections in use.", Value: float64(stat.AcquiredConns())},
 		{Name: "diffluence_db_pool_idle_connections", Help: "Database connections waiting for work.", Value: float64(stat.IdleConns())},
 		{Name: "diffluence_db_pool_max_connections", Help: "The largest the pool may get.", Value: float64(stat.MaxConns())},
+		{Name: "diffluence_db_queries_total", Help: "Queries this node sent since it started.", Value: float64(db.Queries(a.pool))},
 	}
 	ctx, cancel := context.WithTimeout(ctx, gaugeTimeout)
 	defer cancel()

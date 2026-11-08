@@ -24,6 +24,18 @@ func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
 // LoadUser reads what evaluation needs to know about a user.
 func (s *Service) LoadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
+	m := memoOf(ctx)
+	if u, ok := m.user(id); ok {
+		return u, nil
+	}
+	u, err := s.loadUser(ctx, q, id)
+	if err == nil {
+		m.keepUser(u)
+	}
+	return u, err
+}
+
+func (s *Service) loadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
 	u := UserFacts{ID: id}
 	// An account past its end date is not active, from that moment on.
 	err := q.QueryRow(ctx, `SELECT type, status = 'active' AND (expires_at IS NULL OR expires_at > now())
@@ -53,6 +65,18 @@ func (s *Service) LoadUser(ctx context.Context, q db.Querier, id uuid.UUID) (Use
 
 // LoadSpace reads a space and its grants.
 func (s *Service) LoadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {
+	m := memoOf(ctx)
+	if f, ok := m.space(id); ok {
+		return f, nil
+	}
+	f, err := s.loadSpace(ctx, q, id)
+	if err == nil {
+		m.keepSpace(f)
+	}
+	return f, err
+}
+
+func (s *Service) loadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {
 	f := SpaceFacts{ID: id}
 	err := q.QueryRow(ctx, "SELECT status FROM spaces WHERE id = $1", id).Scan(&f.Status)
 	if errors.Is(err, pgx.ErrNoRows) {
