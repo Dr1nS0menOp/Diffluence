@@ -109,6 +109,9 @@ func LoadBlocklist(path string) (map[string]bool, error) {
 	return out, scan.Err()
 }
 
+// productWord may not appear in a password.
+const productWord = "diffluence"
+
 // validateNewPassword applies every rule to a new password. NIST SP 800-63B asks
 // for a check against known bad passwords, and not for odd characters.
 func (s *Service) validateNewPassword(password, email, name string) error {
@@ -124,7 +127,8 @@ func (s *Service) validateNewPassword(password, email, name string) error {
 		return apperr.Invalid("This password is on a list of leaked passwords. Choose another one.")
 	}
 	local, _, _ := strings.Cut(strings.ToLower(email), "@")
-	parts := append(strings.Fields(strings.ToLower(name)), local)
+	// The name of the product is the first word anyone tries against a login here (SEC-106).
+	parts := append(strings.Fields(strings.ToLower(name)), local, productWord)
 	for _, part := range parts {
 		if utf8.RuneCountInString(part) >= minNamePartForPassword && strings.Contains(lower, part) {
 			return apperr.Invalid("A password cannot hold your name or e-mail address.")

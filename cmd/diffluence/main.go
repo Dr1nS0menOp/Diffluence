@@ -39,6 +39,8 @@ Commands:
   audit verify              verify the audit log hash chain
   audit prune               remove audit rows past their retention, as the owner of the tables
   key <step>                replace master.key without downtime; see diffluence key
+  session end --email ADDR  log one person out everywhere, without disabling them
+  session end --all         log everyone out, for an incident
   healthcheck               ask a running server on this machine whether it is ready
   client <command>          use the API of a server with a token; see diffluence client
   version                   print the version
@@ -83,6 +85,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		}
 	case "key":
 		err = cmdKey(ctx, args[1:], stdout, stderr)
+	case "session":
+		if len(args) < 2 || args[1] != "end" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdEndSessions(ctx, args[2:], stdout)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
 	case "help", "-h", "--help":

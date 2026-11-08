@@ -18,7 +18,7 @@ How to read this chapter: see `../05-data-and-permissions.md`. Every line has a 
 - **DAT-012** · built · A derived table holds no rule. Whoever reads it joins through `perm_visible_pages`, or through the function that replaces it for lists (DAT-013).
 - **DAT-013** · wave D · `perm_listed_pages(u)` is what lists use: visible and not archived. `perm_visible_pages(u)` stays what a direct address uses.
 - **DAT-014** · built · Foreign keys that delete have one of three meanings, and each is chosen on purpose. `CASCADE`: the child has no meaning without the parent. `SET NULL`: the link is optional. No key: the row must outlive its target, as in `audit_events` and `page_links.target_id`.
-- **DAT-015** · partly · **Nothing may fall open through a delete.** `pages.parent_id` is `ON DELETE SET NULL` and `page_tree` cascades. So deleting a parent row without its branch would lift an inherited view restriction. Today only `Purge` deletes pages, and it takes the whole branch. That is a promise in code, not in the schema (GAP-019).
+- **DAT-015** · built · **Nothing may fall open through a delete.** `pages.parent_id` is `ON DELETE SET NULL` and `page_tree` cascades. So deleting a parent row without its branch would lift an inherited view restriction. Today only `Purge` deletes pages, and it takes the whole branch. That is a promise in code, not in the schema (GAP-019).
 
 ## 1.2 What can happen to a row
 

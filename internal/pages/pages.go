@@ -30,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/plaintext"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/tasks"
@@ -133,7 +134,7 @@ func NewService(pool *pgxpool.Pool, perms *permissions.Service, att *attachments
 }
 
 func cleanTitle(title string) (string, error) {
-	title = strings.TrimSpace(title)
+	title = strings.TrimSpace(plaintext.WithoutDirectionMarks(title))
 	if title == "" {
 		return "", apperr.Invalid("A page needs a title.")
 	}

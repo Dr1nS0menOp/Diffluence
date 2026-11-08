@@ -9,7 +9,7 @@
 - **SEC-602** · built · *System administrator* is separate, and only one can grant it.
 - **SEC-603** · built · Settings changes are audited with what changed.
 - **SEC-604** · built · Reading and exporting the audit log is itself audited.
-- **SEC-605** · wave F · Heavy actions need a recent proof of identity, through the `Sensitive` route wrapper: granting *administrator*, resets, anonymising, recover access, SCIM and service tokens, maintenance mode, audit retention and the rule for second factors (ASVS 7.5.1, 7.5.3).
+- **SEC-605** · built · Heavy actions need a recent proof of identity, through the `Sensitive` route wrapper: granting *administrator*, resets, anonymising, recover access, SCIM and service tokens, maintenance mode, audit retention and the rule for second factors (ASVS 7.5.1, 7.5.3).
 - **SEC-606** · new · **Medium.** Titles and filenames are in the details of audit events, and the audit screen shows them to administrators. So an administrator can read the title of a restricted page, and "administrators do not read content by default" holds for text but not for titles. Spec 013 hides titles in the audit of a space, and the instance's audit screen still shows them. The product owner decided (ADR-029): an administrator sees the id of a restricted page with "(Censored title)", on the screen and in exports.
 - **SEC-607** · built · There is no way to log in as someone else, and none is planned. Nobody can act as a person without leaving their own name.
 - **SEC-608** · new · The console has no second layer of its own (ASVS 8.4.2, Level 3). Requiring a second factor for administrators is that layer (SEC-164). An address filter for the console can come later. Low.
@@ -41,7 +41,7 @@
 - **SEC-635** · built · `scripts/backup.sh` runs with `umask 077`, writes checksums, and a restore drill exists. Restore verifies the audit chain.
 - **SEC-636** · built · **High.** Backups are not encrypted, while this blueprint promised AES-256 before they leave the host. The script also copies `master.key` into the same folder as the database and files, and only prints a reminder. Whoever gets that folder gets everything, including TOTP seeds. Encrypt the backup with a key the operator holds, and write the key file somewhere else by default. Belongs in phase 3, and earlier for the script. Built: all of a backup is encrypted with AES-256 through `gpg`, plain data never reaches the disk, the script refuses to run without a key or with the key in the backup folder, and the drill proves it (spec 021).
 - **SEC-637** · built · The guide says to keep `master.key` and the secrets apart from the rest.
-- **SEC-638** · wave F · After a restore, anonymising must be done again, which the operations guide will say.
+- **SEC-638** · built · After a restore, anonymising must be done again, which the operations guide will say.
 - **SEC-639** · partly · An automatic restore test, and RPO and RTO of at most 4 hours. Built: the restore drill runs every night in CI. Still open: RPO and RTO measured on real data.
 
 ## 7.4 Upgrades and availability
@@ -57,4 +57,4 @@
 
 - **SEC-655** · partly · A daily job verifies the audit chain and writes the result as an audit event. A failure goes to the log, not to a person. Show it in the console, and notify administrators, once wave C has notifications. Medium.
 - **SEC-656** · new · Alerts for what matters: many failed logins, a burst of refusals, a new administrator, a recovered access, a failed chain check. Metrics belong in phase 3, and events can go to a SIEM (SEC-832).
-- **SEC-657** · new · An operator's runbook for an incident: end sessions, rotate keys, read the audit log, restore, tell people. Belongs in `docs/operations/` before 1.0.
+- **SEC-657** · built · An operator's runbook for an incident: end sessions, rotate keys, read the audit log, restore, tell people. Belongs in `docs/operations/` before 1.0.

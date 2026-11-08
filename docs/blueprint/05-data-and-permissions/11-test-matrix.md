@@ -6,7 +6,7 @@ NIST SP 800-192 asks that a policy written as a model is checked for inconsisten
 
 - **PRM-150** · built · `literalRule`, written out by hand in the test, on the case tables and not on production types. `permissions.Evaluate`. The SQL functions on real rows. Any difference fails the build.
 - **PRM-151** · built · Every bug found later adds a case. Every new rule adds a dimension, and lands in the same commit in all three places.
-- **PRM-152** · wave D · Second paths join the matrix: `mayReadRound`, the `templates` module's rule, `UndoDelete`.
+- **PRM-152** · built · Second paths join the matrix: `mayReadRound`, the `templates` module's rule, `UndoDelete`.
 - **PRM-153** · wave E · Named variants of the rule join too, such as "could have seen this page".
 
 ## 11.2 Dimensions
@@ -28,9 +28,9 @@ Status **built** means it is in `matrix_test.go` today.
 | **PRM-164** | built | Space state | active, archived, trashed |
 | **PRM-165** | built | Action | view, create, edit, archive, delete, add file, delete file, manage restrictions, export, administer |
 | **PRM-166** | new | Action, missing | `space.view` at space level with no page, `comment.add`, delete with a creator who differs from the page's creator |
-| **PRM-167** | wave C | Action, later | `comment.delete`, comment view with `editors_only` |
-| **PRM-168** | wave F | Action, later | `space.manage_access` |
-| **PRM-169** | wave H | Action, later | `analytics.view` |
+| **PRM-167** | built | Action, later | `comment.delete`, comment view with `editors_only` |
+| **PRM-168** | built | Action, later | `space.manage_access` |
+| **PRM-169** | built | Action, later | `analytics.view` |
 
 Today: 6 people × 11 grants × 13 restrictions × 4 page states × 3 space states × 10 actions = **102,960 cases** in `Evaluate`. The test fails if that falls below 10,000. Adding the lines marked new gives roughly 450,000, which is still quick for a pure function. The SQL half needs real rows, so it should use a smaller set (PRM-173).
 
@@ -77,7 +77,7 @@ permission_for(other)           = holds(other)
 - **PRM-174** · new · **Restriction survival:** for every operation that changes the place of a page (move, copy, archive, restore, import, bundle, delete and undo), a test proves that nobody can see the page who could not see it before, unless the actor held *manage restrictions*.
 - **PRM-175** · built · **Mutation:** `scripts/mutation-check.sh` breaks a rule on purpose, and the tests must notice. Each new rule adds a line. A wave B mutation caught that a test proved nothing, because nobody had the searched name.
 - **PRM-176** · new · **Purge walk:** after a purge and after anonymising, a test walks every table through `information_schema`. It looks for the id in every `uuid` column and for planted words in every text and JSON column. A new table is covered the moment it exists. Wave F has the text half. The id half finds rows such as `follows`.
-- **PRM-177** · new · **No fall-open:** a test deletes a parent row directly, and proves no child becomes more visible (GAP-019).
+- **PRM-177** · built · **No fall-open:** a test deletes a parent row directly, and proves no child becomes more visible (GAP-019).
 
 ## 11.5 What the rule does not test
 

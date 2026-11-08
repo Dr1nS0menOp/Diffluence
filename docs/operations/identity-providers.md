@@ -48,3 +48,17 @@ Any provider with discovery, the code flow and PKCE should work. For a groups cl
 - Deleting a user through SCIM disables the account. Their content and audit trail stay.
 - Groups from SCIM or OIDC are read-only in the admin console.
 - If a provider removes the last administrator, `diffluence user create-admin` is the way back.
+
+## How long a login lasts
+
+A login through a provider opens a session here, and from then on the two run apart:
+
+- **Ending a session at the provider does not end it here.** It runs until its idle limit (8 hours by default) or its absolute limit (7 days), unless SCIM disables the person, which ends it at once. Set `DIFFLUENCE_SESSION_IDLE_TIMEOUT` shorter if that matters, and use SCIM so leaving the organisation counts here straight away.
+- **Asking for proof again** before a heavy action sends a person back to the provider for a fresh login.
+- **A provider with a shorter session** does not shorten ours. Choose the limits here with the provider's in mind, and write the choice down.
+
+## Who gets an account
+
+`DIFFLUENCE_OIDC_AUTO_CREATE` is on by default: **everyone the provider lets in gets an account here at their first login.** That suits a provider that only holds your own organisation. With a shared or public provider, turn it off and create accounts through SCIM or by invitation, or limit who may log in at the provider itself.
+
+A group from the provider can hold *administrator*. Whoever controls that group at the provider then controls this instance, so treat the provider's administrators as administrators here, and protect their accounts the same way.

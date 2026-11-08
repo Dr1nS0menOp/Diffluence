@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"golang.org/x/crypto/argon2"
+	"golang.org/x/text/unicode/norm"
 )
 
 // Params are Argon2id settings. Stored hashes carry their own parameters, so
@@ -55,6 +56,7 @@ var (
 
 // ValidatePassword checks the length rules.
 func ValidatePassword(pw string) error {
+	pw = norm.NFC.String(pw)
 	if len(pw) > MaxPasswordBytes {
 		return ErrPasswordTooLong
 	}
@@ -65,15 +67,22 @@ func ValidatePassword(pw string) error {
 }
 
 // HashPassword returns a PHC-formatted Argon2id hash.
+// The password is normalised to NFC first, so the same password typed on two systems,
+// composed or decomposed, gives the same hash (NIST SP 800-63B, SEC-107).
 func HashPassword(pw string, p Params) (string, error) {
+	pw = norm.NFC.String(pw)
 	if len(pw) > MaxPasswordBytes {
 		return "", ErrPasswordTooLong
 	}
 	salt := make([]byte, p.SaltLen)
 	_, _ = rand.Read(salt) // crypto/rand.Read never fails on supported platforms
-	key := hashKey(pw, salt, p, p.KeyLen)
+	return encodeHash(p, salt, hashKey(pw, salt, p, p.KeyLen)), nil
+}
+
+// encodeHash writes a hash in the PHC format.
+func encodeHash(p Params, salt, key []byte) string {
 	return fmt.Sprintf("$argon2id$v=%d$m=%d,t=%d,p=%d$%s$%s", argon2.Version, p.Memory, p.Time, p.Threads,
-		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key)), nil
+		base64.RawStdEncoding.EncodeToString(salt), base64.RawStdEncoding.EncodeToString(key))
 }
 
 // VerifyPassword checks pw against an encoded hash in constant time.
@@ -86,9 +95,16 @@ func VerifyPassword(encoded, pw string, current Params) (ok, needsRehash bool, e
 	if len(pw) > MaxPasswordBytes {
 		return false, false, nil
 	}
-	got := hashKey(pw, salt, p, uint32(len(key)))
-	ok = subtle.ConstantTimeCompare(got, key) == 1
-	needsRehash = p.Memory < current.Memory || p.Time < current.Time || p.Threads < current.Threads ||
+	normal := norm.NFC.String(pw)
+	ok = subtle.ConstantTimeCompare(hashKey(normal, salt, p, uint32(len(key))), key) == 1
+	// A hash from before normalising holds the bytes as typed. Only a password that is not
+	// already NFC costs a second hash, and a match is stored again in the new form.
+	asTyped := false
+	if !ok && normal != pw {
+		ok = subtle.ConstantTimeCompare(hashKey(pw, salt, p, uint32(len(key))), key) == 1
+		asTyped = ok
+	}
+	needsRehash = asTyped || p.Memory < current.Memory || p.Time < current.Time || p.Threads < current.Threads ||
 		uint32(len(key)) < current.KeyLen || uint32(len(salt)) < current.SaltLen
 	return ok, needsRehash, nil
 }

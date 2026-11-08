@@ -26,6 +26,7 @@ import (
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/plaintext"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/trash"
@@ -95,7 +96,7 @@ const maxIconRunes = 12
 var keyPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{1,31}$`)
 
 func (in *Input) validate() error {
-	in.Name = strings.TrimSpace(in.Name)
+	in.Name = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.Name))
 	in.Description = strings.TrimSpace(in.Description)
 	in.Icon = strings.TrimSpace(in.Icon)
 	switch {

@@ -40,6 +40,12 @@ func newEnv(t *testing.T) *env {
 
 func newEnvWith(t *testing.T, change func(*config.Config)) *env {
 	t.Helper()
+	return newEnvLogging(t, change, slog.New(slog.DiscardHandler))
+}
+
+// newEnvLogging is newEnvWith with a logger of the test's choosing.
+func newEnvLogging(t *testing.T, change func(*config.Config), log *slog.Logger) *env {
+	t.Helper()
 	tdb := testutil.Database(t)
 	u, _ := url.Parse("http://localhost")
 	cfg := config.Config{
@@ -48,7 +54,7 @@ func newEnvWith(t *testing.T, change func(*config.Config)) *env {
 		SessionIdleTimeout: time.Hour, SessionMaxAge: 24 * time.Hour,
 	}
 	change(&cfg)
-	a, err := app.New(context.Background(), cfg, slog.New(slog.DiscardHandler))
+	a, err := app.New(context.Background(), cfg, log)
 	if err != nil {
 		t.Fatal(err)
 	}

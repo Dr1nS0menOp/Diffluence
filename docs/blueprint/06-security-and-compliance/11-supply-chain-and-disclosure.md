@@ -13,7 +13,7 @@
 - **SEC-1006** · new · **Medium.** There is no SBOM. ASVS 15.1.2 asks for an inventory, and customers and the Cyber Resilience Act will too. Generate one per release, for Go, npm and the image. Belongs before the first beta.
 - **SEC-1007** · new · ASVS 15.1.1 asks for time limits for fixing vulnerable components. Proposal: critical 7 days, high 30, medium 90, and a yearly check on abandoned packages.
 - **SEC-1008** · new · A list of risky components (ASVS 15.1.4), which this document starts in chapter 6: anything that parses hostile files, and anything alpha.
-- **SEC-1009** · wave F · The leaked password list is data from SecLists (MIT), with a generator so it can be rebuilt, and an entry in `docs/dependencies.md`.
+- **SEC-1009** · built · The leaked password list is data from SecLists (MIT), with a generator so it can be rebuilt, and an entry in `docs/dependencies.md`.
 
 ## 11.2 Building and releasing
 
@@ -31,7 +31,7 @@
 - **SEC-1022** · partly · Fuzzing covers the Markdown reader and the document gate, nightly. Wave G adds every format reader. The SCIM filter parser has no target yet. Low.
 - **SEC-1023** · partly · `09-way-of-working.md` lists gates that are not in `ci.yml`: Semgrep, CodeQL and an OWASP ZAP baseline. Either add them or change the list. A check on paper is worse than none. CodeQL and a ZAP baseline are cheap. Medium.
 - **SEC-1024** · new · The code is written by AI sessions, and read by no person. The checks stand in for review, which covers what they know about. Fresh review sessions and the penetration test must cover the rest, and no review session has run yet: see SEC-006.
-- **SEC-1025** · new · A test that scans all logs and audit details from a test run for planted secrets. Low, and cheap.
+- **SEC-1025** · built · A test that scans all logs and audit details from a test run for planted secrets. Low, and cheap.
 
 ## 11.4 Reporting and fixing
 

@@ -94,28 +94,36 @@ type flow struct {
 	Nonce    string `json:"nonce"`
 	Verifier string `json:"verifier"`
 	Binding  string `json:"binding"`
+	// FreshAfter is set for a step-up: the provider must say the person logged in after
+	// this moment, in Unix seconds. Zero = an ordinary login.
+	FreshAfter int64 `json:"fresh_after,omitempty"`
 }
 
 // Start begins a login. It returns the URL to send the browser to, and a value
 // for a cookie that ties the flow to this browser. That stops an attacker from
 // slipping their own login into someone else's browser.
 func (p *Provider) Start(ctx context.Context) (redirect, binding string, err error) {
-	return p.start(ctx)
+	return p.start(ctx, false)
 }
 
 // StartFresh begins a login in which the provider must ask again, also when the
 // person is still logged in there. It is the step-up of an account without a
 // password in Diffluence (spec 013, F6).
 func (p *Provider) StartFresh(ctx context.Context) (redirect, binding string, err error) {
-	return p.start(ctx, oauth2.SetAuthURLParam("prompt", "login"))
+	// prompt=login asks the provider to ask again, and max_age=0 makes it say when it did
+	// (auth_time), so Callback can check that it really asked: a provider may ignore prompt.
+	return p.start(ctx, true, oauth2.SetAuthURLParam("prompt", "login"), oauth2.SetAuthURLParam("max_age", "0"))
 }
 
-func (p *Provider) start(ctx context.Context, extra ...oauth2.AuthCodeOption) (redirect, binding string, err error) {
+func (p *Provider) start(ctx context.Context, fresh bool, extra ...oauth2.AuthCodeOption) (redirect, binding string, err error) {
 	_, config, err := p.discover(ctx)
 	if err != nil {
 		return "", "", err
 	}
 	f := flow{Nonce: oauth2.GenerateVerifier(), Verifier: oauth2.GenerateVerifier(), Binding: oauth2.GenerateVerifier()}
+	if fresh {
+		f.FreshAfter = time.Now().Add(-freshSkew).Unix()
+	}
 	state, err := p.identity.NewChallenge(ctx, p.pool, challengeKind, nil, f, flowTTL)
 	if err != nil {
 		return "", "", err
@@ -131,7 +139,11 @@ type claims struct {
 	EmailVerified     *bool  `json:"email_verified"`
 	Name              string `json:"name"`
 	PreferredUsername string `json:"preferred_username"`
+	AuthTime          int64  `json:"auth_time"`
 }
+
+// freshSkew allows for clocks that differ a little between the provider and this server.
+const freshSkew = time.Minute
 
 var providerError = regexp.MustCompile(`^[a-z_]{1,64}$`)
 
@@ -187,6 +199,9 @@ func (p *Provider) Callback(ctx context.Context, state, code, binding string, me
 	var c claims
 	if err := idToken.Claims(&c); err != nil || c.Subject == "" {
 		return fail("bad_claims", ErrFailed)
+	}
+	if f.FreshAfter != 0 && c.AuthTime < f.FreshAfter {
+		return fail("not_fresh", ErrFailed)
 	}
 	var all map[string]any
 	if err := idToken.Claims(&all); err != nil {

@@ -15,8 +15,8 @@
 - **SEC-208** · built · Answers use typed structs with chosen fields, not whole rows (ASVS 15.3.1).
 - **SEC-209** · built · Administrators have no content access by default. Recover access needs a reason and is audited.
 - **SEC-210** · partly · The rules are in `05-data-and-permissions.md` (ASVS 8.1.1), and rules per field are not written down (ASVS 8.1.2). The access table in wave F should cover them.
-- **SEC-211** · wave F · People directories limit what a guest can see, and a person can hide their address. `GET /directory` hands out addresses to everyone with *view profiles* today.
-- **SEC-212** · wave D · Bulk actions check every page, and report what was skipped. A bulk action must never act on a page the person cannot see.
+- **SEC-211** · built · People directories limit what a guest can see, and a person can hide their address. `GET /directory` hands out addresses to everyone with *view profiles* today.
+- **SEC-212** · built · Bulk actions check every page, and report what was skipped. A bulk action must never act on a page the person cannot see.
 
 ## 3.2 The API
 
@@ -29,13 +29,13 @@
 - **SEC-224** · built · Errors say what a person can do about them. Internal details stay in the log, with a request id to find them (ASVS 16.5.1).
 - **SEC-225** · built · There is no CORS: no cross-origin caller is allowed, so nothing can be misconfigured (ASVS 3.4.2).
 - **SEC-226** · built · Only the methods of a route work, because the router matches on them. `TRACE` has no route (ASVS 4.1.4, 13.4.4).
-- **SEC-227** · wave F · Personal API tokens have a name, an end date and a limited scope, are stored hashed, and are shown once (ACC-019).
-- **SEC-228** · wave F · Routes that manage tokens, sessions or factors work with a session only, never with a token (`SessionOnly`). A stolen token cannot make a new one.
-- **SEC-229** · wave H · Scopes `read`, `write`, `export` and `admin` are checked in the middleware, the module's checks still apply, and a token never exceeds its owner.
-- **SEC-230** · wave H · The audit log says which token made a call. `audit.Event` knows user, system and anonymous, so it needs a field for this. Spec 015 does not name it.
+- **SEC-227** · built · Personal API tokens have a name, an end date and a limited scope, are stored hashed, and are shown once (ACC-019).
+- **SEC-228** · built · Routes that manage tokens, sessions or factors work with a session only, never with a token (`SessionOnly`). A stolen token cannot make a new one.
+- **SEC-229** · built · Scopes `read`, `write`, `export` and `admin` are checked in the middleware, the module's checks still apply, and a token never exceeds its owner.
+- **SEC-230** · built · The audit log says which token made a call. `audit.Event` knows user, system and anonymous, so it needs a field for this. Spec 015 does not name it.
 - **SEC-231** · new · Medium. Only login has a limit. Any other route can be called as fast as a person likes, and search and exports are the expensive ones. Limits per person and per token belong in phase 3 (ASVS 2.4.1, 15.2.2). Spec 015 limits tokens, and sessions need the same.
 - **SEC-232** · partly · Every refused request writes an audit event, so a flood of refusals can fill the log and slow writing. It was accepted for now in the threat model. It needs the limit of SEC-231.
-- **SEC-233** · wave H · An OpenAPI description matches the routes, and every entry has its access rule.
+- **SEC-233** · built · An OpenAPI description matches the routes, and every entry has its access rule.
 - **SEC-234** · later · Full OAuth for apps stays in phase 7, by the product owner's choice. Tokens with scopes serve scripts until then.
 
 ## 3.3 Requests from other sites
@@ -46,7 +46,7 @@
 - **SEC-241** · built · The session cookie is `SameSite=Strict`, so it does not travel on requests from another site.
 - **SEC-242** · built · The protection only covers unsafe methods, so nothing may change on `GET`. Two `GET` routes have small effects: reading a page updates the person's own recent list, and `?download=1` writes an audit event. Neither gives an attacker anything, and strict cookies do not travel cross-site.
 - **SEC-243** · new · A test that no new `GET` route writes to the database. Low. Belongs next to the route walker.
-- **SEC-244** · wave H · Public routes for incoming hooks and one-click unsubscribe have no session, so the protection does not matter to them. Their token is the proof, and they can only do one small thing.
+- **SEC-244** · built · Public routes for incoming hooks and one-click unsubscribe have no session, so the protection does not matter to them. Their token is the proof, and they can only do one small thing.
 
 ## 3.4 What the browser is told
 
@@ -61,7 +61,7 @@
 - **SEC-256** · partly · HSTS is sent when the public address is https (ASVS 3.4.1). See SEC-257.
 - **SEC-257** · new · Medium. Cookies only get `Secure`, the `__Host-` prefix and HSTS when `DIFFLUENCE_PUBLIC_URL` starts with https, and the reference `compose.yaml` defaults to `http://localhost:8080`. An operator who puts a TLS proxy in front and forgets the address gets weak cookies, without any warning. Log a loud warning at start, and show it in the admin console. Belongs in wave F.
 - **SEC-258** · built · The app never uses `dangerouslySetInnerHTML`, and text reaches the screen through React or the editor, so a search snippet is text with markers (ASVS 3.2.2).
-- **SEC-259** · wave E · `frame-src` stays `'none'` unless an administrator sets up a service. Then only that address is allowed. External embeds stay out (BLK-068).
+- **SEC-259** · built · `frame-src` stays `'none'` unless an administrator sets up a service. Then only that address is allowed. External embeds stay out (BLK-068).
 - **SEC-260** · wave H · `connect-src` gets the `wss:` address of the collab service only when that service is on.
 
 ## 3.5 What stays in the browser

@@ -27,7 +27,9 @@ import (
 )
 
 const (
-	pdfTimeout        = 5 * time.Minute
+	pdfTimeout = 5 * time.Minute
+	// helperUser is the name the PDF helper expects with its password (compose.yaml).
+	helperUser        = "diffluence"
 	pdfConvertPath    = "/forms/chromium/convert/html"
 	maxPDFDesignRunes = 200
 )
@@ -49,6 +51,17 @@ func (s *Service) PDFAvailable() bool { return s.pdfURL != "" }
 
 // SetPDFHelper points to the helper process. Tests use it to fit a fake one.
 func (s *Service) SetPDFHelper(url string) { s.pdfURL = url }
+
+// SetPDFPassword sets what the helper asks for. Tests use it with a fake helper.
+func (s *Service) SetPDFPassword(password string) { s.pdfPassword = password }
+
+// askHelper sends a request to the PDF helper, with its password when one is set.
+func (s *Service) askHelper(req *http.Request) (*http.Response, error) {
+	if s.pdfPassword != "" {
+		req.SetBasicAuth(helperUser, s.pdfPassword)
+	}
+	return http.DefaultClient.Do(req)
+}
 
 // PDFDesignOf reads the design of a space.
 func (s *Service) PDFDesignOf(ctx context.Context, c identity.Caller, spaceID uuid.UUID) (PDFDesign, error) {
@@ -178,7 +191,7 @@ func (w *exportWriter) pdf(parent context.Context) error {
 		return err
 	}
 	req.Header.Set("Content-Type", contentType)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := w.s.askHelper(req)
 	if err != nil {
 		return apperr.Invalid("The PDF helper did not answer. Try again later, or ask an administrator.")
 	}

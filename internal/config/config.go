@@ -63,6 +63,9 @@ type Config struct {
 	MetricsToken string
 	// PDFURL is the helper process that makes PDF files. Empty = no PDF.
 	PDFURL string
+	// PDFPassword is what the PDF helper asks for, sent as basic authentication. Empty =
+	// the helper asks nothing, for installs from before it could.
+	PDFPassword string
 	// CollaboraURL is an office service. It opens office files as a PDF, in place of the
 	// LibreOffice of the PDF helper. Empty = that helper, if there is one.
 	CollaboraURL string
@@ -156,6 +159,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		CollabToken:           l.str("COLLAB_TOKEN", ""),
 		MetricsToken:          l.str("METRICS_TOKEN", ""),
 		PDFURL:                l.str("PDF_URL", ""),
+		PDFPassword:           l.str("PDF_PASSWORD", ""),
 		CollaboraURL:          l.str("COLLABORA_URL", ""),
 		PublishDir:            l.str("PUBLISH_DIR", ""),
 		OIDC: OIDC{

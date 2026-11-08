@@ -47,7 +47,7 @@ ASVS 11.1.2 asks for an inventory. Primitives come from the Go standard library 
 - **SEC-720** · built · Secrets stay out of the database on purpose: database addresses, the OIDC client secret and the mail password come from the environment or a file. The blueprint said OIDC secrets would be sealed in the database, and this simpler way replaced it.
 - **SEC-721** · built · The access log has no query strings or bodies, and no secret is written to the audit log. Tests and review watch for this.
 - **SEC-722** · new · `.gitignore` covers `secrets/` and `.env`, and GitHub secret scanning should be on. A scan in CI would make that a check instead of a setting (ASVS 13.3.1). Low.
-- **SEC-723** · new · Write down how each secret is rotated and how often (ASVS 13.1.4, 13.3.4): database roles, OIDC client secret, mail password, service secrets.
+- **SEC-723** · built · Write down how each secret is rotated and how often (ASVS 13.1.4, 13.3.4): database roles, OIDC client secret, mail password, service secrets.
 
 ## 8.4 Encryption at rest and on the way
 

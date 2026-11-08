@@ -55,6 +55,8 @@ type Service struct {
 	log         *slog.Logger
 	tempDir     string
 	pdfURL      string
+	// pdfPassword is sent to the PDF helper, never to Collabora. Empty = none.
+	pdfPassword string
 	// collaboraURL is an office service that an administrator configured. Empty = none.
 	collaboraURL string
 }
@@ -63,6 +65,8 @@ type Service struct {
 type Options struct {
 	TempDir string
 	PDFURL  string // the helper process that makes PDF files; empty = no PDF
+	// PDFPassword is what the PDF helper asks for. Empty = it asks nothing.
+	PDFPassword string
 	// CollaboraURL converts office files when it is set, in place of the PDF helper.
 	CollaboraURL string
 	Log          *slog.Logger
@@ -75,7 +79,7 @@ type Options struct {
 func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, att *attachments.Service,
 	store storage.Store, jb *jobs.Service, st *settings.Service, o Options) *Service {
 	s := &Service{pool: pool, perms: perms, pages: pg, attachments: att, store: store, jobs: jb, settings: st,
-		log: o.Log, tempDir: o.TempDir, pdfURL: o.PDFURL, collaboraURL: o.CollaboraURL, keyring: o.Keyring, instanceID: o.InstanceID}
+		log: o.Log, tempDir: o.TempDir, pdfURL: o.PDFURL, pdfPassword: o.PDFPassword, collaboraURL: o.CollaboraURL, keyring: o.Keyring, instanceID: o.InstanceID}
 	jb.RegisterLong(JobKindImport, s.runImport)
 	jb.RegisterLong(JobKindImportRead, s.readImport)
 	jb.RegisterLong(JobKindExport, s.runExport)

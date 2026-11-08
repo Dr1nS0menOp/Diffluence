@@ -20,24 +20,24 @@
 
 Wave G, spec 014.
 
-- **DAT-138** · wave G · `export_runs`: job, space, format, options, object key, file name, size, created by, expiry. Only the person who started it can download it. It needs the list of pages it holds (GAP-008).
-- **DAT-139** · wave G · `export_policy`, `space_pdf_design`.
-- **DAT-140** · wave G · `import_runs`, `import_items`. An item ties a source to the page it made, so Undo can work. A former author has no user row, so the model needs a place for that name (GAP-029).
-- **DAT-141** · wave G · A bundle is a zip with `manifest.json`, a SHA-256 per file, and a detached signature. It holds no passwords, sessions, tokens, audit events or view data.
-- **DAT-142** · wave G · `public_sites`, `public_site_pages`, `public_site_builds`, `public_links` (with a token of 128 random bits). A built site is a copy outside every rule, so what goes in is decided by PRM-096 to PRM-099.
+- **DAT-138** · built · `export_runs`: job, space, format, options, object key, file name, size, created by, expiry. Only the person who started it can download it. It needs the list of pages it holds (GAP-008).
+- **DAT-139** · built · `export_policy`, `space_pdf_design`.
+- **DAT-140** · built · `import_runs`, `import_items`. An item ties a source to the page it made, so Undo can work. A former author has no user row, so the model needs a place for that name (GAP-029).
+- **DAT-141** · built · A bundle is a zip with `manifest.json`, a SHA-256 per file, and a detached signature. It holds no passwords, sessions, tokens, audit events or view data.
+- **DAT-142** · built · `public_sites`, `public_site_pages`, `public_site_builds`, `public_links` (with a token of 128 random bits). A built site is a copy outside every rule, so what goes in is decided by PRM-096 to PRM-099.
 
 ## 6.4 Analytics
 
 Wave H, spec 015.
 
-- **DAT-143** · wave H · `page_view_days`, `page_view_links`, `analytics_days`: counts without people.
-- **DAT-144** · wave H · `page_view_seen`, `analytics_salts`: an HMAC of a person's id with a salt per day. Both go when the day closes, so nothing can be traced back.
-- **DAT-145** · wave H · `page_view_people`: only in name mode, off by default (ADR-026). Leaving that mode deletes the rows in the same transaction.
-- **DAT-146** · wave H · `search_terms`: without people, shown from three uses. A term can hold a name.
+- **DAT-143** · built · `page_view_days`, `page_view_links`, `analytics_days`: counts without people.
+- **DAT-144** · built · `page_view_seen`, `analytics_salts`: an HMAC of a person's id with a salt per day. Both go when the day closes, so nothing can be traced back.
+- **DAT-145** · built · `page_view_people`: only in name mode, off by default (ADR-026). Leaving that mode deletes the rows in the same transaction.
+- **DAT-146** · built · `search_terms`: without people, shown from three uses. A term can hold a name.
 
 ## 6.5 Automation and the outside
 
-- **DAT-147** · wave H · `automation_rules`, `automation_runs` (with `UNIQUE (rule_id, event_id)`), `automation_hooks` (hashed token). A run's report must hold ids, not titles (GAP-009).
-- **DAT-148** · wave H · `outgoing_hosts`: empty by default, so nothing leaves.
-- **DAT-149** · wave H · `webhook_endpoints` (sealed secrets), `webhook_deliveries` (no bodies).
-- **DAT-150** · wave H · `page_presence`: who is here, for 60 seconds, only when not turned off.
+- **DAT-147** · built · `automation_rules`, `automation_runs` (with `UNIQUE (rule_id, event_id)`), `automation_hooks` (hashed token). A run's report must hold ids, not titles (GAP-009).
+- **DAT-148** · built · `outgoing_hosts`: empty by default, so nothing leaves.
+- **DAT-149** · built · `webhook_endpoints` (sealed secrets), `webhook_deliveries` (no bodies).
+- **DAT-150** · built · `page_presence`: who is here, for 60 seconds, only when not turned off.

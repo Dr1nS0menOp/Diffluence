@@ -67,6 +67,18 @@ Diffluence creates `master.key` in the data directory on first start. It protect
 
 With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MASTER_KEY_FILE` to the same key on every node. Diffluence refuses to start without it. HA itself is phase 3: attachments are on local disk until the S3 store exists.
 
+## Helpers and what they may reach
+
+Each optional helper runs in its own container on the `helpers` network, which has no way out (SEC-501, SEC-507). What each one gets:
+
+| Helper | Reaches | Sees | Notes |
+|---|---|---|---|
+| `pdf` (Gotenberg) | Nothing; only the app reaches it | The HTML of an export, and office files a reader opens as a preview | Set a long `DIFFLUENCE_PDF_PASSWORD` in `.env`: the helper then answers only the app. It fetches no address, runs no script in pages, keeps nothing on disk, and runs read-only without extra rights |
+| `collab` | The app, to check each connection | The shared draft of a page for people who may edit it | Needs `DIFFLUENCE_COLLAB_TOKEN` on both sides |
+| Collabora, draw.io | What you set up | Office files or drawings a person opens | Run them on the same closed network when you can |
+
+**The app itself** needs to reach only PostgreSQL, the mail server, the identity provider, and the addresses an administrator allowed under Outgoing calls. A firewall rule that allows only those, and nothing else on the way out, stops a mistake from becoming a leak (SEC-433).
+
 ## Health
 
 - `/livez`: the process is alive

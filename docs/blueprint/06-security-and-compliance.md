@@ -43,14 +43,16 @@ Every ASVS reference is to version 5.0.0, so `ASVS 6.2.1` stands for `v5.0.0-6.2
 
 ## Where it stands
 
+Counted again in spec 035, against the code and the tests. Lines still marked with the wave that planned them could not be proven line by line; spec 035 lists them.
+
 | Status | Lines |
 |---|---|
-| built | 153 |
-| partly | 39 |
-| planned in a wave | 119 |
-| planned in a phase | 8 |
-| new | 99 |
-| later | 11 |
+| built | 284 |
+| partly | 43 |
+| still marked with a wave | 14 |
+| planned in a phase | 5 |
+| new | 68 |
+| later | 15 |
 | **Total** | **429** |
 
 Chapter 12 lists what is still open at ASVS Level 1 and 2.
@@ -59,33 +61,20 @@ Chapter 12 lists what is still open at ASVS Level 1 and 2.
 
 ### High
 
-Wave F is finished on its branch but not merged. At `a017fdc` it closes none of the lines below that belong in wave F.
+Every High line of the first study is closed but one:
 
-| Line | Problem | Belongs in |
+| Line | Problem | Status |
 |---|---|---|
-| SEC-134 | Passkey login does not require user verification, so a stolen key without a PIN logs in with one factor | Wave F |
-| SEC-135 | Adding or removing a passkey needs no proof of identity, so a stolen session can leave itself a way back in | Wave F |
-| SEC-820 | A failed login stores the typed address in the audit log, which cannot be changed. People sometimes type a password there | Wave F |
-| SEC-265 | Recent searches and tree state stay in the browser after logout, so the next person sees them | Before wave C lands |
-| SEC-814 | Nothing checks the signatures on audit checkpoints, so the one defence against a full rewrite of the log never runs | The next commit that touches `internal/app` |
-| SEC-636 | Backups are not encrypted, and `master.key` is copied into the same folder | The script now, encryption in phase 3 |
-| SEC-521 | The draw.io editor must run on another origin, or its scripts get our cookies and API | Wave E |
-| SEC-555 | The PdfCraft frame must not have `allow-same-origin` on our own origin, or it can remove its own sandbox | Wave E |
-| SEC-542 | The service for editing together does not check rights again by itself, so someone whose access ended can go on | Wave H |
-| SEC-546 | Changes while editing together go past the document gate, so a hostile client can reach a colleague's browser | Wave H |
+| SEC-546 | Changes while editing together go past the document gate, so a hostile client could reach a colleague's browser | Partly: messages are limited in size, and the gate still does not run on each change |
 
-### Medium, by where it belongs
+### Medium, still open
 
-- **Wave C:** SEC-266 comment drafts in the browser. SEC-416 the mail server's certificate check is not in spec 010. SEC-422 tokens in URL paths reach the logs (wave H as well).
-- **Waves C and D:** SEC-407 comment anchors keep text that was removed from a page.
-- **Wave E:** SEC-513 separate Gotenberg instances for PDF export and office files (wave G as well). SEC-523 and SEC-557 checks on `postMessage`. SEC-532 Collabora's security settings must be read before building.
-- **Wave F:** SEC-124 recovery codes. SEC-126 removing a factor leaves other sessions running. SEC-156 SCIM tokens never expire. None of these is closed on the branch.
-- **Wave G:** SEC-353 imported history can be made up. SEC-382 a policy for public sites. SEC-383 the search index of a public site.
-- **Wave H:** SEC-443 what a webhook body holds. SEC-807 reads by token leave no audit event.
-- **Any change to the gate:** SEC-308 a stricter rule leaves stored documents as they are.
-- **Phase 3:** SEC-713 the KEK cannot be rotated.
-- **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. SEC-1023 checks that the way of working lists are not in CI.
-
+- **Accounts:** SEC-124 recovery codes are stored as plain hashes of 80 bits.
+- **The browser:** SEC-266 comment drafts stay in the browser. SEC-523 and SEC-557 checks on `postMessage`.
+- **Content:** SEC-308 a stricter rule leaves stored documents as they are. SEC-353 imported history can be made up. SEC-383 the search index of a public site. SEC-407 comment anchors keep removed text.
+- **Mail and calls:** SEC-416 the check of the mail server's certificate has no test of its own. SEC-443 what a webhook body holds. SEC-807 reads by token leave no audit event.
+- **Services:** SEC-513 one Gotenberg for PDF export and hostile office files. SEC-532 Collabora's own security settings.
+- **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. SEC-1023 gates that the way of working lists are not in CI.
 ## Where this differs from the earlier blueprint
 
 The earlier version of this file promised some things that were then built differently, or not yet. Its other facts moved into the chapters.

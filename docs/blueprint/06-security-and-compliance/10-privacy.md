@@ -68,9 +68,9 @@ The default today is *forever* for most data. Storage limitation asks for better
 | Application logs | The operator's | Advise 30 to 90 days in the guide |
 | Backups | The operator's | Advise a period, and say that erasure reaches them when they expire |
 
-- **SEC-910** · wave F · Retention settings for audit events, with the anchor of SEC-830.
+- **SEC-910** · built · Retention settings for audit events, with the anchor of SEC-830.
 - **SEC-911** · new · **Medium.** A default for audit retention (SEC-831). Decision for the product owner.
-- **SEC-912** · wave D · Old drafts are removed after a warning (PAG-019).
+- **SEC-912** · built · Old drafts are removed after a warning (PAG-019).
 - **SEC-913** · new · A reminder for accounts that were disabled long ago, to hand over content and anonymise. Low. Belongs in wave F.
 
 ## 10.5 People's rights
@@ -88,10 +88,10 @@ The controller must answer within one month (Article 12). These are the tools th
 
 - **SEC-915** · wave F · The download covers profile, preferences, groups, sessions, login history, own comments and reactions, and titles of own pages they can still see. A copy must not harm the rights of others (Article 15(4)), so it leaves out what others wrote.
 - **SEC-916** · new · The download should also hold the person's own audit events, because Article 15 covers them, or the guide should say how an administrator gives them. Spec 013's list leaves them out. *Lawyer*, on how far this goes. Belongs in wave F.
-- **SEC-917** · wave F · Anonymising replaces name and address, and removes profile, picture, sessions, tokens, passkeys, history, links, follows and preferences. A test walks every column of every table. The dialog says what it cannot reach: audit rows, backups, and names typed in text.
+- **SEC-917** · built · Anonymising replaces name and address, and removes profile, picture, sessions, tokens, passkeys, history, links, follows and preferences. A test walks every column of every table. The dialog says what it cannot reach: audit rows, backups, and names typed in text.
 - **SEC-918** · partly · Article 17(3) allows keeping data needed for legal claims, or under a legal obligation. Whether audit rows fit that depends on the controller. Spec 013 relies on it (D10), so a controller needs to know that this is a choice. *Lawyer.* SEC-821 would make it easier.
 - **SEC-919** · new · Names typed in pages and comments are not found by anonymising. Search finds them, and the dialog should offer a search for the person's name, so an administrator can look. Low. Belongs in wave F.
-- **SEC-920** · wave F · After a restore from a backup, anonymising must be repeated. A small list of what was anonymised, holding only ids, would make that safe and quick. Spec 013 only says the guide will mention it.
+- **SEC-920** · built · After a restore from a backup, anonymising must be repeated. A small list of what was anonymised, holding only ids, would make that safe and quick. Spec 013 only says the guide will mention it.
 - **SEC-921** · new · The address of a local account cannot be corrected by anyone, though Article 16 gives a right to correction. See SEC-192. Belongs in wave F.
 
 ## 10.6 Breaches
@@ -118,7 +118,7 @@ Features in Diffluence that are suitable for monitoring:
 | Task lists | What someone did not finish | Only on pages one may see |
 
 - **SEC-930** · built · Page views are not in the audit log, and reading is not reported per person by default (deliberate difference 7).
-- **SEC-931** · wave H · Name mode stays off by default, by the product owner's choice. A setting that turns it on shows a text about consent and works councils, and leaves an audit event.
+- **SEC-931** · built · Name mode stays off by default, by the product owner's choice. A setting that turns it on shows a text about consent and works councils, and leaves an audit event.
 - **SEC-932** · new · A text a controller can give their works council: which data, who sees it, which settings, and what is not done. Belongs in `docs/compliance/`. *Lawyer.*
 - **SEC-933** · new · A DPIA (Article 35) may be needed for name mode, or for large HR spaces. Give a starting text in `docs/compliance/`. *Lawyer.*
 - **SEC-934** · built · No report ranks people. Keep it that way: no "most active" lists with names.
@@ -127,5 +127,5 @@ Features in Diffluence that are suitable for monitoring:
 
 - **SEC-940** · built · Nothing leaves by itself. Mail, webhooks, a provider and public sites are each set up by the operator.
 - **SEC-941** · new · A mail provider or a hosted identity provider outside the EU is an international transfer. That is the controller's call, and the guide should mention it. *Lawyer.*
-- **SEC-942** · wave G · Public sites leave author names out unless chosen, and strip metadata from photos.
+- **SEC-942** · built · Public sites leave author names out unless chosen, and strip metadata from photos.
 - **SEC-943** · wave G · A bundle carries personal data. It needs *administer*, is audited, and lives 24 hours.

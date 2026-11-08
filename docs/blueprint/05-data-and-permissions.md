@@ -37,7 +37,7 @@ A problem found in the study has a **GAP** number, in chapter 12. When something
 | [12. Gaps and contradictions](05-data-and-permissions/12-gaps-and-contradictions.md) | What is wrong, how bad, and how to fix it | GAP-001 to 030 |
 | [Sources](05-data-and-permissions/sources.md) | What was read | |
 
-In total 295 numbered items: 152 built, 7 partly, 125 in a wave, 10 new and 1 for later, with 30 gaps.
+In total 298 numbered items: 265 built, 6 partly, 17 still marked with the wave that planned them, 9 new and 1 for later, with 30 gaps. Counted again in spec 035, against the code and the tests.
 
 ## The model in short
 

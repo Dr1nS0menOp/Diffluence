@@ -12,7 +12,7 @@ Two different things. The **audit log** is a record of who did what, kept in the
 - **SEC-803** · built · An event has the time in UTC, actor, action, object, space, result, address, user agent, request id and details (ASVS 16.2.1, 16.2.2).
 - **SEC-804** · built · Page views are not audit events. Downloads are.
 - **SEC-805** · partly · Changes record a short summary, not always before and after. Permission changes do. Settings record the new values only. Add the old value where it helps an investigation. Low.
-- **SEC-806** · wave F · An event says which token acted (SEC-230). `on-behalf-of` for apps comes with phase 7.
+- **SEC-806** · later · An event says which token acted (SEC-230). `on-behalf-of` for apps comes with phase 7.
 - **SEC-807** · new · The earlier blueprint promised an event for every API call made with a token. Nothing records that: changes, refusals and downloads leave a trace, and other reads do not. A read through a stolen token would leave no audit event. Record reads by token, or change the promise. Medium. Belongs in wave H, with SEC-230.
 
 ## 9.2 Can it be trusted?
@@ -39,7 +39,7 @@ Two different things. The **audit log** is a record of who did what, kept in the
 
 ## 9.4 Keeping and moving it
 
-- **SEC-830** · wave F · Audit retention is a setting. A prune runs with the owner's role, verifies the chain, leaves a signed anchor and removes older rows, so the app still cannot delete (spec 013, D11).
+- **SEC-830** · built · Audit retention is a setting. A prune runs with the owner's role, verifies the chain, leaves a signed anchor and removes older rows, so the app still cannot delete (spec 013, D11).
 - **SEC-831** · new · Retention needs a default. Without one the log grows forever and holds personal data forever, against the GDPR's storage limitation. Advice in chapter 10: 12 months for most events, longer only with a reason. Decision for the product owner.
 - **SEC-832** · later · Sending events to a SIEM by syslog, CEF, GELF or Sentinel (ASVS 16.4.3 at Level 2). The product owner mentioned a SIEM in ADR-026. A SIEM is also the real answer to SEC-815, so this should move up to phase 3.
 - **SEC-833** · new · Medium. Sending the signed head of the chain to something outside the instance, even a daily mail or a file an operator collects, makes a full rewrite visible. It is small, and could come with SEC-832.

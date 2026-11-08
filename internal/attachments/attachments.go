@@ -28,6 +28,7 @@ import (
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/plaintext"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/storage"
@@ -175,7 +176,7 @@ func collectFound(rows pgx.Rows) ([]Found, error) {
 // cleanFilename keeps a usable display name. Names are only ever shown, never
 // used as a path, but a clean name protects whoever downloads the file.
 func cleanFilename(name string) (string, error) {
-	name = strings.ReplaceAll(name, `\`, "/")
+	name = strings.ReplaceAll(plaintext.WithoutDirectionMarks(name), `\`, "/")
 	name = path.Base(strings.TrimSpace(name))
 	name = strings.Map(func(r rune) rune {
 		if unicode.IsControl(r) || r == utf8.RuneError {

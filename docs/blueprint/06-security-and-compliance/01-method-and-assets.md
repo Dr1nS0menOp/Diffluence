@@ -39,7 +39,7 @@ ASVS 14.1.1 asks for classes with protection rules. These hold for every new tab
 
 - **SEC-008** · new · Add the class to `docs/compliance/` as a table per data store, so each new column gets a class in review. Belongs in wave F, with the data download and anonymising work.
 - **SEC-009** · built · Outbox events and queue messages hold ids, not text, so a message broker never holds Content.
-- **SEC-010** · wave C · Notifications store ids and read titles when they are shown, so old text cannot leak later (spec 010, D10).
+- **SEC-010** · built · Notifications store ids and read titles when they are shown, so old text cannot leak later (spec 010, D10).
 
 ## 1.4 Who attacks
 

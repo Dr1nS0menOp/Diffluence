@@ -29,6 +29,7 @@ import (
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/keys"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/plaintext"
 )
 
 // Global permissions.
@@ -193,7 +194,7 @@ type NewUser struct {
 // CreateLocalUser creates an account with a password and global permissions.
 func (s *Service) CreateLocalUser(ctx context.Context, in NewUser, actor Actor, meta RequestMeta) (User, error) {
 	in.Email = normalizeEmail(in.Email)
-	in.DisplayName = strings.TrimSpace(in.DisplayName)
+	in.DisplayName = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.DisplayName))
 	if in.Type == "" {
 		in.Type = TypeMember
 	}

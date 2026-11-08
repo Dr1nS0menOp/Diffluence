@@ -13,7 +13,7 @@ Granted to a person or a group in `global_grants`.
 | **PRM-003** | built | `view_profiles` | The directory of people and groups, people in quick search, pickers | Members. Guests only when granted |
 | **PRM-004** | built | `administrator` | Users, groups, settings, audit, spaces as metadata, recover access. **No content** | First person, through the command line |
 | **PRM-005** | built | `system_administrator` | Infrastructure, keys, backups, maintenance mode | First person |
-| **PRM-006** | wave F | `create_personal_space` | One personal space | Members who can use the product |
+| **PRM-006** | built | `create_personal_space` | One personal space | Members who can use the product |
 | **PRM-009** | built | `invite_people` | Ask for an invitation for someone without an account. An administrator approves each one (ADR-033, spec 022) | Nobody |
 
 - **PRM-007** · built · At least one active administrator must remain. People cannot break that. It does not hold for an identity provider on purpose, because a sync that fails would lock people out. The way back is `diffluence user create-admin`.
@@ -40,8 +40,8 @@ Granted to a person, a group, all members or all guests, in `space_grants`.
 | **PRM-022** | built | `attachment.delete_own` | Delete a file the person added first |
 | **PRM-023** | built | `attachment.delete_any` | Delete any file |
 | **PRM-024** | built | `restriction.manage` | Add and lift restrictions on pages the person can see |
-| **PRM-025** | wave F | `space.manage_access` | The grants of a space, without *administer*. Implied by *administer* in `Evaluate`. Cannot touch a subject that holds *administer* |
-| **PRM-026** | wave H | `analytics.view` | Insights of the space. The migration gives it to who holds *administer* |
+| **PRM-025** | built | `space.manage_access` | The grants of a space, without *administer*. Implied by *administer* in `Evaluate`. Cannot touch a subject that holds *administer* |
+| **PRM-026** | built | `analytics.view` | Insights of the space. The migration gives it to who holds *administer* |
 
 ## 8.3 Actions that are not permissions
 
@@ -50,7 +50,7 @@ Granted to a person, a group, all members or all guests, in `space_grants`.
 | **PRM-027** | built | `page.view` | `space.view` and the restrictions |
 | **PRM-028** | built | `page.delete` | `delete_any`, or `delete_own` for the person who created the page |
 | **PRM-029** | built | `attachment.delete` | `delete_any`, or `delete_own` for the person who added the file. A new version by someone else does not change who that is |
-| **PRM-030** | wave C | `comment.delete` | `delete_any`, or `delete_own` for the author |
+| **PRM-030** | built | `comment.delete` | `delete_any`, or `delete_own` for the author |
 
 "Own" always means the creator. Handing a page to a new owner gives no right (wave D, D9). The field `Input.Owner` holds the creator, and should be renamed before `pages.owner_id` lands, because two meanings of one word cause bugs.
 
@@ -63,12 +63,12 @@ A set fills in boxes. It is not a rule, and it can be changed box by box afterwa
 | **PRM-032** | built | Viewer | view, export, comment add, comment delete own |
 | **PRM-033** | built | Editor | view, export, page create, edit, archive, delete own, comment add, comment delete own, attachment add, attachment delete own |
 | **PRM-034** | built | Space administrator | All space permissions |
-| **PRM-035** | wave F | Manager | Editor, plus delete any page, comment and file, manage restrictions, manage access |
-| **PRM-036** | wave F | Own sets | Defined by administrators, for the whole instance |
+| **PRM-035** | built | Manager | Editor, plus delete any page, comment and file, manage restrictions, manage access |
+| **PRM-036** | built | Own sets | Defined by administrators, for the whole instance |
 | **PRM-037** | built | Presets | Team space: all members get Editor. Read-only knowledge base: all members get Viewer. Other entries stay |
 
 ## 8.5 Rules of a route
 
 - **PRM-031** · built · Every route is registered with an access rule, or registration fails: `public`, `authenticated`, `permission`, `object`, `scim-token`. `docs/api/routes.txt` lists all of them, and a test compares it. Wave F adds `Sensitive` and `SessionOnly`.
-- **PRM-038** · wave F and H · Token scopes: `read`, `write`, `export`, `admin`. The scope limits a token, and the rule still runs for its owner. A token never reaches `SessionOnly` routes.
+- **PRM-038** · built · Token scopes: `read`, `write`, `export`, `admin`. The scope limits a token, and the rule still runs for its owner. A token never reaches `SessionOnly` routes.
 - **PRM-039** · built · `object` declares the rule, and the module makes the decision, because only it knows the object. A route cannot skip the check, because the module's method checks by itself.

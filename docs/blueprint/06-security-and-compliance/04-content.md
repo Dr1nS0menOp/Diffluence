@@ -12,8 +12,8 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-303** · built · Limits on size (5 MiB), depth (100) and the number of columns.
 - **SEC-304** · built · `Normalize` and the Markdown reader are fuzzed every night.
 - **SEC-305** · built · Every way in passes the gate: publishing, drafts, imports, restoring.
-- **SEC-306** · wave C · The `mention` node and `id` on tasks join the gate. Comments have an allow-list of their own, smaller than a page's (spec 010).
-- **SEC-307** · wave E · Every new block joins the gate with its attributes, and gets a mutation line for its rule. Settings of dynamic blocks are data, never code or queries.
+- **SEC-306** · built · The `mention` node and `id` on tasks join the gate. Comments have an allow-list of their own, smaller than a page's (spec 010).
+- **SEC-307** · built · Every new block joins the gate with its attributes, and gets a mutation line for its rule. Settings of dynamic blocks are data, never code or queries.
 - **SEC-308** · new · When a rule gets stricter, stored documents stay as they are, because `Parse` trusts what is stored. Any tightening needs a pass over the stored versions, or a check when they are read. Medium. Add to the definition of done for changes to the gate.
 - **SEC-309** · wave H · A shared document in the collab service does not pass the gate on each keystroke. See SEC-546.
 
@@ -25,7 +25,7 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-316** · built · Links open with `rel="noopener noreferrer nofollow"`. Links inside the instance stay in the tab through the router, and only for paths that start with `/`.
 - **SEC-317** · built · The server does not fetch outside addresses, so a link cannot be used to reach the internal network. There are no link previews (deliberate difference 5).
 - **SEC-318** · later · Asking before leaving for an outside site (ASVS 3.7.3, Level 3). It would annoy people on every link. The browser shows the address on hover.
-- **SEC-319** · new · Names and titles can hold direction control characters that make text read differently. Filenames too: `cleanFilename` removes control characters, but format characters such as U+202E pass, so `gpj.exe` can be made to look like `exe.jpg`. Remove them from filenames and display names. Low. Belongs in wave E.
+- **SEC-319** · partly · Names and titles can hold direction control characters that make text read differently. Filenames too: `cleanFilename` removes control characters, but format characters such as U+202E pass, so `gpj.exe` can be made to look like `exe.jpg`. Remove them from filenames and display names. Low. Belongs in wave E.
 - **SEC-320** · new · Heading addresses from wave B put words from a document into `id` attributes. A heading can then shadow a name on the page (DOM clobbering, ASVS 3.2.3). Our code keeps no such globals and Trusted Types guard the rest, so a fixed prefix on these ids is enough, and old links need a fallback. Low. Belongs with the next change to heading addresses.
 
 ## 4.3 Files
@@ -44,9 +44,9 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-334** · new · Photos keep their metadata inside the wiki, which can hold a place and a name (ASVS 14.2.8, Level 3). Public sites remove it (SEC-381). Say so where a person uploads, or remove it from JPEG and PNG at upload. Low. Belongs in wave E.
 - **SEC-335** · built · The server never decodes an image, so a decompression bomb cannot hurt it. Browsers do that work. Spec 012 keeps this: no server thumbnails (D14).
 - **SEC-336** · built · An imported font is only accepted by its first bytes, is limited to 2 MiB, and only an administrator can add one. It is public on purpose, because the login page needs it.
-- **SEC-337** · wave F · A logo must be a safe image, never SVG.
-- **SEC-338** · wave E · Video and audio are served with the same locked-down headers, with range requests. Text previews come through a JSON route as plain text, up to 1 MiB, so no file is shown as a document (spec 012, D15).
-- **SEC-339** · wave E · Removing a file also removes what was made from it, such as a converted PDF, or an erasure leaves a copy behind.
+- **SEC-337** · built · A logo must be a safe image, never SVG.
+- **SEC-338** · built · Video and audio are served with the same locked-down headers, with range requests. Text previews come through a JSON route as plain text, up to 1 MiB, so no file is shown as a document (spec 012, D15).
+- **SEC-339** · built · Removing a file also removes what was made from it, such as a converted PDF, or an erasure leaves a copy behind.
 
 ## 4.4 Imports
 
@@ -56,12 +56,12 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-346** · built · Paths inside an archive are cleaned and never touch the disk, so `../` and symbolic links do nothing (ASVS 5.2.5, 5.3.3).
 - **SEC-347** · built · Imports run in the worker, under the person's rights, and each page passes the gate.
 - **SEC-348** · built · A failing import reports what went wrong, and never takes the server down. A panic in a job is caught.
-- **SEC-349** · wave G · DOCX and ODT are read with `encoding/xml`, with limits on depth and size, a `DOCTYPE` refused, and relationships that point outside (`TargetMode="External"`) ignored. Go's parser does not fetch entities (ASVS 1.5.1).
-- **SEC-350** · wave G · HTML is parsed with `golang.org/x/net/html` and only ever turned into document blocks, so no HTML survives (ADR-026).
+- **SEC-349** · built · DOCX and ODT are read with `encoding/xml`, with limits on depth and size, a `DOCTYPE` refused, and relationships that point outside (`TargetMode="External"`) ignored. Go's parser does not fetch entities (ASVS 1.5.1).
+- **SEC-350** · built · HTML is parsed with `golang.org/x/net/html` and only ever turned into document blocks, so no HTML survives (ADR-026).
 - **SEC-351** · wave G · Every reader of a format gets a fuzz target and a set of hostile files.
-- **SEC-352** · wave G · A bundle has a manifest with a SHA-256 per file and an Ed25519 signature. A wrong signature always stops an import, and an unknown signer needs an administrator.
+- **SEC-352** · built · A bundle has a manifest with a SHA-256 per file and an Ed25519 signature. A wrong signature always stops an import, and an unknown signer needs an administrator.
 - **SEC-353** · new · Imports can bring old versions with authors and dates, so history can be made up. Mark imported versions as imported in the history and the audit log, so they never count as proof of who wrote what. Medium. Belongs in wave G.
-- **SEC-354** · wave G · The Confluence importer reads documented formats only, and unknown parts stay visible as text.
+- **SEC-354** · later · The Confluence importer reads documented formats only, and unknown parts stay visible as text.
 - **SEC-355** · new · A temporary file of an import stays on disk if the worker stops at the wrong moment. A sweep at start, and a limit on age. Low. Belongs in wave G.
 
 ## 4.5 Exports
@@ -70,22 +70,22 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 
 - **SEC-360** · built · An export uses the same access rule as the screen, and leaves out what the person may not see. Exports need their own permission, and are audited.
 - **SEC-361** · built · Audit CSV exports neutralise cells that start with `=`, `+`, `-`, `@`, tab or return (ASVS 1.2.10).
-- **SEC-362** · wave F · One writer for all CSV, with the same guard. Spec 015 adds one in `internal/outward`. Keep it to one, and add a line feed to the guarded characters.
+- **SEC-362** · built · One writer for all CSV, with the same guard. Spec 015 adds one in `internal/outward`. Keep it to one, and add a line feed to the guarded characters.
 - **SEC-363** · wave G · A stored export is only for the person who asked, and is deleted after a set time. A bundle needs *administer*, and lives 24 hours.
-- **SEC-364** · wave G · `document.ToHTML` escapes everything, and is built on the allow-list. The instance itself never serves that HTML to a browser.
-- **SEC-365** · wave G · PDF goes through Gotenberg with only HTML we made (see chapter 6).
+- **SEC-364** · built · `document.ToHTML` escapes everything, and is built on the allow-list. The instance itself never serves that HTML to a browser.
+- **SEC-365** · built · PDF goes through Gotenberg with only HTML we made (see chapter 6).
 
 ## 4.6 Public sites
 
 **What can go wrong:** something secret goes public, a restricted page slips in, an old page stays online, the site leads back into the instance.
 
-- **SEC-375** · wave G · A public site is static files on another host, with no server code and no way back (ADR-010).
-- **SEC-376** · wave G · Pages are chosen by hand, and a page with a restriction can never be part of it.
-- **SEC-377** · wave G · A preview shows what will be added, changed and removed, with warnings, and the first publish needs the name of the site typed in.
-- **SEC-378** · wave G · A scrub looks for addresses of the instance before anything leaves, and a page that is withdrawn leaves at once.
-- **SEC-379** · wave G · Only files a published page shows go along.
-- **SEC-380** · wave G · No comments, no author names unless chosen, and no version history.
-- **SEC-381** · wave G · JPEG and PNG are re-encoded without metadata. GIF and WebP cannot be cleaned by the standard library, so the preview warns about them.
-- **SEC-382** · new · The site itself needs headers and a policy. The site is static, so the guide should give a policy for common web servers, with no outside resources. The theme must load nothing from elsewhere. Medium. Belongs in wave G.
+- **SEC-375** · built · A public site is static files on another host, with no server code and no way back (ADR-010).
+- **SEC-376** · built · Pages are chosen by hand, and a page with a restriction can never be part of it.
+- **SEC-377** · built · A preview shows what will be added, changed and removed, with warnings, and the first publish needs the name of the site typed in.
+- **SEC-378** · built · A scrub looks for addresses of the instance before anything leaves, and a page that is withdrawn leaves at once.
+- **SEC-379** · built · Only files a published page shows go along.
+- **SEC-380** · built · No comments, no author names unless chosen, and no version history.
+- **SEC-381** · built · JPEG and PNG are re-encoded without metadata. GIF and WebP cannot be cleaned by the standard library, so the preview warns about them.
+- **SEC-382** · built · The site itself needs headers and a policy. The site is static, so the guide should give a policy for common web servers, with no outside resources. The theme must load nothing from elsewhere. Medium. Belongs in wave G.
 - **SEC-383** · new · The client-side search index is public too, so it may only hold what is on the site. A test must plant a word on a page that is left out. Medium. Belongs in wave G.
 - **SEC-384** · new · The scrub looks for known addresses. It could also warn about things that look like secrets, such as `password=` or a private key block. Low. Belongs in wave G.

@@ -18,8 +18,8 @@
 - **DAT-163** · built · Restore is refused while the parent is in the trash, so a page never loses a restriction it inherited.
 - **DAT-164** · built · Purge takes the branch, also pages below that were trashed earlier. Versions, drafts, restrictions, favourites, search entries, links from it and files go with it. Audit rows stay. `page_links` rows that point at it stay, so old links can be found.
 - **DAT-165** · built · The person who deleted a page can undo it for 60 seconds, without *administer*.
-- **DAT-166** · wave D · Archive keeps the page in `page_tree`, so it keeps what it inherits. A page below that the person may not archive moves up, under the rule of a move. A page below a page that is still archived cannot be restored alone (ADR-026).
-- **DAT-167** · wave D · Moving to another space takes the branch, its files and its history. It is refused while the branch holds something the person cannot see. A page in the trash counts as that today, so a branch with a trashed page cannot move until it is purged or restored.
+- **DAT-166** · built · Archive keeps the page in `page_tree`, so it keeps what it inherits. A page below that the person may not archive moves up, under the rule of a move. A page below a page that is still archived cannot be restored alone (ADR-026).
+- **DAT-167** · built · Moving to another space takes the branch, its files and its history. It is refused while the branch holds something the person cannot see. A page in the trash counts as that today, so a branch with a trashed page cannot move until it is purged or restored.
 
 ## 7.2 A space
 
@@ -58,6 +58,6 @@
 ## 7.5 A person
 
 - **DAT-170** · built · Active and disabled. Disabling ends every session and stops every token. Content stays. A person can be enabled again.
-- **DAT-171** · wave F · Expired: the date on the account makes it inactive at once, by rule, before any job runs.
-- **DAT-172** · wave F · Anonymised: for good. See 05.1, section 1.4.
-- **DAT-173** · wave F · When a person is disabled, their personal space stays. An administrator hands it over or archives it.
+- **DAT-171** · built · Expired: the date on the account makes it inactive at once, by rule, before any job runs.
+- **DAT-172** · built · Anonymised: for good. See 05.1, section 1.4.
+- **DAT-173** · built · When a person is disabled, their personal space stays. An administrator hands it over or archives it.

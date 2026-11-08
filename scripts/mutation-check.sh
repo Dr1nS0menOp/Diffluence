@@ -793,6 +793,21 @@ mutate "promote drops the old key" internal/keys/rotate.go \
   's.replace("\t\t\tif err := writeFile(path+PreviousSuffix, kek); err != nil {\n\t\t\t\treturn \"\", err\n\t\t\t}", "\t\t\t_ = kek")' ./internal/keys/ -run TestTheKeyCanBeReplacedWhileEveryValueStaysReadable
 mutate "a second key change starts while the first is unfinished" internal/keys/rotate.go \
   's.replace("\tif _, err := os.Stat(path + PreviousSuffix); err == nil {\n\t\treturn \"\", ErrPreviousPresent\n\t}", "")' ./internal/keys/ -run TestANewChangeWaitsUntilTheLastOneIsFinished
+# Spec 035: blueprints 05 and 06.
+mutate "the PDF helper gets no password" internal/exchange/pdf.go \
+  's.replace("\t\treq.SetBasicAuth(helperUser, s.pdfPassword)\n", "")' $app -run TestThePDFHelperGetsItsPasswordAndRefusesWithoutIt
+mutate "a password is hashed as typed, not as NFC" internal/identity/password.go \
+  's.replace("func HashPassword(pw string, p Params) (string, error) {\n\tpw = norm.NFC.String(pw)\n", "func HashPassword(pw string, p Params) (string, error) {\n")' ./internal/identity/ -run TestAPasswordIsTheSameComposedOrDecomposed
+mutate "a password may hold the product name" internal/identity/lifecycle.go \
+  's.replace(", local, productWord)", ", local)")' ./internal/identity/ -run TestANewPasswordCannotHoldTheNameOfTheProduct
+mutate "a title keeps the marks that reverse reading" internal/pages/pages.go \
+  's.replace("strings.TrimSpace(plaintext.WithoutDirectionMarks(title))", "strings.TrimSpace(plaintext.WithoutDirectionMarks(\"\") + title)")' $app -run TestNamesLoseTheMarksThatReverseReading
+mutate "a parent can be deleted alone and its children fall open" internal/db/migrations/0035_no_fall_open.sql \
+  's.replace("ON DELETE NO ACTION", "ON DELETE SET NULL")' $app -run TestDeletingAParentAloneIsRefusedSoNothingFallsOpen
+mutate "ending one person's sessions ends everyone's" internal/identity/factors.go \
+  's.replace("query, args = \"DELETE FROM sessions WHERE user_id = $1\", []any{id}", "query, args = \"DELETE FROM sessions\", []any{}")' $app -run TestAnOperatorEndsTheSessionsOfOnePersonOrOfEveryone
+mutate "a step-up through the provider takes an old login" internal/sso/sso.go \
+  's.replace("if f.FreshAfter != 0 && c.AuthTime < f.FreshAfter {", "if false && c.AuthTime < f.FreshAfter {")' $app -run TestAStepUpThroughTheProviderNeedsALoginAfterItStarted
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

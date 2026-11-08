@@ -9,11 +9,11 @@ Owners: `internal/document`, `internal/attachments`, `internal/storage`, `intern
 - **DAT-082** · built · Blocks: `doc`, `paragraph`, `heading`, `bulletList`, `orderedList`, `listItem`, `taskList`, `taskItem`, `blockquote`, `codeBlock`, `horizontalRule`, `image`, `file`, `panel`, `expand`, `columns`, `column`, `decision`, `table`, `tableRow`, `tableCell`, `tableHeader`. Inline: `text`, `hardBreak`, `status`, `date`.
 - **DAT-083** · built · Marks: `bold`, `italic`, `underline`, `strike`, `code`, `link`, `subscript`, `superscript`, `textColor`, `highlight`. A link passes `SafeHref`: `http`, `https`, `mailto` and relative paths. Colours are names, never values.
 - **DAT-084** · built · `image` and `file` hold an `attachment_id`, never an address. A document can name a file of another page. The file route then decides by that page's rights, so such a file simply does not show for someone who may not see it.
-- **DAT-085** · wave C · `mention` (inline): `id`, `kind`, `label`. `taskItem` gains `id`. See GAP-004 on `label`.
-- **DAT-086** · wave D · `templateField` and `instruction`, only in templates and drafts. Publishing removes `instruction`, and refuses `templateField`.
-- **DAT-087** · wave E · `dynamic` with `kind` and `settings` from an allow-list per kind, `pageFacts`, `excerpt`, `variable`, `anchor`, `pageTag`, `pageCard`, `chart`, `drawing`, `timeline`, `media`, `spotlight`, and new attributes in spec 012. A document stores settings, never results, so no title is frozen into a version.
+- **DAT-085** · built · `mention` (inline): `id`, `kind`, `label`. `taskItem` gains `id`. See GAP-004 on `label`.
+- **DAT-086** · built · `templateField` and `instruction`, only in templates and drafts. Publishing removes `instruction`, and refuses `templateField`.
+- **DAT-087** · built · `dynamic` with `kind` and `settings` from an allow-list per kind, `pageFacts`, `excerpt`, `variable`, `anchor`, `pageTag`, `pageCard`, `chart`, `drawing`, `timeline`, `media`, `spotlight`, and new attributes in spec 012. A document stores settings, never results, so no title is frozen into a version.
 - **DAT-088** · built · `document.Text` gives the plain text for search, one line per text block. `Compare` works per block. `ToMarkdown` and `FromMarkdown` give the Markdown form.
-- **DAT-089** · wave G · `document.ToHTML` is the one renderer for HTML, public sites and PDF. It escapes everything, and leaves the instance only as a file.
+- **DAT-089** · built · `document.ToHTML` is the one renderer for HTML, public sites and PDF. It escapes everything, and leaves the instance only as a file.
 - **DAT-090** · later · An old schema is upgraded on read. No such upgrade has been needed yet.
 
 ## 4.2 Files
@@ -30,8 +30,8 @@ Owners: `internal/document`, `internal/attachments`, `internal/storage`, `intern
 ## 4.3 Search and other derived tables
 
 - **DAT-096** · built · `search_documents`: `page_id`, `title`, `body`, `attachment_names`, generated `tsv`, `updated_at`. `simple` configuration, so no stemming. Body is cut at 400,000 bytes to stay under the limit of 1 MB for a `tsvector`. Only the current version is indexed.
-- **DAT-097** · wave C · `page_mentions`, `page_tasks`. `page_tasks` holds a copy of the task's text, and is an index only: the document stays the truth.
-- **DAT-098** · wave E · `page_facts`, `page_decisions`, `page_includes`, `page_placeholders`. These copy text out of documents, so a reader only reaches them through the page.
+- **DAT-097** · built · `page_mentions`, `page_tasks`. `page_tasks` holds a copy of the task's text, and is an index only: the document stays the truth.
+- **DAT-098** · built · `page_facts`, `page_decisions`, `page_includes`, `page_placeholders`. These copy text out of documents, so a reader only reaches them through the page.
 - **DAT-098a** · built · `page_placeholders` has `source_id`, `title`, `target_id` (spec 023, D7). Source and title can be rebuilt from `page_versions`. `target_id` cannot: it records what a placeholder became, so publishing keeps it for a title that stays.
 - **DAT-098b** · built · `pageLink`, `pageCard` and `placeholderLink` hold an id or the words of the writer, never a stored title (spec 023, D1). `document.ResolveLinks` turns them into words and links before a document leaves the instance.
 - **DAT-099** · wave D or E · Searchable comments (ORG-024) and text inside files (ORG-025). Both need their own index with the rule of their object, not of the page alone (PRM-089).

@@ -19,6 +19,7 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/plaintext"
 )
 
 // Sources of an account.
@@ -220,7 +221,7 @@ type UpdateUser struct {
 
 // UpdateUserDetails changes a name or user type. The route requires administrator.
 func (s *Service) UpdateUserDetails(ctx context.Context, c Caller, id uuid.UUID, in UpdateUser) (UserDetail, error) {
-	in.DisplayName = strings.TrimSpace(in.DisplayName)
+	in.DisplayName = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.DisplayName))
 	if in.DisplayName == "" || utf8.RuneCountInString(in.DisplayName) > 200 {
 		return UserDetail{}, apperr.Invalid("A display name has 1 to 200 characters.")
 	}
@@ -548,7 +549,7 @@ type External struct {
 // CreateExternalUser creates an account without a local password, for OIDC and SCIM.
 func (s *Service) CreateExternalUser(ctx context.Context, tx pgx.Tx, c Caller, in External) (uuid.UUID, error) {
 	in.Email = normalizeEmail(in.Email)
-	in.DisplayName = strings.TrimSpace(in.DisplayName)
+	in.DisplayName = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.DisplayName))
 	if in.DisplayName == "" {
 		in.DisplayName = in.Email
 	}
@@ -587,7 +588,8 @@ func (s *Service) UpdateExternalUser(ctx context.Context, c Caller, id uuid.UUID
 	if !validEmail(in.Email) {
 		return apperr.Invalid("The account has no valid e-mail address.")
 	}
-	if strings.TrimSpace(in.DisplayName) == "" {
+	in.DisplayName = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.DisplayName))
+	if in.DisplayName == "" {
 		in.DisplayName = in.Email
 	}
 	status := StatusActive

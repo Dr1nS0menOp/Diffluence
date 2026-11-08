@@ -3,6 +3,15 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Security: open lines of blueprints 05 and 06 (spec 035)
+- The PDF helper can ask for a password, `DIFFLUENCE_PDF_PASSWORD`, and then answers only Diffluence. In `compose.yaml` it also fetches no address, runs no script in pages, runs read-only without extra rights, and is pinned by digest
+- Passwords are compared in one Unicode form, so the same password typed on two systems always works. A new password may not hold the product's name
+- Characters that turn reading order around are removed from page titles, file names, names of people and names of spaces
+- The database refuses to delete a parent page on its own, so a child can never lose a restriction it inherits
+- `diffluence session end --email ADDR` or `--all` logs one person or everyone out, without disabling anyone. `docs/operations/incidents.md` says what to do when something went wrong
+- Asking again through the identity provider now checks that the provider really asked
+- Blueprints 05 and 06 show what is built, checked against the code and the tests
+- Upgrade impact: one migration. To protect the PDF helper, set a long `DIFFLUENCE_PDF_PASSWORD` in `.env` and restart both. Without it, everything works as before
 ### Security: master.key can be replaced (spec 034)
 - `diffluence key add`, `promote`, `reseal`, `check` and `retire` replace `master.key` while Diffluence keeps running. Every stored file and secret is sealed again with the new key, and the old key is removed only when a check proves nothing needs it
 - `diffluence key check` proves that every stored file and secret opens, and names what does not, without showing its content. `--deep` reads every byte

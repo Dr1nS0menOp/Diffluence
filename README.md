@@ -43,6 +43,7 @@ Then open http://localhost:8080. For a real installation, read [the install guid
 | `diffluence user create-admin` | Creates a local administrator account |
 | `diffluence audit verify` | Verifies the audit log hash chain |
 | `diffluence key <step>` | Checks or replaces `master.key` while Diffluence runs; see [backup and restore](docs/operations/backup-restore.md#replace-it) |
+| `diffluence session end` | Logs one person (`--email`) or everyone (`--all`) out, without disabling anyone; see [incidents](docs/operations/incidents.md) |
 | `diffluence healthcheck` | Asks a running server whether it is ready |
 | `diffluence version` | Prints the version |
 

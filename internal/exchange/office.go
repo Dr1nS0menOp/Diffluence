@@ -66,7 +66,12 @@ func (s *Service) OfficeToPDF(parent context.Context, filename string, file io.R
 		return err
 	}
 	req.Header.Set("Content-Type", form.FormDataContentType())
-	resp, err := http.DefaultClient.Do(req)
+	// Collabora checks the host of the caller instead (post_allow), so only the PDF helper gets the password.
+	do := http.DefaultClient.Do
+	if s.collaboraURL == "" {
+		do = s.askHelper
+	}
+	resp, err := do(req)
 	if err != nil {
 		return apperr.Invalid("The PDF helper did not answer. Try again later, or ask an administrator.")
 	}

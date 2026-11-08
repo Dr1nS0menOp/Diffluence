@@ -256,6 +256,38 @@ func (s *Service) EndOtherSessions(ctx context.Context, c Caller, sessionID uuid
 	})
 }
 
+// EndSessions logs out one person, by e-mail address, or everyone when email is empty,
+// without disabling anyone. It is for an operator during an incident (SEC-178), so it runs
+// from the command line as the system, and is audited with how many sessions ended.
+func (s *Service) EndSessions(ctx context.Context, actor Actor, email string, meta RequestMeta) (int64, error) {
+	var ended int64
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		target, objectID := "everyone", ""
+		query, args := "DELETE FROM sessions", []any{}
+		if email != "" {
+			var id uuid.UUID
+			err := tx.QueryRow(ctx, "SELECT id FROM users WHERE lower(email) = $1", normalizeEmail(email)).Scan(&id)
+			if errors.Is(err, pgx.ErrNoRows) {
+				return apperr.NotFound()
+			}
+			if err != nil {
+				return err
+			}
+			target, objectID = "one person", id.String()
+			query, args = "DELETE FROM sessions WHERE user_id = $1", []any{id}
+		}
+		tag, err := tx.Exec(ctx, query, args...)
+		if err != nil {
+			return err
+		}
+		ended = tag.RowsAffected()
+		_, err = audit.Record(ctx, tx, event(meta, actor, "sessions.ended", "user", objectID, audit.ResultSuccess,
+			map[string]any{"whose": target, "sessions": ended}))
+		return err
+	})
+	return ended, err
+}
+
 // ResetMFA removes someone's authenticator, for a lost phone, and ends their sessions:
 // an attacker with a session must not outlive the reset of the account (SEC-126). The
 // route requires administrator.

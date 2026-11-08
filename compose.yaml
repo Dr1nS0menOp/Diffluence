@@ -59,6 +59,8 @@ services:
       DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-starttls}
       # PDF files need the helper below. Empty = no PDF, and browser print remains.
       DIFFLUENCE_PDF_URL: ${DIFFLUENCE_PDF_URL:-}
+      # The password the helper asks for. Set the same value for the helper below.
+      DIFFLUENCE_PDF_PASSWORD: ${DIFFLUENCE_PDF_PASSWORD:-}
       DIFFLUENCE_COLLABORA_URL: ${DIFFLUENCE_COLLABORA_URL:-}
       # Public sites are written below this folder. Empty = no sites.
       DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
@@ -72,13 +74,35 @@ services:
 
   # The helper for PDF files and office previews. It reads hostile files, so it can only
   # reach the app: no database, no internet (ARC-074).
-  # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000.
+  # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000 and a long
+  # DIFFLUENCE_PDF_PASSWORD in .env. With a password set, it answers nobody without it.
+  # It never fetches an address, runs no script in pages, and holds nothing on disk.
   pdf:
-    image: gotenberg/gotenberg:8.40.0
+    image: gotenberg/gotenberg:8.40.0@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996
     profiles: [pdf]
     restart: unless-stopped
     networks: [helpers]
+    environment:
+      GOTENBERG_API_BASIC_AUTH_USERNAME: diffluence
+      GOTENBERG_API_BASIC_AUTH_PASSWORD: ${DIFFLUENCE_PDF_PASSWORD:-}
+    # The password switches on the check, so an install without one keeps working.
+    entrypoint:
+      - sh
+      - -c
+      - 'if [ -n "$$GOTENBERG_API_BASIC_AUTH_PASSWORD" ]; then set -- --api-enable-basic-auth "$$@"; fi; exec gotenberg "$$@"'
+      - gotenberg
+    command:
+      - --api-disable-download-from
+      - --api-timeout=120s
+      - --chromium-deny-private-ips
+      - --chromium-disable-javascript
+      - --webhook-disable
+      - --prometheus-disable-collect
+      - --log-level=warn
+    read_only: true
+    tmpfs: [/tmp, /home/gotenberg]
     security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
 
 networks:
   helpers:
