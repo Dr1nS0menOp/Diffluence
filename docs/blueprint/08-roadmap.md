@@ -70,6 +70,8 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 
 ## Wanted, later
 
+- **Diffluence Query Language (DQL)** (2026-11-08). The search box always searches all spaces. Clicking in it unfolds a panel with filters as buttons. Later that panel also takes a query language, DQL, that means the same as the buttons, so a person can type what the buttons do and more. It builds on the existing search syntax, such as `title:`, and every result stays within what the reader may see.
+
 - **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
 - **S3 storage.** It needs a client module, chosen when the time comes.
 
