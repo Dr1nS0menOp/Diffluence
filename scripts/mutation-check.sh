@@ -721,6 +721,13 @@ mutate "a panel emoji takes markup" internal/document/attrs.go \
   's.replace("if !isEmoji(emoji) {\n\t\treturn errors.New(\"a panel takes one emoji\")\n\t}\n", "")' ./internal/document/
 mutate "an unknown block reaches an export" internal/document/html.go \
   's.replace("w.b.WriteString(`<p class=\"unknown-block\">Block not shown: ` + esc(name) + `</p>`)", "orig, _ := n.Attrs[\"original\"].(string)\n\t\tw.b.WriteString(name + orig)")' ./internal/document/
+# Wave U (spec 030).
+mutate "the user list names spaces a guest cannot open" internal/identity/users.go \
+  's.replace("FROM perm_spaces(u.id, '"'"'space.view'"'"') ps JOIN spaces s ON s.id = ps.space_id", "FROM spaces s")' $app -run TestTheUserListNamesTheSpacesOfAGuestOnly
+mutate "the content screen ignores the last day of a change" internal/pages/content.go \
+  's.replace("p.updated_at < $20::timestamptz + interval '"'"'1 day'"'"'", "p.updated_at < $20::timestamptz")' $app -run TestContentFiltersByTheDayOfChangeAndOfCreation
+mutate "the reach of a person counts pages of others" internal/identity/lifecycle.go \
+  's.replace("FROM pages p WHERE COALESCE(p.owner_id, p.created_by) = $1 AND p.status", "FROM pages p WHERE p.status")' $app -run TestAnAdministratorSeesTheReachOfAPersonButNoTitles
 
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

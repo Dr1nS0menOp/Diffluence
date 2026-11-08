@@ -3,6 +3,14 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: smaller things for the people who keep an instance tidy (spec 030)
+- The lock beside a page title is open or closed, so a restricted page shows at a glance
+- The spaces in the administration filter by name, pages, storage and months without a change
+- The Content screen of a space filters by the day of the last change and of creation
+- The user list names the spaces of each guest, and a person's screen shows their groups, spaces and how many pages they own, without titles
+- The administration warns when the disk for files has less than a tenth free
+- Upgrade impact: none
+
 ### Changed: search that carries the load, and a tree that loads by branch (spec 028)
 - A search no longer reads every match. A common word in 50,000 pages went from seconds to tens of milliseconds, also with reading and publishing going on
 - The order is new: the title as typed, every word in the title, then the rest, each with the newest first. Nothing is left out, however old

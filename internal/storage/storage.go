@@ -52,6 +52,11 @@ type Store interface {
 	Healthy(ctx context.Context) error
 }
 
+// Spacer is a store that knows how much room it has left. Object storage does not.
+type Spacer interface {
+	Space(ctx context.Context) (free, total uint64, err error)
+}
+
 // Listed is one stored object.
 type Listed struct {
 	Key      string

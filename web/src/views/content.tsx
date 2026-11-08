@@ -226,6 +226,12 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
               ))}
             </select>
           </label>
+          {(['changed_from', 'changed_until', 'created_from', 'created_until'] as const).map((key) => (
+            <label key={key} className="field">
+              <span>{t(`content.${key}`)}</span>
+              <input type="date" value={params.get(key) ?? ''} onChange={(e) => set(key, e.target.value)} />
+            </label>
+          ))}
           <label className="field">
             <span>{t('directory.sort')}</span>
             <select value={params.get('sort') ?? 'title'} onChange={(e) => set('sort', e.target.value)}>

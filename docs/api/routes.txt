@@ -84,6 +84,7 @@ GET /api/v1/admin/templates                                    permission:admini
 GET /api/v1/admin/trash/spaces                                 session-only permission:administrator
 GET /api/v1/admin/users                                        session-only permission:administrator
 GET /api/v1/admin/users/{id}                                   session-only permission:administrator
+GET /api/v1/admin/users/{id}/reach                             session-only permission:administrator
 GET /api/v1/admin/users/{id}/type-impact                       session-only permission:administrator
 GET /api/v1/admin/webhooks                                     permission:administrator
 GET /api/v1/appearance                                         public

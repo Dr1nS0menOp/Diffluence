@@ -35,6 +35,7 @@ func (s *Server) registerConsoleRoutes() {
 	r.HandleFunc("POST /api/v1/admin/users/import", SessionOnly(admin), s.handleUsersImport)
 	r.HandleFunc("POST /api/v1/admin/users/{id}/anonymise", sensitive, s.handleAnonymise)
 	r.HandleFunc("GET /api/v1/admin/users/{id}/type-impact", SessionOnly(admin), s.handleTypeImpact)
+	r.HandleFunc("GET /api/v1/admin/users/{id}/reach", SessionOnly(admin), s.handleUserReach)
 	r.HandleFunc("PUT /api/v1/admin/users/{id}/expiry", SessionOnly(admin), s.handleExpiry)
 	r.HandleFunc("POST /api/v1/admin/service-accounts", SessionOnly(admin), s.handleServiceAccount)
 	r.HandleFunc("POST /api/v1/admin/service-accounts/{id}/tokens", sensitive, s.handleServiceToken)
@@ -235,6 +236,19 @@ func (s *Server) handleTypeImpact(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, impact)
+}
+
+func (s *Server) handleUserReach(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	reach, err := s.deps.Identity.UserReach(r.Context(), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, reach)
 }
 
 func (s *Server) handleExpiry(w http.ResponseWriter, r *http.Request) {

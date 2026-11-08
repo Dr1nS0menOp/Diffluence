@@ -50,7 +50,7 @@
 - **ACC-037** · built · Guests can be granted any space, but start with none.
 - **ACC-038** · built · A guest has a mark on their name, so others know they are talking to someone outside.
 - **ACC-039** · built · A guest account can expire on a date, and an administrator gets a reminder before that.
-- **ACC-040** · partly · An administrator can list guests with their spaces and last login. Built: guests by filter, with last login. Still open: their spaces in the list.
+- **ACC-040** · built · An administrator can list guests with their spaces and last login. See spec 030.
 - **ACC-041** · built · A space administrator with `invite_people` can ask for a guest in their space, when an administrator allows it. An administrator approves each one (ADR-033, spec 022).
 - **ACC-042** · built · A guest can be turned into a member, and back, with a clear warning about what changes.
 - **ACC-043** · built · A service account is a user type for automation.
@@ -85,7 +85,7 @@
 - **ACC-063** · built · Restrictions are managed by people with *manage restrictions*, who can see the page.
 - **ACC-064** · built · Three clear states at the top of the dialog: **Open** (everyone in the space can view and edit), **View only for most** (everyone can view, chosen people can edit), and **Private** (only chosen people).
 - **ACC-065** · built · A person setting a restriction is added to it, so nobody locks themselves out by accident.
-- **ACC-066** · partly · The lock icon shows the state: open or closed. Everyone who can see the page can see that it is restricted. Built: the word Restricted for everyone who can see the page. Still open: an open and a closed lock.
+- **ACC-066** · built · The lock icon shows the state: open when the page has no restrictions of its own, closed when it has. Everyone who can see the page can see that it is restricted. See spec 030.
 - **ACC-067** · built · A list in space settings shows all restricted pages (SPC-065). It is the flag `restricted` on the Content screen of a space (SPC-065).
 - **ACC-068** · built · The dialog says how many pages below are affected.
 

@@ -148,7 +148,29 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	if damaged {
 		out = append(out, Item{Kind: "audit_damaged"})
 	}
+	// Uploads fail on a full disk while text still saves (docs/operations/limits.md), so
+	// this warns early. The count is the percentage still free.
+	if disk, ok := s.store.(storage.Spacer); ok {
+		if free, total, err := disk.Space(ctx); err == nil {
+			if percent, full := DiskNearlyFull(free, total); full {
+				out = append(out, Item{Kind: "disk_nearly_full", Count: percent})
+			}
+		}
+	}
 	return out, nil
+}
+
+// diskWarnPercent is how much room is left when the console starts to warn.
+const diskWarnPercent = 10
+
+// DiskNearlyFull says whether the free part of a disk is below the warning, and gives
+// the free percentage. An unknown size never warns.
+func DiskNearlyFull(free, total uint64) (percent int, full bool) {
+	if total == 0 {
+		return 0, false
+	}
+	percent = int(free * 100 / total)
+	return percent, percent < diskWarnPercent
 }
 
 // Sized is one entry of a report: a name and a size, and nothing of the content.

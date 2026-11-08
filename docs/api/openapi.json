@@ -2080,6 +2080,33 @@
         "x-access": "sensitive permission:administrator"
       }
     },
+    "/api/v1/admin/users/{id}/reach": {
+      "get": {
+        "operationId": "get /api/v1/admin/users/{id}/reach",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/users/{id}/reset-mfa": {
       "post": {
         "operationId": "post /api/v1/admin/users/{id}/reset-mfa",

@@ -14,7 +14,7 @@
 - **ADM-007** · built · Disabling a user ends their sessions at once. They can no longer log in by any method.
 - **ADM-008** · built · The list filters by type, status, group, last login and how they log in.
 - **ADM-009** · built · Bulk actions: disable, add to group. Import of users from CSV for instances without SCIM.
-- **ADM-010** · partly · A user's screen shows groups, spaces, last login, and pages they own, and offers to hand over ownership. Built: last login. Still open: groups, spaces, pages owned and hand-over (wave D).
+- **ADM-010** · partly · A user's screen shows groups, spaces, last login, and pages they own, and offers to hand over ownership. Built: last login, groups, the spaces they can open and how many pages they own, without titles (spec 030). Still open: hand-over of ownership.
 - **ADM-011** · built · A list of people who have not logged in for a chosen time helps to clean up.
 - **ADM-012** · built · Administrators cannot read content through user screens.
 
@@ -49,7 +49,7 @@
 - **ADM-030** · built · An administrator lists all spaces, also ones they cannot read, with key, name, status and owners.
 - **ADM-031** · built · An administrator recovers access to a space.
 - **ADM-032** · built · An administrator restores or purges spaces from the trash.
-- **ADM-033** · partly · The list shows the number of pages, storage used and last activity, and can be filtered by them. Built: pages, storage and last activity in the list. Still open: filtering by them.
+- **ADM-033** · built · The list shows the number of pages, storage used and last activity, and can be filtered by them, and by name or key. See spec 030.
 - **ADM-034** · built · A list shows spaces with no active administrator.
 
 ## 10.7 Templates and content defaults
@@ -74,7 +74,7 @@
 
 - **ADM-047** · built · A screen shows nodes, versions, migrations, the queue, storage and failed jobs.
 - **ADM-048** · built · Jobs can be retried or cancelled from the screen.
-- **ADM-049** · partly · A check lists what needs attention: mail not set, backup not seen, a node with an old version, disk nearly full. Built: mail not set, a node with another version, failed jobs, accounts that end soon. Still open: backup not seen, disk nearly full.
+- **ADM-049** · partly · A check lists what needs attention: mail not set, backup not seen, a node with an old version, disk nearly full. Built: mail not set, a node with another version, failed jobs, accounts that end soon, and the disk for files below a tenth free (spec 030). Still open: backup not seen, because nothing records a backup yet.
 - **ADM-050** · later · Diffluence tells an administrator when a new release exists, only when they allow it to check, because a check reveals an installation. Withdrawn by ADR-029: operators follow a release feed, and nothing calls home.
 - **ADM-051** · built · Liveness and readiness endpoints serve load balancers.
 - **ADM-052** · phase 3 · Metrics for Prometheus and traces for OpenTelemetry.

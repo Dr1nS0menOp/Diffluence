@@ -241,7 +241,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-147** · built · The browser's spell checker is on, and respects the language of the page.
 - **EDT-148** · built · **Page language:** a page can state its language, which sets the spell checker, the hyphenation and what screen readers pronounce.
 - **EDT-149** · partly · **Comment while editing:** selecting text in the editor allows an inline comment. It stays with the draft until publishing. Built: on a page that was published before. New: on a page that never was.
-- **EDT-150** · new · A long page keeps typing smooth: 100,000 words stay usable, and the tools do not freeze.
+- **EDT-150** · partly · A long page keeps typing smooth: 100,000 words stay usable, and the tools do not freeze. Measured in spec 030: a page of 100,000 words opens to read in 0.4 s and to edit in 0.5 s, and typing takes about 10 ms a key, in headless Chromium on one machine. Still open: the tools were not measured on their own, and nor was a slow device.
 - **EDT-151** · built · **Word count** counts the selection when there is one.
 
 ## 4.16 Safety of the document

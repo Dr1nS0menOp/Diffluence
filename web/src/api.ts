@@ -852,6 +852,8 @@ export interface UserDetail {
   global_permissions: string[];
   expires_at: string | null;
   last_login_at: string | null;
+  /** The keys of the spaces a guest can open. Empty for members. */
+  spaces?: string[];
 }
 
 export interface Group {

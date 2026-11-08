@@ -267,6 +267,27 @@ func TestContentScreenFiltersAndReportsWhatWorked(t *testing.T) {
 	}
 }
 
+func TestContentFiltersByTheDayOfChangeAndOfCreation(t *testing.T) {
+	e := newEnv(t)
+	owner, _, _, space := e.team("ENG")
+	old := owner.page(space, nil, "Old", "x")
+	recent := owner.page(space, nil, "Recent", "x")
+	e.sql("UPDATE pages SET created_at = '2024-03-01T10:00:00Z', updated_at = '2024-05-10T23:30:00Z' WHERE id = $1", old)
+	e.sql("UPDATE pages SET created_at = '2026-01-15T10:00:00Z', updated_at = '2026-02-01T08:00:00Z' WHERE id = $1", recent)
+	content := "/api/v1/spaces/" + space + "/content?"
+
+	owner.want(400, "GET", content+"changed_from=last+week", nil)
+	if got := titlesIn(owner.ok("GET", content+"changed_until=2024-05-10", nil), "pages"); len(got) != 1 || got[0] != "Old" {
+		t.Fatalf("the last day counts whole: %v", got)
+	}
+	if got := titlesIn(owner.ok("GET", content+"changed_from=2024-05-11", nil), "pages"); has(got, "Old") || !has(got, "Recent") {
+		t.Fatalf("changed from: %v", got)
+	}
+	if got := titlesIn(owner.ok("GET", content+"created_from=2026-01-15&created_until=2026-01-15", nil), "pages"); len(got) != 1 || got[0] != "Recent" {
+		t.Fatalf("created on one day: %v", got)
+	}
+}
+
 func TestRemovingOneVersionLeavesAMark(t *testing.T) {
 	e := newEnv(t)
 	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)

@@ -795,3 +795,31 @@ func (s *Service) ChangeImpact(ctx context.Context, id uuid.UUID) (TypeImpact, e
 	}
 	return TypeImpact{Spaces: spaces, Permissions: u.GlobalPermissions}, nil
 }
+
+// Reach is what an administrator sees of one person: groups, the spaces they can
+// open and how many pages they own. Titles stay out, because administrators read no
+// content by default (ADM-010, ADM-012).
+type Reach struct {
+	Groups     []string `json:"groups"`
+	Spaces     []string `json:"spaces"`
+	PagesOwned int      `json:"pages_owned"`
+}
+
+// maxReachRows keeps one person's overview to a screenful.
+const maxReachRows = 200
+
+// UserReach reads the overview of one person. The route requires administrator.
+func (s *Service) UserReach(ctx context.Context, id uuid.UUID) (Reach, error) {
+	if _, err := s.GetUser(ctx, s.pool, id); err != nil {
+		return Reach{}, err
+	}
+	out := Reach{Groups: []string{}, Spaces: []string{}}
+	err := s.pool.QueryRow(ctx, `SELECT
+			COALESCE((SELECT array_agg(name ORDER BY name) FROM (SELECT g.name FROM group_members m
+				JOIN groups g ON g.id = m.group_id WHERE m.user_id = $1 ORDER BY g.name LIMIT $2) gs), '{}'),
+			COALESCE((SELECT array_agg(key ORDER BY key) FROM (SELECT s.key FROM perm_spaces($1, 'space.view') ps
+				JOIN spaces s ON s.id = ps.space_id ORDER BY s.key LIMIT $2) ss), '{}'),
+			(SELECT count(*) FROM pages p WHERE COALESCE(p.owner_id, p.created_by) = $1 AND p.status = 'published')`,
+		id, maxReachRows).Scan(&out.Groups, &out.Spaces, &out.PagesOwned)
+	return out, err
+}

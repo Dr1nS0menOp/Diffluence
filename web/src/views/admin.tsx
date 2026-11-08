@@ -37,6 +37,7 @@ import {
 } from './admin-people';
 import { PermissionsTab, RulesTab } from './admin-rules';
 import { StorageLimitDialog } from './admin-storage';
+import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
 import { SettingsSearch, SummaryTab } from './admin-summary';
 
 const TABS = [
@@ -101,6 +102,28 @@ function GlobalPermissions({ current, onChange }: { current: string[]; onChange:
   );
 }
 
+/** Groups, spaces and the number of pages a person owns, without titles (ADM-010). */
+function UserReach({ userId }: { userId: string }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['user-reach', userId],
+    queryFn: () =>
+      api.get<{ groups: string[]; spaces: string[]; pages_owned: number }>(`/admin/users/${userId}/reach`),
+  });
+  if (!q.data) return <ErrorNote error={q.error} />;
+  const none = t('admin.reachNone');
+  return (
+    <dl className="facts">
+      <dt>{t('admin.reachGroups')}</dt>
+      <dd>{q.data.groups.join(', ') || none}</dd>
+      <dt>{t('admin.reachSpaces')}</dt>
+      <dd>{q.data.spaces.join(', ') || none}</dd>
+      <dt>{t('admin.reachPages')}</dt>
+      <dd>{q.data.pages_owned}</dd>
+    </dl>
+  );
+}
+
 function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -132,6 +155,7 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
         {user.email} · {t(`admin.source_${user.source}`)}
       </p>
       <ErrorNote error={act.error ?? save.error ?? reset.error} />
+      <UserReach userId={user.id} />
       <GlobalPermissions
         current={perms}
         onChange={(next) => {
@@ -380,7 +404,15 @@ function UserTable({
               </button>
             </td>
             <td>{u.email}</td>
-            <td>{t(`admin.${u.type}`)}</td>
+            <td>
+              {t(`admin.${u.type}`)}
+              {u.type === 'guest' && (
+                <span className="muted">
+                  {' · '}
+                  {u.spaces?.length ? u.spaces.join(', ') : t('admin.guestNoSpaces')}
+                </span>
+              )}
+            </td>
             <td>{t(`admin.source_${u.source}`)}</td>
             <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
             <td>{dates.moment(u.last_login_at)}</td>
@@ -691,9 +723,65 @@ function SpacesTab() {
     onSettled: refresh,
   });
   const purge = useMutation({ mutationFn: (id: string) => api.del(`/trash/${id}`), onSettled: refresh });
+  const [filter, setFilter] = useState<SpaceFilter>(NO_SPACE_FILTER);
+  const now = new Date();
+  const shown = (q.data?.spaces ?? []).filter((s) => {
+    const total = q.data?.totals.find((row) => row.id === s.id);
+    return matchesSpaceFilter(
+      {
+        name: s.name,
+        key: s.key,
+        pages: total?.pages ?? 0,
+        bytes: total?.bytes ?? 0,
+        lastActivity: total?.last_activity ?? null,
+      },
+      filter,
+      now,
+    );
+  });
+  const count = (raw: string) => Math.max(0, Number.parseInt(raw, 10) || 0);
   return (
     <>
       <ErrorNote error={q.error ?? restore.error ?? purge.error} />
+      <div className="row">
+        <input
+          type="search"
+          value={filter.text}
+          onChange={(e) => setFilter({ ...filter, text: e.target.value })}
+          aria-label={t('admin.spaceFind')}
+          placeholder={t('admin.spaceFind')}
+        />
+        <input
+          type="number"
+          min={0}
+          value={filter.minPages || ''}
+          onChange={(e) => setFilter({ ...filter, minPages: count(e.target.value) })}
+          aria-label={t('admin.spaceMinPages')}
+          placeholder={t('admin.spaceMinPages')}
+        />
+        <input
+          type="number"
+          min={0}
+          value={filter.minMiB || ''}
+          onChange={(e) => setFilter({ ...filter, minMiB: count(e.target.value) })}
+          aria-label={t('admin.spaceMinMiB')}
+          placeholder={t('admin.spaceMinMiB')}
+        />
+        <select
+          aria-label={t('admin.spaceQuiet')}
+          value={filter.quietMonths}
+          onChange={(e) => setFilter({ ...filter, quietMonths: Number(e.target.value) })}
+        >
+          {QUIET_MONTHS.map((m) => (
+            <option key={m} value={m}>
+              {m === 0
+                ? `${t('admin.spaceQuiet')}: ${t('admin.any')}`
+                : t('admin.spaceQuietFor', { count: m })}
+            </option>
+          ))}
+        </select>
+      </div>
+      {q.data && shown.length === 0 && <p className="muted">{t('admin.spaceNoneFit')}</p>}
       <table>
         <thead>
           <tr>
@@ -707,8 +795,8 @@ function SpacesTab() {
           </tr>
         </thead>
         <tbody>
-          {q.data?.spaces.map((s) => {
-            const total = q.data.totals.find((row) => row.id === s.id);
+          {shown.map((s) => {
+            const total = q.data?.totals.find((row) => row.id === s.id);
             return (
               <tr key={s.id}>
                 <td>

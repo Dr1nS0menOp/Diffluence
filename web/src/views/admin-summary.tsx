@@ -53,6 +53,7 @@ const ATTENTION_LINKS: Record<string, string> = {
   events_failed: '/admin/care',
   events_waiting: '/admin/care',
   audit_damaged: '/admin/audit',
+  disk_nearly_full: '/admin/care',
 };
 
 function SummaryTiles() {

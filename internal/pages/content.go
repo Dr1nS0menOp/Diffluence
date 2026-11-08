@@ -48,9 +48,15 @@ type ContentQuery struct {
 	BrokenLinks    bool
 	Orphaned       bool
 	PastReview     bool
-	Sort           string
-	Limit          int
-	Offset         int
+	// ChangedFrom and the rest bound the last change and the creation of a page, as whole
+	// days: From is the first day that counts, Until the last.
+	ChangedFrom  *time.Time
+	ChangedUntil *time.Time
+	CreatedFrom  *time.Time
+	CreatedUntil *time.Time
+	Sort         string
+	Limit        int
+	Offset       int
 }
 
 // ContentRow is a line of the Content screen.
@@ -94,6 +100,10 @@ const contentSQL = `SELECT p.id, p.parent_id, p.title, COALESCE(p.owner_id, p.cr
 	  AND (NOT $12 OR (NOT EXISTS (SELECT 1 FROM page_links k WHERE k.target_id = p.id)
 	                   AND (SELECT count(*) FROM page_tree a WHERE a.descendant_id = p.id) > $15))
 	  AND (NOT $13 OR p.review_on <= current_date)
+	  AND ($19::timestamptz IS NULL OR p.updated_at >= $19)
+	  AND ($20::timestamptz IS NULL OR p.updated_at < $20::timestamptz + interval '1 day')
+	  AND ($21::timestamptz IS NULL OR p.created_at >= $21)
+	  AND ($22::timestamptz IS NULL OR p.created_at < $22::timestamptz + interval '1 day')
 	ORDER BY
 		CASE WHEN $16 = 'changed' THEN p.updated_at END DESC NULLS LAST,
 		CASE WHEN $16 = 'created' THEN p.created_at END DESC NULLS LAST,
@@ -110,7 +120,8 @@ func (s *Service) Content(ctx context.Context, c identity.Caller, spaceID uuid.U
 		q.Limit = defaultContentRows
 	}
 	rows, err := s.pool.Query(ctx, contentSQL, c.UserID, spaceID, q.OwnerID, q.OwnerDisabled, q.Stage, q.Label, q.ContributorID,
-		q.InactiveMonths, q.WithParents, q.Restricted, q.BrokenLinks, q.Orphaned, q.PastReview, treeKinds, farFromTheTop, q.Sort, q.Limit, max(q.Offset, 0))
+		q.InactiveMonths, q.WithParents, q.Restricted, q.BrokenLinks, q.Orphaned, q.PastReview, treeKinds, farFromTheTop, q.Sort, q.Limit, max(q.Offset, 0),
+		q.ChangedFrom, q.ChangedUntil, q.CreatedFrom, q.CreatedUntil)
 	if err != nil {
 		return nil, 0, err
 	}

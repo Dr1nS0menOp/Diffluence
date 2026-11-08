@@ -47,6 +47,9 @@ type UserDetail struct {
 	// ExpiresAt is when the account ends, and LastLoginAt when it was last used.
 	ExpiresAt   *time.Time `json:"expires_at"`
 	LastLoginAt *time.Time `json:"last_login_at"`
+	// Spaces are the keys of the spaces a guest can open now. Members leave it empty,
+	// because most of them reach most spaces and the list would say nothing (ACC-040).
+	Spaces []string `json:"spaces"`
 }
 
 const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u.username, u.external_id, u.source,
@@ -55,13 +58,16 @@ const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u
 		(SELECT count(*) FROM webauthn_credentials w WHERE w.user_id = u.id),
 		COALESCE((SELECT array_agg(g.permission ORDER BY g.permission) FROM global_grants g
 			WHERE g.subject_type = 'user' AND g.subject_id = u.id), '{}'),
-		u.created_at, u.updated_at, u.expires_at, u.last_login_at
+		u.created_at, u.updated_at, u.expires_at, u.last_login_at,
+		CASE WHEN u.type = 'guest' THEN COALESCE((SELECT array_agg(s.key ORDER BY s.key)
+			FROM perm_spaces(u.id, 'space.view') ps JOIN spaces s ON s.id = ps.space_id), '{}') ELSE '{}' END
 	FROM users u`
 
 func scanUserDetail(r pgx.Row) (UserDetail, error) {
 	var u UserDetail
 	err := r.Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.Username, &u.ExternalID, &u.Source,
-		&u.HasPassword, &u.TOTPEnabled, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.LastLoginAt)
+		&u.HasPassword, &u.TOTPEnabled, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.LastLoginAt,
+		&u.Spaces)
 	return u, err
 }
 

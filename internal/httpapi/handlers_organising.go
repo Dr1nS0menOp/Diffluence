@@ -760,11 +760,26 @@ func contentQuery(w http.ResponseWriter, r *http.Request) (pages.ContentQuery, b
 	if !ok {
 		return pages.ContentQuery{}, false
 	}
+	days := map[string]*time.Time{}
+	for _, key := range []string{"changed_from", "changed_until", "created_from", "created_until"} {
+		raw := q.Get(key)
+		if raw == "" {
+			continue
+		}
+		day, err := time.Parse(time.DateOnly, raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "bad_request", "A date is written as 2026-11-07.")
+			return pages.ContentQuery{}, false
+		}
+		days[key] = &day
+	}
 	months, _ := strconv.Atoi(q.Get("inactive_months"))
 	on := func(key string) bool { return q.Get(key) == "1" }
 	return pages.ContentQuery{OwnerID: owner, OwnerDisabled: on("owner_disabled"), Stage: q.Get("stage"), Label: q.Get("label"),
 		ContributorID: contributor, InactiveMonths: months, WithParents: on("with_parents"), Restricted: on("restricted"),
 		BrokenLinks: on("broken_links"), Orphaned: on("orphaned"), PastReview: on("past_review"), Sort: q.Get("sort"),
+		ChangedFrom: days["changed_from"], ChangedUntil: days["changed_until"],
+		CreatedFrom: days["created_from"], CreatedUntil: days["created_until"],
 		Limit: queryInt(r, "limit"), Offset: queryInt(r, "offset")}, true
 }
 

@@ -36,6 +36,8 @@ const line = (path: string) => {
 export const IconPencil = line('M4 20l1-4L16 5l3 3L8 19l-4 1zM14 7l3 3');
 export const IconStar = line('M12 3.6l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z');
 export const IconLock = line('M7 11V8a5 5 0 0 1 10 0v3M6 11h12v9H6z');
+/** The lock of a page without restrictions of its own: the shackle stands open. */
+export const IconLockOpen = line('M7 11V8a5 5 0 0 1 9.6-2M6 11h12v9H6z');
 export const IconPlus = line('M12 5v14M5 12h14');
 export const IconSearch = line('M11 18a7 7 0 1 0 0-14 7 7 0 0 0 0 14zM20 20l-4-4');
 export const IconChevronDown = line('M6 9l6 6 6-6');

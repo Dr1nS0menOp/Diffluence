@@ -33,6 +33,7 @@ import {
   IconFolder,
   IconInfo,
   IconLock,
+  IconLockOpen,
   IconMore,
   IconMove,
   IconPage,
@@ -695,11 +696,12 @@ export function PageView({ pageId }: { pageId: string }) {
             <button
               type="button"
               className="icon"
-              aria-label={t('page.restrictions')}
-              title={t('page.restrictions')}
+              aria-label={t(page.restricted ? 'page.restrictionsClosed' : 'page.restrictionsOpen')}
+              title={t(page.restricted ? 'page.restrictionsClosed' : 'page.restrictionsOpen')}
+              data-restricted={page.restricted}
               onClick={() => setDialog('restrictions')}
             >
-              <IconLock />
+              {page.restricted ? <IconLock /> : <IconLockOpen />}
             </button>
             <PageMenu
               page={page}

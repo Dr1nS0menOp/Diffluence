@@ -321,6 +321,49 @@ func TestGuestsCannotBrowseTheDirectory(t *testing.T) {
 	guest.want(403, "GET", "/api/v1/directory?q=member", nil)
 }
 
+func TestTheUserListNamesTheSpacesOfAGuestOnly(t *testing.T) {
+	e := newEnv(t)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	owner, _, _, space := e.team("ENG")
+	owner.ok("POST", "/api/v1/spaces", map[string]any{"key": "OPS", "name": "Operations"})
+	guest := e.userOfType("guest@example.com", identity.TypeGuest, identity.PermUseProduct)
+	owner.grant(space, "user", guest.id, permissions.TemplateViewer)
+
+	spacesOf := func(email string) []string {
+		list := admin.ok("GET", "/api/v1/admin/users?q="+email, nil)["users"].([]any)
+		if len(list) != 1 {
+			t.Fatalf("users for %s: %v", email, list)
+		}
+		return strs(list[0].(map[string]any)["spaces"])
+	}
+	if got := spacesOf("guest@example.com"); len(got) != 1 || got[0] != "ENG" {
+		t.Fatalf("a guest shows the spaces it can open, and only those: %v", got)
+	}
+	if got := spacesOf("owner@example.com"); len(got) != 0 {
+		t.Fatalf("members show no list: %v", got)
+	}
+	owner.want(403, "GET", "/api/v1/admin/users", nil)
+}
+
+func TestAnAdministratorSeesTheReachOfAPersonButNoTitles(t *testing.T) {
+	e := newEnv(t)
+	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
+	_, editor, _, space := e.team("ENG")
+	editor.page(space, nil, "Secret plans", "x")
+	editor.page(space, nil, "More plans", "x")
+
+	editor.want(403, "GET", "/api/v1/admin/users/"+editor.id+"/reach", nil)
+	admin.want(404, "GET", "/api/v1/admin/users/00000000-0000-0000-0000-000000000001/reach", nil)
+	out := admin.want(200, "GET", "/api/v1/admin/users/"+editor.id+"/reach", nil)
+	if strings.Contains(out, "Secret plans") {
+		t.Fatalf("a title reached the administrator: %s", out)
+	}
+	reach := admin.ok("GET", "/api/v1/admin/users/"+editor.id+"/reach", nil)
+	if reach["pages_owned"].(float64) != 2 || !has(strs(reach["spaces"]), "ENG") {
+		t.Fatalf("reach: %v", reach)
+	}
+}
+
 // idp is a small OpenID Connect provider for tests.
 type idp struct {
 	t      *testing.T
