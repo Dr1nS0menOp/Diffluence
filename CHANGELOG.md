@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Security: master.key can be replaced (spec 034)
+- `diffluence key add`, `promote`, `reseal`, `check` and `retire` replace `master.key` while Diffluence keeps running. Every stored file and secret is sealed again with the new key, and the old key is removed only when a check proves nothing needs it
+- `diffluence key check` proves that every stored file and secret opens, and names what does not, without showing its content. `--deep` reads every byte
+- Backups take a key on its way in or out along, and a restore now ends with `key check`. The restore drill replaces the key halfway through
+- The job that encrypts old files remembers where it stopped, so a store of millions of files gets through
+- Upgrade impact: one migration. New secrets are sealed in a new layout that names their key; older ones still open. Nothing to do
 ### Changed: an order of work when the database is full (spec 031)
 - Saving comes first, then reading, then search and reports. Each has its own share of the database connections, so a flood of searches or page views cannot take the room a save needs
 - When a share is full and too many wait, the answer comes at once: 503 with `Retry-After`, and the screen says Diffluence is very busy. Text being written stays in the browser
@@ -14,7 +20,7 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 ### Security: stored files are encrypted (spec 032)
 - Every stored file is encrypted with its own key, which `master.key` protects. A wrong key, a changed file or a file cut short is refused, and nothing of it is served
 - Files from before this release are encrypted by a job in the background, a little at a time. Until it is done they are still read; after that, a plain file is refused
-- Upgrade impact: one migration. Keep `master.key` safe and apart from the data: without it, no file can be read. Replacing `master.key` is not supported yet
+- Upgrade impact: one migration. Keep `master.key` safe and apart from the data: without it, no file can be read
 
 ### Changed: smaller parts of blueprint 04 (spec 032)
 - The PDF of an office file is made once per version and kept, instead of on every view, and copies of the same file share it

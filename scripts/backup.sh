@@ -35,8 +35,16 @@ docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc | 
 
 # Stored files and the encryption key, read through a throw-away container.
 volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -q diffluence)")
-docker run --rm -v "$volume:/data:ro" busybox tar -C /data -czf - --exclude=./master.key --exclude=./nats . | encrypt_to files.tar.gz.gpg
+docker run --rm -v "$volume:/data:ro" busybox tar -C /data -czf - --exclude=./master.key --exclude=./master.key.next \
+  --exclude=./master.key.previous --exclude=./nats . | encrypt_to files.tar.gz.gpg
 docker run --rm -v "$volume:/data:ro" busybox cat /data/master.key | encrypt_to master.key.gpg
+# While master.key is being replaced (spec 034), the key on its way in or out is needed too:
+# without it, what it sealed cannot be read after a restore.
+for extra in next previous; do
+  if docker run --rm -v "$volume:/data:ro" busybox test -f "/data/master.key.$extra"; then
+    docker run --rm -v "$volume:/data:ro" busybox cat "/data/master.key.$extra" | encrypt_to "master.key.$extra.gpg"
+  fi
+done
 tar -C secrets -cf - . | encrypt_to secrets.tar.gpg
 
 # Relative names, so the backup can be checked after moving it to another machine.

@@ -40,9 +40,11 @@ const (
 	maxAttempts     = 5
 	failuresToOff   = 50
 	rotationOverlap = 24 * time.Hour
-	logDays         = 30
-	maxListed       = 200
-	maxBatch        = 50
+	// SecretContext is the context webhook secrets are sealed under, for tools that seal them again.
+	SecretContext = secretContext
+	logDays       = 30
+	maxListed     = 200
+	maxBatch      = 50
 )
 
 // waits are the pauses after each failed attempt: five attempts over a day.

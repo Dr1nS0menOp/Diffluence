@@ -27,9 +27,17 @@ decrypt database.dump.gpg | docker compose exec -T postgres pg_restore -U difflu
 docker compose create diffluence
 volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq diffluence)")
 decrypt files.tar.gz.gpg | docker run --rm -i -v "$volume:/data" busybox tar -C /data -xzf -
+for extra in next previous; do
+  if [ -f "$src/master.key.$extra.gpg" ]; then
+    decrypt "master.key.$extra.gpg" | docker run --rm -i -v "$volume:/data" busybox \
+      sh -c "cat >/data/master.key.$extra && chmod 600 /data/master.key.$extra"
+  fi
+done
 decrypt master.key.gpg | docker run --rm -i -v "$volume:/data" busybox \
   sh -c 'cat >/data/master.key && chmod 600 /data/master.key && chown -R 65532:65532 /data'
 
 docker compose up -d --wait diffluence
 docker compose exec -T diffluence diffluence audit verify
+# Every secret and stored file must open with the restored keys.
+docker compose exec -T diffluence diffluence key check
 echo "restore finished"

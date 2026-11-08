@@ -95,6 +95,9 @@ func (s *Service) hasTOTP(ctx context.Context, q db.Querier, userID uuid.UUID) (
 
 func totpContext(userID uuid.UUID) string { return "totp:" + userID.String() }
 
+// TOTPContext is the context a TOTP seed of a person is sealed under, for tools that seal it again.
+func TOTPContext(userID uuid.UUID) string { return totpContext(userID) }
+
 // TOTPSetup is shown once to the user while they enrol.
 type TOTPSetup struct {
 	Secret string `json:"secret"`

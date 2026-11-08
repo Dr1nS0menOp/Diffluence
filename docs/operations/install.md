@@ -63,7 +63,7 @@ Mailpit is a tool for developers and catches mail without delivering it, so it i
 
 ## The encryption key
 
-Diffluence creates `master.key` in the data directory on first start. It encrypts TOTP seeds and derives the key that signs audit checkpoints. **Back it up separately from your data.** Without it, users must set up their authenticator app again.
+Diffluence creates `master.key` in the data directory on first start. It protects every stored file and secret, and derives the key that signs audit checkpoints. **Back it up separately from your data.** Without it, no file can be read and users must set up their authenticator app again. To replace it, see [backup and restore](backup-restore.md#replace-it).
 
 With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MASTER_KEY_FILE` to the same key on every node. Diffluence refuses to start without it. HA itself is phase 3: attachments are on local disk until the S3 store exists.
 

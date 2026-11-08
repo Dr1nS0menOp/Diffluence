@@ -196,6 +196,57 @@ func (e *Encrypted) EncryptInPlace(ctx context.Context, key string) error {
 	return err
 }
 
+// WrappedKey returns the sealed data key from the header of a stored file, without opening
+// it, so a caller can see which key-encryption key protects the file. A plain file gives
+// ErrNotEncrypted, a damaged header ErrUnreadable.
+func (e *Encrypted) WrappedKey(ctx context.Context, key string) ([]byte, error) {
+	f, err := e.inner.Open(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = f.Close() }()
+	head := make([]byte, len(magic)+2)
+	n, err := io.ReadFull(f, head)
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
+		return nil, err
+	}
+	if n < len(magic) || !bytes.Equal(head[:len(magic)], magic) {
+		return nil, ErrNotEncrypted
+	}
+	if n < len(head) {
+		return nil, ErrUnreadable
+	}
+	size := int(binary.BigEndian.Uint16(head[len(magic):]))
+	if size == 0 || size > maxWrappedKey {
+		return nil, ErrUnreadable
+	}
+	wrapped := make([]byte, size)
+	if _, err := io.ReadFull(f, wrapped); err != nil {
+		return nil, ErrUnreadable
+	}
+	return wrapped, nil
+}
+
+// Reseal encrypts a stored file again under the same name with a new data key, which the
+// current key-encryption key wraps. It reads the file through Open, so a file that does not
+// decrypt is left as it is. The new file replaces the old one at once.
+func (e *Encrypted) Reseal(ctx context.Context, key string) error {
+	f, err := e.Open(ctx, key)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = f.Close() }()
+	size, err := f.Seek(0, io.SeekEnd)
+	if err != nil {
+		return err
+	}
+	if _, err := f.Seek(0, io.SeekStart); err != nil {
+		return err
+	}
+	_, err = e.Put(ctx, key, f, size)
+	return err
+}
+
 // MarkEveryFileEncrypted tells this store at once that plain files are now refused.
 func (e *Encrypted) MarkEveryFileEncrypted() {
 	e.mu.Lock()

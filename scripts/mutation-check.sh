@@ -775,6 +775,24 @@ mutate "the purge drops previews in use" internal/exchange/previews.go \
   's.replace("\t\tdelete(kept, hex.EncodeToString(raw))\n", "\t\t_ = raw\n")' $app -run TestAnOfficePreviewIsMadeOncePerVersionAndDroppedWhenUnused
 mutate "the notification cursor skips what shares a time" internal/notify/list.go \
   's.replace(" OR (n.created_at = $5 AND $7::uuid IS NOT NULL AND n.id > $7)", "")' $app -run TestPagingNotificationsWithACursorSkipsNothingThatSharesATime
+mutate "the old master key is retired while it is still needed" internal/app/keyrotation.go \
+  's.replace("\tif !rep.AllCurrent() {\n\t\treturn rep, ErrOldKeyStillNeeded", "\tif false {\n\t\treturn rep, ErrOldKeyStillNeeded")' $app -run TestTheOldKeyCannotBeRetiredBeforeEverythingIsSealedAgain
+mutate "a check counts an older key as current" internal/app/keyrotation.go \
+  's.replaceAll("if id != r.CurrentKey {", "if false && id != r.CurrentKey {")' $app -run TestTheOldKeyCannotBeRetiredBeforeEverythingIsSealedAgain
+mutate "resealing overwrites a value changed meanwhile" internal/app/keyrotation.go \
+  's.replace("WHERE %s::text = $1 AND %s = $3\", table, column, idCol, column)", "WHERE %s::text = $1 AND $3::bytea IS NOT NULL\", table, column, idCol)")' $app -run TestAValueChangedWhileItIsSealedAgainKeepsTheNewValue
+mutate "a check passes a value that does not open" internal/app/keyrotation.go \
+  's.replace("if _, err := k.Open(sealed, purpose); err != nil {", "if _, err := k.Open(sealed, purpose); err != nil && false {")' $app -run TestAWrongKeyIsNamedForEveryValueAndFileWithoutShowingThem
+mutate "a deep check reads only the end of a file" internal/app/keyrotation.go \
+  's.replace("\tif !deep {\n\t\treturn nil\n\t}", "\tif true {\n\t\treturn nil\n\t}")' $app -run TestADeepCheckFindsDamageInsideAFile
+mutate "the encryption job starts at the first file every run" internal/app/encryption.go \
+  's.replace("\t\tif name <= cursor {\n\t\t\tcontinue\n\t\t}", "\t\tif false && name <= cursor {\n\t\t\tcontinue\n\t\t}")' $app -run TestTheEncryptionJobGoesOnWhereTheLastRunStopped
+mutate "a value of an unknown key is tried with the current one" internal/keys/keys.go \
+  's.replace("\t\te, ok := k.byID(sealed[1 : 1+idSize])\n\t\tif !ok {\n\t\t\treturn nil, ErrNoKey\n\t\t}", "\t\te := k.current")' ./internal/keys/ -run TestAValueNamingAKeyThatIsNotLoadedFailsClearly
+mutate "promote drops the old key" internal/keys/rotate.go \
+  's.replace("\t\t\tif err := writeFile(path+PreviousSuffix, kek); err != nil {\n\t\t\t\treturn \"\", err\n\t\t\t}", "\t\t\t_ = kek")' ./internal/keys/ -run TestTheKeyCanBeReplacedWhileEveryValueStaysReadable
+mutate "a second key change starts while the first is unfinished" internal/keys/rotate.go \
+  's.replace("\tif _, err := os.Stat(path + PreviousSuffix); err == nil {\n\t\treturn \"\", ErrPreviousPresent\n\t}", "")' ./internal/keys/ -run TestANewChangeWaitsUntilTheLastOneIsFinished
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

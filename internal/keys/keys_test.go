@@ -62,7 +62,7 @@ func TestKeyFile(t *testing.T) {
 		t.Fatalf("key file is readable by others: %v", info.Mode())
 	}
 	k2, err := LoadOrCreate(path, true)
-	if err != nil || !bytes.Equal(k1.kek, k2.kek) {
+	if err != nil || !bytes.Equal(k1.current.kek, k2.current.kek) {
 		t.Fatal("the key must survive a restart")
 	}
 	s1, _ := k1.SigningKey()

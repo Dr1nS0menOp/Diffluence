@@ -4,6 +4,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/mail"
@@ -20,6 +21,19 @@ func (a *App) VerifyAuditForTest(ctx context.Context) error { return a.verifyAud
 
 // EncryptStoredFilesForTest runs the job that encrypts files written before encryption.
 func (a *App) EncryptStoredFilesForTest(ctx context.Context) error { return a.encryptStoredFiles(ctx) }
+
+// EncryptStoredFilesWithinForTest runs the encryption job with a budget of its own.
+func (a *App) EncryptStoredFilesWithinForTest(ctx context.Context, budget time.Duration) error {
+	return a.encryptStoredFilesWithin(ctx, budget)
+}
+
+// ResealWithHookForTest runs ResealKeys with a function that runs between reading a value and
+// replacing it, so a test can change the value meanwhile.
+func ResealWithHookForTest(ctx context.Context, t *KeyTools, hook func(table, column, id string)) (ResealReport, error) {
+	r := resealer{pool: t.Pool, store: t.Store, keyring: t.Keyring, deadline: time.Now().Add(time.Hour),
+		beforeUpdate: func(c sealedColumn, id string) { hook(c.table, c.column, id) }}
+	return r.run(ctx)
+}
 
 // UseMailForTest sends account mail through the queue, as with a mail server.
 func (a *App) UseMailForTest() {

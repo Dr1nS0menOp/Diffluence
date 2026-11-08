@@ -41,6 +41,13 @@ api -d "{\"title\":\"Important\",\"base_version\":0,\"document\":$doc}" "$url/ap
 echo 'attached file contents' >"$work/note.txt"
 curl -sf -b "$jar" -H 'Content-Type: application/octet-stream' --data-binary "@$work/note.txt" "$url/api/v1/pages/$page/attachments?filename=note.txt" >"$work/att.json"
 attachment=$(first_id <"$work/att.json")
+
+echo "1b. start replacing master.key, and back up halfway (spec 034)"
+# A restart after each step loads the keys, as an operator does on every node.
+docker compose exec -T diffluence diffluence key add >/dev/null
+docker compose up -d --force-recreate --wait diffluence >/dev/null 2>&1
+docker compose exec -T diffluence diffluence key promote >/dev/null
+docker compose up -d --force-recreate --wait diffluence >/dev/null 2>&1
 before=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc 'SELECT count(*) FROM audit_events')
 
 echo "2. back up, then destroy the whole installation"
@@ -84,10 +91,20 @@ api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
 api "$url/api/v1/search?q=survive" | grep -q '"title":"Important"'
 after=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc 'SELECT count(*) FROM audit_events')
 [ "$after" -ge "$before" ]
+
+# The keys came back halfway through their change: everything opens, and the change can finish.
+docker compose exec -T diffluence diffluence key check --deep >/dev/null
+docker compose exec -T diffluence diffluence key reseal >/dev/null
+docker compose exec -T diffluence diffluence key check --require-current >/dev/null
+docker compose exec -T diffluence diffluence key retire >/dev/null
+docker compose up -d --force-recreate --wait diffluence >/dev/null 2>&1
+rm -f "$jar"
+api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
+[ "$(curl -sf -b "$jar" "$url/api/v1/attachments/$attachment/content?download=1")" = "attached file contents" ]
 # The application role must still be unable to touch the audit log after a restore.
 password=$(cat secrets/db_app_password.txt)
 if docker compose exec -T -e PGPASSWORD="$password" postgres psql -h localhost -U diffluence_app -d diffluence -c "DELETE FROM audit_events" >/dev/null 2>&1; then
   echo "the application role can delete audit events after a restore"
   exit 1
 fi
-echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain and role separation"
+echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, and a key change finished after the restore"

@@ -38,6 +38,7 @@ Commands:
   user create-admin         create a local administrator (password on stdin)
   audit verify              verify the audit log hash chain
   audit prune               remove audit rows past their retention, as the owner of the tables
+  key <step>                replace master.key without downtime; see diffluence key
   healthcheck               ask a running server on this machine whether it is ready
   client <command>          use the API of a server with a token; see diffluence client
   version                   print the version
@@ -80,6 +81,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
+	case "key":
+		err = cmdKey(ctx, args[1:], stdout, stderr)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
 	case "help", "-h", "--help":
