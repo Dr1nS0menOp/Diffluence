@@ -70,6 +70,7 @@ Every phase ends with an **exit check**: all its tests are green in CI, the prod
 
 ## Wanted, later
 
+- **Automation as flows** (2026-11-08). Automation grows from rules into flows that can build almost anything: a trigger, then steps in a visual editor, with conditions, branches, loops, waits, variables, and steps that use DQL to find pages, people and files. A flow can be saved, versioned, switched on and off, and locked so others cannot change it. The aim is the reach of a general workflow tool, in the behaviour people know from wiki automation, with our own look (02). Every flow acts with the rights of a named owner, never more, writes every step to the audit log, has a load budget (ARC-238) and limits on loops, time and calls, and can be stopped at once.
 - **Diffluence Query Language (DQL)** (2026-11-08). The search box always searches all spaces. Clicking in it unfolds a panel with filters as buttons. Later that panel also takes a query language, DQL, that means the same as the buttons, so a person can type what the buttons do and more. It builds on the existing search syntax, such as `title:`, and every result stays within what the reader may see.
 
 - **Searching the text inside attachments** (ORG-025). People want it, and it needs a text extractor, a new dependency.
