@@ -39,7 +39,7 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-329** · built · Every read checks the page's access rule, and downloads are audited. An image inside a page counts as viewing the page.
 - **SEC-330** · built · An upload is checked again at the end, because rights may have changed during a long upload.
 - **SEC-331** · partly · Files are served from the same origin as the app. `sandbox`, `nosniff` and forced download cover the known attacks, and a separate origin is defence in depth (ASVS 3.5.4). Accepted until phase 3, as the threat model says. The blueprint promised a separate origin, so phase 3 must deliver it or say why not.
-- **SEC-332** · phase 3 · Files are not encrypted at rest. Disk encryption covers them until then (ADR-011). See SEC-725.
+- **SEC-332** · built · Files are encrypted at rest by Diffluence (ADR-011, spec 032). See SEC-725. Disk encryption stays wise for the database, whose page text is not encrypted (SEC-726).
 - **SEC-333** · later · Files are not scanned for malware (FIL-021). ASVS 5.4.3 asks for it at Level 2. A wiki passes files between colleagues, so this matters more than it looks. A scanner such as ClamAV runs as a separate program. Decision for the product owner.
 - **SEC-334** · new · Photos keep their metadata inside the wiki, which can hold a place and a name (ASVS 14.2.8, Level 3). Public sites remove it (SEC-381). Say so where a person uploads, or remove it from JPEG and PNG at upload. Low. Belongs in wave E.
 - **SEC-335** · built · The server never decodes an image, so a decompression bomb cannot hurt it. Browsers do that work. Spec 012 keeps this: no server thumbnails (D14).

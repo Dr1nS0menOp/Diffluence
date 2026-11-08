@@ -11,7 +11,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - A page view reuses the permission facts it loaded: opening a page costs 25 queries instead of 30, a space 11 instead of 36
 - The main screens have a query budget that a test enforces, and `/metrics` counts queries as `diffluence_db_queries_total`
 - Upgrade impact: none. A load balancer that checks `/readyz` now also takes a busy node out for a moment
+### Security: stored files are encrypted (spec 032)
+- Every stored file is encrypted with its own key, which `master.key` protects. A wrong key, a changed file or a file cut short is refused, and nothing of it is served
+- Files from before this release are encrypted by a job in the background, a little at a time. Until it is done they are still read; after that, a plain file is refused
+- Upgrade impact: one migration. Keep `master.key` safe and apart from the data: without it, no file can be read. Replacing `master.key` is not supported yet
 
+### Changed: smaller parts of blueprint 04 (spec 032)
+- The PDF of an office file is made once per version and kept, instead of on every view, and copies of the same file share it
+- The feed and notifications page by the time and id of the last item, so two items with the same time are never skipped. `before` alone still works
+- `GET /api/v1/system/capabilities` says which optional parts are on
+- Upgrade impact: none
 ### Added: smaller things for the people who keep an instance tidy (spec 030)
 - The lock beside a page title is open or closed, so a restricted page shows at a glance
 - The spaces in the administration filter by name, pages, storage and months without a change

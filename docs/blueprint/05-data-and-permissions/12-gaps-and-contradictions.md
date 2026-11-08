@@ -58,7 +58,7 @@ Found by reading blueprint 03, specs 008 to 016 and the code on 2026-11-05. For 
 | One `grant` table with a scope | `global_grants` and `space_grants` | Fixed in 05.3 and 05.2 |
 | `attachment` holds object key, hash and key id | These sit in `attachment_versions` | Fixed in 05.4 |
 | Every row with content has `origin_instance_id` | Not all do | DAT-002 |
-| Files are encrypted (blueprint 06) | `encryption_key_id` stays empty | Phase 3, and blueprint 06 must say so |
+| Files are encrypted (blueprint 06) | Built in spec 032; the key sits in each file's header, so `encryption_key_id` stays empty | Closed |
 | Files come from a separate origin (blueprint 06) | Same origin, locked down with `sandbox` and `nosniff` | For the study of blueprint 06 |
 
 - **GAP-020** · Medium · The matrix does not hold a service account, `use_product` through a group, a restriction on the middle level, two subjects on a list, a space-level action with no page, or a creator who differs from the page's creator. See PRM-155, 158, 161, 166.

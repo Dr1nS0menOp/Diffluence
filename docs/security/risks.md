@@ -47,7 +47,8 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 
 **Do not rely on these, because they are not there or not finished:**
 
-- **Files and page text are not encrypted by Diffluence at rest.** Search needs the text. Use disk encryption on the server.
+- **Page text is not encrypted by Diffluence at rest.** Search needs the text. Stored files are encrypted, but the database is not: use disk encryption on the server.
+- **Without `master.key`, no file can be read.** Files are encrypted with keys that `master.key` protects. Back it up apart from the data, and do not lose it.
 - **Files are served from the same address as the app.** Other measures cover the known attacks, but a separate address would be stronger.
 - **Limits on login attempts are counted per node.** A restart clears them, and two nodes count apart.
 - **Optional helpers** run as separate programs, each with its own flaws and updates. Only turn on what you need.

@@ -18,6 +18,9 @@ func (a *App) SignCheckpointForTest(ctx context.Context) error { return a.signCh
 // VerifyAuditForTest runs the daily job.
 func (a *App) VerifyAuditForTest(ctx context.Context) error { return a.verifyAudit(ctx) }
 
+// EncryptStoredFilesForTest runs the job that encrypts files written before encryption.
+func (a *App) EncryptStoredFilesForTest(ctx context.Context) error { return a.encryptStoredFiles(ctx) }
+
 // UseMailForTest sends account mail through the queue, as with a mail server.
 func (a *App) UseMailForTest() {
 	a.identity.SetMailer(accountMailer{pool: a.pool, keyring: a.keyring}, "http://example.test")

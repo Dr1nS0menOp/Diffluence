@@ -32,7 +32,7 @@ Written for: reviewers and a future penetration tester. Updated every phase (blu
 
 | Risk | Why accepted | Planned |
 |---|---|---|
-| Attachments are not encrypted at rest | Disk encryption covers this for now | Phase 3 (ADR-011) |
+| Page text in the database is not encrypted at rest | Search needs it; files are encrypted since spec 032 | Disk encryption on the host |
 | Attachments are served from the same origin as the app | `sandbox`, `nosniff` and forced download cover the known attacks; a separate origin is defence in depth | Phase 3 |
 | Rate limits are per node | One node until phase 3 | Phase 3 |
 | No breached-password check | Length rule only | Before 1.0 |

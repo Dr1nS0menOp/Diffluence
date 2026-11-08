@@ -36,6 +36,7 @@ func (s *Server) registerRoutes() {
 	r.HandleFunc("POST /api/v1/auth/logout", Authenticated(), s.handleLogout)
 	r.HandleFunc("GET /api/v1/me", Authenticated(), s.handleMe)
 	r.HandleFunc("GET /api/v1/system/info", Permission(identity.PermUseProduct), s.handleSystemInfo)
+	r.HandleFunc("GET /api/v1/system/capabilities", Permission(identity.PermUseProduct), s.handleCapabilities)
 
 	auditor := SessionOnly(Permission(identity.PermAdministrator))
 	r.HandleFunc("GET /api/v1/admin/audit-events", auditor, s.handleAuditList)
@@ -175,6 +176,17 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User), "global_permissions": perms, "preferences": preferences,
 		"personal_space": personal, "needs_second_factor": p.NeedsSecondFactor, "sign_in": signIn, "idle_minutes": access.IdleMinutes, "drawing_origin": s.deps.Config.DrawingOrigin(),
 		"office_preview": s.deps.Exchange.OfficeAvailable()})
+}
+
+// handleCapabilities says in one answer which optional parts are on (ARC-071), so a screen
+// never offers what would fail. It says only whether a part is on, never where it runs.
+func (s *Server) handleCapabilities(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]any{
+		"pdf_export":     s.deps.Exchange.PDFAvailable(),
+		"office_preview": s.deps.Exchange.OfficeAvailable(),
+		"drawing":        s.deps.Config.DrawingOrigin() != "",
+		"collaboration":  s.deps.Config.CollabURL != "",
+	})
 }
 
 func (s *Server) handleSystemInfo(w http.ResponseWriter, _ *http.Request) {

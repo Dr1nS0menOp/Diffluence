@@ -28,6 +28,8 @@ type Query struct {
 	SpaceID    uuid.UUID
 	Limit      int
 	Before     time.Time
+	// BeforeID is the id of the last item seen; with Before it makes the cursor exact.
+	BeforeID uuid.UUID
 }
 
 // Item is one line in the panel: one notification, or a group of them.
@@ -131,6 +133,10 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 	if !q.Before.IsZero() {
 		before = &q.Before
 	}
+	var beforeID *uuid.UUID
+	if q.BeforeID != uuid.Nil {
+		beforeID = &q.BeforeID
+	}
 	if q.Type != "" && !slices.Contains(Types, q.Type) {
 		return nil, apperr.Invalid("That is not a type of notification.")
 	}
@@ -138,8 +144,8 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 		AND (NOT $2 OR n.read_at IS NULL)
 		AND ($3 = '' OR n.type = $3)
 		AND ($4::uuid IS NULL OR n.space_id = $4)
-		AND ($5::timestamptz IS NULL OR n.created_at < $5)
-		ORDER BY n.created_at DESC, n.id LIMIT $6`, c.UserID, q.UnreadOnly, q.Type, space, before, limit*2)
+		AND ($5::timestamptz IS NULL OR n.created_at < $5 OR (n.created_at = $5 AND $7::uuid IS NOT NULL AND n.id > $7))
+		ORDER BY n.created_at DESC, n.id LIMIT $6`, c.UserID, q.UnreadOnly, q.Type, space, before, limit*2, beforeID)
 	if err != nil {
 		return nil, err
 	}

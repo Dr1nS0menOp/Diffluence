@@ -37,7 +37,9 @@ type Query struct {
 	Tab     string
 	SpaceID uuid.UUID
 	Before  time.Time
-	Limit   int
+	// BeforeID is the page of the last item seen; with Before it makes the cursor exact.
+	BeforeID uuid.UUID
+	Limit    int
 }
 
 // Item is one entry of a feed.
@@ -82,7 +84,7 @@ const changesSQL = `WITH visible AS (SELECT page_id FROM perm_visible_pages($1))
 	LEFT JOIN search_documents d ON d.page_id = c.page_id
 	LEFT JOIN users u ON u.id = c.author_id
 	WHERE ($2::uuid IS NULL OR p.space_id = $2)
-	  AND ($3::timestamptz IS NULL OR c.at < $3)
+	  AND ($3::timestamptz IS NULL OR c.at < $3 OR (c.at = $3 AND $7::uuid IS NOT NULL AND c.page_id > $7))
 	  AND (NOT $6 OR (c.author_id <> $1 AND (
 		c.author_id IN (SELECT followed_id FROM follows WHERE user_id = $1)
 		OR EXISTS (SELECT 1 FROM watches w WHERE w.user_id = $1 AND (
@@ -139,12 +141,16 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 	if !q.Before.IsZero() {
 		before = &q.Before
 	}
+	var beforeID *uuid.UUID
+	if q.BeforeID != uuid.Nil {
+		beforeID = &q.BeforeID
+	}
 	var rows pgx.Rows
 	var err error
 	if q.Tab == TabPopular {
 		rows, err = s.pool.Query(ctx, popularSQL, c.UserID, space, limit, popularDays, excerptChars)
 	} else {
-		rows, err = s.pool.Query(ctx, changesSQL, c.UserID, space, before, limit, excerptChars, q.Tab == TabForYou)
+		rows, err = s.pool.Query(ctx, changesSQL, c.UserID, space, before, limit, excerptChars, q.Tab == TabForYou, beforeID)
 	}
 	if err != nil {
 		return nil, err

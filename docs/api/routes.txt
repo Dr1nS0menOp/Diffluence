@@ -227,6 +227,7 @@ GET /api/v1/spaces/{id}/tree/find                              object:space.view
 GET /api/v1/spaces/{id}/watch                                  object:space.view
 GET /api/v1/spaces/{id}/webhooks                               object:space.administer
 GET /api/v1/start                                              authenticated
+GET /api/v1/system/capabilities                                permission:use_product
 GET /api/v1/system/info                                        permission:use_product
 GET /api/v1/templates/{id}                                     authenticated
 GET /api/v1/templates/{id}/export                              authenticated

@@ -55,7 +55,7 @@ ASVS 11.1.2 asks for an inventory. Primitives come from the Go standard library 
 
 The blueprint names three layers at rest. **Disk:** LUKS or ZFS on the host, which is the operator's job. **Application:** secrets in the database are sealed with AES-256-GCM, and attachments are not yet (SEC-725). **Backups:** AES-256 before they leave the host, which is not built (SEC-636).
 
-- **SEC-725** · phase 3 · Attachments are encrypted with their own key (ADR-011). Today they are plain files on disk, and `encryption_key_id` stays empty. Disk encryption covers them until then, which is the operator's job, and the install guide should say so plainly.
+- **SEC-725** · built · Attachments and derived files are encrypted with their own key (ADR-011, spec 032). The key sits in the file's own header, wrapped by `master.key`, so `encryption_key_id` stays empty. A wrong or missing key, a changed file or a file cut short fails clearly and serves nothing. Without `master.key`, no file can be read: back it up apart from the data, as for TOTP seeds.
 - **SEC-726** · built · The trade-off stays honest: page text is not encrypted in the database, because full-text search needs it. Disk encryption protects it today, and backup encryption will once SEC-636 is done.
 - **SEC-727** · later · An option to encrypt the content of very sensitive spaces, with search limited to titles.
 - **SEC-728** · partly · TLS is the job of the proxy, so the blueprint's sentence about Go's hybrid post-quantum exchange only holds if that proxy offers it. Go does it where Go is the TLS client: the identity provider and, later, mail and webhooks. The guide should advise TLS 1.3 at the proxy (ASVS 12.1.1, 12.1.2).

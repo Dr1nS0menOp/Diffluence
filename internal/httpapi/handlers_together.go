@@ -459,6 +459,21 @@ func queryTime(w http.ResponseWriter, r *http.Request, key string) (time.Time, b
 	return t, true
 }
 
+// queryCursor reads `before` and `before_id`: the time and id of the last item seen. The id
+// makes the cursor exact when two items share a time (ARC-133); without it, `before` works as it did.
+func queryCursor(w http.ResponseWriter, r *http.Request) (time.Time, uuid.UUID, bool) {
+	before, ok := queryTime(w, r, "before")
+	if !ok {
+		return before, uuid.Nil, false
+	}
+	id, err := optionalID(r.URL.Query().Get("before_id"))
+	if err != nil || (id != uuid.Nil && before.IsZero()) {
+		writeError(w, http.StatusBadRequest, "bad_request", "before_id needs before, and must be an id.")
+		return before, id, false
+	}
+	return before, id, true
+}
+
 func querySpace(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 	id, err := optionalID(r.URL.Query().Get("space_id"))
 	if err != nil {
@@ -469,7 +484,7 @@ func querySpace(w http.ResponseWriter, r *http.Request) (uuid.UUID, bool) {
 }
 
 func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
-	before, ok := queryTime(w, r, "before")
+	before, beforeID, ok := queryCursor(w, r)
 	if !ok {
 		return
 	}
@@ -480,7 +495,7 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query()
 	unreadOnly, _ := strconv.ParseBool(q.Get("unread"))
 	list, err := s.deps.Notify.List(r.Context(), s.caller(r), notify.Query{UnreadOnly: unreadOnly, Type: q.Get("type"),
-		SpaceID: space, Before: before, Limit: queryInt(r, "limit")})
+		SpaceID: space, Before: before, BeforeID: beforeID, Limit: queryInt(r, "limit")})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -536,7 +551,7 @@ func (s *Server) handleNotificationSettingsSet(w http.ResponseWriter, r *http.Re
 }
 
 func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
-	before, ok := queryTime(w, r, "before")
+	before, beforeID, ok := queryCursor(w, r)
 	if !ok {
 		return
 	}
@@ -545,7 +560,7 @@ func (s *Server) handleFeed(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	list, err := s.deps.Feed.List(r.Context(), s.caller(r), feed.Query{Tab: r.URL.Query().Get("tab"), SpaceID: space,
-		Before: before, Limit: queryInt(r, "limit")})
+		Before: before, BeforeID: beforeID, Limit: queryInt(r, "limit")})
 	if err != nil {
 		s.fail(w, r, err)
 		return

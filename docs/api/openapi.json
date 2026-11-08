@@ -10027,6 +10027,24 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/system/capabilities": {
+      "get": {
+        "operationId": "get /api/v1/system/capabilities",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "system"
+        ],
+        "x-access": "permission:use_product"
+      }
+    },
     "/api/v1/system/info": {
       "get": {
         "operationId": "get /api/v1/system/info",

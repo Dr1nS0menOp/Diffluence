@@ -90,6 +90,7 @@ type App struct {
 	collab     *collab.Service
 	templates  *templates.Service
 	store      storage.Store
+	encrypted  *storage.Encrypted
 	attach     *attachments.Service
 	pages      *pages.Service
 	spaces     *spaces.Service
@@ -163,10 +164,13 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		Issuer:             cfg.InstanceName,
 		PasswordBlocklist:  blocklist,
 	})
-	if a.store, err = storage.NewDisk(filepath.Join(cfg.DataDir, "objects")); err != nil {
+	disk, err := storage.NewDisk(filepath.Join(cfg.DataDir, "objects"))
+	if err != nil {
 		a.Close()
 		return nil, err
 	}
+	a.encrypted = storage.NewEncrypted(disk, a.keyring, a.everyFileEncrypted)
+	a.store = a.encrypted
 	a.perms = permissions.NewService(a.pool)
 	a.settings = settings.NewService(a.pool, a.store)
 	a.identity.SetPolicy(a.accessPolicy())
@@ -567,6 +571,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 			_, err := a.attach.DrainDeletions(ctx)
 			return err
 		}},
+		{Name: "encrypt-stored-files", Every: 10 * time.Minute, Run: a.encryptStoredFiles},
 		{Name: "fail-stale-jobs", Every: 10 * time.Minute, Run: a.jobs.FailStale},
 		{Name: "purge-identity", Every: 10 * time.Minute, Run: a.identity.PurgeExpired},
 		{Name: "end-expired-accounts", Every: 10 * time.Minute, Run: a.identity.EndExpiredAccounts},
@@ -583,6 +588,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "notification-digests", Every: time.Hour, Run: a.notify.SendDigests},
 		{Name: "purge-notifications", Every: 24 * time.Hour, Run: a.notify.Purge},
 		{Name: "purge-exports", Every: 10 * time.Minute, Run: a.exchange.PurgeExports},
+		{Name: "purge-previews", Every: 24 * time.Hour, Run: a.exchange.PurgePreviews},
 		{Name: "purge-imports", Every: time.Hour, Run: a.exchange.PurgeImports},
 		{Name: "build-sites", Every: time.Minute, Run: a.sites.RunDue},
 		{Name: "build-sites-daily", Every: 24 * time.Hour, Run: a.sites.RunDaily},

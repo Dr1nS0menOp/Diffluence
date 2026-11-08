@@ -6,7 +6,7 @@ The product owner chose these in ADR-026. They are separate programs, so their l
 
 - **ARC-069** · built · A helper is switched on by an address in the configuration. Nothing is found by itself.
 - **ARC-070** · built · Without its address the feature is absent, not broken: the menu entry is gone, and the administrator's screen says what to install. This is the rule of NAV-004 applied to helpers.
-- **ARC-071** · partly · A new route `GET /system/capabilities` tells the frontend what is on, so a screen never offers what would fail. Still open: one route. What is on reaches the frontend through several answers.
+- **ARC-071** · partly · A new route `GET /system/capabilities` tells the frontend what is on, so a screen never offers what would fail. Built: the route, which says only whether PDF export, office previews, drawing and editing together are on, never where they run (spec 032). Still open: the frontend reads it, instead of the separate answers it reads today.
 - **ARC-072** · partly · A helper never blocks `/readyz`. A wiki that cannot make a PDF is still a wiki. The console shows its health, from a check by the worker every minute. Still open: the health of a helper in the console.
 - **ARC-073** · built · The server calls helpers only from the worker, with a timeout, and one failure becomes a clear sentence in that job. Requests never wait for a helper.
 - **ARC-074** · built · Helpers sit on an internal network, and get no route to the internet. They get what a job sends them, and nothing else.
@@ -50,7 +50,7 @@ Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the b
 - **ARC-090** · built · **LibreOffice** needs no extra container when Gotenberg is there, through `/forms/libreoffice/convert`. This is the choice that costs least. Built in `internal/exchange/office.go` (wave J), and tried with the real Gotenberg 8.40 (spec 025).
 - **ARC-091** · later · **Euro-Office** joins when its way of connecting is known. It is AGPLv3, which is fine for a separate program, and no source read here confirms how it connects.
 - **ARC-092** · built · No WOPI. Editing through WOPI needs public routes on our side, tokens per file and a frame per editor. None of that serves a preview, and each is attack surface. If office editing is ever wanted, it is a new study.
-- **ARC-093** · partly · The result is a derived file: `previews/<sha256 of the source>`, made once per version in a job, and removed when nothing uses it. The PDF viewer shows it. Built: the conversion and the viewer (wave J). Still open: storing the result under `previews/`.
+- **ARC-093** · built · The result is a derived file: `previews/<sha256 of the source>-pdf`, made once per version and removed when no version uses it any more. It is made on the first view instead of in a job, which gives the same once-per-version result without a queue. The PDF viewer shows it (spec 032).
 - **ARC-094** · built · Office files can hold macros and links. The converter runs without network, per file, with a time limit, and the result is shown only through the PDF viewer. Word, ODT and RTF files that ask for outside images asked for nothing through the real Gotenberg (spec 025).
 
 ## 4.5 The PDF viewer

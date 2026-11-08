@@ -758,6 +758,23 @@ mutate "hashes run without a limit" internal/identity/password.go \
   's.replace("\thashSlots <- struct{}{}\n\tdefer func() { <-hashSlots }()\n", "")' ./internal/identity/ -run TestNoMoreHashesRunAtOnceThanTheLimit
 mutate "a memo mixes up people" internal/permissions/memo.go \
   's.replace("\tu, ok := m.users[id]\n\treturn u, ok", "\tfor _, u := range m.users {\n\t\treturn u, true\n\t}\n\treturn UserFacts{}, false")' ./internal/permissions/ -run TestTheMemoKeepsEachPersonsOwnFactsAndLivesOneContext
+# Files at rest (SEC-725, spec 032).
+mutate "a file is stored plain" internal/storage/encrypted.go \
+  's.replace("if _, err := e.inner.Put(ctx, key, enc, MaxCiphertext(maxBytes)); err != nil {", "if _, err := e.inner.Put(ctx, key, io.MultiReader(bytes.NewReader(magic), r), MaxCiphertext(maxBytes)); err != nil {\n\t\t_ = enc")' $app -run TestAFileIsStoredEncryptedAndComesBackWhole
+mutate "a plain file is served after the job" internal/storage/encrypted.go \
+  's.replace("\tif done {\n\t\t_ = f.Close()\n\t\treturn nil, ErrNotEncrypted", "\tif false && done {\n\t\t_ = f.Close()\n\t\treturn nil, ErrNotEncrypted")' ./internal/storage/ -run TestPlainFilesAreReadUntilEveryFileIsEncrypted
+mutate "a file cut at a chunk border opens" internal/storage/encrypted.go \
+  's.replace("\tif last {\n\t\taad[8] = 1\n\t}", "")' ./internal/storage/ -run TestAFileCutShortOrChangedNeverOpensOrReads
+mutate "a file key is not bound to its name" internal/storage/encrypted.go \
+  's.replace("func keyContext(key string) string { return \"storage-file:\" + key }", "func keyContext(key string) string { return \"storage-file\" }")' ./internal/storage/ -run TestAFileMovedUnderAnotherNameDoesNotOpen
+mutate "the job never refuses plain files" internal/app/encryption.go \
+  's.replace("\ta.encrypted.MarkEveryFileEncrypted()\n", "").replace("UPDATE storage_state SET encrypted_all_at = now()", "UPDATE storage_state SET encrypted_all_at = NULL")' $app -run TestOldPlainFilesAreEncryptedThenPlainIsRefused
+mutate "a preview is converted on every request" internal/exchange/previews.go \
+  's.replace("if kept, err := s.store.Open(ctx, key); err == nil {", "if kept, err := s.store.Open(ctx, key+\"-never\"); err == nil {")' $app -run TestAnOfficePreviewIsMadeOncePerVersionAndDroppedWhenUnused
+mutate "the purge drops previews in use" internal/exchange/previews.go \
+  's.replace("\t\tdelete(kept, hex.EncodeToString(raw))\n", "\t\t_ = raw\n")' $app -run TestAnOfficePreviewIsMadeOncePerVersionAndDroppedWhenUnused
+mutate "the notification cursor skips what shares a time" internal/notify/list.go \
+  's.replace(" OR (n.created_at = $5 AND $7::uuid IS NOT NULL AND n.id > $7)", "")' $app -run TestPagingNotificationsWithACursorSkipsNothingThatSharesATime
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

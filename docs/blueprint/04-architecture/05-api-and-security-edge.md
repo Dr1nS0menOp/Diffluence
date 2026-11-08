@@ -8,7 +8,7 @@
 - **ARC-130** · built · A JSON body is decoded strictly: known fields only, one object, a size limit. 64 KiB for small bodies and 6 MiB for documents.
 - **ARC-131** · built · Publishing uses `base_version`, so two people cannot overwrite each other without being told.
 - **ARC-132** · built · A toggle is `PUT` and `DELETE` on a sub-resource, such as `/favourite`, so repeating it is harmless.
-- **ARC-133** · partly · Lists use `limit` and `offset`. That is fine for a directory. A list that grows and moves, such as the feed, notifications or the audit log, uses a cursor: `before=<time and id>`. Still open: the rule is new, and only the feed follows it so far (wave C).
+- **ARC-133** · built · Lists use `limit` and `offset`. That is fine for a directory. A list that grows and moves, such as the feed, notifications or the audit log, uses a cursor. The audit log pages by `before_seq`. The feed and notifications page by `before`, the time of the last item, and `before_id`, its id, so two items with the same time are never skipped; `before` alone still works as it did (spec 032).
 - **ARC-134** · built · A total is capped when counting costs more than it tells: search stops at "1,000 or more" (spec 011 D21).
 - **ARC-135** · built · `/api/v1` only grows. A removal needs a new version, and a `Sunset` header for at least 12 months (spec 015 D21).
 - **ARC-136** · built · `docs/api/openapi.json` is written from a table next to the routes, and a test fails on any difference (spec 015 D19). "Spec-first with a generated client", the old plan, did not happen, and a generator would be a dependency.

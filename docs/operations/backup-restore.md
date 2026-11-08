@@ -7,7 +7,7 @@ Written for: operators. Goal from blueprint 07: lose at most 4 hours of work, an
 | What | Where | Why |
 |---|---|---|
 | Database | PostgreSQL | Pages, versions, users, permissions, audit log |
-| Stored files | `objects/` in the data directory | Attachments |
+| Stored files | `objects/` in the data directory | Attachments, encrypted with keys that `master.key` protects (spec 032). `previews/` below it can be left out: it is made again |
 | `master.key` | data directory | Decrypts TOTP seeds, signs audit checkpoints |
 | `secrets/` | next to `compose.yaml` | Database passwords |
 

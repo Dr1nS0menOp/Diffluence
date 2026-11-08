@@ -308,7 +308,7 @@ func (s *Server) handleFilePDF(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "no_preview", "This file cannot open as a PDF here.")
 		return
 	}
-	err = s.deps.Exchange.OfficeToPDF(r.Context(), a.Filename, f, func(pdf io.Reader) error {
+	err = s.deps.Exchange.OfficePreview(r.Context(), a.SHA256, a.Filename, f, func(pdf io.Reader) error {
 		h := w.Header()
 		h.Set("Content-Security-Policy", "default-src 'none'; sandbox")
 		h.Set("X-Content-Type-Options", "nosniff")
