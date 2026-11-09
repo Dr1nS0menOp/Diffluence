@@ -26,6 +26,8 @@ var accountWords = map[string]accountWord{
 		"Someone signed up for %s with this address. This link finishes that, and works once:\n\n%s\n\nDid you not ask for it? Then you can ignore this mail."},
 	identity.MailNewDevice: {"A new device logged in to %s",
 		"A device we have not seen before logged in to your account on %s. Was that not you? Change your password now.%s"},
+	identity.MailSignInChanged: {"Your sign-in changed on %s",
+		"A way into your account on %s changed just now: a password, a second factor or a passkey. Was that not you? Ask an administrator to lock your account now.%s"},
 }
 
 // AccountMessage writes a mail about an account. It carries no unsubscribe link: these

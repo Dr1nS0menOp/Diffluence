@@ -91,6 +91,28 @@ func TestHTTPSAndProxies(t *testing.T) {
 	}
 }
 
+// Cookies and HSTS follow the public address, so a plain address that others reach must be
+// said out loud (SEC-257). On this machine alone, plain http is how people try it out.
+func TestAPlainAddressIsWeakOnlyWhenOthersReachIt(t *testing.T) {
+	for address, weak := range map[string]bool{
+		"http://wiki.example.com":   true,
+		"http://192.0.2.10:8080":    true,
+		"http://[2001:db8::1]:8080": true,
+		"https://wiki.example.com":  false,
+		"http://localhost:8080":     false,
+		"http://127.0.0.1:8080":     false,
+		"http://[::1]:8080":         false,
+	} {
+		c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_PUBLIC_URL": address}))
+		if err != nil {
+			t.Fatalf("%s: %v", address, err)
+		}
+		if got := c.PlainToOthers(); got != weak {
+			t.Errorf("%s: plain to others = %v, want %v", address, got, weak)
+		}
+	}
+}
+
 func TestTheDrawingServiceIsOptionalAndNeverOurOwnOrigin(t *testing.T) {
 	load := func(address string) (Config, error) {
 		return Load(env(map[string]string{

@@ -85,6 +85,10 @@ func (s *Server) handleAttention(w http.ResponseWriter, r *http.Request) {
 	if s.deps.SSO == nil {
 		list = append(list, console.Item{Kind: "no_identity_provider"})
 	}
+	// A proxy with TLS in front and a forgotten address leaves cookies weak without a sound (SEC-257).
+	if s.deps.Config.PlainToOthers() {
+		list = append(list, console.Item{Kind: "public_address_plain"})
+	}
 	me, err := s.deps.Identity.GetUser(r.Context(), s.deps.Pool, s.caller(r).UserID)
 	if err != nil {
 		s.fail(w, r, err)

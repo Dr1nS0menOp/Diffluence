@@ -229,7 +229,10 @@ func (s *Service) ConfirmTOTP(ctx context.Context, c Caller, code string) ([]str
 				return err
 			}
 		}
-		return s.record(ctx, tx, c, "auth.totp_enabled", "user", c.UserID.String(), nil)
+		if err := s.record(ctx, tx, c, "auth.totp_enabled", "user", c.UserID.String(), nil); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, c.UserID)
 	})
 	return codes, err
 }
@@ -311,7 +314,10 @@ func (s *Service) removeTOTP(ctx context.Context, tx pgx.Tx, c Caller, id uuid.U
 	if _, err := tx.Exec(ctx, "DELETE FROM recovery_codes WHERE user_id = $1", id); err != nil {
 		return err
 	}
-	return s.record(ctx, tx, c, "auth.totp_disabled", "user", id.String(), details)
+	if err := s.record(ctx, tx, c, "auth.totp_disabled", "user", id.String(), details); err != nil {
+		return err
+	}
+	return s.tellOfChange(ctx, tx, id)
 }
 
 // useSecondFactor checks a TOTP or recovery code inside tx. It returns the method

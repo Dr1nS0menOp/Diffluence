@@ -84,6 +84,17 @@ func (s *Server) features(r *http.Request) (settings.Features, error) {
 	return f, s.deps.Settings.ReadSection(r.Context(), settings.SectionFeatures, &f)
 }
 
+// accountMailsPerRecipient is how many reset or sign-up mails one address gets in the
+// window of the login limits: enough for a person who asks again, too few to flood.
+const accountMailsPerRecipient = 3
+
+// mayMail says whether one more account mail may go to an address now. Requests from
+// many addresses together must not flood one inbox (SEC-190). The caller answers the same
+// either way, so the limit says nothing about whether the address has an account.
+func (s *Server) mayMail(email string) bool {
+	return s.mailsTo.allow("mail:" + identityKey(email))
+}
+
 // limitAccountLinks stops anyone from trying links or addresses at speed.
 func (s *Server) limitAccountLinks(w http.ResponseWriter, r *http.Request) bool {
 	if s.loginByIP.allow("ip:" + metaFrom(r).IP) {
@@ -106,8 +117,10 @@ func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ready := time.Now().Add(forgotAnswerTime)
-	if err := s.deps.Identity.RequestReset(r.Context(), in.Email, metaFrom(r)); err != nil {
-		s.deps.Log.Error("password reset failed", "error", err, "request_id", RequestIDFrom(r.Context()))
+	if s.mayMail(in.Email) {
+		if err := s.deps.Identity.RequestReset(r.Context(), in.Email, metaFrom(r)); err != nil {
+			s.deps.Log.Error("password reset failed", "error", err, "request_id", RequestIDFrom(r.Context()))
+		}
 	}
 	time.Sleep(time.Until(ready))
 	w.WriteHeader(http.StatusAccepted)
@@ -202,8 +215,10 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ready := time.Now().Add(forgotAnswerTime)
-	if err := s.deps.Identity.RequestSignup(r.Context(), in.Email, access.SignupDomains); err != nil {
-		s.deps.Log.Error("sign-up failed", "error", err, "request_id", RequestIDFrom(r.Context()))
+	if s.mayMail(in.Email) {
+		if err := s.deps.Identity.RequestSignup(r.Context(), in.Email, access.SignupDomains); err != nil {
+			s.deps.Log.Error("sign-up failed", "error", err, "request_id", RequestIDFrom(r.Context()))
+		}
 	}
 	time.Sleep(time.Until(ready))
 	w.WriteHeader(http.StatusAccepted)

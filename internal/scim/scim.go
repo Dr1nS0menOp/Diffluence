@@ -18,6 +18,7 @@ import (
 	"log/slog"
 	"net/http"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -267,10 +268,17 @@ var (
 	andSplit      = regexp.MustCompile(`(?i)\s+and\s+`)
 )
 
+// The attributes a route filters on, in lower case. A filter on any other is refused.
+var (
+	userFilterAttributes  = []string{"id", "externalid", "username", "emails.value"}
+	groupFilterAttributes = []string{"id", "externalid", "displayname", "members.value"}
+)
+
 // parseFilter understands "attr eq value", joined by "and": what provisioning
-// clients actually send. Anything else is refused and not silently ignored,
-// because an ignored filter returns everyone and creates duplicates.
-func parseFilter(filter string) (map[string]string, error) {
+// clients actually send, on the attributes the route reads. Anything else is refused
+// and not silently ignored, because an ignored filter returns everyone and creates
+// duplicates.
+func parseFilter(filter string, known []string) (map[string]string, error) {
 	out := map[string]string{}
 	if strings.TrimSpace(filter) == "" {
 		return out, nil
@@ -287,6 +295,9 @@ func parseFilter(filter string) (map[string]string, error) {
 		attr := strings.ToLower(strings.TrimSpace(m[1]))
 		if strings.HasPrefix(attr, "emails") {
 			attr = "emails.value"
+		}
+		if !slices.Contains(known, attr) {
+			return nil, errors.New("unsupported filter attribute")
 		}
 		out[attr] = value
 	}
@@ -386,7 +397,7 @@ func listResponse(resources any, total, start, count int) map[string]any {
 
 // ListUsers handles GET /Users.
 func (s *Service) ListUsers(w http.ResponseWriter, r *http.Request) {
-	filter, err := parseFilter(r.URL.Query().Get("filter"))
+	filter, err := parseFilter(r.URL.Query().Get("filter"), userFilterAttributes)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalidFilter", "Only 'attribute eq \"value\"' filters are supported.")
 		return
@@ -643,7 +654,7 @@ func excludesMembers(r *http.Request) bool {
 
 // ListGroups handles GET /Groups.
 func (s *Service) ListGroups(w http.ResponseWriter, r *http.Request) {
-	filter, err := parseFilter(r.URL.Query().Get("filter"))
+	filter, err := parseFilter(r.URL.Query().Get("filter"), groupFilterAttributes)
 	if err != nil {
 		WriteError(w, http.StatusBadRequest, "invalidFilter", "Only 'attribute eq \"value\"' filters are supported.")
 		return

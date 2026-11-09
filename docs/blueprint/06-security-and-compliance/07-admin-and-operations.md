@@ -10,9 +10,9 @@
 - **SEC-603** · built · Settings changes are audited with what changed.
 - **SEC-604** · built · Reading and exporting the audit log is itself audited.
 - **SEC-605** · built · Heavy actions need a recent proof of identity, through the `Sensitive` route wrapper: granting *administrator*, resets, anonymising, recover access, SCIM and service tokens, maintenance mode, audit retention and the rule for second factors (ASVS 7.5.1, 7.5.3).
-- **SEC-606** · new · **Medium.** Titles and filenames are in the details of audit events, and the audit screen shows them to administrators. So an administrator can read the title of a restricted page, and "administrators do not read content by default" holds for text but not for titles. Spec 013 hides titles in the audit of a space, and the instance's audit screen still shows them. The product owner decided (ADR-029): an administrator sees the id of a restricted page with "(Censored title)", on the screen and in exports.
+- **SEC-606** · built · **Medium.** Titles and filenames are in the details of audit events, and the audit screen shows them to administrators. So an administrator can read the title of a restricted page, and "administrators do not read content by default" holds for text but not for titles. Spec 013 hides titles in the audit of a space, and the instance's audit screen still shows them. The product owner decided (ADR-029): an administrator sees the id of a restricted page with "(Censored title)", on the screen and in exports. Built: `TestAnAdministratorSeesACensoredTitleOfAPageTheyCannotRead`.
 - **SEC-607** · built · There is no way to log in as someone else, and none is planned. Nobody can act as a person without leaving their own name.
-- **SEC-608** · new · The console has no second layer of its own (ASVS 8.4.2, Level 3). Requiring a second factor for administrators is that layer (SEC-164). An address filter for the console can come later. Low.
+- **SEC-608** · built · The console has no second layer of its own (ASVS 8.4.2, Level 3). Requiring a second factor for administrators is that layer (SEC-164). An address filter for the console can come later. Low. Built: the second factor for administrators of SEC-164.
 - **SEC-609** · built · The command line runs on the host, which is full trust. Passwords are read from standard input, and never from an argument, so they stay out of the process list.
 
 ## 7.2 How it is deployed
@@ -29,9 +29,9 @@
 - **SEC-622** · built · `/livez` and `/readyz` are public by design, and say no more than a short reason. The version number needs a login (ASVS 13.4.5, 13.4.6).
 - **SEC-623** · built · The embedded queue has no network listener at all.
 - **SEC-624** · phase 3 · An external NATS needs TLS and its own account, and so does anything else between nodes (ASVS 12.3.3).
-- **SEC-625** · partly · The reference install talks to PostgreSQL with `sslmode=disable`, on a private Docker network or the local machine. A database on another machine needs `verify-full`, and the guide must say so (ASVS 12.3.1, 12.3.2).
+- **SEC-625** · built · The reference install talks to PostgreSQL with `sslmode=disable`, on a private Docker network or the local machine. A database on another machine needs `verify-full`, and the guide must say so (ASVS 12.3.1, 12.3.2). Built: in `docs/operations/install.md` (spec 042).
 - **SEC-626** · built · TLS ends at a reverse proxy, which the guide requires. The guide should give settings: TLS 1.2 or newer, and `X-Forwarded-For` set by the proxy only (ASVS 12.1.1, 4.1.3).
-- **SEC-627** · new · `DIFFLUENCE_PORT` is published on all addresses in the reference Compose file, in plain http. A proxy on the same machine only needs `127.0.0.1`. Change the default. Low.
+- **SEC-627** · built · `DIFFLUENCE_PORT` is published on all addresses in the reference Compose file, in plain http. A proxy on the same machine only needs `127.0.0.1`. Change the default. Low. Built (spec 042): the port listens on `127.0.0.1` unless `DIFFLUENCE_BIND` says otherwise, `TestEveryPublishedPortListensOnThisMachineByDefault`.
 - **SEC-628** · built · A failure in the session lookup answers 503. It does not continue as if nobody were logged in, so errors fail closed (ASVS 16.5.3).
 
 ## 7.3 Backups

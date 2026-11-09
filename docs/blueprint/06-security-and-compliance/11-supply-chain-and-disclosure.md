@@ -28,8 +28,8 @@
 
 - **SEC-1020** · built · `go vet`, staticcheck, ESLint, TypeScript in strict mode, the race detector, integration tests on real PostgreSQL, browser tests with axe.
 - **SEC-1021** · built · The permission matrix, the route walker and the mutation check.
-- **SEC-1022** · partly · Fuzzing covers the Markdown reader and the document gate, nightly. Wave G adds every format reader. The SCIM filter parser has no target yet. Low.
-- **SEC-1023** · partly · `09-way-of-working.md` lists gates that are not in `ci.yml`: Semgrep, CodeQL and an OWASP ZAP baseline. Either add them or change the list. A check on paper is worse than none. CodeQL and a ZAP baseline are cheap. Medium.
+- **SEC-1022** · built · Fuzzing covers the Markdown reader and the document gate, nightly. Wave G adds every format reader. The SCIM filter parser has no target yet. Low. Built (spec 042): `FuzzParseFilter`, nightly. A filter on an attribute a route does not read is now refused.
+- **SEC-1023** · built · `09-way-of-working.md` lists gates that are not in `ci.yml`: Semgrep, CodeQL and an OWASP ZAP baseline. Either add them or change the list. A check on paper is worse than none. CodeQL and a ZAP baseline are cheap. Medium. Built: the list in `09-way-of-working.md` now names what runs, and what is not in CI yet (spec 042).
 - **SEC-1024** · new · The code is written by AI sessions, and read by no person. The checks stand in for review, which covers what they know about. Fresh review sessions and the penetration test must cover the rest, and no review session has run yet: see SEC-006.
 - **SEC-1025** · built · A test that scans all logs and audit details from a test run for planted secrets. Low, and cheap.
 

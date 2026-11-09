@@ -501,6 +501,29 @@ func newEnvWithOIDC(t *testing.T, p *idp) *env {
 	})
 }
 
+// SEC-153: on https the cookie of the login flow carries the __Secure- prefix, so a browser
+// takes it only from a secure page (ASVS 3.3.1). On plain http the prefix cannot work.
+func TestTheLoginFlowCookieIsSecureByNameOnHTTPS(t *testing.T) {
+	p := newIDP(t)
+	flowCookie := func(public string) string {
+		e := newEnvWith(t, func(c *config.Config) {
+			c.OIDC = config.OIDC{Issuer: p.srv.URL, ClientID: "client", ClientSecret: "secret", DisplayName: "Authentik"}
+			c.PublicURL, _ = url.Parse(public)
+		})
+		resp, _ := e.do(noRedirect(), "GET", "/api/v1/auth/oidc/start", "")
+		if resp.StatusCode != http.StatusFound {
+			t.Fatalf("%s: start: %d", public, resp.StatusCode)
+		}
+		return resp.Header.Get("Set-Cookie")
+	}
+	if got := flowCookie("https://wiki.example.com"); !strings.HasPrefix(got, "__Secure-diffluence_oidc=") || !strings.Contains(got, "; Secure") {
+		t.Fatalf("on https: %q", got)
+	}
+	if got := flowCookie("http://localhost"); !strings.HasPrefix(got, "diffluence_oidc=") {
+		t.Fatalf("on http: %q", got)
+	}
+}
+
 func TestOIDCLogin(t *testing.T) {
 	p := newIDP(t)
 	e := newEnvWithOIDC(t, p)

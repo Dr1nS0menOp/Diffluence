@@ -399,7 +399,10 @@ func (s *Service) ChangePassword(ctx context.Context, c Caller, sessionID uuid.U
 		if _, err := tx.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1 AND id <> $2", c.UserID, sessionID); err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "auth.password_changed", "user", c.UserID.String(), nil)
+		if err := s.record(ctx, tx, c, "auth.password_changed", "user", c.UserID.String(), nil); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, c.UserID)
 	})
 }
 
@@ -420,7 +423,10 @@ func (s *Service) ResetPassword(ctx context.Context, c Caller, id uuid.UUID, nex
 		if _, err := tx.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1", id); err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "auth.password_changed", "user", id.String(), map[string]any{"by_administrator": true})
+		if err := s.record(ctx, tx, c, "auth.password_changed", "user", id.String(), map[string]any{"by_administrator": true}); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, id)
 	})
 }
 

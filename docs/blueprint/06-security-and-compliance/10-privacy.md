@@ -50,7 +50,7 @@ This is the input for a controller's record of processing activities (Article 30
 | Photo metadata | Attachments | Nothing: it comes along | Readers | As long as the file | See SEC-334 |
 | Recent searches, tree state | The browser | Convenience | The device | See SEC-265 | By the person |
 
-- **SEC-905** · new · Special categories of data can be in any page: health, union membership, religion (Article 9). The software cannot know. The guide should tell a controller to think about that, above all for HR spaces, and page restrictions are the tool.
+- **SEC-905** · built · Special categories of data can be in any page: health, union membership, religion (Article 9). The software cannot know. The guide should tell a controller to think about that, above all for HR spaces, and page restrictions are the tool. Built: in `docs/operations/install.md` (spec 042).
 - **SEC-906** · built · Cookies: one session cookie and one short-lived cookie for single sign-on. Both are needed for the service to work, so no consent banner is expected. Browser storage holds preferences. *Lawyer*, under the ePrivacy rules, before the guide says so.
 
 ## 10.4 How long
@@ -69,7 +69,7 @@ The default today is *forever* for most data. Storage limitation asks for better
 | Backups | The operator's | Advise a period, and say that erasure reaches them when they expire |
 
 - **SEC-910** · built · Retention settings for audit events, with the anchor of SEC-830.
-- **SEC-911** · new · **Medium.** A default for audit retention (SEC-831). Decision for the product owner.
+- **SEC-911** · built · **Medium.** A default for audit retention (SEC-831). Decision for the product owner. Built: see SEC-831.
 - **SEC-912** · built · Old drafts are removed after a warning (PAG-019).
 - **SEC-913** · new · A reminder for accounts that were disabled long ago, to hand over content and anonymise. Low. Belongs in wave F.
 
@@ -128,4 +128,4 @@ Features in Diffluence that are suitable for monitoring:
 - **SEC-940** · built · Nothing leaves by itself. Mail, webhooks, a provider and public sites are each set up by the operator.
 - **SEC-941** · new · A mail provider or a hosted identity provider outside the EU is an international transfer. That is the controller's call, and the guide should mention it. *Lawyer.*
 - **SEC-942** · built · Public sites leave author names out unless chosen, and strip metadata from photos.
-- **SEC-943** · wave G · A bundle carries personal data. It needs *administer*, is audited, and lives 24 hours.
+- **SEC-943** · built · A bundle carries personal data. It needs *administer*, is audited, and lives 24 hours. Built: see SEC-363. Making a bundle is audited.

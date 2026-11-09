@@ -36,6 +36,12 @@ mutate_web() {
   queue web "$1" "$2" "$3" "$4"
 }
 
+# mutate_collab <name> <file below collab> <expression on s> <test file>: queues a mutation of
+# the service for editing together.
+mutate_collab() {
+  queue collab "$1" "$2" "$3" "$4"
+}
+
 # mutate <name> <file> <expression on s> <go test args...>: queues a Go mutation.
 mutate() {
   local name=$1 file=$2 expr=$3
@@ -62,6 +68,7 @@ needed() {
   [ -z "$changed_list" ] && return 0
   dir=$(dirname "${files[i]}")
   [ "${kinds[i]}" = web ] && dir="web/$dir"
+  [ "${kinds[i]}" = collab ] && dir="collab/$dir"
   local -a args
   eval "args=(${argv[i]})"
   while IFS= read -r path; do
@@ -75,6 +82,7 @@ needed() {
       case "$a" in
         ./*/) [ "$(dirname "$path")/" = "${a#./}" ] && return 0 ;;
         *.test.ts | *.test.tsx) [ "$path" = "web/$a" ] && return 0 ;;
+        *.test.mjs) [ "$path" = "collab/$a" ] && return 0 ;;
       esac
     done
   done <"$changed_list"
@@ -89,6 +97,29 @@ take_snapshot() {
   mkdir -p "$snapshot/repo" "$snapshot/web"
   tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$snapshot/repo" -xf -
   tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$snapshot/web" -xf -
+  mkdir -p "$snapshot/collab"
+  tar -C "$src/collab" --exclude=./node_modules -cf - . | tar -C "$snapshot/collab" -xf -
+}
+
+# run_collab <index> <folder>: one mutation of the collab service in its own copy.
+run_collab() {
+  local i=$1 dir=$2
+  mkdir -p "$dir/collab"
+  tar -C "$snapshot/collab" -cf - . | tar -C "$dir/collab" -xf -
+  ln -s "$src/collab/node_modules" "$dir/collab/node_modules"
+  if ! apply "$dir/collab/${files[i]}" "${exprs[i]}" 2>/dev/null; then
+    echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
+    return
+  fi
+  local -a args
+  eval "args=(${argv[i]})"
+  if (cd "$dir/collab" && timeout 300 node --test "${args[@]}" >"$dir/out.txt" 2>&1); then
+    echo "MISSED  ${names[i]}"
+  elif grep -a -q -E '^# fail [1-9]' "$dir/out.txt"; then
+    echo "caught  ${names[i]}"
+  else
+    echo "BROKEN  ${names[i]} (no test failed: $(grep -a -m1 . "$dir/out.txt"))"
+  fi
 }
 
 # run_web <index> <folder>: one frontend mutation in its own copy; prints one result line.
@@ -144,6 +175,8 @@ run_one() {
   mkdir -p "$dir"
   if [ "${kinds[i]}" = web ]; then
     run_web "$i" "$dir" >"$work/result-$i.tmp"
+  elif [ "${kinds[i]}" = collab ]; then
+    run_collab "$i" "$dir" >"$work/result-$i.tmp"
   else
     run_go "$i" "$dir" >"$work/result-$i.tmp"
   fi
@@ -1083,6 +1116,43 @@ mutate "the setup form is read before the code" internal/httpapi/handlers_setup.
   's.replace("\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil {", "\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil && false {")' $app -run TestTheSetupScreenRefusesAnyoneWithoutTheCode
 mutate "one address may guess setup codes for ever" internal/httpapi/handlers_setup.go \
   's.replace("\tif !s.setupTries.allow(\"ip:\" + meta.IP) {", "\tif !s.setupTries.allow(\"ip:\" + meta.IP) && false {")' $app -run TestOneAddressCannotKeepGuessingSetupCodes
+mutate "turning off TOTP lets a session guess the password" internal/httpapi/handlers_identity.go \
+  's.replace("\tif !s.loginByAcc.allow(\"pw:\" + PrincipalFrom(r.Context()).User.ID.String()) {", "\tif false {")' $app -run TestTurningOffTOTPCannotBeUsedToGuessThePassword
+mutate "a plain address on the network counts as safe" internal/config/config.go \
+  's.replace("return err != nil || !ip.IsLoopback()", "return err != nil || (!ip.IsLoopback() && false)")' ./internal/config/ -run TestAPlainAddressIsWeakOnlyWhenOthersReachIt
+mutate "the console keeps quiet about a plain address" internal/httpapi/handlers_console.go \
+  's.replace("if s.deps.Config.PlainToOthers() {", "if false {")' $app -run TestTheConsoleWarnsOfAPlainPublicAddressThatOthersReach
+mutate "the app listens on every address" compose.yaml \
+  's.replace("${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080", "${DIFFLUENCE_PORT:-8080}:8080")' $app -run TestEveryPublishedPortListensOnThisMachineByDefault
+mutate "a SCIM filter on an attribute nobody reads is ignored" internal/scim/scim.go \
+  's.replace("if !slices.Contains(known, attr) {", "if !slices.Contains(known, attr) && false {")' ./internal/scim/ -run TestAFilterIsUnderstoodWholeOrRefused
+mutate "many addresses together flood one inbox" internal/httpapi/handlers_people.go \
+  's.replace("\tif s.mayMail(in.Email) {\n\t\tif err := s.deps.Identity.RequestReset(", "\tif true {\n\t\tif err := s.deps.Identity.RequestReset(")' $app -run TestResetMailToOnePersonStopsAtALimitFromAnyAddress
+mutate "a new second factor goes unmentioned" internal/identity/factors.go \
+  's.replace("return s.tellOfChange(ctx, tx, c.UserID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
+mutate "a new password goes unmentioned" internal/identity/users.go \
+  's.replace("return s.tellOfChange(ctx, tx, c.UserID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
+mutate "a password an administrator set goes unmentioned" internal/identity/users.go \
+  's.replace("return s.tellOfChange(ctx, tx, id)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
+mutate "a reset by link goes unmentioned" internal/identity/lifecycle.go \
+  's.replace("return s.tellOfChange(ctx, tx, u.ID)", "return nil")' $app -run TestAResetMailGoesThroughTheQueueWithItsLinkSealed
+mutate "the login flow cookie has no secure prefix" internal/httpapi/server.go \
+  's.replace("s.flowCookie = \"__Secure-\" + oidcCookie", "s.flowCookie = oidcCookie")' $app -run TestTheLoginFlowCookieIsSecureByNameOnHTTPS
+mutate_collab "a browser names itself in its cursor" presence.mjs \
+  's.replace("states.set(clientID, { ...state, user: { id: user.id, name: user.name } });", "")' presence.test.mjs
+mutate_collab "a connection without a person keeps its cursor" presence.mjs \
+  's.replace("states.delete(clientID);", "")' presence.test.mjs
+
+mutate_web "a shared address may lead anywhere" src/components/editor/shared-clean.ts \
+  's.replace("return SAFE_SCHEMES.has(", "return true || SAFE_SCHEMES.has(")' src/components/editor/shared-clean.test.ts
+mutate_web "a shared node keeps an attribute it does not have" src/components/editor/shared-clean.ts \
+  's.replace("if (!allowed.has(name) || (", "if ((")' src/components/editor/shared-clean.test.ts
+mutate_web "a shared link to an unsafe place stays" src/components/editor/shared-clean.ts \
+  's.replace("isAddressAttribute(key) && !isSafeAddress(value))) return null;", "isAddressAttribute(key) && !isSafeAddress(value) && false)) return null;")' src/components/editor/shared-clean.test.ts
+mutate_web "a shared node the schema does not know stays" src/components/editor/shared-clean.ts \
+  's.replace("parent.delete(i, 1);", "")' src/components/editor/shared-clean.test.ts
+mutate_web "changes from another client are not cleaned" src/components/editor/shared-clean.ts \
+  's.replace("doc.on(\x27afterTransaction\x27, onTransaction);", "")' src/components/editor/shared-clean.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

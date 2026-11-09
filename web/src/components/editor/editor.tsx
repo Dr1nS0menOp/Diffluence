@@ -61,6 +61,7 @@ import {
 } from './insert';
 import { EditorKeys, noActions, type EditorActions } from './keys';
 import { cleanWordHtml, convertPastedMarkdown, looksLikeMarkdown, pastedImages } from './paste';
+import { keepSharedClean } from './shared-clean';
 import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog } from './template-item';
@@ -629,6 +630,9 @@ export function DocumentEditor({
   useCodeColours(editor);
   useEffect(() => onView?.(editor.view), [editor, onView]);
   useEffect(() => onReady?.(editor), [editor, onReady]);
+  // What another client sends past the editor's rules leaves the shared document here (SEC-546).
+  const sharedDoc = together?.doc;
+  useEffect(() => (sharedDoc ? keepSharedClean(sharedDoc, editor.schema) : undefined), [sharedDoc, editor]);
 
   actions.current = {
     pickFiles: () => fileInput.current?.click(),

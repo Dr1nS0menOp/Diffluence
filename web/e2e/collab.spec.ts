@@ -2,6 +2,8 @@
 // Editing together, in two real browsers (spec 015, part 5). These need the service:
 //   E2E_COLLAB=1 scripts/e2e collab.spec.ts
 import type { Browser, Page } from '@playwright/test';
+import { HocuspocusProvider, HocuspocusProviderWebsocket } from '@hocuspocus/provider';
+import * as Y from 'yjs';
 import {
   ADMIN,
   createUser,
@@ -38,6 +40,50 @@ async function typeAtEnd(page: Page, text: string) {
 }
 
 const editorOf = (page: Page) => page.locator('.prose.editing');
+
+/** The shared document as plain JSON, to look for what the gate refuses. */
+function sharedJSON(doc: Y.Doc): unknown {
+  return doc.getXmlFragment('default').toJSON();
+}
+
+/**
+ * A client outside the browser that holds a real session of `page` and speaks the protocol of the
+ * service directly, so nothing in the editor stops what it sends (SEC-546).
+ */
+async function hostileClient(page: Page, pageId: string) {
+  const cookies = await page.context().cookies();
+  const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  const origin = 'http://localhost:8080';
+  // Node's WebSocket takes extra headers, which a browser would add by itself.
+  class SessionSocket extends WebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, { protocols, headers: { cookie, origin } } as unknown as string[]);
+    }
+  }
+  const doc = new Y.Doc();
+  const socket = new HocuspocusProviderWebsocket({
+    url: 'ws://localhost:8080/collab',
+    WebSocketPolyfill: SessionSocket,
+  });
+  const provider = new HocuspocusProvider({
+    websocketProvider: socket,
+    name: pageId,
+    document: doc,
+    token: 'session',
+  });
+  // A socket made outside the provider is not joined by itself.
+  provider.attach();
+  await expect.poll(() => provider.isSynced, SYNC).toBe(true);
+  return {
+    doc,
+    json: () => sharedJSON(doc),
+    pose: (user: { id: string; name: string }) => provider.setAwarenessField('user', user),
+    close: () => {
+      provider.destroy();
+      socket.destroy();
+    },
+  };
+}
 
 test.describe('editing together', () => {
   let target = '';
@@ -122,6 +168,68 @@ test.describe('editing together', () => {
     const res = await page.request.get(`/api/v1/pages/${target}/version-authors`);
     const { authors } = (await res.json()) as { authors: Record<string, string[]> };
     expect(authors['2']?.length).toBe(2);
+    await colleague.context().close();
+  });
+
+  test('what a hostile client sends past the gate never reaches a colleague, the draft or the page', async ({
+    browser,
+    page,
+  }) => {
+    const hostilePattern = /"(script|iframe)"|onerror|javascript:/;
+    const colleague = await asPerson(browser, colleagueEmail);
+    let alerted = false;
+    colleague.on('dialog', async (d) => {
+      alerted = true;
+      await d.dismiss();
+    });
+    await openEditor(colleague, target);
+
+    // A client that speaks the protocol itself, with a valid session, and skips every rule of the editor.
+    const hostile = await hostileClient(page, target);
+    // It poses as someone else first. Its cursor and its changes travel the same socket, in order.
+    hostile.pose({ id: 'someone-else', name: 'Posing Name' });
+    const words = new Y.XmlText();
+    const link = new Y.XmlElement('paragraph');
+    link.insert(0, [words]);
+    const script = new Y.XmlElement('script');
+    script.insert(0, [new Y.XmlText('alert(1)')]);
+    const frame = new Y.XmlElement('iframe');
+    frame.setAttribute('src', 'https://example.org/');
+    const image = new Y.XmlElement('image');
+    image.setAttribute('src', 'x');
+    image.setAttribute('onerror', 'alert(1)');
+    hostile.doc.transact(() => {
+      hostile.doc.getXmlFragment('default').insert(0, [script, frame, image, link]);
+      words.insert(0, 'click me', { link: { href: 'javascript:alert(1)' } });
+    });
+
+    await expect(editorOf(colleague)).toContainText('click me', SYNC);
+    await expect(editorOf(colleague).locator('script, iframe, [onerror]')).toHaveCount(0);
+    await expect(editorOf(colleague).locator('a[href^="javascript"]')).toHaveCount(0);
+    expect(alerted).toBe(false);
+
+    // The name a colleague sees is the one the session proved (SEC-544).
+    const present = () =>
+      colleague
+        .locator('.presence button')
+        .evaluateAll((buttons) => buttons.map((b) => b.getAttribute('aria-label')));
+    await expect.poll(present, SYNC).toHaveLength(1);
+    expect(await present()).not.toContain('Go to Posing Name');
+
+    // The colleague's editor removes what its schema cannot hold, and the service keeps only what passes the gate.
+    await expect.poll(() => JSON.stringify(hostile.json()), { timeout: 30_000 }).not.toMatch(hostilePattern);
+    hostile.close();
+
+    // The cleaned shared document passes the server's gate, so the draft is stored again for everyone.
+    await typeAtEnd(colleague, ' After.');
+    await expect(colleague.getByText('Saved for everyone')).toBeVisible(SYNC);
+
+    // The image the hostile client left has no attachment, so the gate refuses to publish it, and says why.
+    await colleague.getByRole('button', { name: 'Publish', exact: true }).click();
+    await expect(colleague.getByRole('alert')).toContainText('images must point to an attachment', SYNC);
+    const published = await page.request.get(`/api/v1/pages/${target}`);
+    expect(JSON.stringify(await published.json())).not.toMatch(hostilePattern);
+    expect(alerted).toBe(false);
     await colleague.context().close();
   });
 

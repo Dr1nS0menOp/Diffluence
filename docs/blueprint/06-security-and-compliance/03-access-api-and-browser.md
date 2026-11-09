@@ -24,7 +24,7 @@
 
 - **SEC-220** · built · SQL is parameterised everywhere, with fixed statements. Sort orders use `CASE` on a checked value, not string building (ASVS 1.2.4). The blueprint named sqlc, and hand-written pgx took its place.
 - **SEC-221** · built · The search language has no way in: every term is reduced to letters and digits before it reaches `to_tsquery`.
-- **SEC-222** · wave D · The richer search language of wave D must keep to this rule: a query that cannot be understood falls back to plain words, and never reaches PostgreSQL as syntax (ORG-032).
+- **SEC-222** · built · The richer search language of wave D must keep to this rule: a query that cannot be understood falls back to plain words, and never reaches PostgreSQL as syntax (ORG-032). Built: `TestSearchLanguage` (what cannot be read falls back to plain words) and `FuzzParseQuery`.
 - **SEC-223** · built · Bodies are limited per route, a content type is required, and exactly one JSON value is accepted.
 - **SEC-224** · built · Errors say what a person can do about them. Internal details stay in the log, with a request id to find them (ASVS 16.5.1).
 - **SEC-225** · built · There is no CORS: no cross-origin caller is allowed, so nothing can be misconfigured (ASVS 3.4.2).
@@ -58,18 +58,17 @@
 - **SEC-253** · built · API answers forbid everything with `default-src 'none'`, and carry `nosniff`, `no-referrer`, `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy` and `no-store` (ASVS 3.4.4, 3.4.5, 3.4.8, 14.3.2).
 - **SEC-254** · built · `style-src-attr 'unsafe-inline'` is the one loosening. The editor sets column widths that way, and a style attribute cannot run code. `img-src` allows `data:` for the QR code of TOTP. Documents cannot use it, because images must be attachments.
 - **SEC-255** · partly · The policy has no reporting address (ASVS 3.4.7, Level 3). A violation in the field goes unseen. Add `report-to` with a small limited route. Low.
-- **SEC-256** · partly · HSTS is sent when the public address is https (ASVS 3.4.1). See SEC-257.
-- **SEC-257** · new · Medium. Cookies only get `Secure`, the `__Host-` prefix and HSTS when `DIFFLUENCE_PUBLIC_URL` starts with https, and the reference `compose.yaml` defaults to `http://localhost:8080`. An operator who puts a TLS proxy in front and forgets the address gets weak cookies, without any warning. Log a loud warning at start, and show it in the admin console. Belongs in wave F.
+- **SEC-256** · built · HSTS is sent when the public address is https (ASVS 3.4.1). See SEC-257. Built: with SEC-257, a forgotten https address is said out loud (spec 042).
+- **SEC-257** · built · Medium. Cookies only get `Secure`, the `__Host-` prefix and HSTS when `DIFFLUENCE_PUBLIC_URL` starts with https, and the reference `compose.yaml` defaults to `http://localhost:8080`. An operator who puts a TLS proxy in front and forgets the address gets weak cookies, without any warning. Log a loud warning at start, and show it in the admin console. Belongs in wave F. Built (spec 042): a warning at start and an item in the admin console when the public address is plain http on any host but this machine, `TestTheConsoleWarnsOfAPlainPublicAddressThatOthersReach`.
 - **SEC-258** · built · The app never uses `dangerouslySetInnerHTML`, and text reaches the screen through React or the editor, so a search snippet is text with markers (ASVS 3.2.2).
 - **SEC-259** · built · `frame-src` stays `'none'` unless an administrator sets up a service. Then only that address is allowed. External embeds stay out (BLK-068).
-- **SEC-260** · wave H · `connect-src` gets the `wss:` address of the collab service only when that service is on.
-
+- **SEC-260** · built · `connect-src` gets the `wss:` address of the collab service only when that service is on. Built: the service is reached through the app's own origin at `/collab`, so `connect-src` stays `'self'` and never names another address.
 ## 3.5 What stays in the browser
 
 **What can go wrong:** the next person on a shared computer sees what the last one searched for.
 
 - **SEC-265** · built · **High.** ASVS 14.3.1 (Level 1) asks to clear authenticated data from the browser when a session ends, and 14.3.3 asks to keep sensitive data out of browser storage. Wave B keeps recent searches in `localStorage` under `diffluence.searches`, and the tree keeps page ids per space. Logout only clears the query cache, so the next person sees the last person's searches. Store these per person, and remove them at logout. Belongs before wave C lands.
-- **SEC-266** · new · Wave C keeps comment drafts in the browser (COL-011), and PAG-016 keeps page text there when saving fails. That is Content in storage on a device. Key it per person, remove it at logout, and keep it for a short time. Spec 010 should say so.
+- **SEC-266** · built · Wave C keeps comment drafts in the browser (COL-011), and PAG-016 keeps page text there when saving fails. That is Content in storage on a device. Key it per person, remove it at logout, and keep it for a short time. Spec 010 should say so. Built: `web/src/personal.ts`, with three mutations in `src/personal.test.ts`.
 - **SEC-267** · built · The theme, the sidebar state and the scroll position hold no content.
 - **SEC-268** · built · The query cache is cleared at logout.
 
@@ -80,6 +79,6 @@
 - **SEC-270** · built · Documents are limited to 5 MiB and a depth of 100, bodies are limited per route, and uploads have a configurable limit.
 - **SEC-271** · built · Server timeouts are set for reading headers, reading and writing. Only uploads and exports get longer.
 - **SEC-272** · built · Imports run one at a time in the worker, with a limit on size, files, unpacked size and time.
-- **SEC-273** · new · There is no quota per person or space, so one person can fill the disk (ASVS 5.2.4, Level 3). Files can be counted already, and FIL requirements should say what happens at the limit. Low. Belongs in wave E.
+- **SEC-273** · built · There is no quota per person or space, so one person can fill the disk (ASVS 5.2.4, Level 3). Files can be counted already, and FIL requirements should say what happens at the limit. Low. Belongs in wave E. Built for spaces: a storage limit per space, `TestAFullSpaceRefusesEveryWayInAndLeavesNothingBehind`. A personal space is a space.
 - **SEC-274** · partly · ASVS 15.1.3 asks to write down which functions are heavy and how they are protected. Today: hashing, search, exports, imports, the audit chain's lock. The load test of phase 3 should measure them.
 - **SEC-275** · wave E · Dynamic blocks run queries when a page is read. Each needs a limit, and a block that fails or runs too long must leave the page working. A page full of reports must not be a denial of service.

@@ -65,7 +65,9 @@ services:
       # Public sites are written below this folder. Empty = no sites.
       DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
     secrets: [database_url, migrate_database_url]
-    ports: ["${DIFFLUENCE_PORT:-8080}:8080"]
+    # Plain http, so only this machine by default: the TLS proxy in front reaches it here.
+    # Set DIFFLUENCE_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).
+    ports: ["${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080"]
     volumes: [data:/var/lib/diffluence]
     networks: [default, helpers]
     read_only: true

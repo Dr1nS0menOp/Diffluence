@@ -27,7 +27,7 @@ printf '%s\n' 'a long password' | docker compose exec -T diffluence \
 
 `DIFFLUENCE_PUBLIC_URL` must be the address people type in their browser. It drives secure cookies, cross-site protection, passkeys and the OIDC redirect. It is also what decides whether the session cookie gets the `__Host-` prefix, so **https is required in production**.
 
-Put a TLS reverse proxy in front (Traefik, nginx). If it sits on another machine or network, set `DIFFLUENCE_TRUSTED_PROXIES` to its CIDR range, or every user appears to come from the proxy, and the login rate limit counts them all as one.
+Put a TLS reverse proxy in front (Traefik, nginx). The app speaks plain http, so Compose publishes its port on `127.0.0.1` only, where a proxy on the same machine reaches it. If the proxy sits on another machine or network, set `DIFFLUENCE_BIND=0.0.0.0` (or the address of one network card), and set `DIFFLUENCE_TRUSTED_PROXIES` to the proxy's CIDR range, or every user appears to come from the proxy, and the login rate limit counts them all as one. When the public address starts with `http` on any host but this machine, the log at start and the admin console say so.
 
 A new instance gets an example space within seconds of its first administrator: it shows everything a page can do, and can be deleted like any other space. To start empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`. An administrator can add it later under Administration, Settings.
 
@@ -53,6 +53,20 @@ Every setting is in `.env.example`. Any variable can come from a file by adding 
 
 Identity providers: see `identity-providers.md`.
 
+## The database connection
+
+The reference install reaches PostgreSQL with `sslmode=disable`, on a private Docker network or on the same machine, where nothing passes over a wire. **A database on another machine needs `sslmode=verify-full`** in both database addresses, with the server's CA certificate (`sslrootcert=`), so the connection is encrypted and the server is the one you meant (SEC-625).
+
+## The reverse proxy
+
+TLS ends at your proxy, so its settings decide how strong it is. Offer TLS 1.3, and TLS 1.2 only if old clients need it. A recent proxy then also offers a key exchange that resists quantum computers, as Go does where Diffluence itself is the client (SEC-728).
+
+Your proxy keeps access logs, and they hold the address of every person. Keep them as short as you need them: two weeks is plenty to look into a problem. Leave query strings out of them, because SCIM puts e-mail addresses there (SEC-843).
+
+## What people put in pages
+
+Any page can hold special categories of personal data: health, union membership, religion (GDPR article 9). Diffluence cannot know. Think about it before you open a space for HR or for people's own matters, and use page restrictions there: they are the tool for this (SEC-905).
+
 ## Mail
 
 Diffluence works without mail: notifications show in the app, and mail waits in the queue. Any SMTP server works, whether your own or one from a provider. Set these:
@@ -67,7 +81,7 @@ Diffluence works without mail: notifications show in the app, and mail waits in 
 
 With `starttls`, a server that does not offer encryption gets nothing: there is no quiet fall back to plain text. Administration, Mail shows the queue and has a Send test.
 
-Mail is not signed by Diffluence. Let your mail server sign with DKIM, because providers trust one-click unsubscribe only on signed mail. The link in every mail works either way.
+Mail is not signed by Diffluence. Let your mail server sign with DKIM, and publish SPF and DMARC records for the sender's domain: providers trust one-click unsubscribe only on mail whose DKIM signature covers those headers (RFC 8058), and unsigned mail tends to land in spam. The link in every mail works either way (SEC-423).
 
 Mailpit is a tool for developers and catches mail without delivering it, so it is not for production. See `docs/development.md`.
 

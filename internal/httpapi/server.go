@@ -122,6 +122,8 @@ type Server struct {
 	router     *Router
 	handler    http.Handler
 	cookieName string
+	// flowCookie binds a login through the identity provider to the browser that started it.
+	flowCookie string
 	loginByIP  *limiter
 	loginByAcc *limiter
 	// loginByAllIPs counts tries on one account from every address together.
@@ -129,7 +131,9 @@ type Server struct {
 	tokenCalls    *limiter
 	// setupTries limits tries at the first setup per address (spec 038).
 	setupTries *limiter
-	requests   *metrics.Requests
+	// mailsTo limits account mail per recipient, whoever asks for it (SEC-190).
+	mailsTo  *limiter
+	requests *metrics.Requests
 	// markdownBusy holds a place for every paste being converted.
 	markdownBusy chan struct{}
 	// admission keeps the order of work when the database is full (ARC-233).
@@ -144,6 +148,7 @@ func New(d Deps) (*Server, error) {
 	s := &Server{
 		deps:       d,
 		cookieName: "diffluence_session",
+		flowCookie: oidcCookie,
 		loginByIP:  newLimiter(50, loginWindow),
 		loginByAcc: newLimiter(10, loginWindow),
 		tokenCalls: newLimiter(tokenCallsPerMinute, time.Minute),
@@ -151,6 +156,7 @@ func New(d Deps) (*Server, error) {
 
 		loginByAllIPs: newLimiter(100, loginWindow),
 		setupTries:    newLimiter(setupTriesPerAddress, setupWindow),
+		mailsTo:       newLimiter(accountMailsPerRecipient, loginWindow),
 		markdownBusy:  make(chan struct{}, markdownSlots),
 		admission:     newAdmission(poolSize(d)),
 	}
@@ -158,6 +164,9 @@ func New(d Deps) (*Server, error) {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
 		// Secure, has Path=/ and no Domain, which blocks subdomain overrides.
 		s.cookieName = "__Host-diffluence_session"
+		// The flow cookie has a path of its own, so __Host- does not fit; __Secure- still
+		// makes a browser take it only from a secure page (SEC-153).
+		s.flowCookie = "__Secure-" + oidcCookie
 	}
 	s.router = newRouter(s.enforce)
 	s.registerRoutes()

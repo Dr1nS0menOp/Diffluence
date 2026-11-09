@@ -1,6 +1,6 @@
 # Threat model
 
-Written for: reviewers and a future penetration tester. Updated every phase (blueprint 06). Version: phases 1 and 2.
+Written for: reviewers and a future penetration tester. Updated every phase (blueprint 06). Version: phases 1 and 2, with the changes of spec 042.
 
 **Assets:** page content, attachments, credentials and sessions, the permission model, the audit trail.
 
@@ -19,11 +19,13 @@ Written for: reviewers and a future penetration tester. Updated every phase (blu
 | Attachments | Tampering: a file executes in our origin | Type from content; only PNG, JPEG, GIF and WebP inline; all else a download; `sandbox` policy and `nosniff` | Test with HTML posing as PNG, and SVG |
 | Imports | Denial of service, path traversal | Size, count and unpacked limits, enforced while reading; paths never touch disk; runs in the worker | Tests with a zip bomb and `../../etc/passwd`; fuzzing |
 | First setup | Elevation: a stranger reaches a fresh install first and becomes its administrator | One-time code only in the server's log; an hour, once, 10 wrong tries; 10 tries per address per 15 minutes; code checked first; one transaction under a lock; closed for good after use (spec 038) | Tests, mutations |
-| Login | Spoofing: brute force | Argon2id; limits per account and per address; failed logins audited | Tests |
+| Login | Spoofing: brute force | Argon2id; limits per account and per address, also on every route that checks a password; failed logins audited; a mail on every change to a password, factor or passkey | Tests, mutations |
+| Account mail | Denial of service: flooding a person's inbox | Reset and sign-up mail limited per address and per recipient, with the same answer either way | Test, mutation |
 | TOTP | Spoofing: replay, stolen database | One use per time step; challenge dies after 5 tries; seeds sealed with AES-256-GCM, recovery codes hashed | Tests plus mutation check |
 | OIDC | Spoofing: account takeover, login CSRF | PKCE, state, nonce, flow tied to the browser; link by stable id, never e-mail alone; accounts with a password never link | Tests; real Authentik 2026.8.5 |
-| SCIM | Spoofing: stolen token | Tokens hashed, shown once, revocable, audited per token; filters refused rather than ignored | Tests; real Authentik 2026.8.5 |
-| Sessions | Spoofing: theft | Hashed tokens, `HttpOnly`, `SameSite=Strict`, `__Host-` on https; idle and absolute limits; ended on password change and disable | Tests |
+| SCIM | Spoofing: stolen token | Tokens hashed, shown once, revocable, audited per token; filters refused rather than ignored, also on attributes a route does not read | Tests, fuzzing; real Authentik 2026.8.5 |
+| Sessions | Spoofing: theft | Hashed tokens, `HttpOnly`, `SameSite=Strict`, `__Host-` on https, `__Secure-` on the login flow; idle and absolute limits; ended on password change and disable; a loud warning when the public address is plain http | Tests, mutations |
+| Editing together | Tampering, spoofing: a client that skips the editor | Stored state passes the gate; every browser removes what its schema and link rules refuse; the service sets the name in every cursor from the session | Hostile client through the real service; unit tests; mutations |
 | Cross-site requests | Tampering | Go's cross-origin protection, strict cookies | Test |
 | Audit log | Repudiation, tampering | Hash chain; the application role cannot update or delete; daily verification; daily Ed25519 checkpoint with a key outside the database | Tests plus mutation check |
 | Administrators | Elevation: quiet access to content | No automatic content access; recover access needs a reason and is audited; system administrator can only be granted by one | Tests |

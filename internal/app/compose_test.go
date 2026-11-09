@@ -29,3 +29,20 @@ func TestHelpersHaveNoWayOut(t *testing.T) {
 		}
 	}
 }
+
+// The app speaks plain http, so by default only a proxy on the same machine reaches it (SEC-627).
+func TestEveryPublishedPortListensOnThisMachineByDefault(t *testing.T) {
+	raw, err := os.ReadFile("../../compose.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ports := regexp.MustCompile(`(?m)^    ports: \[(.*)\]$`).FindAllStringSubmatch(string(raw), -1)
+	if len(ports) == 0 {
+		t.Fatal("no published port found")
+	}
+	for _, p := range ports {
+		if !strings.HasPrefix(p[1], `"${DIFFLUENCE_BIND:-127.0.0.1}:`) {
+			t.Errorf("a port listens on every address by default: %s", p[1])
+		}
+	}
+}

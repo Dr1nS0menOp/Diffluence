@@ -30,7 +30,7 @@ Because the product owner does not read code, **the automated checks are the cod
 | End-to-end | Playwright on the built app, including accessibility checks (axe) |
 | Design | `docs/design/README.md`: tokens, contrast, icons and dialogs through `npm run design`; approved pictures of every screen in the end-to-end run |
 | Upgrade test | Start the previous release with traffic, upgrade to this build, no failed requests allowed |
-| Security | `govulncheck`, Trivy (image and dependencies), Semgrep, CodeQL, licence scan, OWASP ZAP baseline |
+| Security | In CI today: `govulncheck`, Trivy (image and dependencies), `npm audit` of shipped packages, licence scan, mutation check (nightly). Not in CI yet, each would add a new tool: Semgrep, CodeQL, OWASP ZAP baseline (SEC-1023) |
 | Fuzzing | Go native fuzzing on parsers (Markdown, imports, sanitiser), nightly |
 | Load | k6 smoke test per pull request, full 5,000-user test nightly |
 | API contract | The OpenAPI spec matches the code, and every endpoint has a permission annotation |
@@ -66,7 +66,7 @@ Only then does building start. If a build has started without this, stop and do 
 
 ## Definition of done
 
-The feature matches its spec and acceptance criteria, all gates are green, permissions and audit events are covered, the UI text goes through translation files, the screen follows the design standard, the docs are updated, the upgrade test passes, and the product owner has ticked the "How to test" checklist.
+The feature matches its spec and acceptance criteria, all gates are green, permissions and audit events are covered, the UI text goes through translation files, the screen follows the design standard, the docs are updated, the upgrade test passes, and the product owner has ticked the "How to test" checklist. A change that makes the document gate stricter also says what happens to stored versions: a pass over them, or the same check when they are read, because stored documents are trusted as they are (SEC-308).
 
 ## Working within Claude Max limits
 

@@ -139,6 +139,10 @@ jobs:
       - name: web dependencies
         run: npm ci --no-fund --no-audit
         working-directory: web
+      # Mutations of the service for editing together run its own tests.
+      - name: collab dependencies
+        run: npm ci --no-fund --no-audit
+        working-directory: collab
       - name: do the tests catch injected bugs?
         run: make mutation
       - name: can an encrypted backup be restored on a clean installation?

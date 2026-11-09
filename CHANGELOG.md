@@ -8,6 +8,14 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - Reload first saves the draft of an open editor, so the text is simply there afterwards
 - Comments now ask the page whether they are closed, instead of reading it themselves. Nothing changes for people
 - Upgrade impact: none
+### Security: the rest of blueprint 06 (spec 042)
+- Editing together: what a client sends past the editor's rules leaves the shared draft at once, and the name in a colleague's cursor always comes from their login
+- A mail goes out when a password, second factor or passkey changes, also when an administrator makes the change
+- Reset and sign-up mail to one address is limited, wherever the requests come from. Turning off an authenticator app shares the limit on password tries
+- A warning at start and in the admin console when the public address is plain http to others. The login cookie for an identity provider carries the `__Secure-` prefix on https
+- A SCIM filter on an attribute Diffluence does not read is refused instead of ignored
+- More of the readers are fuzzed every night: HTML import, archives, SCIM filters and the search language
+- Upgrade impact: **Docker Compose now publishes the app on `127.0.0.1` only.** If your reverse proxy runs on another machine, set `DIFFLUENCE_BIND=0.0.0.0` before you update. No migration
 
 ### Added: a setup screen for a new install (spec 038)
 - A new install opens on a setup screen: the name of the company or person it is for, which the search box shows as "Search in" that name, the first administrator and the default time zone. Right after, it asks for a passkey

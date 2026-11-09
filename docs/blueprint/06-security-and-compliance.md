@@ -43,15 +43,15 @@ Every ASVS reference is to version 5.0.0, so `ASVS 6.2.1` stands for `v5.0.0-6.2
 
 ## Where it stands
 
-Counted again in spec 035, against the code and the tests. Lines still marked with the wave that planned them could not be proven line by line; spec 035 lists them.
+Counted again in spec 042, against the code and the tests. Lines still marked with the wave that planned them could not be proven line by line; spec 042 lists them.
 
 | Status | Lines |
 |---|---|
-| built | 284 |
-| partly | 43 |
-| still marked with a wave | 14 |
+| built | 328 |
+| partly | 33 |
+| still marked with a wave | 4 |
 | planned in a phase | 5 |
-| new | 68 |
+| new | 44 |
 | later | 15 |
 | **Total** | **429** |
 
@@ -61,18 +61,14 @@ Chapter 12 lists what is still open at ASVS Level 1 and 2.
 
 ### High
 
-Every High line of the first study is closed but one:
-
-| Line | Problem | Status |
-|---|---|---|
-| SEC-546 | Changes while editing together go past the document gate, so a hostile client could reach a colleague's browser | Partly: messages are limited in size, and the gate still does not run on each change |
+Every High line of the first study is closed. The last, SEC-546, closed in spec 042: every browser takes out of the shared document what its rules refuse, and a test sends hostile changes through the real service.
 
 ### Medium, still open
 
-- **Accounts:** SEC-124 recovery codes are stored as plain hashes of 80 bits.
-- **The browser:** SEC-266 comment drafts stay in the browser. SEC-523 and SEC-557 checks on `postMessage`.
-- **Content:** SEC-308 a stricter rule leaves stored documents as they are. SEC-353 imported history can be made up. SEC-383 the search index of a public site. SEC-407 comment anchors keep removed text.
-- **Mail and calls:** SEC-416 the check of the mail server's certificate has no test of its own. SEC-443 what a webhook body holds. SEC-807 reads by token leave no audit event.
+- **Accounts:** SEC-110 and SEC-111, a lasting count of failures against malicious lockout, wait for a decision. SEC-148 back-channel logout.
+- **The browser:** SEC-557 checks on `postMessage` for the PDF editor, which does not exist yet.
+- **Content:** SEC-548 removed text stays in a browser that had the page open, until logout.
+- **Operations:** SEC-655 a failed chain check reaches the console, not yet a notification.
 - **Services:** SEC-513 one Gotenberg for PDF export and hostile office files. SEC-532 Collabora's own security settings.
 - **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. SEC-1023 gates that the way of working lists are not in CI.
 ## Where this differs from the earlier blueprint
@@ -88,7 +84,7 @@ The earlier version of this file promised some things that were then built diffe
 | OIDC client secrets sealed in the database | In the environment or a file, on purpose | SEC-720 |
 | TLS 1.3 with post-quantum key exchange at the edge | TLS ends at the operator's proxy, so that depends on the proxy | SEC-728 |
 | Backups encrypted before they leave the host | Not built | SEC-636 |
-| Every API call with a token in the audit log | Not built | SEC-807 |
+| Every API call with a token in the audit log | A `token.used` event at most once a minute per token | SEC-807 |
 
 `docs/security/threat-model.md` is shorter than this document and should become a summary that points here. This study did not change it (SEC-007).
 

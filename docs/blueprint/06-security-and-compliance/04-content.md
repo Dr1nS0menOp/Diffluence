@@ -14,9 +14,8 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-305** · built · Every way in passes the gate: publishing, drafts, imports, restoring.
 - **SEC-306** · built · The `mention` node and `id` on tasks join the gate. Comments have an allow-list of their own, smaller than a page's (spec 010).
 - **SEC-307** · built · Every new block joins the gate with its attributes, and gets a mutation line for its rule. Settings of dynamic blocks are data, never code or queries.
-- **SEC-308** · new · When a rule gets stricter, stored documents stay as they are, because `Parse` trusts what is stored. Any tightening needs a pass over the stored versions, or a check when they are read. Medium. Add to the definition of done for changes to the gate.
-- **SEC-309** · wave H · A shared document in the collab service does not pass the gate on each keystroke. See SEC-546.
-
+- **SEC-308** · built · When a rule gets stricter, stored documents stay as they are, because `Parse` trusts what is stored. Any tightening needs a pass over the stored versions, or a check when they are read. Medium. Add to the definition of done for changes to the gate. Built: in the definition of done of `09-way-of-working.md` (spec 042).
+- **SEC-309** · built · A shared document in the collab service does not pass the gate on each keystroke. See SEC-546. Built: see SEC-546 (spec 042).
 ## 4.2 Links in documents
 
 **What can go wrong:** a `javascript:` address, a link that leaves the site without saying so, text that says one thing and goes elsewhere.
@@ -58,9 +57,9 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-348** · built · A failing import reports what went wrong, and never takes the server down. A panic in a job is caught.
 - **SEC-349** · built · DOCX and ODT are read with `encoding/xml`, with limits on depth and size, a `DOCTYPE` refused, and relationships that point outside (`TargetMode="External"`) ignored. Go's parser does not fetch entities (ASVS 1.5.1).
 - **SEC-350** · built · HTML is parsed with `golang.org/x/net/html` and only ever turned into document blocks, so no HTML survives (ADR-026).
-- **SEC-351** · wave G · Every reader of a format gets a fuzz target and a set of hostile files.
+- **SEC-351** · built · Every reader of a format gets a fuzz target and a set of hostile files. Built (spec 042): fuzz targets with hostile seeds for Markdown, Word, HTML, front matter, archives, bundles, the search language and SCIM filters, nightly in `make fuzz`. A `.doc` becomes Word through the helper first.
 - **SEC-352** · built · A bundle has a manifest with a SHA-256 per file and an Ed25519 signature. A wrong signature always stops an import, and an unknown signer needs an administrator.
-- **SEC-353** · new · Imports can bring old versions with authors and dates, so history can be made up. Mark imported versions as imported in the history and the audit log, so they never count as proof of who wrote what. Medium. Belongs in wave G.
+- **SEC-353** · built · Imports can bring old versions with authors and dates, so history can be made up. Mark imported versions as imported in the history and the audit log, so they never count as proof of who wrote what. Medium. Belongs in wave G. Built: `TestABundleMovesASpaceWithItsHistory` checks the mark in the versions and the history.
 - **SEC-354** · later · The Confluence importer reads documented formats only, and unknown parts stay visible as text.
 - **SEC-355** · new · A temporary file of an import stays on disk if the worker stops at the wrong moment. A sweep at start, and a limit on age. Low. Belongs in wave G.
 
@@ -71,7 +70,7 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-360** · built · An export uses the same access rule as the screen, and leaves out what the person may not see. Exports need their own permission, and are audited.
 - **SEC-361** · built · Audit CSV exports neutralise cells that start with `=`, `+`, `-`, `@`, tab or return (ASVS 1.2.10).
 - **SEC-362** · built · One writer for all CSV, with the same guard. Spec 015 adds one in `internal/outward`. Keep it to one, and add a line feed to the guarded characters.
-- **SEC-363** · wave G · A stored export is only for the person who asked, and is deleted after a set time. A bundle needs *administer*, and lives 24 hours.
+- **SEC-363** · built · A stored export is only for the person who asked, and is deleted after a set time. A bundle needs *administer*, and lives 24 hours. Built: `TestOnlyTheOwnerDownloadsAnExport`, `TestAnExpiredFileIsGone`. A bundle is an export, with the same 24 hours; it needs a permission of its own that comes with *administer* (`TestABundleStillNeedsExport`).
 - **SEC-364** · built · `document.ToHTML` escapes everything, and is built on the allow-list. The instance itself never serves that HTML to a browser.
 - **SEC-365** · built · PDF goes through Gotenberg with only HTML we made (see chapter 6).
 
@@ -87,5 +86,5 @@ Everything a person can put into a wiki is hostile until proven otherwise. That 
 - **SEC-380** · built · No comments, no author names unless chosen, and no version history.
 - **SEC-381** · built · JPEG and PNG are re-encoded without metadata. GIF and WebP cannot be cleaned by the standard library, so the preview warns about them.
 - **SEC-382** · built · The site itself needs headers and a policy. The site is static, so the guide should give a policy for common web servers, with no outside resources. The theme must load nothing from elsewhere. Medium. Belongs in wave G.
-- **SEC-383** · new · The client-side search index is public too, so it may only hold what is on the site. A test must plant a word on a page that is left out. Medium. Belongs in wave G.
+- **SEC-383** · built · The client-side search index is public too, so it may only hold what is on the site. A test must plant a word on a page that is left out. Medium. Belongs in wave G. Built: `TestSearchOnlyHoldsWhatIsOnTheSite`.
 - **SEC-384** · new · The scrub looks for known addresses. It could also warn about things that look like secrets, such as `password=` or a private key block. Low. Belongs in wave G.

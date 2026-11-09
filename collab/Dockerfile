@@ -3,7 +3,7 @@ FROM node:22-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
-COPY server.mjs document.mjs ./
+COPY server.mjs document.mjs presence.mjs ./
 USER node
 EXPOSE 1234
 CMD ["node", "server.mjs"]

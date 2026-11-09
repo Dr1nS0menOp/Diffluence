@@ -57,6 +57,9 @@ fuzz:
 	go test ./internal/exchange/ -run '^$$' -fuzz FuzzFrontMatter -fuzztime 30s
 	go test ./internal/exchange/ -run '^$$' -fuzz FuzzVerifyBundle -fuzztime 60s
 	go test ./internal/document/ -run '^$$' -fuzz FuzzNormalize -fuzztime 60s
+	go test ./internal/exchange/ -run '^$$' -fuzz FuzzHTMLImport -fuzztime 60s
+	go test ./internal/scim/ -run '^$$' -fuzz FuzzParseFilter -fuzztime 30s
+	go test ./internal/search/ -run '^$$' -fuzz FuzzParseQuery -fuzztime 30s
 
 check: fmt-check vet staticcheck vuln licenses web-check collab-check test-race
 

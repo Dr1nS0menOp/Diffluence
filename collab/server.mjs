@@ -5,6 +5,7 @@
 import { Server } from '@hocuspocus/server';
 import * as Y from 'yjs';
 import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
+import { bindPresence } from './presence.mjs';
 
 const API_URL = (process.env.DIFFLUENCE_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
 const TOKEN = process.env.DIFFLUENCE_COLLAB_TOKEN ?? '';
@@ -105,6 +106,10 @@ const server = new Server({
     if (!res.ok) throw new Error('the document could not be loaded');
     Y.applyUpdate(document, new Uint8Array(await res.arrayBuffer()));
     return document;
+  },
+
+  async beforeHandleAwareness({ context, states }) {
+    bindPresence(states, context?.user);
   },
 
   async onChange({ documentName, context }) {

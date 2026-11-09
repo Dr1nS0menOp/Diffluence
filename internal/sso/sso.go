@@ -76,6 +76,8 @@ func (p *Provider) discover(ctx context.Context) (*oidc.IDTokenVerifier, *oauth2
 		return p.verifier, p.oauth, nil
 	}
 	// Keys are refreshed in the background with this context, so it must outlive the request.
+	// Discovery uses the library's own client, outside internal/outward, and follows redirects:
+	// the issuer is an address the operator configured, not one a person types (SEC-434).
 	provider, err := oidc.NewProvider(context.WithoutCancel(ctx), p.cfg.Issuer)
 	if err != nil {
 		return nil, nil, fmt.Errorf("sso: discovery: %w", err)

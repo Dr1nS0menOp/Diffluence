@@ -110,6 +110,12 @@ func convertHTML(ctx context.Context, m *importer, pageID uuid.UUID, key string,
 	}
 	folder := path.Dir(key)
 	r := &htmlReader{m: m, folder: folder, store: func(src string) (uuid.UUID, bool) { return m.attachment(ctx, pageID, folder, src) }}
+	doc, warnings := r.document(root)
+	return converted{doc: doc, title: titleOf(root), warnings: warnings}, nil
+}
+
+// document turns parsed HTML into a page that passes the gate, with warnings for what was left out.
+func (r *htmlReader) document(root *html.Node) (document.Node, []string) {
 	doc := document.Node{Type: document.TypeDoc, Content: r.blocks(bodyOf(root), 0)}
 	if len(doc.Content) == 0 {
 		doc = document.Empty()
@@ -119,7 +125,7 @@ func convertHTML(ctx context.Context, m *importer, pageID uuid.UUID, key string,
 		warnings = append(warnings, "Scripts, forms and embedded objects were left out.")
 	}
 	doc = checked(doc, &warnings)
-	return converted{doc: doc, title: titleOf(root), warnings: warnings}, nil
+	return doc, warnings
 }
 
 func isBlock(a atom.Atom) bool {

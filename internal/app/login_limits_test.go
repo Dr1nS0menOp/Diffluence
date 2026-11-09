@@ -69,6 +69,39 @@ func TestWrongPasswordsFromOneAddressDoNotLockOutThePerson(t *testing.T) {
 	}
 }
 
+// A stolen session must not become a way to guess the password (SEC-113).
+func TestTurningOffTOTPCannotBeUsedToGuessThePassword(t *testing.T) {
+	e := newEnv(t)
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+	anna.enrolTOTP()
+	limited := false
+	for range 12 {
+		if got, _ := anna.do("POST", "/api/v1/me/totp/disable", map[string]any{"password": "wrong password here"}); got == http.StatusTooManyRequests {
+			limited = true
+			break
+		}
+	}
+	if !limited {
+		t.Fatal("12 wrong passwords were all checked, want a limit")
+	}
+	anna.want(http.StatusTooManyRequests, "POST", "/api/v1/me/totp/disable", map[string]any{"password": adminPassword})
+}
+
+// Many addresses together must not flood one inbox with reset mail (SEC-190), and every
+// answer stays the same, so the limit says nothing about whether an account exists.
+func TestResetMailToOnePersonStopsAtALimitFromAnyAddress(t *testing.T) {
+	e := newEnvBehindProxy(t)
+	for i := range 6 {
+		resp, _ := e.do(e.client(), "POST", "/api/v1/auth/forgot", `{"email":"Anna@example.com"}`, "X-Forwarded-For", fmt.Sprintf("198.51.100.%d", i+1))
+		if resp.StatusCode != http.StatusAccepted {
+			t.Fatalf("request %d: %d, want 202 every time", i+1, resp.StatusCode)
+		}
+	}
+	if sent := e.auditActions("auth.reset_requested"); sent != 3 {
+		t.Fatalf("%d reset mails to one person in a quarter of an hour, want 3", sent)
+	}
+}
+
 func TestGuessesFromManyAddressesStillStopAtALimit(t *testing.T) {
 	e := newEnvBehindProxy(t)
 	last := 0

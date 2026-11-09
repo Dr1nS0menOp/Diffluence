@@ -45,6 +45,8 @@ const (
 	MailInvitation = "invitation"
 	MailSignup     = "signup"
 	MailNewDevice  = "new_device"
+	// MailSignInChanged says that a password, a second factor or a passkey changed.
+	MailSignInChanged = "sign_in_changed"
 )
 
 // AccountMail is one message about an account. Link holds a secret, so it must
@@ -74,6 +76,16 @@ func (s *Service) send(ctx context.Context, m AccountMail) error {
 		return nil
 	}
 	return s.mailer.Send(ctx, m)
+}
+
+// tellOfChange mails a person that a way into their account changed (ASVS 6.3.7, SEC-127),
+// so someone who did not make the change learns of it while they can still act.
+func (s *Service) tellOfChange(ctx context.Context, q db.Querier, userID uuid.UUID) error {
+	var email string
+	if err := q.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", userID).Scan(&email); err != nil {
+		return err
+	}
+	return s.send(ctx, AccountMail{To: email, Kind: MailSignInChanged})
 }
 
 // Policy holds the rules an administrator sets. The settings package depends on
@@ -330,8 +342,10 @@ func (s *Service) ResetWithLink(ctx context.Context, token, password string, met
 		if _, err := audit.Record(ctx, tx, event(meta, actor, "auth.password_reset", "user", u.ID.String(), audit.ResultSuccess, nil)); err != nil {
 			return err
 		}
-		_, err = outbox.Enqueue(ctx, tx, "auth.password_reset", map[string]any{"user_id": u.ID})
-		return err
+		if _, err := outbox.Enqueue(ctx, tx, "auth.password_reset", map[string]any{"user_id": u.ID}); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, u.ID)
 	})
 }
 

@@ -2371,6 +2371,7 @@
     "item_audit_damaged": "The audit log does not hold: the daily check failed. Find out why now.",
     "item_disk_nearly_full": "The disk for files has {{count}}% free. Uploads fail when it is full.",
     "item_no_identity_provider": "No identity provider is set up. Signing in through one is safer than passwords.",
+    "item_public_address_plain": "The public address starts with http, so sign-in cookies are not protected in transit. Set DIFFLUENCE_PUBLIC_URL to the https address people use.",
     "item_no_passkey": "You have no passkey, and your account reaches everything. Add one."
   },
   "rules": {

@@ -13,8 +13,7 @@ Two different things. The **audit log** is a record of who did what, kept in the
 - **SEC-804** · built · Page views are not audit events. Downloads are.
 - **SEC-805** · partly · Changes record a short summary, not always before and after. Permission changes do. Settings record the new values only. Add the old value where it helps an investigation. Low.
 - **SEC-806** · later · An event says which token acted (SEC-230). `on-behalf-of` for apps comes with phase 7.
-- **SEC-807** · new · The earlier blueprint promised an event for every API call made with a token. Nothing records that: changes, refusals and downloads leave a trace, and other reads do not. A read through a stolen token would leave no audit event. Record reads by token, or change the promise. Medium. Belongs in wave H, with SEC-230.
-
+- **SEC-807** · built · The earlier blueprint promised an event for every API call made with a token. Nothing records that: changes, refusals and downloads leave a trace, and other reads do not. A read through a stolen token would leave no audit event. Record reads by token, or change the promise. Medium. Belongs in wave H, with SEC-230. Built, with the promise changed: a read through a token leaves a `token.used` event, at most once a minute per token (`internal/identity/tokens.go`).
 ## 9.2 Can it be trusted?
 
 **What can go wrong:** someone with database access rewrites history, and nothing notices.
@@ -32,15 +31,15 @@ Two different things. The **audit log** is a record of who did what, kept in the
 **What can go wrong:** the log is immutable, so what goes in cannot come out, and it holds more personal data than it needs.
 
 - **SEC-820** · built · **High.** A failed login stores the typed address in `details.email`, also when no account exists. People sometimes type a password in that field, which then stays in a log that cannot be changed. For an unknown account store a keyed hash of the address, which still shows credential stuffing. Only a known account gets its id. Belongs in wave F.
-- **SEC-821** · new · **Medium.** Events hold personal data for good: e-mail addresses in `user.created`, page titles (which can be names), filenames, and the address and user agent of every action. Spec 013 accepts this until retention ends. That works, but the hash covers the whole payload, so nothing can be blanked for one person. A better shape for new events: identifying fields in a separate part that the hash covers only through a digest. That part can be removed later, and the chain still holds. Decision for the product owner, because it changes the format.
-- **SEC-822** · partly · Titles of restricted pages in the audit log: see SEC-606.
+- **SEC-821** · built · **Medium.** Events hold personal data for good: e-mail addresses in `user.created`, page titles (which can be names), filenames, and the address and user agent of every action. Spec 013 accepts this until retention ends. That works, but the hash covers the whole payload, so nothing can be blanked for one person. A better shape for new events: identifying fields in a separate part that the hash covers only through a digest. That part can be removed later, and the chain still holds. Decision for the product owner, because it changes the format. Built: `TestPersonalDataInTheAuditLogCanBeErasedWhileTheChainHolds`, `TestChangingAPersonalPartOfTheAuditLogIsNoticed`.
+- **SEC-822** · built · Titles of restricted pages in the audit log: see SEC-606. Built: see SEC-606.
 - **SEC-823** · built · No passwords, tokens or document text go into audit details on purpose. SEC-820 is the one way a typed password can end up there by accident.
 - **SEC-824** · built · CSV exports neutralise formulas.
 
 ## 9.4 Keeping and moving it
 
 - **SEC-830** · built · Audit retention is a setting. A prune runs with the owner's role, verifies the chain, leaves a signed anchor and removes older rows, so the app still cannot delete (spec 013, D11).
-- **SEC-831** · new · Retention needs a default. Without one the log grows forever and holds personal data forever, against the GDPR's storage limitation. Advice in chapter 10: 12 months for most events, longer only with a reason. Decision for the product owner.
+- **SEC-831** · built · Retention needs a default. Without one the log grows forever and holds personal data forever, against the GDPR's storage limitation. Advice in chapter 10: 12 months for most events, longer only with a reason. Decision for the product owner. Built: `TestTheAuditLogStaysAYearByDefault`.
 - **SEC-832** · later · Sending events to a SIEM by syslog, CEF, GELF or Sentinel (ASVS 16.4.3 at Level 2). The product owner mentioned a SIEM in ADR-026. A SIEM is also the real answer to SEC-815, so this should move up to phase 3.
 - **SEC-833** · new · Medium. Sending the signed head of the chain to something outside the instance, even a daily mail or a file an operator collects, makes a full rewrite visible. It is small, and could come with SEC-832.
 - **SEC-834** · built · Audit retention is separate from content retention. Events hold ids as plain text, with no link to the page, so deleting a page never deletes its trail.
@@ -60,5 +59,5 @@ ASVS 16.1.1 asks for an inventory. This is it.
 - **SEC-840** · built · Logs are structured JSON, so a line break in a value cannot fake a line (ASVS 16.2.4, 16.4.1).
 - **SEC-841** · built · Query strings are left out, because they may hold tokens. See SEC-422 for tokens in paths.
 - **SEC-842** · built · A panic becomes a 500 with a request id, and the stack stays in the log (ASVS 16.5.1, 16.5.4).
-- **SEC-843** · partly · Addresses are personal data, and the log has them. The operator decides how long logs stay. The guide should advise a period. Low.
+- **SEC-843** · built · Addresses are personal data, and the log has them. The operator decides how long logs stay. The guide should advise a period. Low. Built: in `docs/operations/install.md` (spec 042).
 - **SEC-844** · built · A failed outside call or job is logged, and does not stop the rest (ASVS 16.3.4).

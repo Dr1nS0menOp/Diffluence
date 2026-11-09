@@ -142,7 +142,10 @@ func (s *Service) FinishPasskey(ctx context.Context, c Caller, token, name strin
 		if err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "auth.passkey_added", "passkey", id.String(), map[string]any{"name": name})
+		if err := s.record(ctx, tx, c, "auth.passkey_added", "passkey", id.String(), map[string]any{"name": name}); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, c.UserID)
 	})
 }
 
@@ -181,7 +184,10 @@ func (s *Service) RemovePasskey(ctx context.Context, c Caller, id uuid.UUID) err
 		if tag.RowsAffected() == 0 {
 			return apperr.NotFound()
 		}
-		return s.record(ctx, tx, c, "auth.passkey_removed", "passkey", id.String(), nil)
+		if err := s.record(ctx, tx, c, "auth.passkey_removed", "passkey", id.String(), nil); err != nil {
+			return err
+		}
+		return s.tellOfChange(ctx, tx, c.UserID)
 	})
 }
 

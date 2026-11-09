@@ -426,6 +426,10 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	if a.cfg.Role.RunsAPI() {
 		a.announceSetup(ctx)
 	}
+	if a.cfg.PlainToOthers() {
+		a.log.Warn("DIFFLUENCE_PUBLIC_URL is plain http on another host: cookies go without Secure and no HSTS is sent. Set it to the https address people use.",
+			"public_origin", a.cfg.PublicOrigin())
+	}
 
 	var runErr error
 	select {

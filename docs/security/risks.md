@@ -55,7 +55,7 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 
 **What you should do:**
 
-1. **Keep it off the open internet** where you can: use a VPN or an internal network. If it must be reachable, put it behind HTTPS.
+1. **Keep it off the open internet** where you can: use a VPN or an internal network. If it must be reachable, put it behind HTTPS. The reference Compose file listens on this machine only, for a proxy beside it, and the app warns at start and in the console when its public address is plain http.
 2. **Watch for updates yourself.** Follow the releases and security advisories of this repository, and update soon after a fix. Nobody will warn you personally.
 3. **Update the rest too:** the operating system, Docker, PostgreSQL and every helper.
 4. **Make backups, and test restoring them.** Keep the backup key apart from the backups. Without it, a backup cannot be read. See [backup and restore](../operations/backup-restore.md).
@@ -76,7 +76,7 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 - **Think before sharing.** Whoever has a public link can read the page. Whatever people download or export is out of reach of Diffluence.
 - **Be careful with attachments.** A file from a colleague can still be harmful. Open it as you would an attachment in an e-mail.
 - **Watch out for false messages.** A mail that asks you to log in may not come from Diffluence. Check the address, and go to the site yourself.
-- **Protect your account.** Use a passkey, or an authenticator app. Log out on a shared computer.
+- **Protect your account.** Use a passkey, or an authenticator app. Log out on a shared computer. You get a mail when your password, second factor or a passkey changes: if that was not you, tell your administrator at once.
 - **Report anything odd** to your administrator: a page you should not see, a login you do not recognise.
 
 ## Research

@@ -68,10 +68,42 @@ func TestAResetMailGoesThroughTheQueueWithItsLinkSealed(t *testing.T) {
 	if resp, out := e.do(e.client(), "POST", "/api/v1/auth/reset", string(body)); resp.StatusCode != 204 {
 		t.Fatalf("reset: %d %s", resp.StatusCode, out)
 	}
+	// The reset itself is a change to the sign-in, and the person hears of it (SEC-127).
+	if n, err := queue.RunOnce(ctx); n != 1 || err != nil {
+		t.Fatalf("sent %d after the reset: %v", n, err)
+	}
 	var left int
 	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM mail_queue WHERE sealed IS NOT NULL").Scan(&left); err != nil || left != 0 {
 		t.Fatalf("%d sealed mails stayed behind: %v", left, err)
 	}
+}
+
+// SEC-127: a person hears of every change to a way into their account (ASVS 6.3.7), also
+// when an administrator makes it.
+func TestAPersonIsToldOfEveryChangeToTheirSignIn(t *testing.T) {
+	e := newEnv(t)
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+	root := admin(e)
+	f, queue := withQueuedMail(e)
+	ctx := context.Background()
+	told := func(what string) {
+		t.Helper()
+		before := len(f.sent)
+		if _, err := queue.RunOnce(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if len(f.sent) != before+1 || f.sent[len(f.sent)-1].To != anna.email || !strings.Contains(f.sent[len(f.sent)-1].Subject, "sign-in changed") {
+			t.Fatalf("%s: the person was not told: %+v", what, f.sent[before:])
+		}
+	}
+	anna.enrolTOTP()
+	told("a second factor added")
+	anna.ok("POST", "/api/v1/me/totp/disable", map[string]any{"password": adminPassword})
+	told("a second factor removed")
+	anna.ok("POST", "/api/v1/me/password", map[string]any{"current_password": adminPassword, "new_password": "another fine passphrase here"})
+	told("a new password")
+	root.ok("POST", "/api/v1/admin/users/"+anna.id+"/reset-password", map[string]any{"password": "a passphrase the admin chose"})
+	told("a password set by an administrator")
 }
 
 func TestAnInvitationGoesThroughTheQueueToSomeoneWithoutAnAccount(t *testing.T) {

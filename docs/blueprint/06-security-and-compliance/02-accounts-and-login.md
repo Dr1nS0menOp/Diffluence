@@ -19,7 +19,7 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-110** · new · Medium. NIST asks to stop an authenticator after at most 100 failures in a row, and that count has to survive a restart. Store it in the database when SEC-109 is done.
 - **SEC-111** · new · Anyone who knows an address can keep that person out of password login for 15 minutes, because the limit counts per account. Passkeys and single sign-on still work. ASVS 6.1.1 asks to document how brute force is stopped *without enabling malicious lockout*. Decide and document. Low.
 - **SEC-112** · built · Medium. Nothing limits how many password hashes run at once. Each takes 19 MiB, and 50 tries per address means many addresses can use a lot of memory. A small queue in front of hashing keeps memory bounded (ASVS 15.2.2). Belongs in phase 3.
-- **SEC-113** · new · Medium. `POST /me/totp/disable` checks the password but has no limit, unlike the routes for changing a password and starting TOTP. Someone with a stolen session can use it to guess the password. Add the same limit. Belongs in wave F.
+- **SEC-113** · built · Medium. `POST /me/totp/disable` checks the password but has no limit, unlike the routes for changing a password and starting TOTP. Someone with a stolen session can use it to guess the password. Add the same limit. Belongs in wave F. Built (spec 042): `TestTurningOffTOTPCannotBeUsedToGuessThePassword`.
 - **SEC-114** · built · Password fields use `type="password"` and the right `autocomplete`, and paste is not blocked (ASVS 6.2.6, 6.2.7).
 - **SEC-115** · built · Changing a password needs the current one, and ends all other sessions (ASVS 6.2.3).
 - **SEC-116** · partly · An administrator sets a new password for someone, so the administrator knows it, and it can stay in use. ASVS 6.4.6 (Level 3) wants a reset without that. Once wave F has reset mail, this route should send a link when mail is set up, and the person must choose their own password (ASVS 6.4.1).
@@ -32,11 +32,10 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-121** · built · A code works once: the time step must be newer than the last one used. One step of clock difference is allowed either way, and only the server's clock counts (ASVS 6.5.1, 6.5.5, 6.5.8).
 - **SEC-122** · built · The second step needs a one-time challenge from a correct password. It dies after 5 wrong codes or 5 minutes.
 - **SEC-123** · built · Setting up an authenticator needs the password, so a stolen session alone cannot do it. Nothing takes effect until a first code is confirmed.
-- **SEC-124** · partly · Recovery codes are random and single-use, and using one is audited. But each has 80 bits and is stored as a plain SHA-256. ASVS 6.5.2 says secrets under 112 bits must be salted and hashed with a password hashing function. Medium. Make them 128 bits, which keeps a plain hash acceptable. Belongs in wave F.
+- **SEC-124** · built · Recovery codes are random and single-use, and using one is audited. But each has 80 bits and is stored as a plain SHA-256. ASVS 6.5.2 says secrets under 112 bits must be salted and hashed with a password hashing function. Medium. Make them 128 bits, which keeps a plain hash acceptable. Belongs in wave F. Built: `TestARecoveryCodeHolds128Bits`.
 - **SEC-125** · built · TOTP stays offered next to passkeys. It is not phishing resistant, so passkeys are the route people are pushed towards (SEC-160).
 - **SEC-126** · built · Medium. Removing a factor leaves other sessions running, both when a person does it and when an administrator resets it. ASVS 7.4.3 asks to at least offer ending them. An attacker with a session should not outlive the reset of the account. Belongs in wave F.
-- **SEC-127** · wave C · A person is told by mail when a password, factor or passkey changes (ASVS 6.3.7). Spec 010 builds the mail, and spec 013 the events. Check that the message exists for each change.
-
+- **SEC-127** · built · A person is told by mail when a password, factor or passkey changes (ASVS 6.3.7). Spec 010 builds the mail, and spec 013 the events. Check that the message exists for each change. Built (spec 042): one mail for a new or changed password (also by an administrator or a reset link), a second factor turned on or off, and a passkey added or removed, `TestAPersonIsToldOfEveryChangeToTheirSignIn`.
 ## 2.3 Passkeys
 
 **What can go wrong:** a stolen security key without a PIN opens the account, a stolen session adds its own passkey, a passkey for another site is accepted, a list of credentials shows who has an account.
@@ -68,8 +67,7 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-150** · built · A step-up for accounts of a provider goes through a fresh login with `prompt=login`. The response must then be checked for `auth_time`, or a provider that ignores the prompt passes (ASVS 6.8.4). Spec 013 does not say so yet.
 - **SEC-151** · new · A group from the provider can hold *administrator*, so whoever controls the provider controls this instance. That can be intended. The console should show it plainly, and the audit log shows who joined. Low. Belongs in wave F.
 - **SEC-152** · built · `OIDC_AUTO_CREATE` is on by default, so everyone at the provider can get an account. The install guide should say so. Refuse an `http` issuer outside local testing. Low.
-- **SEC-153** · new · The cookie for the flow has no `__Secure-` prefix on https (ASVS 3.3.1). Low. Belongs in wave F.
-
+- **SEC-153** · built · The cookie for the flow has no `__Secure-` prefix on https (ASVS 3.3.1). Low. Belongs in wave F. Built (spec 042): `TestTheLoginFlowCookieIsSecureByNameOnHTTPS`.
 ## 2.5 Provisioning with SCIM
 
 **What can go wrong:** a stolen token creates or disables people, moves them into groups, or reads the list of everyone.
@@ -78,9 +76,8 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-156** · built · Medium. Tokens never expire. RFC 7644 says bearer tokens must have a limited lifetime that the provider can check. Add `expires_at`, a date chosen at creation (default one year), a warning in the console, and a rotation that lets two tokens overlap (ASVS 7.2.2, 13.3.4). Belongs in wave F, with the other tokens.
 - **SEC-157** · built · Filters that are not understood are refused, not ignored, and SCIM cannot set a password.
 - **SEC-158** · built · A disabled person loses their sessions at once.
-- **SEC-159** · partly · A SCIM call runs as a system caller, so the check that keeps one administrator does not apply: a provider can disable every administrator. The way back is `user create-admin` on the host. Accepted, and it should be in the guide.
-- **SEC-161** · partly · RFC 7644 advises against personal data in query strings, and providers filter on e-mail with `GET`. We keep to what providers send. Query strings are never logged, so the address stays out of our logs. Proxies must do the same, and the guide should say so.
-
+- **SEC-159** · built · A SCIM call runs as a system caller, so the check that keeps one administrator does not apply: a provider can disable every administrator. The way back is `user create-admin` on the host. Accepted, and it should be in the guide. Built: in `docs/operations/identity-providers.md` (spec 042).
+- **SEC-161** · built · RFC 7644 advises against personal data in query strings, and providers filter on e-mail with `GET`. We keep to what providers send. Query strings are never logged, so the address stays out of our logs. Proxies must do the same, and the guide should say so. Built: in `docs/operations/identity-providers.md` (spec 042).
 ## 2.6 Pushing people to stronger login
 
 The product owner's decision (ADR-026): push people towards a second factor and passkeys, and administrators towards an identity provider and passkeys.
@@ -88,8 +85,7 @@ The product owner's decision (ADR-026): push people towards a second factor and 
 - **SEC-160** · built · A person without a second factor or passkey gets a clear prompt after login and in their account. They can put it off, but not switch it off for good.
 - **SEC-162** · built · An administrator sees a warning in the console while no identity provider is set up, and while they have no passkey themselves.
 - **SEC-163** · built · An administrator can require a second factor for administrators or for all members (ACC-015). NIST requires at least one phishing-resistant option at its middle level, which passkeys are.
-- **SEC-164** · new · Administrators get the requirement by default on a new instance: a grace period, then the console needs a second factor. This is the logical end of ADR-026. Decision for the product owner.
-
+- **SEC-164** · built · Administrators get the requirement by default on a new instance: a grace period, then the console needs a second factor. This is the logical end of ADR-026. Decision for the product owner. Built: `TestAdministratorsNeedASecondFactorAfterTheGracePeriod`.
 ## 2.7 Sessions
 
 **What can go wrong:** a stolen cookie, a session that lives too long, a session that survives a change that should end it, a token in a log.
@@ -103,7 +99,7 @@ The product owner's decision (ADR-026): push people towards a second factor and 
 - **SEC-176** · partly · The idle limit is 8 hours and the absolute limit 7 days, both configurable. NIST advises 1 hour and 24 hours at its middle level, so these defaults are those of its lowest level. ASVS 7.1.1 asks to document a deviation with a reason. Decision for the product owner.
 - **SEC-177** · partly · A person sees their sessions and ends any of them (ASVS 7.5.2). One button that ends all others is missing. Belongs in wave F.
 - **SEC-178** · built · An administrator can end the sessions of one person or of everyone, without disabling them, for example during an incident (ASVS 7.4.5). Belongs in wave F.
-- **SEC-179** · new · There is no limit on sessions per person. That is fine, but ASVS 7.1.2 asks to write it down, and the Sessions screen shows them. Low.
+- **SEC-179** · built · There is no limit on sessions per person. That is fine, but ASVS 7.1.2 asks to write it down, and the Sessions screen shows them. Low. Built: in `docs/operations/identity-providers.md` (spec 042).
 - **SEC-180** · built · Background requests do not keep a session alive, or the polling of wave C would make the idle limit meaningless (spec 013, D8).
 - **SEC-181** · later · Sessions are not tied to an address or browser. OWASP says such a binding cannot be relied on alone, and phones change address all day. A change of country can become a warning later.
 - **SEC-182** · built · Session tokens are never in a URL, and the access log leaves query strings out.
@@ -117,6 +113,6 @@ The product owner's decision (ADR-026): push people towards a second factor and 
 - **SEC-187** · built · A reset link has a hashed random token, works once, lasts an hour, and always gets the same answer with equal timing. It ends all sessions and logs nobody in (ASVS 6.4.3, 6.3.8).
 - **SEC-188** · built · The second factor still applies after a reset. Losing a factor goes through an administrator, who must check who is asking (ASVS 6.4.3, 6.4.4). The guide must say how.
 - **SEC-189** · built · Links in mail are built from `DIFFLUENCE_PUBLIC_URL`, never from the `Host` header, or a forged request could send a victim a reset link to an attacker's site. Spec 013 should say this in so many words, with a test.
-- **SEC-190** · wave F · Reset and invitation are limited per address and per account, so nobody can be flooded with mail.
+- **SEC-190** · built · Reset and invitation are limited per address and per account, so nobody can be flooded with mail. Built (spec 042): per address, and at most 3 reset or sign-up mails per recipient in 15 minutes from any address, with the same answer either way, `TestResetMailToOnePersonStopsAtALimitFromAnyAddress`.
 - **SEC-191** · built · Invitations expire. Self sign-up is off by default and limited to chosen domains. Guests can have an end date.
 - **SEC-192** · new · An address can only change through the provider today: a local account has no way to change it, not even through an administrator. If wave F adds that, it needs a step-up, a confirmation at the new address and a notice to the old one, because the address is what `Login` matches on.

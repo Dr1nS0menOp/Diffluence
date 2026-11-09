@@ -153,7 +153,7 @@ func (s *Server) handleOIDCStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Lax on purpose: this cookie must come back on the redirect from the provider.
-	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Value: binding, Path: "/api/v1/auth/oidc", HttpOnly: true,
+	http.SetCookie(w, &http.Cookie{Name: s.flowCookie, Value: binding, Path: "/api/v1/auth/oidc", HttpOnly: true,
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: 600})
 	http.Redirect(w, r, url, http.StatusFound)
 }
@@ -164,10 +164,10 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	binding := ""
-	if c, err := r.Cookie(oidcCookie); err == nil {
+	if c, err := r.Cookie(s.flowCookie); err == nil {
 		binding = c.Value
 	}
-	http.SetCookie(w, &http.Cookie{Name: oidcCookie, Value: "", Path: "/api/v1/auth/oidc", MaxAge: -1, HttpOnly: true, Secure: s.deps.Config.SecureCookies()})
+	http.SetCookie(w, &http.Cookie{Name: s.flowCookie, Value: "", Path: "/api/v1/auth/oidc", MaxAge: -1, HttpOnly: true, Secure: s.deps.Config.SecureCookies()})
 	q := r.URL.Query()
 	if code := q.Get("error"); code != "" {
 		if err := s.deps.SSO.Refused(r.Context(), q.Get("state"), code, metaFrom(r)); err != nil {
@@ -319,6 +319,11 @@ func (s *Server) handleTOTPDisable(w http.ResponseWriter, r *http.Request) {
 	var in passwordBody
 	if decodeJSON(w, r, 4<<10, &in) != nil {
 		badBody(w)
+		return
+	}
+	// The same count as every other route that checks the password, so a stolen session cannot guess it here (SEC-113).
+	if !s.loginByAcc.allow("pw:" + PrincipalFrom(r.Context()).User.ID.String()) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Try again later.")
 		return
 	}
 	if err := s.deps.Identity.DisableTOTP(r.Context(), s.caller(r), in.Password); err != nil {

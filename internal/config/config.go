@@ -109,6 +109,21 @@ type OIDC struct {
 // SecureCookies reports whether cookies must carry the Secure flag.
 func (c Config) SecureCookies() bool { return c.PublicURL.Scheme == "https" }
 
+// PlainToOthers reports whether the public address is plain http on a host other than this
+// machine. Cookies then go without Secure and no HSTS is sent, which is only right for a trial
+// on one's own machine (SEC-257).
+func (c Config) PlainToOthers() bool {
+	if c.SecureCookies() {
+		return false
+	}
+	host := c.PublicURL.Hostname()
+	if strings.EqualFold(host, "localhost") {
+		return false
+	}
+	ip, err := netip.ParseAddr(host)
+	return err != nil || !ip.IsLoopback()
+}
+
 // KeyFile is where the master key lives.
 func (c Config) KeyFile() string {
 	if c.MasterKeyFile != "" {

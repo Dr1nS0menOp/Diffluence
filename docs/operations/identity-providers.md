@@ -47,7 +47,9 @@ Any provider with discovery, the code flow and PKCE should work. For a groups cl
 - Disabling a user ends their sessions at once, for every login method.
 - Deleting a user through SCIM disables the account. Their content and audit trail stay.
 - Groups from SCIM or OIDC are read-only in the admin console.
-- If a provider removes the last administrator, `diffluence user create-admin` is the way back.
+- If a provider removes the last administrator, `diffluence user create-admin` is the way back. SCIM acts as the system, so the rule that keeps one administrator does not stop it: a provider can disable every administrator, and only someone with the host can undo that (SEC-159).
+- Providers look people up by e-mail address with `GET /scim/v2/Users?filter=...`, so the address sits in the query string, as RFC 7644 allows but advises against. Diffluence never logs query strings. **Your reverse proxy must not log them either**: log the path only, or turn access logs off for `/scim/v2` (SEC-161).
+- A SCIM filter is understood whole or refused: only `eq` on the attributes a route reads, joined by `and`.
 
 ## How long a login lasts
 
@@ -56,6 +58,7 @@ A login through a provider opens a session here, and from then on the two run ap
 - **Ending a session at the provider does not end it here.** It runs until its idle limit (8 hours by default) or its absolute limit (7 days), unless SCIM disables the person, which ends it at once. Set `DIFFLUENCE_SESSION_IDLE_TIMEOUT` shorter if that matters, and use SCIM so leaving the organisation counts here straight away.
 - **Asking for proof again** before a heavy action sends a person back to the provider for a fresh login.
 - **A provider with a shorter session** does not shorten ours. Choose the limits here with the provider's in mind, and write the choice down.
+- **There is no limit on the number of sessions per person** (ASVS 7.1.2). A person sees every session under Account, Sessions, and ends any of them there (SEC-179).
 
 ## Who gets an account
 

@@ -13,7 +13,7 @@ All of this is planned in waves C and H. The study below is for what those waves
 - **SEC-404** · built · People pickers for mentions follow the rules of the directory: `GET /pages/{id}/mention-candidates` must not show a guest everyone in the company.
 - **SEC-405** · built · Comments pass an allow-list of their own, and search finds them only through the access rule.
 - **SEC-406** · built · A comment made while editing stays visible to editors only until the page is published.
-- **SEC-407** · new · **Medium.** An inline comment stores the words it points at, as the W3C annotation model does, and shows them after they are gone (COL-018). The model itself warns about copying text. When someone removes a secret from a page, or an administrator removes a version (PAG-096), that text lives on in the anchors. Removing a version must also blank the anchors that quote it. Belongs in waves C and D.
+- **SEC-407** · built · **Medium.** An inline comment stores the words it points at, as the W3C annotation model does, and shows them after they are gone (COL-018). The model itself warns about copying text. When someone removes a secret from a page, or an administrator removes a version (PAG-096), that text lives on in the anchors. Removing a version must also blank the anchors that quote it. Belongs in waves C and D. Built: `TestRemovingAVersionBlanksTheQuotesThatHoldIt`, with mutations.
 - **SEC-408** · built · Share never grants access by itself. A person with the right permission can grant it, and that is audited (COL-043).
 - **SEC-409** · built · An access request reveals nothing about a page a person cannot see, unless a space chooses to allow that (COL-049). Every step is audited.
 
@@ -22,14 +22,14 @@ All of this is planned in waves C and H. The study below is for what those waves
 **What can go wrong:** mail goes out in the clear, a title with a line break adds a header, a mail holds what the person may no longer see, a slow server stops the app, someone's mailbox is flooded, a mail is forged.
 
 - **SEC-415** · built · TLS is required, by STARTTLS or from the first byte. Plain text is only for a local relay, by explicit setting. A server that does not offer STARTTLS fails, and never falls back (ASVS 12.2.1, 12.3.1).
-- **SEC-416** · wave C · The certificate of the mail server is checked (ASVS 12.3.2). Spec 010 does not say so. It must be a test: a fake server with a wrong certificate.
+- **SEC-416** · built · The certificate of the mail server is checked (ASVS 12.3.2). Spec 010 does not say so. It must be a test: a fake server with a wrong certificate. Built: `TestAServerWithAWrongCertificateGetsNothing`, with a mutation.
 - **SEC-417** · built · Names and titles lose line breaks, and headers are encoded, so nothing can add a header (ASVS 1.3.11). `html/template` escapes the body.
 - **SEC-418** · built · By default mail holds a title and a link, no excerpt. An instance with sensitive content keeps it that way.
 - **SEC-419** · built · The worker sends through a queue, so a broken mail server never touches a request.
 - **SEC-420** · built · The password comes from the environment or a file, is never shown, and is not logged. Mail errors are logged without addresses.
 - **SEC-421** · built · One-click unsubscribe follows RFC 8058: a `POST` with no session, a token that identifies the person and what to stop, and `GET` changes nothing, because mail scanners follow links.
 - **SEC-422** · built · **Medium.** The unsubscribe token sits in the URL path, and the request log writes `r.URL.Path`. The comment there only keeps query strings out. So tokens in paths reach the logs: `/api/v1/mail/unsubscribe/<token>`, `/unsubscribe/<token>` and `/hooks/{token}`. Log the route pattern instead of the path, or mask those paths. Belongs in wave C, before the first such route.
-- **SEC-423** · new · RFC 8058 requires a DKIM signature that covers the unsubscribe headers. That is the mail server's job, so the mail guide must tell operators to set up SPF, DKIM and DMARC. Low. Belongs in wave C.
+- **SEC-423** · built · RFC 8058 requires a DKIM signature that covers the unsubscribe headers. That is the mail server's job, so the mail guide must tell operators to set up SPF, DKIM and DMARC. Low. Belongs in wave C. Built: in `docs/operations/install.md` (spec 042).
 - **SEC-424** · built · `mail_queue` holds whole messages with names and titles. Remove a mail when it is sent, and keep only that it was sent. Belongs in wave C, with a retention period.
 - **SEC-425** · built · Mailpit is for testing only, and catches all mail in a screen. Its screen has no login by default, so it must listen on the local machine only.
 - **SEC-426** · built · `net/smtp` is frozen, which is fine for this use: it takes no new features, and it refuses to send a password without TLS, except to the local machine. No dependency is needed.
@@ -42,8 +42,7 @@ All of this is planned in waves C and H. The study below is for what those waves
 - **SEC-431** · built · One client for all other calls, `internal/outward`: https only, an allow-list that starts empty, every resolved address checked, the connection made to the checked address, no redirects, 10 seconds, 64 KiB (ASVS 1.3.6, 13.2.4, 13.2.5, 15.3.2).
 - **SEC-432** · built · Each case in the OWASP cheat sheet is a test: private ranges, link-local and the cloud metadata address `169.254.169.254`, IPv6 local ranges, addresses mapped into IPv6, a name with one good and one bad address, a name that changes between check and connect.
 - **SEC-433** · built · The cheat sheet also asks for a firewall on the way out. The operations guide should give the rule: the app may reach PostgreSQL, the mail server, the identity provider, allowed hosts and the optional services, and nothing else. Medium. Belongs in wave H.
-- **SEC-434** · new · OIDC discovery uses the library's own client and follows redirects. An administrator sets that address, so the risk is small. Keep it out of `internal/outward`, and say so in the code. Low.
-
+- **SEC-434** · built · OIDC discovery uses the library's own client and follows redirects. An administrator sets that address, so the risk is small. Keep it out of `internal/outward`, and say so in the code. Low. Built: said in `internal/sso/sso.go` (spec 042).
 ## 5.4 Webhooks and automation
 
 **What can go wrong:** a webhook carries content to someone who lost access, a delivery is replayed, a secret leaks, a rule loops forever, a rule does what its owner may not.
@@ -51,7 +50,7 @@ All of this is planned in waves C and H. The study below is for what those waves
 - **SEC-440** · built · Webhooks are signed the way the Standard Webhooks specification describes: HMAC-SHA256 over id, timestamp and body, with two signatures during a rotation. Receivers check the time, which stops a replay.
 - **SEC-441** · built · Secrets are sealed by `internal/keys`, and shown once.
 - **SEC-442** · built · Each delivery checks the access of the webhook's owner, so a person who lost access stops getting content.
-- **SEC-443** · new · The body of a webhook should hold ids and a little context, not page text, unless an administrator chooses more. A receiver is a copy outside our rules. Medium. Spec 015 should say what is in a body.
+- **SEC-443** · built · The body of a webhook should hold ids and a little context, not page text, unless an administrator chooses more. A receiver is a copy outside our rules. Medium. Spec 015 should say what is in a body. Built: `TestAWebhookIsSignedAndHoldsNoText`.
 - **SEC-444** · built · An endpoint that keeps failing is switched off, and the owner is told.
 - **SEC-445** · built · An incoming trigger is a public route with a 256-bit token stored hashed, which can only start that one rule. See SEC-422 for the log.
 - **SEC-446** · built · A rule acts with the rights of its owner, checked when it runs, and stops when the owner loses them or is disabled. A rule that triggers itself is stopped. Every action is audited.
