@@ -135,6 +135,10 @@ jobs:
           node-version: 22
       - name: fuzz the parsers
         run: make fuzz
+      # Nine mutations break frontend rules, and their tests need the web dependencies.
+      - name: web dependencies
+        run: npm ci --no-fund --no-audit
+        working-directory: web
       - name: do the tests catch injected bugs?
         run: make mutation
       - name: can an encrypted backup be restored on a clean installation?
