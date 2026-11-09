@@ -181,12 +181,23 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 
 // handleCapabilities says in one answer which optional parts are on (ARC-071), so a screen
 // never offers what would fail. It says only whether a part is on, never where it runs.
-func (s *Server) handleCapabilities(w http.ResponseWriter, _ *http.Request) {
+func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
+	down := map[string]bool{}
+	if s.deps.HelpersDown != nil {
+		found, err := s.deps.HelpersDown(r.Context())
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		down = found
+	}
+	// A helper that is set up but did not answer its last check is not offered either,
+	// because the screen would offer what fails (ARC-071, ARC-072).
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pdf_export":     s.deps.Exchange.PDFAvailable(),
-		"office_preview": s.deps.Exchange.OfficeAvailable(),
+		"pdf_export":     s.deps.Exchange.PDFAvailable() && !down["pdf"],
+		"office_preview": s.deps.Exchange.OfficeAvailable() && !down["office"],
 		"drawing":        s.deps.Config.DrawingOrigin() != "",
-		"collaboration":  s.deps.Config.CollabURL != "",
+		"collaboration":  s.deps.Config.CollabURL != "" && !down["collaboration"],
 	})
 }
 

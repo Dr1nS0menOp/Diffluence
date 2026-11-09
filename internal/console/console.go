@@ -107,7 +107,7 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	if !mailReady {
 		out = append(out, Item{Kind: "mail_not_set"})
 	}
-	var failed, expiring, removal, oldNodes, tokens, gaveUp, waiting, orphaned, invitations int
+	var failed, expiring, removal, oldNodes, tokens, gaveUp, waiting, orphaned, invitations, helpersDown int
 	var damaged bool
 	err := s.pool.QueryRow(ctx, `SELECT
 			(SELECT count(*) FROM jobs WHERE status = 'failed'),
@@ -123,9 +123,10 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 			(SELECT count(*) FROM (`+orphanedRestrictions+`) orphaned),
 			(SELECT count(*) FROM outbox_events WHERE published_at IS NULL AND created_at < now() - interval '1 day'),
 			(SELECT count(*) FROM invitation_requests WHERE status = 'waiting'),
+			(SELECT count(*) FROM helper_health WHERE NOT ok),
 			COALESCE((SELECT a.result <> 'success' FROM audit_events a
 				WHERE a.action = 'audit.verified' AND a.actor_id = 'worker' ORDER BY a.seq DESC LIMIT 1), false)`,
-		expiryWarning, staleNodeMinute, tokenWarning).Scan(&failed, &expiring, &removal, &oldNodes, &tokens, &gaveUp, &orphaned, &waiting, &invitations, &damaged)
+		expiryWarning, staleNodeMinute, tokenWarning).Scan(&failed, &expiring, &removal, &oldNodes, &tokens, &gaveUp, &orphaned, &waiting, &invitations, &helpersDown, &damaged)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +143,8 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	add("invitations_waiting", invitations)
 	add("events_failed", gaveUp)
 	add("restrictions_orphaned", orphaned)
+	// An optional helper that stopped answering, from the worker's minute check (ARC-072).
+	add("helpers_down", helpersDown)
 	// The stream forgets after 7 days, so this warns while there is time (ARC-053).
 	add("events_waiting", waiting)
 	// The result of the daily job: pressing Verify cannot take this away (SEC-814).

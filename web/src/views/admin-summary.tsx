@@ -50,6 +50,7 @@ const ATTENTION_LINKS: Record<string, string> = {
   no_passkey: '/me/security',
   tokens_expiring: '/admin/scim',
   invitations_waiting: '/admin/invitations',
+  helpers_down: '/admin/system',
   events_failed: '/admin/care',
   events_waiting: '/admin/care',
   audit_damaged: '/admin/audit',

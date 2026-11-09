@@ -635,24 +635,3 @@ func ReleaseEditorsOnly(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc do
 	_, err = tx.Exec(ctx, "UPDATE comments SET editors_only = false WHERE id = ANY($1) OR parent_id = ANY($1)", opened)
 	return err
 }
-
-// Closed turns comments off for one page, or back on. Existing comments stay readable.
-func (s *Service) Closed(ctx context.Context, c identity.Caller, pageID uuid.UUID, closed bool) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.PageEdit, uuid.Nil); err != nil {
-			return err
-		}
-		spaceID, err := s.spaceOf(ctx, tx, pageID)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "UPDATE pages SET comments_closed = $2 WHERE id = $1", pageID, closed); err != nil {
-			return err
-		}
-		if _, err := audit.Record(ctx, tx, c.Event("page.comments_closed", "page", pageID.String(), spaceID.String(), map[string]any{"closed": closed})); err != nil {
-			return err
-		}
-		_, err = outbox.Enqueue(ctx, tx, "page.comments_closed", map[string]any{"page_id": pageID, "space_id": spaceID})
-		return err
-	})
-}

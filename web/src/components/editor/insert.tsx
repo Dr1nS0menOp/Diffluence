@@ -15,6 +15,7 @@ import { NodeSelection, PluginKey } from '@tiptap/pm/state';
 import { ReactRenderer } from '@tiptap/react';
 import Suggestion, { type SuggestionProps } from '@tiptap/suggestion';
 import { api, type MentionCandidate } from '../../api';
+import { offered, useCapabilities } from '../../capabilities';
 import i18n from '../../i18n';
 import {
   IconAttach,
@@ -560,7 +561,7 @@ export function InsertDialog({
 }) {
   const { t } = useTranslation();
   const [query, setQuery] = useState('');
-  const items = matchingItems(query);
+  const items = offered(matchingItems(query), useCapabilities());
   const choose = (item: InsertItem) => {
     onClose();
     item.run(editor, actions);

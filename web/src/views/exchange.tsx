@@ -16,6 +16,7 @@ import {
   type TreeNode,
 } from '../api';
 import { Dialog, ErrorNote, Field, FilePicker, Loading, formatSize } from '../components/ui';
+import { offeredNames, useCapabilities } from '../capabilities';
 import { Link } from '../router';
 
 const POLL_MS = 1500;
@@ -236,7 +237,11 @@ export function ExportDialog({
     queryKey: ['export-formats'],
     queryFn: () => api.get<{ formats: string[] }>('/export-formats'),
   });
-  const offered = (formats.data?.formats ?? []).filter((f) => f !== 'bundle');
+  // A format whose helper is off or does not answer is not offered (ARC-071).
+  const offered = offeredNames(
+    (formats.data?.formats ?? []).filter((f) => f !== 'bundle'),
+    useCapabilities(),
+  );
   const [format, setFormat] = useState('');
   const [scope, setScope] = useState<Scope>(page ? 'page' : 'space');
   const [chosen, setChosen] = useState<Set<string>>(new Set());

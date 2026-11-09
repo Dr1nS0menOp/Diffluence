@@ -198,7 +198,12 @@ func (a *App) SystemStatus(ctx context.Context) (any, error) {
 	if err := a.Ready(ctx); err != nil {
 		ready = err.Error()
 	}
+	helpers, err := a.HelperStates(ctx)
+	if err != nil {
+		return nil, err
+	}
 	return map[string]any{
+		"helpers": helpers,
 		"version": version.Version, "ready": ready, "storage": storageState, "queue_healthy": a.queue.Healthy(),
 		"nodes": nodes, "migrations_applied": applied, "contract_pending": len(pending),
 		"outbox_unpublished": unpublished, "jobs_queued": queuedJobs, "jobs_failed_7d": failedJobs,

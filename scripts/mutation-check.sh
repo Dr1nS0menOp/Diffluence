@@ -973,6 +973,16 @@ mutate "an old bundle loses what administering gave" internal/exchange/bundlein.
   's.replace("if version != bundleVersionBeforeSplit {", "if true {")' ./internal/exchange/ -run TestABundleFromBeforeTheSplitKeepsWhatAdministeringGave
 mutate "anyone reads who holds a role" internal/permissions/roles.go \
   's.replace("([]RoleHolder, int, error) {\n\tif err := s.requireAdministrator(ctx, s.pool, c); err != nil {", "([]RoleHolder, int, error) {\n\tif err := error(nil); err != nil {")' $perms -run TestHoldersOfARoleShowOnlyToAdministrators
+mutate "a write may read from a copy that lags" internal/httpapi/admission.go \
+  's.replace("if !isRead(r) {\n\t\treturn false\n\t}\n\tif classOf(r) == classHeavy {", "if classOf(r) == classHeavy {")' ./internal/httpapi/ -run TestOnlyListsAndHeavyReadsMayLag
+mutate "a helper that does not answer is still offered" internal/httpapi/handlers.go \
+  's.replace("s.deps.Exchange.PDFAvailable() && !down[\"pdf\"]", "s.deps.Exchange.PDFAvailable()")' $app -run TestAHelperThatDoesNotAnswerIsShownAndNoLongerOffered
+mutate "a viewer is offered to save a changed PDF" internal/attachments/versions.go \
+  's.replace("out[i].MayAddVersion = allowed", "out[i].MayAddVersion = true")' $app -run TestOnlySomeoneWhoMayAddFilesIsOfferedToSaveAChangedPDF
+mutate_web "any window may pose as a frame" src/components/frame-messages.ts \
+  's.replace("!!frame && event.source === frame && event.origin === origin", "!!frame && event.origin === origin")' src/components/frame-messages.test.ts
+mutate_web "the viewer may give back something that is not a PDF" src/components/craft-frame.tsx \
+  's.replace("return start === PDF_START ? bytes : null;", "return bytes;")' src/components/craft-frame.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

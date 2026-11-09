@@ -3,12 +3,13 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Attachment, type FileRow, type Me, type SearchResult } from '../api';
+import { api, type Attachment, type FileRow, type SearchResult } from '../api';
 import { OpenInCraft } from '../components/craft-frame';
 import { isTextFile, TextPreview } from '../components/file-preview';
 import { IconClose } from '../components/icons';
 import { useCopy } from '../components/toast';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { useCapabilities } from '../capabilities';
 import { useDates } from '../dates';
 
 const REMOVE_ICON_SIZE = 12;
@@ -271,8 +272,8 @@ function MoveOrCopy({
 
 function OpenAsPDF({ file }: { file: Attachment }) {
   const { t } = useTranslation();
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
-  if (!file.office || !me.data?.office_preview) return null;
+  const capabilities = useCapabilities();
+  if (!file.office || !capabilities.office_preview) return null;
   return <a href={`/api/v1/attachments/${file.id}/preview.pdf`}>{t('files.openAsPdf')}</a>;
 }
 

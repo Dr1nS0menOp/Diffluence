@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/core';
 import type { Json } from '../../api';
+import { offered, useCapabilities } from '../../capabilities';
 import { Dialog } from '../ui';
 import { DocumentView } from './editor';
 import { arrangedItems, INSERT_ITEMS, type ArrangedItem } from './insert';
@@ -120,7 +121,7 @@ export function BrowseDialog({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const items = arrangedItems(INSERT_ITEMS, []);
+  const items = arrangedItems(offered(INSERT_ITEMS, useCapabilities()), []);
   const [shown, setShown] = useState<ArrangedItem | undefined>(items[0]);
   const groups = [...new Set(items.map((item) => item.group))];
   return (

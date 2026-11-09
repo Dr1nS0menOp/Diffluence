@@ -166,6 +166,7 @@ func TestACommentIsCheckedAndStaysBehindItsPage(t *testing.T) {
 	foreign := map[string]any{"type": "doc", "content": []any{image}}
 	reader.want(400, "POST", "/api/v1/pages/"+page+"/comments", map[string]any{"body": foreign})
 
+	reader.want(403, "PATCH", "/api/v1/pages/"+page+"/comments-closed", map[string]any{"closed": true})
 	owner.ok("PATCH", "/api/v1/pages/"+page+"/comments-closed", map[string]any{"closed": true})
 	reader.want(409, "POST", "/api/v1/pages/"+page+"/comments", map[string]any{"body": commentBody("x")})
 	if len(threads(reader.ok("GET", "/api/v1/pages/"+page+"/comments", nil), "threads")) != 1 {

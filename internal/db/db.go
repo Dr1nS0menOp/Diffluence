@@ -60,11 +60,17 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 }
 
 // queryCounter counts the queries of a pool, for the query budgets of the main screens
-// (ARC-239) and for /metrics.
-type queryCounter struct{ n atomic.Int64 }
+// (ARC-239) and for /metrics, and how many of them were allowed to lag (ARC-228).
+type queryCounter struct {
+	n   atomic.Int64
+	lag atomic.Int64
+}
 
 func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
 	q.n.Add(1)
+	if FreshnessOf(ctx) == MayLag {
+		q.lag.Add(1)
+	}
 	return ctx
 }
 
@@ -75,6 +81,14 @@ func (*queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEnd
 func Queries(pool *pgxpool.Pool) int64 {
 	if counter, ok := pool.Config().ConnConfig.Tracer.(*queryCounter); ok {
 		return counter.n.Load()
+	}
+	return 0
+}
+
+// LagQueries returns how many of those queries were marked as allowed to lag.
+func LagQueries(pool *pgxpool.Pool) int64 {
+	if counter, ok := pool.Config().ConnConfig.Tracer.(*queryCounter); ok {
+		return counter.lag.Load()
 	}
 	return 0
 }

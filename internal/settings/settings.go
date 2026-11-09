@@ -116,6 +116,15 @@ func (s *Service) Read(ctx context.Context, key string, v any) error {
 	return json.Unmarshal(raw, v)
 }
 
+// Store writes one stored value inside the caller's transaction. Other modules keep
+// their own choices here through this, so only settings writes its table (ARC-027).
+// The caller audits the change and decides who may make it.
+func Store(ctx context.Context, tx pgx.Tx, key string, raw []byte) error {
+	_, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, key, raw)
+	return err
+}
+
 // Write stores one value, and audits who did it. The route decides who may.
 func (s *Service) Write(ctx context.Context, c identity.Caller, key string, v any) error {
 	raw, err := json.Marshal(v)
@@ -123,8 +132,7 @@ func (s *Service) Write(ctx context.Context, c identity.Caller, key string, v an
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, key, raw); err != nil {
+		if err := Store(ctx, tx, key, raw); err != nil {
 			return err
 		}
 		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", key, "", map[string]any{"key": key})); err != nil {

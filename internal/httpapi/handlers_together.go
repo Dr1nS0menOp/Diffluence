@@ -190,7 +190,7 @@ func (s *Server) handleCommentsClosed(w http.ResponseWriter, r *http.Request) {
 		badBody(w)
 		return
 	}
-	if err := s.deps.Comments.Closed(r.Context(), s.caller(r), id, in.Closed); err != nil {
+	if err := s.deps.Pages.SetCommentsClosed(r.Context(), s.caller(r), id, in.Closed); err != nil {
 		s.fail(w, r, err)
 		return
 	}

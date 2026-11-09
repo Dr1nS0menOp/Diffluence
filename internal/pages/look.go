@@ -4,6 +4,7 @@ package pages
 
 import (
 	"context"
+	"errors"
 	"regexp"
 	"strings"
 	"unicode"
@@ -112,4 +113,22 @@ func (s *Service) SetLook(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		return record(ctx, tx, c, "page.look_changed", out, nil)
 	})
 	return out, err
+}
+
+// SetCommentsClosed turns comments off for one page, or back on. Existing comments stay
+// readable. The switch is a column of the page, so pages writes it, not comments (ARC-027).
+func (s *Service) SetCommentsClosed(ctx context.Context, c identity.Caller, id uuid.UUID, closed bool) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {
+			return err
+		}
+		p, err := scanPage(tx.QueryRow(ctx, "UPDATE pages SET comments_closed = $2 WHERE id = $1 RETURNING "+pageColumns, id, closed))
+		if errors.Is(err, pgx.ErrNoRows) {
+			return apperr.NotFound()
+		}
+		if err != nil {
+			return err
+		}
+		return record(ctx, tx, c, "page.comments_closed", p, map[string]any{"closed": closed})
+	})
 }

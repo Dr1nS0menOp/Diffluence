@@ -230,7 +230,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			SCIM: a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
-			SystemStatus: a.SystemStatus, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
+			SystemStatus: a.SystemStatus, HelpersDown: a.HelpersDown, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
 			InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
@@ -592,6 +592,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "purge-imports", Every: time.Hour, Run: a.exchange.PurgeImports},
 		{Name: "build-sites", Every: time.Minute, Run: a.sites.RunDue},
 		{Name: "build-sites-daily", Every: 24 * time.Hour, Run: a.sites.RunDaily},
+		{Name: "check-helpers", Every: time.Minute, Run: a.checkHelpers},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

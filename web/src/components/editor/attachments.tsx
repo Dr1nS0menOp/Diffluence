@@ -78,6 +78,7 @@ function ResizeCorner({
 
 interface FileFacts extends PreviewFile {
   size: number;
+  may_add_version: boolean;
 }
 
 /** Null means the file is gone or hidden, which look the same on purpose. */
@@ -327,7 +328,11 @@ function FileTile({ node, editor, extension }: ReactNodeViewProps) {
             {label}
             <IconDownload size={DOWNLOAD_ICON_SIZE} />
           </a>
-          <OpenInCraft file={{ filename }} address={fileAddress(id)} />
+          <OpenInCraft
+            file={{ filename }}
+            address={fileAddress(id)}
+            versionOf={facts.data?.may_add_version ? id : undefined}
+          />
           {facts.data && (
             <button
               type="button"

@@ -100,6 +100,8 @@ type Deps struct {
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)
+	// HelpersDown names the optional helpers that did not answer the last check (ARC-072).
+	HelpersDown func(ctx context.Context) (map[string]bool, error)
 	// Gauges reads the numbers that /metrics shows beside the request counters.
 	Gauges func(ctx context.Context) []metrics.Gauge
 	// CheckAudit verifies the audit chain and the signed checkpoints.
@@ -173,6 +175,8 @@ func New(d Deps) (*Server, error) {
 		cop.Handler,
 		s.withAuthentication,
 		withPermissionMemo,
+		// After authentication, so a session is always read current (ARC-228).
+		withReadFreshness,
 		s.withMaintenance,
 	)
 	return s, nil

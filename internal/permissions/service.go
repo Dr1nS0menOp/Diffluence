@@ -24,6 +24,8 @@ func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
 // LoadUser reads what evaluation needs to know about a user.
 func (s *Service) LoadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
+	// Facts decide access, so they are always read current (ARC-228).
+	ctx = db.MustBeCurrent(ctx)
 	m := memoOf(ctx)
 	if u, ok := m.user(id); ok {
 		return u, nil
@@ -65,6 +67,8 @@ func (s *Service) loadUser(ctx context.Context, q db.Querier, id uuid.UUID) (Use
 
 // LoadSpace reads a space and its grants.
 func (s *Service) LoadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {
+	// Facts decide access, so they are always read current (ARC-228).
+	ctx = db.MustBeCurrent(ctx)
 	m := memoOf(ctx)
 	if f, ok := m.space(id); ok {
 		return f, nil
@@ -99,6 +103,8 @@ func (s *Service) loadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (Sp
 
 // LoadPage reads a page, its space and the restrictions that apply to it.
 func (s *Service) LoadPage(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, PageFacts, error) {
+	// Facts decide access, so they are always read current (ARC-228).
+	ctx = db.MustBeCurrent(ctx)
 	p := PageFacts{ID: id}
 	var spaceID uuid.UUID
 	err := q.QueryRow(ctx, "SELECT space_id, status, created_by, kind, archived_at IS NOT NULL FROM pages WHERE id = $1", id).

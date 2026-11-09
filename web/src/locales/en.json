@@ -1203,9 +1203,13 @@
     "type_text": "Text"
   },
   "craft": {
+    "changed": "You saved a changed version in the viewer.",
     "download": "Download the file",
+    "notPdf": "The viewer gave back something that is not a PDF, so nothing was stored.",
+    "saveVersion": "Keep it as a new version",
+    "saved": "Stored as a new version of this file.",
     "frame": "{{name}}, opened in a viewer",
-    "note": "This viewer is a picture for a screen reader. Changes stay in this window until you save them there as a download.",
+    "note": "This viewer is a picture for a screen reader. A change you save there is a download, and comes back here to keep as a new version when you may add files.",
     "open": {
       "gridcraft": "Open in GridCraft",
       "pdfcraft": "Open in PdfCraft"
@@ -2318,6 +2322,8 @@
     "item_nodes_differ": "Nodes run different versions.",
     "item_tokens_expiring_one": "{{count}} token ends within a month.",
     "item_tokens_expiring_other": "{{count}} tokens end within a month.",
+    "item_helpers_down_one": "{{count}} optional helper does not answer, so what it does is not offered.",
+    "item_helpers_down_other": "{{count}} optional helpers do not answer, so what they do is not offered.",
     "item_restrictions_orphaned_one": "{{count}} restricted page has nobody left who can open it.",
     "item_restrictions_orphaned_other": "{{count}} restricted pages have nobody left who can open them.",
     "item_events_failed_one": "{{count}} event could not be handled.",

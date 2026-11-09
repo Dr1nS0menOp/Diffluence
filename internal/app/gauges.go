@@ -33,6 +33,8 @@ func (a *App) Gauges(ctx context.Context) []metrics.Gauge {
 		{Name: "diffluence_db_pool_idle_connections", Help: "Database connections waiting for work.", Value: float64(stat.IdleConns())},
 		{Name: "diffluence_db_pool_max_connections", Help: "The largest the pool may get.", Value: float64(stat.MaxConns())},
 		{Name: "diffluence_db_queries_total", Help: "Queries this node sent since it started.", Value: float64(db.Queries(a.pool))},
+		// The share that could move to a standby, measured before one exists (ARC-228).
+		{Name: "diffluence_db_queries_may_lag_total", Help: "Of those, the queries that may read from a copy that lags.", Value: float64(db.LagQueries(a.pool))},
 	}
 	ctx, cancel := context.WithTimeout(ctx, gaugeTimeout)
 	defer cancel()

@@ -6,8 +6,8 @@ The product owner chose these in ADR-026. They are separate programs, so their l
 
 - **ARC-069** · built · A helper is switched on by an address in the configuration. Nothing is found by itself.
 - **ARC-070** · built · Without its address the feature is absent, not broken: the menu entry is gone, and the administrator's screen says what to install. This is the rule of NAV-004 applied to helpers.
-- **ARC-071** · partly · A new route `GET /system/capabilities` tells the frontend what is on, so a screen never offers what would fail. Built: the route, which says only whether PDF export, office previews, drawing and editing together are on, never where they run (spec 032). Still open: the frontend reads it, instead of the separate answers it reads today.
-- **ARC-072** · partly · A helper never blocks `/readyz`. A wiki that cannot make a PDF is still a wiki. The console shows its health, from a check by the worker every minute. Still open: the health of a helper in the console.
+- **ARC-071** · built · A new route `GET /system/capabilities` tells the frontend what is on, so a screen never offers what would fail. Built: the route, which says only whether PDF export, office previews, drawing and editing together are on, never where they run (spec 032). Every screen reads it through one hook, `web/src/capabilities.ts`: the slash menu, the insert dialog, the block browser, the file preview, the PDF button and the export formats. A helper the worker last found not answering counts as off (spec 039).
+- **ARC-072** · built · A helper never blocks `/readyz`. A wiki that cannot make a PDF is still a wiki. The console shows its health, from a check by the worker every minute. Built: the task `check-helpers` keeps one row per configured helper in `helper_health`, the console warns while one does not answer, and the system screen shows each by name, never by address (spec 039).
 - **ARC-073** · built · The server calls helpers only from the worker, with a timeout, and one failure becomes a clear sentence in that job. Requests never wait for a helper.
 - **ARC-074** · built · Helpers sit on an internal network, and get no route to the internet. They get what a job sends them, and nothing else.
 - **ARC-075** · built · A helper's address is the operator's choice, so it is configuration, not a setting in the console. A setting in the console would let an administrator point the server at any host on the inside network.
@@ -59,7 +59,7 @@ Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the b
 - **ARC-096** · built · Our headers forbid it as it stands. Every answer says `X-Frame-Options: DENY`, `frame-ancestors 'none'` and `Cross-Origin-Resource-Policy: same-origin`, the app policy has no `frame-src`, and WebAssembly needs `'wasm-unsafe-eval'`. The viewer gets its own path and its own headers, and the app policy stays as strict as it is.
 - **ARC-097** · built · The frame is `sandbox="allow-scripts"`, **without** `allow-same-origin`. On our own origin those two together let the frame remove its own sandbox. So the viewer gets an opaque origin: no cookies, no session, and no access to the API.
 - **ARC-098** · built · The app fetches the file itself, and hands the bytes over with `postMessage`. An opaque origin needs the exact-origin rules of ARC-112, and its `'self'` may not match, so the viewer's policy names our address.
-- **ARC-099** · partly · A changed PDF comes back the same way, and is stored through the normal upload as a new version of the attachment, with all its checks. The viewer itself can write nothing. Still open: a changed PDF comes back only as a download.
+- **ARC-099** · built · A changed PDF comes back the same way, and is stored through the normal upload as a new version of the attachment, with all its checks. The viewer itself can write nothing. Built: when the viewer saves, our host script in the frame passes the bytes of the download to the page. The page offers to keep them only to someone who may add files, and only when they start as a PDF (spec 039).
 - **ARC-100** · built · The files ship in the binary only if they are small. If not, they are a folder an operator adds, and the block is absent without it.
 
 ## 4.6 Diagrams with draw.io
@@ -77,7 +77,7 @@ Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the b
 - **ARC-108** · built · The list of frame sources comes only from configuration. BLK-068, frames for any address, stays later and needs its own allow-list.
 - **ARC-109** · built · No frame ever gets `allow-top-navigation`, and `allow-popups` only if a helper proves it needs it.
 - **ARC-110** · built · `Trusted Types` stay on for the app. A helper's frame has its own document, so a helper never forces a weaker policy on us.
-- **ARC-111** · partly · One small module handles all frames: it opens one, posts to one origin, and validates messages. Three copies of this code would drift. Still open: the drawing frame and the craft frame each keep their own code.
+- **ARC-111** · built · One small module handles all frames: it opens one, posts to one origin, and validates messages. Three copies of this code would drift. Built: `web/src/components/frame-messages.ts`, used by the drawing frame and the viewer frame. A browser test posts a message from the page itself and proves it is ignored (spec 039).
 - **ARC-112** · built · Every message to a frame names its exact origin, never `*`. Every message received checks `origin` and `source`, then checks its shape. A listener only exists while a frame is open.
 
 ## 4.8 Editing together

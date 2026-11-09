@@ -257,6 +257,9 @@ type Facts struct {
 	Inline      bool      `json:"inline"`
 	Media       bool      `json:"media"`
 	Office      bool      `json:"office"`
+	// MayAddVersion says whether the caller may store a new version, so a viewer only
+	// offers saving to people who may (ARC-099). The upload checks again.
+	MayAddVersion bool `json:"may_add_version"`
 }
 
 // Lookup gives the live facts of files on pages the caller may see.
@@ -264,23 +267,43 @@ func (s *Service) Lookup(ctx context.Context, c identity.Caller, list []uuid.UUI
 	if len(list) > maxLookupIDs {
 		return nil, apperr.Invalid("Too many files at once.")
 	}
-	rows, err := s.pool.Query(ctx, `SELECT a.id, a.filename, v.size, v.content_type FROM attachments a
+	rows, err := s.pool.Query(ctx, `SELECT a.id, a.page_id, a.filename, v.size, v.content_type FROM attachments a
 		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
 		JOIN perm_visible_pages($1) p ON p.page_id = a.page_id
 		WHERE a.id = ANY($2) AND a.status = 'active'`, c.UserID, list)
 	if err != nil {
 		return nil, err
 	}
+	var pages []uuid.UUID
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Facts, error) {
 		var f Facts
-		err := r.Scan(&f.ID, &f.Filename, &f.Size, &f.ContentType)
+		var page uuid.UUID
+		err := r.Scan(&f.ID, &page, &f.Filename, &f.Size, &f.ContentType)
 		f.Inline, f.Media, f.Office = IsInline(f.ContentType), IsMedia(f.ContentType), IsOffice(f.Filename)
+		pages = append(pages, page)
 		return f, err
 	})
+	if err != nil {
+		return nil, err
+	}
+	// Files mostly share a page, so each page is asked once.
+	may := map[uuid.UUID]bool{}
+	for i := range out {
+		allowed, asked := may[pages[i]]
+		if !asked {
+			d, err := s.perms.CheckPage(ctx, s.pool, c.UserID, pages[i], permissions.AttachmentAdd, uuid.Nil)
+			if err != nil {
+				return nil, err
+			}
+			allowed = d.Allowed
+			may[pages[i]] = allowed
+		}
+		out[i].MayAddVersion = allowed
+	}
 	if out == nil {
 		out = []Facts{}
 	}
-	return out, err
+	return out, nil
 }
 
 // SpaceFile is one row of the Files screen.

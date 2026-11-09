@@ -4,12 +4,16 @@ import type { Page } from '@playwright/test';
 import {
   ADMIN,
   checkAccessibility,
+  createUser,
   editorSettled,
   expect,
+  grant,
   login,
   newSpace,
   publishedPage,
   test,
+  unique,
+  VIEWER,
 } from './helpers';
 
 const PNG = Buffer.from(
@@ -680,4 +684,77 @@ test('a PDF opens in a sandboxed viewer that cannot reach the session', async ({
   expect(seen).toEqual({ origin: 'null', answer: 0, cookie: 'refused' });
   await page.frameLocator('iframe.craft-frame').locator('canvas').press('Escape');
   await expect(dialog).toHaveCount(0);
+});
+
+/** Opens the PDF of the page in its viewer and returns the frame, once the file is in. */
+async function openViewer(page: Page, name: string) {
+  await page.getByRole('button', { name: 'Open in PdfCraft' }).click();
+  const dialog = page.getByRole('dialog', { name });
+  await expect(dialog.getByRole('status')).toHaveCount(0, { timeout: 60_000 });
+  const viewer = page.frames().find((frame) => frame.url().includes('/vendor/pdfcraft/'));
+  if (!viewer) throw new Error('the viewer has no frame');
+  return { dialog, viewer };
+}
+
+/** Does inside the viewer what PdfCraft does when it saves: a download of a blob it made. */
+async function saveInViewer(
+  page: Page,
+  viewer: Awaited<ReturnType<typeof openViewer>>['viewer'],
+  text: string,
+) {
+  const download = page.waitForEvent('download');
+  await viewer.evaluate((content) => {
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(new Blob([content], { type: 'application/pdf' }));
+    link.download = 'saved.pdf';
+    link.click();
+  }, text);
+  await download;
+}
+
+test('a PDF changed in the viewer is kept as a new version, and only what the frame sends counts', async ({
+  page,
+  browser,
+}) => {
+  const { id, space } = await editing(page, 'A changed PDF');
+  await page.locator('input[type=file][aria-label="Add image or file"]').setInputFiles({
+    name: 'changed.pdf',
+    mimeType: 'application/pdf',
+    buffer: onePagePdf(),
+  });
+  await expect(body(page).locator('.file-tile')).toContainText('changed.pdf');
+  await publish(page);
+  const listed = await page.request.get(`/api/v1/pages/${id}/attachments`);
+  const { attachments } = (await listed.json()) as { attachments: { id: string }[] };
+  expect(attachments).toHaveLength(1);
+  const fileId = attachments[0]?.id ?? '';
+  const pdf = onePagePdf().toString('latin1');
+
+  const { dialog, viewer } = await openViewer(page, 'changed.pdf');
+  // The page itself cannot pose as the viewer: only the frame's window counts.
+  await page.evaluate((content) => {
+    const bytes = new TextEncoder().encode(content).buffer;
+    window.postMessage({ craft: 'saved', bytes }, '*', [bytes]);
+  }, pdf);
+  await saveInViewer(page, viewer, 'not a PDF at all');
+  await expect(dialog.getByText('The viewer gave back something that is not a PDF')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Keep it as a new version' })).toHaveCount(0);
+
+  await saveInViewer(page, viewer, pdf);
+  await dialog.getByRole('button', { name: 'Keep it as a new version' }).click();
+  await expect(dialog.getByRole('status')).toHaveText('Stored as a new version of this file.');
+  const versions = await page.request.get(`/api/v1/attachments/${fileId}/versions`);
+  expect(((await versions.json()) as { versions: unknown[] }).versions).toHaveLength(2);
+
+  const email = `${unique('reader')}@example.com`;
+  const reader = await createUser(browser, email);
+  await grant(page, space.id, { type: 'user', id: reader }, VIEWER);
+  const context = await browser.newContext();
+  const other = await context.newPage();
+  await login(other, email);
+  await other.goto(`/pages/${id}`);
+  const seen = await openViewer(other, 'changed.pdf');
+  await saveInViewer(other, seen.viewer, pdf);
+  await expect(seen.dialog.getByRole('button', { name: 'Keep it as a new version' })).toHaveCount(0);
+  await context.close();
 });

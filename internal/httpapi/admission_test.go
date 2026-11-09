@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -205,6 +206,40 @@ func TestOnlyAReadReusesPermissionFacts(t *testing.T) {
 		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(method, "/api/v1/pages/x", nil))
 		if memoized != want {
 			t.Errorf("%s: memo %v, want %v", method, memoized, want)
+		}
+	}
+}
+
+func TestOnlyListsAndHeavyReadsMayLag(t *testing.T) {
+	var got db.Freshness
+	h := withReadFreshness(http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+		got = db.FreshnessOf(r.Context())
+	}))
+	cases := []struct {
+		method, path string
+		want         db.Freshness
+	}{
+		{http.MethodGet, "/api/v1/search?q=plan", db.MayLag},
+		{http.MethodGet, "/api/v1/feed", db.MayLag},
+		{http.MethodGet, "/api/v1/people", db.MayLag},
+		{http.MethodGet, "/api/v1/me/recent", db.MayLag},
+		{http.MethodGet, "/api/v1/spaces/x/export", db.MayLag},
+		// A page, its tree and anything a person just saved must be current.
+		{http.MethodGet, "/api/v1/pages/x", db.Current},
+		{http.MethodGet, "/api/v1/spaces/x/tree", db.Current},
+		{http.MethodGet, "/api/v1/feedback", db.Current},
+		// A write is never marked, even on a path whose reads may lag.
+		{http.MethodPost, "/api/v1/search", db.Current},
+		{http.MethodPost, "/api/v1/feed", db.Current},
+		{http.MethodDelete, "/api/v1/me/recent", db.Current},
+		{http.MethodGet, "/api/v1/me/notifications", db.Current},
+		{http.MethodGet, "/api/v1/people/x", db.Current},
+		{http.MethodPost, "/api/v1/me/notifications/read", db.Current},
+	}
+	for _, c := range cases {
+		h.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(c.method, c.path, nil))
+		if got != c.want {
+			t.Errorf("%s %s: freshness %d, want %d", c.method, c.path, got, c.want)
 		}
 	}
 }

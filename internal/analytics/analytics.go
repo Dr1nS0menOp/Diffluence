@@ -27,6 +27,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 // The two privacy modes.
@@ -112,8 +113,7 @@ func (s *Service) SetSettings(ctx context.Context, c identity.Caller, v Settings
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, settingsKey, raw); err != nil {
+		if err := settings.Store(ctx, tx, settingsKey, raw); err != nil {
 			return err
 		}
 		if v.Mode != ModeNames {

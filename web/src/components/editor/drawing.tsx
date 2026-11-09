@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, type Attachment, type Me } from '../../api';
+import { fromFrame, listenToFrame, postToFrame, type IncomingMessage } from '../frame-messages';
 import { Dialog, ErrorNote } from '../ui';
 
 const EMPTY_DRAWING = '<mxfile/>';
@@ -55,13 +56,6 @@ interface DrawingMessage {
   data?: unknown;
 }
 
-/** The parts of a MessageEvent that decide whether we listen to it. */
-interface IncomingMessage {
-  source: unknown;
-  origin: string;
-  data: unknown;
-}
-
 /** The address of embed mode. Offline and stealth keep it from calling anyone else. */
 export function drawingAddress(origin: string): string {
   const address = new URL(origin);
@@ -85,8 +79,12 @@ export function drawingMessage(
   frame: Window | null | undefined,
   origin: string,
 ): DrawingMessage | null {
-  if (!frame || event.source !== frame || event.origin !== origin) return null;
-  const message = parsed(event.data);
+  return fromFrame(event, frame, origin) ? drawingMessageOf(event.data) : null;
+}
+
+/** What the service said, once the frame module has checked where it came from. */
+function drawingMessageOf(data: unknown): DrawingMessage | null {
+  const message = parsed(data);
   if (typeof message !== 'object' || message === null) return null;
   return typeof (message as DrawingMessage).event === 'string' ? (message as DrawingMessage) : null;
 }
@@ -128,7 +126,7 @@ function DrawingFrame({
   const [error, setError] = useState<unknown>(null);
   useEffect(() => {
     const send = (message: unknown) =>
-      frame.current?.contentWindow?.postMessage(JSON.stringify(message), origin);
+      postToFrame(frame.current?.contentWindow, origin, JSON.stringify(message));
     const save = async (address: unknown) => {
       const png = pngFromDataAddress(address);
       if (!png) {
@@ -148,17 +146,19 @@ function DrawingFrame({
         setError(e);
       }
     };
-    const listen = (event: MessageEvent) => {
-      const message = drawingMessage(event, frame.current?.contentWindow, origin);
-      if (message?.event === 'init') {
-        storedPng(existing).then((png) => send(loadMessage(png)), setError);
-      }
-      if (message?.event === 'save') send({ action: 'export', format: 'xmlpng' });
-      if (message?.event === 'export') void save(message.data);
-      if (message?.event === 'exit') onClose();
-    };
-    window.addEventListener('message', listen);
-    return () => window.removeEventListener('message', listen);
+    return listenToFrame(
+      () => frame.current?.contentWindow,
+      origin,
+      (data) => {
+        const message = drawingMessageOf(data);
+        if (message?.event === 'init') {
+          storedPng(existing).then((png) => send(loadMessage(png)), setError);
+        }
+        if (message?.event === 'save') send({ action: 'export', format: 'xmlpng' });
+        if (message?.event === 'export') void save(message.data);
+        if (message?.event === 'exit') onClose();
+      },
+    );
   }, [origin, pageId, existing, onDone, onClose, t]);
   return (
     <>

@@ -19,6 +19,7 @@ import CollaborationCaret from '@tiptap/extension-collaboration-caret';
 import { NodeSelection } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import { api, isCancelled, type Json, type UploadWatch } from '../../api';
+import { offered, useCapabilities } from '../../capabilities';
 import { readRecentItems, rememberItem, usePerson } from '../../personal';
 import { usePreferences } from '../../preferences';
 import { navigate } from '../../router';
@@ -440,6 +441,12 @@ export function DocumentEditor({
   const savedBlocks = useSavedBlocks();
   const savedItems = useRef<InsertItem[]>([]);
   savedItems.current = (savedBlocks.data ?? []).map(savedBlockItem);
+  // The slash menu is built once, so it reads what is on through a ref (ARC-071).
+  const capabilities = useCapabilities();
+  const offeredNow = useRef(capabilities);
+  useEffect(() => {
+    offeredNow.current = capabilities;
+  }, [capabilities]);
   const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const plainPaste = useRef(false);
@@ -544,7 +551,11 @@ export function DocumentEditor({
         : []),
       SlashCommands.configure({
         actions: () => actions.current,
-        items: () => [...INSERT_ITEMS, ...(inTemplate ? TEMPLATE_ITEMS : []), ...savedItems.current],
+        items: () => [
+          ...offered(INSERT_ITEMS, offeredNow.current),
+          ...(inTemplate ? TEMPLATE_ITEMS : []),
+          ...savedItems.current,
+        ],
         recent: () => readRecentItems(person),
         onUsed: (id) => rememberItem(person, id),
       }),

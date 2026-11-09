@@ -4,10 +4,12 @@ package httpapi
 
 import (
 	"net/http"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"time"
 
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -156,6 +158,34 @@ func withPermissionMemo(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// lagLists are reads that list what others change all the time, where a moment's lag is
+// fine. Notifications are left out: a person who marks one read must see it read.
+var lagLists = []string{"/api/v1/feed", "/api/v1/people", "/api/v1/me/recent"}
+
+// withReadFreshness marks the reads that may come from a copy that lags (ARC-228):
+// search, reports, analytics, exports and the lists above. Permission facts and
+// sessions mark themselves as current inside it, so a lagging copy can never decide
+// access. Until a standby exists, this only counts.
+func withReadFreshness(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if mayLag(r) {
+			r = r.WithContext(db.WithMayLag(r.Context()))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func mayLag(r *http.Request) bool {
+	if !isRead(r) {
+		return false
+	}
+	if classOf(r) == classHeavy {
+		return true
+	}
+	// Exact paths only: a profile below /people may be the one a person just saved.
+	return slices.Contains(lagLists, r.URL.Path)
 }
 
 // overloaded says whether saving or reading has more than half its limit waiting, so

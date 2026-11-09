@@ -29,6 +29,28 @@ function open(file) {
   }
 }
 
+// When the app saves a PDF, it hands the browser a download of a blob it made. We keep
+// the download, and also send the bytes to the page, which can store them as a new
+// version through the normal upload (ARC-099). Only the page decides; this frame stores
+// nothing and cannot reach the session.
+if (canvas === 'pdfcraft') {
+  const blobs = new Map();
+  const makeURL = URL.createObjectURL;
+  URL.createObjectURL = function createURL(object) {
+    const address = makeURL.call(URL, object);
+    if (object instanceof Blob) blobs.set(address, object);
+    return address;
+  };
+  const click = HTMLAnchorElement.prototype.click;
+  HTMLAnchorElement.prototype.click = function clickAnchor() {
+    const blob = this.download ? blobs.get(this.href) : undefined;
+    if (blob) {
+      blob.arrayBuffer().then((bytes) => window.parent.postMessage({ craft: 'saved', bytes }, '*', [bytes]));
+    }
+    return click.call(this);
+  };
+}
+
 window.addEventListener('message', (event) => {
   if (event.source !== window.parent || !(event.data?.bytes instanceof ArrayBuffer)) return;
   open(new File([event.data.bytes], String(event.data.name), { type: String(event.data.type) }));

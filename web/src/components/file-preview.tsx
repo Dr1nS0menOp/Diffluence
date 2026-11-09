@@ -4,7 +4,8 @@
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { api, type Me } from '../api';
+import { api } from '../api';
+import { useCapabilities } from '../capabilities';
 import { craftOf, OpenInCraft } from './craft-frame';
 import { highlightFile, type HighlightedText } from './editor/code';
 import { Dialog, ErrorNote, Loading } from './ui';
@@ -16,6 +17,8 @@ export interface PreviewFile {
   content_type: string;
   inline: boolean;
   office: boolean;
+  /** Whether the person may store a changed PDF as a new version (ARC-099). */
+  may_add_version?: boolean;
 }
 
 const TEXT_FILE = /^text\/|json|xml|yaml/;
@@ -62,12 +65,16 @@ export function TextPreview({ file }: { file: { id: string; filename: string; ve
 
 function PreviewBody({ file }: { file: PreviewFile }) {
   const { t } = useTranslation();
-  const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
+  const capabilities = useCapabilities();
   const address = `/api/v1/attachments/${file.id}/content`;
   if (file.inline) return <img className="file-preview-image" src={address} alt={file.filename} />;
   if (isTextFile(file.content_type)) return <TextPreview file={file} />;
-  if (craftOf(file.filename, file.content_type)) return <OpenInCraft file={file} address={address} />;
-  if (file.office && me.data?.office_preview) {
+  if (craftOf(file.filename, file.content_type)) {
+    return (
+      <OpenInCraft file={file} address={address} versionOf={file.may_add_version ? file.id : undefined} />
+    );
+  }
+  if (file.office && capabilities.office_preview) {
     return (
       <OpenInCraft
         file={{ filename: `${file.filename}.pdf`, content_type: 'application/pdf' }}

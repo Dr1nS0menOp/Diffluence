@@ -30,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/outward"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/templates"
 	"github.com/diffluence/diffluence/internal/watches"
 )
@@ -486,8 +487,7 @@ func (s *Service) SetRunsPerHour(ctx context.Context, c identity.Caller, limit i
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, settingsKey, raw); err != nil {
+		if err := settings.Store(ctx, tx, settingsKey, raw); err != nil {
 			return err
 		}
 		if _, err := audit.Record(ctx, tx, c.Event("rule.limit_changed", "settings", "", "", map[string]any{"runs_per_hour": limit})); err != nil {

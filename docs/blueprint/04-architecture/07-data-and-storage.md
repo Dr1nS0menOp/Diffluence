@@ -38,7 +38,7 @@ Rough figures for 5,000 people over five years. They are to plan with, not measu
 
 - **ARC-184** · built · Search is PostgreSQL full text with a GIN index, the type the manual prefers, and the `simple` configuration, so every language behaves alike.
 - **ARC-185** · built · The index is written in the transaction that publishes. A page is never found with old content or old permissions (ORG-013).
-- **ARC-186** · partly · Blueprint 04 calls search pluggable. It is not: `search.Index` runs in the caller's transaction, and results pass `perm_visible_pages`. That is what gives ORG-013. Spec 028 measured the need and compared two engines and a standby: PostgreSQL reaches the target, and an engine would lag and need its own permission filter. Still open: picking can move to a standby (ARC-229), because the rule on each row is a step of its own.
+- **ARC-186** · built · Search is not pluggable, and is not meant to be. `search.Index` runs in the caller's transaction, and results pass `perm_visible_pages`. That is what gives ORG-013. Spec 028 measured the need and compared two engines and a standby: PostgreSQL reaches the target, and an engine would lag and need its own permission filter. A search is marked as a read that may lag (ARC-228), so moving it to a standby is ARC-229 and needs no change here.
 - **ARC-187** · built · `ts_rank` is gone. Reading every match was the cost, so a search walks the newest pages first and goes to the index of words only if that does not fill the page, in two fixed steps (spec 028, D3). Ranking only the newest matches was refused: everything stays findable (ADR-035).
 
 ## 7.4 Files
