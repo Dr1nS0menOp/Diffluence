@@ -16,7 +16,7 @@ import (
 func (s *Server) registerRuleRoutes() {
 	r := s.router
 	admin := Permission(identity.PermAdministrator)
-	manage := Object(permissions.SpaceAdminister)
+	manage := Object(permissions.SpaceAutomation)
 
 	r.HandleFunc("GET /api/v1/spaces/{id}/rules", manage, s.handleSpaceRules)
 	r.HandleFunc("POST /api/v1/spaces/{id}/rules", manage, s.handleSpaceRuleCreate)

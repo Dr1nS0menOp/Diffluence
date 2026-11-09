@@ -74,7 +74,7 @@ func (s *Server) registerPeopleRoutes() {
 	r.HandleFunc("GET /api/v1/spaces/{id}/access.csv", Object("space.manage_access"), s.handleSpaceAccessCSV)
 	r.HandleFunc("POST /api/v1/spaces/{id}/grants/preview", Object("space.manage_access"), s.handleGrantPreview)
 	r.HandleFunc("POST /api/v1/spaces/{id}/guests", Object("space.manage_access"), s.handleInviteGuest)
-	r.HandleFunc("GET /api/v1/spaces/{id}/audit", Object("space.administer"), s.handleSpaceAudit)
+	r.HandleFunc("GET /api/v1/spaces/{id}/audit", Object("space.audit"), s.handleSpaceAudit)
 	r.HandleFunc("GET /api/v1/spaces/{id}/categories", Object("space.view"), s.handleSpaceCategoriesGet)
 	r.HandleFunc("PUT /api/v1/spaces/{id}/categories", Object("space.administer"), s.handleSpaceCategories)
 }

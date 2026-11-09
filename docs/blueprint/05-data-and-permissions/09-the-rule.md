@@ -116,3 +116,12 @@ Each rule is "the rule of the page, and then this".
 - **PRM-106** · built · **Administrators and content:** no route gives an administrator a document. They see spaces as metadata. Titles do reach them through the audit log (For the product owner to decide, 1).
 - **PRM-107** · built · **Audit of a space:** a space administrator sees their space. A row about a page they may not see shows the action and the time, no title and no details.
 - **PRM-108** · built · **Why can or can't I:** space administrators who can see the page, and administrators. It runs the real evaluation for the other person.
+
+## 9.11 Roles and the rule
+
+- **PRM-192** · built · Roles change how access is given, not the rule. `permissions.Evaluate` and every `perm_*` function still read `space_grants` and `global_grants`, and the database keeps those equal to what roles add up to, with triggers (migration 0036). `rbac_drift()` lists any difference, and must stay empty.
+- **PRM-193** · built · The application role cannot write a grant itself. Only the triggers, which run as the owner of the tables, write them, so no code path can grant past a role.
+- **PRM-194** · built · The migration turned every existing grant into roles, and no decision changed: a test compares 369,861 decisions of Evaluate and the SQL lists before and after, on grants of every shape beside restrictions, drafts, groups and guests.
+- **PRM-195** · built · Restrictions still only narrow: a role never lifts one. `administrator` still gives no content, because instance roles hold only global permissions.
+- **PRM-196** · built · An assignment must match the scope of its role: a space role in a space, an instance role for a user or group without one. Anything else is refused.
+- **PRM-197** · new · `permission_sets` is no longer read. A contract migration drops it once no supported release writes it.

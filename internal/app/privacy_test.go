@@ -128,6 +128,7 @@ var idColumns = map[string]string{
 	"scim_tokens.created_by":          "authorship resolves to the neutral name",
 	"space_grants.subject_id":         "the rule stays: taking it away could open a page",
 	"global_grants.subject_id":        "the rule stays, and the account cannot log in",
+	"role_assignments.subject_id":     "the roles stay with the grants they add up to, for the same reason",
 	"page_restrictions.subject_id":    "the rule stays: an empty restriction would open a page",
 	"access_requests.asked_id":        "someone else's request keeps who it went to",
 	"access_requests.answered_by":     "someone else's request keeps who answered",

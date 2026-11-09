@@ -229,7 +229,8 @@ func (s *Service) accountActive(ctx context.Context, rule Rule) (bool, error) {
 	return active, err
 }
 
-// stopForDisabledOwner turns the rule off, and tells those who run the space (H5).
+// stopForDisabledOwner turns the rule off, and tells those who look after the automation of
+// the space (H5, spec 036).
 func (s *Service) stopForDisabledOwner(ctx context.Context, rule Rule) error {
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, "UPDATE automation_rules SET enabled = false, updated_at = now() WHERE id = $1", rule.ID); err != nil {
@@ -242,7 +243,7 @@ func (s *Service) stopForDisabledOwner(ctx context.Context, rule Rule) error {
 			return nil
 		}
 		rows, err := tx.Query(ctx, `SELECT DISTINCT g.subject_id FROM space_grants g JOIN users u ON u.id = g.subject_id
-			WHERE g.space_id = $1 AND g.permission = $2 AND g.subject_type = 'user' AND u.status = 'active'`, *rule.SpaceID, permissions.SpaceAdminister)
+			WHERE g.space_id = $1 AND g.permission = $2 AND g.subject_type = 'user' AND u.status = 'active'`, *rule.SpaceID, permissions.SpaceAutomation)
 		if err != nil {
 			return err
 		}

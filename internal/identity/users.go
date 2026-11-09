@@ -321,11 +321,8 @@ func (s *Service) SetGlobalPermissions(ctx context.Context, c Caller, subjectTyp
 		if err := s.mayGrant(ctx, c, perms, before); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, "DELETE FROM global_grants WHERE subject_type = $1 AND subject_id = $2", subjectType, subjectID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO global_grants (subject_type, subject_id, permission)
-			SELECT $1::text, $2::uuid, unnest($3::text[]) ON CONFLICT DO NOTHING`, subjectType, subjectID, perms); err != nil {
+		// The set becomes one instance role; grants follow from it (spec 036).
+		if _, err := tx.Exec(ctx, "SELECT rbac_set_exact(NULL, $1, $2, $3::text[])", subjectType, subjectID, perms); err != nil {
 			return err
 		}
 		if err := s.keepsAnAdministrator(ctx, tx, c); err != nil {
@@ -587,7 +584,7 @@ func (s *Service) CreateExternalUser(ctx context.Context, tx pgx.Tx, c Caller, i
 		return uuid.Nil, err
 	}
 	for _, p := range defaultPermissions(TypeMember) {
-		if _, err := tx.Exec(ctx, "INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, $2)", id, p); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", id, p); err != nil {
 			return uuid.Nil, err
 		}
 	}

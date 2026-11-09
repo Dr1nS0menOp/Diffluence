@@ -187,7 +187,7 @@ func (s *Service) mayRead(ctx context.Context, q db.Querier, c identity.Caller, 
 
 func (s *Service) requireManager(ctx context.Context, q db.Querier, c identity.Caller, spaceID *uuid.UUID) error {
 	if spaceID != nil {
-		return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceAdminister)
+		return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceTemplates)
 	}
 	admin, err := s.identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
 	if err != nil {

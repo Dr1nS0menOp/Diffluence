@@ -51,7 +51,7 @@ func (s *Service) requireLinks(ctx context.Context) error {
 	return nil
 }
 
-func (s *Service) requireAdminister(ctx context.Context, q db.Querier, c identity.Caller, pageID uuid.UUID) (uuid.UUID, error) {
+func (s *Service) requirePublisher(ctx context.Context, q db.Querier, c identity.Caller, pageID uuid.UUID) (uuid.UUID, error) {
 	if err := s.perms.RequirePage(ctx, q, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {
 		return uuid.Nil, err
 	}
@@ -59,7 +59,7 @@ func (s *Service) requireAdminister(ctx context.Context, q db.Querier, c identit
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return spaceID, s.perms.RequireSpace(ctx, q, c.UserID, spaceID, permissions.SpaceAdminister)
+	return spaceID, s.perms.RequireSpace(ctx, q, c.UserID, spaceID, permissions.SitePublish)
 }
 
 const linkSelect = `SELECT l.id, l.page_id, p.title, l.version, l.token, COALESCE(u.display_name, ''), l.created_at
@@ -78,7 +78,7 @@ func scanLink(row pgx.Row) (Link, error) {
 
 // LinkOf gives the public link of a page.
 func (s *Service) LinkOf(ctx context.Context, c identity.Caller, pageID uuid.UUID) (Link, error) {
-	if _, err := s.requireAdminister(ctx, s.pool, c, pageID); err != nil {
+	if _, err := s.requirePublisher(ctx, s.pool, c, pageID); err != nil {
 		return Link{}, err
 	}
 	return scanLink(s.pool.QueryRow(ctx, linkSelect+` AND l.page_id = $1`, pageID))
@@ -108,7 +108,7 @@ func (s *Service) linkFolder(token string) string {
 // MakeLink builds one page as a static page under an unguessable address. It shows
 // this version: a later publish does not reach it until the person says so (G16).
 func (s *Service) MakeLink(ctx context.Context, c identity.Caller, pageID uuid.UUID) (Link, error) {
-	spaceID, err := s.requireAdminister(ctx, s.pool, c, pageID)
+	spaceID, err := s.requirePublisher(ctx, s.pool, c, pageID)
 	if err != nil {
 		return Link{}, err
 	}
@@ -176,7 +176,7 @@ func (s *Service) closeLinks(ctx context.Context, q db.Querier, pageID uuid.UUID
 
 // WithdrawLink takes a public page down.
 func (s *Service) WithdrawLink(ctx context.Context, c identity.Caller, pageID uuid.UUID) error {
-	spaceID, err := s.requireAdminister(ctx, s.pool, c, pageID)
+	spaceID, err := s.requirePublisher(ctx, s.pool, c, pageID)
 	if err != nil {
 		return err
 	}

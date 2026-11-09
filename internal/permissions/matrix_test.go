@@ -67,6 +67,8 @@ var grantCases = []grantCase{
 	{"user-manager", "user", managerPerms},
 	{"group-manager", "group", managerPerms},
 	{"administer-only", "user", []string{permissions.SpaceView, permissions.SpaceAdminister}},
+	{"split-off-administer", "user", []string{permissions.SpaceView, permissions.SitePublish, permissions.SpaceAutomation,
+		permissions.SpaceTemplates, permissions.SpaceAudit}},
 	{"group-viewer", "group", viewerPerms},
 	{"group-editor", "group", editorPerms},
 	{"members-viewer", "all_members", viewerPerms},
@@ -126,6 +128,7 @@ var actions = []string{
 	permissions.ActionPageDelete, permissions.AttachmentAdd, permissions.ActionAttachmentDelete,
 	permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess,
 	permissions.CommentAdd, permissions.ActionCommentDelete, permissions.ActionReact, permissions.AnalyticsView,
+	permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 }
 
 // literalRule is the rule of spec 002, written out independently of Evaluate.
@@ -185,7 +188,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	// Archived spaces are read-only.
 	switch action {
 	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister, permissions.SpaceManageAccess,
-		permissions.AnalyticsView:
+		permissions.AnalyticsView, permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit:
 	default:
 		if spaceStatus == "archived" {
 			return false
@@ -195,7 +198,8 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	// restricted. Nothing else.
 	switch action {
 	case permissions.ActionPageView, permissions.SpaceExport, permissions.SpaceAdminister,
-		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage, permissions.AnalyticsView:
+		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage, permissions.AnalyticsView,
+		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit:
 	default:
 		if ps.archived {
 			return false

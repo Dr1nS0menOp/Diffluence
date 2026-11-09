@@ -30,14 +30,14 @@ A problem found in the study has a **GAP** number, in chapter 12. When something
 | [5. Working together](05-data-and-permissions/05-working-together.md) | Comments, reactions, watching, notifications, mail, requests | DAT-110 to 119 |
 | [6. Operations](05-data-and-permissions/06-operations.md) | Trash, jobs, audit, exchange, analytics, automation | DAT-130 to 150 |
 | [7. Life cycles](05-data-and-permissions/07-life-cycles.md) | A page, a space and a person, and what goes along | DAT-160 to 173 |
-| [8. Permissions](05-data-and-permissions/08-permissions.md) | Every permission, action, named set and route rule | PRM-001 to 039 |
-| [9. The rule](05-data-and-permissions/09-the-rule.md) | The rule, and every edge case per subject | PRM-040 to 108 |
+| [8. Permissions](05-data-and-permissions/08-permissions.md) | Every permission, action, named set, route rule and role | PRM-001 to 039, PRM-178 to 191, PRM-198 to 215 |
+| [9. The rule](05-data-and-permissions/09-the-rule.md) | The rule, and every edge case per subject, and roles | PRM-040 to 108, PRM-192 to 197 |
 | [10. Safe lists](05-data-and-permissions/10-safe-lists.md) | Every list and what guards it, and the side doors | PRM-120 to 149 |
 | [11. The test matrix](05-data-and-permissions/11-test-matrix.md) | Dimensions, the literal rule, tests beside the matrix | PRM-150 to 177 |
 | [12. Gaps and contradictions](05-data-and-permissions/12-gaps-and-contradictions.md) | What is wrong, how bad, and how to fix it | GAP-001 to 030 |
 | [Sources](05-data-and-permissions/sources.md) | What was read | |
 
-In total 298 numbered items: 265 built, 6 partly, 17 still marked with the wave that planned them, 9 new and 1 for later, with 30 gaps. Counted again in spec 035, against the code and the tests.
+In total 318 numbered items: 283 built, 7 partly, 17 still marked with the wave that planned them, 10 new and 1 for later, with 30 gaps. Counted again in spec 035, and the roles of spec 036 added.
 
 ## The model in short
 

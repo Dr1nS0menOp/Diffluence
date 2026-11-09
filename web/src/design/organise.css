@@ -349,3 +349,41 @@ fieldset.choices legend {
   color: var(--color-accent);
   font-size: var(--text-small);
 }
+
+/* The permissions of a role, and the roles of a person: one choice per line (spec 036). */
+.role-permissions {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  border: 0;
+}
+
+.role-permissions legend {
+  margin-block-end: var(--space-1);
+  font-weight: var(--weight-strong);
+}
+
+/* A permission with its one line on what it allows beneath the name. */
+.role-permission {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.role-permission input {
+  margin-block-start: var(--space-1);
+}
+
+.role-permission > span {
+  display: grid;
+}
+
+.role-holders {
+  margin-block: var(--space-3);
+}
+
+.role-holders h3 {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-ui);
+}

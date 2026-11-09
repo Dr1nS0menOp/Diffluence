@@ -161,7 +161,8 @@ func verifyBundle(zr *zip.Reader) (openedBundle, error) {
 	if err != nil || len(public) != ed25519.PublicKeySize || !ed25519.Verify(public, raw, sig) {
 		return out, apperr.Invalid("The signature of this bundle is wrong. It was changed after it was made.")
 	}
-	if out.manifest.Format != bundleFormat || out.manifest.Version != bundleVersion {
+	if out.manifest.Format != bundleFormat ||
+		(out.manifest.Version != bundleVersion && out.manifest.Version != bundleVersionBeforeSplit) {
 		return out, apperr.Invalid("This version of a bundle cannot be read here.")
 	}
 	out.signer = fingerprintOf(public)
@@ -547,12 +548,30 @@ func (in *bundleImport) grants(ctx context.Context, tx pgx.Tx) error {
 		if !ok {
 			continue // nobody here: the grant goes, and the space stays closed
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO space_grants (space_id, subject_type, subject_id, permission) VALUES ($1, $2, $3, $4)
-			ON CONFLICT DO NOTHING`, in.spaceID, g.SubjectType, subject, g.Permission); err != nil {
+		perms := permissionsOfGrant(in.b.manifest.Version, g.Permission)
+		// Grants are what roles add up to, so a grant comes in as part of a role (spec 036).
+		if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions($1, $2, $3, $4::text[])",
+			in.spaceID, g.SubjectType, subject, perms); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// permissionsOfGrant is what one grant in a bundle stands for here. In a bundle from before
+// spec 036 a broader permission brings the finer ones split off it, as migration 0036 did.
+func permissionsOfGrant(version int, permission string) []string {
+	perms := []string{permission}
+	if version != bundleVersionBeforeSplit {
+		return perms
+	}
+	for finer, broad := range permissions.SplitFrom {
+		if broad == permission {
+			perms = append(perms, finer)
+		}
+	}
+	slices.Sort(perms)
+	return perms
 }
 
 // subject finds who a grant or restriction means here.

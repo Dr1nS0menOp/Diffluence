@@ -237,13 +237,20 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 	if sp.Features, err = s.features.ForSpace(ctx, s.pool, id); err != nil {
 		return sp, err
 	}
+	// The facts are loaded once and asked about every action, so a capability more costs
+	// no query.
+	user, err := s.perms.LoadUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return sp, err
+	}
+	facts, err := s.perms.LoadSpace(ctx, s.pool, id)
+	if err != nil {
+		return sp, err
+	}
 	sp.Can = map[string]bool{}
-	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess, permissions.AnalyticsView} {
-		d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, id, action)
-		if err != nil {
-			return sp, err
-		}
-		sp.Can[action] = d.Allowed
+	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess, permissions.AnalyticsView,
+		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit} {
+		sp.Can[action] = permissions.Evaluate(permissions.Input{User: user, Space: facts, Action: action}).Allowed
 	}
 	return sp, nil
 }

@@ -357,7 +357,7 @@ function PageMenu({
           {t('organise.verify')}
         </MenuEntry>
       )}
-      {page.can['space.administer'] && published && (
+      {page.can['space.templates'] && published && (
         <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('template')}>
           {t('organise.saveAsTemplate')}
         </MenuEntry>
@@ -403,7 +403,7 @@ function PageMenu({
           <MenuEntry icon={<IconDownload size={MENU_ICON_SIZE} />} onClick={() => onOpen('export')}>
             {t('exchange.export')}
           </MenuEntry>
-          {page.can['space.administer'] && (
+          {page.can['site.publish'] && (
             <MenuEntry icon={<IconLink size={MENU_ICON_SIZE} />} onClick={() => onOpen('public-link')}>
               {t('exchange.publicLink')}
             </MenuEntry>

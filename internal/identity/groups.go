@@ -171,10 +171,8 @@ func (s *Service) DeleteGroup(ctx context.Context, c Caller, id uuid.UUID) error
 		if err := s.managedGuard(ctx, tx, c, id); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, "DELETE FROM global_grants WHERE subject_type = 'group' AND subject_id = $1", id); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "DELETE FROM space_grants WHERE subject_type = 'group' AND subject_id = $1", id); err != nil {
+		// Its roles go, everywhere, and with them every grant they added (spec 036).
+		if _, err := tx.Exec(ctx, "DELETE FROM role_assignments WHERE subject_type = 'group' AND subject_id = $1", id); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM groups WHERE id = $1", id); err != nil {

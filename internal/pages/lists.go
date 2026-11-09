@@ -231,7 +231,7 @@ type SpaceEvent struct {
 // a page they may not see shows the action and the time, and nothing else: the
 // audit may not reveal a hidden page (NAV-005).
 func (s *Service) SpaceAudit(ctx context.Context, c identity.Caller, spaceID uuid.UUID, beforeSeq int64) ([]SpaceEvent, error) {
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAudit); err != nil {
 		return nil, err
 	}
 	events, err := audit.List(ctx, s.pool, audit.Filter{SpaceID: spaceID.String(), BeforeSeq: beforeSeq, Limit: spaceAuditRows})

@@ -8,6 +8,7 @@ import { api, type Group, type UserDetail } from '../api';
 import { appearanceQuery } from '../appearance';
 import { useDates } from '../dates';
 import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
+import { permissionLabel } from '../permission-words';
 
 const DAY_MS = 86_400_000;
 const SERVICE_TOKEN_DAYS = 365;
@@ -282,7 +283,12 @@ export function TypeChange({ user, onDone }: { user: UserDetail; onDone: () => v
           {impact.data && (
             <>
               <p>{t('admin.typeImpactSpaces', { list: impact.data.spaces.join(', ') || '-' })}</p>
-              <p>{t('admin.typeImpactPermissions', { list: impact.data.permissions.join(', ') || '-' })}</p>
+              <p>
+                {t('admin.typeImpactPermissions', {
+                  list:
+                    impact.data.permissions.map((p) => permissionLabel(t, 'instance', p)).join(', ') || '-',
+                })}
+              </p>
             </>
           )}
           <div className="dialog-actions">

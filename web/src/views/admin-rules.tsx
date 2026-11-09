@@ -5,7 +5,9 @@ import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Category } from '../api';
-import { ConfirmButton, ErrorNote, Field, Loading } from '../components/ui';
+import { ErrorNote, Field, Loading } from '../components/ui';
+import { permissionLabel } from '../permission-words';
+import { RolesTab } from './roles';
 
 const FEATURES = [
   'comments',
@@ -244,12 +246,6 @@ export function RulesTab() {
   );
 }
 
-interface PermissionSet {
-  id: string;
-  name: string;
-  permissions: string[];
-}
-
 interface GlobalHolder {
   permission: string;
   type: string;
@@ -269,7 +265,7 @@ function GlobalHolders() {
       <table>
         <thead>
           <tr>
-            <th>{t('admin.permission')}</th>
+            <th>{t('roles.permission')}</th>
             <th>{t('common.name')}</th>
             <th>{t('common.type')}</th>
           </tr>
@@ -277,77 +273,13 @@ function GlobalHolders() {
         <tbody>
           {q.data?.holders.map((h) => (
             <tr key={h.permission + h.type + h.name}>
-              <td>{h.permission}</td>
+              <td>{permissionLabel(t, 'instance', h.permission)}</td>
               <td>{h.name}</td>
-              <td>{h.type}</td>
+              <td>{t(`roles.subject_${h.type}`)}</td>
             </tr>
           ))}
         </tbody>
       </table>
-    </section>
-  );
-}
-
-function PermissionSets() {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const [name, setName] = useState('');
-  const [permissions, setPermissions] = useState('');
-  const q = useQuery({
-    queryKey: ['permission-sets'],
-    queryFn: () => api.get<{ sets: PermissionSet[] }>('/admin/permission-sets'),
-  });
-  const refresh = () => client.invalidateQueries({ queryKey: ['permission-sets'] });
-  const save = useMutation({
-    mutationFn: () =>
-      api.put('/admin/permission-sets', {
-        name,
-        permissions: permissions.split(/[\s,]+/).filter(Boolean),
-      }),
-    onSuccess: async () => {
-      setName('');
-      setPermissions('');
-      await refresh();
-    },
-  });
-  const remove = useMutation({
-    mutationFn: (id: string) => api.del(`/admin/permission-sets/${id}`),
-    onSettled: refresh,
-  });
-  return (
-    <section>
-      <h2>{t('admin.permissionSets')}</h2>
-      <p className="muted">{t('admin.permissionSetsHelp')}</p>
-      <ErrorNote error={q.error ?? save.error ?? remove.error} />
-      <ul className="plain-list">
-        {q.data?.sets.map((s) => (
-          <li key={s.id} className="row">
-            <span className="grow">
-              {s.name} <span className="muted">{s.permissions.join(', ')}</span>
-            </span>
-            <ConfirmButton
-              label={t('common.delete')}
-              message={t('admin.permissionSetDelete', { name: s.name })}
-              className="ghost"
-              onConfirm={() => remove.mutate(s.id)}
-            />
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          save.mutate();
-        }}
-      >
-        <Field label={t('common.name')}>
-          <input value={name} onChange={(e) => setName(e.target.value)} required />
-        </Field>
-        <Field label={t('admin.permissionSetList')}>
-          <input value={permissions} onChange={(e) => setPermissions(e.target.value)} required />
-        </Field>
-        <button type="submit">{t('common.add')}</button>
-      </form>
     </section>
   );
 }
@@ -406,11 +338,12 @@ function Categories() {
   );
 }
 
+/** The roles of the instance and its spaces, and who holds what, in words (spec 036). */
 export function PermissionsTab() {
   return (
     <>
+      <RolesTab />
       <GlobalHolders />
-      <PermissionSets />
       <Categories />
     </>
   );

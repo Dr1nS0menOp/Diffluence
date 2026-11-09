@@ -132,11 +132,11 @@ func (s *Service) load(ctx context.Context, q db.Querier, id uuid.UUID) (Rule, e
 	return scanRule(q.QueryRow(ctx, "SELECT "+ruleColumns+"WHERE r.id = $1", id))
 }
 
-// mayManage is the rule on rules: administer on the space, or administrator for an
-// instance rule (spec 015, H5).
+// mayManage is the rule on rules: automation on the space (spec 036), or administrator
+// for an instance rule (spec 015, H5).
 func (s *Service) mayManage(ctx context.Context, c identity.Caller, spaceID *uuid.UUID) error {
 	if spaceID != nil {
-		return s.Perms.RequireSpace(ctx, s.Pool, c.UserID, *spaceID, permissions.SpaceAdminister)
+		return s.Perms.RequireSpace(ctx, s.Pool, c.UserID, *spaceID, permissions.SpaceAutomation)
 	}
 	allowed, err := s.Identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
 	if err != nil {

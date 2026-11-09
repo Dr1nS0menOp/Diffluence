@@ -465,7 +465,7 @@ mutate "search does not find a mentioned person" internal/search/words.go \
 mutate "an unpublished sentence reaches readers" internal/comments/comments.go \
   's.replace("if reachedReaders(t.anchor, doc) {", "if t.id != uuid.Nil || reachedReaders(t.anchor, doc) {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a reaction changes an archived space" internal/permissions/evaluate.go \
-  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView:", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView, ActionReact:")' $app -run TestAReactionChangesNothingInAnArchivedSpace
+  's.replace("case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView,", "case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView, ActionReact,")' $app -run TestAReactionChangesNothingInAnArchivedSpace
 mutate "following tells who exists" internal/watches/watches.go \
   's.replace("if !known || !slices.Contains(facts.Global, identity.PermViewProfiles) {", "if !known || (len(facts.Global) < 0 && !slices.Contains(facts.Global, identity.PermViewProfiles)) {")' $app -run TestFollowingGoesByTheRuleForSeeingPeople
 mutate "allowing skips a level out of reach" internal/sharing/sharing.go \
@@ -516,7 +516,7 @@ mutate "search shows a comment in the trash" internal/db/migrations/0008_organis
 mutate "an edit restriction does not count for a thread" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
 mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
-  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
+  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
 mutate "a removed version lives on in a quote" internal/pages/versions.go \
   's.replace("if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {", "_ = removed\n\t\tif err := comments.BlankQuotes(ctx, tx, c, id, current, current); err != nil {")' $app -run TestRemovingAVersionBlanksTheQuotesThatHoldIt
 mutate "nodes hand out rights at the same time" internal/db/db.go \
@@ -921,6 +921,58 @@ mutate "the user list ignores the space" internal/identity/users.go \
   's.replace("AND ($11::uuid IS NULL OR $11 IN (SELECT ps.space_id FROM perm_spaces(u.id, '"'"'space.view'"'"') ps))", "AND ($11::uuid IS NULL OR true)")' $app -run TestTheUserListFiltersByRoleAndBySpace
 mutate "a guest is not marked" internal/permissions/access.go \
   's.replace("holders[i].Guest = holders[i].Subject.Type == SubjectUser && slices.Contains(guests, holders[i].Subject.ID)", "holders[i].Guest = len(guests) < 0")' $app -run TestWhoHasAccessShowsHowAndExportsSafely
+mutate "anyone makes a role" internal/permissions/roles.go \
+  's.replace("if !u.Active || !slices.Contains(u.Global, identity.PermAdministrator) {", "if false && !u.Active {")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a built-in role changes its meaning" internal/permissions/roles.go \
+  's.replace("if r.BuiltIn != \"\" {\n\t\t\treturn apperr.Conflict(\"built_in\", \"A built-in role keeps", "if false {\n\t\t\treturn apperr.Conflict(\"built_in\", \"A built-in role keeps")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a built-in role can be deleted" internal/permissions/roles.go \
+  's.replace("if r.BuiltIn != \"\" {\n\t\t\treturn apperr.Conflict(\"built_in\", \"A built-in role cannot be deleted.\")", "if false {\n\t\t\treturn apperr.Conflict(\"built_in\", \"A built-in role cannot be deleted.\")")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a role in use is deleted from under the people who hold it" internal/permissions/roles.go \
+  's.replace("if r.InUse > 0 {\n\t\t\treturn apperr.Conflict(\"role_in_use\"", "if false {\n\t\t\treturn apperr.Conflict(\"role_in_use\"")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a role in use gains space administration" internal/permissions/roles.go \
+  's.replace("slices.Contains(difference(in.Permissions, r.Permissions), SpaceAdminister)", "false")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a role in use changes without a confirmation" internal/permissions/roles.go \
+  's.replace("if !confirm {", "if false {")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "a role with system administration needs no system administrator" internal/permissions/roles.go \
+  's.replace("if !ok {\n\t\treturn apperr.Conflict(\"needs_system_administrator\"", "if false && !ok {\n\t\treturn apperr.Conflict(\"needs_system_administrator\"")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "giving roles skips the limits of managing access" internal/permissions/roles.go \
+  's.replace("if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, after); err != nil {", "if err := error(nil); err != nil {")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
+mutate "instance roles can remove the last administrator" internal/permissions/roles.go \
+  's.replace("if err := keepsAnAdministrator(ctx, tx, c); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange", "if err := error(nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
+mutate "adopting grants as roles drops a permission" internal/db/migrations/0036_roles.sql \
+  's.replace("PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms);", "PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms[2:]);")' $perms -run TestAdoptingGrantsChangesNoDecision
+mutate "a changed role does not reach the people who hold it" internal/db/migrations/0036_roles.sql \
+  's.replace("FOR EACH ROW EXECUTE FUNCTION rbac_role_changed();", "FOR EACH ROW WHEN (false) EXECUTE FUNCTION rbac_role_changed();")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
+mutate "taking a role away leaves its grants behind" internal/db/migrations/0036_roles.sql \
+  's.replace("DELETE FROM space_grants g WHERE g.space_id = sp", "DELETE FROM space_grants g WHERE false AND g.space_id = sp")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
+mutate "the application role writes grants itself" internal/db/db.go \
+  's.replace("\"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON space_grants FROM \" + ident,", "")' ./internal/db/ -run TestApplicationRoleGrantsOnlyThroughRoles
+mutate "publishing a site needs space administration again" internal/sites/sites.go \
+  's.replace("RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SitePublish); err != nil {\n\t\treturn Site{}, err", "RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {\n\t\treturn Site{}, err")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "a public link needs space administration again" internal/sites/links.go \
+  's.replace("permissions.SitePublish)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "automation rules need space administration again" internal/automation/service.go \
+  's.replace("permissions.SpaceAutomation)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "webhooks need space administration again" internal/webhooks/webhooks.go \
+  's.replace("permissions.SpaceAutomation)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "space templates need space administration again" internal/templates/templates.go \
+  's.replace("permissions.SpaceTemplates)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "the audit of a space needs space administration again" internal/pages/lists.go \
+  's.replace("permissions.SpaceAudit)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "a space template is made by anyone who sees the space" internal/templates/templates.go \
+  's.replace("permissions.SpaceTemplates)", "permissions.SpaceView)")' $app -run TestAdministeringASpaceNoLongerHoldsWhatWasSplitOff
+mutate "administering a space still holds what was split off it" internal/permissions/evaluate.go \
+  's.replace("return in.Action, holds(in, in.Action)", "return in.Action, holds(in, in.Action) || holds(in, SpaceAdminister)")' $perms -run TestMatrixEvaluate
+mutate "what was split off administering stops on an archived page" internal/permissions/evaluate.go \
+  's.replace("SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:", "SpaceAudit:")' $perms -run TestMatrixEvaluate
+mutate "adoption leaves out what was split off administering" internal/db/migrations/0036_roles.sql \
+  's.replace("WHERE k.permission = '"'"'space.administer'"'"'", "WHERE false AND k.permission = '"'"'space.administer'"'"'")' $perms -run TestAdoptingGrantsChangesNoDecision
+mutate "a permission set with administering becomes a role without what was split off" internal/db/migrations/0036_roles.sql \
+  's.replace("CASE WHEN '"'"'space.administer'"'"' = ANY (s.permissions) THEN split_off ELSE '"'"'{}'"'"' END", "'"'"'{}'"'"'::text[]")' $perms -run TestAdoptingGrantsChangesNoDecision
+mutate "an old bundle loses what administering gave" internal/exchange/bundlein.go \
+  's.replace("if version != bundleVersionBeforeSplit {", "if true {")' ./internal/exchange/ -run TestABundleFromBeforeTheSplitKeepsWhatAdministeringGave
+mutate "anyone reads who holds a role" internal/permissions/roles.go \
+  's.replace("([]RoleHolder, int, error) {\n\tif err := s.requireAdministrator(ctx, s.pool, c); err != nil {", "([]RoleHolder, int, error) {\n\tif err := error(nil); err != nil {")' $perms -run TestHoldersOfARoleShowOnlyToAdministrators
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

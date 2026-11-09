@@ -9,6 +9,7 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp, IconChevronLeft } from '../components/icons';
 import { SettingsFrame, type SettingsGroup } from '../components/settings-frame';
+import { SpaceRolesSection } from './roles';
 import { ConfirmButton, ErrorNote, Field, Loading, SpaceBadge } from '../components/ui';
 import { useDates } from '../dates';
 import { ExportSection, ImportSection, PDFDesignSection } from './exchange';
@@ -32,6 +33,7 @@ const SPACE_SECTIONS = [
   'shortcuts',
   'categories',
   'people',
+  'roles',
   'statuses',
   'labels',
   'placeholders',
@@ -42,6 +44,17 @@ const SPACE_SECTIONS = [
   'danger',
 ] as const;
 type SpaceSection = (typeof SPACE_SECTIONS)[number];
+/** The permission a part of the space settings needs. Every other part needs space administration. */
+const SECTION_NEEDS: Record<string, string> = {
+  roles: 'space.manage_access',
+  permissions: 'space.manage_access',
+  audit: 'space.audit',
+  templates: 'space.templates',
+  rules: 'space.automation',
+  automation: 'space.automation',
+  webhooks: 'space.automation',
+  sites: 'site.publish',
+};
 const BACK_ICON_SIZE = 16;
 
 function useSpaceByKey(key: string) {
@@ -251,11 +264,10 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
     );
   }
   if (!space || !form) return <Loading />;
-  const section = SPACE_SECTIONS.includes(current as SpaceSection) ? (current as SpaceSection) : 'details';
   const base = `/spaces/${space.key}`;
   const item = (id: SpaceSection, label: string) => ({ id, label, href: `${base}/settings?section=${id}` });
   const away = (id: string, label: string, href: string) => ({ id, label, href });
-  const groups: SettingsGroup[] = [
+  const allGroups: SettingsGroup[] = [
     {
       id: 'general',
       title: t('spaceSettings.groupGeneral'),
@@ -273,6 +285,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       title: t('spaceSettings.groupAccess'),
       items: [
         item('people', t('spaceSettings.owners')),
+        item('roles', t('roles.spaceSection')),
         away('permissions', t('access.open'), `${base}/access`),
         away('audit', t('access.auditTitle'), `${base}/audit`),
       ],
@@ -285,6 +298,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
         item('labels', t('organise.labels')),
         item('placeholders', t('space.placeholders')),
         away('content', t('content.title'), `${base}/content`),
+        away('templates', t('templates.title'), `${base}/templates`),
         away('trash', t('space.trash'), `${base}/trash`),
       ],
     },
@@ -313,13 +327,26 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       items: [item('danger', t('spaceSettings.archiveOrDelete'))],
     },
   ];
+  // Each part shows to whoever holds the permission it needs, so a role with only
+  // publishing or automation still finds its way here.
+  const groups = allGroups
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((i) => space.can?.[SECTION_NEEDS[i.id] ?? 'space.administer']),
+    }))
+    .filter((g) => g.items.length > 0);
+  const allowed = groups.flatMap((g) => g.items).map((i) => i.id);
+  const asked = SPACE_SECTIONS.includes(current as SpaceSection) ? (current as SpaceSection) : 'details';
+  // Someone who may only open pages elsewhere, such as the sites, gets no part here.
+  const first = SPACE_SECTIONS.find((s) => allowed.includes(s)) ?? null;
+  const section = allowed.includes(asked) ? asked : first;
   const label = groups.flatMap((g) => g.items).find((i) => i.id === section)?.label ?? t('space.settings');
   return (
     <SettingsFrame
       title={t('space.settings')}
       head={<SettingsBack space={space} />}
       groups={groups}
-      current={section}
+      current={section ?? ''}
     >
       {space.status === 'archived' && (
         <p role="status" className="note">
@@ -327,6 +354,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
         </p>
       )}
       <h1>{label}</h1>
+      {section === null && <p className="muted">{t('spaceSettings.pickOne')}</p>}
       {section === 'details' && (
         <form
           className="settings-form"
@@ -363,6 +391,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       {section === 'shortcuts' && <ShortcutsSection space={space} />}
       {section === 'categories' && <CategoriesSection space={space} />}
       {section === 'people' && <PeopleSection space={space} />}
+      {section === 'roles' && <SpaceRolesSection space={space} />}
       {section === 'statuses' && <StatusesSection space={space} />}
       {section === 'labels' && <LabelsSection space={space} />}
       {section === 'placeholders' && <PlaceholdersSection space={space} />}

@@ -58,6 +58,7 @@ func (s *Server) registerRoutes() {
 	s.registerExchangeRoutes()
 	s.registerSiteRoutes()
 	s.registerConsoleRoutes()
+	s.registerRoleRoutes()
 	s.registerInsightRoutes()
 	s.registerRuleRoutes()
 	s.registerCollabRoutes()

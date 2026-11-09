@@ -232,6 +232,10 @@ test.describe('the look of every kind of screen', () => {
       'page.delete_any',
       'page.archive',
       'space.administer',
+      'site.publish',
+      'space.automation',
+      'space.templates',
+      'space.audit',
       'analytics.view',
       'space.export',
     ]);
@@ -707,6 +711,22 @@ test.describe('the look of every kind of screen', () => {
     await page.goto('/admin/rules');
     await expect(page.getByRole('heading', { name: 'Features' })).toBeVisible();
     await picture(page, 'admin-rules');
+  });
+
+  test('the roles of an instance, and who holds them in a space', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto('/admin/permissions');
+    await expect(page.getByRole('heading', { name: 'Roles for a space' })).toBeVisible();
+    await picture(page, 'admin-roles');
+    // The editor shows the permissions in groups, each with what it allows.
+    await page.getByRole('button', { name: 'New role' }).first().click();
+    await expect(page.getByRole('group', { name: 'People and access' })).toBeVisible();
+    await picture(page, 'role-editor');
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
+    await page.goto('/spaces/HANDBOOK/settings?section=roles');
+    await expect(page.getByRole('heading', { name: 'People and roles', level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Who holds which role' })).toBeVisible();
+    await picture(page, 'space-roles');
   });
 
   test('a person asked for a stronger sign-in, and a maintenance note', async ({ browser }) => {

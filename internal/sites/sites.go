@@ -114,14 +114,14 @@ func load(ctx context.Context, q db.Querier, id uuid.UUID) (Site, error) {
 	return scan(q.QueryRow(ctx, `SELECT `+siteColumns+` FROM public_sites WHERE id = $1`, id))
 }
 
-// owned loads a site for someone who administers its space. For anyone who may not
+// owned loads a site for someone who publishes for its space. For anyone who may not
 // see that space, the site does not exist.
 func (s *Service) owned(ctx context.Context, c identity.Caller, id uuid.UUID) (Site, error) {
 	v, err := load(ctx, s.pool, id)
 	if err != nil {
 		return v, err
 	}
-	return v, s.perms.RequireSpace(ctx, s.pool, c.UserID, v.SpaceID, permissions.SpaceAdminister)
+	return v, s.perms.RequireSpace(ctx, s.pool, c.UserID, v.SpaceID, permissions.SitePublish)
 }
 
 func (s *Service) requireEnabled(ctx context.Context) error {
@@ -203,7 +203,7 @@ func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, v 
 
 // Create makes a site. It holds nothing until pages are chosen and it is published.
 func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in Input) (Site, error) {
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SitePublish); err != nil {
 		return Site{}, err
 	}
 	if err := s.requireEnabled(ctx); err != nil {
@@ -229,7 +229,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID uuid.UU
 
 // List gives the sites of a space.
 func (s *Service) List(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]Site, error) {
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SitePublish); err != nil {
 		return nil, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT `+siteColumns+` FROM public_sites WHERE space_id = $1 ORDER BY name`, spaceID)
@@ -293,7 +293,7 @@ type PageChoice struct {
 }
 
 // Choices lists the pages a person can pick. A page that may not be public is
-// listed as blocked: only someone who administers the space sees this, and drafts
+// listed as blocked: only someone who publishes for the space sees this, and drafts
 // are not offered at all.
 func (s *Service) Choices(ctx context.Context, c identity.Caller, id uuid.UUID) ([]PageChoice, error) {
 	v, err := s.owned(ctx, c, id)

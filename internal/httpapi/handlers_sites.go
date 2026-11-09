@@ -14,7 +14,7 @@ import (
 
 func (s *Server) registerSiteRoutes() {
 	r := s.router
-	rule := Object("space.administer")
+	rule := Object("site.publish")
 	admin := Permission(identity.PermAdministrator)
 
 	r.HandleFunc("GET /api/v1/spaces/{id}/sites", rule, s.handleSites)

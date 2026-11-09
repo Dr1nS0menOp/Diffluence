@@ -20,10 +20,10 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("POST "+spacesPath+"/{id}/trash/bulk", Object("space.administer"), s.handleTrashBulk)
 
 	r.HandleFunc("GET "+spacesPath+"/{id}/templates", Object("page.create"), s.handleGallery)
-	r.HandleFunc("GET "+spacesPath+"/{id}/manage-templates", Object("space.administer"), s.handleSpaceTemplateList)
-	r.HandleFunc("POST "+spacesPath+"/{id}/templates", Object("space.administer"), s.handleSpaceTemplateCreate)
-	r.HandleFunc("POST "+spacesPath+"/{id}/templates/import", Object("space.administer"), s.handleSpaceTemplateImport)
-	r.HandleFunc("POST "+pagesPath+"/{id}/save-as-template", Object("space.administer"), s.handleSaveAsTemplate)
+	r.HandleFunc("GET "+spacesPath+"/{id}/manage-templates", Object("space.templates"), s.handleSpaceTemplateList)
+	r.HandleFunc("POST "+spacesPath+"/{id}/templates", Object("space.templates"), s.handleSpaceTemplateCreate)
+	r.HandleFunc("POST "+spacesPath+"/{id}/templates/import", Object("space.templates"), s.handleSpaceTemplateImport)
+	r.HandleFunc("POST "+pagesPath+"/{id}/save-as-template", Object("space.templates"), s.handleSaveAsTemplate)
 	// The module decides per template: it may belong to a space or to everyone.
 	r.HandleFunc("GET /api/v1/templates/{id}", me, s.handleTemplate)
 	r.HandleFunc("PATCH /api/v1/templates/{id}", me, s.handleTemplateUpdate)

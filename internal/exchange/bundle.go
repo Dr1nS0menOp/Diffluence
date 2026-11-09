@@ -32,18 +32,22 @@ import (
 const JobKindBundle = "bundle_export"
 
 const (
-	bundleFormat   = "diffluence-bundle"
-	bundleVersion  = 1
-	manifestFile   = "manifest.json"
-	signatureFile  = "manifest.sig"
-	spaceFile      = "space.json"
-	pagesFile      = "pages.json"
-	commentsFile   = "comments.json"
-	filesFile      = "attachments.json"
-	peopleFile     = "people.json"
-	bundleFiles    = "files/"
-	maxBundleJSON  = 512 << 20
-	maxPartEntries = 1_000_000
+	bundleFormat = "diffluence-bundle"
+	// bundleVersion 2 holds the permissions spec 036 split off broader ones.
+	bundleVersion = 2
+	// bundleVersionBeforeSplit is still read: its grants of a broader permission bring the
+	// finer ones with them, as migration 0036 did.
+	bundleVersionBeforeSplit = 1
+	manifestFile             = "manifest.json"
+	signatureFile            = "manifest.sig"
+	spaceFile                = "space.json"
+	pagesFile                = "pages.json"
+	commentsFile             = "comments.json"
+	filesFile                = "attachments.json"
+	peopleFile               = "people.json"
+	bundleFiles              = "files/"
+	maxBundleJSON            = 512 << 20
+	maxPartEntries           = 1_000_000
 )
 
 // bundleEntry is one file in a manifest.

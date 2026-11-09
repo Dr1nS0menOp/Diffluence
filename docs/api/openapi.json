@@ -1313,6 +1313,164 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/role-assignments": {
+      "get": {
+        "operationId": "get /api/v1/admin/role-assignments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/role-assignments",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/roles": {
+      "post": {
+        "operationId": "post /api/v1/admin/roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/roles/{id}": {
+      "delete": {
+        "operationId": "delete /api/v1/admin/roles/{id}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/roles/{id}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/roles/{id}/holders": {
+      "get": {
+        "operationId": "get /api/v1/admin/roles/{id}/holders",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "permission:administrator"
+      }
+    },
+    "/api/v1/admin/roles/{id}/preview": {
+      "post": {
+        "operationId": "post /api/v1/admin/roles/{id}/preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/rules": {
       "get": {
         "operationId": "get /api/v1/admin/rules",
@@ -6082,7 +6240,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "get": {
         "operationId": "get /api/v1/pages/{id}/public-link",
@@ -6107,7 +6265,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "put": {
         "operationId": "put /api/v1/pages/{id}/public-link",
@@ -6132,7 +6290,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/pages/{id}/public-state": {
@@ -6414,7 +6572,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.templates"
       }
     },
     "/api/v1/pages/{id}/schedule": {
@@ -7256,6 +7414,24 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/roles": {
+      "get": {
+        "operationId": "get /api/v1/roles",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "roles"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/rules/{id}": {
       "delete": {
         "operationId": "delete /api/v1/rules/{id}",
@@ -7280,7 +7456,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "get": {
         "operationId": "get /api/v1/rules/{id}",
@@ -7305,7 +7481,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "put": {
         "operationId": "put /api/v1/rules/{id}",
@@ -7330,7 +7506,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/rules/{id}/hook": {
@@ -7357,7 +7533,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "session-only object:space.administer"
+        "x-access": "session-only object:space.automation"
       }
     },
     "/api/v1/rules/{id}/run": {
@@ -7411,7 +7587,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/rules/{id}/test": {
@@ -7438,7 +7614,7 @@
         "tags": [
           "rules"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/same-title": {
@@ -7605,7 +7781,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "get": {
         "operationId": "get /api/v1/sites/{id}",
@@ -7630,7 +7806,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "patch": {
         "operationId": "patch /api/v1/sites/{id}",
@@ -7655,7 +7831,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/builds": {
@@ -7682,7 +7858,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/download": {
@@ -7709,7 +7885,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/pages": {
@@ -7736,7 +7912,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "put": {
         "operationId": "put /api/v1/sites/{id}/pages",
@@ -7761,7 +7937,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/preview": {
@@ -7788,7 +7964,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/publish": {
@@ -7815,7 +7991,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/rollback": {
@@ -7842,7 +8018,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/sites/{id}/withdraw": {
@@ -7869,7 +8045,7 @@
         "tags": [
           "sites"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/space-directory": {
@@ -8246,7 +8422,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.audit"
       }
     },
     "/api/v1/spaces/{id}/bundles": {
@@ -9071,7 +9247,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.templates"
       }
     },
     "/api/v1/spaces/{id}/old-keys": {
@@ -9404,6 +9580,58 @@
         "x-access": "object:space.administer"
       }
     },
+    "/api/v1/spaces/{id}/role-assignments": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/role-assignments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.manage_access"
+      },
+      "put": {
+        "operationId": "put /api/v1/spaces/{id}/role-assignments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.manage_access"
+      }
+    },
     "/api/v1/spaces/{id}/rules": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/rules",
@@ -9428,7 +9656,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "post": {
         "operationId": "post /api/v1/spaces/{id}/rules",
@@ -9453,7 +9681,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/spaces/{id}/shortcuts": {
@@ -9532,7 +9760,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       },
       "post": {
         "operationId": "post /api/v1/spaces/{id}/sites",
@@ -9557,7 +9785,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:site.publish"
       }
     },
     "/api/v1/spaces/{id}/statuses": {
@@ -9661,7 +9889,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.templates"
       }
     },
     "/api/v1/spaces/{id}/templates/import": {
@@ -9688,7 +9916,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.templates"
       }
     },
     "/api/v1/spaces/{id}/title-align": {
@@ -9981,7 +10209,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "post": {
         "operationId": "post /api/v1/spaces/{id}/webhooks",
@@ -10006,7 +10234,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/start": {
@@ -10438,7 +10666,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "get": {
         "operationId": "get /api/v1/webhooks/{id}",
@@ -10463,7 +10691,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       },
       "patch": {
         "operationId": "patch /api/v1/webhooks/{id}",
@@ -10488,7 +10716,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/webhooks/{id}/deliveries": {
@@ -10515,7 +10743,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/webhooks/{id}/deliveries/{delivery}/resend": {
@@ -10550,7 +10778,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.automation"
       }
     },
     "/api/v1/webhooks/{id}/rotate": {
@@ -10577,7 +10805,7 @@
         "tags": [
           "webhooks"
         ],
-        "x-access": "session-only object:space.administer"
+        "x-access": "session-only object:space.automation"
       }
     },
     "/collab": {

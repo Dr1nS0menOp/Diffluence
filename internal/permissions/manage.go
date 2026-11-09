@@ -57,12 +57,8 @@ func validSpaceSubject(s Subject) bool {
 // ApplyTemplateTx replaces a subject's permissions in a space, inside tx, with no
 // checks. It is for setting up a new space; everything else uses SetGrants.
 func ApplyTemplateTx(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID, sub Subject, template string) error {
-	if _, err := tx.Exec(ctx, "DELETE FROM space_grants WHERE space_id = $1 AND subject_type = $2 AND subject_id = $3",
-		spaceID, sub.Type, sub.ID); err != nil {
-		return err
-	}
-	_, err := tx.Exec(ctx, `INSERT INTO space_grants (space_id, subject_type, subject_id, permission)
-		SELECT $1::uuid, $2::text, $3::uuid, unnest($4::text[])`, spaceID, sub.Type, sub.ID, Templates[template])
+	// The template's built-in role, which rbac_set_exact prefers for the same set.
+	_, err := tx.Exec(ctx, "SELECT rbac_set_exact($1, $2, $3, $4::text[])", spaceID, sub.Type, sub.ID, Templates[template])
 	return err
 }
 
@@ -175,12 +171,9 @@ func (s *Service) SetGrants(ctx context.Context, c identity.Caller, spaceID uuid
 		if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, perms); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, "DELETE FROM space_grants WHERE space_id = $1 AND subject_type = $2 AND subject_id = $3",
-			spaceID, sub.Type, sub.ID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO space_grants (space_id, subject_type, subject_id, permission)
-			SELECT $1::uuid, $2::text, $3::uuid, unnest($4::text[]) ON CONFLICT DO NOTHING`, spaceID, sub.Type, sub.ID, perms); err != nil {
+		// A set of single permissions becomes a role: a built-in one when it matches,
+		// otherwise the role with exactly this set, made once (spec 036).
+		if _, err := tx.Exec(ctx, "SELECT rbac_set_exact($1, $2, $3, $4::text[])", spaceID, sub.Type, sub.ID, perms); err != nil {
 			return err
 		}
 		if err := s.keepsAnAdmin(ctx, tx, spaceID); err != nil {

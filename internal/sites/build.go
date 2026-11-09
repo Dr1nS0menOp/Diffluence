@@ -702,7 +702,7 @@ func (s *Service) runBuild(ctx context.Context, j jobs.Job) (any, error) {
 		return nil, err
 	}
 	c := identity.Caller{UserID: j.CreatedBy, Meta: identity.RequestMeta{RequestID: "job-" + j.ID.String()}}
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, v.SpaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, v.SpaceID, permissions.SitePublish); err != nil {
 		return nil, err
 	}
 	report, err := s.build(ctx, c, v)

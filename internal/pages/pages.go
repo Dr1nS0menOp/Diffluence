@@ -595,7 +595,7 @@ func (s *Service) capabilities(ctx context.Context, c identity.Caller, p Page) (
 	out := map[string]bool{}
 	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.PageArchive, permissions.ActionPageDelete,
 		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
-		permissions.CommentAdd, permissions.ActionReact} {
+		permissions.CommentAdd, permissions.ActionReact, permissions.SitePublish, permissions.SpaceTemplates} {
 		d := permissions.Evaluate(permissions.Input{User: u, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
 		out[action] = d.Allowed
 	}

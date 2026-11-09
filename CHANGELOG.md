@@ -8,6 +8,19 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - Builders may run only what their change can affect. Main and CI always run every mutation
 - Upgrade impact: none
 
+### Added: roles you make yourself (spec 036)
+- Access is given as roles: named sets of permissions, for a space or for the whole instance. Administrators make and change them; people and groups hold them, and what they may do follows a role when it changes
+- Viewer, Editor, Manager and Space admin are built-in roles with the meaning they always had, and cannot be changed or deleted
+- A role in use cannot be deleted, cannot gain space administration, and changes only after a preview that says who it reaches. Every change to a role or to who holds it is audited, with before and after
+- Who may give access does not change: in a space whoever manages access there, for the instance administrators, and only a space administrator makes another one
+- The routes for single permissions keep working: a set becomes the role with exactly that set. Own permission sets became roles under their own names
+- Four permissions of their own, taken out of space administration: publishing to the web (public sites and public links), automation (rules and webhooks), templates, and reading the audit of a space. Whoever administered a space holds them too, so a role can now give one without the rest
+- Every permission has a plain name and one line on what it allows, in groups: pages, comments, files, people and access, space, administration. No key such as create_personal_space shows on a screen any more
+- Administration > Roles makes and changes roles with those groups of checkboxes, and shows who holds each role and in which space. A space's settings give roles under People and roles. The list of who holds which instance permission stays, in words. The old box for named permission sets is gone: those sets are roles now
+- Space settings show each part to whoever holds the permission it needs, so someone who only publishes or only runs automation still finds it
+- Bundles are format 2. A bundle of format 1 still comes in, and its space administrators keep what the split took out of administering
+- Upgrade impact: one migration, which gives the four new permissions to everyone who administered a space and turns every existing permission into roles, without changing what anyone may do. The application's database role can no longer write permissions itself; only the database's own role triggers can
+
 ### Security: open lines of blueprints 05 and 06 (spec 035)
 - The PDF helper can ask for a password, `DIFFLUENCE_PDF_PASSWORD`, and then answers only Diffluence. In `compose.yaml` it also fetches no address, runs no script in pages, runs read-only without extra rights, and is pinned by digest
 - Passwords are compared in one Unicode form, so the same password typed on two systems always works. A new password may not hold the product's name

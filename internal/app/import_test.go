@@ -369,8 +369,10 @@ func TestABundleMovesASpaceWithItsHistory(t *testing.T) {
 			t.Fatalf("missing %s", name)
 		}
 	}
+	// The permission to read a space's audit is a grant like any other, not audit itself.
+	held := strings.ReplaceAll(files["people.json"]+files["space.json"], `"`+permissions.SpaceAudit+`"`, "")
 	for _, secret := range []string{"password", "session", "audit"} {
-		if strings.Contains(strings.ToLower(files["people.json"]+files["space.json"]), secret) {
+		if strings.Contains(strings.ToLower(held), secret) {
 			t.Fatalf("a bundle holds %s", secret)
 		}
 	}

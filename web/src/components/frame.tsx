@@ -66,6 +66,19 @@ export const spaceByKeyQuery = (key: string) => ({
   queryFn: () => api.get<Space>(`/space-keys/${encodeURIComponent(key)}`),
 });
 
+/** Permissions that each open a part of the space settings (spec 036). */
+const SETTINGS_PERMISSIONS = [
+  'space.administer',
+  'space.audit',
+  'space.templates',
+  'space.automation',
+  'site.publish',
+];
+
+function mayOpenSettings(space: Space): boolean {
+  return SETTINGS_PERMISSIONS.some((p) => space.can?.[p]);
+}
+
 function firstMatch(patterns: string[], path: string, part: string): string | undefined {
   return patterns.map((pattern) => match(pattern, path)?.[part]).find(Boolean);
 }
@@ -159,7 +172,7 @@ function SpaceMenu({ space }: { space: Space }) {
             <IconDownload size={MENU_ICON_SIZE} /> {t('exchange.export')}
           </MenuItem>
         )}
-        {space.can?.['space.administer'] && (
+        {mayOpenSettings(space) && (
           <MenuLink href={`/spaces/${space.key}/settings`}>
             <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
           </MenuLink>
@@ -317,7 +330,7 @@ function Sidebar({
       />
       {space.can?.['space.manage_access'] && (
         <nav className="sidebar-foot" aria-label={t('space.settings')}>
-          {space.can['space.administer'] && (
+          {mayOpenSettings(space) && (
             <Link href={`/spaces/${space.key}/settings`} className="side-link">
               <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
             </Link>

@@ -520,7 +520,7 @@ func (s *Service) newLocalAccount(ctx context.Context, tx pgx.Tx, data invitatio
 		return uuid.Nil, err
 	}
 	for _, p := range defaultPermissions(data.Type) {
-		if _, err := tx.Exec(ctx, "INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, $2)", id, p); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", id, p); err != nil {
 			return uuid.Nil, err
 		}
 	}
@@ -585,7 +585,7 @@ func (s *Service) CreateServiceAccount(ctx context.Context, c Caller, name strin
 			VALUES ($1, $2, 'service', 'active', $3, $4)`, id, s.instanceID, "service-"+id.String()+"@service.invalid", name); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, "INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, $2)", id, PermUseProduct); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", id, PermUseProduct); err != nil {
 			return err
 		}
 		return s.record(ctx, tx, c, "user.created", "user", id.String(), map[string]any{"type": TypeService})

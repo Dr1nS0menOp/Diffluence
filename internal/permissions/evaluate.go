@@ -41,6 +41,16 @@ const (
 
 	// AnalyticsView shows what is read in a space (spec 015, D5).
 	AnalyticsView = "analytics.view"
+
+	// SitePublish publishes public sites of a space and makes public links to its
+	// pages (spec 036).
+	SitePublish = "site.publish"
+	// SpaceAutomation looks after the automation rules and webhooks of a space.
+	SpaceAutomation = "space.automation"
+	// SpaceTemplates makes and changes the templates of a space.
+	SpaceTemplates = "space.templates"
+	// SpaceAudit reads the audit of a space.
+	SpaceAudit = "space.audit"
 )
 
 // AllSpacePermissions lists every space permission.
@@ -50,6 +60,17 @@ var AllSpacePermissions = []string{
 	CommentAdd, CommentDeleteOwn, CommentDeleteAny,
 	AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
 	RestrictionManage, AnalyticsView,
+	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
+}
+
+// SplitFrom names, for each permission spec 036 split off a broader one, that broader
+// permission. Whoever held the broader one before holds the finer one too, so the split
+// moves no access; it only lets a role hold one without the other.
+var SplitFrom = map[string]string{
+	SitePublish:     SpaceAdminister,
+	SpaceAutomation: SpaceAdminister,
+	SpaceTemplates:  SpaceAdminister,
+	SpaceAudit:      SpaceAdminister,
 }
 
 // Actions that are not permissions themselves.
@@ -168,10 +189,12 @@ func isEdit(action string) bool {
 const KindTemplate = "template"
 
 // worksOnArchivedPage lists what still works on a page in the archive: reading,
-// export and delete, restoring it, and who may see it.
+// export and delete, restoring it, and who may see it. What spec 036 split off
+// administer works where administer does.
 func worksOnArchivedPage(action string) bool {
 	switch action {
-	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:
+	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,
+		SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:
 		return true
 	}
 	return false
@@ -180,7 +203,8 @@ func worksOnArchivedPage(action string) bool {
 // worksWhenArchived lists what still works in an archived (read-only) space.
 func worksWhenArchived(action string) bool {
 	switch action {
-	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView:
+	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView,
+		SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:
 		return true
 	}
 	return false

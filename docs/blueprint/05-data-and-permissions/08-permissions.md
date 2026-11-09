@@ -64,7 +64,7 @@ A set fills in boxes. It is not a rule, and it can be changed box by box afterwa
 | **PRM-033** | built | Editor | view, export, page create, edit, archive, delete own, comment add, comment delete own, attachment add, attachment delete own |
 | **PRM-034** | built | Space administrator | All space permissions |
 | **PRM-035** | built | Manager | Editor, plus delete any page, comment and file, manage restrictions, manage access |
-| **PRM-036** | built | Own sets | Defined by administrators, for the whole instance |
+| **PRM-036** | built | Own sets | Defined by administrators, for the whole instance. They became roles in spec 036 (PRM-190) |
 | **PRM-037** | built | Presets | Team space: all members get Editor. Read-only knowledge base: all members get Viewer. Other entries stay |
 
 ## 8.5 Rules of a route
@@ -72,3 +72,48 @@ A set fills in boxes. It is not a rule, and it can be changed box by box afterwa
 - **PRM-031** · built · Every route is registered with an access rule, or registration fails: `public`, `authenticated`, `permission`, `object`, `scim-token`. `docs/api/routes.txt` lists all of them, and a test compares it. Wave F adds `Sensitive` and `SessionOnly`.
 - **PRM-038** · built · Token scopes: `read`, `write`, `export`, `admin`. The scope limits a token, and the rule still runs for its owner. A token never reaches `SessionOnly` routes.
 - **PRM-039** · built · `object` declares the rule, and the module makes the decision, because only it knows the object. A route cannot skip the check, because the module's method checks by itself.
+
+## 8.6 Roles
+
+Spec 036, ADR-034. A role is not a set that fills in boxes: people and groups hold roles, and what they may do follows the role when it changes.
+
+- **PRM-178** · built · A role is a named set of permissions, for a space or for the instance. People and groups get roles, and what they may do is what all their roles add up to.
+- **PRM-179** · built · The built-in space roles Viewer, Editor, Manager and Space admin keep the meaning of PRM-032 to PRM-035, and cannot be changed or deleted. A test compares them with the templates in the code.
+- **PRM-180** · built · Administrators make, rename and change roles. Anyone who uses the product may read the list, so a space manager can choose one.
+- **PRM-181** · built · A role with `system_administrator` needs a system administrator to make, change or give, as PRM-008 says for the permission.
+- **PRM-182** · built · A role in use cannot be deleted. The people who hold it get another role first, where it can be seen.
+- **PRM-183** · built · A change to the permissions of a role in use needs a preview and a confirmation. The preview says how many assignments, spaces and people it reaches, and what they gain and lose.
+- **PRM-184** · built · A space role in use cannot gain `space.administer`. Who administers a space is chosen in that space.
+- **PRM-185** · built · A change to a role cannot leave a space without an administrator, or the instance without an active administrator.
+- **PRM-186** · built · Space roles are given by whoever manages access in the space, within PRM-025: only a space administrator makes or unmakes an administrator, a space keeps one, and the owner of a personal space keeps theirs.
+- **PRM-187** · built · Instance roles are given by administrators, to users and groups only.
+- **PRM-188** · built · Every change to a role or to who holds it is audited, with before and after: the names of the roles and the permissions.
+- **PRM-189** · built · Permissions set one by one, through the older routes, become one role with exactly that set: the built-in role when it matches, otherwise a role named after its permissions. The same set shares one role.
+- **PRM-190** · built · Own sets of PRM-036 became space roles under their own names.
+- **PRM-191** · built · Screens for roles and for who holds them, in the settings pattern of ADR-034: Administration > Roles makes and changes roles, with the permissions in groups and a line on what each allows, and shows who holds each role and where; a space's settings give roles under People and roles; who holds which instance permission stays as a list to read.
+
+## 8.7 Finer permissions
+
+Spec 036. The product owner asked whether one screen of permissions was all there is. Four things hid under `space.administer` that a space can reasonably give apart: they are now permissions of their own. Whoever held *administer* holds them too, so nobody gained or lost anything by the split.
+
+| ID | Status | Permission | What it allows | Split from |
+|---|---|---|---|---|
+| **PRM-198** | built | `site.publish` | Public sites of the space, and public links to its pages | `space.administer` |
+| **PRM-199** | built | `space.automation` | Automation rules and webhooks of the space. Those who hold it are told when a rule stops because its owner left | `space.administer` |
+| **PRM-200** | built | `space.templates` | Making, importing and changing the templates of the space, and saving a page as one | `space.administer` |
+| **PRM-201** | built | `space.audit` | Reading the audit of the space | `space.administer` |
+
+- **PRM-202** · built · A permission split off a broader one works wherever the broader one worked, in an archived space and on an archived page too, so the split changes no decision. `permissions.SplitFrom` names the pairs; the matrix test holds `Evaluate`, the SQL and the literal rule to it.
+- **PRM-203** · built · The migration gives each split-off permission to every subject and own set that held the broader one, before turning grants into roles. Its test compares 369,861 decisions before and after, 720 of them allowed through a split, and none changed.
+- **PRM-204** · built · A bundle of format 1, from before the split, gives the split-off permissions with the broader one. Bundles are now format 2 and taken as they are.
+- **PRM-205** · built · Every permission has a name and one line on what it allows, in the translation files, grouped as pages, comments, files, people and access, space, and administration. No key reaches a screen: a role made from single permissions is named in the same words, and a test holds the database and the interface to one wording.
+- **PRM-206** · new · `post.create`: blog posts apart from pages, given to whoever holds `page.create`. Turning an unpublished page into a post would need it too, which takes that from someone who holds `page.edit` without `page.create`. Needs that decision first.
+- **PRM-207** · new · `space.labels`: the fixed labels of a space and renaming a label, apart from `space.administer`.
+- **PRM-208** · new · `space.statuses`: the page statuses and review rules of a space, apart from `space.administer`.
+- **PRM-209** · new · `space.approvals`: the approval rule of a space, apart from `space.administer`.
+- **PRM-210** · new · `page.move_out`: moving and copying pages out of the space, apart from `page.edit`. Today moving out needs edit and create where the page is, and create where it goes.
+- **PRM-211** · new · Export per format: PDF, office files and bundles apart. Today `space.export` covers files and PDF, and a bundle of the whole space needs `space.administer`.
+- **PRM-212** · new · `page.watchers`: seeing who watches a page and adding or removing someone else, apart from `space.administer`.
+- **PRM-213** · new · `space.invite_guests`: inviting a guest into one space, apart from the instance-wide `invite_people`.
+- **PRM-214** · new · `space.look`: the shortcuts, icon, title alignment and home page of a space, apart from `space.administer`.
+- **PRM-215** · new · `space.databases`: making and changing the databases of a space, after a study of which permission guards them today.

@@ -238,7 +238,7 @@ func (s *Service) CreateLocalUser(ctx context.Context, in NewUser, actor Actor, 
 			return err
 		}
 		for _, p := range in.GlobalPermissions {
-			if _, err := tx.Exec(ctx, "INSERT INTO global_grants (subject_type, subject_id, permission) VALUES ('user', $1, $2)", u.ID, p); err != nil {
+			if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", u.ID, p); err != nil {
 				return err
 			}
 			if _, err := audit.Record(ctx, tx, event(meta, actor, "permission.global.granted", "user", u.ID.String(), audit.ResultSuccess,

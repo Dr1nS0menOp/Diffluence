@@ -18,7 +18,6 @@ import (
 	"github.com/diffluence/diffluence/internal/csvout"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
 )
 
 const (
@@ -222,9 +221,11 @@ type PermissionSet struct {
 	Permissions []string  `json:"permissions"`
 }
 
-// PermissionSets lists the sets administrators made.
+// PermissionSets lists the space roles administrators made. Sets became roles in
+// migration 0036; this keeps the older screens and routes working until they move.
 func (s *Service) PermissionSets(ctx context.Context) ([]PermissionSet, error) {
-	rows, err := s.pool.Query(ctx, "SELECT id, name, permissions FROM permission_sets ORDER BY lower(name)")
+	rows, err := s.pool.Query(ctx, `SELECT id, name, ARRAY(SELECT p FROM unnest(permissions) p ORDER BY 1)
+		FROM roles WHERE scope = 'space' AND builtin IS NULL ORDER BY lower(name)`)
 	if err != nil {
 		return nil, err
 	}
@@ -239,43 +240,31 @@ func (s *Service) PermissionSets(ctx context.Context) ([]PermissionSet, error) {
 	return out, err
 }
 
-// SavePermissionSet adds a set, or replaces the one with the same name.
+// SavePermissionSet adds a space role, or changes the one with the same name, with
+// every rule of UpdateRole: a role in use does not change through this older route.
 func (s *Service) SavePermissionSet(ctx context.Context, c identity.Caller, name string, perms []string) error {
 	name = strings.TrimSpace(name)
 	if name == "" || utf8.RuneCountInString(name) > maxSetName || strings.ContainsAny(name, "\r\n\x00") {
 		return apperr.Invalid("A set needs a name of at most 100 characters.")
 	}
-	for _, p := range perms {
-		if !slices.Contains(AllSpacePermissions, p) {
-			return apperr.Invalid("Unknown permission.")
-		}
+	var id uuid.UUID
+	var description string
+	err := s.pool.QueryRow(ctx, "SELECT id, description FROM roles WHERE scope = 'space' AND lower(name) = lower($1)", name).
+		Scan(&id, &description)
+	if errors.Is(err, pgx.ErrNoRows) {
+		_, err = s.CreateRole(ctx, c, ScopeSpace, RoleInput{Name: name, Permissions: perms})
+		return err
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, "UPDATE permission_sets SET permissions = $2 WHERE lower(name) = lower($1)", name, perms)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
-			if _, err := tx.Exec(ctx, "INSERT INTO permission_sets (id, name, permissions) VALUES ($1, $2, $3)", ids.New(), name, perms); err != nil {
-				return err
-			}
-		}
-		return recordChange(ctx, tx, c, "permission_set.saved", "permission_set", name, "", nil)
-	})
+	if err != nil {
+		return err
+	}
+	_, err = s.UpdateRole(ctx, c, id, RoleInput{Name: name, Description: description, Permissions: perms}, false)
+	return err
 }
 
-// DeletePermissionSet removes a set. No grant changes: a set only filled in boxes.
+// DeletePermissionSet removes a space role nobody holds, as DeleteRole does.
 func (s *Service) DeletePermissionSet(ctx context.Context, c identity.Caller, id uuid.UUID) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, "DELETE FROM permission_sets WHERE id = $1", id)
-		if err != nil {
-			return err
-		}
-		if tag.RowsAffected() == 0 {
-			return apperr.NotFound()
-		}
-		return recordChange(ctx, tx, c, "permission_set.deleted", "permission_set", id.String(), "", nil)
-	})
+	return s.DeleteRole(ctx, c, id)
 }
 
 // GlobalHolder is who holds a global permission, and how.

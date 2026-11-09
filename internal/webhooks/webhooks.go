@@ -105,7 +105,7 @@ func scanEndpoint(row pgx.Row) (Endpoint, error) {
 
 func (s *Service) mayManage(ctx context.Context, c identity.Caller, spaceID *uuid.UUID) error {
 	if spaceID != nil {
-		return s.perms.RequireSpace(ctx, s.pool, c.UserID, *spaceID, permissions.SpaceAdminister)
+		return s.perms.RequireSpace(ctx, s.pool, c.UserID, *spaceID, permissions.SpaceAutomation)
 	}
 	allowed, err := s.id.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
 	if err != nil {
