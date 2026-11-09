@@ -5,13 +5,48 @@
 package webui
 
 import (
+	"crypto/sha256"
 	"embed"
+	"encoding/hex"
 	"io/fs"
 	"mime"
 	"net/http"
 	"path"
 	"strings"
+	"sync"
 )
+
+// buildOnce and buildID hold the build id. The embedded files never change while the binary
+// runs, so it is worked out once: logically constant data, not shared state.
+var (
+	buildOnce sync.Once
+	buildID   string
+)
+
+// Build is a short id of the frontend inside this binary: a hash of index.html, which names
+// every asset by its content, so each frontend build gets a new id. An open tab compares it
+// to find out that a newer version runs (spec 041). It tells nothing a visitor cannot already
+// download. It is empty when the frontend was not built.
+func Build() string {
+	buildOnce.Do(func() {
+		root, err := fs.Sub(dist, "dist")
+		if err != nil {
+			return
+		}
+		buildID = buildOf(root)
+	})
+	return buildID
+}
+
+// buildOf hashes index.html of a frontend, or gives "" when there is none.
+func buildOf(root fs.FS) string {
+	index, err := fs.ReadFile(root, "index.html")
+	if err != nil {
+		return ""
+	}
+	sum := sha256.Sum256(index)
+	return hex.EncodeToString(sum[:8])
+}
 
 // The frontend build writes into dist/. An empty placeholder keeps go:embed
 // working when only the backend is built.

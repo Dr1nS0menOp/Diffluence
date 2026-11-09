@@ -8,7 +8,7 @@ The binary stays simple only if its inside stays strict. This chapter says who o
 - **ARC-024** · built · Every method takes a `Caller` and checks permissions itself (`permissions.Require...`), so no path through the code can skip them. A handler never decides.
 - **ARC-025** · built · A state change writes its audit event and outbox event in the same transaction as the change.
 - **ARC-026** · built · Imports only go one way. The order is in 2.3, and a cycle does not compile.
-- **ARC-027** · built · Modules do not write each other's tables. Reading is looser than `CLAUDE.md` says: lists join `spaces` and `users` for a name, and `perm_*` functions are shared on purpose. A scan in spec 032 found 14 tables written by more than one module, and records each with its reason: erasing a person and importing a bundle each change many modules in one transaction, file-owning modules queue their files for deletion in their own transaction, and some space settings are written by `pages`. The small ones moved behind their owner (spec 039): closing comments on a page is `pages.SetCommentsClosed`, and `analytics` and `automation` keep their choices through `settings.Store`.
+- **ARC-027** · built · Modules do not write each other's tables. Reading is looser than `CLAUDE.md` says: lists join `spaces` and `users` for a name, and `perm_*` functions are shared on purpose. A scan in spec 032 found 14 tables written by more than one module, and records each with its reason: erasing a person and importing a bundle each change many modules in one transaction, file-owning modules queue their files for deletion in their own transaction, and some space settings are written by `pages`. The small ones moved behind their owner (spec 039): closing comments on a page is `pages.SetCommentsClosed`, and `analytics` and `automation` keep their choices through `settings.Store`. Whether a page takes new comments is decided by `pages` too: `comments` asks through its own small interface, `PageGate`, inside its own transaction, and never reads the column itself (spec 041).
 - **ARC-028** · built · Where two modules must react to each other in one transaction, the lower one offers a hook. `trash` holds a `Handler` per object type, so it needs no import of `pages`.
 - **ARC-029** · built · A module that only reacts to something listens to an event, and is not called by the sender. Publishing a page does not know that notifications exist.
 - **ARC-030** · built · Wiring lives in one place, `internal/app`. Nothing else builds a service.
@@ -85,6 +85,8 @@ app
 
 - **ARC-035** · built · `features` sits low, below `pages`, because pages, comments and spaces all ask it (spec 011 D25).
 - **ARC-036** · built · A new feature module sits above `pages` and uses its exported API. If `pages` must call it, an event is the answer, or a hook as in ARC-028.
+
+The picture is not quite true for `comments`: `pages` imports it, because publishing releases comments meant for editors, and removing a version blanks the quotes of its words, each in the same transaction. So `comments` cannot import `pages`. Where it needs an answer from `pages`, it defines an interface where it is used, and `app` hands in the pages service (spec 041). An import cycle stays impossible, and `pages` stays the one that decides about its own columns.
 
 ## 2.4 The frontend
 

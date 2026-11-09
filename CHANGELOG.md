@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: a note when a newer version runs (spec 041)
+- A tab that was opened before an update says so under the top bar, and offers Reload. It never reloads by itself and takes no focus, so typing goes on
+- Reload first saves the draft of an open editor, so the text is simply there afterwards
+- Comments now ask the page whether they are closed, instead of reading it themselves. Nothing changes for people
+- Upgrade impact: none
+
 ### Added: a setup screen for a new install (spec 038)
 - A new install opens on a setup screen: the name of the company or person it is for, which the search box shows as "Search in" that name, the first administrator and the default time zone. Right after, it asks for a passkey
 - The screen needs a one-time code from the server's log, or from `diffluence setup-code`. A code lasts an hour, works once and stops after 10 wrong tries. Once an administrator exists, the screen is gone for good

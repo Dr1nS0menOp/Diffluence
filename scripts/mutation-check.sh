@@ -462,6 +462,10 @@ mutate "sharing gives access" internal/sharing/sharing.go \
   's.replace("missing = append(missing, person)\n\t\t\t\tcontinue\n", "if err := s.perms.GrantEditor(ctx, tx, c, space.ID, person); err != nil {\n\t\t\t\t\treturn err\n\t\t\t\t}\n\t\t\t\tcontinue\n")' $app -run TestSharingOnlyNotifies
 mutate "a page manager can widen a whole space" internal/sharing/sharing.go \
   's.replace("if effect == EffectSpaceGrant {\n\t\treturn permissions.SpaceAdminister", "if len(effect) < 0 {\n\t\treturn permissions.SpaceAdminister")' $app -run TestAllowingOpensTheSpaceAndEveryRestriction
+mutate "a closed page still takes comments" internal/pages/look.go \
+  's.replace("return closed, err\n}", "return false, err\n}")' $app -run TestClosingCommentsStopsNewOnesAtOnce
+mutate "comments ignore what pages says about closing" internal/comments/comments.go \
+  's.replace("if !on || closed {", "if !on || closed && false {")' $app -run TestClosingCommentsStopsNewOnesAtOnce
 mutate "a comment for editors reaches everyone" internal/comments/list.go \
   's.replace("if v.EditorsOnly && !a.canEdit {", "if v.EditorsOnly && !a.canEdit && len(v.Status) < 0 {")' $app -run TestInlineThreadsResolveAndStayWithEditorsUntilPublishing
 mutate "a mention reaches a group of any size" internal/notify/fanout.go \

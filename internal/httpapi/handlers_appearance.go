@@ -8,6 +8,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/webui"
 )
 
 // fontCacheSeconds can be long: a replaced font gets a new versioned address.
@@ -66,7 +67,9 @@ func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
 	out := map[string]any{"font": nil, "name": look.InstanceName, "organisation": look.OrganisationName, "accent": settings.DerivedAccent(look.AccentLight, look.AccentDark),
 		"login_welcome": look.LoginWelcome, "terms_url": look.TermsURL, "banner": activeBanner(look), "welcome_page": look.WelcomePage,
 		"help_url": general.HelpURL, "maintenance": maintenance, "logo": "", "mail_ready": s.deps.Identity.MailReady(),
-		"self_signup": features.SelfSignup}
+		"self_signup": features.SelfSignup,
+		// The id of the frontend this server ships, so an open tab notices a newer version (spec 041).
+		"build": webui.Build()}
 	if found {
 		out["font"] = fontJSON{Name: font.Name, Format: font.Format, Version: font.Version}
 	}

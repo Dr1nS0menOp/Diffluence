@@ -101,12 +101,20 @@ type Service struct {
 	perms      *permissions.Service
 	settings   *settings.Service
 	features   *features.Service
+	pages      PageGate
 	instanceID uuid.UUID
 }
 
+// PageGate tells whether a page takes new comments. The switch is a column of the page, so
+// the pages module decides it; comments only asks, inside its own transaction (ARC-027, spec 041).
+// It is defined here, where it is used, because pages already imports comments.
+type PageGate interface {
+	CommentsClosed(ctx context.Context, q db.Querier, pageID uuid.UUID) (bool, error)
+}
+
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, st *settings.Service, f *features.Service, instanceID uuid.UUID) *Service {
-	return &Service{pool: pool, perms: perms, settings: st, features: f, instanceID: instanceID}
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, st *settings.Service, f *features.Service, pages PageGate, instanceID uuid.UUID) *Service {
+	return &Service{pool: pool, perms: perms, settings: st, features: f, pages: pages, instanceID: instanceID}
 }
 
 type row struct {
@@ -244,8 +252,8 @@ func (s *Service) checkOpen(ctx context.Context, q db.Querier, pageID, spaceID u
 	if err != nil {
 		return err
 	}
-	var closed bool
-	if err := q.QueryRow(ctx, "SELECT comments_closed FROM pages WHERE id = $1", pageID).Scan(&closed); err != nil {
+	closed, err := s.pages.CommentsClosed(ctx, q, pageID)
+	if err != nil {
 		return err
 	}
 	if !on || closed {

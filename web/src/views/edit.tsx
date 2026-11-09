@@ -16,6 +16,7 @@ import {
 } from '../api';
 import { Link, navigate } from '../router';
 import { unsavedKey, usePerson } from '../personal';
+import { useSaveBeforeReload } from '../before-reload';
 import { anchorOfSelection } from '../components/comments/anchor';
 import { NewThread } from '../components/comments/selection-bar';
 import { DocumentEditor } from '../components/editor/editor';
@@ -325,6 +326,12 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
     );
   };
   useEffect(() => () => saveOnLeaving.current(), []);
+
+  // A reload offered for a new version saves the draft first, so the text is simply there after it.
+  useSaveBeforeReload(() => {
+    clearTimeout(timer.current);
+    return save();
+  });
 
   useEffect(() => {
     const keep = () => {

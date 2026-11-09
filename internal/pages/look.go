@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -131,4 +132,12 @@ func (s *Service) SetCommentsClosed(ctx context.Context, c identity.Caller, id u
 		}
 		return record(ctx, tx, c, "page.comments_closed", p, map[string]any{"closed": closed})
 	})
+}
+
+// CommentsClosed tells whether a page takes no new comments. The comments module asks this
+// instead of reading the column itself, so pages stays the only one that decides (ARC-027).
+func (s *Service) CommentsClosed(ctx context.Context, q db.Querier, id uuid.UUID) (bool, error) {
+	var closed bool
+	err := q.QueryRow(ctx, "SELECT comments_closed FROM pages WHERE id = $1", id).Scan(&closed)
+	return closed, err
 }

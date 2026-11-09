@@ -2195,7 +2195,10 @@
     "signIn": "Stronger sign-in",
     "signInHelp": "Your account is protected by a password only. Add a passkey or an authenticator app.",
     "signInSetUp": "Set it up",
-    "signInLater": "Later"
+    "signInLater": "Later",
+    "newVersion": "New version",
+    "newVersionHelp": "A newer version of Diffluence is running. Reload when it suits you; text you are writing stays.",
+    "reload": "Reload"
   },
   "reauth": {
     "title": "Confirm it is you",

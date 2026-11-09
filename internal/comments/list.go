@@ -194,9 +194,11 @@ func (s *Service) List(ctx context.Context, c identity.Caller, pageID uuid.UUID,
 	}
 	out.Total = len(out.Threads)
 	out.Threads = window(out.Threads, opts)
-	if err := s.pool.QueryRow(ctx, "SELECT comments_closed FROM pages WHERE id = $1", pageID).Scan(&out.Closed); err != nil {
+	closed, err := s.pages.CommentsClosed(ctx, s.pool, pageID)
+	if err != nil {
 		return out, err
 	}
+	out.Closed = closed
 	return out, s.addReactions(ctx, c, &out)
 }
 

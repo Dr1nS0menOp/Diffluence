@@ -35,6 +35,24 @@ func TestOnlyOurViewersAndTheDrawingServiceMayBeFramed(t *testing.T) {
 	}
 }
 
+func TestANewFrontendGetsANewBuildId(t *testing.T) {
+	if got := buildOf(fstest.MapFS{}); got != "" {
+		t.Fatalf("a binary without a frontend must say nothing: %q", got)
+	}
+	first := buildOf(fstest.MapFS{"index.html": {Data: []byte(`<script src="/assets/index-a1.js">`)}})
+	same := buildOf(fstest.MapFS{"index.html": {Data: []byte(`<script src="/assets/index-a1.js">`)}})
+	next := buildOf(fstest.MapFS{"index.html": {Data: []byte(`<script src="/assets/index-b2.js">`)}})
+	if first == "" || first != same {
+		t.Fatalf("the same build must keep its id: %q %q", first, same)
+	}
+	if first == next {
+		t.Fatal("a new build must get a new id")
+	}
+	if len(first) != 16 {
+		t.Fatalf("the id stays short: %q", first)
+	}
+}
+
 func serve(t *testing.T, name string) *httptest.ResponseRecorder {
 	t.Helper()
 	files := fstest.MapFS{

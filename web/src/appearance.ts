@@ -35,6 +35,8 @@ export interface Appearance {
   logo: string;
   mail_ready: boolean;
   self_signup: boolean;
+  /** Which frontend the server ships, or empty in a build without one (spec 041). */
+  build: string;
 }
 
 export const appearanceQuery = {

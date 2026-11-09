@@ -795,6 +795,27 @@ test.describe('the look of every kind of screen', () => {
     await context.close();
   });
 
+  test('a newer version is running, in light, and dark on a phone', async ({ browser }) => {
+    for (const scheme of ['light', 'dark'] as const) {
+      const page = await newReaderPage(browser, scheme);
+      if (scheme === 'dark') await page.setViewportSize({ width: 390, height: 844 });
+      let newer = false;
+      await page.route('**/api/v1/appearance', async (route) => {
+        const res = await route.fetch();
+        const look = (await res.json()) as { build: string };
+        if (newer) look.build = `${look.build}-newer`;
+        await route.fulfill({ response: res, json: look });
+      });
+      await page.goto('/people');
+      await expect(page.locator('main')).toBeVisible();
+      newer = true;
+      await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
+      await expect(page.getByRole('status', { name: 'New version' })).toBeVisible();
+      await picture(page, `new-version-${scheme}`);
+      await page.context().close();
+    }
+  });
+
   test('TrashView: an empty trash', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/trash');
