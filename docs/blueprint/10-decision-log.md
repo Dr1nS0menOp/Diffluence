@@ -137,6 +137,19 @@ Status: decided by the product owner (2026-11-07). Context: one database carries
 **ADR-037: Search stays in PostgreSQL, with room to grow**
 Status: decided by the product owner (2026-11-07), after spec 028. Context: tuned PostgreSQL reached the target, and a separate engine keeps a copy that can show what a permission change has just hidden. Decision: search stays in PostgreSQL. The way to scale is fixed in this order: a PostgreSQL standby for search when search slows other work (ARC-229), and only then an engine, and only if measurements show the standby is not enough. Finding pages and checking permissions stay separate in the code, so the check stays on the primary whatever finds the pages. Word forms count: `plans` finds `plan`. File names match the same way everywhere, in the search box and on the Files screen: whole words and the start of a word, so `rep` finds `report.pdf`. The install guide names about 2.5 CPUs as the least for the database at the model of 5,000 people, because 1.5 was too tight. Consequences: a stress test on a large server (32 cores, 96 GB) follows when the product owner provides one, and replaces estimates with numbers in `docs/operations/limits.md`.
 
+**ADR-038: The open questions of 9 November**
+Status: decided by the product owner (2026-11-09). Context: waves R, P5, S6 and F2 left choices that were the product owner's. Decision:
+- **Permissions:** blog posts get their own permission (`post.create`), and databases get theirs (PRM-215) once the rule can tell page kinds apart; whoever may create pages today receives both, so nobody loses anything. Export stays one permission, not one per format.
+- **Audit log:** a database owner must not be able to shorten the tail of the log unnoticed. Every signed checkpoint is also written outside the database, to the application log and so to a SIEM, `audit verify` compares the two, and checkpoints are made every five minutes instead of daily. This changes ADR-013.
+- **Password login:** after 100 failed attempts in a row on one account, password login for that account stops, kept across restarts (NIST SP 800-63B). Because anyone who knows an address could cause it, the person is told by mail, passkeys and the identity provider keep working, and an administrator can lift it.
+- **CI:** Semgrep, CodeQL and a ZAP baseline scan join the checks.
+- **Editor:** a floating bar appears over selected text and over a selected image (EDT-006, EDT-080), beside the fixed bar.
+- **Files and search:** no first-page picture on file tiles (FIL-026). The storage limit of a space counts everywhere: uploads, page copies, moves, imports and the trash. File names and titles are matched with trigrams (`pg_trgm`, part of PostgreSQL), so a part of a word and a small typo also find a file, with exact matches and word starts ranked first. This widens ADR-037.
+- **Look:** settings and the administration stay at the left beside their sidebar on wide screens; pages in a space stay centred.
+- **Audit of tokens:** one `token.used` event per token per minute is enough.
+- **Enterprise document features** (roadmap) are built before 1.0.
+Consequences: each item lands in a wave with its own study, failure paths first; the permission items repeat the migration proof that nobody gains or loses access.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).
