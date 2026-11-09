@@ -7,6 +7,7 @@ import { Extension } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { EditorContent, useEditor, type Editor } from '@tiptap/react';
 import { api, type Attachment, type Json } from '../../api';
+import { keepOpenAcrossReload, useOpenAfterReload, useSaveBeforeReload } from '../../before-reload';
 import { dropDraft, keepDraft, readDraft, usePerson } from '../../personal';
 import { match, navigate } from '../../router';
 import { AttachmentImage, attachmentNode } from '../editor/attachments';
@@ -150,6 +151,9 @@ export function CommentBox({
   const isSending = useRef(false);
   const [empty, setEmpty] = useState(true);
   const [failed, setFailed] = useState<unknown>(null);
+  // Open with text when the tab reloaded for a new version: what was typed comes back, also
+  // over the comment being changed (spec 043).
+  const reopened = useOpenAfterReload(draftKey);
   // Sharing happens on the page itself, so from an editor the warning stands alone.
   const warnNoAccess = (name: string) => {
     const onPage = match('/pages/:id', window.location.pathname);
@@ -175,7 +179,11 @@ export function CommentBox({
       MentionSuggestions.configure({ pageId, onNoAccess: (name) => warnNoAccess(name) }),
       SubmitKey.configure({ submit: () => submit.current() }),
     ],
-    content: initial ?? readDraft(person, draftKey) ?? EMPTY_COMMENT,
+    content:
+      (reopened ? readDraft(person, draftKey) : undefined) ??
+      initial ??
+      readDraft(person, draftKey) ??
+      EMPTY_COMMENT,
     injectCSS: false,
     autofocus: autoFocus ? 'end' : false,
     editorProps: {
@@ -214,6 +222,13 @@ export function CommentBox({
     isSending.current = true;
     onSubmit(editor.getJSON() as Json, clear);
   };
+  // A reload offered for a new version keeps the text and opens this box again after it.
+  useSaveBeforeReload(async () => {
+    if (editor.isEmpty) return;
+    keepDraft(person, draftKey, editor.getJSON() as Json);
+    keepOpenAcrossReload(draftKey);
+  });
+
   // The second click of a double click comes before busy reaches this box.
   useEffect(() => {
     if (!busy) isSending.current = false;

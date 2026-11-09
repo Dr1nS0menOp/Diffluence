@@ -678,7 +678,9 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/access');
     await expect(page.getByRole('tab', { name: 'People' })).toBeVisible();
-    await expect(page.getByRole('table')).toBeVisible();
+    // People and groups with a role each, not a matrix of ticks (spec 043).
+    await expect(page.locator('.member-row').first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Give access' })).toBeVisible();
     await picture(page, 'space-access');
     await page.getByRole('tab', { name: 'People' }).click();
     await expect(page.getByRole('link', { name: /CSV/ })).toBeVisible();
@@ -768,8 +770,14 @@ test.describe('the look of every kind of screen', () => {
     await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
     await page.goto('/spaces/HANDBOOK/settings?section=roles');
     await expect(page.getByRole('heading', { name: 'People and roles', level: 1 })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Who holds which role' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Give access' })).toBeVisible();
+    await expect(page.locator('.member-row').first()).toBeVisible();
     await picture(page, 'space-roles');
+    // A combination without a name shows as it is, and an administrator can name it.
+    await page.getByRole('button', { name: 'Name this role' }).first().click();
+    await expect(page.getByRole('dialog', { name: 'Name this role' })).toBeVisible();
+    await picture(page, 'name-role');
+    await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
   });
 
   test('a person asked for a stronger sign-in, and a maintenance note', async ({ browser }) => {

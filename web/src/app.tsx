@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me } from './api';
 import { appearanceQuery, useAccent, useImportedFont } from './appearance';
+import { keepSettingsTyping } from './kept-fields';
 import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
@@ -111,6 +112,8 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
   useEffect(() => {
     void forgetSharedDocuments(person);
   }, [person]);
+  // Text typed into settings forms outlives a reload offered for a new version (spec 043).
+  useEffect(() => keepSettingsTyping(), []);
   const logout = async () => {
     await api.post('/auth/logout');
     forgetPersonalData();

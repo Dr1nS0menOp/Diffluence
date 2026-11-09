@@ -383,6 +383,11 @@ fieldset.choices legend {
   margin-block: var(--space-3);
 }
 
+/* "0 holders" is one short fact: it stays on one line however narrow the table gets. */
+.role-count {
+  white-space: nowrap;
+}
+
 .role-holders h3 {
   margin: 0 0 var(--space-1);
   font-size: var(--text-ui);

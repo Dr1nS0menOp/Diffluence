@@ -188,15 +188,26 @@ func (s *Service) PreviewGrant(ctx context.Context, c identity.Caller, spaceID u
 	if err := s.RequireSpace(ctx, s.pool, c.UserID, spaceID, SpaceManageAccess); err != nil {
 		return GrantPreview{}, err
 	}
-	rows, err := s.pool.Query(ctx, `SELECT permission FROM space_grants
+	before, err := grantsOf(ctx, s.pool, spaceID, sub)
+	if err != nil {
+		return GrantPreview{}, err
+	}
+	return previewAgainst(ctx, s.pool, sub, before, perms)
+}
+
+// grantsOf reads what a subject holds in a space now.
+func grantsOf(ctx context.Context, q db.Querier, spaceID uuid.UUID, sub Subject) ([]string, error) {
+	rows, err := q.Query(ctx, `SELECT permission FROM space_grants
 		WHERE space_id = $1 AND subject_type = $2 AND subject_id = $3`, spaceID, sub.Type, sub.ID)
 	if err != nil {
-		return GrantPreview{}, err
+		return nil, err
 	}
-	before, err := pgx.CollectRows(rows, pgx.RowTo[string])
-	if err != nil {
-		return GrantPreview{}, err
-	}
+	return pgx.CollectRows(rows, pgx.RowTo[string])
+}
+
+// previewAgainst compares what a subject holds now, before, with perms.
+func previewAgainst(ctx context.Context, q db.Querier, sub Subject, before, perms []string) (GrantPreview, error) {
+	var err error
 	out := GrantPreview{Gains: []string{}, Loses: []string{}, People: 1}
 	for _, p := range perms {
 		if !slices.Contains(before, p) {
@@ -210,7 +221,7 @@ func (s *Service) PreviewGrant(ctx context.Context, c identity.Caller, spaceID u
 	}
 	out.LosesView = slices.Contains(out.Loses, SpaceView)
 	if sub.Type == SubjectGroup {
-		err = s.pool.QueryRow(ctx, "SELECT count(*) FROM group_members WHERE group_id = $1", sub.ID).Scan(&out.People)
+		err = q.QueryRow(ctx, "SELECT count(*) FROM group_members WHERE group_id = $1", sub.ID).Scan(&out.People)
 	}
 	return out, err
 }

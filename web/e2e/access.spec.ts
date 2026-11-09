@@ -124,7 +124,7 @@ test('space settings: details, roles, archive', async ({ page }) => {
   await page.goto(`/spaces/${space.key}/access`);
   await checkAccessibility(page);
   await page.getByRole('button', { name: /Team space/ }).click();
-  await expect(page.getByRole('row', { name: /All members/ })).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: 'All members' })).toBeVisible();
   await page.goto(`/spaces/${space.key}/settings?section=danger`);
   await checkAccessibility(page);
   await page.getByRole('button', { name: 'Archive', exact: true }).click();

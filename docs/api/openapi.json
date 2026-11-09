@@ -9666,6 +9666,33 @@
         "x-access": "object:space.manage_access"
       }
     },
+    "/api/v1/spaces/{id}/role-assignments/preview": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/role-assignments/preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.manage_access"
+      }
+    },
     "/api/v1/spaces/{id}/rules": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/rules",

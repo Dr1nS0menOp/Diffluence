@@ -2310,7 +2310,7 @@
   "access": {
     "title": "Access",
     "open": "Who has access",
-    "tab_grants": "Permissions",
+    "tab_grants": "Roles",
     "tab_people": "People",
     "search": "Search by name",
     "gains": "Gains: {{list}}",
@@ -2330,7 +2330,19 @@
     "peopleTitle": "People",
     "auditTitle": "Audit of this space",
     "auditHelp": "Rows about pages you may not see show the action and the time only.",
-    "hiddenPage": "Hidden"
+    "hiddenPage": "Hidden",
+    "rolesHelp": "Each person and group here holds a role. What a role allows is set under Roles in the administration.",
+    "roleOf": "Role of {{name}}",
+    "several": "Several roles: {{names}}",
+    "builtInRoles": "Built-in roles",
+    "ownRoles": "Roles made for this instance",
+    "unnamedRoles": "Combinations without a name",
+    "unnamedHelp": "This combination of permissions matches no named role.",
+    "unnamedAsk": "An administrator can give it a name.",
+    "nameRole": "Name this role",
+    "nameRoleHelp": "Everyone who holds it keeps exactly the same permissions. Only the name changes, in every space.",
+    "giveTo": "Give {{name}} a role",
+    "give": "Give access"
   },
   "summary": {
     "pages": "Pages",

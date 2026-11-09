@@ -348,8 +348,9 @@ test('a manager runs access, and cannot reach administer or the settings', async
   const as = await browserAs(browser, email);
   await as.goto(`/spaces/${space.key}/access`);
   await checkAccessibility(as);
-  const row = as.getByRole('row', { name: new RegExp(viewerMail.split('@')[0] ?? '') });
-  await row.getByLabel('Role').selectOption('editor');
+  const viewerName = viewerMail.split('@')[0] ?? '';
+  const row = as.getByRole('listitem').filter({ hasText: viewerName });
+  await row.getByLabel(`Role of ${viewerName}`).selectOption({ label: 'Editor' });
   await expect(as.getByRole('status').filter({ hasText: 'Gains' })).toBeVisible();
 
   // Taking someone's access asks first.

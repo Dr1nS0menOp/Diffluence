@@ -588,6 +588,36 @@ func (s *Service) SetSpaceRoles(ctx context.Context, c identity.Caller, spaceID 
 	})
 }
 
+// PreviewSpaceRoles says what SetSpaceRoles would do, without doing it. A role holds
+// exactly its permissions, so unlike PreviewGrant nothing is filled in.
+func (s *Service) PreviewSpaceRoles(ctx context.Context, c identity.Caller, spaceID uuid.UUID, sub Subject, roleIDs []uuid.UUID) (GrantPreview, error) {
+	var out GrantPreview
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		// Access first, as in SetSpaceRoles, so a stranger learns nothing from the answer.
+		if err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceManageAccess); err != nil {
+			return err
+		}
+		if !validSpaceSubject(sub) {
+			return apperr.Invalid("Choose a user, a group, all members or all guests.")
+		}
+		_, after, err := rolesByID(ctx, tx, ScopeSpace, roleIDs)
+		if err != nil {
+			return err
+		}
+		before, err := grantsOf(ctx, tx, spaceID, sub)
+		if err != nil {
+			return err
+		}
+		// The limits of SetSpaceRoles hold here too, so a preview never shows a change that cannot happen.
+		if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, after); err != nil {
+			return err
+		}
+		out, err = previewAgainst(ctx, tx, sub, before, after)
+		return err
+	})
+	return out, err
+}
+
 // SetInstanceRoles gives a user or group exactly these instance roles. Administrators
 // do this; system_administrator needs a system administrator, and one active
 // administrator remains.

@@ -27,6 +27,7 @@ func (s *Server) registerRoleRoutes() {
 	r.HandleFunc("PUT /api/v1/admin/role-assignments", SessionOnly(admin), s.handleInstanceAssign)
 	r.HandleFunc("GET /api/v1/spaces/{id}/role-assignments", Object(permissions.SpaceManageAccess), s.handleSpaceAssignments)
 	r.HandleFunc("PUT /api/v1/spaces/{id}/role-assignments", Object(permissions.SpaceManageAccess), s.handleSpaceAssign)
+	r.HandleFunc("POST /api/v1/spaces/{id}/role-assignments/preview", Object(permissions.SpaceManageAccess), s.handleSpaceAssignPreview)
 }
 
 func (s *Server) handleRoles(w http.ResponseWriter, r *http.Request) {
@@ -181,4 +182,22 @@ func (s *Server) handleSpaceAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleSpaceAssignPreview(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in assignmentBody
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	preview, err := s.deps.Permissions.PreviewSpaceRoles(r.Context(), s.caller(r), id, in.Subject, in.Roles)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, preview)
 }

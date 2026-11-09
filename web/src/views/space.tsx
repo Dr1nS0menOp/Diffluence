@@ -9,7 +9,7 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
 import { IconArrowDown, IconArrowUp, IconChevronLeft } from '../components/icons';
 import { SettingsFrame, type SettingsGroup } from '../components/settings-frame';
-import { SpaceRolesSection } from './roles';
+import { SpaceRolesPanel } from './access-roles';
 import { ConfirmButton, ErrorNote, Field, Loading, SpaceBadge } from '../components/ui';
 import { useDates } from '../dates';
 import { ExportSection, ImportSection, PDFDesignSection } from './exchange';
@@ -398,7 +398,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       {section === 'shortcuts' && <ShortcutsSection space={space} />}
       {section === 'categories' && <CategoriesSection space={space} />}
       {section === 'people' && <PeopleSection space={space} />}
-      {section === 'roles' && <SpaceRolesSection space={space} />}
+      {section === 'roles' && <SpaceRolesPanel space={space} />}
       {section === 'statuses' && <StatusesSection space={space} />}
       {section === 'labels' && <LabelsSection space={space} />}
       {section === 'placeholders' && <PlaceholdersSection space={space} />}

@@ -987,6 +987,14 @@ mutate "giving roles skips the limits of managing access" internal/permissions/r
   's.replace("if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, after); err != nil {", "if err := error(nil); err != nil {")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
 mutate "instance roles can remove the last administrator" internal/permissions/roles.go \
   's.replace("if err := keepsAnAdministrator(ctx, tx, c); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange", "if err := error(nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
+mutate "anyone previews the roles of a space" internal/permissions/roles.go \
+  's.replace("learns nothing from the answer.\n\t\tif err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceManageAccess); err != nil {", "learns nothing from the answer.\n\t\tif err := error(nil); err != nil {")' $perms -run TestPreviewingRolesSaysWhatChangesAndChangesNothing
+mutate "a role preview ignores the roles chosen" internal/permissions/roles.go \
+  's.replace("out, err = previewAgainst(ctx, tx, sub, before, after)", "out, err = previewAgainst(ctx, tx, sub, before, nil)")' $perms -run TestPreviewingRolesSaysWhatChangesAndChangesNothing
+mutate "a role preview promises what the change refuses" internal/permissions/roles.go \
+  's.replace("cannot happen.\n\t\tif err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, after); err != nil {", "cannot happen.\n\t\tif err := error(nil); err != nil {")' $perms -run TestPreviewingRolesSaysWhatChangesAndChangesNothing
+mutate "a preview hides that someone loses the space" internal/permissions/access.go \
+  's.replace("out.LosesView = slices.Contains(out.Loses, SpaceView)", "out.LosesView = false")' $perms -run TestPreviewingRolesSaysWhatChangesAndChangesNothing
 mutate "adopting grants as roles drops a permission" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms);", "PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms[2:]);")' $perms -run TestAdoptingGrantsChangesNoDecision
 mutate "a changed role does not reach the people who hold it" internal/db/migrations/0036_roles.sql \

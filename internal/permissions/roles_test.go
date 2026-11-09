@@ -558,6 +558,77 @@ func TestAssigningRolesKeepsTheLimitsOfManagingAccess(t *testing.T) {
 		[]uuid.UUID{instance.ID}), "last_administrator")
 }
 
+// TestPreviewingRolesSaysWhatChangesAndChangesNothing: the Access screen shows what a
+// choice of roles does before it is saved (spec 043), so nobody gains or loses access
+// without seeing it.
+func TestPreviewingRolesSaysWhatChangesAndChangesNothing(t *testing.T) {
+	w := newRoleWorld(t)
+	ctx := w.ctx
+	plain := permissions.Subject{Type: permissions.SubjectUser, ID: w.plain.UserID}
+	viewer := w.builtin(t, permissions.TemplateViewer)
+	editor := w.builtin(t, permissions.TemplateEditor)
+	admin := w.builtin(t, permissions.TemplateSpaceAdmin)
+
+	_, err := w.svc.PreviewSpaceRoles(ctx, w.plain, w.space, plain, []uuid.UUID{editor})
+	wantKind(t, err, apperr.KindNotFound)
+	_, err = w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, plain, []uuid.UUID{ids.New()})
+	wantKind(t, err, apperr.KindInvalid)
+	_, err = w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, permissions.Subject{Type: "nobody", ID: ids.New()}, []uuid.UUID{editor})
+	wantKind(t, err, apperr.KindInvalid)
+	// The preview refuses what the change would refuse, so the screen never shows a gain that cannot happen.
+	_, err = w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, plain, []uuid.UUID{admin})
+	wantConflict(t, err, "needs_administer")
+
+	gain, err := w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, plain, []uuid.UUID{editor})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(gain.Gains, permissions.PageEdit) || len(gain.Loses) != 0 || gain.LosesView || gain.People != 1 {
+		t.Fatalf("giving a role: %+v", gain)
+	}
+	d, err := w.svc.CheckSpace(ctx, w.pool, w.plain.UserID, w.space, permissions.SpaceView)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.Allowed {
+		t.Fatal("a preview gave access")
+	}
+
+	if err := w.svc.SetSpaceRoles(ctx, w.manager, w.space, plain, []uuid.UUID{editor}); err != nil {
+		t.Fatal(err)
+	}
+	narrower, err := w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, plain, []uuid.UUID{viewer})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(narrower.Loses, permissions.PageEdit) || len(narrower.Gains) != 0 || narrower.LosesView {
+		t.Fatalf("a narrower role: %+v", narrower)
+	}
+	gone, err := w.svc.PreviewSpaceRoles(ctx, w.manager, w.space, plain, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !gone.LosesView {
+		t.Fatalf("taking every role away must ask first: %+v", gone)
+	}
+	// A role holds exactly its permissions: the space admin role brings what was split
+	// off administration because it lists it, not because the preview adds it.
+	full, err := w.svc.PreviewSpaceRoles(ctx, w.owner, w.space, plain, []uuid.UUID{admin})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Contains(full.Gains, permissions.SpaceAdminister) || !slices.Contains(full.Gains, permissions.SitePublish) {
+		t.Fatalf("the space admin role: %+v", full)
+	}
+	d, err = w.svc.CheckSpace(ctx, w.pool, w.plain.UserID, w.space, permissions.PageEdit)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !d.Allowed {
+		t.Fatal("a preview took access away")
+	}
+}
+
 // TestSettingSinglePermissionsMakesOneRolePerSet: the old way of ticking permissions
 // keeps working, and the same set shares one role instead of making many.
 func TestSettingSinglePermissionsMakesOneRolePerSet(t *testing.T) {

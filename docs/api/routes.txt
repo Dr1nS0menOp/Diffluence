@@ -392,6 +392,7 @@ POST /api/v1/spaces/{id}/icon                                  object:space.look
 POST /api/v1/spaces/{id}/imports                               object:page.create
 POST /api/v1/spaces/{id}/labels/rename                         object:space.labels
 POST /api/v1/spaces/{id}/preset                                object:space.administer
+POST /api/v1/spaces/{id}/role-assignments/preview              object:space.manage_access
 POST /api/v1/spaces/{id}/rules                                 object:space.automation
 POST /api/v1/spaces/{id}/sites                                 object:site.publish
 POST /api/v1/spaces/{id}/templates                             object:space.templates

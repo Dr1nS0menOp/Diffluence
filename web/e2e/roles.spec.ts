@@ -30,11 +30,11 @@ test('a role is made, given in a space, and changed after a preview', async ({ p
   await expect(page.getByRole('heading', { name: 'People and roles', level: 1 })).toBeVisible();
   await page.getByPlaceholder('Give a role to').fill(person);
   await page.getByRole('option', { name: new RegExp(email) }).click();
-  const give = page.getByRole('dialog', { name: `Roles of ${person}` });
-  await give.getByRole('checkbox', { name: roleName }).check();
-  await give.getByRole('button', { name: 'Save' }).click();
-  await expect(give).toBeHidden();
-  await expect(page.getByRole('listitem').filter({ hasText: person })).toContainText(roleName);
+  await page.getByLabel(`Role of ${person}`).selectOption({ label: roleName });
+  await page.getByRole('button', { name: 'Give access' }).click();
+  await expect(page.getByRole('status').filter({ hasText: 'Gains' })).toContainText('View the space');
+  const held = page.getByRole('listitem').filter({ hasText: person }).getByLabel(`Role of ${person}`);
+  await expect(held.locator('option:checked')).toHaveText(roleName);
 
   // The person can now open the space.
   const theirs = await browser.newContext({ baseURL: 'http://localhost:8080' });

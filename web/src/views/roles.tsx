@@ -3,7 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, type DirectoryEntry, type Space, type Subject } from '../api';
+import { api, ApiError, type DirectoryEntry, type Subject } from '../api';
 import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { groupPermissions, permissionHelp, permissionLabel } from '../permission-words';
@@ -47,7 +47,8 @@ interface RoleHolder {
   space_name?: string;
 }
 
-function useRoles(scope: RoleScope) {
+/** The roles of a scope, with the permissions a new one can hold. */
+export function useRoles(scope: RoleScope) {
   return useQuery({
     queryKey: ['roles', scope],
     queryFn: () => api.get<RoleList>(`/roles?scope=${scope}`),
@@ -246,7 +247,7 @@ function RoleTable({ scope }: { scope: RoleScope }) {
                     .map((p) => permissionLabel(t, scope, p))
                     .join(', ')}
                 </td>
-                <td>{t('roles.holders', { count: role.in_use })}</td>
+                <td className="role-count">{t('roles.holders', { count: role.in_use })}</td>
                 <td className="row">
                   {!role.built_in && (
                     <>
@@ -344,8 +345,10 @@ function AssignDialog({
   );
 }
 
-function Assignments({ scope, path }: { scope: RoleScope; path: string }) {
+/** Who holds which instance role. A space gives its roles on its Access screen (spec 043). */
+function Assignments({ path }: { path: string }) {
   const { t } = useTranslation();
+  const scope = 'instance';
   const [open, setOpen] = useState<{ subject: Subject; name: string; holds: string[] } | null>(null);
   const q = useQuery({
     queryKey: ['role-assignments', path],
@@ -359,18 +362,9 @@ function Assignments({ scope, path }: { scope: RoleScope; path: string }) {
       holds: held?.roles.map((r) => r.id) ?? [],
     });
   };
-  const everyone = (type: 'all_members' | 'all_guests') => {
-    const held = q.data?.assignments.find((a) => a.subject.type === type);
-    const name = type === 'all_members' ? t('permissions.allMembers') : t('permissions.allGuests');
-    setOpen({
-      subject: { type, id: '00000000-0000-0000-0000-000000000000' },
-      name,
-      holds: held?.roles.map((r) => r.id) ?? [],
-    });
-  };
   return (
     <section>
-      <h2>{scope === 'space' ? t('roles.whoHolds') : t('roles.whoHoldsInstance')}</h2>
+      <h2>{t('roles.whoHoldsInstance')}</h2>
       <ErrorNote error={q.error} />
       {!q.data && !q.error && <Loading />}
       {q.data && q.data.assignments.length === 0 && <p className="muted">{t('roles.nobody')}</p>}
@@ -395,16 +389,6 @@ function Assignments({ scope, path }: { scope: RoleScope; path: string }) {
       </ul>
       <div className="row">
         <SubjectPicker label={t('roles.give')} onPick={pick} />
-        {scope === 'space' && (
-          <>
-            <button type="button" className="quiet" onClick={() => everyone('all_members')}>
-              {t('permissions.allMembers')}
-            </button>
-            <button type="button" className="quiet" onClick={() => everyone('all_guests')}>
-              {t('permissions.allGuests')}
-            </button>
-          </>
-        )}
       </div>
       {open && (
         <AssignDialog
@@ -426,18 +410,7 @@ export function RolesTab() {
     <>
       <RoleTable scope="space" />
       <RoleTable scope="instance" />
-      <Assignments scope="instance" path="/admin/role-assignments" />
-    </>
-  );
-}
-
-/** Who holds which roles in a space, for those who manage access there. */
-export function SpaceRolesSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  return (
-    <>
-      <p className="muted">{t('roles.spaceSectionHelp')}</p>
-      <Assignments scope="space" path={`/spaces/${space.id}/role-assignments`} />
+      <Assignments path="/admin/role-assignments" />
     </>
   );
 }

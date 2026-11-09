@@ -1591,6 +1591,17 @@ span.twist {
   color: var(--color-muted);
 }
 
+/* A long role name, such as a combination without a name, is cut short in its list rather
+   than pushing the name of the person out of the row (spec 043). */
+.member-row .role-choice {
+  max-inline-size: var(--size-card);
+}
+
+.member-row > button {
+  flex: none;
+  white-space: nowrap;
+}
+
 /* The tree of a space follows the space part directly, without a heading; its tools are a quiet row of icons. */
 .pages-part {
   display: flex;

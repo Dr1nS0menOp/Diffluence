@@ -16,6 +16,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - A SCIM filter on an attribute Diffluence does not read is refused instead of ignored
 - More of the readers are fuzzed every night: HTML import, archives, SCIM filters and the search language
 - Upgrade impact: **Docker Compose now publishes the app on `127.0.0.1` only.** If your reverse proxy runs on another machine, set `DIFFLUENCE_BIND=0.0.0.0` before you update. No migration
+### Changed: roles on the Access screen of a space (spec 043)
+- The Access screen lists people and groups with one role each, chosen from a list of the built-in roles and the roles of your instance. The matrix of ticks is gone
+- A combination of permissions that matches no named role shows as it is, "Custom: ...", and an administrator can give it a name without changing anyone's access
+- Every change says what it gives and takes, and asks first when someone would lose the space. The settings part People and roles shows the same list
+- "0 holders" on the Roles screen stays on one line
+- A reply, a comment being changed and text in a settings form survive the Reload offered for a new version
+- Upgrade impact: none. The routes for single permissions keep working for scripts
 
 ### Added: a setup screen for a new install (spec 038)
 - A new install opens on a setup screen: the name of the company or person it is for, which the search box shows as "Search in" that name, the first administrator and the default time zone. Right after, it asks for a passkey

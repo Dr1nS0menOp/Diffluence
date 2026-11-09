@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type Comment, type Json, type PageDetail } from '../../api';
+import { useOpenAfterReload } from '../../before-reload';
 import { DocumentView } from '../editor/editor';
 import { useToast } from '../toast';
 import { Avatar, ConfirmDialog, ErrorNote, RelativeTime } from '../ui';
@@ -21,7 +22,8 @@ function Item({ page, comment, onReply }: { page: PageDetail; comment: Comment; 
   const { t } = useTranslation();
   const toast = useToast();
   const refresh = useRefresh(page.id);
-  const [editing, setEditing] = useState(false);
+  const wasEditing = useOpenAfterReload(`${comment.id}:edit`);
+  const [editing, setEditing] = useState(wasEditing);
   const [asking, setAsking] = useState(false);
   const [viewing, setViewing] = useState<{ images: ShownImage[]; start: number } | null>(null);
   const edit = useMutation({
@@ -133,7 +135,8 @@ function Item({ page, comment, onReply }: { page: PageDetail; comment: Comment; 
 export function Thread({ page, thread, canReply }: { page: PageDetail; thread: Comment; canReply: boolean }) {
   const { t } = useTranslation();
   const refresh = useRefresh(page.id);
-  const [replying, setReplying] = useState(false);
+  const wasReplying = useOpenAfterReload(`${page.id}:${thread.id}`);
+  const [replying, setReplying] = useState(wasReplying);
   const reply = useMutation({
     mutationFn: (body: Json) => api.post(`/pages/${page.id}/comments`, { body, parent_id: thread.id }),
     onSuccess: refresh,
