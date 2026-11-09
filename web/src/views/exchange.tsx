@@ -858,12 +858,16 @@ export function ExportSection({ space }: { space: Space }) {
       <p className="muted">{t('exchange.exportHelp')}</p>
       <ErrorNote error={start.error} />
       <div className="row">
-        <button type="button" onClick={() => setOpen(true)}>
-          {t('exchange.exportButton')}
-        </button>
-        <button type="button" onClick={() => start.mutate()}>
-          {t('exchange.exportBundle')}
-        </button>
+        {space.can?.['space.export'] && (
+          <button type="button" onClick={() => setOpen(true)}>
+            {t('exchange.exportButton')}
+          </button>
+        )}
+        {space.can?.['space.bundle'] && space.can?.['space.export'] && (
+          <button type="button" onClick={() => start.mutate()}>
+            {t('exchange.exportBundle')}
+          </button>
+        )}
       </div>
       {bundle && <RunProgress id={bundle} />}
       {open && <ExportDialog spaceId={space.id} onClose={() => setOpen(false)} />}

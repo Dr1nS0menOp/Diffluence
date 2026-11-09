@@ -233,7 +233,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
           <UsedBy pageId={page.id} />
           <LabelBar page={page} />
           <Files pageId={page.id} />
-          {page.can['space.administer'] && <Watchers pageId={page.id} />}
+          {page.can['page.watchers'] && <Watchers pageId={page.id} />}
         </>
       )}
       {changing === 'owner' && <OwnerDialog page={page} onClose={() => setChanging(null)} />}

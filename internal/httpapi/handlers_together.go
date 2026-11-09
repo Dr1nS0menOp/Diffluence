@@ -68,9 +68,9 @@ func (s *Server) registerTogetherRoutes() {
 	r.HandleFunc("GET /api/v1/spaces/{id}/watch", Object("space.view"), s.handleSpaceWatchState)
 	r.HandleFunc("PUT /api/v1/spaces/{id}/watch", Object("space.view"), s.handleWatchSpace(true))
 	r.HandleFunc("DELETE /api/v1/spaces/{id}/watch", Object("space.view"), s.handleWatchSpace(false))
-	r.HandleFunc("GET "+pagesPath+"/watchers", Object("space.administer"), s.handleWatchers)
-	r.HandleFunc("PUT "+pagesPath+"/watchers/{user}", Object("space.administer"), s.handleWatcher(true))
-	r.HandleFunc("DELETE "+pagesPath+"/watchers/{user}", Object("space.administer"), s.handleWatcher(false))
+	r.HandleFunc("GET "+pagesPath+"/watchers", Object("page.watchers"), s.handleWatchers)
+	r.HandleFunc("PUT "+pagesPath+"/watchers/{user}", Object("page.watchers"), s.handleWatcher(true))
+	r.HandleFunc("DELETE "+pagesPath+"/watchers/{user}", Object("page.watchers"), s.handleWatcher(false))
 	r.HandleFunc("GET /api/v1/me/watches", me, s.handleMyWatches)
 
 	r.HandleFunc("GET /api/v1/me/tasks", me, s.handleMyTasks)

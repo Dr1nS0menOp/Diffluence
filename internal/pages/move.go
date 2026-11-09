@@ -112,7 +112,7 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := lockSpaces(ctx, tx, p.SpaceID, target); err != nil {
 		return Page{}, err
 	}
-	for _, action := range []string{permissions.PageEdit, permissions.PageCreate} {
+	for _, action := range []string{permissions.PageMoveOut, permissions.PageCreate} {
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, action, uuid.Nil); err != nil {
 			return Page{}, err
 		}
@@ -204,11 +204,19 @@ func titlesOf(ctx context.Context, q db.Querier, ids []uuid.UUID) ([]string, err
 // MoveImpact says what moving a page would change.
 func (s *Service) MoveImpact(ctx context.Context, c identity.Caller, id uuid.UUID, spaceID, parent *uuid.UUID) (MoveImpact, error) {
 	var out MoveImpact
-	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return out, err
 	}
 	p, err := load(ctx, s.pool, id)
 	if err != nil {
+		return out, err
+	}
+	// Moving to another space asks what the move itself asks (spec 040).
+	action := permissions.PageEdit
+	if spaceID != nil && *spaceID != p.SpaceID {
+		action = permissions.PageMoveOut
+	}
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, action, uuid.Nil); err != nil {
 		return out, err
 	}
 	if spaceID != nil && *spaceID != p.SpaceID {

@@ -35,7 +35,7 @@ func (s *Server) registerReadingRoutes() {
 	r.HandleFunc("DELETE /api/v1/spaces/{id}/favourite", Object("space.view"), s.handleSpaceFavouriteOff)
 	r.HandleFunc("GET /api/v1/spaces/{id}/overview", Object("space.view"), s.handleSpaceOverview)
 	r.HandleFunc("GET /api/v1/spaces/{id}/shortcuts", Object("space.view"), s.handleShortcuts)
-	r.HandleFunc("PUT /api/v1/spaces/{id}/shortcuts", Object("space.administer"), s.handleShortcutsSet)
+	r.HandleFunc("PUT /api/v1/spaces/{id}/shortcuts", Object("space.look"), s.handleShortcutsSet)
 
 	r.HandleFunc("PATCH /api/v1/pages/{id}/look", Object("page.edit"), s.handlePageLook)
 	r.HandleFunc("GET /api/v1/pages/{id}/details", Object("page.view"), s.handlePageDetails)

@@ -138,47 +138,57 @@ export function PeopleSection({ space }: { space: Space }) {
     queryKey: ['tree-pages', space.id],
     queryFn: () => api.get<{ pages: PageRef[] }>(`/spaces/${space.id}/tree`),
   });
+  const mayOwn = space.can?.['space.administer'] ?? false;
+  const mayLook = space.can?.['space.look'] ?? false;
   return (
     <section>
-      <h2>{t('spaceSettings.owners')}</h2>
-      <p className="muted">{t('spaceSettings.ownersHelp')}</p>
       <ErrorNote error={save.error ?? setHomePage.error} />
-      <ul className="plain-list">
-        {owners.map((o) => (
-          <li key={o.id} className="row">
-            {o.name}
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => save.mutate(owners.filter((x) => x.id !== o.id).map((x) => x.id))}
+      {mayOwn && (
+        <>
+          <h2>{t('spaceSettings.owners')}</h2>
+          <p className="muted">{t('spaceSettings.ownersHelp')}</p>
+          <ul className="plain-list">
+            {owners.map((o) => (
+              <li key={o.id} className="row">
+                {o.name}
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() => save.mutate(owners.filter((x) => x.id !== o.id).map((x) => x.id))}
+                >
+                  {t('common.remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <SubjectPicker
+            label={t('spaceSettings.addOwner')}
+            usersOnly
+            onPick={(e: DirectoryEntry) => save.mutate([...owners.map((o) => o.id), e.id])}
+          />
+        </>
+      )}
+      {mayLook && (
+        <>
+          <h2>{t('spaceSettings.home')}</h2>
+          <div className="row">
+            <select
+              aria-label={t('spaceSettings.home')}
+              value={home || (space.home_page_id ?? '')}
+              onChange={(e) => setHome(e.target.value)}
             >
-              {t('common.remove')}
+              {pages.data?.pages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+            <button type="button" disabled={!home} onClick={() => setHomePage.mutate()}>
+              {t('common.save')}
             </button>
-          </li>
-        ))}
-      </ul>
-      <SubjectPicker
-        label={t('spaceSettings.addOwner')}
-        usersOnly
-        onPick={(e: DirectoryEntry) => save.mutate([...owners.map((o) => o.id), e.id])}
-      />
-      <h2>{t('spaceSettings.home')}</h2>
-      <div className="row">
-        <select
-          aria-label={t('spaceSettings.home')}
-          value={home || (space.home_page_id ?? '')}
-          onChange={(e) => setHome(e.target.value)}
-        >
-          {pages.data?.pages.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.title}
-            </option>
-          ))}
-        </select>
-        <button type="button" disabled={!home} onClick={() => setHomePage.mutate()}>
-          {t('common.save')}
-        </button>
-      </div>
+          </div>
+        </>
+      )}
     </section>
   );
 }
@@ -373,6 +383,7 @@ export function RulesSection({ space }: { space: Space }) {
   const client = useQueryClient();
   const ruleKey = ['approval-rule', space.id];
   const rule = useQuery({
+    enabled: space.can?.['space.approvals'] ?? false,
     queryKey: ruleKey,
     queryFn: () =>
       api.get<{ required: boolean; approvers: { id: string; name: string }[] }>(
@@ -390,6 +401,9 @@ export function RulesSection({ space }: { space: Space }) {
     },
   });
   const approverIds = approvers.map((a) => a.id);
+  const mayStatuses = space.can?.['space.statuses'] ?? false;
+  const mayApprovals = space.can?.['space.approvals'] ?? false;
+  const mayLook = space.can?.['space.look'] ?? false;
   const align = useMutation({
     mutationFn: (value: string) => api.put(`/spaces/${space.id}/title-align`, { align: value }),
     onSuccess: refresh,
@@ -406,63 +420,73 @@ export function RulesSection({ space }: { space: Space }) {
     <section>
       <h2>{t('spaceSettings.rules')}</h2>
       <ErrorNote error={review.error ?? approval.error ?? align.error ?? upload.error ?? removeIcon.error} />
-      <Field label={t('spaceSettings.reviewMonths')} help={t('spaceSettings.reviewHelp')}>
-        <input
-          type="number"
-          min={0}
-          max={120}
-          value={months}
-          onChange={(e) => setMonths(Number(e.target.value))}
-          onBlur={() => review.mutate()}
-        />
-      </Field>
-      <Field label={t('spaceSettings.titleAlign')}>
-        <select value={space.title_align ?? 'start'} onChange={(e) => align.mutate(e.target.value)}>
-          <option value="start">{t('look.alignStart')}</option>
-          <option value="center">{t('look.alignCenter')}</option>
-        </select>
-      </Field>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={required}
-          onChange={(e) => approval.mutate({ required: e.target.checked, approvers: approverIds })}
-        />
-        {t('spaceSettings.requireApproval')}
-      </label>
-      <ul className="plain-list">
-        {approvers.map((a) => (
-          <li key={a.id} className="row">
-            {a.name}
-            <button
-              type="button"
-              className="ghost"
-              onClick={() =>
-                approval.mutate({ required, approvers: approverIds.filter((id) => id !== a.id) })
-              }
-            >
-              {t('common.remove')}
+      {mayStatuses && (
+        <Field label={t('spaceSettings.reviewMonths')} help={t('spaceSettings.reviewHelp')}>
+          <input
+            type="number"
+            min={0}
+            max={120}
+            value={months}
+            onChange={(e) => setMonths(Number(e.target.value))}
+            onBlur={() => review.mutate()}
+          />
+        </Field>
+      )}
+      {mayLook && (
+        <Field label={t('spaceSettings.titleAlign')}>
+          <select value={space.title_align ?? 'start'} onChange={(e) => align.mutate(e.target.value)}>
+            <option value="start">{t('look.alignStart')}</option>
+            <option value="center">{t('look.alignCenter')}</option>
+          </select>
+        </Field>
+      )}
+      {mayApprovals && (
+        <>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={required}
+              onChange={(e) => approval.mutate({ required: e.target.checked, approvers: approverIds })}
+            />
+            {t('spaceSettings.requireApproval')}
+          </label>
+          <ul className="plain-list">
+            {approvers.map((a) => (
+              <li key={a.id} className="row">
+                {a.name}
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() =>
+                    approval.mutate({ required, approvers: approverIds.filter((id) => id !== a.id) })
+                  }
+                >
+                  {t('common.remove')}
+                </button>
+              </li>
+            ))}
+          </ul>
+          <SubjectPicker
+            label={t('spaceSettings.fixedApprover')}
+            usersOnly
+            onPick={(e) => approval.mutate({ required, approvers: [...approverIds, e.id] })}
+          />
+        </>
+      )}
+      {mayLook && (
+        <div className="row">
+          <FilePicker
+            label={t('spaceSettings.picture')}
+            accept="image/png,image/jpeg,image/gif,image/webp"
+            onPick={(f) => upload.mutate(f)}
+          />
+          {space.has_icon && (
+            <button type="button" className="quiet" onClick={() => removeIcon.mutate()}>
+              {t('spaceSettings.removePicture')}
             </button>
-          </li>
-        ))}
-      </ul>
-      <SubjectPicker
-        label={t('spaceSettings.fixedApprover')}
-        usersOnly
-        onPick={(e) => approval.mutate({ required, approvers: [...approverIds, e.id] })}
-      />
-      <div className="row">
-        <FilePicker
-          label={t('spaceSettings.picture')}
-          accept="image/png,image/jpeg,image/gif,image/webp"
-          onPick={(f) => upload.mutate(f)}
-        />
-        {space.has_icon && (
-          <button type="button" className="quiet" onClick={() => removeIcon.mutate()}>
-            {t('spaceSettings.removePicture')}
-          </button>
-        )}
-      </div>
+          )}
+        </div>
+      )}
     </section>
   );
 }

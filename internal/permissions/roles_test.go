@@ -192,14 +192,18 @@ func TestAdoptingGrantsChangesNoDecision(t *testing.T) {
 	}
 	adminBeforeSplit := beforeSplit(adminPerms)
 	cases := []grantCase{
-		{"reviewer-set", "user", []string{permissions.SpaceView, permissions.CommentAdd, permissions.AnalyticsView}},
-		{"view-and-analytics", "group", []string{permissions.SpaceView, permissions.AnalyticsView}},
-		{"group-admin", "group", adminBeforeSplit},
-		{"members-admin", "all_members", adminBeforeSplit},
-		{"guests-admin", "all_guests", adminBeforeSplit},
+		{name: "reviewer-set", subject: "user", perms: []string{permissions.SpaceView, permissions.CommentAdd, permissions.AnalyticsView}},
+		{name: "view-and-analytics", subject: "group", perms: []string{permissions.SpaceView, permissions.AnalyticsView}},
+		{name: "group-admin", subject: "group", perms: adminBeforeSplit},
+		{name: "members-admin", subject: "all_members", perms: adminBeforeSplit},
+		{name: "guests-admin", subject: "all_guests", perms: adminBeforeSplit},
+		{name: "manage-access-only", subject: "user", perms: []string{permissions.SpaceView, permissions.SpaceManageAccess}},
 	}
+	// The extra cases of spec 040 test the rule, not the move to roles.
 	for _, g := range grantCases {
-		cases = append(cases, grantCase{g.name, g.subject, beforeSplit(g.perms)})
+		if !g.extra {
+			cases = append(cases, grantCase{name: g.name, subject: g.subject, perms: beforeSplit(g.perms)})
+		}
 	}
 	var spaces, pages []uuid.UUID
 	for n, g := range cases {
@@ -230,6 +234,9 @@ func TestAdoptingGrantsChangesNoDecision(t *testing.T) {
 			}
 			spaces = append(spaces, space)
 			for _, r := range restrictionCases {
+				if r.extra {
+					continue
+				}
 				for _, state := range []string{"published", "draft"} {
 					creator := other
 					if state == "draft" && n%2 == 0 {
@@ -328,8 +335,8 @@ func TestAdoptingGrantsChangesNoDecision(t *testing.T) {
 	if err := pool.QueryRow(ctx, "SELECT permissions FROM roles WHERE name = 'Keeper'").Scan(&keeper); err != nil {
 		t.Fatal(err)
 	}
-	for finer := range permissions.SplitFrom {
-		if !slices.Contains(keeper, finer) {
+	for finer, broad := range permissions.SplitFrom {
+		if broad == permissions.SpaceAdminister && !slices.Contains(keeper, finer) {
 			t.Fatalf("a set with space administration became a role without %s: %v", finer, keeper)
 		}
 	}
@@ -610,4 +617,87 @@ func TestHoldersOfARoleShowOnlyToAdministrators(t *testing.T) {
 		list[0].Name != "manager@example.com" || list[0].SpaceName != "r" {
 		t.Fatalf("holders of the manager role: %d %+v", total, list)
 	}
+}
+
+// TestTheSplitIsTheSameInGoAndSQL: migration 0040 hands out finer permissions by
+// rbac_split_off, and Evaluate reads SplitFrom. A pair known to one side only would move
+// access in an upgrade.
+func TestTheSplitIsTheSameInGoAndSQL(t *testing.T) {
+	tdb := testutil.Database(t)
+	ctx := context.Background()
+	broad := map[string][]string{}
+	for finer, b := range permissions.SplitFrom {
+		broad[b] = append(broad[b], finer)
+	}
+	for _, p := range permissions.AllSpacePermissions {
+		var got []string
+		if err := tdb.Pool.QueryRow(ctx, "SELECT ARRAY(SELECT x FROM unnest(rbac_split_off($1)) x ORDER BY 1)", p).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		want := slices.Sorted(slices.Values(broad[p]))
+		if !slices.Equal(got, want) && !(len(got) == 0 && len(want) == 0) {
+			t.Fatalf("%s: SQL splits off %v, Go %v", p, got, want)
+		}
+	}
+}
+
+// TestEveryWayToAdministerASpaceGivesTheFinerPermissions: nobody who is given space
+// administration, or editing, or managing access, in any way the product still offers,
+// ends up without what was split off it. Roles made by hand are the one way to hold the
+// broader permission alone, and that is what they are for.
+func TestEveryWayToAdministerASpaceGivesTheFinerPermissions(t *testing.T) {
+	w := newRoleWorld(t)
+	ctx := w.ctx
+	finerOf := func(broad string) []string {
+		var out []string
+		for f, b := range permissions.SplitFrom {
+			if b == broad {
+				out = append(out, f)
+			}
+		}
+		return out
+	}
+	holds := func(why string, subject uuid.UUID, want []string) {
+		t.Helper()
+		var got []string
+		if err := w.pool.QueryRow(ctx, `SELECT ARRAY(SELECT permission FROM space_grants WHERE space_id = $1 AND subject_id = $2)`,
+			w.space, subject).Scan(&got); err != nil {
+			t.Fatal(err)
+		}
+		for _, p := range want {
+			if !slices.Contains(got, p) {
+				t.Fatalf("%s: %s is missing from %v", why, p, got)
+			}
+		}
+	}
+
+	// The built-in Space admin role, given at creation, handover and bundle import.
+	admin := permissions.Templates[permissions.TemplateSpaceAdmin]
+	for _, f := range finerOf(permissions.SpaceAdminister) {
+		if !slices.Contains(admin, f) {
+			t.Fatalf("the Space admin template lacks %s", f)
+		}
+	}
+	holds("the owner, who got Space admin", w.owner.UserID, finerOf(permissions.SpaceAdminister))
+
+	// The older grants route, with a list written before the splits.
+	plain := permissions.Subject{Type: permissions.SubjectUser, ID: w.plain.UserID}
+	if err := w.svc.SetGrants(ctx, w.owner, w.space, plain, []string{permissions.SpaceView, permissions.SpaceAdminister,
+		permissions.PageEdit, permissions.SpaceManageAccess}); err != nil {
+		t.Fatal(err)
+	}
+	holds("an old list on the grants route", w.plain.UserID, append(append(finerOf(permissions.SpaceAdminister),
+		finerOf(permissions.PageEdit)...), finerOf(permissions.SpaceManageAccess)...))
+	noDrift(t, ctx, w.pool)
+
+	// The migration, on a role that held administration before it.
+	other := ids.New()
+	w.exec(t, `INSERT INTO users (id, origin_instance_id, type, status, email, display_name) VALUES ($1, $2, 'member', 'active', 'old@example.com', 'o')`,
+		other, ids.New())
+	w.exec(t, "UPDATE roles SET permissions = ARRAY['space.view', 'space.administer'] WHERE builtin = $1", permissions.TemplateSpaceAdmin)
+	w.exec(t, "SELECT rbac_set_exact($1, 'user', $2, ARRAY['space.view', 'space.administer'])", w.space, other)
+	w.exec(t, "SELECT rbac_split_roles()")
+	holds("a holder of a role from before the migration", other, finerOf(permissions.SpaceAdminister))
+	holds("the built-in role after the migration", w.owner.UserID, finerOf(permissions.SpaceAdminister))
+	noDrift(t, ctx, w.pool)
 }

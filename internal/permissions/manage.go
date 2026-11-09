@@ -30,11 +30,11 @@ const (
 var Templates = map[string][]string{
 	TemplateViewer: {SpaceView, SpaceExport, CommentAdd, CommentDeleteOwn},
 	TemplateEditor: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn,
-		CommentAdd, CommentDeleteOwn, AttachmentAdd, AttachmentDeleteOwn},
+		CommentAdd, CommentDeleteOwn, AttachmentAdd, AttachmentDeleteOwn, PageMoveOut},
 	// Manager runs the people and the content of a space, but not the space itself.
 	TemplateManager: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn, PageDeleteAny,
 		CommentAdd, CommentDeleteOwn, CommentDeleteAny, AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
-		RestrictionManage, SpaceManageAccess},
+		RestrictionManage, SpaceManageAccess, PageMoveOut, SpaceInviteGuests},
 	TemplateSpaceAdmin: AllSpacePermissions,
 }
 
@@ -152,6 +152,9 @@ func (s *Service) SetGrants(ctx context.Context, c identity.Caller, spaceID uuid
 			return apperr.Invalid("Unknown permission.")
 		}
 	}
+	// This route is older than the finer permissions: a list written before a split
+	// keeps giving what the broader permission gave.
+	perms = WithSplitOff(perms)
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := s.RequireSpace(ctx, tx, c.UserID, spaceID, SpaceManageAccess); err != nil {
 			return err

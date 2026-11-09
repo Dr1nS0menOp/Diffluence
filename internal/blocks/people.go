@@ -45,7 +45,7 @@ func (r reader) contributionKinds(ctx context.Context, page uuid.UUID) ([]string
 	if !slices.Contains(kinds, contributionWatchers) {
 		return kinds, nil
 	}
-	d, err := r.s.perms.CheckPage(ctx, r.s.pool, r.userID, page, permissions.SpaceAdminister, uuid.Nil)
+	d, err := r.s.perms.CheckPage(ctx, r.s.pool, r.userID, page, permissions.PageWatchers, uuid.Nil)
 	if err != nil {
 		return nil, err
 	}

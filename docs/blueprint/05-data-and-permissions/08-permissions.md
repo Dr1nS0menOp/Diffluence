@@ -27,7 +27,7 @@ Granted to a person, a group, all members or all guests, in `space_grants`.
 |---|---|---|---|
 | **PRM-010** | built | `space.view` | The space and its pages. Every other permission needs this one too |
 | **PRM-011** | built | `space.export` | Export what the person can see |
-| **PRM-012** | built | `space.administer` | Name, settings, grants, trash, archive, delete, shortcuts |
+| **PRM-012** | built | `space.administer` | Name, settings, grants, trash, archive, delete. What specs 036 and 040 split off it is in 8.7 |
 | **PRM-013** | built | `page.create` | New pages, moving and copying into the space, importing |
 | **PRM-014** | built | `page.edit` | Editing, renaming, page look, publishing, restoring a version |
 | **PRM-015** | built, used from wave D | `page.archive` | Archiving a page. Exists with nothing behind it today |
@@ -61,9 +61,9 @@ A set fills in boxes. It is not a rule, and it can be changed box by box afterwa
 | Number | Status | Set | Permissions |
 |---|---|---|---|
 | **PRM-032** | built | Viewer | view, export, comment add, comment delete own |
-| **PRM-033** | built | Editor | view, export, page create, edit, archive, delete own, comment add, comment delete own, attachment add, attachment delete own |
+| **PRM-033** | built | Editor | view, export, page create, edit, move out, archive, delete own, comment add, comment delete own, attachment add, attachment delete own |
 | **PRM-034** | built | Space administrator | All space permissions |
-| **PRM-035** | built | Manager | Editor, plus delete any page, comment and file, manage restrictions, manage access |
+| **PRM-035** | built | Manager | Editor, plus delete any page, comment and file, manage restrictions, manage access, ask for guests |
 | **PRM-036** | built | Own sets | Defined by administrators, for the whole instance. They became roles in spec 036 (PRM-190) |
 | **PRM-037** | built | Presets | Team space: all members get Editor. Read-only knowledge base: all members get Viewer. Other entries stay |
 
@@ -94,7 +94,7 @@ Spec 036, ADR-034. A role is not a set that fills in boxes: people and groups ho
 
 ## 8.7 Finer permissions
 
-Spec 036. The product owner asked whether one screen of permissions was all there is. Four things hid under `space.administer` that a space can reasonably give apart: they are now permissions of their own. Whoever held *administer* holds them too, so nobody gained or lost anything by the split.
+Spec 036. The product owner asked whether one screen of permissions was all there is. Four things hid under `space.administer` that a space can reasonably give apart: they are now permissions of their own. Whoever held *administer* holds them too, so nobody gained or lost anything by the split. Spec 040 split eight more in the same way: PRM-207 to PRM-214.
 
 | ID | Status | Permission | What it allows | Split from |
 |---|---|---|---|---|
@@ -104,16 +104,16 @@ Spec 036. The product owner asked whether one screen of permissions was all ther
 | **PRM-201** | built | `space.audit` | Reading the audit of the space | `space.administer` |
 
 - **PRM-202** · built · A permission split off a broader one works wherever the broader one worked, in an archived space and on an archived page too, so the split changes no decision. `permissions.SplitFrom` names the pairs; the matrix test holds `Evaluate`, the SQL and the literal rule to it.
-- **PRM-203** · built · The migration gives each split-off permission to every subject and own set that held the broader one, before turning grants into roles. Its test compares 369,861 decisions before and after, 720 of them allowed through a split, and none changed.
-- **PRM-204** · built · A bundle of format 1, from before the split, gives the split-off permissions with the broader one. Bundles are now format 2 and taken as they are.
+- **PRM-203** · built · The migration gives each split-off permission to every subject and own set that held the broader one, before turning grants into roles. Its test compares 369,861 decisions before and after, 720 of them allowed through a split, and none changed. Spec 040 does the same for its eight (migration 0040, `rbac_split_off`): the test now compares 949,740 decisions, 3,506 of them allowed through a split, and none changed.
+- **PRM-204** · built · A bundle from before a split gives the split-off permissions with the broader one: format 1 those of specs 036 and 040, format 2 those of spec 040. Bundles are now format 3 and taken as they are. `exchange.heldSince` names the first format that holds each permission, and a test fails when one is missing.
 - **PRM-205** · built · Every permission has a name and one line on what it allows, in the translation files, grouped as pages, comments, files, people and access, space, and administration. No key reaches a screen: a role made from single permissions is named in the same words, and a test holds the database and the interface to one wording.
 - **PRM-206** · new · `post.create`: blog posts apart from pages, given to whoever holds `page.create`. Turning an unpublished page into a post would need it too, which takes that from someone who holds `page.edit` without `page.create`. Needs that decision first.
-- **PRM-207** · new · `space.labels`: the fixed labels of a space and renaming a label, apart from `space.administer`.
-- **PRM-208** · new · `space.statuses`: the page statuses and review rules of a space, apart from `space.administer`.
-- **PRM-209** · new · `space.approvals`: the approval rule of a space, apart from `space.administer`.
-- **PRM-210** · new · `page.move_out`: moving and copying pages out of the space, apart from `page.edit`. Today moving out needs edit and create where the page is, and create where it goes.
-- **PRM-211** · new · Export per format: PDF, office files and bundles apart. Today `space.export` covers files and PDF, and a bundle of the whole space needs `space.administer`.
-- **PRM-212** · new · `page.watchers`: seeing who watches a page and adding or removing someone else, apart from `space.administer`.
-- **PRM-213** · new · `space.invite_guests`: inviting a guest into one space, apart from the instance-wide `invite_people`.
-- **PRM-214** · new · `space.look`: the shortcuts, icon, title alignment and home page of a space, apart from `space.administer`.
-- **PRM-215** · new · `space.databases`: making and changing the databases of a space, after a study of which permission guards them today.
+- **PRM-207** · built · `space.labels`, "Labels": the fixed labels of a space and renaming a label, apart from `space.administer` (spec 040).
+- **PRM-208** · built · `space.statuses`, "Statuses and reviews": the page statuses and the review period of a space, apart from `space.administer`.
+- **PRM-209** · built · `space.approvals`, "Approval rule": reading and setting the approval rule of a space and its fixed approvers, apart from `space.administer`.
+- **PRM-210** · built · `page.move_out`, "Move pages to another space": moving a page and the pages below it to another space, apart from `page.edit`. The page still needs create where it is and where it goes, and an edit restriction on the page stops it as it stops editing. Copying out stays as it was, because a copy takes nothing away from the space and needs only view there: asking more would take access from people who have it.
+- **PRM-211** · partly · Export per format. Built: `space.bundle`, "Bundle the space", apart from `space.administer`; a bundle still needs `space.export` too, because it is an export. Open: PDF and office files apart from Markdown and HTML, which would take formats from everyone who exports today, so it waits for the product owner.
+- **PRM-212** · built · `page.watchers`, "Manage who watches": seeing who watches a page, and adding or removing someone else, apart from `space.administer`. The block that lists contributors follows it too.
+- **PRM-213** · built · `space.invite_guests`, "Ask for guests": asking for a guest in one space, apart from `space.manage_access`, which held it before. *Administer* implies it, as it implies managing access, and the instance-wide `invite_people` still decides who may ask at all.
+- **PRM-214** · built · `space.look`, "Look and shortcuts": the shortcuts, picture, title alignment and home page of a space, apart from `space.administer`. The name, description and kind of icon stay with *administer*, because they say what the space is.
+- **PRM-215** · new · `space.databases`. The study of spec 040 found that a database is a page of its own kind, guarded by `page.create` and `page.edit` like every page. A permission of its own needs the kind of the page in the rule first, which `Evaluate` reads only for templates today. Waits for that change, and for the product owner to say a database should differ from a page.

@@ -73,6 +73,11 @@ const SETTINGS_PERMISSIONS = [
   'space.templates',
   'space.automation',
   'site.publish',
+  'space.labels',
+  'space.statuses',
+  'space.approvals',
+  'space.bundle',
+  'space.look',
 ];
 
 function mayOpenSettings(space: Space): boolean {

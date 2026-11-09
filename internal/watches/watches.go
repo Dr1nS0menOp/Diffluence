@@ -170,7 +170,7 @@ type Watcher struct {
 
 // Watchers lists who watches a page directly. Space administrators only.
 func (s *Service) Watchers(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Watcher, error) {
-	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.SpaceAdminister, uuid.Nil); err != nil {
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.PageWatchers, uuid.Nil); err != nil {
 		return nil, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT u.id, u.display_name FROM watches w JOIN users u ON u.id = w.user_id
@@ -193,7 +193,7 @@ func (s *Service) Watchers(ctx context.Context, c identity.Caller, pageID uuid.U
 // it changes what another person receives.
 func (s *Service) SetWatcher(ctx context.Context, c identity.Caller, pageID, user uuid.UUID, on bool) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.SpaceAdminister, uuid.Nil); err != nil {
+		if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.PageWatchers, uuid.Nil); err != nil {
 			return err
 		}
 		var spaceID uuid.UUID

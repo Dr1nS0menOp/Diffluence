@@ -16,6 +16,9 @@ type memo struct {
 	mu     sync.Mutex
 	users  map[uuid.UUID]UserFacts
 	spaces map[uuid.UUID]SpaceFacts
+	// gen is the permission generation this request saw first (ARC-231).
+	gen    int64
+	hasGen bool
 }
 
 type memoKey struct{}
@@ -55,6 +58,18 @@ func (m *memo) keepUser(u UserFacts) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.users[u.ID] = u
+}
+
+func (m *memo) generation() (int64, bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.gen, m.hasGen
+}
+
+func (m *memo) keepGeneration(gen int64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.gen, m.hasGen = gen, true
 }
 
 func (m *memo) space(id uuid.UUID) (SpaceFacts, bool) {

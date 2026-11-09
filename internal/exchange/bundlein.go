@@ -162,7 +162,7 @@ func verifyBundle(zr *zip.Reader) (openedBundle, error) {
 		return out, apperr.Invalid("The signature of this bundle is wrong. It was changed after it was made.")
 	}
 	if out.manifest.Format != bundleFormat ||
-		(out.manifest.Version != bundleVersion && out.manifest.Version != bundleVersionBeforeSplit) {
+		out.manifest.Version < bundleVersionBeforeSplit || out.manifest.Version > bundleVersion {
 		return out, apperr.Invalid("This version of a bundle cannot be read here.")
 	}
 	out.signer = fingerprintOf(public)
@@ -558,15 +558,30 @@ func (in *bundleImport) grants(ctx context.Context, tx pgx.Tx) error {
 	return nil
 }
 
+// heldSince is the first bundle version that holds a permission split off a broader one.
+// A bundle older than that knew only the broader one.
+var heldSince = map[string]int{
+	permissions.SitePublish:       2,
+	permissions.SpaceAutomation:   2,
+	permissions.SpaceTemplates:    2,
+	permissions.SpaceAudit:        2,
+	permissions.SpaceLabels:       3,
+	permissions.SpaceStatuses:     3,
+	permissions.SpaceApprovals:    3,
+	permissions.SpaceBundle:       3,
+	permissions.SpaceLook:         3,
+	permissions.PageWatchers:      3,
+	permissions.PageMoveOut:       3,
+	permissions.SpaceInviteGuests: 3,
+}
+
 // permissionsOfGrant is what one grant in a bundle stands for here. In a bundle from before
-// spec 036 a broader permission brings the finer ones split off it, as migration 0036 did.
+// a split a broader permission brings the finer ones split off it, as the migration of
+// that split did.
 func permissionsOfGrant(version int, permission string) []string {
 	perms := []string{permission}
-	if version != bundleVersionBeforeSplit {
-		return perms
-	}
 	for finer, broad := range permissions.SplitFrom {
-		if broad == permission {
+		if broad == permission && version < heldSince[finer] {
 			perms = append(perms, finer)
 		}
 	}

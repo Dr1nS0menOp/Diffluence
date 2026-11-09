@@ -51,6 +51,24 @@ const (
 	SpaceTemplates = "space.templates"
 	// SpaceAudit reads the audit of a space.
 	SpaceAudit = "space.audit"
+
+	// SpaceLabels fixes the labels of a space and renames a label in it (spec 040).
+	SpaceLabels = "space.labels"
+	// SpaceStatuses sets the page statuses and the review period of a space.
+	SpaceStatuses = "space.statuses"
+	// SpaceApprovals sets the approval rule of a space and its fixed approvers.
+	SpaceApprovals = "space.approvals"
+	// SpaceBundle makes a bundle of the whole space, which still needs export too.
+	SpaceBundle = "space.bundle"
+	// SpaceLook sets the shortcuts, the picture, the title alignment and the home page.
+	SpaceLook = "space.look"
+	// PageWatchers shows who watches a page, and adds or removes someone else.
+	PageWatchers = "page.watchers"
+	// PageMoveOut moves a page and the pages below it to another space.
+	PageMoveOut = "page.move_out"
+	// SpaceInviteGuests asks for a guest in the space. Like manage access, administer
+	// implies it; the instance-wide invite_people still decides who may ask at all.
+	SpaceInviteGuests = "space.invite_guests"
 )
 
 // AllSpacePermissions lists every space permission.
@@ -61,16 +79,32 @@ var AllSpacePermissions = []string{
 	AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
 	RestrictionManage, AnalyticsView,
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
+	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
+	PageMoveOut, SpaceInviteGuests,
 }
 
-// SplitFrom names, for each permission spec 036 split off a broader one, that broader
-// permission. Whoever held the broader one before holds the finer one too, so the split
-// moves no access; it only lets a role hold one without the other.
+// SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
+// broader permission. Whoever held the broader one before holds the finer one too, so the
+// split moves no access; it only lets a role hold one without the other.
 var SplitFrom = map[string]string{
-	SitePublish:     SpaceAdminister,
-	SpaceAutomation: SpaceAdminister,
-	SpaceTemplates:  SpaceAdminister,
-	SpaceAudit:      SpaceAdminister,
+	SitePublish:       SpaceAdminister,
+	SpaceAutomation:   SpaceAdminister,
+	SpaceTemplates:    SpaceAdminister,
+	SpaceAudit:        SpaceAdminister,
+	SpaceLabels:       SpaceAdminister,
+	SpaceStatuses:     SpaceAdminister,
+	SpaceApprovals:    SpaceAdminister,
+	SpaceBundle:       SpaceAdminister,
+	SpaceLook:         SpaceAdminister,
+	PageWatchers:      SpaceAdminister,
+	PageMoveOut:       PageEdit,
+	SpaceInviteGuests: SpaceManageAccess,
+}
+
+// splitOffAdminister reports whether a permission was split off space administration, so
+// it works wherever administer worked.
+func splitOffAdminister(action string) bool {
+	return SplitFrom[action] == SpaceAdminister
 }
 
 // Actions that are not permissions themselves.
@@ -178,7 +212,7 @@ type Decision struct {
 // isEdit reports whether an edit restriction on the page applies to action.
 func isEdit(action string) bool {
 	switch action {
-	case PageEdit, PageArchive, ActionPageDelete, AttachmentAdd, ActionAttachmentDelete:
+	case PageEdit, PageArchive, ActionPageDelete, AttachmentAdd, ActionAttachmentDelete, PageMoveOut:
 		return true
 	}
 	return false
@@ -193,21 +227,20 @@ const KindTemplate = "template"
 // administer works where administer does.
 func worksOnArchivedPage(action string) bool {
 	switch action {
-	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,
-		SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:
+	case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:
 		return true
 	}
-	return false
+	return splitOffAdminister(action)
 }
 
 // worksWhenArchived lists what still works in an archived (read-only) space.
 func worksWhenArchived(action string) bool {
 	switch action {
 	case SpaceView, ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, SpaceManageAccess, AnalyticsView,
-		SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:
+		SpaceInviteGuests:
 		return true
 	}
-	return false
+	return splitOffAdminister(action)
 }
 
 func (u UserFacts) matches(s Subject) bool {
@@ -245,6 +278,8 @@ func actionAllowedBySpace(in Input) (string, bool) {
 		return AttachmentDeleteAny, holds(in, AttachmentDeleteAny) || (in.Owner == in.User.ID && holds(in, AttachmentDeleteOwn))
 	case SpaceManageAccess:
 		return SpaceManageAccess, holds(in, SpaceManageAccess) || holds(in, SpaceAdminister)
+	case SpaceInviteGuests:
+		return SpaceInviteGuests, holds(in, SpaceInviteGuests) || holds(in, SpaceAdminister)
 	case ActionCommentDelete:
 		return CommentDeleteAny, holds(in, CommentDeleteAny) || (in.Owner == in.User.ID && holds(in, CommentDeleteOwn))
 	}

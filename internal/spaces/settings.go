@@ -27,7 +27,16 @@ const maxIconBytes = 1 << 20
 var iconTypes = map[string]bool{"image/png": true, "image/jpeg": true, "image/gif": true, "image/webp": true}
 
 func (s *Service) requireAdmin(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID) (Space, error) {
-	if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceAdminister); err != nil {
+	return s.requirePermission(ctx, tx, c, id, permissions.SpaceAdminister)
+}
+
+// requireLook is for the shortcuts, picture, title alignment and home page (spec 040).
+func (s *Service) requireLook(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID) (Space, error) {
+	return s.requirePermission(ctx, tx, c, id, permissions.SpaceLook)
+}
+
+func (s *Service) requirePermission(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID, permission string) (Space, error) {
+	if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permission); err != nil {
 		return Space{}, err
 	}
 	return load(ctx, tx, id)
@@ -173,7 +182,7 @@ func (s *Service) SetOwners(ctx context.Context, c identity.Caller, id uuid.UUID
 func (s *Service) SetHome(ctx context.Context, c identity.Caller, id, page uuid.UUID) (Space, error) {
 	var out Space
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := s.requireAdmin(ctx, tx, c, id); err != nil {
+		if _, err := s.requireLook(ctx, tx, c, id); err != nil {
 			return err
 		}
 		ok, err := s.pages.CanBeHome(ctx, tx, c, page, id)
@@ -198,7 +207,7 @@ func (s *Service) SetTitleAlign(ctx context.Context, c identity.Caller, id uuid.
 		return apperr.Invalid("A title is aligned to the start or the centre.")
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		sp, err := s.requireAdmin(ctx, tx, c, id)
+		sp, err := s.requireLook(ctx, tx, c, id)
 		if err != nil {
 			return err
 		}
@@ -257,7 +266,7 @@ func (s *Service) SetIcon(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if !iconTypes[http.DetectContentType(raw)] {
 		return apperr.Invalid("A space picture is a PNG, JPEG, GIF or WebP file.")
 	}
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, id, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, id, permissions.SpaceLook); err != nil {
 		return err
 	}
 	key := iconKey(id)
@@ -265,7 +274,7 @@ func (s *Service) SetIcon(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		sp, err := s.requireAdmin(ctx, tx, c, id)
+		sp, err := s.requireLook(ctx, tx, c, id)
 		if err != nil {
 			return err
 		}
@@ -279,7 +288,7 @@ func (s *Service) SetIcon(ctx context.Context, c identity.Caller, id uuid.UUID, 
 // RemoveIcon goes back to the character or the first letter.
 func (s *Service) RemoveIcon(ctx context.Context, c identity.Caller, id uuid.UUID) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		sp, err := s.requireAdmin(ctx, tx, c, id)
+		sp, err := s.requireLook(ctx, tx, c, id)
 		if err != nil {
 			return err
 		}

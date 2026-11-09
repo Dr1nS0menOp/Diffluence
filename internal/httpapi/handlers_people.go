@@ -73,7 +73,7 @@ func (s *Server) registerPeopleRoutes() {
 	r.HandleFunc("GET /api/v1/spaces/{id}/access", Object("space.manage_access"), s.handleSpaceAccess)
 	r.HandleFunc("GET /api/v1/spaces/{id}/access.csv", Object("space.manage_access"), s.handleSpaceAccessCSV)
 	r.HandleFunc("POST /api/v1/spaces/{id}/grants/preview", Object("space.manage_access"), s.handleGrantPreview)
-	r.HandleFunc("POST /api/v1/spaces/{id}/guests", Object("space.manage_access"), s.handleInviteGuest)
+	r.HandleFunc("POST /api/v1/spaces/{id}/guests", Object("space.invite_guests"), s.handleInviteGuest)
 	r.HandleFunc("GET /api/v1/spaces/{id}/audit", Object("space.audit"), s.handleSpaceAudit)
 	r.HandleFunc("GET /api/v1/spaces/{id}/categories", Object("space.view"), s.handleSpaceCategoriesGet)
 	r.HandleFunc("PUT /api/v1/spaces/{id}/categories", Object("space.administer"), s.handleSpaceCategories)
@@ -658,7 +658,7 @@ func (s *Server) handleInviteGuest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	c := s.caller(r)
-	if err := s.deps.Permissions.RequireSpace(r.Context(), s.deps.Pool, c.UserID, id, permissions.SpaceManageAccess); err != nil {
+	if err := s.deps.Permissions.RequireSpace(r.Context(), s.deps.Pool, c.UserID, id, permissions.SpaceInviteGuests); err != nil {
 		s.fail(w, r, err)
 		return
 	}

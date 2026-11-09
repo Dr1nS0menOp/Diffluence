@@ -33,10 +33,11 @@ const JobKindBundle = "bundle_export"
 
 const (
 	bundleFormat = "diffluence-bundle"
-	// bundleVersion 2 holds the permissions spec 036 split off broader ones.
-	bundleVersion = 2
-	// bundleVersionBeforeSplit is still read: its grants of a broader permission bring the
-	// finer ones with them, as migration 0036 did.
+	// bundleVersion 3 holds the permissions spec 040 split off broader ones, and version 2
+	// those of spec 036. Older versions are still read: see heldSince.
+	bundleVersion = 3
+	// bundleVersionBeforeSplit is the oldest version read: its grants of a broader
+	// permission bring every finer one with them, as migrations 0036 and 0040 did.
 	bundleVersionBeforeSplit = 1
 	manifestFile             = "manifest.json"
 	signatureFile            = "manifest.sig"
@@ -136,7 +137,7 @@ type BundlePerson struct {
 // StartBundle queues a bundle of a space. It holds everything, so it needs both
 // administer and export (PRM-095).
 func (s *Service) StartBundle(ctx context.Context, c identity.Caller, spaceID uuid.UUID) (ExportRun, error) {
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceBundle); err != nil {
 		return ExportRun{}, err
 	}
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceExport); err != nil {

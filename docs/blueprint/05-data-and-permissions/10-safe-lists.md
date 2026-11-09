@@ -23,7 +23,7 @@ A single object is guarded by `Require...`. A list is where hidden things slip t
 | **PRM-128** | built | Recent spaces, favourite spaces | `perm_spaces`, active only |
 | **PRM-129** | built | Export | `ForExport`, the same function, and files of those pages only |
 | **PRM-130** | built | Files in quick search | `perm_visible_pages` on the file's page |
-| **PRM-131** | partly | Trash of a space | *administer* only. No rule of the object (GAP-001) |
+| **PRM-131** | built | Trash of a space | *administer*, and the rule of the object: an item on a page the person may not see shows no title and cannot be purged by hand (GAP-001, PRM-070) |
 | **PRM-132** | built | Move dialog | The tree, so the same guard |
 
 ## 10.2 Lists of people
@@ -35,23 +35,25 @@ A single object is guarded by `Require...`. A list is where hidden things slip t
 | **PRM-135** | built | Administrators of a space | Whoever can see the space. Names only |
 | **PRM-136** | built | Names on a restriction | Whoever can see the page. Names only (GAP-025) |
 | **PRM-137** | built | Mention candidates | Without `view_profiles`, people with a direct grant in this space. `can_view` is only answered for a page the asker can see |
-| **PRM-138** | wave C | Who has access | Whoever can see the page. All members is one line, at most 50 names |
+| **PRM-138** | built | Who has access | Whoever can see the page. All members is one line, at most 50 names |
 | **PRM-139** | built | People directory, profiles, cards | `perm_visible_people` |
 
 ## 10.3 Lists from later waves
 
 | Number | Status | List | Guard |
 |---|---|---|---|
-| **PRM-140** | wave C | Comments, threads, counts in the byline | PRM-077 |
+| **PRM-140** | built | Comments, threads, counts in the byline | PRM-077 |
 | **PRM-141** | built | Notifications and the count | PRM-085. The count must follow the hidden rows, or it says that something exists |
-| **PRM-142** | wave C | My tasks | Through the page. A task's text is a copy, so a hidden page takes its tasks along |
-| **PRM-143** | wave C | Feed, Popular | PRM-090 |
-| **PRM-144** | wave D | Labels, suggestions, counts, label pages | Through visible pages only. A rename by a space administrator also touches pages they cannot see, so its answer must not say how many |
+| **PRM-142** | built | My tasks | Through the page. A task's text is a copy, so a hidden page takes its tasks along |
+| **PRM-143** | built | Feed, Popular | PRM-090 |
+| **PRM-144** | built | Labels, suggestions, counts, label pages | Through visible pages only. A rename by a space administrator also touches pages they cannot see, so its answer must not say how many |
 | **PRM-145** | built | Content screen | Only pages the person may see. A link to a page they cannot see counts as "gone", so the filter cannot tell hidden from absent (GAP-024) |
 | **PRM-146** | built | Archive screen, blog lists | `perm_visible_pages` with the right kind |
-| **PRM-147** | wave D | Search filters and spelling | PRM-089 |
+| **PRM-147** | built | Search filters and spelling | PRM-089 |
 | **PRM-148** | built | Every dynamic block, reports, file lists | One route, one filter, and totals only for space administrators |
 | **PRM-149** | wave H | Insights, rule logs, webhook logs | PRM-103, GAP-009 |
+
+Spec 040: the list and count walks (PRM-171, PRM-172) are the evidence for PRM-138 to PRM-147, beside the tests named in spec 040.
 
 ## 10.4 Side doors
 

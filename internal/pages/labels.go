@@ -203,7 +203,7 @@ func (s *Service) SetFixedLabels(ctx context.Context, c identity.Caller, spaceID
 		clean = append(clean, label)
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceLabels); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "UPDATE spaces SET fixed_labels = $2 WHERE id = $1", spaceID, fixed); err != nil {
@@ -228,7 +228,7 @@ func (s *Service) RenameLabel(ctx context.Context, c identity.Caller, spaceID uu
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceLabels); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)

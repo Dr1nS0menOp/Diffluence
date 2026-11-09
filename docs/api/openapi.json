@@ -7172,7 +7172,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:page.watchers"
       }
     },
     "/api/v1/pages/{id}/watchers/{user}": {
@@ -7207,7 +7207,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:page.watchers"
       },
       "put": {
         "operationId": "put /api/v1/pages/{id}/watchers/{user}",
@@ -7240,7 +7240,7 @@
         "tags": [
           "pages"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:page.watchers"
       }
     },
     "/api/v1/people": {
@@ -8352,7 +8352,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.approvals"
       },
       "put": {
         "operationId": "put /api/v1/spaces/{id}/approvals",
@@ -8377,7 +8377,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.approvals"
       }
     },
     "/api/v1/spaces/{id}/archive": {
@@ -8483,7 +8483,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.bundle"
       }
     },
     "/api/v1/spaces/{id}/categories": {
@@ -8936,7 +8936,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.manage_access"
+        "x-access": "object:space.invite_guests"
       }
     },
     "/api/v1/spaces/{id}/home": {
@@ -8963,7 +8963,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.look"
       }
     },
     "/api/v1/spaces/{id}/icon": {
@@ -8990,7 +8990,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.look"
       },
       "get": {
         "operationId": "get /api/v1/spaces/{id}/icon",
@@ -9040,7 +9040,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.look"
       }
     },
     "/api/v1/spaces/{id}/imports": {
@@ -9227,7 +9227,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.labels"
       }
     },
     "/api/v1/spaces/{id}/labels/rename": {
@@ -9254,7 +9254,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.labels"
       }
     },
     "/api/v1/spaces/{id}/manage-templates": {
@@ -9611,7 +9611,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.statuses"
       }
     },
     "/api/v1/spaces/{id}/role-assignments": {
@@ -9767,7 +9767,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.look"
       }
     },
     "/api/v1/spaces/{id}/sites": {
@@ -9871,7 +9871,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.statuses"
       }
     },
     "/api/v1/spaces/{id}/templates": {
@@ -9977,7 +9977,7 @@
         "tags": [
           "spaces"
         ],
-        "x-access": "object:space.administer"
+        "x-access": "object:space.look"
       }
     },
     "/api/v1/spaces/{id}/trash": {

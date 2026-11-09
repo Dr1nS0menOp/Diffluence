@@ -221,7 +221,7 @@ type Person struct {
 // ApprovalRuleOf says what SetApprovalRule set, for the settings of a space.
 func (s *Service) ApprovalRuleOf(ctx context.Context, c identity.Caller, spaceID uuid.UUID) (ApprovalRule, error) {
 	out := ApprovalRule{Approvers: []Person{}}
-	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceApprovals); err != nil {
 		return out, err
 	}
 	if err := s.pool.QueryRow(ctx, "SELECT approval_required FROM spaces WHERE id = $1", spaceID).Scan(&out.Required); err != nil {
@@ -488,7 +488,7 @@ func (s *Service) SetApprovalRule(ctx context.Context, c identity.Caller, spaceI
 		return apperr.Invalid("A space can have at most ten fixed approvers.")
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceApprovals); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "UPDATE spaces SET approval_required = $2 WHERE id = $1", spaceID, required); err != nil {

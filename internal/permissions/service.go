@@ -5,6 +5,7 @@ package permissions
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -16,38 +17,64 @@ import (
 
 // Service loads facts and answers permission questions.
 type Service struct {
-	pool *pgxpool.Pool
+	pool  *pgxpool.Pool
+	cache *factCache
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
+func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool, cache: newFactCache()} }
 
-// LoadUser reads what evaluation needs to know about a user.
+// LoadUser reads what evaluation needs to know about a user. A read keeps the facts in
+// the memo of its request, and in the memory of the node while the permission generation
+// stays the same (ARC-197, ARC-231). A write reads them fresh every time.
 func (s *Service) LoadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
 	// Facts decide access, so they are always read current (ARC-228).
 	ctx = db.MustBeCurrent(ctx)
 	m := memoOf(ctx)
+	if m == nil {
+		u, _, _, err := s.loadUser(ctx, q, id)
+		return u, err
+	}
 	if u, ok := m.user(id); ok {
 		return u, nil
 	}
-	u, err := s.loadUser(ctx, q, id)
-	if err == nil {
+	gen, err := s.generation(ctx, q, m)
+	if err != nil {
+		return UserFacts{ID: id}, err
+	}
+	if u, ok := s.cache.user(gen, id); ok {
 		m.keepUser(u)
+		return u, nil
 	}
-	return u, err
-}
-
-func (s *Service) loadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, error) {
-	u := UserFacts{ID: id}
-	// An account past its end date is not active, from that moment on.
-	err := q.QueryRow(ctx, `SELECT type, status = 'active' AND (expires_at IS NULL OR expires_at > now())
-		FROM users WHERE id = $1`, id).Scan(&u.Type, &u.Active)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return u, nil // an unknown user is simply inactive
-	}
+	u, status, expires, err := s.loadUser(ctx, q, id)
 	if err != nil {
 		return u, err
 	}
+	m.keepUser(u)
+	s.cache.keepUser(gen, u, status, expires)
+	return u, nil
+}
+
+func (s *Service) loadUser(ctx context.Context, q db.Querier, id uuid.UUID) (UserFacts, string, *time.Time, error) {
+	u := UserFacts{ID: id}
+	var status string
+	var expires *time.Time
+	err := q.QueryRow(ctx, "SELECT type, status, expires_at FROM users WHERE id = $1", id).Scan(&u.Type, &status, &expires)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return u, "", nil, nil // an unknown user is simply inactive
+	}
+	if err != nil {
+		return u, "", nil, err
+	}
+	// An account past its end date is not active, from that moment on.
+	u.Active = activeAt(status, expires, time.Now())
+	u, err = loadMemberships(ctx, q, u)
+	return u, status, expires, err
+}
+
+// loadMemberships reads the groups of a person and what they hold across the instance.
+func loadMemberships(ctx context.Context, q db.Querier, u UserFacts) (UserFacts, error) {
+	id := u.ID
 	rows, err := q.Query(ctx, "SELECT group_id FROM group_members WHERE user_id = $1", id)
 	if err != nil {
 		return u, err
@@ -65,19 +92,32 @@ func (s *Service) loadUser(ctx context.Context, q db.Querier, id uuid.UUID) (Use
 	return u, err
 }
 
-// LoadSpace reads a space and its grants.
+// LoadSpace reads a space and its grants, kept like the facts of a person.
 func (s *Service) LoadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {
 	// Facts decide access, so they are always read current (ARC-228).
 	ctx = db.MustBeCurrent(ctx)
 	m := memoOf(ctx)
+	if m == nil {
+		return s.loadSpace(ctx, q, id)
+	}
 	if f, ok := m.space(id); ok {
 		return f, nil
 	}
-	f, err := s.loadSpace(ctx, q, id)
-	if err == nil {
-		m.keepSpace(f)
+	gen, err := s.generation(ctx, q, m)
+	if err != nil {
+		return SpaceFacts{ID: id}, err
 	}
-	return f, err
+	if f, ok := s.cache.space(gen, id); ok {
+		m.keepSpace(f)
+		return f, nil
+	}
+	f, err := s.loadSpace(ctx, q, id)
+	if err != nil {
+		return f, err
+	}
+	m.keepSpace(f)
+	s.cache.keepSpace(gen, f)
+	return f, nil
 }
 
 func (s *Service) loadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {

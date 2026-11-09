@@ -25,7 +25,7 @@
 - **PRM-044** · built · Allow-only. There is no deny entry. To limit access, narrow it with a restriction.
 - **PRM-045** · built · Deny by default. No grant means no access, also for administrators.
 - **PRM-046** · built · One rule, in two forms: `permissions.Evaluate` for one decision, the `perm_*` SQL functions for lists. A test compares both with a third, literal copy of the rule (05.11).
-- **PRM-047** · built · **No cache.** Facts are read for each decision. The old text promised a cache with invalidation, which does not exist. A cache may only come after a measurement in phase 3, with a test that a revoked right ends within one request.
+- **PRM-047** · built · **Facts kept briefly.** A read keeps the facts of a person and of a space in the memory of its node while `permission_generation` stays the same, and at most 30 seconds (ARC-231, spec 040). Triggers count every change to accounts, group members, grants and the status of a space, so a change ends every kept fact at once, on every node. A write never reads kept facts. `TestAChangeEndsKeptFactsAtOnce` proves that a revoked grant, a left group, an archived space and a disabled account count from the next request.
 - **PRM-048** · built · A decision holds for one request. Under Read Committed a restriction can land between the check and the read, and the person then gets what they could have had a moment earlier. Actions that write check inside their transaction. Long actions check again at the end, as an upload does.
 - **PRM-049** · built · Every refusal through a module is audited as denied.
 
@@ -55,7 +55,7 @@
 ## 9.5 Kinds of people
 
 - **PRM-064** · built · **Guest:** a user type. Never in all members. Starts with nothing. Without `view_profiles` a guest cannot browse people.
-- **PRM-065** · partly · **Service account:** a user type for automation. Built: the type, and the rule treats it as neither member nor guest. New: it cannot log in with a browser, and works through tokens.
+- **PRM-065** · built · **Service account:** a user type for automation. The rule treats it as neither member nor guest, and the matrix holds it (PRM-155). It cannot log in with a browser, and works only through tokens an administrator makes (`TestServiceAccountsWorkOnlyThroughTokens`).
 - **PRM-066** · built · **Disabled:** nothing works, and every session ends. **Expired** (wave F) means the same from the date on, in `LoadUser` and in the SQL, before any job has run.
 - **PRM-067** · built · **Personal space:** an ordinary space, with an ordinary grant for its owner. `Evaluate` has no branch for it. Others only see it through a grant. Recover access works here as elsewhere, audited, and the owner is told.
 
@@ -67,7 +67,7 @@
 
 ## 9.7 Trash and recovery
 
-- **PRM-070** · partly · The trash of a space belongs to its administrators. Built: list, restore, purge with *administer*. Missing: the rule of the object, so an item on a page they may not see must not show its title, and must not be purged by hand (GAP-001).
+- **PRM-070** · built · The trash of a space belongs to its administrators: list, restore, purge with *administer*. An item on a page they may not see shows no title, also not through search or sort, and cannot be purged by hand; retention still removes it (GAP-001, `TestTrashNeverNamesWhatIsHiddenFromThePerson`, `TestPurgingAPageIsRefusedWhenAPageBelowItIsHidden`).
 - **PRM-072** · built · The person who deleted a page can undo it for 60 seconds. Nobody else can, and after that it belongs to the trash.
 - **PRM-073** · built · **Recover access:** an administrator gives themselves *space administrator* on a space, or adds themselves to every restriction on a page and above it. A reason is required. It is always audited. Wave F adds step-up, and tells the author.
 
@@ -82,13 +82,13 @@ Each rule is "the rule of the page, and then this".
 - **PRM-078** · built · Editing a comment: its author with `comment.add`, or a space administrator who can see the page.
 - **PRM-079** · built · Resolving and reopening: `page.edit`.
 - **PRM-080** · built · An `editors_only` thread opens at publishing only when its quote is in the published text. Otherwise it stays closed, or loses its quote (GAP-006).
-- **PRM-081** · wave C · **Reaction:** needs view on the target, and that the target is not archived. Who reacted is shown to whoever can see the target.
+- **PRM-081** · built · **Reaction:** needs view on the target, and that the target is not archived. Who reacted is shown to whoever can see the target (`TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace`, and the matrix holds `reaction.set`).
 - **PRM-082** · built · **Mention:** a person without access gets nothing, and no title. The writer is told.
 - **PRM-083** · built · **Seeing a person.** `perm_visible_people`: with `view_profiles` everyone but service accounts. Without it, those they share a space with through a direct or group grant, because all members and all guests do not count. Names on content are always shown: it is the profile, the directory and the pickers that follow this rule. Until wave F lands, only direct grants count.
 - **PRM-084** · built · **Task:** shown through the page. Ticking needs edit, and makes a silent version.
 - **PRM-085** · built · **Notification:** checked at fan-out, when shown and when mailed. It holds ids. Nobody hears about what they cannot see, also when they are still a watcher.
 - **PRM-086** · built · **Watch:** own watches are personal. Who watches a page is for a space administrator who can see that page.
-- **PRM-087** · wave C · **Share:** never grants anything. A person without access gets no notification, and the sharer is told.
+- **PRM-087** · built · **Share:** never grants anything. A person without access gets no notification, and the sharer is told (`TestSharingOnlyNotifies`).
 - **PRM-088** · built · **Asking for access:** a hidden page stays "not found". Only a space that turns the feature on offers a button, which reveals that something is there, and never what. Allowing changes a restriction or a grant, and only someone who may do that can allow it. When the blocking restriction sits above the page, allowing opens more than this page, and the dialog must say so (GAP-007).
 - **PRM-089** · built · **Search:** only through the rule of the object. Comments in results follow PRM-077. A spelling suggestion comes only from titles the person may see.
 - **PRM-090** · built · **Feed:** versions and comments on pages in `perm_listed_pages`, without silent versions, and with counts that follow PRM-077.
@@ -98,8 +98,8 @@ Each rule is "the rule of the page, and then this".
 
 ## 9.9 Copies that leave
 
-- **PRM-094** · partly · **Export:** needs `space.export`, and holds published versions of pages the person may see at that moment. Built: Markdown, as a stream. Wave G: a file that lives 24 hours for the person who made it, checked per page again at download (GAP-008).
-- **PRM-095** · wave G · **Bundle:** needs *administer* and *export*. It holds everything, so a page the person cannot see stops it. On import a restriction that cannot be matched stays closed, as for Confluence, and grants to all members are shown in the report, because the people differ (GAP-011).
+- **PRM-094** · built · **Export:** needs `space.export`, and holds published versions of pages the person may see at that moment (`TestExportLeavesOutWhatThePersonCannotSee`). The file lives 24 hours for the person who made it (`TestOnlyTheOwnerDownloadsAnExport`), and `export_run_pages` lets the download check each page again (GAP-008).
+- **PRM-095** · built · **Bundle:** needs `space.bundle` (spec 040, split off *administer*) and *export* (`TestABundleStillNeedsExport`). It holds everything, so a page the person cannot see stops it. On import a restriction that cannot be matched stays closed, as for Confluence, and grants to all members are shown in the report, because the people differ (GAP-011; `TestABundleStopsOnAPageThePersonCannotSee`, `TestAnUnmatchedRestrictionStaysClosed`, `TestAGrantToAllMembersIsShownInTheReport`).
 - **PRM-096** · built · **Public site:** no person's rights decide what the world sees. A page is on a site when it was chosen by hand, is published, and has no view restriction on or above it.
 - **PRM-097** · built · What a chosen page refers to must meet the same test. Dynamic blocks, includes, cards and tags are built as a reader who may see only the pages on that site. A person's name appears only when the site says so, and a mention is otherwise left as neutral text (GAP-010).
 - **PRM-098** · built · One function says whether a page may be public. It runs on every event that can change that: a restriction on the page or above it, a move, an archive, a delete, a version removal, the space archived or deleted. A page that fails it leaves at once (GAP-015).
@@ -124,4 +124,4 @@ Each rule is "the rule of the page, and then this".
 - **PRM-194** · built · The migration turned every existing grant into roles, and no decision changed: a test compares 369,861 decisions of Evaluate and the SQL lists before and after, on grants of every shape beside restrictions, drafts, groups and guests.
 - **PRM-195** · built · Restrictions still only narrow: a role never lifts one. `administrator` still gives no content, because instance roles hold only global permissions.
 - **PRM-196** · built · An assignment must match the scope of its role: a space role in a space, an instance role for a user or group without one. Anything else is refused.
-- **PRM-197** · new · `permission_sets` is no longer read. A contract migration drops it once no supported release writes it.
+- **PRM-197** · new · `permission_sets` is no longer read. A contract migration drops it once no supported release writes it. Spec 040 checked: no code of this release writes it, but the release before spec 036 does, and starting that release again is still the way back from an upgrade (`docs/operations/upgrade.md`). It goes in the first contract migration after a release with spec 036 has shipped.

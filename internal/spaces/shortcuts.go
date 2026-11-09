@@ -83,7 +83,7 @@ func (s *Service) SetShortcuts(ctx context.Context, c identity.Caller, id uuid.U
 		clean[i] = v
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceLook); err != nil {
 			return err
 		}
 		sp, err := load(ctx, tx, id)

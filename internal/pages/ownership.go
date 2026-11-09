@@ -174,7 +174,7 @@ func (s *Service) SetStages(ctx context.Context, c identity.Caller, spaceID uuid
 		}
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceStatuses); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "UPDATE spaces SET free_stage = $2 WHERE id = $1", spaceID, free); err != nil {
@@ -337,7 +337,7 @@ func (s *Service) SetReviewDefault(ctx context.Context, c identity.Caller, space
 		return apperr.Invalid("A review period is between 0 and 120 months.")
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceStatuses); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "UPDATE spaces SET review_months = $2 WHERE id = $1", spaceID, months); err != nil {

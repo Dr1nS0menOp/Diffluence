@@ -16,7 +16,7 @@ Owner of these tables: `internal/identity`, unless a line says otherwise.
 - **DAT-023** · built · **Anonymising:** name becomes `Former user` and a short code, address becomes one that cannot receive mail, `username` and `external_id` are emptied, status becomes disabled. See 05.1, section 1.4, for what it reaches.
 - **DAT-024** · built · `user_profiles`: job title, department, location, about, picture key, field visibility, locked fields. Cascades with the user. The picture is re-encoded to a 256 pixel PNG, so it holds no metadata.
 - **DAT-025** · built · `user_preferences`: `user_id`, `preferences` (JSON), `updated_at`. Personal, not audited. Cascades. Unknown keys are refused at the door.
-- **DAT-026** · wave C · `user_preferences.notifications`: per type, digest, quiet hours, pause.
+- **DAT-026** · built · `user_preferences.notifications`: per type, digest, quiet hours, pause (`TestPreferencesDecideWhenMailGoes`).
 
 ## 2.3 Ways to log in
 

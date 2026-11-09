@@ -17,9 +17,9 @@ test('a role is made, given in a space, and changed after a preview', async ({ p
   await expect(page.getByRole('heading', { name: 'Roles for a space' })).toBeVisible();
   await page.getByRole('button', { name: 'New role' }).first().click();
   const make = page.getByRole('dialog');
-  await make.getByLabel('Name').fill(roleName);
-  await make.getByRole('checkbox', { name: 'View the space' }).check();
-  await make.getByRole('checkbox', { name: 'Add comments' }).check();
+  await make.getByLabel('Name', { exact: true }).fill(roleName);
+  await make.getByRole('checkbox', { name: /^View the space\b/ }).check();
+  await make.getByRole('checkbox', { name: /^Add comments\b/ }).check();
   await make.getByRole('button', { name: 'Save' }).click();
   await expect(make).toBeHidden();
   const row = page.getByRole('row').filter({ hasText: roleName });
@@ -50,7 +50,7 @@ test('a role is made, given in a space, and changed after a preview', async ({ p
   const change = page.getByRole('dialog');
   // The editor says who holds the role, and where.
   await expect(change.getByRole('region', { name: 'Who has this role' })).toContainText(person);
-  await change.getByRole('checkbox', { name: 'Create pages' }).check();
+  await change.getByRole('checkbox', { name: /^Create pages\b/ }).check();
   await change.getByRole('button', { name: 'Save' }).click();
   await expect(change.getByRole('status')).toContainText('This role is in use');
   await expect(change.getByRole('status')).toContainText('Create pages');

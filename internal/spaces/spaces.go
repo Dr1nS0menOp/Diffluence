@@ -249,7 +249,9 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 	}
 	sp.Can = map[string]bool{}
 	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess, permissions.AnalyticsView,
-		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit} {
+		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
+		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle, permissions.SpaceLook,
+		permissions.SpaceInviteGuests} {
 		sp.Can[action] = permissions.Evaluate(permissions.Input{User: user, Space: facts, Action: action}).Allowed
 	}
 	return sp, nil

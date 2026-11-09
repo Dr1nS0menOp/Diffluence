@@ -32,7 +32,7 @@ func (s *Server) registerExchangeRoutes() {
 	r.HandleFunc("POST /api/v1/imports/{id}/run", me, s.handleImportRun)
 	r.HandleFunc("POST /api/v1/imports/{id}/undo", me, s.handleImportUndo)
 	r.HandleFunc("POST /api/v1/pages/{id}/import-word", Object("page.edit"), s.handleImportWord)
-	r.HandleFunc("POST /api/v1/spaces/{id}/bundles", Object("space.administer"), s.handleBundleStart)
+	r.HandleFunc("POST /api/v1/spaces/{id}/bundles", Object("space.bundle"), s.handleBundleStart)
 	r.HandleFunc("POST /api/v1/admin/bundles", admin, s.handleBundleImport)
 	r.HandleFunc("GET /api/v1/admin/bundles/key", admin, s.handleBundleKey)
 	r.HandleFunc("GET /api/v1/admin/export-policy", admin, s.handleExportPolicy)

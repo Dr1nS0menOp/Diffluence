@@ -356,7 +356,7 @@ mutate "administer does not imply managing access" internal/permissions/evaluate
 mutate "SQL: an expired account stays active" internal/db/migrations/0010_people.sql \
   's.replaceAll("AND (x.expires_at IS NULL OR x.expires_at > now())", "")' $perms -run TestMatrixSQL
 mutate "LoadUser: an expired account stays active" internal/permissions/service.go \
-  's.replace("status = \x27active\x27 AND (expires_at IS NULL OR expires_at > now())", "status = \x27active\x27")' $perms -run TestMatrixSQL
+  's.replace("u.Active = activeAt(status, expires, time.Now())", "u.Active = status == \"active\"")' $perms -run TestMatrixSQL
 mutate "a guest sees everyone" internal/permissions/evaluate.go \
   's.replace("return target.ID == viewer.ID || slices.Contains(viewer.Global, globalViewProfiles) || target.SharedSpace", "return true")' $perms -run TestMatrixPeople
 mutate "SQL: a guest sees everyone" internal/db/migrations/0010_people.sql \
@@ -527,7 +527,7 @@ mutate "search shows a comment in the trash" internal/db/migrations/0008_organis
 mutate "an edit restriction does not count for a thread" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
 mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
-  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView,")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
+  's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
 mutate "a removed version lives on in a quote" internal/pages/versions.go \
   's.replace("if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {", "_ = removed\n\t\tif err := comments.BlankQuotes(ctx, tx, c, id, current, current); err != nil {")' $app -run TestRemovingAVersionBlanksTheQuotesThatHoldIt
 mutate "nodes hand out rights at the same time" internal/db/db.go \
@@ -950,7 +950,7 @@ mutate "giving roles skips the limits of managing access" internal/permissions/r
   's.replace("if err := s.mayChangeSubject(ctx, tx, c, spaceID, sub, before, after); err != nil {", "if err := error(nil); err != nil {")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
 mutate "instance roles can remove the last administrator" internal/permissions/roles.go \
   's.replace("if err := keepsAnAdministrator(ctx, tx, c); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange", "if err := error(nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn recordChange")' $perms -run TestAssigningRolesKeepsTheLimitsOfManagingAccess
-mutate "adopting grants as roles drops a permission" internal/db/migrations/0036_roles.sql \
+mutate "adopting grants as roles drops a permission" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms);", "PERFORM rbac_set_exact(g.space_id, g.subject_type, g.subject_id, g.perms[2:]);")' $perms -run TestAdoptingGrantsChangesNoDecision
 mutate "a changed role does not reach the people who hold it" internal/db/migrations/0036_roles.sql \
   's.replace("FOR EACH ROW EXECUTE FUNCTION rbac_role_changed();", "FOR EACH ROW WHEN (false) EXECUTE FUNCTION rbac_role_changed();")' $perms -run TestRolesRefuseWhatWouldChangeAccessQuietly
@@ -975,13 +975,84 @@ mutate "a space template is made by anyone who sees the space" internal/template
 mutate "administering a space still holds what was split off it" internal/permissions/evaluate.go \
   's.replace("return in.Action, holds(in, in.Action)", "return in.Action, holds(in, in.Action) || holds(in, SpaceAdminister)")' $perms -run TestMatrixEvaluate
 mutate "what was split off administering stops on an archived page" internal/permissions/evaluate.go \
-  's.replace("SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit:", "SpaceAudit:")' $perms -run TestMatrixEvaluate
-mutate "adoption leaves out what was split off administering" internal/db/migrations/0036_roles.sql \
-  's.replace("WHERE k.permission = '"'"'space.administer'"'"'", "WHERE false AND k.permission = '"'"'space.administer'"'"'")' $perms -run TestAdoptingGrantsChangesNoDecision
-mutate "a permission set with administering becomes a role without what was split off" internal/db/migrations/0036_roles.sql \
-  's.replace("CASE WHEN '"'"'space.administer'"'"' = ANY (s.permissions) THEN split_off ELSE '"'"'{}'"'"' END", "'"'"'{}'"'"'::text[]")' $perms -run TestAdoptingGrantsChangesNoDecision
-mutate "an old bundle loses what administering gave" internal/exchange/bundlein.go \
-  's.replace("if version != bundleVersionBeforeSplit {", "if true {")' ./internal/exchange/ -run TestABundleFromBeforeTheSplitKeepsWhatAdministeringGave
+  's.replace("\treturn splitOffAdminister(action)\n}\n\n// worksWhenArchived", "\treturn false\n}\n\n// worksWhenArchived")' $perms -run TestMatrixEvaluate
+mutate "adoption leaves out what was split off" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("AS f(p)\n        WHERE NOT EXISTS", "AS f(p)\n        WHERE false AND NOT EXISTS")' $perms -run TestAdoptingGrantsChangesNoDecision
+mutate "a permission set with administering becomes a role without what was split off" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("rbac_with_split_off(s.permissions));", "s.permissions);")' $perms -run TestAdoptingGrantsChangesNoDecision
+mutate "an old bundle loses what the broader permission gave" internal/exchange/bundlein.go \
+  's.replace("version < heldSince[finer]", "version < 0")' ./internal/exchange/ -run TestABundleFromBeforeTheSplitKeepsWhatTheBroaderPermissionGave
+# Spec 040: eight more permissions split off broader ones, and facts kept between requests.
+mutate "a version 2 bundle gains what it already held" internal/exchange/bundlein.go \
+  's.replace("version < heldSince[finer]", "version <= heldSince[finer]")' ./internal/exchange/ -run TestABundleOfVersionTwoGainsOnlyTheLaterSplit
+mutate "labels need space administration again" internal/pages/labels.go \
+  's.replaceAll("permissions.SpaceLabels)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "statuses need space administration again" internal/pages/ownership.go \
+  's.replace("permissions.SpaceStatuses)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "the review period needs space administration again" internal/pages/ownership.go \
+  's.replace(/permissions.SpaceStatuses\)([\s\S]*)permissions.SpaceStatuses\)/, "permissions.SpaceStatuses)$1permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "the approval rule needs space administration again" internal/pages/approvals.go \
+  's.replaceAll("permissions.SpaceApprovals)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "the look of a space needs space administration again" internal/spaces/settings.go \
+  's.replace("return s.requirePermission(ctx, tx, c, id, permissions.SpaceLook)", "return s.requirePermission(ctx, tx, c, id, permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "shortcuts need space administration again" internal/spaces/shortcuts.go \
+  's.replace("permissions.SpaceLook)", "permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "watchers need space administration again" internal/watches/watches.go \
+  's.replaceAll("permissions.PageWatchers,", "permissions.SpaceAdminister,")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "a bundle needs space administration again" internal/exchange/bundle.go \
+  's.replace("spaceID, permissions.SpaceBundle)", "spaceID, permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
+mutate "a bundle no longer needs export" internal/exchange/bundle.go \
+  's.replace("if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceExport); err != nil {\n\t\treturn ExportRun{}, err\n\t}\n\tallowed, err := s.mayUseFormat(ctx, c.UserID, FormatBundle)", "allowed, err := s.mayUseFormat(ctx, c.UserID, FormatBundle)")' $app -run TestABundleStillNeedsExport
+mutate "asking for guests needs only manage access again" internal/httpapi/handlers_people.go \
+  's.replace("id, permissions.SpaceInviteGuests); err != nil {", "id, permissions.SpaceManageAccess); err != nil {")' $app -run TestAskingForGuestsIsItsOwnPermission
+mutate "administering no longer asks for guests" internal/permissions/evaluate.go \
+  's.replace("holds(in, SpaceInviteGuests) || holds(in, SpaceAdminister)", "holds(in, SpaceInviteGuests)")' $perms -run TestMatrixEvaluate
+mutate "moving out needs only edit again" internal/pages/move.go \
+  's.replace("[]string{permissions.PageMoveOut, permissions.PageCreate}", "[]string{permissions.PageEdit, permissions.PageCreate}")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
+mutate "the impact of a move out needs only edit" internal/pages/move.go \
+  's.replace("action = permissions.PageMoveOut", "action = permissions.PageEdit")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
+mutate "an edit restriction does not stop a move out" internal/permissions/evaluate.go \
+  's.replace("AttachmentAdd, ActionAttachmentDelete, PageMoveOut:", "AttachmentAdd, ActionAttachmentDelete:")' $perms -run TestMatrixEvaluate
+mutate "asking for guests stops in an archived space" internal/permissions/evaluate.go \
+  's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
+mutate "the migration gives editors no move out" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"']", "WHEN '"'"'page.edit'"'"' THEN '"'"'{}'"'"'::text[]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
+mutate "kept facts ignore the permission generation" internal/permissions/factcache.go \
+  's.replace("\treturn gen == c.gen\n", "\treturn true\n").replace("\tif gen > c.gen {", "\tif false {")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "a revoked space grant does not count" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("ON space_grants\n    FOR EACH STATEMENT", "ON space_grants\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "leaving a group does not count" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("ON group_members\n    FOR EACH STATEMENT", "ON group_members\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "archiving a space does not count" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("UPDATE OF status ON spaces\n    FOR EACH STATEMENT", "UPDATE OF status ON spaces\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "disabling an account does not count" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("ON users\n    FOR EACH STATEMENT", "ON users\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "losing the product does not count" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("ON global_grants\n    FOR EACH STATEMENT", "ON global_grants\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "an account past its end stays active while kept" internal/permissions/factcache.go \
+  's.replace("\tu.Active = activeAt(e.status, e.expires, c.now())\n", "")' $perms -run TestAKeptAccountEndsAtItsEndDate
+mutate "kept facts never grow old" internal/permissions/factcache.go \
+  's.replace("return c.now().Sub(at) < FactMaxAge", "return true")' $perms -run TestKeptFactsEndWithTheirGenerationAndTheirAge
+mutate "a request from before a change uses kept facts" internal/permissions/factcache.go \
+  's.replace("\treturn gen == c.gen\n", "\treturn gen <= c.gen\n")' $perms -run TestKeptFactsEndWithTheirGenerationAndTheirAge
+mutate "a purged page leaves its reactions" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("CREATE TRIGGER pages_take_reactions AFTER DELETE ON pages\n    FOR EACH ROW", "CREATE TRIGGER pages_take_reactions AFTER DELETE ON pages\n    FOR EACH ROW WHEN (false)")' $app -run TestAPurgedPageLeavesNothingBehind
+mutate "a list shows a hidden page" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("      AND p.archived_at IS NULL\n      AND p.id NOT IN (SELECT h.page_id FROM perm_hidden_pages(u) h)", "      AND p.archived_at IS NULL")' $app -run TestNoListShowsAHiddenPageOrWhatHangsOnIt
+mutate "a move out of a restricted branch needs no right to restrict" internal/pages/move.go \
+  's.replace("\tif len(lost) \x3e 0 {\n\t\tif err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {", "\tif len(lost) \x3c 0 {\n\t\tif err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {")' $app -run TestNoPlaceChangeOpensAPage
+mutate "the faster list forgets the archive" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("      AND p.archived_at IS NULL\n", "")' $perms -run TestMatrixSQLAgreesWithEvaluate
+mutate "the faster hidden pages miss a group" internal/db/migrations/0040_finer_permissions.sql \
+  's.replace("OR (r.subject_type = '"'"'group'"'"' AND r.subject_id IN\n                   (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = u)))))", "OR false)))")' $perms -run TestMatrixSQLAgreesWithEvaluate
+mutate "the old grants route gives administration without what was split off it" internal/permissions/manage.go \
+  's.replace("\tperms = WithSplitOff(perms)\n", "")' $perms -run TestEveryWayToAdministerASpaceGivesTheFinerPermissions
+mutate "a list from between the splits loses the later one" internal/permissions/split.go \
+  's.replace("g := group{broad, splitInSpec[f]}", "g := group{broad, 0}")' $perms -run TestAListFromBeforeASplitGetsWhatWasSplitOff
+mutate "a write reads kept facts" internal/permissions/service.go \
+  's.replace("\tif m == nil {\n\t\tu, _, _, err := s.loadUser(ctx, q, id)\n\t\treturn u, err\n\t}\n", "")' $perms -run TestAWriteNeverReadsKeptFacts
 mutate "anyone reads who holds a role" internal/permissions/roles.go \
   's.replace("([]RoleHolder, int, error) {\n\tif err := s.requireAdministrator(ctx, s.pool, c); err != nil {", "([]RoleHolder, int, error) {\n\tif err := error(nil); err != nil {")' $perms -run TestHoldersOfARoleShowOnlyToAdministrators
 mutate "a write may read from a copy that lags" internal/httpapi/admission.go \

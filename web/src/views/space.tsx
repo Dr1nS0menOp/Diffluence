@@ -46,15 +46,21 @@ const SPACE_SECTIONS = [
 ] as const;
 type SpaceSection = (typeof SPACE_SECTIONS)[number];
 /** The permission a part of the space settings needs. Every other part needs space administration. */
-const SECTION_NEEDS: Record<string, string> = {
-  roles: 'space.manage_access',
-  permissions: 'space.manage_access',
-  audit: 'space.audit',
-  templates: 'space.templates',
-  rules: 'space.automation',
-  automation: 'space.automation',
-  webhooks: 'space.automation',
-  sites: 'site.publish',
+/** The permissions that open a part; any one of them is enough (specs 036 and 040). */
+const SECTION_NEEDS: Record<string, string[]> = {
+  roles: ['space.manage_access'],
+  permissions: ['space.manage_access'],
+  audit: ['space.audit'],
+  templates: ['space.templates'],
+  rules: ['space.statuses', 'space.approvals', 'space.look'],
+  automation: ['space.automation'],
+  webhooks: ['space.automation'],
+  sites: ['site.publish'],
+  statuses: ['space.statuses'],
+  labels: ['space.labels'],
+  shortcuts: ['space.look'],
+  people: ['space.administer', 'space.look'],
+  export: ['space.administer', 'space.bundle'],
 };
 const BACK_ICON_SIZE = 16;
 
@@ -333,7 +339,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   const groups = allGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => space.can?.[SECTION_NEEDS[i.id] ?? 'space.administer']),
+      items: g.items.filter((i) => (SECTION_NEEDS[i.id] ?? ['space.administer']).some((p) => space.can?.[p])),
     }))
     .filter((g) => g.items.length > 0);
   const allowed = groups.flatMap((g) => g.items).map((i) => i.id);

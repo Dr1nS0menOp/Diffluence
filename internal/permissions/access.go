@@ -183,6 +183,8 @@ type GrantPreview struct {
 
 // PreviewGrant says what SetGrants would do, without doing it.
 func (s *Service) PreviewGrant(ctx context.Context, c identity.Caller, spaceID uuid.UUID, sub Subject, perms []string) (GrantPreview, error) {
+	// The preview says what SetGrants will do, so it completes the list the same way.
+	perms = WithSplitOff(perms)
 	if err := s.RequireSpace(ctx, s.pool, c.UserID, spaceID, SpaceManageAccess); err != nil {
 		return GrantPreview{}, err
 	}
