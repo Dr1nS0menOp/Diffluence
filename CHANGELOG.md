@@ -3,6 +3,11 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: a faster mutation check (spec 037)
+- The check that breaks security rules on purpose runs several mutations at once, and the slowest ones run only the tests that catch them. A full run takes about a third of the time, and catches the same mutations with the same tests
+- Builders may run only what their change can affect. Main and CI always run every mutation
+- Upgrade impact: none
+
 ### Security: open lines of blueprints 05 and 06 (spec 035)
 - The PDF helper can ask for a password, `DIFFLUENCE_PDF_PASSWORD`, and then answers only Diffluence. In `compose.yaml` it also fetches no address, runs no script in pages, runs read-only without extra rights, and is pinned by digest
 - Passwords are compared in one Unicode form, so the same password typed on two systems always works. A new password may not hold the product's name

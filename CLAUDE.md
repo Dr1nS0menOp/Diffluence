@@ -73,7 +73,7 @@ Modules talk through their exported Go API and events, never through each other'
 - `scripts/dev up`, then `scripts/dev make check`: everything CI runs (see docs/development.md). The host needs only Docker; on Windows use WSL.
 - `scripts/e2e`: real binary, PostgreSQL and Chromium, with the design pictures
 - `scripts/e2e design.spec.ts --update-snapshots`: new pictures after an intended change of look
-- `scripts/dev make mutation`: proves the tests catch injected bugs. Add a line for every new security rule.
+- `scripts/dev make mutation`: proves the tests catch injected bugs. Add a line for every new security rule. `MUTATION_JOBS` runs several at once (default 4). On your own branch you may run only what your change can affect, with `MUTATION_CHANGED` naming a file of changed paths (`git diff --name-only main > .mutation-changed`). Landing on `main`, and CI, always run every mutation (spec 037). A mutation that runs a whole package may only get `-run` with every test that catches it in a whole-package run.
 - Integration tests need `DIFFLUENCE_TEST_DATABASE_URL` pointing to a Postgres role that may create databases (`scripts/dev` sets it).
 
 ## Definition of done

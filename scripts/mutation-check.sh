@@ -3,12 +3,21 @@
 # Do the tests catch real bugs? This script breaks a security rule on purpose,
 # in a throw-away copy of the code, and fails when the tests stay green.
 # Run it in the development toolbox: scripts/dev bash scripts/mutation-check.sh
+#
+# MUTATION_JOBS sets how many mutations run at once, each in its own copy (default 4).
+# MUTATION_CHANGED names a file that lists changed paths, one per line; then only the
+# mutations those paths can affect run. That mode is for builders: main and CI always
+# run every mutation (spec 037).
 set -uo pipefail
 
 src=$(pwd)
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 survived=0
+jobs_max=${MUTATION_JOBS:-4}
+changed_list=${MUTATION_CHANGED:-}
+count=0
+declare -a kinds names files exprs argv
 
 # apply <file> <expression on s>: changes a file, and fails when nothing changed.
 apply() {
@@ -22,56 +31,149 @@ apply() {
   ' "$1" "$2"
 }
 
-# mutate_web <name> <file below web> <expression on s> <test file>: the same for the frontend.
+# mutate_web <name> <file below web> <expression on s> <test file>: queues a frontend mutation.
 mutate_web() {
-  local name=$1 file=$2 expr=$3 test=$4
-  rm -rf "$work/web"
-  mkdir -p "$work/web"
-  tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$work/web" -xf -
-  ln -s "$src/web/node_modules" "$work/web/node_modules"
-  if ! apply "$work/web/$file" "$expr"; then
-    echo "BROKEN  $name (the mutation no longer applies; update this script)"
-    survived=$((survived + 1))
-    return
-  fi
-  if (cd "$work/web" && npx vitest run "$test" >"$work/out.txt" 2>&1); then
-    echo "MISSED  $name"
-    survived=$((survived + 1))
-  elif grep -a -q -E 'Tests .*failed' "$work/out.txt"; then
-    echo "caught  $name"
-  else
-    echo "BROKEN  $name (no test failed: $(grep -a -m1 . "$work/out.txt"))"
-    survived=$((survived + 1))
-  fi
+  queue web "$1" "$2" "$3" "$4"
 }
 
-# mutate <name> <file> <python expression on s> <go test args...>
+# mutate <name> <file> <expression on s> <go test args...>: queues a Go mutation.
 mutate() {
   local name=$1 file=$2 expr=$3
   shift 3
-  rm -rf "$work/repo"
-  mkdir -p "$work/repo"
-  tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$work/repo" -xf -
-  if ! apply "$work/repo/$file" "$expr"; then
-    echo "BROKEN  $name (the mutation no longer applies; update this script)"
-    survived=$((survived + 1))
+  queue go "$name" "$file" "$expr" "$@"
+}
+
+# queue <kind> <name> <file> <expression> <args...>: keeps a mutation for the run at the end.
+queue() {
+  kinds[count]=$1
+  names[count]=$2
+  files[count]=$3
+  exprs[count]=$4
+  shift 4
+  argv[count]=$(printf '%q ' "$@")
+  count=$((count + 1))
+}
+
+# needed <index>: whether a mutation must run. Every mutation runs unless MUTATION_CHANGED is
+# set. With a list, a mutation runs when a changed path sits in the folder of the mutated file
+# or of its tests, and every mutation runs when this script or a shared test helper changed.
+needed() {
+  local i=$1 path dir
+  [ -z "$changed_list" ] && return 0
+  dir=$(dirname "${files[i]}")
+  [ "${kinds[i]}" = web ] && dir="web/$dir"
+  local -a args
+  eval "args=(${argv[i]})"
+  while IFS= read -r path; do
+    [ -z "$path" ] && continue
+    case "$path" in
+      scripts/mutation-check.sh | internal/testutil/* | web/src/test/*) return 0 ;;
+    esac
+    [ "$(dirname "$path")" = "$dir" ] && return 0
+    local a
+    for a in "${args[@]}"; do
+      case "$a" in
+        ./*/) [ "$(dirname "$path")/" = "${a#./}" ] && return 0 ;;
+        *.test.ts | *.test.tsx) [ "$path" = "web/$a" ] && return 0 ;;
+      esac
+    done
+  done <"$changed_list"
+  return 1
+}
+
+# run_web <index> <folder>: one frontend mutation in its own copy; prints one result line.
+run_web() {
+  local i=$1 dir=$2
+  mkdir -p "$dir/web"
+  tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$dir/web" -xf -
+  ln -s "$src/web/node_modules" "$dir/web/node_modules"
+  if ! apply "$dir/web/${files[i]}" "${exprs[i]}" 2>/dev/null; then
+    echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
+    return
+  fi
+  local -a args
+  eval "args=(${argv[i]})"
+  if (cd "$dir/web" && npx vitest run "${args[@]}" >"$dir/out.txt" 2>&1); then
+    echo "MISSED  ${names[i]}"
+  elif grep -a -q -E 'Tests .*failed' "$dir/out.txt"; then
+    echo "caught  ${names[i]}"
+  else
+    echo "BROKEN  ${names[i]} (no test failed: $(grep -a -m1 . "$dir/out.txt"))"
+  fi
+}
+
+# run_go <index> <folder>: one Go mutation in its own copy; prints one result line.
+run_go() {
+  local i=$1 dir=$2
+  mkdir -p "$dir/repo"
+  tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$dir/repo" -xf -
+  if ! apply "$dir/repo/${files[i]}" "${exprs[i]}" 2>/dev/null; then
+    echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
     return
   fi
   # A mutation that does not compile proves nothing, so it must not count as caught.
-  if ! (cd "$work/repo" && go vet ./internal/... >"$work/out.txt" 2>&1); then
-    echo "BROKEN  $name (the mutated code does not compile: $(grep -a -m1 -E '\.go:' "$work/out.txt"))"
-    survived=$((survived + 1))
+  if ! (cd "$dir/repo" && go vet ./internal/... >"$dir/out.txt" 2>&1); then
+    echo "BROKEN  ${names[i]} (the mutated code does not compile: $(grep -a -m1 -E '\.go:' "$dir/out.txt"))"
     return
   fi
-  if (cd "$work/repo" && go test -count=1 "$@" >"$work/out.txt" 2>&1); then
-    echo "MISSED  $name"
-    survived=$((survived + 1))
-  elif failed=$(grep -a -m1 -E '^--- FAIL' "$work/out.txt"); then
-    echo "caught  $name: $failed"
+  local -a args
+  eval "args=(${argv[i]})"
+  # A long limit, so a package slowed by runs beside it fails on a test, not on the clock.
+  if (cd "$dir/repo" && go test -count=1 -timeout=30m "${args[@]}" >"$dir/out.txt" 2>&1); then
+    echo "MISSED  ${names[i]}"
+  elif failed=$(grep -a -m1 -E '^--- FAIL' "$dir/out.txt"); then
+    echo "caught  ${names[i]}: $failed"
   else
-    echo "BROKEN  $name (no test failed: $(grep -a -m1 . "$work/out.txt"))"
-    survived=$((survived + 1))
+    echo "BROKEN  ${names[i]} (no test failed: $(grep -a -m1 . "$dir/out.txt"))"
   fi
+}
+
+# run_one <index>: runs a mutation and leaves its result line in a file, then cleans its copy.
+run_one() {
+  local i=$1 dir="$work/job-$1"
+  mkdir -p "$dir"
+  if [ "${kinds[i]}" = web ]; then
+    run_web "$i" "$dir" >"$work/result-$i.tmp"
+  else
+    run_go "$i" "$dir" >"$work/result-$i.tmp"
+  fi
+  rm -rf "$dir"
+  mv "$work/result-$i.tmp" "$work/result-$i"
+}
+
+# finish_mutations: runs the queued mutations, at most MUTATION_JOBS at once, and prints the
+# results in the order of this file as soon as they are known. Sets survived.
+finish_mutations() {
+  local next=0 printed=0 running=0 line
+  local -a picked=()
+  local i
+  for ((i = 0; i < count; i++)); do
+    if needed "$i"; then picked+=("$i"); fi
+  done
+  if [ -n "$changed_list" ]; then
+    echo "running ${#picked[@]} of $count mutations for the changed paths in $changed_list"
+  fi
+  while [ "$printed" -lt "${#picked[@]}" ]; do
+    while [ "$next" -lt "${#picked[@]}" ] && [ "$running" -lt "$jobs_max" ]; do
+      run_one "${picked[next]}" &
+      next=$((next + 1))
+      running=$((running + 1))
+    done
+    while [ "$printed" -lt "${#picked[@]}" ] && [ -f "$work/result-${picked[printed]}" ]; do
+      line=$(cat "$work/result-${picked[printed]}")
+      echo "$line"
+      case "$line" in
+        caught*) ;;
+        *) survived=$((survived + 1)) ;;
+      esac
+      printed=$((printed + 1))
+    done
+    if [ "$running" -gt 0 ] && [ "$printed" -lt "${#picked[@]}" ]; then
+      wait -n
+      running=$((running - 1))
+    fi
+  done
+  wait
 }
 
 perms=./internal/permissions/
@@ -92,19 +194,19 @@ mutate "SQL: restrictions hide nothing" internal/db/migrations/0003_permission_f
 mutate "SQL: guests count as all members" internal/db/migrations/0010_people.sql \
   's.replace(`(g.subject_type = '"'"'all_members'"'"' AND x.type = '"'"'member'"'"')`, `(g.subject_type = '"'"'all_members'"'"')`)' $perms
 mutate "reading a page skips the check" internal/pages/pages.go \
-  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Detail{}, err\n\t}", "")' $app
+  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Detail{}, err\n\t}", "")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestANamedApproverCanReadAnUnpublishedPage|TestAPageTheAccountCannotSeeStopsTheRun|TestARestoreBelowAnArchivedPageCannotDropARestriction|TestAdministratorsHaveNoContentAccessUntilRecovery|TestAllowingAccessNamesEveryLevelAndNeedsThemAll|TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent|TestAskingForAccessReachesSomeoneWhoMayGrantIt|TestDeleteRestoreAndPurge|TestDeletingAPageTakesArchivedPagesBelowItAlong|TestDeletingAParentAloneIsRefusedSoNothingFallsOpen|TestEveryObjectRouteIsProtected|TestGroups|TestMoveToAnotherSpaceTakesTheBranchAlong|TestRestrictionsAcrossTreeSearchFavouritesAndExport|TestSeveralWordFilesWaitUnderARestrictedPage|TestSharingOnlyNotifies|TestSpaceKeepsAnAdministratorAndGuestsAreNotMembers|TestStarterTemplatesAreThereAndCanBeHidden|TestUnpublishedPageIsPrivate)$'
 mutate "downloads skip the check" internal/attachments/attachments.go \
-  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app
+  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app -run '^(TestAFileAnswersNotModifiedButStillChecksAccess|TestAFileMovesAcrossSpacesAndFollowsTheRulesOfItsNewPage|TestAnOfficeFileOpensAsPDFThroughTheHelper|TestAttachmentsNeverTrustAFile|TestEveryObjectRouteIsProtected|TestTemplateFilesFollowTheRuleOfTheTemplate)$'
 mutate "any member can import a font" internal/httpapi/handlers_appearance.go \
-  's.replace("admin := SessionOnly(Permission(identity.PermAdministrator))", "admin := SessionOnly(Permission(identity.PermUseProduct))")' $app
+  's.replace("admin := SessionOnly(Permission(identity.PermAdministrator))", "admin := SessionOnly(Permission(identity.PermUseProduct))")' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont|TestRouteTableIsDocumented|TestTheAPIDescriptionMatchesTheRoutes)$'
 mutate "any file passes as a font" internal/settings/font.go \
-  's.replace(`return "", false`, `return "woff2", true`)' $app
+  's.replace(`return "", false`, `return "woff2", true`)' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont)$'
 mutate "font changes are not audited" internal/settings/font.go \
-  's.replace(`c.Event("settings.font_changed"`, `c.Event("settings.updated"`)' $app
+  's.replace(`c.Event("settings.font_changed"`, `c.Event("settings.updated"`)' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont)$'
 mutate "a replaced font file stays on disk" internal/settings/font.go \
-  's.replace("if found {", "if false && found {")' $app
+  's.replace("if found {", "if false && found {")' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont)$'
 mutate "publishing skips the check" internal/pages/versions.go \
-  's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion")' $app
+  's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestArchivedPagesAreReadOnlyAndLeaveEveryList|TestEditRestrictionDoesNotInherit|TestEveryObjectRouteIsProtected|TestScheduledPublishingStopsWhenTheRightsAreGone)$'
 mutate "search ignores permissions" internal/search/words.go \
   's.replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "")' $app -run TestAWrongRowOfTheSearchTableShowsNothing
 mutate "a hidden page counts in a search" internal/search/words.go \
@@ -122,15 +224,15 @@ mutate "the tree picks hidden rows and the rule has to stop them" internal/pages
 mutate "the rows of a tree skip the rule" internal/pages/branches.go \
   's.replace("JOIN (SELECT v.page_id FROM perm_listed_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "JOIN (SELECT unnest(@ids::uuid[]) AS page_id) v ON v.page_id = p.id")' $app -run TestAHiddenChildLeavesNoTraceInTheTree
 mutate "export ignores permissions" internal/pages/export.go \
-  's.replace("JOIN perm_visible_pages($1) vis ON vis.page_id = p.id\n", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) vis ON vis.page_id = p.id\n")' $app
+  's.replace("JOIN perm_visible_pages($1) vis ON vis.page_id = p.id\n", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) vis ON vis.page_id = p.id\n")' $app -run '^(TestExportLeavesOutWhatThePersonCannotSee|TestRestrictionsAcrossTreeSearchFavouritesAndExport)$'
 mutate "moves can drop restrictions" internal/pages/tree.go \
-  's.replace("if !slices.Contains(after, r) {", "if !slices.Contains(after, r) && len(before) < 0 {")' $app
+  's.replace("if !slices.Contains(after, r) {", "if !slices.Contains(after, r) && len(before) < 0 {")' $app -run '^(TestMoveCannotQuietlyDropARestriction)$'
 mutate "moves can create loops" internal/pages/tree.go \
-  's.replace("if slices.Contains(tree, *parent) {", "if slices.Contains(tree, *parent) && len(tree) < 0 {")' $app
+  's.replace("if slices.Contains(tree, *parent) {", "if slices.Contains(tree, *parent) && len(tree) < 0 {")' $app -run '^(TestTreeMoveAndStableURL)$'
 mutate "a page returns while its parent is in the trash" internal/pages/tree.go \
-  's.replace("if parent.Status == StatusTrashed {", "if parent.Status == StatusTrashed && len(parent.Title) < 0 {")' $app
+  's.replace("if parent.Status == StatusTrashed {", "if parent.Status == StatusTrashed && len(parent.Title) < 0 {")' $app -run '^(TestDeleteRestoreAndPurge|TestTrashCanBeSearchedAndWorkedOffTogether)$'
 mutate "SVG shown inline" internal/attachments/attachments.go \
-  's.replace(`"image/webp": true}`, `"image/webp": true, "text/xml; charset=utf-8": true, "text/plain": true, "text/xml": true}`)' $app
+  's.replace(`"image/webp": true}`, `"image/webp": true, "text/xml; charset=utf-8": true, "text/plain": true, "text/xml": true}`)' $app -run '^(TestAttachmentsNeverTrustAFile|TestPageLookIsCheckedAndAudited)$'
 mutate "publish loses its audit event" internal/pages/pages.go \
   's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
@@ -819,6 +921,7 @@ mutate "the user list ignores the space" internal/identity/users.go \
   's.replace("AND ($11::uuid IS NULL OR $11 IN (SELECT ps.space_id FROM perm_spaces(u.id, '"'"'space.view'"'"') ps))", "AND ($11::uuid IS NULL OR true)")' $app -run TestTheUserListFiltersByRoleAndBySpace
 mutate "a guest is not marked" internal/permissions/access.go \
   's.replace("holders[i].Guest = holders[i].Subject.Type == SubjectUser && slices.Contains(guests, holders[i].Subject.ID)", "holders[i].Guest = len(guests) < 0")' $app -run TestWhoHasAccessShowsHowAndExportsSafely
+finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1

@@ -12,3 +12,4 @@ node_modules/
 !/internal/webui/dist/.placeholder
 /web/test-results/
 /web/playwright-report/
+.mutation-changed
