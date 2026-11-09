@@ -7757,6 +7757,40 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/setup": {
+      "get": {
+        "operationId": "get /api/v1/setup",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "setup"
+        ],
+        "x-access": "public"
+      },
+      "post": {
+        "operationId": "post /api/v1/setup",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "setup"
+        ],
+        "x-access": "public"
+      }
+    },
     "/api/v1/sites/{id}": {
       "delete": {
         "operationId": "delete /api/v1/sites/{id}",

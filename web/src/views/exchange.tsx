@@ -18,6 +18,7 @@ import {
 import { Dialog, ErrorNote, Field, FilePicker, Loading, formatSize } from '../components/ui';
 import { offeredNames, useCapabilities } from '../capabilities';
 import { Link } from '../router';
+import { TableBox } from '../components/table-box';
 
 const POLL_MS = 1500;
 const ENDED = ['done', 'failed', 'expired'];
@@ -467,25 +468,27 @@ function PeopleTable({ run, onDone }: { run: ImportRun; onDone: () => void }) {
         />
       </Field>
       {people.length > 0 && (
-        <table>
-          <caption>{t('exchange.people')}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t('common.name')}</th>
-              <th scope="col">{t('exchange.matchedTo')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {people.map((p) => (
-              <tr key={p.id}>
-                <th scope="row">
-                  {p.name} <span className="muted">{p.email}</span>
-                </th>
-                <td>{p.matched ? t('exchange.matched') : t('exchange.becomesYou')}</td>
+        <TableBox>
+          <table>
+            <caption>{t('exchange.people')}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t('common.name')}</th>
+                <th scope="col">{t('exchange.matchedTo')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {people.map((p) => (
+                <tr key={p.id}>
+                  <th scope="row">
+                    {p.name} <span className="muted">{p.email}</span>
+                  </th>
+                  <td>{p.matched ? t('exchange.matched') : t('exchange.becomesYou')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       <button type="submit" className="quiet">
         {t('common.save')}
@@ -679,25 +682,30 @@ export function ExportTab() {
           }}
         >
           <ErrorNote error={save.error} />
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">{t('exchange.format')}</th>
-                <th scope="col">{t('exchange.formatEnabled')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {form.rules.map((rule) => (
-                <PolicyRow
-                  key={rule.format}
-                  rule={rule}
-                  onChange={(next) =>
-                    setForm({ ...form, rules: form.rules.map((r) => (r.format === next.format ? next : r)) })
-                  }
-                />
-              ))}
-            </tbody>
-          </table>
+          <TableBox>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">{t('exchange.format')}</th>
+                  <th scope="col">{t('exchange.formatEnabled')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {form.rules.map((rule) => (
+                  <PolicyRow
+                    key={rule.format}
+                    rule={rule}
+                    onChange={(next) =>
+                      setForm({
+                        ...form,
+                        rules: form.rules.map((r) => (r.format === next.format ? next : r)),
+                      })
+                    }
+                  />
+                ))}
+              </tbody>
+            </table>
+          </TableBox>
           <Field label={t('exchange.maxExport')}>
             <input
               type="number"

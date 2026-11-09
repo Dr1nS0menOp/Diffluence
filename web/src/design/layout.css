@@ -1503,6 +1503,23 @@ span.twist {
   gap: var(--space-0-5);
 }
 
+/* The area starts beside the sidebar rather than in the middle of the room, and nothing in
+   it is wider than that room: a wide table scrolls in its own box, a long choice is cut short. */
+.settings-area {
+  min-inline-size: 0;
+  margin-inline: 0;
+}
+
+.settings-area > *,
+.settings-area .row > * {
+  min-inline-size: 0;
+}
+
+.settings-area select,
+.settings-area input {
+  max-inline-size: 100%;
+}
+
 .settings-area > h1 {
   margin-block-end: var(--space-2);
 }

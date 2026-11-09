@@ -40,6 +40,7 @@ import { StorageLimitDialog } from './admin-storage';
 import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
 import { SettingsSearch, SummaryTab } from './admin-summary';
 import { SettingsFrame } from '../components/settings-frame';
+import { TableBox } from '../components/table-box';
 
 const TABS = [
   'summary',
@@ -403,53 +404,55 @@ function UserTable({
   const { t } = useTranslation();
   const dates = useDates();
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>
-            <span className="visually-hidden">{t('admin.select')}</span>
-          </th>
-          <th>{t('common.name')}</th>
-          <th>{t('common.email')}</th>
-          <th>{t('common.type')}</th>
-          <th>{t('admin.source')}</th>
-          <th>{t('common.status')}</th>
-          <th>{t('admin.lastLogin')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {users.map((u) => (
-          <tr key={u.id}>
-            <td>
-              <input
-                type="checkbox"
-                aria-label={t('admin.selectUser', { name: u.display_name })}
-                checked={picked.includes(u.id)}
-                onChange={() => onToggle(u.id)}
-              />
-            </td>
-            <td>
-              <button type="button" className="ghost" onClick={() => onOpen(u.id)}>
-                {u.display_name}
-              </button>
-            </td>
-            <td>{u.email}</td>
-            <td>
-              {t(`admin.${u.type}`)}
-              {u.type === 'guest' && (
-                <span className="muted">
-                  {' · '}
-                  {u.spaces?.length ? u.spaces.join(', ') : t('admin.guestNoSpaces')}
-                </span>
-              )}
-            </td>
-            <td>{t(`admin.source_${u.source}`)}</td>
-            <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
-            <td>{dates.moment(u.last_login_at)}</td>
+    <TableBox>
+      <table>
+        <thead>
+          <tr>
+            <th>
+              <span className="visually-hidden">{t('admin.select')}</span>
+            </th>
+            <th>{t('common.name')}</th>
+            <th>{t('common.email')}</th>
+            <th>{t('common.type')}</th>
+            <th>{t('admin.source')}</th>
+            <th>{t('common.status')}</th>
+            <th>{t('admin.lastLogin')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {users.map((u) => (
+            <tr key={u.id}>
+              <td>
+                <input
+                  type="checkbox"
+                  aria-label={t('admin.selectUser', { name: u.display_name })}
+                  checked={picked.includes(u.id)}
+                  onChange={() => onToggle(u.id)}
+                />
+              </td>
+              <td>
+                <button type="button" className="ghost" onClick={() => onOpen(u.id)}>
+                  {u.display_name}
+                </button>
+              </td>
+              <td className="email">{u.email}</td>
+              <td>
+                {t(`admin.${u.type}`)}
+                {u.type === 'guest' && (
+                  <span className="muted">
+                    {' · '}
+                    {u.spaces?.length ? u.spaces.join(', ') : t('admin.guestNoSpaces')}
+                  </span>
+                )}
+              </td>
+              <td>{t(`admin.source_${u.source}`)}</td>
+              <td>{u.status === 'active' ? t('admin.active') : t('admin.disabled')}</td>
+              <td>{dates.moment(u.last_login_at)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableBox>
   );
 }
 
@@ -683,28 +686,30 @@ function GroupsTab() {
       {q.data?.groups.length === 0 ? (
         <p className="muted">{t('admin.noGroups')}</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.name')}</th>
-              <th>{t('admin.members')}</th>
-              <th>{t('admin.source')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.groups.map((g) => (
-              <tr key={g.id}>
-                <td>
-                  <button type="button" className="ghost" onClick={() => setOpen(g.id)}>
-                    {g.name}
-                  </button>
-                </td>
-                <td>{g.members}</td>
-                <td>{g.source}</td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.name')}</th>
+                <th>{t('admin.members')}</th>
+                <th>{t('admin.source')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.groups.map((g) => (
+                <tr key={g.id}>
+                  <td>
+                    <button type="button" className="ghost" onClick={() => setOpen(g.id)}>
+                      {g.name}
+                    </button>
+                  </td>
+                  <td>{g.members}</td>
+                  <td>{g.source}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       {selected && <GroupDialog group={selected} onClose={() => setOpen(null)} />}
     </>
@@ -812,47 +817,49 @@ function SpacesTab() {
         </select>
       </div>
       {q.data && shown.length === 0 && <p className="muted">{t('admin.spaceNoneFit')}</p>}
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('space.key')}</th>
-            <th>{t('common.status')}</th>
-            <th>{t('admin.spacePages')}</th>
-            <th>{t('admin.spaceStorage')}</th>
-            <th>{t('admin.spaceActivity')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((s) => {
-            const total = q.data?.totals.find((row) => row.id === s.id);
-            return (
-              <tr key={s.id}>
-                <td>
-                  <Link href={`/spaces/${s.key}`}>{s.name}</Link>
-                </td>
-                <td>{s.key}</td>
-                <td>{s.status}</td>
-                <td>{total?.pages ?? 0}</td>
-                <td>
-                  {formatSize(total?.bytes ?? 0)}
-                  {total?.limit_mib ? ` / ${formatSize(total.limit_mib * MEBIBYTE)}` : ''}
-                </td>
-                <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
-                <td className="row">
-                  <button type="button" className="ghost" onClick={() => setLimiting(s)}>
-                    {t('admin.storageLimit')}
-                  </button>
-                  <button type="button" className="ghost" onClick={() => setRecovering(s)}>
-                    {t('admin.recover')}
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('space.key')}</th>
+              <th>{t('common.status')}</th>
+              <th>{t('admin.spacePages')}</th>
+              <th>{t('admin.spaceStorage')}</th>
+              <th>{t('admin.spaceActivity')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((s) => {
+              const total = q.data?.totals.find((row) => row.id === s.id);
+              return (
+                <tr key={s.id}>
+                  <td>
+                    <Link href={`/spaces/${s.key}`}>{s.name}</Link>
+                  </td>
+                  <td>{s.key}</td>
+                  <td>{s.status}</td>
+                  <td>{total?.pages ?? 0}</td>
+                  <td>
+                    {formatSize(total?.bytes ?? 0)}
+                    {total?.limit_mib ? ` / ${formatSize(total.limit_mib * MEBIBYTE)}` : ''}
+                  </td>
+                  <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
+                  <td className="row">
+                    <button type="button" className="ghost" onClick={() => setLimiting(s)}>
+                      {t('admin.storageLimit')}
+                    </button>
+                    <button type="button" className="ghost" onClick={() => setRecovering(s)}>
+                      {t('admin.recover')}
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TableBox>
       {(trashed.data?.items.length ?? 0) > 0 && (
         <>
           <h2>{t('admin.trashedSpaces')}</h2>
@@ -1033,36 +1040,38 @@ function AuditTab() {
             : t('admin.verifyBad', { seq: verify.data.first_bad_seq, reason: verify.data.reason })}
         </p>
       )}
-      <table>
-        <thead>
-          <tr>
-            <th>{t('admin.when')}</th>
-            <th>{t('admin.actor')}</th>
-            <th>{t('admin.action')}</th>
-            <th>{t('admin.object')}</th>
-            <th>{t('admin.result')}</th>
-            <th>{t('admin.ip')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.events.map((e) => (
-            <tr key={e.seq}>
-              <td>
-                <button type="button" className="ghost" onClick={() => setOpen(e)}>
-                  {dates.moment(e.occurred_at)}
-                </button>
-              </td>
-              <td>{e.actor_id ? <PersonName id={e.actor_id} name={e.actor_id} /> : e.actor_type}</td>
-              <td>{e.action}</td>
-              <td>
-                {e.object_type} <span className="muted">{auditObject(e)}</span>
-              </td>
-              <td>{e.result}</td>
-              <td>{e.ip}</td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('admin.when')}</th>
+              <th>{t('admin.actor')}</th>
+              <th>{t('admin.action')}</th>
+              <th>{t('admin.object')}</th>
+              <th>{t('admin.result')}</th>
+              <th>{t('admin.ip')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.events.map((e) => (
+              <tr key={e.seq}>
+                <td>
+                  <button type="button" className="ghost" onClick={() => setOpen(e)}>
+                    {dates.moment(e.occurred_at)}
+                  </button>
+                </td>
+                <td>{e.actor_id ? <PersonName id={e.actor_id} name={e.actor_id} /> : e.actor_type}</td>
+                <td>{e.action}</td>
+                <td>
+                  {e.object_type} <span className="muted">{auditObject(e)}</span>
+                </td>
+                <td>{e.result}</td>
+                <td>{e.ip}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
       {open && (
         <Dialog title={open.action} onClose={() => setOpen(null)}>
           {open.object_type === 'page' && open.object_id && <PageNoteFacts id={open.object_id} />}
@@ -1180,28 +1189,30 @@ function MailQueue({ entries }: { entries: MailEntry[] }) {
   const dates = useDates();
   if (entries.length === 0) return <p className="muted">{t('admin.mailEmpty')}</p>;
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>{t('admin.when')}</th>
-          <th>{t('common.type')}</th>
-          <th>{t('common.status')}</th>
-          <th>{t('admin.mailAttempts')}</th>
-          <th>{t('admin.mailError')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((m) => (
-          <tr key={m.id}>
-            <td>{dates.moment(m.created_at)}</td>
-            <td>{m.kind}</td>
-            <td>{m.status}</td>
-            <td>{m.attempts}</td>
-            <td>{m.last_error}</td>
+    <TableBox>
+      <table>
+        <thead>
+          <tr>
+            <th>{t('admin.when')}</th>
+            <th>{t('common.type')}</th>
+            <th>{t('common.status')}</th>
+            <th>{t('admin.mailAttempts')}</th>
+            <th>{t('admin.mailError')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {entries.map((m) => (
+            <tr key={m.id}>
+              <td>{dates.moment(m.created_at)}</td>
+              <td>{m.kind}</td>
+              <td>{m.status}</td>
+              <td>{m.attempts}</td>
+              <td>{m.last_error}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableBox>
   );
 }
 
@@ -1335,41 +1346,43 @@ function ScimTab() {
       {q.data?.tokens.length === 0 ? (
         <p className="muted">{t('admin.noTokens')}</p>
       ) : (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.name')}</th>
-              <th>{t('admin.created')}</th>
-              <th>{t('admin.tokenEnds')}</th>
-              <th>{t('admin.lastUsed')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.tokens.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td>{dates.moment(k.created_at)}</td>
-                <td>{dates.day(k.expires_at)}</td>
-                <td>{dates.moment(k.last_used_at)}</td>
-                <td className="row">
-                  {k.revoked_at ? (
-                    t('admin.revoked')
-                  ) : (
-                    <>
-                      <button type="button" className="ghost" onClick={() => rotate.mutate(k.id)}>
-                        {t('admin.rotate')}
-                      </button>
-                      <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
-                        {t('admin.revoke')}
-                      </button>
-                    </>
-                  )}
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.name')}</th>
+                <th>{t('admin.created')}</th>
+                <th>{t('admin.tokenEnds')}</th>
+                <th>{t('admin.lastUsed')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.tokens.map((k) => (
+                <tr key={k.id}>
+                  <td>{k.name}</td>
+                  <td>{dates.moment(k.created_at)}</td>
+                  <td>{dates.day(k.expires_at)}</td>
+                  <td>{dates.moment(k.last_used_at)}</td>
+                  <td className="row">
+                    {k.revoked_at ? (
+                      t('admin.revoked')
+                    ) : (
+                      <>
+                        <button type="button" className="ghost" onClick={() => rotate.mutate(k.id)}>
+                          {t('admin.rotate')}
+                        </button>
+                        <button type="button" className="ghost" onClick={() => revoke.mutate(k.id)}>
+                          {t('admin.revoke')}
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       {secret && (
         <Dialog title={t('admin.newToken')} onClose={() => setSecret(null)}>
@@ -1422,37 +1435,41 @@ function SystemTab() {
   ];
   return (
     <>
-      <table>
-        <tbody>
-          {rows.map(([k, v]) => (
-            <tr key={k}>
-              <th scope="row">{k}</th>
-              <td>{v}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TableBox>
+        <table>
+          <tbody>
+            {rows.map(([k, v]) => (
+              <tr key={k}>
+                <th scope="row">{k}</th>
+                <td>{v}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
       <h2>{t('admin.nodes')}</h2>
-      <table>
-        <thead>
-          <tr>
-            <th>{t('admin.role')}</th>
-            <th>{t('admin.version')}</th>
-            <th>{t('admin.lastSeen')}</th>
-            <th>{t('common.status')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {s.nodes.map((n) => (
-            <tr key={n.id}>
-              <td>{n.role}</td>
-              <td>{n.version}</td>
-              <td>{dates.moment(n.last_seen_at)}</td>
-              <td>{n.live ? t('admin.live') : t('admin.gone')}</td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('admin.role')}</th>
+              <th>{t('admin.version')}</th>
+              <th>{t('admin.lastSeen')}</th>
+              <th>{t('common.status')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {s.nodes.map((n) => (
+              <tr key={n.id}>
+                <td>{n.role}</td>
+                <td>{n.version}</td>
+                <td>{dates.moment(n.last_seen_at)}</td>
+                <td>{n.live ? t('admin.live') : t('admin.gone')}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </>
   );
 }

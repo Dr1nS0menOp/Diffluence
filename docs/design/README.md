@@ -122,6 +122,7 @@ Use these. Reuse beats a new variant.
 | Numbers on a summary | `.tiles` |
 | A colleague in the same document | `TogetherPeople`, and a cursor with a name in words, from `renderCaret` |
 | A table people sort | `SortTable` in `components/sort-table.tsx`, which keeps `aria-sort` right |
+| Any other table of the app | `TableBox` in `components/table-box.tsx` around the `<table>`: a wide table scrolls there, and only then is the box a named Tab stop |
 | Who else is on a page | `PresencePeople`: pictures up to five, then a number, and a quiet status line |
 | A block that fills itself | `.dynamic`, with `.dynamic-head` only while editing. Empty is one muted sentence |
 | A chart | `Chart` in `components/chart.tsx`. Series differ by shape as well as colour, and the numbers are one press away |
@@ -137,7 +138,7 @@ Use these. Reuse beats a new variant.
 
 ## Settings and lists (ADR-034)
 
-- Settings of a space and of the instance use the **Settings** frame. The sidebar holds the sections in groups that fold, and **Jump to a setting** narrows them; the administration's own search also finds settings inside a section. The large area shows one section, with its name as the page title.
+- Settings of a space and of the instance use the **Settings** frame. The sidebar holds the sections in groups that fold, and **Jump to a setting** narrows them; the administration's own search also finds settings inside a section. The large area shows one section, with its name as the page title. It starts beside the sidebar, not in the middle of the room, and nothing in it runs past the window: a wide table scrolls in its own `TableBox`, and the page itself never scrolls sideways.
 - The administration has these groups: Overview; People and access; Content; Automation; Look; System. Care and System health sit under System. A new tab goes into exactly one group.
 - Tables of the app show rows, not boxes: a line under each row, a quiet heading, no cell borders. Tables inside a page keep their own rules.
 - Lists of people show a picture, the name, how they got in and the role. Someone who may change a role picks it in the row. Long lists filter with dropdowns above them.

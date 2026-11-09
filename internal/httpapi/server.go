@@ -44,6 +44,7 @@ import (
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/setup"
 	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/sites"
 	"github.com/diffluence/diffluence/internal/spaces"
@@ -97,6 +98,7 @@ type Deps struct {
 	Webhooks    *webhooks.Service
 	Collab      *collab.Service
 	Failures    *failures.Service
+	Setup       *setup.Service
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)
@@ -125,7 +127,9 @@ type Server struct {
 	// loginByAllIPs counts tries on one account from every address together.
 	loginByAllIPs *limiter
 	tokenCalls    *limiter
-	requests      *metrics.Requests
+	// setupTries limits tries at the first setup per address (spec 038).
+	setupTries *limiter
+	requests   *metrics.Requests
 	// markdownBusy holds a place for every paste being converted.
 	markdownBusy chan struct{}
 	// admission keeps the order of work when the database is full (ARC-233).
@@ -146,6 +150,7 @@ func New(d Deps) (*Server, error) {
 		requests:   metrics.NewRequests(),
 
 		loginByAllIPs: newLimiter(100, loginWindow),
+		setupTries:    newLimiter(setupTriesPerAddress, setupWindow),
 		markdownBusy:  make(chan struct{}, markdownSlots),
 		admission:     newAdmission(poolSize(d)),
 	}

@@ -9,6 +9,7 @@ import { appearanceQuery } from '../appearance';
 import { useDates } from '../dates';
 import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
 import { permissionLabel } from '../permission-words';
+import { TableBox } from '../components/table-box';
 
 const DAY_MS = 86_400_000;
 const SERVICE_TOKEN_DAYS = 365;
@@ -169,26 +170,28 @@ function ImportSection() {
         }}
       />
       {rows && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('admin.importLine')}</th>
-              <th>{t('common.email')}</th>
-              <th>{t('common.type')}</th>
-              <th>{t('common.status')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.line}>
-                <td>{r.line}</td>
-                <td>{r.email}</td>
-                <td>{r.type}</td>
-                <td>{r.problem ? t(`admin.import_${r.problem}`, r.problem) : t('admin.importGood')}</td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('admin.importLine')}</th>
+                <th>{t('common.email')}</th>
+                <th>{t('common.type')}</th>
+                <th>{t('common.status')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.line}>
+                  <td>{r.line}</td>
+                  <td className="email">{r.email}</td>
+                  <td>{r.type}</td>
+                  <td>{r.problem ? t(`admin.import_${r.problem}`, r.problem) : t('admin.importGood')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       {file && rows && !run.data && (
         <button type="button" className="primary" disabled={run.isPending} onClick={() => run.mutate(file)}>
@@ -227,30 +230,32 @@ export function InvitationsTab() {
       {q.data?.invitations.length === 0 && <p className="muted">{t('admin.invitationsNone')}</p>}
       <ImportSection />
       {(q.data?.invitations.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.email')}</th>
-              <th>{t('common.type')}</th>
-              <th>{t('account.tokenExpires')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.invitations.map((i) => (
-              <tr key={i.id}>
-                <td>{i.email}</td>
-                <td>{i.type}</td>
-                <td>{dates.day(i.expires_at)}</td>
-                <td>
-                  <button type="button" className="ghost" onClick={() => cancel.mutate(i.id)}>
-                    {t('common.cancel')}
-                  </button>
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.email')}</th>
+                <th>{t('common.type')}</th>
+                <th>{t('account.tokenExpires')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.invitations.map((i) => (
+                <tr key={i.id}>
+                  <td className="email">{i.email}</td>
+                  <td>{i.type}</td>
+                  <td>{dates.day(i.expires_at)}</td>
+                  <td>
+                    <button type="button" className="ghost" onClick={() => cancel.mutate(i.id)}>
+                      {t('common.cancel')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
     </>
   );

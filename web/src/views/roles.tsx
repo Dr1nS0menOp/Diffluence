@@ -7,6 +7,7 @@ import { api, ApiError, type DirectoryEntry, type Space, type Subject } from '..
 import { SubjectPicker } from '../components/picker';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { groupPermissions, permissionHelp, permissionLabel } from '../permission-words';
+import { TableBox } from '../components/table-box';
 
 type RoleScope = 'space' | 'instance';
 
@@ -222,50 +223,52 @@ function RoleTable({ scope }: { scope: RoleScope }) {
       </div>
       <p className="muted">{scope === 'space' ? t('roles.spaceHelp') : t('roles.instanceHelp')}</p>
       <ErrorNote error={remove.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('roles.permissions')}</th>
-            <th>{t('roles.heldBy')}</th>
-            <th aria-label={t('common.actions')} />
-          </tr>
-        </thead>
-        <tbody>
-          {data.roles.map((role) => (
-            <tr key={role.id}>
-              <td>
-                {role.name} {role.built_in && <span className="lozenge">{t('roles.builtIn')}</span>}
-                {role.description && <div className="muted">{role.description}</div>}
-              </td>
-              <td className="muted">
-                {groupPermissions(scope, role.permissions)
-                  .flatMap((g) => g.permissions)
-                  .map((p) => permissionLabel(t, scope, p))
-                  .join(', ')}
-              </td>
-              <td>{t('roles.holders', { count: role.in_use })}</td>
-              <td className="row">
-                {!role.built_in && (
-                  <>
-                    <button type="button" className="ghost" onClick={() => setEditing(role)}>
-                      {t('common.edit')}
-                    </button>
-                    {role.in_use === 0 && (
-                      <ConfirmButton
-                        label={t('common.delete')}
-                        message={t('roles.deleteAsk', { name: role.name })}
-                        className="ghost"
-                        onConfirm={() => remove.mutate(role.id)}
-                      />
-                    )}
-                  </>
-                )}
-              </td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('roles.permissions')}</th>
+              <th>{t('roles.heldBy')}</th>
+              <th aria-label={t('common.actions')} />
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {data.roles.map((role) => (
+              <tr key={role.id}>
+                <td>
+                  {role.name} {role.built_in && <span className="lozenge">{t('roles.builtIn')}</span>}
+                  {role.description && <div className="muted">{role.description}</div>}
+                </td>
+                <td className="muted">
+                  {groupPermissions(scope, role.permissions)
+                    .flatMap((g) => g.permissions)
+                    .map((p) => permissionLabel(t, scope, p))
+                    .join(', ')}
+                </td>
+                <td>{t('roles.holders', { count: role.in_use })}</td>
+                <td className="row">
+                  {!role.built_in && (
+                    <>
+                      <button type="button" className="ghost" onClick={() => setEditing(role)}>
+                        {t('common.edit')}
+                      </button>
+                      {role.in_use === 0 && (
+                        <ConfirmButton
+                          label={t('common.delete')}
+                          message={t('roles.deleteAsk', { name: role.name })}
+                          className="ghost"
+                          onConfirm={() => remove.mutate(role.id)}
+                        />
+                      )}
+                    </>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
       {editing && (
         <RoleDialog
           scope={scope}

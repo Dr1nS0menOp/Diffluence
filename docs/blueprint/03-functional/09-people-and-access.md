@@ -11,7 +11,7 @@
 - **ACC-007** · built · A person sets up an authenticator app and receives 10 recovery codes, each usable once.
 - **ACC-008** · built · A person registers, lists and removes passkeys.
 - **ACC-009** · built · An administrator resets a password or the second factor of a person, and it is audited.
-- **ACC-010** · built · The first administrator is created from the command line.
+- **ACC-010** · built · The first administrator is created from the command line, or on the setup screen of a new install with the one-time code from the server's log (spec 038).
 - **ACC-011** · built · **Forgot password:** a person asks for a link by e-mail, which works once and expires within an hour. It works only when e-mail is configured, and never for accounts of an identity provider.
 - **ACC-012** · built · **Invitation:** an administrator invites by e-mail. The person chooses their own password and name, and the link expires.
 - **ACC-013** · built · **Self sign-up:** optional, limited to e-mail domains on a list. Off by default.

@@ -52,6 +52,7 @@ import (
 	"github.com/diffluence/diffluence/internal/scim"
 	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/setup"
 	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/sites"
 	"github.com/diffluence/diffluence/internal/spaces"
@@ -106,6 +107,7 @@ type App struct {
 	watches    *watches.Service
 	tasks      *tasks.Service
 	failures   *failures.Service
+	setup      *setup.Service
 	notify     *notify.Service
 	mail       *mail.Service
 	sharing    *sharing.Service
@@ -192,6 +194,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.watches = watches.NewService(a.pool, a.perms)
 	a.tasks = tasks.NewService(a.pool)
 	a.failures = failures.NewService(a.pool, log)
+	a.setup = setup.New(a.pool)
 	a.feed = feed.NewService(a.pool)
 	a.notify = notify.NewService(a.pool, a.perms, a.settings, a.watches, notify.Options{
 		InstanceName: cfg.InstanceName, PublicOrigin: cfg.PublicOrigin(), Keyring: a.keyring})
@@ -231,7 +234,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, HelpersDown: a.HelpersDown, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
-			InstanceID: a.instanceID, Log: log, Ready: a.Ready})
+			Setup: a.setup, InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
 			return nil, err
@@ -309,6 +312,9 @@ func (a *App) migrate(ctx context.Context, opts db.Options) error {
 
 // Identity exposes the identity service (used by the CLI and tests).
 func (a *App) Identity() *identity.Service { return a.identity }
+
+// Setup returns the guard of the first setup.
+func (a *App) Setup() *setup.Service { return a.setup }
 
 // Pool exposes the database pool (used by the CLI and tests).
 func (a *App) Pool() *pgxpool.Pool { return a.pool }
@@ -417,6 +423,9 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	go func() { serveErr <- srv.Serve(ln) }()
 	a.log.Info("diffluence started", "version", version.Version, "role", a.cfg.Role, "addr", ln.Addr().String(),
 		"instance_id", a.instanceID)
+	if a.cfg.Role.RunsAPI() {
+		a.announceSetup(ctx)
+	}
 
 	var runErr error
 	select {

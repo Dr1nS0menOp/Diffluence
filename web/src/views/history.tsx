@@ -8,6 +8,7 @@ import { DiffDocument } from '../components/editor/diff-view';
 import { DocumentView } from '../components/editor/editor';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { useDates } from '../dates';
+import { TableBox } from '../components/table-box';
 
 /** For a leaked secret. The number stays, and the audit log keeps who, when and why. */
 function RemoveVersionDialog({
@@ -178,64 +179,66 @@ export function HistoryView({ pageId }: { pageId: string }) {
         <Link href={`/pages/${pageId}`}>{page.data?.title}</Link>
       </p>
       <ErrorNote error={q.error ?? restore.error} />
-      <table>
-        <thead>
-          <tr>
-            {canCompare && <th>{t('history.pick')}</th>}
-            <th>{t('common.name')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.versions.map((v, i) => (
-            <tr key={v.number}>
-              {canCompare && (
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={t('history.version', { number: v.number })}
-                    checked={picked.includes(v.number)}
-                    onChange={() => toggle(v.number)}
-                  />
-                </td>
-              )}
-              <td>
-                <strong>{t('history.version', { number: v.number })}</strong>{' '}
-                {t('history.by', { name: v.author_name })}{' '}
-                <span className="muted">{dates.moment(v.created_at)}</span>{' '}
-                {i === 0 && <span className="lozenge">{t('history.current')}</span>}
-                {v.restored_from !== null && (
-                  <span className="muted"> · {t('history.restoredFrom', { number: v.restored_from })}</span>
-                )}
-                {v.removed && <span className="lozenge">{t('history.removed')}</span>}
-                {v.imported && <span className="muted"> · {t('history.imported')}</span>}
-                {v.summary && <div>{v.summary}</div>}
-              </td>
-              <td className="row">
-                {!v.removed && (
-                  <button type="button" className="ghost" onClick={() => setShown(v.number)}>
-                    {t('history.view')}
-                  </button>
-                )}
-                {isAdministrator && !v.removed && i > 0 && (
-                  <button type="button" className="ghost" onClick={() => setRemoving(v.number)}>
-                    {t('history.remove')}
-                  </button>
-                )}
-                {canEdit && !v.removed && i > 0 && (
-                  <ConfirmButton
-                    label={t('history.restore')}
-                    message={t('history.confirmRestore')}
-                    className="ghost"
-                    tone="primary"
-                    onConfirm={() => restore.mutate(v.number)}
-                  />
-                )}
-              </td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              {canCompare && <th>{t('history.pick')}</th>}
+              <th>{t('common.name')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.versions.map((v, i) => (
+              <tr key={v.number}>
+                {canCompare && (
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t('history.version', { number: v.number })}
+                      checked={picked.includes(v.number)}
+                      onChange={() => toggle(v.number)}
+                    />
+                  </td>
+                )}
+                <td>
+                  <strong>{t('history.version', { number: v.number })}</strong>{' '}
+                  {t('history.by', { name: v.author_name })}{' '}
+                  <span className="muted">{dates.moment(v.created_at)}</span>{' '}
+                  {i === 0 && <span className="lozenge">{t('history.current')}</span>}
+                  {v.restored_from !== null && (
+                    <span className="muted"> · {t('history.restoredFrom', { number: v.restored_from })}</span>
+                  )}
+                  {v.removed && <span className="lozenge">{t('history.removed')}</span>}
+                  {v.imported && <span className="muted"> · {t('history.imported')}</span>}
+                  {v.summary && <div>{v.summary}</div>}
+                </td>
+                <td className="row">
+                  {!v.removed && (
+                    <button type="button" className="ghost" onClick={() => setShown(v.number)}>
+                      {t('history.view')}
+                    </button>
+                  )}
+                  {isAdministrator && !v.removed && i > 0 && (
+                    <button type="button" className="ghost" onClick={() => setRemoving(v.number)}>
+                      {t('history.remove')}
+                    </button>
+                  )}
+                  {canEdit && !v.removed && i > 0 && (
+                    <ConfirmButton
+                      label={t('history.restore')}
+                      message={t('history.confirmRestore')}
+                      className="ghost"
+                      tone="primary"
+                      onConfirm={() => restore.mutate(v.number)}
+                    />
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
       {pair.length === 2 && (
         <div>
           <Link className="button primary" href={`/pages/${pageId}/compare?from=${pair[0]}&to=${pair[1]}`}>

@@ -24,6 +24,7 @@ import {
   SpaceLinksSection,
   StatusesSection,
 } from './space-organise';
+import { TableBox } from '../components/table-box';
 
 const SPACE_SECTIONS = [
   'details',
@@ -513,53 +514,55 @@ export function TrashView({ spaceKey }: { spaceKey: string }) {
       )}
       {items.data?.items.length === 0 && <p className="muted">{t('trash.empty')}</p>}
       {(items.data?.items.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('history.pick')}</th>
-              <th>{t('common.name')}</th>
-              <th>{t('common.type')}</th>
-              <th>{t('trash.deletedBy')}</th>
-              <th>{t('trash.deleted')}</th>
-              <th>{t('trash.purgeAfter')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.data?.items.map((i) => (
-              <tr key={i.id} className={picked.includes(i.id) ? 'picked' : undefined}>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={t('favourites.pick', { title: i.hidden ? t('trash.restricted') : i.title })}
-                    checked={picked.includes(i.id)}
-                    onChange={(e) =>
-                      setPicked(e.target.checked ? [...picked, i.id] : picked.filter((x) => x !== i.id))
-                    }
-                  />
-                </td>
-                <td>{i.hidden ? t('trash.restricted') : i.title}</td>
-                <td>{i.object_type}</td>
-                <td>{i.deleted_by_name || t('common.unknown')}</td>
-                <td>{dates.moment(i.deleted_at)}</td>
-                <td>{dates.moment(i.purge_after)}</td>
-                <td className="row">
-                  <button type="button" onClick={() => restore.mutate(i.id)}>
-                    {t('trash.restore')}
-                  </button>
-                  {!i.hidden && (
-                    <ConfirmButton
-                      label={t('trash.purge')}
-                      message={t('trash.confirmPurge')}
-                      className="danger"
-                      onConfirm={() => purge.mutate(i.id)}
-                    />
-                  )}
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('history.pick')}</th>
+                <th>{t('common.name')}</th>
+                <th>{t('common.type')}</th>
+                <th>{t('trash.deletedBy')}</th>
+                <th>{t('trash.deleted')}</th>
+                <th>{t('trash.purgeAfter')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {items.data?.items.map((i) => (
+                <tr key={i.id} className={picked.includes(i.id) ? 'picked' : undefined}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t('favourites.pick', { title: i.hidden ? t('trash.restricted') : i.title })}
+                      checked={picked.includes(i.id)}
+                      onChange={(e) =>
+                        setPicked(e.target.checked ? [...picked, i.id] : picked.filter((x) => x !== i.id))
+                      }
+                    />
+                  </td>
+                  <td>{i.hidden ? t('trash.restricted') : i.title}</td>
+                  <td>{i.object_type}</td>
+                  <td>{i.deleted_by_name || t('common.unknown')}</td>
+                  <td>{dates.moment(i.deleted_at)}</td>
+                  <td>{dates.moment(i.purge_after)}</td>
+                  <td className="row">
+                    <button type="button" onClick={() => restore.mutate(i.id)}>
+                      {t('trash.restore')}
+                    </button>
+                    {!i.hidden && (
+                      <ConfirmButton
+                        label={t('trash.purge')}
+                        message={t('trash.confirmPurge')}
+                        className="danger"
+                        onConfirm={() => purge.mutate(i.id)}
+                      />
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
     </Frame>
   );

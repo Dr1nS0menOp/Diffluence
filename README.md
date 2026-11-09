@@ -17,10 +17,16 @@ Needs Docker with the Compose plugin.
 ```sh
 sh scripts/setup-secrets.sh
 docker compose up -d --build --wait
+docker compose logs diffluence | grep 'first setup'
+```
+
+Then open http://localhost:8080/setup and enter the setup code from that log line. The setup screen asks for the name of your company or your own name, which the search box shows as "Search in Your team", and makes you the first administrator. The code works once, for an hour; `docker compose exec diffluence diffluence setup-code` gives a new one. You can also make the first administrator on the command line:
+
+```sh
 printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name "You" --organisation "Your team"
 ```
 
-Then open http://localhost:8080. `--organisation` is optional: the name of your company, or your own name, which the search box shows as "Search in Your team". It can be changed later under Administration, Look. For a real installation, read [the install guide](docs/operations/install.md).
+For a real installation, read [the install guide](docs/operations/install.md).
 
 ## Documentation
 
@@ -41,6 +47,7 @@ Then open http://localhost:8080. `--organisation` is optional: the name of your 
 | `diffluence serve` | Runs the server. `DIFFLUENCE_ROLE` = `all` (default), `api` or `worker`. |
 | `diffluence migrate` | Applies pending *expand* migrations |
 | `diffluence user create-admin` | Creates a local administrator account |
+| `diffluence setup-code` | Prints a new one-time code for the setup screen of a new install |
 | `diffluence audit verify` | Verifies the audit log hash chain |
 | `diffluence key <step>` | Checks or replaces `master.key` while Diffluence runs; see [backup and restore](docs/operations/backup-restore.md#replace-it) |
 | `diffluence session end` | Logs one person (`--email`) or everyone (`--all`) out, without disabling anyone; see [incidents](docs/operations/incidents.md) |

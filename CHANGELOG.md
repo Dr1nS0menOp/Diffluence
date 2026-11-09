@@ -3,6 +3,14 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: a setup screen for a new install (spec 038)
+- A new install opens on a setup screen: the name of the company or person it is for, which the search box shows as "Search in" that name, the first administrator and the default time zone. Right after, it asks for a passkey
+- The screen needs a one-time code from the server's log, or from `diffluence setup-code`. A code lasts an hour, works once and stops after 10 wrong tries. Once an administrator exists, the screen is gone for good
+- Folded groups in the settings sidebar are kept per person, on every device
+- The results page has no space list of its own any more: choose spaces in the search panel
+- Settings and the administration start right beside the sidebar and stay inside the window on a laptop. A table that is too wide scrolls sideways in its own box, also with the keyboard
+- Upgrade impact: one migration. An existing install has an administrator, so it never shows the setup screen
+
 ### Changed: a faster mutation check (spec 037)
 - The check that breaks security rules on purpose runs several mutations at once, and the slowest ones run only the tests that catch them. A full run takes about a third of the time, and catches the same mutations with the same tests
 - Builders may run only what their change can affect. Main and CI always run every mutation

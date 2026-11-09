@@ -199,6 +199,15 @@ async function picture(page: Page, name: string, mask: Locator[] = []) {
   await expect(page).toHaveScreenshot(`${name}.png`, { mask });
 }
 
+/** Gives every match the same text, so a time cannot change the width of what holds it. */
+async function fixText(where: Locator, text: string) {
+  await where.evaluateAll((all, fixed) => {
+    all.forEach((element) => {
+      element.textContent = fixed;
+    });
+  }, text);
+}
+
 async function newReaderPage(browser: Browser, colorScheme: 'light' | 'dark'): Promise<Page> {
   const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme });
   const page = await context.newPage();
@@ -271,6 +280,32 @@ test.describe('the look of every kind of screen', () => {
     await page.goto('/login');
     await expect(page.getByRole('heading', { name: 'Log in' })).toBeVisible();
     await picture(page, 'login');
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`SetupView: the first setup of a new install, ${colorScheme}`, async ({ browser }) => {
+      // This instance has an administrator, so the server would say the setup is over. The
+      // picture shows the form a new install shows; its rules are tested in Go (spec 038).
+      const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme });
+      const page = await context.newPage();
+      await page.route('**/api/v1/setup', (route) =>
+        route.request().method() === 'GET'
+          ? route.fulfill({ status: 200, contentType: 'application/json', body: '{"open":true}' })
+          : route.fallback(),
+      );
+      await page.goto('/setup');
+      await expect(page.getByRole('heading', { name: 'Set up Diffluence' })).toBeVisible();
+      await expect(page.getByLabel('Setup code')).toBeFocused();
+      await checkAccessibility(page);
+      await picture(page, `setup-${colorScheme}`);
+      await context.close();
+    });
+  }
+
+  test('SetupView: once set up, the screen says so', async ({ page }) => {
+    await page.goto('/setup');
+    await expect(page.getByRole('heading', { name: 'Already set up' })).toBeVisible();
+    await expect(page.getByLabel('Setup code')).toHaveCount(0);
   });
 
   test('HomeView: the start screen', async ({ browser }) => {
@@ -764,6 +799,8 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces');
     await expect(page.locator('#main').getByRole('link', { name: 'Engineering Handbook' })).toBeVisible();
+    // "now" or "2 minutes ago" depends on how long the run took, and its width moves the table.
+    await fixText(page.locator('#main time'), 'now');
     await picture(page, 'directory', [page.locator('time')]);
     await page.context().close();
   });
@@ -772,6 +809,8 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/recent');
     await expect(page.getByRole('link', { name: 'Your first week' })).toBeVisible();
+    // The width of a relative time moves the space name beside it.
+    await fixText(page.locator('#main time'), 'now');
     await picture(page, 'recent', [page.locator('time')]);
     await page.context().close();
   });
@@ -1385,6 +1424,141 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.getByRole('link', { name: 'Download' })).toBeVisible();
     // The notification of this very export can come in at any moment.
     await picture(page, 'export-view', [page.locator('.bell-number')]);
+    await page.context().close();
+  });
+});
+
+// Last in this file, so the long names below show in no other picture.
+test.describe('the settings area at the widths of a laptop', () => {
+  test.describe.configure({ mode: 'serial' });
+  // An address with no hyphen, as many are, cannot wrap, so it makes the table of people wide.
+  const LONG_EMAIL = 'johannavandersteenhovendegroot@facilitiesandprocurementexampleholding.com';
+  const LAPTOP = { width: 1150, height: 900 };
+  // The clock moves the width of a login time, and with it the columns.
+  const LAST_LOGIN = '9 Nov 2026, 12:00';
+  // A wide screen as well: there a centred area leaves an empty band beside the sidebar.
+  const WIDTHS = [1024, 1150, 1280, 1600];
+  const SCREENS = [
+    '/admin/users',
+    '/admin/spaces',
+    '/admin/groups',
+    '/admin/audit',
+    '/admin/system',
+    '/spaces/HANDBOOK/settings?section=people',
+  ];
+
+  test.beforeAll(async ({ browser }) => {
+    const { api, close } = await adminRequest(browser);
+    const made = [
+      await api.post('/api/v1/admin/users', {
+        data: {
+          email: LONG_EMAIL,
+          display_name: 'Johanna van der Steenhoven-de Groot',
+          type: 'member',
+          password: PASSWORD,
+          global_permissions: null,
+        },
+      }),
+      await api.post('/api/v1/spaces', {
+        data: {
+          key: 'BENELUX',
+          name: 'Customer onboarding and contract administration for the Benelux region',
+        },
+      }),
+      await api.post('/api/v1/admin/groups', {
+        data: { name: 'Facilities, procurement and workplace services' },
+      }),
+    ];
+    for (const res of made) expect(res.status(), await res.text()).toBe(201);
+    await close();
+  });
+
+  async function newAdminPage(browser: Browser, colorScheme: 'light' | 'dark'): Promise<Page> {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme });
+    const page = await context.newPage();
+    await login(page, ADMIN.email, ADMIN.password);
+    return page;
+  }
+
+  test('every screen starts beside the sidebar and stays inside the window', async ({ browser }) => {
+    const page = await newAdminPage(browser, 'light');
+    for (const width of WIDTHS) {
+      await page.setViewportSize({ width, height: LAPTOP.height });
+      for (const address of SCREENS) {
+        await page.goto(address);
+        await expect(page.locator('.settings-area > h1')).toBeVisible();
+        const place = await page.evaluate(() => {
+          const main = document.querySelector('main.content') as HTMLElement;
+          const area = (document.querySelector('.settings-area') as HTMLElement).getBoundingClientRect();
+          const sidebar = (document.querySelector('.sidebar-frame') as HTMLElement).getBoundingClientRect();
+          // What sits in a box that scrolls may be wider than the room: that box is the point.
+          const loose = [...document.querySelectorAll('.settings-area *')].filter(
+            (el) => !el.closest('.table-box') && el.getBoundingClientRect().width > 0,
+          );
+          const right = Math.max(...loose.map((el) => el.getBoundingClientRect().right));
+          return {
+            band: Math.round(
+              area.left - sidebar.right - parseFloat(getComputedStyle(main).paddingInlineStart),
+            ),
+            past: Math.round(right - main.getBoundingClientRect().right),
+            pageScrolls: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+          };
+        });
+        expect(place, `${address} at ${width} px`).toEqual({
+          band: 0,
+          past: expect.any(Number),
+          pageScrolls: false,
+        });
+        expect(place.past, `${address} at ${width} px`).toBeLessThanOrEqual(0);
+      }
+    }
+    await page.context().close();
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`AdminView: the people of an instance at 1150 px, ${colorScheme}`, async ({ browser }) => {
+      const page = await newAdminPage(browser, colorScheme);
+      await page.setViewportSize(LAPTOP);
+      await page.goto('/admin/users');
+      // The address wraps, so every column and every filter is in view.
+      await expect(page.getByRole('cell', { name: LONG_EMAIL })).toBeInViewport({ ratio: 1 });
+      await expect(page.getByRole('columnheader', { name: 'Last login' })).toBeInViewport({ ratio: 1 });
+      await expect(page.getByRole('combobox', { name: 'Source', exact: true })).toBeInViewport({ ratio: 1 });
+      await fixText(page.locator('tbody td:nth-child(7)'), LAST_LOGIN);
+      await picture(page, `admin-users-1150-${colorScheme}`, [page.locator('tbody td:nth-child(7)')]);
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+  }
+
+  test('AdminView: a table too wide for a narrow screen scrolls in its own box', async ({ browser }) => {
+    const page = await newAdminPage(browser, 'light');
+    await page.setViewportSize(NARROW_SCREEN);
+    await page.goto('/admin/users');
+    await expect(page.getByRole('cell', { name: LONG_EMAIL })).toBeAttached();
+    const box = page.getByRole('region', { name: 'Table, scrolls sideways' });
+    await expect(box).toBeVisible();
+    await box.scrollIntoViewIfNeeded();
+    await fixText(page.locator('tbody td:nth-child(7)'), LAST_LOGIN);
+    await picture(page, 'admin-users-narrow', [page.locator('tbody td:nth-child(7)')]);
+    await checkAccessibility(page);
+    // The keyboard reaches the box and scrolls it; the page itself stays put.
+    await box.focus();
+    await expect(box).toBeFocused();
+    await page.keyboard.press('ArrowRight');
+    await expect.poll(() => box.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.context().close();
+  });
+
+  test('AdminView: the spaces of an instance at 1150 px', async ({ browser }) => {
+    const page = await newAdminPage(browser, 'light');
+    await page.setViewportSize(LAPTOP);
+    await page.goto('/admin/spaces');
+    await expect(page.getByRole('link', { name: /Benelux region/ })).toBeVisible();
+    await fixText(page.locator('tbody td:nth-child(6)'), 'now');
+    await picture(page, 'admin-spaces-1150', [page.locator('tbody td:nth-child(6)')]);
+    await checkAccessibility(page);
     await page.context().close();
   });
 });

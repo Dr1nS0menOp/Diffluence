@@ -71,13 +71,12 @@ function ResultRow({ result }: { result: SearchResult }) {
   );
 }
 
+/** Spaces are chosen with space: words in the search box and its panel, not here. */
 function Filters({
   address,
-  spaces,
   onSet,
 }: {
   address: URLSearchParams;
-  spaces: Space[];
   onSet: (key: string, value: string) => void;
 }) {
   const { t } = useTranslation();
@@ -97,17 +96,6 @@ function Filters({
       aria-label={t('search.filters')}
       onSubmit={(e) => e.preventDefault()}
     >
-      <label className="field">
-        <span>{t('move.space')}</span>
-        <select value={address.get('space_id') ?? ''} onChange={(e) => onSet('space_id', e.target.value)}>
-          <option value="">{t('search.anySpace')}</option>
-          {spaces.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
       <label className="field">
         <span>{t('search.kind')}</span>
         <select value={address.get('kind') ?? ''} onChange={(e) => onSet('kind', e.target.value)}>
@@ -416,7 +404,7 @@ export function SearchView() {
         ))}
       </div>
       <QueryWords text={text} spaces={list} onChange={(next) => set('q', next)} />
-      {tab === 'content' && <Filters address={searchParams} spaces={list} onSet={set} />}
+      {tab === 'content' && <Filters address={searchParams} onSet={set} />}
       {!searching && <p className="muted">{t('search.hint')}</p>}
       {tab === 'content' && searching && <ContentResults params={params} />}
       {tab === 'people' && searching && <PeopleResults text={text} />}

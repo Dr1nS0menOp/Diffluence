@@ -149,6 +149,8 @@ export interface Preferences {
   sidebar_shut: string[] | null;
   /** Height in rem of the links of a space, or 0 for their own height. */
   sidebar_links_height: number;
+  /** Groups of the settings sidebar folded shut; the server sends null for none. */
+  settings_shut: string[] | null;
   tree_view: string;
   language: string;
   time_zone: string;

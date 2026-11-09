@@ -36,6 +36,7 @@ Commands:
   serve                     run the server (role from DIFFLUENCE_ROLE)
   migrate [--contract]      apply pending migrations
   user create-admin         create a local administrator (password on stdin)
+  setup-code                print a new one-time code for the setup screen of a new install
   audit verify              verify the audit log hash chain
   audit prune               remove audit rows past their retention, as the owner of the tables
   key <step>                replace master.key without downtime; see diffluence key
@@ -83,6 +84,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
+	case "setup-code":
+		err = cmdSetupCode(ctx, stdout)
 	case "key":
 		err = cmdKey(ctx, args[1:], stdout, stderr)
 	case "session":

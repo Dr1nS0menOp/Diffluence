@@ -7,6 +7,7 @@ import { api, type Me } from '../api';
 import { appearanceQuery } from '../appearance';
 import { useDates } from '../dates';
 import { ConfirmButton, ErrorNote, Field, formatSize } from '../components/ui';
+import { TableBox } from '../components/table-box';
 
 interface Job {
   id: string;
@@ -75,45 +76,47 @@ function Jobs() {
       <ErrorNote error={q.error ?? act.error} />
       {q.data?.jobs.length === 0 && <p className="muted">{t('care.noJobs')}</p>}
       {(q.data?.jobs.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.type')}</th>
-              <th>{t('common.status')}</th>
-              <th>{t('admin.when')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.jobs.map((j) => (
-              <tr key={j.id}>
-                <td>{j.kind}</td>
-                <td>{j.status}</td>
-                <td>{dates.moment(j.finished_at ?? j.created_at)}</td>
-                <td>
-                  {j.status === 'failed' && (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => act.mutate({ id: j.id, action: 'retry' })}
-                    >
-                      {t('care.retry')}
-                    </button>
-                  )}
-                  {j.status === 'queued' && (
-                    <button
-                      type="button"
-                      className="ghost"
-                      onClick={() => act.mutate({ id: j.id, action: 'cancel' })}
-                    >
-                      {t('common.cancel')}
-                    </button>
-                  )}
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.type')}</th>
+                <th>{t('common.status')}</th>
+                <th>{t('admin.when')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.jobs.map((j) => (
+                <tr key={j.id}>
+                  <td>{j.kind}</td>
+                  <td>{j.status}</td>
+                  <td>{dates.moment(j.finished_at ?? j.created_at)}</td>
+                  <td>
+                    {j.status === 'failed' && (
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => act.mutate({ id: j.id, action: 'retry' })}
+                      >
+                        {t('care.retry')}
+                      </button>
+                    )}
+                    {j.status === 'queued' && (
+                      <button
+                        type="button"
+                        className="ghost"
+                        onClick={() => act.mutate({ id: j.id, action: 'cancel' })}
+                      >
+                        {t('common.cancel')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
     </section>
   );
@@ -145,34 +148,36 @@ function EventFailures() {
       <ErrorNote error={q.error ?? replay.error} />
       {q.data?.failures.length === 0 && <p className="muted">{t('care.noEvents')}</p>}
       {(q.data?.failures.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('care.listener')}</th>
-              <th>{t('care.reason')}</th>
-              <th>{t('admin.when')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.failures.map((f) => (
-              <tr key={f.id}>
-                <td>{f.consumer}</td>
-                <td>{f.error}</td>
-                <td>{dates.moment(f.failed_at)}</td>
-                <td>
-                  {f.replay_requested_at ? (
-                    t('care.replayWaits')
-                  ) : (
-                    <button type="button" className="ghost" onClick={() => replay.mutate(f.id)}>
-                      {t('care.replay')}
-                    </button>
-                  )}
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('care.listener')}</th>
+                <th>{t('care.reason')}</th>
+                <th>{t('admin.when')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.failures.map((f) => (
+                <tr key={f.id}>
+                  <td>{f.consumer}</td>
+                  <td>{f.error}</td>
+                  <td>{dates.moment(f.failed_at)}</td>
+                  <td>
+                    {f.replay_requested_at ? (
+                      t('care.replayWaits')
+                    ) : (
+                      <button type="button" className="ghost" onClick={() => replay.mutate(f.id)}>
+                        {t('care.replay')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
     </section>
   );

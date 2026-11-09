@@ -62,6 +62,7 @@ func (s *Server) registerRoutes() {
 	s.registerInsightRoutes()
 	s.registerRuleRoutes()
 	s.registerCollabRoutes()
+	s.registerSetupRoutes()
 }
 
 type userJSON struct {

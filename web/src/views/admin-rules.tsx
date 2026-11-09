@@ -8,6 +8,7 @@ import { api, type Category } from '../api';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { permissionLabel } from '../permission-words';
 import { RolesTab } from './roles';
+import { TableBox } from '../components/table-box';
 
 const FEATURES = [
   'comments',
@@ -262,24 +263,26 @@ function GlobalHolders() {
     <section>
       <h2>{t('admin.holders')}</h2>
       <ErrorNote error={q.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('roles.permission')}</th>
-            <th>{t('common.name')}</th>
-            <th>{t('common.type')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.holders.map((h) => (
-            <tr key={h.permission + h.type + h.name}>
-              <td>{permissionLabel(t, 'instance', h.permission)}</td>
-              <td>{h.name}</td>
-              <td>{t(`roles.subject_${h.type}`)}</td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('roles.permission')}</th>
+              <th>{t('common.name')}</th>
+              <th>{t('common.type')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.holders.map((h) => (
+              <tr key={h.permission + h.type + h.name}>
+                <td>{permissionLabel(t, 'instance', h.permission)}</td>
+                <td>{h.name}</td>
+                <td>{t(`roles.subject_${h.type}`)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </section>
   );
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"slices"
 	"time"
 	_ "time/tzdata" // the zones must be known, whatever the host has installed
@@ -35,7 +36,13 @@ var (
 	startScreens = []string{"", "company", "personal"}
 	// sidebarParts are the parts of the sidebar that fold: of a space, and of the home page.
 	sidebarParts = []string{"space", "you", "spaces"}
+	// settingsGroup is the form of the id of a group of settings. The ids live in the web
+	// app; the server only keeps the list short and plain.
+	settingsGroup = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
 )
+
+// maxSettingsGroups is far above the groups there are, and keeps the list small.
+const maxSettingsGroups = 30
 
 // Preferences are personal settings that follow a person to other devices. They
 // are private and change often, so they are not audited.
@@ -67,6 +74,9 @@ type Preferences struct {
 	// SidebarLinksHeight is the height in rem this person dragged the links of a space
 	// to, or 0 for as tall as they are.
 	SidebarLinksHeight int `json:"sidebar_links_height"`
+	// SettingsShut names the groups of the settings sidebar this person folded shut, of a
+	// space and of the administration (spec 038).
+	SettingsShut []string `json:"settings_shut"`
 }
 
 // DefaultPreferences is what someone has who never chose anything.
@@ -93,6 +103,14 @@ func (p Preferences) validate() error {
 		return apperr.Invalid("A week starts on Saturday, Sunday or Monday.")
 	case p.SidebarLinksHeight != 0 && (p.SidebarLinksHeight < minSidebarPart || p.SidebarLinksHeight > maxSidebarPart):
 		return apperr.Invalid("A part of the sidebar is between 4 and 40 high.")
+	}
+	if len(p.SettingsShut) > maxSettingsGroups {
+		return apperr.Invalid("There are not that many groups of settings.")
+	}
+	for _, group := range p.SettingsShut {
+		if !settingsGroup.MatchString(group) {
+			return apperr.Invalid("That is not a group of settings.")
+		}
 	}
 	for _, part := range p.SidebarShut {
 		if !slices.Contains(sidebarParts, part) {

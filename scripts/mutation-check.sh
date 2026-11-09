@@ -81,11 +81,21 @@ needed() {
   return 1
 }
 
+# take_snapshot: copies the code once, before any mutation starts, so every mutation tests the
+# same tree even when the working tree changes during a run. The installed packages of the web
+# app are linked, not copied: they are large and do not change within a run.
+snapshot="$work/snapshot"
+take_snapshot() {
+  mkdir -p "$snapshot/repo" "$snapshot/web"
+  tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$snapshot/repo" -xf -
+  tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$snapshot/web" -xf -
+}
+
 # run_web <index> <folder>: one frontend mutation in its own copy; prints one result line.
 run_web() {
   local i=$1 dir=$2
   mkdir -p "$dir/web"
-  tar -C "$src/web" --exclude=./node_modules --exclude=./e2e --exclude=./test-results -cf - . | tar -C "$dir/web" -xf -
+  tar -C "$snapshot/web" -cf - . | tar -C "$dir/web" -xf -
   ln -s "$src/web/node_modules" "$dir/web/node_modules"
   if ! apply "$dir/web/${files[i]}" "${exprs[i]}" 2>/dev/null; then
     echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
@@ -106,7 +116,7 @@ run_web() {
 run_go() {
   local i=$1 dir=$2
   mkdir -p "$dir/repo"
-  tar -C "$src" --exclude=./web --exclude=./collab --exclude=./bin --exclude=./.git -cf - . | tar -C "$dir/repo" -xf -
+  tar -C "$snapshot/repo" -cf - . | tar -C "$dir/repo" -xf -
   if ! apply "$dir/repo/${files[i]}" "${exprs[i]}" 2>/dev/null; then
     echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
     return
@@ -153,6 +163,7 @@ finish_mutations() {
   if [ -n "$changed_list" ]; then
     echo "running ${#picked[@]} of $count mutations for the changed paths in $changed_list"
   fi
+  take_snapshot
   while [ "$printed" -lt "${#picked[@]}" ]; do
     while [ "$next" -lt "${#picked[@]}" ] && [ "$running" -lt "$jobs_max" ]; do
       run_one "${picked[next]}" &
@@ -983,6 +994,20 @@ mutate_web "any window may pose as a frame" src/components/frame-messages.ts \
   's.replace("!!frame && event.source === frame && event.origin === origin", "!!frame && event.origin === origin")' src/components/frame-messages.test.ts
 mutate_web "the viewer may give back something that is not a PDF" src/components/craft-frame.tsx \
   's.replace("return start === PDF_START ? bytes : null;", "return bytes;")' src/components/craft-frame.test.ts
+mutate "any setup code works" internal/setup/setup.go \
+  's.replace("matches := subtle.ConstantTimeCompare(given, hash) == 1", "matches := len(given) > 0 || subtle.ConstantTimeCompare(given, hash) == 1")' $app -run TestTheSetupScreenRefusesAnyoneWithoutTheCode
+mutate "a setup code never expires" internal/setup/setup.go \
+  's.replace("if wrong >= MaxWrongTries || !s.now().Before(expiresAt) {", "if wrong >= MaxWrongTries {")' $app -run TestAnExpiredSetupCodeIsRefused
+mutate "a setup code can be guessed for ever" internal/setup/setup.go \
+  's.replace("if wrong >= MaxWrongTries || !s.now().Before(expiresAt) {", "if !s.now().Before(expiresAt) {")' $app -run TestASetupCodeEndsAfterTooManyWrongTries
+mutate "a used setup code stays unused" internal/setup/setup.go \
+  's.replace("\tif use {\n", "\tif use && false {\n")' $app -run TestTheSetupStaysClosedEvenIfNoAdministratorIsLeft
+mutate "the setup stays open with an administrator" internal/setup/setup.go \
+  's.replace("SELECT EXISTS (SELECT 1 FROM global_grants WHERE permission = '"'"'administrator'"'"')\n\t\tOR ", "SELECT false AND EXISTS (SELECT 1 FROM global_grants WHERE permission = '"'"'administrator'"'"')\n\t\tOR ")' $app -run TestTheSetupIsGoneOnceAnAdministratorExists
+mutate "the setup form is read before the code" internal/httpapi/handlers_setup.go \
+  's.replace("\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil {", "\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil && false {")' $app -run TestTheSetupScreenRefusesAnyoneWithoutTheCode
+mutate "one address may guess setup codes for ever" internal/httpapi/handlers_setup.go \
+  's.replace("\tif !s.setupTries.allow(\"ip:\" + meta.IP) {", "\tif !s.setupTries.allow(\"ip:\" + meta.IP) && false {")' $app -run TestOneAddressCannotKeepGuessingSetupCodes
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

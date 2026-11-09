@@ -29,6 +29,7 @@ import { GroupView } from './views/group';
 import { StartScreen } from './views/home';
 import { FavouritesView, RecentView } from './views/lists';
 import { LoginView } from './views/login';
+import { SetupView } from './views/setup';
 import { ArchiveView, BlogView, LabelsView, LabelView, MissingPage } from './views/organise';
 import { NotificationSettingsView, NotificationsView, WatchingView } from './views/notifications';
 import { EditView } from './views/edit';
@@ -61,6 +62,7 @@ const PUBLIC_SCREENS: Record<string, () => ReactNode> = {
   '/reset': () => <ResetView />,
   '/invitation': () => <InvitationView />,
   '/signup': () => <SignupView />,
+  '/setup': () => <SetupView />,
 };
 
 function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => void }) {

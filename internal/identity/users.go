@@ -145,6 +145,9 @@ func (s *Service) GetUser(ctx context.Context, q db.Querier, id uuid.UUID) (User
 	return u, err
 }
 
+// Explain turns an error of creating an account into one a person can act on.
+func Explain(err error) error { return toInvalid(err) }
+
 func toInvalid(err error) error {
 	if err == nil {
 		return nil

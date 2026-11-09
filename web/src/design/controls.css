@@ -791,6 +791,30 @@ table {
   border-collapse: collapse;
 }
 
+/* A wide table of the app scrolls in its own box, so the screen never runs past its edge. */
+.table-box {
+  max-inline-size: 100%;
+  margin-block: var(--space-3);
+  overflow-x: auto;
+}
+
+.table-box > table {
+  margin-block: 0;
+}
+
+/* An address has no place to wrap, and a select is as wide as its longest choice: either alone
+   would make a table wider than its room. The address breaks where it must, in pieces long
+   enough to read. A select with a width in percent counts as narrow when the columns are shared
+   out, so it fills its column and cuts a long choice short. */
+td.email {
+  min-inline-size: 16ch;
+  overflow-wrap: anywhere;
+}
+
+td select {
+  inline-size: 100%;
+}
+
 /* Tables of the app have rows, not boxes (ADR-034). Tables in a page have their own rules. */
 th,
 td {

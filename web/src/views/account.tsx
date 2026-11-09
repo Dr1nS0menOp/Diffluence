@@ -12,6 +12,7 @@ import { PersonPicture } from '../components/person';
 import { useCopy } from '../components/toast';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, Loading } from '../components/ui';
 import type { Crop } from '../crop';
+import { TableBox } from '../components/table-box';
 
 const SECTIONS = [
   ['/me', 'sectionProfile'],
@@ -322,35 +323,37 @@ export function TokensView() {
       <ErrorNote error={q.error ?? revoke.error} />
       {q.data?.tokens.length === 0 && <p className="muted">{t('account.tokensNone')}</p>}
       {(q.data?.tokens.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.name')}</th>
-              <th>{t('account.tokenScope')}</th>
-              <th>{t('account.tokenExpires')}</th>
-              <th>{t('admin.lastUsed')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.tokens.map((k) => (
-              <tr key={k.id}>
-                <td>{k.name}</td>
-                <td>{k.scopes.map((scope) => t(`account.scope_${scope}`)).join(', ')}</td>
-                <td>{dates.day(k.expires_at)}</td>
-                <td>{dates.moment(k.last_used_at)}</td>
-                <td>
-                  <ConfirmButton
-                    label={t('admin.revoke')}
-                    message={t('account.tokenRevokeHelp', { name: k.name })}
-                    className="ghost"
-                    onConfirm={() => revoke.mutate(k.id)}
-                  />
-                </td>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.name')}</th>
+                <th>{t('account.tokenScope')}</th>
+                <th>{t('account.tokenExpires')}</th>
+                <th>{t('admin.lastUsed')}</th>
+                <th>{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {q.data?.tokens.map((k) => (
+                <tr key={k.id}>
+                  <td>{k.name}</td>
+                  <td>{k.scopes.map((scope) => t(`account.scope_${scope}`)).join(', ')}</td>
+                  <td>{dates.day(k.expires_at)}</td>
+                  <td>{dates.moment(k.last_used_at)}</td>
+                  <td>
+                    <ConfirmButton
+                      label={t('admin.revoke')}
+                      message={t('account.tokenRevokeHelp', { name: k.name })}
+                      className="ghost"
+                      onConfirm={() => revoke.mutate(k.id)}
+                    />
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       <section>
         <h2>{t('account.tokenNew')}</h2>

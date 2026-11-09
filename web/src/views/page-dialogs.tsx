@@ -24,6 +24,7 @@ import { FilePreviewDialog } from '../components/file-preview';
 import { useDates } from '../dates';
 import { FileDetailsDialog } from './file-details';
 import { arrangedFiles, FILE_ORDERS, type FileOrder } from './file-list';
+import { TableBox } from '../components/table-box';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
 export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
@@ -221,17 +222,19 @@ function WhyPanel({ page }: { page: PageSummary }) {
           <p className={q.data.allowed ? 'note' : 'note note-error'} role="status">
             {q.data.allowed ? t('restrictions.allowed') : t('restrictions.denied')}
           </p>
-          <table>
-            <tbody>
-              {q.data.checks.map((c) => (
-                <tr key={c.layer + c.rule}>
-                  <td>{c.layer}</td>
-                  <td>{c.rule}</td>
-                  <td>{c.passed ? t('restrictions.passed') : t('restrictions.failed')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <TableBox>
+            <table>
+              <tbody>
+                {q.data.checks.map((c) => (
+                  <tr key={c.layer + c.rule}>
+                    <td>{c.layer}</td>
+                    <td>{c.rule}</td>
+                    <td>{c.passed ? t('restrictions.passed') : t('restrictions.failed')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableBox>
         </>
       )}
     </section>

@@ -23,7 +23,7 @@
 - **ARC-142** · built · Tokens have scopes: `read`, `write`, `export`, `admin`. A token never exceeds its owner, because the module's checks still run.
 - **ARC-143** · phase 7 · OAuth for the API waits for the platform phase (ADR-026). Tokens with scopes cover what is needed until then.
 
-**Public routes, all of them, now and planned:** the app itself, login with its steps and providers, the OIDC start and callback, the look of the login page (`/appearance` and its font), `/livez`, `/readyz`, `POST /mail/unsubscribe/{token}` (wave C) and `POST /hooks/{token}` (wave H). In each of the last two the token is the permission. Nothing else may be added without a stated reason.
+**Public routes, all of them, now and planned:** the app itself, login with its steps and providers, the OIDC start and callback, the look of the login page (`/appearance` and its font), `/livez`, `/readyz`, `POST /mail/unsubscribe/{token}` (wave C) and `POST /hooks/{token}` (wave H). In each of the last two the token is the permission. The first setup, `GET` and `POST /api/v1/setup` (spec 038): it happens before any account exists, answers as if it does not exist once an administrator exists, and changes nothing without the one-time code from the server's log. Nothing else may be added without a stated reason.
 
 ## 5.3 The order of the middleware
 

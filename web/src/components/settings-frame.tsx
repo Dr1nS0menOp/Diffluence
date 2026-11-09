@@ -3,6 +3,7 @@
 // fold, with a way to jump to one; the large area beside it changes them (ADR-034).
 import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
+import { usePreferences } from '../preferences';
 import { Link } from '../router';
 import { IconChevronDown } from './icons';
 
@@ -51,9 +52,12 @@ export function SettingsFrame({
 }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
-  const [shut, setShut] = useState<string[]>([]);
+  // Folded groups follow the person to other devices, like the parts of the sidebar.
+  const { preferences, update } = usePreferences();
+  const shut = preferences.settings_shut ?? [];
   const shown = matchingItems(groups, text);
-  const toggle = (id: string) => setShut(shut.includes(id) ? shut.filter((g) => g !== id) : [...shut, id]);
+  const toggle = (id: string) =>
+    update({ settings_shut: shut.includes(id) ? shut.filter((g) => g !== id) : [...shut, id] });
   return (
     <div className="split">
       <div className="sidebar-frame">

@@ -6,6 +6,7 @@ import { api, type Space } from '../api';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, Loading, RelativeTime } from '../components/ui';
 import { Link, navigate } from '../router';
+import { TableBox } from '../components/table-box';
 
 export interface RuleAction {
   type: string;
@@ -336,23 +337,25 @@ export function RuleList({ spaceId }: { spaceId: string | null }) {
       {q.isPending && <Loading />}
       {q.data?.rules.length === 0 && <p className="muted">{t('rules2.none')}</p>}
       {(q.data?.rules.length ?? 0) > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.name')}</th>
-              <th>{t('rules2.when')}</th>
-              <th>{t('rules2.state')}</th>
-              <th>{t('rules2.lastRun')}</th>
-              <th>{t('rules2.owner')}</th>
-              <th>{t('rules2.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {q.data?.rules.map((r) => (
-              <RuleRow key={r.id} rule={r} spaceId={spaceId} />
-            ))}
-          </tbody>
-        </table>
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.name')}</th>
+                <th>{t('rules2.when')}</th>
+                <th>{t('rules2.state')}</th>
+                <th>{t('rules2.lastRun')}</th>
+                <th>{t('rules2.owner')}</th>
+                <th>{t('rules2.actions')}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {q.data?.rules.map((r) => (
+                <RuleRow key={r.id} rule={r} spaceId={spaceId} />
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
     </>
   );

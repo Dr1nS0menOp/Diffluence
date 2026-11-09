@@ -9,6 +9,7 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { SubjectPicker } from '../components/picker';
 import { StageMark } from '../components/page-marks';
 import { Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
+import { TableBox } from '../components/table-box';
 
 const FLAGS = ['owner_disabled', 'restricted', 'broken_links', 'orphaned', 'past_review', 'with_parents'];
 const ACTIONS = ['archive', 'delete', 'owner', 'stage', 'label_add', 'label_remove', 'move'] as const;
@@ -289,53 +290,55 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
           </div>
         )}
         {list.length > 0 && (
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <input
-                    type="checkbox"
-                    aria-label={t('content.selectAll')}
-                    checked={list.every((r) => picked.includes(r.id))}
-                    onChange={(e) => setPicked(e.target.checked ? list.map((r) => r.id) : [])}
-                  />
-                </th>
-                <th>{t('page.title')}</th>
-                <th>{t('content.owner')}</th>
-                <th>{t('organise.status')}</th>
-                <th>{t('organise.labels')}</th>
-                <th>{t('directory.lastChange')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {list.map((r) => (
-                <tr key={r.id} className={picked.includes(r.id) ? 'picked' : undefined}>
-                  <td>
+          <TableBox>
+            <table>
+              <thead>
+                <tr>
+                  <th>
                     <input
                       type="checkbox"
-                      aria-label={t('favourites.pick', { title: r.title })}
-                      checked={picked.includes(r.id)}
-                      onChange={() => setPicked(selectWithChildren(list, picked, r.id))}
+                      aria-label={t('content.selectAll')}
+                      checked={list.every((r) => picked.includes(r.id))}
+                      onChange={(e) => setPicked(e.target.checked ? list.map((r) => r.id) : [])}
                     />
-                  </td>
-                  <td>
-                    <Link href={`/pages/${r.id}`}>{r.title}</Link>
-                  </td>
-                  <td>
-                    {r.owner_name}
-                    {r.owner_disabled && <span className="muted"> {t('content.noLongerActive')}</span>}
-                  </td>
-                  <td>
-                    <StageMark text={r.stage_text} color={r.stage_color} />
-                  </td>
-                  <td>{r.labels.join(', ')}</td>
-                  <td>
-                    <RelativeTime value={r.updated_at} />
-                  </td>
+                  </th>
+                  <th>{t('page.title')}</th>
+                  <th>{t('content.owner')}</th>
+                  <th>{t('organise.status')}</th>
+                  <th>{t('organise.labels')}</th>
+                  <th>{t('directory.lastChange')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {list.map((r) => (
+                  <tr key={r.id} className={picked.includes(r.id) ? 'picked' : undefined}>
+                    <td>
+                      <input
+                        type="checkbox"
+                        aria-label={t('favourites.pick', { title: r.title })}
+                        checked={picked.includes(r.id)}
+                        onChange={() => setPicked(selectWithChildren(list, picked, r.id))}
+                      />
+                    </td>
+                    <td>
+                      <Link href={`/pages/${r.id}`}>{r.title}</Link>
+                    </td>
+                    <td>
+                      {r.owner_name}
+                      {r.owner_disabled && <span className="muted"> {t('content.noLongerActive')}</span>}
+                    </td>
+                    <td>
+                      <StageMark text={r.stage_text} color={r.stage_color} />
+                    </td>
+                    <td>{r.labels.join(', ')}</td>
+                    <td>
+                      <RelativeTime value={r.updated_at} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableBox>
         )}
         {offset + list.length < total && (
           <button type="button" onClick={() => set('offset', String(offset + ROWS))}>

@@ -184,6 +184,7 @@ GET /api/v1/same-title                                         authenticated
 GET /api/v1/saved-blocks                                       authenticated
 GET /api/v1/search                                             object:page.view
 GET /api/v1/search/quick                                       authenticated
+GET /api/v1/setup                                              public
 GET /api/v1/sites/{id}                                         object:site.publish
 GET /api/v1/sites/{id}/builds                                  object:site.publish
 GET /api/v1/sites/{id}/download                                object:site.publish
@@ -374,6 +375,7 @@ POST /api/v1/rules/{id}/hook                                   session-only obje
 POST /api/v1/rules/{id}/run                                    object:page.view
 POST /api/v1/rules/{id}/test                                   object:space.automation
 POST /api/v1/saved-blocks                                      authenticated
+POST /api/v1/setup                                             public
 POST /api/v1/sites/{id}/preview                                object:site.publish
 POST /api/v1/sites/{id}/publish                                object:site.publish
 POST /api/v1/sites/{id}/rollback                               object:site.publish

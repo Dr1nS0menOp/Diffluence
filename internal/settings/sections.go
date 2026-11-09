@@ -338,6 +338,35 @@ func (s *Service) SetOrganisationName(ctx context.Context, c identity.Caller, na
 	return err
 }
 
+// CheckFirstSetup refuses what the first setup could not store, before it creates
+// anything: the organisation name, the default language and the default time zone.
+func CheckFirstSetup(organisation, language, zone string) error {
+	if err := (Look{OrganisationName: organisation}).validate(); err != nil {
+		return err
+	}
+	g := DefaultGeneral
+	g.DefaultLanguage, g.DefaultTimeZone = language, zone
+	return g.validate()
+}
+
+// ApplyFirstSetup stores the organisation name and the defaults the first setup gave.
+func (s *Service) ApplyFirstSetup(ctx context.Context, c identity.Caller, organisation, language, zone string) error {
+	if err := s.SetOrganisationName(ctx, c, organisation); err != nil {
+		return err
+	}
+	g := DefaultGeneral
+	if err := s.ReadSection(ctx, SectionGeneral, &g); err != nil {
+		return err
+	}
+	g.DefaultLanguage, g.DefaultTimeZone = language, zone
+	body, err := json.Marshal(g)
+	if err != nil {
+		return err
+	}
+	_, err = s.SetSection(ctx, c, SectionGeneral, bytes.NewReader(body))
+	return err
+}
+
 // ResetLook returns everything about the look to the defaults.
 func (s *Service) ResetLook(ctx context.Context, c identity.Caller) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {

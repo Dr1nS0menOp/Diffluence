@@ -10,6 +10,7 @@ import { IconArrowBack } from '../components/icons';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, FilePicker, Loading } from '../components/ui';
+import { TableBox } from '../components/table-box';
 
 function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -35,50 +36,52 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
   return (
     <>
       <ErrorNote error={update.error ?? remove.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('templates.category')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {list.map((x) => (
-            <tr key={x.id}>
-              <td>
-                <Link href={`/templates/${x.id}/edit`}>{x.name}</Link>
-                {x.hidden && <span className="muted"> {t('templates.hidden')}</span>}
-              </td>
-              <td>{x.category}</td>
-              <td className="row">
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => update.mutate({ ...x, hidden: !x.hidden, promoted: x.promoted })}
-                >
-                  {x.hidden ? t('templates.show') : t('templates.hide')}
-                </button>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => update.mutate({ ...x, hidden: x.hidden, promoted: !x.promoted })}
-                >
-                  {x.promoted ? t('templates.unpromote') : t('templates.promote')}
-                </button>
-                <a className="ghost" href={`/api/v1/templates/${x.id}/export`}>
-                  {t('templates.export')}
-                </a>
-                {!x.starter && (
-                  <button type="button" className="ghost" onClick={() => remove.mutate(x.id)}>
-                    {t('common.delete')}
-                  </button>
-                )}
-              </td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('templates.category')}</th>
+              <th>{t('common.actions')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {list.map((x) => (
+              <tr key={x.id}>
+                <td>
+                  <Link href={`/templates/${x.id}/edit`}>{x.name}</Link>
+                  {x.hidden && <span className="muted"> {t('templates.hidden')}</span>}
+                </td>
+                <td>{x.category}</td>
+                <td className="row">
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => update.mutate({ ...x, hidden: !x.hidden, promoted: x.promoted })}
+                  >
+                    {x.hidden ? t('templates.show') : t('templates.hide')}
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => update.mutate({ ...x, hidden: x.hidden, promoted: !x.promoted })}
+                  >
+                    {x.promoted ? t('templates.unpromote') : t('templates.promote')}
+                  </button>
+                  <a className="ghost" href={`/api/v1/templates/${x.id}/export`}>
+                    {t('templates.export')}
+                  </a>
+                  {!x.starter && (
+                    <button type="button" className="ghost" onClick={() => remove.mutate(x.id)}>
+                      {t('common.delete')}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </>
   );
 }

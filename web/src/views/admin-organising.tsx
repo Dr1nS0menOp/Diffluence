@@ -7,6 +7,7 @@ import { api, NIL_ID, type Space } from '../api';
 import { PagePicker } from '../components/picker';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TemplateManager } from './templates';
+import { TableBox } from '../components/table-box';
 
 const PRESETS = ['team_space', 'read_only_kb'];
 
@@ -86,43 +87,47 @@ function FeatureTable({ start }: { start: InstanceFeatures }) {
     <section>
       <h2>{t('spaceSettings.features')}</h2>
       <ErrorNote error={save.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('common.name')}</th>
-            <th>{t('adminOrganise.onForAll')}</th>
-            <th>{t('adminOrganise.onForNew')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {start.all.map((name) => {
-            const label = t(`spaceSettings.feature_${name}`);
-            return (
-              <tr key={name}>
-                <td>{label}</td>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={t('adminOrganise.onForAllNamed', { name: label })}
-                    checked={!start.off.includes(name)}
-                    onChange={(e) => save.mutate({ ...start, off: flip(start.off, name, e.target.checked) })}
-                  />
-                </td>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={t('adminOrganise.onForNewNamed', { name: label })}
-                    checked={!start.new_off.includes(name)}
-                    onChange={(e) =>
-                      save.mutate({ ...start, new_off: flip(start.new_off, name, e.target.checked) })
-                    }
-                  />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('adminOrganise.onForAll')}</th>
+              <th>{t('adminOrganise.onForNew')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {start.all.map((name) => {
+              const label = t(`spaceSettings.feature_${name}`);
+              return (
+                <tr key={name}>
+                  <td>{label}</td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t('adminOrganise.onForAllNamed', { name: label })}
+                      checked={!start.off.includes(name)}
+                      onChange={(e) =>
+                        save.mutate({ ...start, off: flip(start.off, name, e.target.checked) })
+                      }
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t('adminOrganise.onForNewNamed', { name: label })}
+                      checked={!start.new_off.includes(name)}
+                      onChange={(e) =>
+                        save.mutate({ ...start, new_off: flip(start.new_off, name, e.target.checked) })
+                      }
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TableBox>
     </section>
   );
 }

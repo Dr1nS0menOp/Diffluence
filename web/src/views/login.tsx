@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useState, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError } from '../api';
@@ -9,6 +9,7 @@ import { provePasskey } from '../passkey';
 import { Link, navigate, useLocation } from '../router';
 import { Logo } from '../components/icons';
 import { Field } from '../components/ui';
+import { setupStateQuery } from '../setup-state';
 
 interface Providers {
   oidc?: { name: string };
@@ -84,6 +85,12 @@ export function LoginView() {
   const [mfaToken, setMfaToken] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  // A new install has nobody to log in yet: send the visitor to the setup, which asks for
+  // the code from the server's log.
+  const setupOpen = useQuery(setupStateQuery).data;
+  useEffect(() => {
+    if (setupOpen) navigate('/setup', true);
+  }, [setupOpen]);
 
   const fromUrl = location.searchParams.get('error') ?? '';
   const urlError = OIDC_ERRORS.includes(fromUrl) ? t(`login.${fromUrl}`) : '';

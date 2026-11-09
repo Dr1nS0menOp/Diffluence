@@ -8,6 +8,7 @@
     "copyFailed": "Your browser refused to copy. Copy it by hand."
   },
   "common": {
+    "tableScrolls": "Table, scrolls sideways",
     "save": "Save",
     "cancel": "Cancel",
     "close": "Close",
@@ -575,6 +576,24 @@
     "help": "Links in the sidebar of this space, to pages or to other addresses.",
     "label": "Label",
     "target": "Address, such as /pages/… or https://…"
+  },
+  "setup": {
+    "title": "Set up Diffluence",
+    "intro": "This Diffluence is new. Make the first administrator, and say who it is for.",
+    "code": "Setup code",
+    "codeHelp": "The server wrote it to its log when it started. Run diffluence setup-code on the server for a new one.",
+    "organisation": "Company or your name",
+    "organisationHelp": "The search box will say Search in this name. You can change it later under Look.",
+    "you": "You, the first administrator",
+    "defaults": "For everyone who joins",
+    "language": "Language",
+    "english": "English",
+    "timeZone": "Time zone",
+    "submit": "Set up",
+    "closedTitle": "Already set up",
+    "closed": "This Diffluence has an administrator. Log in instead.",
+    "toLogin": "Go to log in",
+    "welcome": "Welcome. Your account can change everything, so add a passkey now."
   },
   "login": {
     "title": "Log in",

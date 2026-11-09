@@ -7,6 +7,7 @@ import { Link, navigate, useLocation } from '../router';
 import { NewSpaceDialog } from '../components/create';
 import { IconPlus, IconStar } from '../components/icons';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge } from '../components/ui';
+import { TableBox } from '../components/table-box';
 
 const ROWS_PER_LOAD = 50;
 const KINDS = ['all', 'team', 'personal', 'favourites', 'archived'];
@@ -183,25 +184,27 @@ export function DirectoryView({ me }: { me: Me }) {
           <p role="status" className="muted">
             {t('directory.count', { count: total })}
           </p>
-          <table>
-            <thead>
-              <tr>
-                <th>
-                  <span className="visually-hidden">{t('directory.star')}</span>
-                </th>
-                <th>{t('common.name')}</th>
-                <th>{t('space.key')}</th>
-                <th>{t('directory.administrators')}</th>
-                <th>{t('space.pages')}</th>
-                <th>{t('directory.lastChange')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((space) => (
-                <Row key={space.id} space={space} onStar={(s) => star.mutate(s)} />
-              ))}
-            </tbody>
-          </table>
+          <TableBox>
+            <table>
+              <thead>
+                <tr>
+                  <th>
+                    <span className="visually-hidden">{t('directory.star')}</span>
+                  </th>
+                  <th>{t('common.name')}</th>
+                  <th>{t('space.key')}</th>
+                  <th>{t('directory.administrators')}</th>
+                  <th>{t('space.pages')}</th>
+                  <th>{t('directory.lastChange')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((space) => (
+                  <Row key={space.id} space={space} onStar={(s) => star.mutate(s)} />
+                ))}
+              </tbody>
+            </table>
+          </TableBox>
         </>
       )}
       {q.hasNextPage && (

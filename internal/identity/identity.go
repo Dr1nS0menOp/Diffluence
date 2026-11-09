@@ -193,6 +193,21 @@ type NewUser struct {
 
 // CreateLocalUser creates an account with a password and global permissions.
 func (s *Service) CreateLocalUser(ctx context.Context, in NewUser, actor Actor, meta RequestMeta) (User, error) {
+	var u User
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		u, err = s.CreateLocalUserIn(ctx, tx, in, actor, meta)
+		return err
+	})
+	if err != nil {
+		return User{}, err
+	}
+	return u, nil
+}
+
+// CreateLocalUserIn is CreateLocalUser inside a transaction of the caller, so the first
+// setup can create its administrator and use its code as one step (spec 038).
+func (s *Service) CreateLocalUserIn(ctx context.Context, tx pgx.Tx, in NewUser, actor Actor, meta RequestMeta) (User, error) {
 	in.Email = normalizeEmail(in.Email)
 	in.DisplayName = strings.TrimSpace(plaintext.WithoutDirectionMarks(in.DisplayName))
 	if in.Type == "" {
@@ -220,36 +235,32 @@ func (s *Service) CreateLocalUser(ctx context.Context, in NewUser, actor Actor, 
 	}
 
 	u := User{ID: ids.New(), Type: in.Type, Status: StatusActive, Email: in.Email, DisplayName: in.DisplayName}
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		err := tx.QueryRow(ctx, `INSERT INTO users (id, origin_instance_id, type, status, email, display_name)
-			VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
-			u.ID, s.instanceID, u.Type, u.Status, u.Email, u.DisplayName).Scan(&u.CreatedAt)
-		if db.IsUniqueViolation(err) {
-			return ErrEmailTaken
-		}
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)", u.ID, hash); err != nil {
-			return err
-		}
-		if _, err := audit.Record(ctx, tx, event(meta, actor, "user.created", "user", u.ID.String(), audit.ResultSuccess,
-			map[string]any{"email": u.Email, "type": u.Type, "auth": "local"})); err != nil {
-			return err
-		}
-		for _, p := range in.GlobalPermissions {
-			if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", u.ID, p); err != nil {
-				return err
-			}
-			if _, err := audit.Record(ctx, tx, event(meta, actor, "permission.global.granted", "user", u.ID.String(), audit.ResultSuccess,
-				map[string]any{"permission": p})); err != nil {
-				return err
-			}
-		}
-		_, err = outbox.Enqueue(ctx, tx, "user.created", map[string]any{"user_id": u.ID, "type": u.Type})
-		return err
-	})
+	err = tx.QueryRow(ctx, `INSERT INTO users (id, origin_instance_id, type, status, email, display_name)
+		VALUES ($1, $2, $3, $4, $5, $6) RETURNING created_at`,
+		u.ID, s.instanceID, u.Type, u.Status, u.Email, u.DisplayName).Scan(&u.CreatedAt)
+	if db.IsUniqueViolation(err) {
+		return User{}, ErrEmailTaken
+	}
 	if err != nil {
+		return User{}, err
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)", u.ID, hash); err != nil {
+		return User{}, err
+	}
+	if _, err := audit.Record(ctx, tx, event(meta, actor, "user.created", "user", u.ID.String(), audit.ResultSuccess,
+		map[string]any{"email": u.Email, "type": u.Type, "auth": "local"})); err != nil {
+		return User{}, err
+	}
+	for _, p := range in.GlobalPermissions {
+		if _, err := tx.Exec(ctx, "SELECT rbac_add_permissions(NULL, 'user', $1, ARRAY[$2::text])", u.ID, p); err != nil {
+			return User{}, err
+		}
+		if _, err := audit.Record(ctx, tx, event(meta, actor, "permission.global.granted", "user", u.ID.String(), audit.ResultSuccess,
+			map[string]any{"permission": p})); err != nil {
+			return User{}, err
+		}
+	}
+	if _, err := outbox.Enqueue(ctx, tx, "user.created", map[string]any{"user_id": u.ID, "type": u.Type}); err != nil {
 		return User{}, err
 	}
 	return u, nil

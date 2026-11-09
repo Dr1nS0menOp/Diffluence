@@ -18,6 +18,7 @@ Written for: reviewers and a future penetration tester. Updated every phase (blu
 | Web app | Tampering: XSS if everything else fails | CSP with no inline script, Trusted Types, no `dangerouslySetInnerHTML` | Every browser test fails on a violation; a test confirms an inline script cannot run |
 | Attachments | Tampering: a file executes in our origin | Type from content; only PNG, JPEG, GIF and WebP inline; all else a download; `sandbox` policy and `nosniff` | Test with HTML posing as PNG, and SVG |
 | Imports | Denial of service, path traversal | Size, count and unpacked limits, enforced while reading; paths never touch disk; runs in the worker | Tests with a zip bomb and `../../etc/passwd`; fuzzing |
+| First setup | Elevation: a stranger reaches a fresh install first and becomes its administrator | One-time code only in the server's log; an hour, once, 10 wrong tries; 10 tries per address per 15 minutes; code checked first; one transaction under a lock; closed for good after use (spec 038) | Tests, mutations |
 | Login | Spoofing: brute force | Argon2id; limits per account and per address; failed logins audited | Tests |
 | TOTP | Spoofing: replay, stolen database | One use per time step; challenge dies after 5 tries; seeds sealed with AES-256-GCM, recovery codes hashed | Tests plus mutation check |
 | OIDC | Spoofing: account takeover, login CSRF | PKCE, state, nonce, flow tied to the browser; link by stable id, never e-mail alone; accounts with a password never link | Tests; real Authentik 2026.8.5 |

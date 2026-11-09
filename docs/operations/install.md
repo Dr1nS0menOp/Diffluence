@@ -11,6 +11,16 @@ git clone https://github.com/Dr1nS0menOp/Diffluence.git && cd Diffluence
 sh scripts/setup-secrets.sh                 # creates ./secrets, never overwrites
 export DIFFLUENCE_PUBLIC_URL=https://wiki.example.com
 docker compose up -d --build --wait
+docker compose logs diffluence | grep 'first setup'
+```
+
+Open the address in that log line, `/setup`, and enter its code. The setup screen makes the first administrator, takes the name of the company or person the instance is for, and sets the default time zone. Then it asks for a passkey.
+
+**The setup screen is guarded.** It works only while no administrator exists, and only with the one-time code in the server's log, which only someone who runs the server can read. A code lasts an hour, works once, and stops after 10 wrong tries; one address gets 10 tries in 15 minutes. Every try is audited, never with the code. `diffluence setup-code` prints a new code and makes older ones useless. Once an administrator exists, the screen and its routes answer as if they do not exist, also when that administrator is later removed: the way back is the command line. Do not leave a new install reachable from the internet before it is set up.
+
+The command line does the same without the screen:
+
+```sh
 printf '%s\n' 'a long password' | docker compose exec -T diffluence \
   diffluence user create-admin --email you@example.com --name "You" --organisation "Your team"
 ```

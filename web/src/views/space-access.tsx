@@ -12,6 +12,7 @@ import { Tabs } from '../components/tabs';
 import { Dialog, ErrorNote, Loading } from '../components/ui';
 import { SpacePeople } from './space-people';
 import { PreviewText, TEMPLATES, templateOf, useGrantChange, type Change, type Grants } from './space-grants';
+import { TableBox } from '../components/table-box';
 
 const ACCESS_TABS = ['grants', 'people'] as const;
 type AccessTab = (typeof ACCESS_TABS)[number];
@@ -243,27 +244,29 @@ function GrantsPanel({ space }: { space: Space }) {
         placeholder={t('access.search')}
         onChange={(e) => setText(e.target.value)}
       />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('permissions.subject')}</th>
-            <th>{t('permissions.template')}</th>
-            <th>{t('common.actions')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {shown.map((g) => (
-            <GrantRow
-              key={g.subject.type + g.subject.id}
-              grant={g}
-              data={data}
-              space={space}
-              onChange={grants.change}
-              onDetail={setDetail}
-            />
-          ))}
-        </tbody>
-      </table>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('permissions.subject')}</th>
+              <th>{t('permissions.template')}</th>
+              <th>{t('common.actions')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.map((g) => (
+              <GrantRow
+                key={g.subject.type + g.subject.id}
+                grant={g}
+                data={data}
+                space={space}
+                onChange={grants.change}
+                onDetail={setDetail}
+              />
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
       <AddSubject viewer={viewer} onChange={grants.change} />
       {space.can?.['space.administer'] && <Presets space={space} />}
       <InviteGuest space={space} />
@@ -303,32 +306,34 @@ function HolderSource({ holder }: { holder: Holder }) {
 function HolderTable({ people }: { people: Holder[] }) {
   const { t } = useTranslation();
   return (
-    <table>
-      <thead>
-        <tr>
-          <th>{t('common.name')}</th>
-          <th>{t('permissions.template')}</th>
-          <th>{t('access.how')}</th>
-        </tr>
-      </thead>
-      <tbody>
-        {people.map((p) => (
-          <tr key={p.subject.type + p.subject.id + p.source + p.via}>
-            <td>
-              {p.subject.type === 'user' ? (
-                <PersonName id={p.subject.id} name={p.name} />
-              ) : (
-                p.name || t(`permissions.${p.subject.type === 'all_guests' ? 'allGuests' : 'allMembers'}`)
-              )}
-            </td>
-            <td>{TEMPLATES.includes(p.role) ? t(`permissions.${p.role}`) : t('permissions.custom')}</td>
-            <td>
-              <HolderSource holder={p} />
-            </td>
+    <TableBox>
+      <table>
+        <thead>
+          <tr>
+            <th>{t('common.name')}</th>
+            <th>{t('permissions.template')}</th>
+            <th>{t('access.how')}</th>
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {people.map((p) => (
+            <tr key={p.subject.type + p.subject.id + p.source + p.via}>
+              <td>
+                {p.subject.type === 'user' ? (
+                  <PersonName id={p.subject.id} name={p.name} />
+                ) : (
+                  p.name || t(`permissions.${p.subject.type === 'all_guests' ? 'allGuests' : 'allMembers'}`)
+                )}
+              </td>
+              <td>{TEMPLATES.includes(p.role) ? t(`permissions.${p.role}`) : t('permissions.custom')}</td>
+              <td>
+                <HolderSource holder={p} />
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableBox>
   );
 }
 
@@ -430,30 +435,36 @@ function SpaceAuditTable({ space }: { space: Space }) {
     <>
       <p className="muted">{t('access.auditHelp')}</p>
       <ErrorNote error={q.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('admin.when')}</th>
-            <th>{t('admin.actor')}</th>
-            <th>{t('admin.action')}</th>
-            <th>{t('admin.object')}</th>
-            <th>{t('admin.result')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.events.map((e) => (
-            <tr key={e.seq}>
-              <td>{dates.moment(e.occurred_at)}</td>
-              <td>
-                {e.actor_id ? <PersonName id={e.actor_id} name={e.actor_id.slice(0, AUDIT_ID_LENGTH)} /> : ''}
-              </td>
-              <td>{e.action}</td>
-              <td>{e.object_type || t('access.hiddenPage')}</td>
-              <td>{e.result}</td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('admin.when')}</th>
+              <th>{t('admin.actor')}</th>
+              <th>{t('admin.action')}</th>
+              <th>{t('admin.object')}</th>
+              <th>{t('admin.result')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.events.map((e) => (
+              <tr key={e.seq}>
+                <td>{dates.moment(e.occurred_at)}</td>
+                <td>
+                  {e.actor_id ? (
+                    <PersonName id={e.actor_id} name={e.actor_id.slice(0, AUDIT_ID_LENGTH)} />
+                  ) : (
+                    ''
+                  )}
+                </td>
+                <td>{e.action}</td>
+                <td>{e.object_type || t('access.hiddenPage')}</td>
+                <td>{e.result}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </>
   );
 }

@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type PublicSite, type SiteBuild, type SiteChoice, type SiteReport, type Space } from '../api';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ErrorNote, Field, Loading } from '../components/ui';
+import { TableBox } from '../components/table-box';
 
 // A build runs in the background, and this is how it shows up.
 const POLL_MS = 2000;
@@ -250,34 +251,36 @@ function Builds({ site, onDone }: { site: PublicSite; onDone: () => void }) {
     <div>
       <ErrorNote error={rollback.error ?? withdraw.error} />
       {builds.length > 0 && (
-        <table>
-          <caption>{t('sites.builds')}</caption>
-          <thead>
-            <tr>
-              <th scope="col">{t('sites.build')}</th>
-              <th scope="col">{t('sites.state')}</th>
-              <th scope="col">{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {builds.map((b) => (
-              <tr key={b.number}>
-                <th scope="row">{b.number}</th>
-                <td>
-                  {t(`sites.state_${b.state}`)}
-                  {b.report.stopped ? ` · ${b.report.stopped}` : ''}
-                </td>
-                <td>
-                  {b.state === 'old' && (
-                    <button type="button" className="quiet" onClick={() => rollback.mutate(b.number)}>
-                      {t('sites.rollback')}
-                    </button>
-                  )}
-                </td>
+        <TableBox>
+          <table>
+            <caption>{t('sites.builds')}</caption>
+            <thead>
+              <tr>
+                <th scope="col">{t('sites.build')}</th>
+                <th scope="col">{t('sites.state')}</th>
+                <th scope="col">{t('common.actions')}</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {builds.map((b) => (
+                <tr key={b.number}>
+                  <th scope="row">{b.number}</th>
+                  <td>
+                    {t(`sites.state_${b.state}`)}
+                    {b.report.stopped ? ` · ${b.report.stopped}` : ''}
+                  </td>
+                  <td>
+                    {b.state === 'old' && (
+                      <button type="button" className="quiet" onClick={() => rollback.mutate(b.number)}>
+                        {t('sites.rollback')}
+                      </button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
       )}
       {site.live_build > 0 && (
         <div className="row">

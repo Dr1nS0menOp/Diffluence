@@ -5,7 +5,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type LoginEntry, type Me } from '../api';
 import { Dialog, ErrorNote, Field, NewPasswordField } from '../components/ui';
 import { useDates } from '../dates';
+import { useLocation } from '../router';
 import { AccountNav } from './account';
+import { TableBox } from '../components/table-box';
 
 interface Security {
   has_password: boolean;
@@ -281,26 +283,28 @@ function SessionsSection() {
   return (
     <section>
       <h2>{t('profile.sessions')}</h2>
-      <table>
-        <tbody>
-          {q.data?.sessions.map((s) => (
-            <tr key={s.id}>
-              <td>{s.user_agent}</td>
-              <td>{s.ip}</td>
-              <td>{dates.moment(s.last_seen_at)}</td>
-              <td>
-                {s.current ? (
-                  t('profile.thisSession')
-                ) : (
-                  <button type="button" className="ghost" onClick={() => revoke.mutate(s.id)}>
-                    {t('profile.revoke')}
-                  </button>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <TableBox>
+        <table>
+          <tbody>
+            {q.data?.sessions.map((s) => (
+              <tr key={s.id}>
+                <td>{s.user_agent}</td>
+                <td>{s.ip}</td>
+                <td>{dates.moment(s.last_seen_at)}</td>
+                <td>
+                  {s.current ? (
+                    t('profile.thisSession')
+                  ) : (
+                    <button type="button" className="ghost" onClick={() => revoke.mutate(s.id)}>
+                      {t('profile.revoke')}
+                    </button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </section>
   );
 }
@@ -316,26 +320,28 @@ function LoginHistorySection() {
     <section>
       <h2>{t('account.logins')}</h2>
       <ErrorNote error={q.error} />
-      <table>
-        <thead>
-          <tr>
-            <th>{t('admin.when')}</th>
-            <th>{t('account.loginMethod')}</th>
-            <th>{t('admin.ip')}</th>
-            <th>{t('account.loginDevice')}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {q.data?.logins.map((l) => (
-            <tr key={l.at}>
-              <td>{dates.moment(l.at)}</td>
-              <td>{l.method}</td>
-              <td>{l.ip}</td>
-              <td>{l.user_agent}</td>
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('admin.when')}</th>
+              <th>{t('account.loginMethod')}</th>
+              <th>{t('admin.ip')}</th>
+              <th>{t('account.loginDevice')}</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {q.data?.logins.map((l) => (
+              <tr key={l.at}>
+                <td>{dates.moment(l.at)}</td>
+                <td>{l.method}</td>
+                <td>{l.ip}</td>
+                <td>{l.user_agent}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </TableBox>
     </section>
   );
 }
@@ -356,11 +362,18 @@ function SignInNote({ me }: { me: Me }) {
 
 export function SecurityView({ me }: { me: Me }) {
   const { t } = useTranslation();
+  // Right after the first setup: the new administrator's account reaches everything.
+  const welcome = useLocation().searchParams.get('welcome') === '1';
   const security = useQuery({ queryKey: ['security'], queryFn: () => api.get<Security>('/me/security') });
   return (
     <>
       <h1>{t('profile.title')}</h1>
       {!me.needs_second_factor && <AccountNav />}
+      {welcome && (
+        <p role="status" className="note">
+          {t('setup.welcome')}
+        </p>
+      )}
       <SignInNote me={me} />
       {security.data?.has_password === false && <p className="muted">{t('profile.noPassword')}</p>}
       {security.data?.has_password && <PasswordSection />}

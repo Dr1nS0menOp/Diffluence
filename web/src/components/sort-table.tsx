@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 import { useMemo, useState, type ReactNode } from 'react';
+import { TableBox } from './table-box';
 
 export interface SortColumn<Row> {
   key: string;
@@ -41,34 +42,36 @@ export function SortTable<Row>({
     return sorted.ascending ? 'ascending' : 'descending';
   };
   return (
-    <table>
-      <caption className="visually-hidden">{caption}</caption>
-      <thead>
-        <tr>
-          {columns.map((c) => (
-            <th key={c.key} scope="col" aria-sort={stateOf(c.key)}>
-              <button
-                type="button"
-                className="ghost"
-                onClick={() =>
-                  setSorted({ key: c.key, ascending: sorted?.key === c.key ? !sorted.ascending : true })
-                }
-              >
-                {c.label}
-              </button>
-            </th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {shown.map((row) => (
-          <tr key={rowKey(row)}>
+    <TableBox>
+      <table>
+        <caption className="visually-hidden">{caption}</caption>
+        <thead>
+          <tr>
             {columns.map((c) => (
-              <td key={c.key}>{c.show ? c.show(row) : c.value(row)}</td>
+              <th key={c.key} scope="col" aria-sort={stateOf(c.key)}>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={() =>
+                    setSorted({ key: c.key, ascending: sorted?.key === c.key ? !sorted.ascending : true })
+                  }
+                >
+                  {c.label}
+                </button>
+              </th>
             ))}
           </tr>
-        ))}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {shown.map((row) => (
+            <tr key={rowKey(row)}>
+              {columns.map((c) => (
+                <td key={c.key}>{c.show ? c.show(row) : c.value(row)}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableBox>
   );
 }

@@ -112,7 +112,7 @@ The product owner's decision (ADR-026): push people towards a second factor and 
 
 **What can go wrong:** a default account, a reset link that can be guessed or used twice, a link built from a forged `Host` header, a mail bomb, a reset that skips the second factor, an invited guest who stays forever.
 
-- **SEC-185** · built · There are no default accounts. The first administrator is made from the command line, with the password from standard input (ASVS 6.3.2).
+- **SEC-185** · built · There are no default accounts. The first administrator is made from the command line, with the password from standard input, or on the setup screen, which needs a one-time code from the server's log and closes for good once used (ASVS 6.3.2, spec 038).
 - **SEC-186** · built · The last administrator cannot be removed by a person, and *system administrator* can only be granted by one.
 - **SEC-187** · built · A reset link has a hashed random token, works once, lasts an hour, and always gets the same answer with equal timing. It ends all sessions and logs nobody in (ASVS 6.4.3, 6.3.8).
 - **SEC-188** · built · The second factor still applies after a reset. Losing a factor goes through an administrator, who must check who is asking (ASVS 6.4.3, 6.4.4). The guide must say how.
