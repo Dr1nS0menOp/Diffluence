@@ -59,6 +59,9 @@ const TAGS = /<[^>]+>/g;
 /** A run of list paragraphs from Word as one real list. Word marks items with a typed sign. */
 function wordRun(run: string): string {
   const items = Array.from(run.matchAll(WORD_LIST_ITEM), (match) => match[1] ?? '');
+  // The marker text is only tested for a number, never put into the page, and pasted HTML
+  // passes the editor's schema afterwards anyway.
+  // codeql[js/incomplete-multi-character-sanitization]
   const marker = (WORD_MARKER.exec(items[0] ?? '')?.[1] ?? '').replace(TAGS, '').trim();
   const tag = NUMBERED_MARKER.test(marker) ? 'ol' : 'ul';
   const lines = items.map((item) => `<li>${item.replace(WORD_MARKER, '')}</li>`);

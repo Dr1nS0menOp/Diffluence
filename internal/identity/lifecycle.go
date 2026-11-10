@@ -47,6 +47,8 @@ const (
 	MailNewDevice  = "new_device"
 	// MailSignInChanged says that a password, a second factor or a passkey changed.
 	MailSignInChanged = "sign_in_changed"
+	// MailPasswordLocked says that password login stopped after too many wrong passwords.
+	MailPasswordLocked = "password_locked"
 )
 
 // AccountMail is one message about an account. Link holds a secret, so it must

@@ -301,6 +301,7 @@ POST /api/v1/admin/users/{id}/disable                          session-only perm
 POST /api/v1/admin/users/{id}/enable                           session-only permission:administrator
 POST /api/v1/admin/users/{id}/reset-mfa                        sensitive permission:administrator
 POST /api/v1/admin/users/{id}/reset-password                   sensitive permission:administrator
+POST /api/v1/admin/users/{id}/unlock-password                  session-only permission:administrator
 POST /api/v1/admin/webhooks                                    permission:administrator
 POST /api/v1/approvals/{id}/close                              authenticated
 POST /api/v1/attachments/lookup                                authenticated

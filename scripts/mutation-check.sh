@@ -1211,6 +1211,51 @@ mutate "the page created event forgets its kind" internal/pages/pages.go \
   's.replace("\"parent_id\": in.parent, \"kind\": in.kind}", "\"parent_id\": in.parent}")' $app -run TestThePageCreatedEventSaysWhichKindWasMade
 mutate_web "the create menu offers a database to anyone who makes pages" src/create-permission.ts \
   's.replace("if (kind === \x27database\x27) return \x27database.create\x27;", "")' src/create-permission.test.ts
+
+# Wave SX (spec 046): the witness of the audit log outside the database, and the stop
+# on password login after 100 wrong passwords in a row (ADR-038, ADR-039).
+mutate "a quieter log level drops the witness" internal/app/app.go \
+  's.replace("witness: slog.New(alwaysEnabled{log.Handler()})", "witness: log")' $app -run TestTheWitnessLogShowsATailRemovedFromTheDatabase
+mutate "no witness line is written" internal/app/ops.go \
+  's.replace("a.witness.Info(audit.WitnessMessage, cp.WitnessAttrs()...)", "_ = cp")' $app -run TestTheWitnessLogShowsATailRemovedFromTheDatabase
+mutate "checkpoints are daily again" internal/app/ops.go \
+  's.replace("checkpointEvery = 5 * time.Minute", "checkpointEvery = 24 * time.Hour")' $app -run TestTheHeadOfTheChainIsSignedEveryFiveMinutes
+mutate "a quiet instance signs the same head again" internal/audit/checkpoint.go \
+  's.replace("if action == checkpointSignedAction {", "if action == \"\" {")' $app -run TestNothingNewMeansNoNewCheckpoint
+mutate "a removed tail passes the witness" internal/audit/witness.go \
+  's.replace("if c.Seq > head {", "if c.Seq > head && head < 0 {")' $app -run TestTheWitnessLogShowsATailRemovedFromTheDatabase
+mutate "a forged witness line passes" internal/audit/witness.go \
+  's.replace("if !ed25519.Verify(public, checkpointMessage(c.Seq, c.Hash), c.Signature) {", "if len(c.Signature) < 0 {")' $app -run TestAForgedWitnessLineIsRefused
+mutate "a chain that differs from the witness passes" internal/audit/witness.go \
+  's.replace("if !bytes.Equal(chain, c.Hash) {", "if len(chain) < 0 {")' ./internal/audit/ -run TestAChainThatDiffersFromTheWitnessIsNamed
+mutate "a broken witness line is skipped" internal/audit/witness.go \
+  's.replace("return nil, fmt.Errorf(\"audit: witness line %d cannot be read\", number)", "continue")' ./internal/audit/ -run TestABrokenWitnessLineIsAnError
+mutate "checkpoints from before a prune count as damage" internal/audit/witness.go \
+  's.replace("if c.Seq <= prunedUpTo {", "if c.Seq <= prunedUpTo && prunedUpTo < 0 {")' ./internal/audit/ -run TestWitnessCheckpointsBeforeAPruneAreSkipped
+mutate "audit verify ignores the witness" cmd/diffluence/main.go \
+  's.replace("if res.OK && witness != nil {", "if res.OK && witness == nil {")' ./cmd/diffluence/ -run TestAuditVerifyComparesTheChainWithTheWitnessLog
+mutate "an empty witness log passes" cmd/diffluence/main.go \
+  's.replace("if len(witness) == 0 {", "if len(witness) < 0 {")' ./cmd/diffluence/ -run TestAuditVerifyRefusesAWitnessLogWithoutCheckpoints
+mutate "a hundred wrong passwords stop nothing" internal/identity/identity.go \
+  's.replace("THEN now() END", "THEN NULL END")' ./internal/identity/ -run TestAHundredWrongPasswordsStopPasswordLoginAcrossARestart
+mutate "the right password opens a stopped account" internal/identity/identity.go \
+  's.replace("\tcase locked:\n", "\tcase locked && len(password) < 0:\n")' $app -run TestTheHundredthWrongPasswordStopsPasswordLogin
+mutate "the right password leaves the run of wrong ones" internal/identity/identity.go \
+  's.replace("if failedInRow > 0 {", "if failedInRow < 0 {")' $app -run TestTheRightPasswordEndsARunOfWrongOnes
+mutate "a disabled account counts wrong passwords" internal/identity/identity.go \
+  's.replace("if f.known && f.reason == \"bad_password\" {", "if f.known {")' $app -run TestOnlyWrongPasswordsOnALiveAccountCount
+mutate "the person is not told of the stop" internal/identity/identity.go \
+  's.replace("return s.send(ctx, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})", "return nil")' $app -run TestTheHundredthWrongPasswordStopsPasswordLogin
+mutate "a new password leaves the stop" internal/identity/users.go \
+  's.replace("updated_at = now(),\n\t\t\tfailed_logins_in_row = 0, password_locked_at = NULL`", "updated_at = now()`")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
+mutate "lifting the stop changes nothing" internal/identity/users.go \
+  's.replace("UPDATE local_credentials SET failed_logins_in_row = 0, password_locked_at = NULL\n\t\t\tWHERE", "UPDATE local_credentials SET failed_logins_in_row = 0\n\t\t\tWHERE")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
+mutate "anyone can lift the stop" internal/httpapi/handlers_identity.go \
+  's.replace("\"POST /api/v1/admin/users/{id}/unlock-password\", admin,", "\"POST /api/v1/admin/users/{id}/unlock-password\", SessionOnly(Authenticated()),")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
+mutate_web "a Word file shows as text" src/components/file-preview.tsx \
+  's.replace("const TEXT_FILE = /^(?:text\\/[^;]+|[^/;]+\\/(?:[^;]*\\+)?(?:json|xml|yaml|x-yaml))(?:\\s*;.*)?$/;", "const TEXT_FILE = /^text\\/|json|xml|yaml/;")' src/components/file-preview.test.ts
+mutate "the console does not show the stop" internal/identity/users.go \
+  's.replace("WHERE c.user_id = u.id AND c.password_locked_at IS NOT NULL),", "WHERE c.user_id = u.id AND c.password_locked_at IS NULL AND false),")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

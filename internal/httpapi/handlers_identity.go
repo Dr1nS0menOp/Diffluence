@@ -55,6 +55,7 @@ func (s *Server) registerIdentityRoutes() {
 	r.HandleFunc("POST /api/v1/admin/users/{id}/enable", admin, s.handleUserEnable)
 	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-password", Sensitive(admin), s.handleUserResetPassword)
 	r.HandleFunc("POST /api/v1/admin/users/{id}/reset-mfa", Sensitive(admin), s.handleUserResetMFA)
+	r.HandleFunc("POST /api/v1/admin/users/{id}/unlock-password", admin, s.handleUserUnlockPassword)
 	r.HandleFunc("PUT /api/v1/admin/users/{id}/permissions", Sensitive(admin), s.handleUserPermissions)
 	r.HandleFunc("GET /api/v1/admin/groups", admin, s.handleGroups)
 	r.HandleFunc("POST /api/v1/admin/groups", admin, s.handleGroupCreate)
@@ -96,6 +97,8 @@ func (s *Server) registerIdentityRoutes() {
 }
 
 func (s *Server) setSessionCookie(w http.ResponseWriter, token string) {
+	// Secure follows the public address: on for https, off only where a browser would drop it, on plain http.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{Name: s.cookieName, Value: token, Path: "/", HttpOnly: true,
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteStrictMode, MaxAge: int(s.deps.Config.SessionMaxAge.Seconds())})
 }
@@ -152,7 +155,9 @@ func (s *Server) handleOIDCStart(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=oidc_unavailable", http.StatusFound)
 		return
 	}
-	// Lax on purpose: this cookie must come back on the redirect from the provider.
+	// Lax on purpose: this cookie must come back on the redirect from the provider. Secure
+	// follows the public address: on for https, off only on plain http.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{Name: s.flowCookie, Value: binding, Path: "/api/v1/auth/oidc", HttpOnly: true,
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: 600})
 	http.Redirect(w, r, url, http.StatusFound)
@@ -167,6 +172,8 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 	if c, err := r.Cookie(s.flowCookie); err == nil {
 		binding = c.Value
 	}
+	// Clears the flow cookie; Secure follows the public address, as when it was set.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{Name: s.flowCookie, Value: "", Path: "/api/v1/auth/oidc", MaxAge: -1, HttpOnly: true, Secure: s.deps.Config.SecureCookies()})
 	q := r.URL.Query()
 	if code := q.Get("error"); code != "" {
@@ -499,6 +506,12 @@ func (s *Server) handleUserResetPassword(w http.ResponseWriter, r *http.Request)
 
 func (s *Server) handleUserResetMFA(w http.ResponseWriter, r *http.Request) {
 	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error { return s.deps.Identity.ResetMFA(r.Context(), c, id) })
+}
+
+func (s *Server) handleUserUnlockPassword(w http.ResponseWriter, r *http.Request) {
+	s.spaceAction(w, r, func(c identity.Caller, id uuid.UUID) error {
+		return s.deps.Identity.LiftPasswordLock(r.Context(), c, id)
+	})
 }
 
 func (s *Server) setGlobalPermissions(w http.ResponseWriter, r *http.Request, subjectType string) {

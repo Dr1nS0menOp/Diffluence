@@ -272,12 +272,14 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	email = normalizeEmail(email)
 	var u User
 	var hash string
+	var locked bool
+	var failedInRow int
 	// An account past its end date is treated like a disabled one.
 	err := s.pool.QueryRow(ctx, `SELECT u.id, u.type,
 			CASE WHEN u.expires_at IS NOT NULL AND u.expires_at <= now() THEN 'disabled' ELSE u.status END,
-			u.email, u.display_name, u.created_at, c.password_hash
+			u.email, u.display_name, u.created_at, c.password_hash, c.password_locked_at IS NOT NULL, c.failed_logins_in_row
 		FROM users u JOIN local_credentials c ON c.user_id = u.id WHERE lower(u.email) = $1 AND u.type <> 'service'`, email).
-		Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.CreatedAt, &hash)
+		Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.CreatedAt, &hash, &locked, &failedInRow)
 	found := err == nil
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return "", Principal{}, err
@@ -285,6 +287,8 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	if !found {
 		hash = s.dummyHash()
 	}
+	// The hash runs for a locked account too, so a lock costs the same time as a wrong
+	// password and its answer is the same: the lock says nothing to a guesser.
 	ok, rehash, verr := VerifyPassword(hash, password, s.params)
 
 	reason := ""
@@ -295,6 +299,8 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		reason = "unusable_password_hash"
 	case u.Status != StatusActive:
 		reason = "user_disabled"
+	case locked:
+		reason = "password_locked"
 	case !ok:
 		reason = "bad_password"
 	}
@@ -313,6 +319,12 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	var p Principal
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		var err error
+		// A right password ends a run of wrong ones (ADR-038). Written only when there was a run.
+		if failedInRow > 0 {
+			if _, err := tx.Exec(ctx, "UPDATE local_credentials SET failed_logins_in_row = 0 WHERE user_id = $1", u.ID); err != nil {
+				return err
+			}
+		}
 		if !mfa {
 			token, p.SessionID, err = s.createSession(ctx, tx, sessionStart{UserID: u.ID, Method: "password", Meta: meta})
 			if err != nil {
@@ -374,8 +386,52 @@ func (s *Service) recordFailedLogin(ctx context.Context, f failedLogin, meta Req
 		}
 		details["address_hash"] = hex.EncodeToString(sum)
 	}
-	return audit.RecordStandalone(ctx, s.pool, event(meta, Actor{Type: audit.ActorAnonymous}, "auth.login", "user", objectID,
-		audit.ResultFailure, details))
+	lockedNow := false
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var err error
+		if lockedNow, err = s.countWrongPassword(ctx, tx, f); err != nil {
+			return err
+		}
+		if _, err := audit.Record(ctx, tx, event(meta, Actor{Type: audit.ActorAnonymous}, "auth.login", "user", objectID,
+			audit.ResultFailure, details)); err != nil {
+			return err
+		}
+		if !lockedNow {
+			return nil
+		}
+		_, err = audit.Record(ctx, tx, event(meta, SystemActor("login"), "auth.password_locked", "user", objectID,
+			audit.ResultSuccess, map[string]any{"failed_in_row": PasswordLockAfter}))
+		return err
+	})
+	if err != nil || !lockedNow {
+		return err
+	}
+	return s.send(ctx, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})
+}
+
+// PasswordLockAfter is how many wrong passwords in a row stop password login for an
+// account (ADR-038, NIST SP 800-63B: at most 100).
+const PasswordLockAfter = 100
+
+// countWrongPassword adds one to the run of wrong passwords of a known account, and
+// reports whether this one stopped password login. Only a wrong password on a live
+// account counts: an unknown address, a disabled account or a locked one does not, so
+// nothing but guessing this account's password can lock it. An unknown address runs
+// the same statement on no row, so it costs about the same and says nothing.
+func (s *Service) countWrongPassword(ctx context.Context, tx pgx.Tx, f failedLogin) (bool, error) {
+	id := uuid.Nil
+	if f.known && f.reason == "bad_password" {
+		id = f.account.ID
+	}
+	var locked bool
+	err := tx.QueryRow(ctx, `UPDATE local_credentials SET failed_logins_in_row = failed_logins_in_row + 1,
+			password_locked_at = CASE WHEN failed_logins_in_row + 1 >= $2 THEN now() END
+		WHERE user_id = $1 AND password_locked_at IS NULL
+		RETURNING password_locked_at IS NOT NULL`, id, PasswordLockAfter).Scan(&locked)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	return locked, err
 }
 
 func hashToken(token string) []byte {

@@ -7,6 +7,7 @@ import (
 	"crypto/ed25519"
 	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -24,7 +25,16 @@ const (
 	// How long every live node must have known a contract migration before it
 	// runs: leaves room for a rollback in the first minutes after an upgrade.
 	contractGrace = 10 * time.Minute
+	// How often the head of the audit chain is signed. It bounds what an owner of the
+	// database can remove from the tail before the witness holds a copy (ADR-039).
+	checkpointEvery = 5 * time.Minute
 )
+
+// alwaysEnabled passes every record to its handler, whatever level that was set to, so
+// a quieter log level cannot drop the witness of the audit log.
+type alwaysEnabled struct{ slog.Handler }
+
+func (alwaysEnabled) Enabled(context.Context, slog.Level) bool { return true }
 
 func (a *App) maxMigration() int {
 	if n := len(a.migrations); n > 0 {
@@ -135,13 +145,20 @@ func resultOf(ok bool) string {
 }
 
 // signCheckpoint signs the current head of the audit chain. Someone who rewrites
-// the whole chain cannot forge these without the key.
+// the whole chain cannot forge these without the key. Each checkpoint also goes to the
+// application log once it is committed, as the witness outside the database (ADR-039):
+// a line for a checkpoint that was rolled back would look like a removed tail.
 func (a *App) signCheckpoint(ctx context.Context) error {
 	key, err := a.keyring.SigningKey()
 	if err != nil {
 		return err
 	}
-	return audit.SignCheckpoint(ctx, a.pool, key)
+	cp, signed, err := audit.SignCheckpoint(ctx, a.pool, key)
+	if err != nil || !signed {
+		return err
+	}
+	a.witness.Info(audit.WitnessMessage, cp.WitnessAttrs()...)
+	return nil
 }
 
 // NodeStatus is one row of the admin console's node list.

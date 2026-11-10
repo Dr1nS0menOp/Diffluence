@@ -38,6 +38,9 @@ func New(entries, bitsPerEntry uint64, hashes uint32) *Filter {
 
 // positions gives the two hashes that every bit position is derived from.
 func positions(password string) (uint64, uint64) {
+	// This hash places a candidate in a filter of passwords that are already public; it is
+	// never stored, so it needs to be fast and even, not slow like a password hash.
+	// codeql[go/weak-sensitive-data-hashing]
 	sum := sha256.Sum256([]byte(strings.ToLower(password)))
 	return binary.LittleEndian.Uint64(sum[0:8]), binary.LittleEndian.Uint64(sum[8:16])
 }

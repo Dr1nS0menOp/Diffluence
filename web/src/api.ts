@@ -856,6 +856,8 @@ export interface UserDetail {
   source: string;
   has_password: boolean;
   totp_enabled: boolean;
+  /** Password login stopped after too many wrong passwords in a row. */
+  password_locked: boolean;
   passkeys: number;
   global_permissions: string[];
   expires_at: string | null;

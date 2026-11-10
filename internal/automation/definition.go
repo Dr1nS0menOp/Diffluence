@@ -339,7 +339,7 @@ func (t Trigger) bringsPage() bool {
 // expand fills in {name} from values, and leaves what it does not know alone. There
 // is no expression language, so a value can never become an instruction (D13).
 func expand(text string, values map[string]string) string {
-	pairs := make([]string, 0, 2*len(values))
+	pairs := make([]string, 0, len(values))
 	for name, value := range values {
 		pairs = append(pairs, "{"+name+"}", value)
 	}

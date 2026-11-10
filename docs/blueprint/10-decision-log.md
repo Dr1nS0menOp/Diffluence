@@ -150,6 +150,9 @@ Status: decided by the product owner (2026-11-09). Context: waves R, P5, S6 and 
 - **Enterprise document features** (roadmap) are built before 1.0.
 Consequences: each item lands in a wave with its own study, failure paths first; the permission items repeat the migration proof that nobody gains or loses access.
 
+**ADR-039: A witness of the audit log outside the database**
+Status: decided by the product owner (2026-11-09, in ADR-038), built in spec 046. Context: ADR-013 signs the head of the chain once a day, in the database. Someone who owns the database can remove the newest rows with their checkpoints, and the shortened chain still verifies. Decision: a worker signs the head every five minutes, when something happened since the last checkpoint, and writes each checkpoint to the application log once it is committed, at every log level. `diffluence audit verify --witness` reads those lines back, checks their signatures and names the first one the chain no longer matches. Consequences: an operator sends the application log to a place the database owner cannot change. At most five minutes of events have no copy. The witness holds no personal data. Supersedes: the daily checkpoint of ADR-013; the rest of ADR-013 stands.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

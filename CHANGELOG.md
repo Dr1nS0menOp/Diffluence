@@ -3,6 +3,11 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Security: a copy of the audit log outside the database, and a stop on password guessing (spec 046)
+- The head of the audit log is signed every five minutes when something happened, instead of once a day, and each signature also goes to the application log, whatever its level. Keep that log on a log server: `diffluence audit verify --witness <log>` then shows if the newest audit rows were removed from the database
+- After 100 wrong passwords in a row, password login for that account stops until the person chooses a new password or an administrator allows it again. The person gets a mail. Passkeys and single sign-on keep working, and the right password ends a run of wrong ones
+- CI also runs Semgrep, CodeQL and a ZAP baseline against the real image
+- Upgrade impact: migration 0042 adds two columns to `local_credentials`, expand only. Send the application log somewhere the database owner cannot change, and keep it as long as the audit log
 ### Added: checks before an upgrade, and a safe way back (spec 044)
 - Before it migrates, a node checks that PostgreSQL is 16 or newer, that its data folder has 512 MiB free and that the queue answers. If not, it does not start, says every reason, and changes nothing
 - Set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, such as `26h`, and an upgrade also refuses without a recent backup. `scripts/backup.sh` notes each backup it completes; without the setting, a missing backup only gives a warning

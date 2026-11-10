@@ -37,7 +37,9 @@ Commands:
   migrate [--contract]      apply pending migrations
   user create-admin         create a local administrator (password on stdin)
   setup-code                print a new one-time code for the setup screen of a new install
-  audit verify              verify the audit log hash chain
+  audit verify [--witness FILE]
+                            verify the audit log hash chain, and compare it with the
+                            checkpoints in an application log (FILE, or - for stdin)
   audit prune               remove audit rows past their retention, as the owner of the tables
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   key <step>                replace master.key without downtime; see diffluence key
@@ -78,7 +80,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 	case "audit":
 		switch {
 		case len(args) >= 2 && args[1] == "verify":
-			err = cmdAuditVerify(ctx, stdout)
+			err = cmdAuditVerify(ctx, args[2:], stdin, stdout)
 		case len(args) >= 2 && args[1] == "prune":
 			err = cmdAuditPrune(ctx, stdout)
 		default:
@@ -329,7 +331,19 @@ func cmdBackupNote(ctx context.Context, stdout io.Writer) error {
 	return nil
 }
 
-func cmdAuditVerify(ctx context.Context, stdout io.Writer) error {
+func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
+	fs := flag.NewFlagSet("audit verify", flag.ContinueOnError)
+	witnessPath := fs.String("witness", "", "an application log holding audit checkpoints, or - for standard input")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	var witness []audit.Checkpoint
+	if *witnessPath != "" {
+		var err error
+		if witness, err = readWitness(*witnessPath, stdin); err != nil {
+			return err
+		}
+	}
 	cfg, err := config.FromEnvironment()
 	if err != nil {
 		return err
@@ -351,18 +365,58 @@ func cmdAuditVerify(ctx context.Context, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	compared := audit.WitnessResult{OK: true}
+	if res.OK && witness != nil {
+		if compared, err = audit.CompareWitness(ctx, pool, public, witness); err != nil {
+			return err
+		}
+	}
+	whole := res.OK && compared.OK
+	details := map[string]any{"ok": whole, "checked": res.Checked, "checkpoints": res.Checkpoints}
+	if witness != nil {
+		details["witness_compared"] = compared.Compared
+	}
 	result := audit.ResultSuccess
-	if !res.OK {
+	if !whole {
 		result = audit.ResultFailure
 	}
 	if err := audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "cli",
-		Action: "audit.verified", ObjectType: "audit_log", Result: result,
-		Details: map[string]any{"ok": res.OK, "checked": res.Checked, "checkpoints": res.Checkpoints}}); err != nil {
+		Action: "audit.verified", ObjectType: "audit_log", Result: result, Details: details}); err != nil {
 		return err
 	}
 	if !res.OK {
 		return fmt.Errorf("audit chain BROKEN at seq %d: %s (checked %d events)", res.FirstBadSeq, res.Reason, res.Checked)
 	}
+	if !compared.OK {
+		return fmt.Errorf("audit chain does not match the witness log at seq %d: %s", compared.FirstBadSeq, compared.Reason)
+	}
 	fmt.Fprintf(stdout, "audit chain OK (%d events and %d signed checkpoints checked)\n", res.Checked, res.Checkpoints)
+	if witness != nil {
+		fmt.Fprintf(stdout, "witness log OK (%d checkpoints match the chain, %d from before the retention period)\n",
+			compared.Compared, compared.Pruned)
+	}
 	return nil
+}
+
+// readWitness reads the checkpoints from an application log. A log without any is an
+// error: checkpoints are made every few minutes, so none means the wrong file, or a
+// collector that kept nothing.
+func readWitness(path string, stdin io.Reader) ([]audit.Checkpoint, error) {
+	in := stdin
+	if path != "-" {
+		f, err := os.Open(path) // #nosec G304 -- the operator names the log to read.
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = f.Close() }()
+		in = f
+	}
+	witness, err := audit.ReadWitness(in)
+	if err != nil {
+		return nil, err
+	}
+	if len(witness) == 0 {
+		return nil, errors.New("the witness log holds no audit checkpoints")
+	}
+	return witness, nil
 }

@@ -168,6 +168,14 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
         {user.email} · {t(`admin.source_${user.source}`)}
       </p>
       <ErrorNote error={act.error ?? save.error ?? reset.error} />
+      {user.password_locked && (
+        <div className="row" role="status">
+          <p>{t('admin.passwordLocked')}</p>
+          <button type="button" onClick={() => act.mutate('unlock-password')}>
+            {t('admin.liftPasswordLock')}
+          </button>
+        </div>
+      )}
       <UserReach userId={user.id} />
       <GlobalPermissions
         current={perms}

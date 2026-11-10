@@ -30,7 +30,7 @@ Because the product owner does not read code, **the automated checks are the cod
 | End-to-end | Playwright on the built app, including accessibility checks (axe) |
 | Design | `docs/design/README.md`: tokens, contrast, icons and dialogs through `npm run design`; approved pictures of every screen in the end-to-end run |
 | Upgrade test | Start the previous release with traffic, upgrade to this build, no failed requests allowed, then roll back to the previous release. In CI as the job `upgrade`, with the target branch or the previous commit of main as the previous release (OPS-036) |
-| Security | In CI today: `govulncheck`, Trivy (image and dependencies), `npm audit` of shipped packages, licence scan, mutation check (nightly). Not in CI yet, each would add a new tool: Semgrep, CodeQL, OWASP ZAP baseline (SEC-1023) |
+| Security | In CI: `govulncheck`, Trivy (image and dependencies), `npm audit` of shipped packages, licence scan, Semgrep (Go, TypeScript, React and secrets rules), CodeQL (extended security queries, Go and TypeScript), an OWASP ZAP baseline against the real image, and the mutation check (nightly). A finding fails the build; an exception sits on its line with the reason (SEC-1023, ADR-038) |
 | Fuzzing | Go native fuzzing on parsers (Markdown, imports, sanitiser), nightly |
 | Load | k6 smoke test per pull request, full 5,000-user test nightly |
 | API contract | The OpenAPI spec matches the code, and every endpoint has a permission annotation |

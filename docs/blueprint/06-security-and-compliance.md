@@ -47,11 +47,11 @@ Counted again in spec 042, against the code and the tests. Lines still marked wi
 
 | Status | Lines |
 |---|---|
-| built | 328 |
-| partly | 33 |
+| built | 332 |
+| partly | 32 |
 | still marked with a wave | 4 |
 | planned in a phase | 5 |
-| new | 44 |
+| new | 41 |
 | later | 15 |
 | **Total** | **429** |
 
@@ -65,12 +65,12 @@ Every High line of the first study is closed. The last, SEC-546, closed in spec 
 
 ### Medium, still open
 
-- **Accounts:** SEC-110 and SEC-111, a lasting count of failures against malicious lockout, wait for a decision. SEC-148 back-channel logout.
+- **Accounts:** SEC-148 back-channel logout. SEC-110 and SEC-111 closed in spec 046: 100 wrong passwords in a row stop password login, while passkeys and single sign-on keep working.
 - **The browser:** SEC-557 checks on `postMessage` for the PDF editor, which does not exist yet.
 - **Content:** SEC-548 removed text stays in a browser that had the page open, until logout.
 - **Operations:** SEC-655 a failed chain check reaches the console, not yet a notification.
 - **Services:** SEC-513 one Gotenberg for PDF export and hostile office files. SEC-532 Collabora's own security settings.
-- **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. SEC-1023 gates that the way of working lists are not in CI.
+- **The project itself:** SEC-1003 Renovate may not be running. SEC-1004 most actions use moving tags. SEC-1006 there is no SBOM. Since spec 046, Semgrep, CodeQL and a ZAP baseline run in CI.
 ## Where this differs from the earlier blueprint
 
 The earlier version of this file promised some things that were then built differently, or not yet. Its other facts moved into the chapters.

@@ -73,8 +73,10 @@ func NewLogger(level slog.Level) *slog.Logger {
 
 // App is one running Diffluence process.
 type App struct {
-	cfg        config.Config
-	log        *slog.Logger
+	cfg config.Config
+	log *slog.Logger
+	// witness writes the copies of audit checkpoints, whatever the log level (ADR-039).
+	witness    *slog.Logger
 	pool       *pgxpool.Pool
 	queue      *queue.Queue
 	identity   *identity.Service
@@ -122,7 +124,7 @@ type App struct {
 
 // New connects to the database and queue and builds the modules.
 func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error) {
-	a := &App{cfg: cfg, log: log}
+	a := &App{cfg: cfg, log: log, witness: slog.New(alwaysEnabled{log.Handler()})}
 	var err error
 	if a.migrations, err = db.Migrations(); err != nil {
 		return nil, err
@@ -600,7 +602,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 			return outbox.PurgePublished(ctx, a.pool, 7*24*time.Hour)
 		}},
 		{Name: "audit-verify", Every: 24 * time.Hour, Run: a.verifyAudit},
-		{Name: "audit-checkpoint", Every: 24 * time.Hour, Run: a.signCheckpoint},
+		{Name: "audit-checkpoint", Every: checkpointEvery, Run: a.signCheckpoint},
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},
 		{Name: "publish-scheduled", Every: time.Minute, Run: a.pages.PublishDue},
 		{Name: "remind-reviews", Every: 24 * time.Hour, Run: a.pages.RemindReviews},

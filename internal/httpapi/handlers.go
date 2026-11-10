@@ -136,6 +136,8 @@ func (s *Server) handleLogout(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
+	// Secure follows the public address: on for https, off only where a browser would drop it, on plain http.
+	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{Name: s.cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true,
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteStrictMode})
 	w.WriteHeader(http.StatusNoContent)

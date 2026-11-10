@@ -31,16 +31,18 @@ const (
 
 // UserDetail is a user as administrators see it.
 type UserDetail struct {
-	ID                uuid.UUID `json:"id"`
-	Type              string    `json:"type"`
-	Status            string    `json:"status"`
-	Email             string    `json:"email"`
-	DisplayName       string    `json:"display_name"`
-	Username          string    `json:"username"`
-	ExternalID        string    `json:"external_id"`
-	Source            string    `json:"source"`
-	HasPassword       bool      `json:"has_password"`
-	TOTPEnabled       bool      `json:"totp_enabled"`
+	ID          uuid.UUID `json:"id"`
+	Type        string    `json:"type"`
+	Status      string    `json:"status"`
+	Email       string    `json:"email"`
+	DisplayName string    `json:"display_name"`
+	Username    string    `json:"username"`
+	ExternalID  string    `json:"external_id"`
+	Source      string    `json:"source"`
+	HasPassword bool      `json:"has_password"`
+	TOTPEnabled bool      `json:"totp_enabled"`
+	// PasswordLocked says that password login stopped after too many wrong passwords.
+	PasswordLocked    bool      `json:"password_locked"`
 	Passkeys          int       `json:"passkeys"`
 	GlobalPermissions []string  `json:"global_permissions"`
 	CreatedAt         time.Time `json:"created_at"`
@@ -56,6 +58,7 @@ type UserDetail struct {
 const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u.username, u.external_id, u.source,
 		EXISTS (SELECT 1 FROM local_credentials c WHERE c.user_id = u.id),
 		EXISTS (SELECT 1 FROM totp_credentials t WHERE t.user_id = u.id AND t.confirmed_at IS NOT NULL),
+		EXISTS (SELECT 1 FROM local_credentials c WHERE c.user_id = u.id AND c.password_locked_at IS NOT NULL),
 		(SELECT count(*) FROM webauthn_credentials w WHERE w.user_id = u.id),
 		COALESCE((SELECT array_agg(g.permission ORDER BY g.permission) FROM global_grants g
 			WHERE g.subject_type = 'user' AND g.subject_id = u.id), '{}'),
@@ -67,7 +70,7 @@ const userDetailSQL = `SELECT u.id, u.type, u.status, u.email, u.display_name, u
 func scanUserDetail(r pgx.Row) (UserDetail, error) {
 	var u UserDetail
 	err := r.Scan(&u.ID, &u.Type, &u.Status, &u.Email, &u.DisplayName, &u.Username, &u.ExternalID, &u.Source,
-		&u.HasPassword, &u.TOTPEnabled, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.LastLoginAt,
+		&u.HasPassword, &u.TOTPEnabled, &u.PasswordLocked, &u.Passkeys, &u.GlobalPermissions, &u.CreatedAt, &u.UpdatedAt, &u.ExpiresAt, &u.LastLoginAt,
 		&u.Spaces)
 	return u, err
 }
@@ -354,9 +357,28 @@ func (s *Service) storePassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 	if err != nil {
 		return err
 	}
+	// A new password ends a stop after wrong ones: it was chosen by the person through a
+	// reset link or a session, or by an administrator (ADR-038).
 	_, err = tx.Exec(ctx, `INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)
-		ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now()`, userID, hash)
+		ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now(),
+			failed_logins_in_row = 0, password_locked_at = NULL`, userID, hash)
 	return err
+}
+
+// LiftPasswordLock lets password login work again for an account that was stopped after
+// too many wrong passwords. The route requires administrator.
+func (s *Service) LiftPasswordLock(ctx context.Context, c Caller, id uuid.UUID) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE local_credentials SET failed_logins_in_row = 0, password_locked_at = NULL
+			WHERE user_id = $1 AND password_locked_at IS NOT NULL`, id)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return apperr.Conflict("not_locked", "Password login is not stopped for this person.")
+		}
+		return s.record(ctx, tx, c, "auth.password_unlocked", "user", id.String(), nil)
+	})
 }
 
 // checkPassword verifies a user's current password. It returns a forbidden error

@@ -227,6 +227,9 @@ func withLogAndRecover(log *slog.Logger) func(http.Handler) http.Handler {
 				if traceID, _ := r.Context().Value(ctxTraceID).(string); traceID != "" {
 					attrs = append(attrs, "trace_id", traceID)
 				}
+				// The handler writes JSON, which escapes a line break in the path, so a path
+				// cannot fake a log line (SEC-840).
+				// codeql[go/log-injection]
 				log.Log(r.Context(), level, "http request", attrs...)
 			}()
 			next.ServeHTTP(rec, r)

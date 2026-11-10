@@ -138,6 +138,8 @@ func newHandler(root fs.FS, notFound http.HandlerFunc, drawingOrigin, publicOrig
 		}
 		h := w.Header()
 		h.Set("Content-Security-Policy", policy)
+		// root is an fs.FS, which refuses any name with ".." in it, so Clean only tidies here.
+		// nosemgrep: go.lang.security.filepath-clean-misuse.filepath-clean-misuse
 		name := strings.TrimPrefix(path.Clean(r.URL.Path), "/")
 		if strings.HasPrefix(name, vendorFolder) {
 			serveViewerFile(w, r, root, name, publicOrigin, notFound)

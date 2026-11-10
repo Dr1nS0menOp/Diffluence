@@ -21,7 +21,8 @@ export interface PreviewFile {
   may_add_version?: boolean;
 }
 
-const TEXT_FILE = /^text\/|json|xml|yaml/;
+// The whole type is matched, so an office type with "xml" inside its name stays an office file.
+const TEXT_FILE = /^(?:text\/[^;]+|[^/;]+\/(?:[^;]*\+)?(?:json|xml|yaml|x-yaml))(?:\s*;.*)?$/;
 
 export const isTextFile = (contentType: string) => TEXT_FILE.test(contentType);
 

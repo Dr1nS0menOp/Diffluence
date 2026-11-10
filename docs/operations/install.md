@@ -113,9 +113,33 @@ Each optional helper runs in its own container on the `helpers` network, which h
 
 New passwords need 15 characters, and are checked against about 5 million leaked passwords that ship with Diffluence. To refuse more, set `DIFFLUENCE_PASSWORD_BLOCKLIST_FILE` to a text file with one password per line. It works on top of the built-in list, and Diffluence reads it at startup. Existing passwords stay valid.
 
+Guessing is slowed in three layers:
+
+| Limit | Counts | Kept |
+|---|---|---|
+| 50 tries per address in 15 minutes | Every login from one address | In memory, per node |
+| 10 tries per account and address in 15 minutes, and 100 per account from all addresses | Logins on one account | In memory, per node |
+| 100 wrong passwords in a row stop password login for the account | Only a wrong password on a live account, on the login page | In the database, across restarts and nodes |
+
+The first two end by themselves after 15 minutes. The third does not: the person gets a mail, and password login for that account answers as if the password were wrong, until the person chooses a new password through "Forgot your password?", or an administrator presses **Allow password login again** in Administration, Users. A passkey and single sign-on keep working, so someone who guesses on purpose cannot keep a person out of their account. The right password ends a run of wrong ones. One address can make at most 10 wrong guesses on an account in 15 minutes, so the stop needs many addresses or many hours.
+
 ## Audit retention
 
 The console stores how many days audit rows stay: a year by default, and longer only with a stated reason. The application cannot delete them. To remove older rows, an operator runs `diffluence audit prune` with `DIFFLUENCE_MIGRATE_DATABASE_URL` set to the owner of the tables. It verifies the chain, leaves an anchor signed with the instance key, and removes the rows. Verification then starts at the anchor.
+
+## A copy of the audit log outside the database
+
+Every five minutes, when something happened, a worker signs the head of the audit chain. It also writes that checkpoint to the application log, as a line with `"msg":"audit checkpoint"` and `"witness":"audit-checkpoint-1"`. The line holds a position, two hashes and a public key, and no personal data. It is written at every log level.
+
+Someone who owns the database can remove the newest rows of the audit log together with their checkpoints, and the chain then still checks out on its own. The copies in the log show it. So send the application log to a place the database owner cannot change, such as a SIEM or a log server, and keep it as long as the audit log. To compare:
+
+```sh
+diffluence audit verify --witness /path/to/application.log
+```
+
+It reads every witness line, also with a prefix from the container runtime, checks each signature, and names the first checkpoint the chain no longer matches. `-` reads the log from standard input, for example `docker compose logs --no-log-prefix diffluence | diffluence audit verify --witness -`. Checkpoints older than the last prune are skipped. A log without any checkpoint is refused, because that is the wrong file or a collector that kept nothing. At most the last five minutes of events have no copy yet.
+
+Whoever holds both the database and `master.key` can still sign new checkpoints, but cannot change the lines the log server already has.
 
 ## After restoring a backup
 

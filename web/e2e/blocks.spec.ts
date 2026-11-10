@@ -734,6 +734,8 @@ test('a PDF changed in the viewer is kept as a new version, and only what the fr
   // The page itself cannot pose as the viewer: only the frame's window counts.
   await page.evaluate((content) => {
     const bytes = new TextEncoder().encode(content).buffer;
+    // The test forges a message from the page itself, so the target is deliberately open.
+    // nosemgrep: javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration
     window.postMessage({ craft: 'saved', bytes }, '*', [bytes]);
   }, pdf);
   await saveInViewer(page, viewer, 'not a PDF at all');

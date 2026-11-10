@@ -124,7 +124,7 @@ The level column is the ASVS level. Level 2 is our target (SEC-001).
 
 | Req | L | Short | State | Line |
 |---|---|---|---|---|
-| 6.1.1 | 1 | Document rate limits and lockout | gap | SEC-111 |
+| 6.1.1 | 1 | Document rate limits and lockout | ok | SEC-110, SEC-111, `docs/operations/install.md` |
 | 6.1.2 | 2 | Context words | gap | SEC-106 |
 | 6.1.3 | 2 | Document pathways | part | Chapter 2 starts this |
 | 6.2.1 | 1 | Length | plan | SEC-102 |
@@ -134,7 +134,7 @@ The level column is the ASVS level. Level 2 is our target (SEC-001).
 | 6.2.9, 6.2.10 | 2 | Long, no rotation | ok | SEC-103, SEC-104 |
 | 6.2.11 | 2 | Context words used | gap | SEC-106 |
 | 6.2.12 | 2 | Breached passwords | plan | SEC-105 |
-| 6.3.1 | 1 | Stuffing and brute force | part | SEC-109 |
+| 6.3.1 | 1 | Stuffing and brute force | part | SEC-109, SEC-110: the stop after 100 is kept in the database |
 | 6.3.2 | 1 | No default accounts | ok | SEC-185 |
 | 6.3.3 | 2 | Multi-factor | plan | SEC-160, SEC-163 |
 | 6.3.4 | 2 | No hidden pathways | ok | SEC-133 |
@@ -319,7 +319,7 @@ The rest of V10 is for authorization servers, which we are not until phase 7.
 | 16.3.3 | 2 | Security events | part | SEC-800, SEC-656 |
 | 16.3.4 | 2 | Errors | ok | SEC-844 |
 | 16.4.1 | 2 | Log injection | ok | SEC-840 |
-| 16.4.2 | 2 | Protected logs | part | SEC-811, SEC-814 |
+| 16.4.2 | 2 | Protected logs | part | SEC-811, SEC-814, SEC-833: signed checkpoints are copied to the application log |
 | 16.4.3 | 2 | A separate system | later | SEC-832 |
 | 16.5.1 to 16.5.4 | 2, 3 | Safe errors | ok | SEC-224, SEC-506, SEC-628, SEC-842 |
 

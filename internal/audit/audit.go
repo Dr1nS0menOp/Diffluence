@@ -246,6 +246,9 @@ func RecordStandalone(ctx context.Context, pool *pgxpool.Pool, e Event) error {
 func chainHash(prev, payload []byte) []byte {
 	h := sha256.New()
 	h.Write(prev)
+	// The payload is an audit event, never a password: no event holds one (SEC-823). A
+	// chain needs a fast hash, so this is the right tool, not a password hash.
+	// codeql[go/weak-sensitive-data-hashing]
 	h.Write(payload)
 	return h.Sum(nil)
 }

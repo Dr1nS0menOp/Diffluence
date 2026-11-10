@@ -22,31 +22,59 @@ func checkpointMessage(seq int64, hash []byte) []byte {
 	return append(out, hash...)
 }
 
-// SignCheckpoint signs the head of the chain (ADR-013). A hash chain alone can be
-// rewritten end to end by someone with database access; a signature cannot be
-// forged without the key, which is not in the database.
-func SignCheckpoint(ctx context.Context, pool *pgxpool.Pool, key ed25519.PrivateKey) error {
-	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-		var seq int64
-		var hash []byte
-		err := tx.QueryRow(ctx, "SELECT seq, hash FROM audit_events ORDER BY seq DESC LIMIT 1").Scan(&seq, &hash)
+// checkpointSignedAction is the event that records a new checkpoint.
+const checkpointSignedAction = "audit.checkpoint_signed"
+
+// Checkpoint is one signed head of the chain.
+type Checkpoint struct {
+	Seq       int64
+	Hash      []byte
+	Signature []byte
+	PublicKey ed25519.PublicKey
+}
+
+// SignCheckpoint signs the head of the chain (ADR-013, ADR-039). A hash chain alone can
+// be rewritten end to end by someone with database access; a signature cannot be forged
+// without the key, which is not in the database. It reports false when there was nothing
+// new to sign, so a quiet instance does not grow its log by a checkpoint every few minutes.
+func SignCheckpoint(ctx context.Context, pool *pgxpool.Pool, key ed25519.PrivateKey) (Checkpoint, bool, error) {
+	public, ok := key.Public().(ed25519.PublicKey)
+	if !ok {
+		return Checkpoint{}, false, errors.New("audit: unexpected key type")
+	}
+	var out Checkpoint
+	signed := false
+	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		var action string
+		err := tx.QueryRow(ctx, "SELECT seq, hash, action FROM audit_events ORDER BY seq DESC LIMIT 1").Scan(&out.Seq, &out.Hash, &action)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
 		if err != nil {
 			return err
 		}
-		sig := ed25519.Sign(key, checkpointMessage(seq, hash))
-		public, _ := key.Public().(ed25519.PublicKey)
+		// Only the record of the last checkpoint came after it: nothing happened since.
+		if action == checkpointSignedAction {
+			return nil
+		}
+		out.Signature = ed25519.Sign(key, checkpointMessage(out.Seq, out.Hash))
+		out.PublicKey = public
 		tag, err := tx.Exec(ctx, `INSERT INTO audit_checkpoints (seq, hash, signature, public_key) VALUES ($1, $2, $3, $4)
-			ON CONFLICT (seq) DO NOTHING`, seq, hash, sig, []byte(public))
+			ON CONFLICT (seq) DO NOTHING`, out.Seq, out.Hash, out.Signature, []byte(public))
 		if err != nil || tag.RowsAffected() == 0 {
 			return err
 		}
-		_, err = Record(ctx, tx, Event{ActorType: ActorSystem, ActorID: "worker", Action: "audit.checkpoint_signed",
-			ObjectType: "audit_log", Result: ResultSuccess, Details: map[string]any{"seq": seq}})
-		return err
+		if _, err = Record(ctx, tx, Event{ActorType: ActorSystem, ActorID: "worker", Action: checkpointSignedAction,
+			ObjectType: "audit_log", Result: ResultSuccess, Details: map[string]any{"seq": out.Seq}}); err != nil {
+			return err
+		}
+		signed = true
+		return nil
 	})
+	if err != nil || !signed {
+		return Checkpoint{}, false, err
+	}
+	return out, true, nil
 }
 
 // BadCheckpointError says which signed checkpoint does not hold.

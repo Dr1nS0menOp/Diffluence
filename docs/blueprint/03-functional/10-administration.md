@@ -63,7 +63,7 @@
 - **ADM-038** · built · Every user and admin action is recorded with who, what, when and from where.
 - **ADM-039** · built · The log is append-only and hash-chained, and the application's database role cannot change it.
 - **ADM-040** · built · An administrator filters the log and exports it as CSV.
-- **ADM-041** · built · A daily job verifies the chain and signs a checkpoint.
+- **ADM-041** · built · A daily job verifies the chain. A checkpoint is signed every five minutes when something happened, and also written to the application log, so a copy lives outside the database (ADR-039).
 - **ADM-042** · built · Page views are not in the audit log (decision of 2026-11-03).
 - **ADM-043** · built · The log filters by person, action, object, space, result and time, and the filters are part of the address.
 - **ADM-044** · built · A line opens to show all its details, and links to the object.

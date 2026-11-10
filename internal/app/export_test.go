@@ -4,8 +4,10 @@ package app
 
 import (
 	"context"
+	"crypto/ed25519"
 	"time"
 
+	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/mail"
 )
@@ -15,6 +17,17 @@ func (a *App) AddMigrationForTest(m db.Migration) { a.migrations = append(a.migr
 
 // SignCheckpointForTest runs the daily job.
 func (a *App) SignCheckpointForTest(ctx context.Context) error { return a.signCheckpoint(ctx) }
+
+// CheckWitnessForTest compares the chain with checkpoints taken from an application log,
+// as `diffluence audit verify --witness` does.
+func (a *App) CheckWitnessForTest(ctx context.Context, witness []audit.Checkpoint) (audit.WitnessResult, error) {
+	key, err := a.keyring.SigningKey()
+	if err != nil {
+		return audit.WitnessResult{}, err
+	}
+	public, _ := key.Public().(ed25519.PublicKey)
+	return audit.CompareWitness(ctx, a.pool, public, witness)
+}
 
 // VerifyAuditForTest runs the daily job.
 func (a *App) VerifyAuditForTest(ctx context.Context) error { return a.verifyAudit(ctx) }

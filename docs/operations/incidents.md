@@ -26,7 +26,8 @@ Replace a secret on a schedule as well, not only after an incident: at least onc
 
 ## 3. Find out what happened
 
-- **The audit log** shows who did what, and its chain shows whether it was changed: run `diffluence audit verify`.
+- **The audit log** shows who did what, and its chain shows whether it was changed: run `diffluence audit verify --witness` with the application log your log server kept, so a removed tail shows too ([install.md](install.md#a-copy-of-the-audit-log-outside-the-database)).
+- **Password login stopped for someone** after 100 wrong passwords in a row: the audit log has `auth.password_locked`, and the failed logins before it show from which addresses.
 - **Refused requests and failed logins** are audit events too. Filter on them for the time in question.
 - **The request log** of the server holds addresses and times, never tokens or passwords.
 

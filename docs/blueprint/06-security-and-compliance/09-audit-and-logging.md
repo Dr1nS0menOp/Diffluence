@@ -21,9 +21,9 @@ Two different things. The **audit log** is a record of who did what, kept in the
 - **SEC-810** · built · Each event holds a hash of the one before it, so changing, removing or reordering a row breaks the chain. A verification walks the whole chain, including the copied columns.
 - **SEC-811** · built · Triggers refuse update, delete and truncate, and the application role has no such rights, so even a bug in the app cannot change the log (ASVS 16.4.2).
 - **SEC-812** · built · A daily job checks the chain, and records the result.
-- **SEC-813** · partly · A daily job signs the head of the chain with Ed25519. A chain alone can be rewritten end to end by someone with the database, and only a signature stops that.
+- **SEC-813** · built · A job signs the head of the chain with Ed25519 every five minutes, when something happened since the last checkpoint (ADR-039). A chain alone can be rewritten end to end by someone with the database, and only a signature stops that. `TestTheHeadOfTheChainIsSignedEveryFiveMinutes`, `TestNothingNewMeansNoNewCheckpoint`.
 - **SEC-814** · built · **High.** Nothing checks those signatures. `VerifyCheckpoints` is only called from a test: not by the daily job, not by the admin route, not by `restore.sh` and not from the command line. The one defence against a full rewrite never runs. The daily job, the Verify button and the restore script must all call it, and a failure must reach a person (SEC-655). Belongs in the next commit that touches `internal/app`, with a mutation line.
-- **SEC-815** · partly · Whoever has both the database and `master.key` can forge checkpoints too. Only a copy outside the instance stops that (SEC-833). The guide should say what the log can and cannot prove.
+- **SEC-815** · partly · Whoever has both the database and `master.key` can forge checkpoints too. Only a copy outside the instance stops that (SEC-833). The guide should say what the log can and cannot prove. Since spec 046 the copy exists, and `install.md` says what it proves: lines a log server already holds cannot be changed. Still open: forged new checkpoints after a theft of both, which only a key outside the instance stops (SEC-715).
 - **SEC-816** · partly · One lock keeps the chain in order, so all audited writes take turns. That is fine at wiki scale, and phase 3 measures it.
 
 ## 9.3 What it should not hold
@@ -41,7 +41,7 @@ Two different things. The **audit log** is a record of who did what, kept in the
 - **SEC-830** · built · Audit retention is a setting. A prune runs with the owner's role, verifies the chain, leaves a signed anchor and removes older rows, so the app still cannot delete (spec 013, D11).
 - **SEC-831** · built · Retention needs a default. Without one the log grows forever and holds personal data forever, against the GDPR's storage limitation. Advice in chapter 10: 12 months for most events, longer only with a reason. Decision for the product owner. Built: `TestTheAuditLogStaysAYearByDefault`.
 - **SEC-832** · later · Sending events to a SIEM by syslog, CEF, GELF or Sentinel (ASVS 16.4.3 at Level 2). The product owner mentioned a SIEM in ADR-026. A SIEM is also the real answer to SEC-815, so this should move up to phase 3.
-- **SEC-833** · new · Medium. Sending the signed head of the chain to something outside the instance, even a daily mail or a file an operator collects, makes a full rewrite visible. It is small, and could come with SEC-832.
+- **SEC-833** · built · Medium. Sending the signed head of the chain to something outside the instance, even a daily mail or a file an operator collects, makes a full rewrite visible. It is small, and could come with SEC-832. Built (ADR-039, spec 046): every checkpoint goes to the application log at every level, and `diffluence audit verify --witness` compares, naming the first checkpoint the chain no longer matches. `TestTheWitnessLogShowsATailRemovedFromTheDatabase`, `TestAuditVerifyComparesTheChainWithTheWitnessLog`.
 - **SEC-834** · built · Audit retention is separate from content retention. Events hold ids as plain text, with no link to the page, so deleting a page never deletes its trail.
 
 ## 9.5 The application log
@@ -55,6 +55,7 @@ ASVS 16.1.1 asks for an inventory. This is it.
 | Panics | JSON on standard error | Stack trace | Request bodies | By the operator |
 | Jobs | JSON on standard error | Job id, kind, error | Document text | By the operator |
 | Audit verification | JSON and the audit log | First bad row | Personal data | Log: operator, audit: see above |
+| Audit checkpoints (the witness) | JSON on standard error, at every level | Position, hash, signature, public key | Personal data | As long as the audit log, outside the database owner's reach |
 
 - **SEC-840** · built · Logs are structured JSON, so a line break in a value cannot fake a line (ASVS 16.2.4, 16.4.1).
 - **SEC-841** · built · Query strings are left out, because they may hold tokens. See SEC-422 for tokens in paths.

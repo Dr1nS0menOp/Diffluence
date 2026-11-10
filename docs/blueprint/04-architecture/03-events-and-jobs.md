@@ -123,7 +123,8 @@ Who listens: **N** notifications, **A** automation rules, **W** webhooks, **S** 
 | `fail-stale-jobs` | 10 minutes | built |
 | `purge-identity` | 10 minutes | built |
 | `purge-outbox` | Hour | built |
-| `audit-verify`, `audit-checkpoint` | Day | built |
+| `audit-verify` | Day | built |
+| `audit-checkpoint`, with a copy in the application log (ADR-039) | 5 minutes, when something happened | built |
 | `contract-migrations` | Minute | built |
 | Example space on a new instance | Minute, until done | Being built |
 | Send mail queue, batch mail at once | Minute | wave C |

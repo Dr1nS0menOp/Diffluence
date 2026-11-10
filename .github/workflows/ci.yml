@@ -129,6 +129,17 @@ jobs:
   container:
     runs-on: ubuntu-latest
     needs: go
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: diffluence
+          POSTGRES_PASSWORD: diffluence
+          POSTGRES_DB: diffluence
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U diffluence"
+          --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v5
       - name: build image
@@ -140,6 +151,85 @@ jobs:
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
+      # ADR-038: a ZAP baseline against the real image, as a browser would reach it.
+      - name: start the image for ZAP
+        run: |
+          docker run -d --name diffluence --network host \
+            -e DIFFLUENCE_DATABASE_URL='postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable' \
+            -e DIFFLUENCE_PUBLIC_URL=http://localhost:8080 diffluence:ci
+          for _ in $(seq 1 60); do curl -sf http://localhost:8080/readyz >/dev/null && break; sleep 1; done
+          curl -sf http://localhost:8080/readyz
+      - name: ZAP baseline
+        uses: zaproxy/action-baseline@de8ad967d3548d44ef623df22cf95c3b0baf8b25 # v0.15.0
+        with:
+          target: http://localhost:8080
+          rules_file_name: .zap/rules.tsv
+          cmd_options: -a
+          fail_action: true
+          allow_issue_writing: false
+      - name: server log, when something failed
+        if: failure()
+        run: docker logs diffluence 2>&1 | tail -50
+
+  # ADR-038: Semgrep's rules for Go, TypeScript, React and secrets. A finding fails the
+  # build; an exception is a nosemgrep comment on the line, with the reason above it.
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
+    steps:
+      - uses: actions/checkout@v5
+      - name: scan
+        run: >-
+          semgrep scan --metrics=off --error
+          --config p/golang --config p/typescript --config p/react --config p/secrets
+          --exclude internal/webui/dist
+
+  # ADR-038: CodeQL with its extended security queries. A finding fails the build.
+  codeql:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: go
+            build-mode: autobuild
+            pack: go
+          - language: javascript-typescript
+            build-mode: none
+            pack: javascript
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        if: matrix.language == 'go'
+        with:
+          go-version-file: go.mod
+      - uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          # The suppression query turns a codeql[rule] comment above a line into a suppression.
+          queries: security-extended,codeql/${{ matrix.pack }}-queries:AlertSuppression.ql
+      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
+          output: codeql-results
+          # A pull request from a fork may not write to code scanning; the check below still runs.
+          upload: ${{ github.event.pull_request.head.repo.fork && 'never' || 'always' }}
+      # A result counts unless a `codeql[rule]` comment above its line, with the reason, suppresses it.
+      - name: no findings
+        run: |
+          open='.runs[].results[] | select((.suppressions // []) | length == 0)'
+          found=$(jq "[$open] | length" codeql-results/*.sarif | awk '{s+=$1} END {print s+0}')
+          if [ "$found" -gt 0 ]; then
+            jq -r "$open"' | "\(.ruleId): \(.locations[0].physicalLocation.artifactLocation.uri):\(.locations[0].physicalLocation.region.startLine) \(.message.text)"' codeql-results/*.sarif
+            echo "CodeQL found $found problem(s)"
+            exit 1
+          fi
 
   nightly:
     if: github.event_name == 'schedule'

@@ -2039,6 +2039,8 @@
     "enable": "Enable",
     "resetPassword": "Reset password",
     "resetMfa": "Reset authenticator",
+    "passwordLocked": "Password login stopped after 100 wrong passwords in a row. A passkey and single sign-on still work. A new password also lifts the stop.",
+    "liftPasswordLock": "Allow password login again",
     "newPassword": "New password",
     "globalPermissions": "Global permissions",
     "source": "Source",
