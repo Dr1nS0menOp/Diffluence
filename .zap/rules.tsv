@@ -1,5 +1,6 @@
 10049	IGNORE	(Non-Storable Content: an informational rule about caches; the server keeps private answers out of shared caches on purpose)
 10094	IGNORE	(Base64 Disclosure: a string inside the built JavaScript bundle; no secret ships to the browser, which the Semgrep secrets rules check)
+10109	IGNORE	(Modern Web Application: an informational note that the page is a JavaScript app the plain spider cannot walk; it reports no weakness)
 10096	IGNORE	(Timestamp Disclosure: number constants inside the built JavaScript bundle, not times from the server)
 90004	IGNORE	(Cross-Origin-Embedder-Policy: the app needs no cross-origin isolation, and require-corp would block the drawing and viewer frames)
 90005	IGNORE	(Sec-Fetch-Dest missing: this rule looks at headers of the scanner's own requests, which a server cannot set)
