@@ -1,5 +1,7 @@
 # 07: Operations and upgrades
 
+> **The study (2026-11-10).** Each part of this blueprint was studied against research and industry practice in [`07-operations/`](07-operations/): upgrades and schema change, backup and recovery, high availability, observability, release engineering, configuration, running it yourself, capacity and load testing, and a review of what wave O7 built. The study adds lines OPS-070 to OPS-114 below. The build order is in spec 048.
+
 ## Deployment targets
 
 | Target | What we ship |
@@ -126,3 +128,55 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 - **OPS-060** · built · Before 1.0, every build goes through the upgrade machinery: migrations at start, and the upgrade test in CI on every change.
 - **OPS-061** · later · From 1.0, monthly releases, security fixes as patch releases, only the latest line supported. The checklist is ready in `docs/operations/release.md` (spec 044).
 - **OPS-062** · built · Release notes in plain language with an "upgrade impact" line: every entry in `CHANGELOG.md` has one, and the release checklist asks for it.
+
+### From the study of 2026-11-10
+
+Each line is explained in the chapter named after it, in [`07-operations/`](07-operations/). All are **new**; spec 048 orders them into waves.
+
+| Line | Priority | What | Chapter |
+|---|---|---|---|
+| OPS-070 | High | Test every format that crosses versions: documents, bundles, events, jobs, settings, the editing service | 1 |
+| OPS-071 | High | The upgrade test also writes while the new version migrates | 1 |
+| OPS-072 | Medium | CI refuses migrations that rewrite or lock a table for long | 1 |
+| OPS-073 | Medium | Migrations outside a transaction, for concurrent indexes, checked afterwards | 1 |
+| OPS-074 | Medium | A `statement_timeout` on every migration | 1 |
+| OPS-075 | Medium | A written version-skew policy, proven by the upgrade test | 1 |
+| OPS-076 | Low | From 1.0, CI upgrades from the oldest release that may jump straight to this one | 1 |
+| OPS-077 | High | The age of the last backup as a metric, on the health page and as a warning | 2 |
+| OPS-078 | High | Restore time measured for 10 GB and 100 GB on real disks | 2 |
+| OPS-079 | Medium | A tested pgBackRest set-up with WAL archiving | 2 |
+| OPS-080 | Medium | A scheduled backup service in Compose, every 4 hours by default | 2 |
+| OPS-081 | Medium | A weekly restore of a real installation into a throw-away project | 2 |
+| OPS-082 | Low | The guide says a standby or RAID is not a backup, and what 3-2-1 asks | 2 |
+| OPS-083 | High | The queue's storage settings chosen on purpose, and events proven after a hard reset | 3 |
+| OPS-084 | High | The HA topology run on virtual machines, with failures and partitions under load | 3 |
+| OPS-085 | Medium | The reference Patroni set-up with the watchdog and 3 etcd members | 3 |
+| OPS-086 | Medium | The whole suite under PgBouncer in transaction mode | 3 |
+| OPS-087 | Low | A page on what HA protects and what it does not | 3 |
+| OPS-088 | Medium | Trace export with OpenTelemetry over OTLP, off by default | 4 |
+| OPS-089 | Medium | Prometheus rules: SLOs, burn-rate alerts and alerts for causes | 4 |
+| OPS-090 | Low | One dashboard as a file | 4 |
+| OPS-091 | Low | checkmk tried and written down | 4 |
+| OPS-092 | Low | Metric and log names listed as an interface | 4 |
+| OPS-093 | High | A release workflow with GoReleaser: archives, `.deb`, `.rpm`, image | 5 |
+| OPS-094 | High | SBOM, keyless signature and provenance for each release | 5 |
+| OPS-095 | Medium | CI checks that a build reproduces byte for byte | 5 |
+| OPS-096 | Medium | Base images pinned by digest | 5 |
+| OPS-097 | Low | Named toggles for dark features, each with a removal issue | 5 |
+| OPS-098 | Low | The support policy written down | 5 |
+| OPS-099 | Medium | A strict YAML configuration file | 6 |
+| OPS-100 | Medium | `diffluence config check` | 6 |
+| OPS-101 | Medium | Settings for later use checked at start, as warnings | 6 |
+| OPS-102 | Low | The list of settings reviewed and shortened | 6 |
+| OPS-103 | High | The health page shows disk, database growth, backup, migrations, work, mail, login and version | 7 |
+| OPS-104 | High | Low disk is visible and handled before it is full | 7 |
+| OPS-105 | Medium | Everything that grows has a limit or a cleaner, tested | 7 |
+| OPS-106 | Medium | A sign when the installation is behind, without phoning home | 7 |
+| OPS-107 | Medium | `diffluence doctor` | 7 |
+| OPS-108 | Low | Sizing examples for 50, 500 and 5,000 people | 7 |
+| OPS-109 | High | The load test series on server hardware, to four times the model and beyond | 8 |
+| OPS-110 | High | A soak of at least 24 hours | 8 |
+| OPS-111 | Medium | k6 scripts for each kind of test, open model only | 8 |
+| OPS-112 | Medium | A small load test in CI that catches slow queries | 8 |
+| OPS-113 | Medium | CPU of PostgreSQL per active person, turned into sizing | 8 |
+| OPS-114 | Low | A rolling upgrade under load on several VMs | 8 |

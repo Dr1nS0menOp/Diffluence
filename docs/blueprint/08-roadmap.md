@@ -1,5 +1,7 @@
 # 08: Roadmap
 
+> **The study (2026-11-10).** This roadmap was studied against research and the practice of comparable projects in [`08-roadmap/`](08-roadmap/): the road to 1.0, what enterprise teams need first, the risks of each phase after 1.0, and keeping the project going without a budget. It adds lines RMP-001 to RMP-033, listed at the end. The build order is in spec 048.
+
 > The order changed on 2026-11-05 (ADR-024): The product owner chose to build the whole of `03-functional-requirements.md` first, in waves, with one commit per wave. Phase 3 follows that work. The phases below still say what each theme contains.
 
 Every phase ends with an **exit check**: all its tests are green in CI, the product owner has done an acceptance session on the staging environment, and there are no open high or critical security findings. Durations are rough and depend on usage limits and review time.
@@ -115,3 +117,31 @@ Create offers four kinds of item, made the same way, each with its own job (ADR-
 
 ## Things decided now so later phases don't need a rewrite
 UUIDv7 IDs and `origin_instance_id` (phase 8), the outbox and event system (6, 7, automation), API-first with scopes (7), no hard-coded strings and RTL-ready CSS (translations), the structured document model (co-editing, macros), the `space_id` on everything (scaling and the work module).
+
+## Lines from the study of 2026-11-10
+
+Each line is explained in the chapter named after it, in [`08-roadmap/`](08-roadmap/). All are **new**; spec 048 places them in the build order.
+
+| Line | Priority | What | Chapter |
+|---|---|---|---|
+| RMP-001 | High | Beta criteria written before the beta | 1 |
+| RMP-002 | High | The 1.0 promises written as a page: what is frozen, how it may change, support, upgrades | 1 |
+| RMP-003 | Medium | The order before 1.0: safe to run, enterprise document features, server lines, beta | 1 |
+| RMP-004 | Medium | Every wave leaves the product maintainable if work pauses | 1 |
+| RMP-005 | Low | Each phase after 1.0 starts with a study and a list of what it will not do | 1 |
+| RMP-010 | High | Document control first of the three enterprise features | 2 |
+| RMP-011 | High | The minimum of document control, derived from ISO 9001, 21 CFR Part 11 and Annex 11 | 2 |
+| RMP-012 | Medium | Read and understood, with a record | 2 |
+| RMP-013 | Medium | Then draft and published spaces | 2 |
+| RMP-014 | Medium | Then guided templates | 2 |
+| RMP-015 | Medium | The guide says which controls the software gives and which stay the customer's | 2 |
+| RMP-020 | High | AI: no text reaches a model that the asker may not read; off by default | 3 |
+| RMP-021 | High | Platform: narrow OAuth scopes, apps on their own origin, a marketplace last | 3 |
+| RMP-022 | Medium | Linked instances start as one-way, revocable copies | 3 |
+| RMP-023 | Medium | The work module starts as integration with existing trackers | 3 |
+| RMP-024 | Medium | Mobile starts as a progressive web app | 3 |
+| RMP-025 | Low | Migration starts in one direction, with a dry run and a report | 3 |
+| RMP-030 | Medium | Donations only through a payout route that keeps the author anonymous | 4 |
+| RMP-031 | Medium | Grant proposals ready per theme, written from the specs | 4 |
+| RMP-032 | Medium | The project's own infrastructure costs nothing, and each service it depends on is listed | 4 |
+| RMP-033 | Low | Good first issues from the Low lines of the blueprints | 4 |
