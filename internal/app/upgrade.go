@@ -46,12 +46,44 @@ func (a *App) prepareSchema(ctx context.Context) error {
 	})
 }
 
+// extensionState is whether a migration can create a PostgreSQL extension it needs.
+type extensionState int
+
+const (
+	extensionReady extensionState = iota
+	extensionMissing
+	extensionNotAllowed
+)
+
+// trigramStateSQL reads whether pg_trgm (migration 0043) can be had. Since PostgreSQL 13 it
+// is trusted: whoever may create objects in the database may create it.
+const trigramStateSQL = `SELECT
+	EXISTS (SELECT 1 FROM pg_available_extensions WHERE name = 'pg_trgm'),
+	EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_trgm')
+		OR has_database_privilege(current_database(), 'CREATE')
+		OR (SELECT rolsuper FROM pg_roles WHERE rolname = current_user)`
+
 // upgradeFacts is what the checks before a migration look at.
 type upgradeFacts struct {
 	freeBytes    uint64
 	freeKnown    bool // false where the system cannot tell
 	queueHealthy bool
 	lastBackup   time.Time // zero = no backup noted
+	trigrams     extensionState
+}
+
+func trigramState(ctx context.Context, q db.Querier) (extensionState, error) {
+	var available, allowed bool
+	if err := q.QueryRow(ctx, trigramStateSQL).Scan(&available, &allowed); err != nil {
+		return extensionReady, fmt.Errorf("app: read whether pg_trgm can be created: %w", err)
+	}
+	switch {
+	case !available:
+		return extensionMissing, nil
+	case !allowed:
+		return extensionNotAllowed, nil
+	}
+	return extensionReady, nil
 }
 
 // upgradeProblems lists the reasons an upgrade may not start. None = it may.
@@ -63,6 +95,12 @@ func upgradeProblems(f upgradeFacts, now time.Time, backupMaxAge time.Duration) 
 	}
 	if !f.queueHealthy {
 		problems = append(problems, "the queue (NATS) does not answer")
+	}
+	switch f.trigrams {
+	case extensionMissing:
+		problems = append(problems, "the PostgreSQL extension pg_trgm is not available: install the PostgreSQL contrib modules, or ask the provider of a managed database to allow pg_trgm")
+	case extensionNotAllowed:
+		problems = append(problems, "the role that migrates may not create the extension pg_trgm: give it CREATE on the database, or create the extension once as a superuser")
 	}
 	if backupMaxAge == 0 {
 		return problems
@@ -91,6 +129,9 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 	facts := upgradeFacts{queueHealthy: a.queue.Healthy()}
 	if facts.freeBytes, facts.freeKnown, err = freeSpace(a.cfg.DataDir); err != nil {
 		return fmt.Errorf("app: read the free space of the data folder: %w", err)
+	}
+	if facts.trigrams, err = trigramState(ctx, owner); err != nil {
+		return err
 	}
 	// A new install has nothing to back up, and no audit log yet.
 	isNewInstall := st.Newest == 0

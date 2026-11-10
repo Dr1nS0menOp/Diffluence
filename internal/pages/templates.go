@@ -10,6 +10,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -136,6 +137,12 @@ func (s *Service) StartFromTemplate(ctx context.Context, c identity.Caller, in T
 		return nil
 	})
 	return out, skipped, err
+}
+
+// RequireRoomForFiles refuses at once when the files of a page would not fit in a space,
+// so saving a page as a template stops before it makes the template.
+func (s *Service) RequireRoomForFiles(ctx context.Context, from, spaceID uuid.UUID) error {
+	return attachments.RefuseCopyThatDoesNotFit(ctx, s.pool, from, spaceID)
 }
 
 // CopyFilesToTemplate copies a page's files to its template, and points the

@@ -243,7 +243,7 @@ const (
 	// and the right plan for a word in every page is the wrong one for a word in ten. A
 	// search is short and many run at once, so workers only take CPU from everyone else.
 	wordSettings = statementTime + `; SET LOCAL plan_cache_mode = force_custom_plan;
-		SET LOCAL max_parallel_workers_per_gather = 0`
+		SET LOCAL max_parallel_workers_per_gather = 0; SET LOCAL pg_trgm.word_similarity_threshold = ` + NearThreshold
 	// pickSettings: the planner does not count what it costs to unpack the words of a row.
 	// For a word in a fifth of the pages it reads them all, 175 ms against 13 ms through the
 	// index. Only for picking: on the small tables before it, a scan is the right plan.

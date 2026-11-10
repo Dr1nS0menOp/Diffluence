@@ -480,6 +480,9 @@ func (s *Service) FromPage(ctx context.Context, c identity.Caller, pageID uuid.U
 	if strings.TrimSpace(in.Name) == "" {
 		in.Name = detail.Title
 	}
+	if err := s.pages.RequireRoomForFiles(ctx, pageID, detail.SpaceID); err != nil {
+		return Template{}, err
+	}
 	t, err := s.Create(ctx, c, &detail.SpaceID, in)
 	if err != nil {
 		return t, err

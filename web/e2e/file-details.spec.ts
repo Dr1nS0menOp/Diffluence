@@ -100,6 +100,10 @@ test('a tile can be large, and that stays after publishing', async ({ page }) =>
   const file = await addFile(page, id, 'plan.txt', 'words');
   await showFiles(page, id, [{ id: file.id, name: 'plan.txt' }]);
   await page.goto(`/pages/${id}/edit`);
+  // The first click gives the editor focus, which puts the cursor back a moment later; the
+  // click after that selects the tile.
+  await page.locator(`[data-file-tile="${file.id}"]`).click();
+  await editorSettled(page);
   await page.locator(`[data-file-tile="${file.id}"]`).click();
   await page.getByLabel('File tile').selectOption('large');
   await page.getByRole('button', { name: 'Publish', exact: true }).click();

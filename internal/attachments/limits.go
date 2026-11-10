@@ -14,8 +14,10 @@ import (
 
 // spaceBytesSQL is what a space stores. A limit counts the same number as the total on
 // the Files screen, so a refusal never disagrees with what people see (spec 024, D10).
-const spaceBytesSQL = `(SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
-	JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = $1 AND a.status = 'active')`
+// Files in the trash still take room until they are purged, and a version made current
+// again shares its stored object, so each object counts once (spec 047, D19).
+const spaceBytesSQL = `(SELECT COALESCE(sum(stored.size), 0)::bigint FROM (SELECT DISTINCT v.object_key, v.size
+	FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = $1) stored)`
 
 const mebibyte = 1 << 20
 
@@ -44,6 +46,69 @@ func requireRoom(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID, size int64) 
 		return errSpaceFull()
 	}
 	return nil
+}
+
+// copiedBytesSQL is what copying the files of a page stores anew: the current version of
+// each file that is not in the trash, as CopyAll copies them.
+const copiedBytesSQL = `SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
+	JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
+	WHERE a.page_id = $1 AND a.status = 'active'`
+
+// movedBytesSQL is what moving pages brings into another space: every stored object of
+// their files, in the trash too, that the target does not hold yet.
+const movedBytesSQL = `SELECT COALESCE(sum(stored.size), 0)::bigint FROM (SELECT DISTINCT v.object_key, v.size
+	FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id
+	WHERE a.page_id = ANY($1) AND a.space_id <> $2) stored`
+
+// requireRoomForCopy refuses a copy of a page's files into a space that has no room for
+// them. Every way that copies files goes through CopyAll, which asks this before it
+// stores anything (spec 047, D20).
+func requireRoomForCopy(ctx context.Context, tx pgx.Tx, from, spaceID uuid.UUID) error {
+	var size int64
+	if err := tx.QueryRow(ctx, copiedBytesSQL, from).Scan(&size); err != nil {
+		return err
+	}
+	return requireRoom(ctx, tx, spaceID, size)
+}
+
+// FitsCopy says, without locking, whether the files of a page would fit in a space, so
+// a dialog can warn before the copy. The copy itself checks again (spec 047, D24).
+func FitsCopy(ctx context.Context, q db.Querier, from, spaceID uuid.UUID) (bool, error) {
+	var size int64
+	if err := q.QueryRow(ctx, copiedBytesSQL, from).Scan(&size); err != nil {
+		return false, err
+	}
+	return fits(ctx, q, spaceID, size)
+}
+
+// RefuseCopyThatDoesNotFit gives the refusal of a full space early, before work that a
+// later refusal inside CopyAll would leave half done.
+func RefuseCopyThatDoesNotFit(ctx context.Context, q db.Querier, from, spaceID uuid.UUID) error {
+	ok, err := FitsCopy(ctx, q, from, spaceID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errSpaceFull()
+	}
+	return nil
+}
+
+// FitsMove says, without locking, whether the files of moved pages would fit in a space.
+func FitsMove(ctx context.Context, q db.Querier, pageIDs []uuid.UUID, spaceID uuid.UUID) (bool, error) {
+	var size int64
+	if err := q.QueryRow(ctx, movedBytesSQL, pageIDs, spaceID).Scan(&size); err != nil {
+		return false, err
+	}
+	return fits(ctx, q, spaceID, size)
+}
+
+func fits(ctx context.Context, q db.Querier, spaceID uuid.UUID, size int64) (bool, error) {
+	left, limited, err := room(ctx, q, spaceID)
+	if err != nil {
+		return false, err
+	}
+	return !limited || size <= left, nil
 }
 
 // allowance is the most one upload may store, and what to say when it goes over.

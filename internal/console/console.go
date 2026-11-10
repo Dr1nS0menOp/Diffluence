@@ -244,8 +244,9 @@ type SpaceTotal struct {
 func (s *Service) SpaceTotals(ctx context.Context) ([]SpaceTotal, error) {
 	rows, err := s.pool.Query(ctx, `SELECT sp.id,
 			(SELECT count(*) FROM pages p WHERE p.space_id = sp.id AND p.status = 'published'),
-			(SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
-				JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = sp.id),
+			-- The same count as the storage limit: each stored object once (spec 047, D19).
+			(SELECT COALESCE(sum(stored.size), 0)::bigint FROM (SELECT DISTINCT v.object_key, v.size FROM attachments a
+				JOIN attachment_versions v ON v.attachment_id = a.id WHERE a.space_id = sp.id) stored),
 			(SELECT max(p.updated_at) FROM pages p WHERE p.space_id = sp.id),
 			sp.storage_limit_mib
 		FROM spaces sp WHERE sp.status <> 'trashed'`)

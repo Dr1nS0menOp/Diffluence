@@ -565,6 +565,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
           together={together}
           onReady={editorReady}
           onFocusTitle={() => titleField.current?.focus()}
+          onComment={page.status === 'published' && !isDatabase ? startComment : undefined}
           onShare={() => setSharing(true)}
           onPublish={() => void publish(false)}
           onSave={() => {

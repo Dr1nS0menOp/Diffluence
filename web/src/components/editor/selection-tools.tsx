@@ -134,7 +134,7 @@ function EditDrawingTool({ editor, actions }: { editor: Editor; actions: EditorA
   );
 }
 
-function ImageTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
+export function ImageTools({ editor, actions }: { editor: Editor; actions: EditorActions }) {
   const { t } = useTranslation();
   const attrs = useEditorState({
     editor,

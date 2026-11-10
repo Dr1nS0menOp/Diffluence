@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -214,6 +215,8 @@ type MoveImpact struct {
 	RestrictionsGained []string `json:"restrictions_gained"`
 	NeedsManage        bool     `json:"needs_manage"`
 	OtherSpace         bool     `json:"other_space"`
+	// Fits is false when the target space has no room for the files of the branch.
+	Fits bool `json:"fits"`
 }
 
 func titlesOf(ctx context.Context, q db.Querier, ids []uuid.UUID) ([]string, error) {
@@ -262,8 +265,12 @@ func (s *Service) MoveImpact(ctx context.Context, c identity.Caller, id uuid.UUI
 		return out, err
 	}
 	out.Pages = len(tree)
+	out.Fits = true
 	if out.OtherSpace {
 		if out.Hidden, err = s.branchHasHiddenPages(ctx, s.pool, c.UserID, tree); err != nil {
+			return out, err
+		}
+		if out.Fits, err = attachments.FitsMove(ctx, s.pool, tree, *spaceID); err != nil {
 			return out, err
 		}
 	}
@@ -291,6 +298,8 @@ func (s *Service) MoveImpact(ctx context.Context, c identity.Caller, id uuid.UUI
 type CopyImpact struct {
 	RestrictionsLost []string `json:"restrictions_lost"`
 	NeedsManage      bool     `json:"needs_manage"`
+	// Fits is false when the target space has no room for the files of the page.
+	Fits bool `json:"fits"`
 }
 
 // CopyImpact says which restrictions from above a copy would not take along.
@@ -303,15 +312,20 @@ func (s *Service) CopyImpact(ctx context.Context, c identity.Caller, id uuid.UUI
 	if err != nil {
 		return out, err
 	}
+	target := p.SpaceID
 	if spaceID != nil && *spaceID != p.SpaceID {
 		if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, *spaceID, permissions.SpaceView); err != nil {
 			return out, err
 		}
+		target = *spaceID
 	}
 	if parent != nil {
 		if err := s.perms.RequirePage(ctx, s.pool, c.UserID, *parent, permissions.ActionPageView, uuid.Nil); err != nil {
 			return out, err
 		}
+	}
+	if out.Fits, err = attachments.FitsCopy(ctx, s.pool, id, target); err != nil {
+		return out, err
 	}
 	lost, _, err := inheritedChange(ctx, s.pool, p, parent)
 	if err != nil {

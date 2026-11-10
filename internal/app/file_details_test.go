@@ -379,10 +379,14 @@ func TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen(t *testing.T) {
 		"label=layoffs":         nil,
 		"uploader=" + editor.id: {"picture.png"},
 		"q=note&kind=image":     nil,
-		// A name is found as in the search box: whole words and word starts, not inside a word.
+		// A name is found as in the search box: whole words and word starts, and since spec
+		// 047 also the typed text inside a word and a small typo.
+		"q=no":     {"notes.txt"},
 		"q=rep":    {"report.docx"},
 		"q=report": {"report.docx"},
-		"q=port":   nil,
+		"q=port":   {"report.docx"},
+		"q=reprt":  {"report.docx"},
+		"q=xyz":    nil,
 		"q=notes":  {"notes.txt"},
 		"q=secret": nil,
 	} {

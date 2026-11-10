@@ -5,6 +5,7 @@ package search
 import (
 	"context"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -27,6 +28,8 @@ type tier struct {
 	// byWords is the tier for the index of words: what is left to check once the index has
 	// given its rows. Empty for a tier that the index of words does not serve.
 	byWords string
+	// order replaces newest first, for a tier that sorts by something else first.
+	order string
 }
 
 const (
@@ -46,7 +49,53 @@ var (
 	// mentionTier stands apart: an OR with the words would keep the index of words from
 	// being used, for every search that matches a name.
 	mentionTier = tier{match: `w.page_id = ANY(@mentioned) AND NOT d.tsv @@ ` + matchesWords, readsText: true}
+	// containsTier is a title that holds the typed text inside a word, such as "port" in
+	// "Quarterly report", through the index of trigrams (spec 047, D13).
+	containsTier = tier{match: `lower(w.title) LIKE @like AND NOT w.words @@ ` + matchesWords + notAsTyped}
+	// nearTier is a title near the typed words: a letter dropped, doubled, swapped or wrong.
+	// The closest come first, and within the same closeness the newest.
+	nearTier = tier{match: `lower(w.title) %> lower(@text) AND lower(w.title) NOT LIKE @like AND NOT w.words @@ ` + matchesWords + notAsTyped,
+		order: ` ORDER BY word_similarity(lower(@text), lower(w.title)) DESC, w.updated_at DESC, w.page_id DESC LIMIT @need`}
 )
+
+// Typed text of fewer letters has too few trigrams to mean anything, and longer text is
+// no name (spec 047, D15). A typo needs more: below five letters, a word that only starts
+// with the same two letters already counts as near ("week" and "Welcome").
+const (
+	minNearRunes = 3
+	minTypoRunes = 5
+	maxNearRunes = 64
+)
+
+// NearThreshold is how close a title must be to count as a typo of the typed words. It was
+// settled on the pairs and decoys in testdata/typos.txt (spec 047, D16): at 0.4, 42 of 45
+// typos are found and no decoy comes above 0.25; at 0.5 only 37 were found.
+const NearThreshold = "0.4"
+
+// wantsNear says whether the near tiers run: plain typing of a sensible length. The search
+// syntax keeps its exact meaning (D18).
+func wantsNear(parsed Parsed, text string) bool {
+	return parsed.Plain && NearLength(text)
+}
+
+// NearLength says whether typed text has a length worth looking for inside names.
+func NearLength(text string) bool {
+	n := utf8.RuneCountInString(strings.TrimSpace(text))
+	return n >= minNearRunes && n <= maxNearRunes
+}
+
+// TypoLength says whether typed text is long enough to look for names it is a typo of.
+func TypoLength(text string) bool {
+	n := utf8.RuneCountInString(strings.TrimSpace(text))
+	return n >= minTypoRunes && n <= maxNearRunes
+}
+
+// LikeOf is the typed text as a LIKE pattern that holds it anywhere. % and _ are taken
+// as letters.
+func LikeOf(text string) string {
+	escaped := strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(strings.ToLower(strings.TrimSpace(text)))
+	return "%" + escaped + "%"
+}
 
 // rowScope is what can be told from search_pages alone, so a walk through the newest
 // pages counts only pages this search can show.
@@ -127,7 +176,11 @@ const wordHits = `(SELECT x.page_id FROM search_documents x WHERE x.tsv @@ ` + m
 // titles reads a title tier in one step. A title is small, so even a walk past many of them
 // costs little, and the index of titles settles the rest. The planner may choose here.
 func (s sqlOf) titles(t tier) string {
-	return `SELECT w.page_id FROM search_pages w` + s.joins(t) + ` WHERE ` + rowScope + ` AND ` + s.tail(t) + newest
+	order := newest
+	if t.order != "" {
+		order = t.order
+	}
+	return `SELECT w.page_id FROM search_pages w` + s.joins(t) + ` WHERE ` + rowScope + ` AND ` + s.tail(t) + order
 }
 
 func (s sqlOf) every(t tier) string {
@@ -269,6 +322,7 @@ func wordArgs(userID uuid.UUID, q Query, parsed Parsed) pgx.NamedArgs {
 		"contributors": nilIfEmpty(q.Contributors), "stage": q.Stage, "below": optID(q.Below),
 		"spacekeys": nilIfEmpty(parsed.Spaces), "authors": nilIfEmpty(allowedAuthors(q, parsed)),
 		"patterns": nilIfEmpty(parsed.Patterns), "mentionlimit": mentionLimit, "snippets": !q.Quick,
+		"like": LikeOf(q.Text),
 	}
 }
 
@@ -323,8 +377,27 @@ func (p *picking) pick(ctx context.Context, q Query, parsed Parsed) error {
 	if err := p.addAll(ctx, p.sql.titles, title); err != nil {
 		return err
 	}
+	near := wantsNear(parsed, q.Text)
+	if near {
+		if err := p.addAll(ctx, p.sql.titles, containsTier); err != nil {
+			return err
+		}
+	}
+	// In the box a typo in a title is what is looked for; in a full search a real word in
+	// the text is the surer find (spec 047, D13).
+	typos := near && TypoLength(q.Text)
+	if typos && q.Quick {
+		if err := p.addAll(ctx, p.sql.titles, nearTier); err != nil {
+			return err
+		}
+	}
 	if err := p.add(ctx, textTier); err != nil {
 		return err
+	}
+	if typos && !q.Quick {
+		if err := p.addAll(ctx, p.sql.titles, nearTier); err != nil {
+			return err
+		}
 	}
 	return p.addMentioned(ctx)
 }

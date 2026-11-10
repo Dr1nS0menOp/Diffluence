@@ -173,6 +173,7 @@ function ImpactNote({ impact }: { impact: MoveImpact }) {
         <p>{t('move.gained', { titles: impact.restrictions_gained.join(', ') })}</p>
       )}
       {impact.needs_manage && <p>{t('move.needsManage')}</p>}
+      {!impact.fits && <p>{t('move.noRoom')}</p>}
     </div>
   );
 }
@@ -229,7 +230,11 @@ export function MoveDialog({
         <ParentField targets={targets} value={parent} onChange={setParent} />
         {impact.data && <ImpactNote impact={impact.data} />}
         <div className="dialog-actions">
-          <button type="submit" className="primary" disabled={impact.data?.hidden ?? false}>
+          <button
+            type="submit"
+            className="primary"
+            disabled={(impact.data?.hidden ?? false) || impact.data?.fits === false}
+          >
             {t('page.move')}
           </button>
         </div>
@@ -378,6 +383,11 @@ export function CopyDialog({ page, onClose }: { page: PageSummary; onClose: () =
           <p>{t('copy.lost', { titles: lost.join(', ') })}</p>
           {refused && <p>{t('move.needsManage')}</p>}
         </div>
+      )}
+      {impact.data?.fits === false && (
+        <p role="status" className="note">
+          {t('copy.noRoom')}
+        </p>
       )}
       <label className="check">
         <input type="checkbox" checked={children} onChange={(e) => setChildren(e.target.checked)} />

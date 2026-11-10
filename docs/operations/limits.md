@@ -56,6 +56,20 @@ Since spec 029 each word also asks for its common forms, such as `plans` for `pl
 | Two words, the newest ten | 0.3 ms | 0.6 ms |
 
 The forms cost the index little. A full run with the setup of spec 028 is still open.
+
+### Part of a word and small typos (spec 047)
+
+Titles and file names are also matched by trigrams (`pg_trgm`), after the words and only when the words leave room: a name that holds the typed text from three letters, a typo from five. Measured on 10 November 2026 in PostgreSQL 16 alone, in the development container, on 50,000 titles and 52,000 file names made of 30 common words, with the two GIN indexes of migration 0043. The application and the load model of spec 028 were not part of it.
+
+| Query | Result |
+|---|---|
+| Size of the indexes | 2.9 MB for titles, 2.4 MB for file names |
+| A title that holds the typed text ("udget"), 5,000 matches | 4 ms, through the index |
+| A typo of a word in a tenth of all titles ("handbok"), 5,000 near matches sorted by closeness | 48 ms, through the index |
+| A typo that matches nothing | 0.08 ms |
+| A file name that holds the text or is near it ("forcast") | 47 ms, through the index |
+
+A typo of a very common word is the costly case, because every near title is ranked. It runs inside the search share of one connection in four and the 3 second statement time. The target of spec 047, the quick box at p95 under 50 ms at the model on 2.5 CPUs, is still to be measured with the full setup and on the stress server.
 ## An order of work under too much load (spec 031)
 
 Measured on 8 November 2026, 50,000 pages, the same caps: the app 2 CPUs and 1.5 GB, PostgreSQL 1.5 CPUs and 2 GB, the load tool 0.5 CPU and 512 MB, a pool of 20. "Before" is main before spec 031, "after" is with it, on the same data, one after the other. Another build ran on the machine at the same time, the same for both. Each row is one run of 40 seconds, so take differences of a few percent as noise.

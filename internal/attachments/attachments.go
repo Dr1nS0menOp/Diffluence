@@ -87,8 +87,16 @@ func (s *Service) IsImageOf(ctx context.Context, q db.Querier, id, pageID uuid.U
 }
 
 // MoveToSpace keeps the files of moved pages in step with their pages, inside the
-// transaction of the move.
+// transaction of the move. The target must have room for everything they store
+// (spec 047, D21).
 func (s *Service) MoveToSpace(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID, spaceID uuid.UUID) error {
+	var size int64
+	if err := tx.QueryRow(ctx, movedBytesSQL, pageIDs, spaceID).Scan(&size); err != nil {
+		return err
+	}
+	if err := requireRoom(ctx, tx, spaceID, size); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx, "UPDATE attachments SET space_id = $2 WHERE page_id = ANY($1)", pageIDs, spaceID)
 	return err
 }
@@ -117,6 +125,44 @@ const fileWords = `to_tsvector('simple', translate(a.filename, '-_.()[]', '     
 // everywhere: whole words, and the start of the last word typed (ADR-037).
 const fileNameWords = `to_tsvector('simple', translate(a.filename, '-_.()[]', '       ')) @@ to_tsquery('simple', $3)`
 
+// holdsName and nearName are how a name is found past its words, the same in the quick box
+// and on the Files screen (spec 047, D14): a name that holds the typed text, and from five
+// letters on also a name near the typed words. like and text are placeholders for
+// search.LikeOf and the typed text.
+func holdsName(like string) string {
+	return `(lower(a.filename) LIKE ` + like + `)`
+}
+
+func nearName(like, text string) string {
+	return `(lower(a.filename) LIKE ` + like + ` OR lower(a.filename) %> lower(` + text + `))`
+}
+
+// pastWords is the condition for typed text: holdsName, or nearName when it is long enough
+// to be a typo.
+func pastWords(text, like, typed string) string {
+	if search.TypoLength(text) {
+		return nearName(like, typed)
+	}
+	return holdsName(like)
+}
+
+// nearNameOrder puts the names that hold the text before those that are only near it, the
+// closest first, then the newest.
+func nearNameOrder(like, text string) string {
+	return `lower(a.filename) LIKE ` + like + ` DESC, word_similarity(lower(` + text + `), lower(a.filename)) DESC, a.updated_at DESC, a.id`
+}
+
+// withNearThreshold runs a statement that uses %> with the threshold of search, which is
+// a setting of the transaction.
+func (s *Service) withNearThreshold(ctx context.Context, fn func(pgx.Tx) error) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SET LOCAL pg_trgm.word_similarity_threshold = "+search.NearThreshold); err != nil {
+			return err
+		}
+		return fn(tx)
+	})
+}
+
 const fileRows = `SELECT a.id, a.filename, a.page_id, p.title, sp.name, a.updated_at
 	FROM attachments a
 	JOIN pages p ON p.id = a.page_id
@@ -132,6 +178,29 @@ func (s *Service) Find(ctx context.Context, c identity.Caller, text string, spac
 	if spaceID != uuid.Nil {
 		within = &spaceID
 	}
+	found, err := s.findByWords(ctx, c, text, within, limit)
+	if err != nil || len(found) >= limit || !search.NearLength(text) {
+		return found, err
+	}
+	seen := make([]uuid.UUID, len(found))
+	for i, f := range found {
+		seen[i] = f.ID
+	}
+	err = s.withNearThreshold(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, fileRows+`a.id <> ALL($6) AND `+pastWords(text, "$2", "$5")+` ORDER BY `+nearNameOrder("$2", "$5")+` LIMIT $4`,
+			c.UserID, search.LikeOf(text), within, limit-len(found), strings.TrimSpace(text), seen)
+		if err != nil {
+			return err
+		}
+		more, err := collectFound(rows)
+		found = append(found, more...)
+		return err
+	})
+	return found, err
+}
+
+// findByWords finds files by the words of their name, or a label.
+func (s *Service) findByWords(ctx context.Context, c identity.Caller, text string, within *uuid.UUID, limit int) ([]Found, error) {
 	words := search.Prefixes(text)
 	rows, err := s.pool.Query(ctx, `SELECT a.id FROM attachments a WHERE a.status = 'active' AND `+fileWords+`
 		UNION SELECT l.attachment_id FROM attachment_labels l WHERE l.label = lower($1) LIMIT $3`, text, words, fileMatches+1)
@@ -579,6 +648,9 @@ func QueueDeletionForPages(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID) 
 // CopyAll gives a new page its own attachment rows pointing at new copies of
 // the current files. It returns the mapping from old to new ids.
 func (s *Service) CopyAll(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to, spaceID uuid.UUID) (map[uuid.UUID]uuid.UUID, error) {
+	if err := requireRoomForCopy(ctx, tx, from, spaceID); err != nil {
+		return nil, err
+	}
 	rows, err := tx.Query(ctx, `SELECT a.id, a.filename, v.object_key, v.content_type FROM attachments a
 		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
 		WHERE a.page_id = $1 AND a.status = 'active'`, from)

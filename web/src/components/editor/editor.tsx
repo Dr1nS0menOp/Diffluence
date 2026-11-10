@@ -72,6 +72,7 @@ import { tableAround } from './table';
 import { TableFrame, useTableTracking } from './table-frame';
 import { TableRules } from './table-rules';
 import { TableSizeDialog } from './table-size';
+import { FloatingBars } from './floating-bars';
 import { Toolbar } from './toolbar';
 import { TypingHelp } from './typing';
 import { pickWordFile } from './word';
@@ -386,6 +387,7 @@ export function DocumentEditor({
   together,
   onReady,
   onFocusTitle,
+  onComment,
   language,
 }: {
   pageId: string;
@@ -407,6 +409,8 @@ export function DocumentEditor({
   onReady?: (editor: Editor) => void;
   /** Backspace at the very start of the text goes here. */
   onFocusTitle?: () => void;
+  /** Starts a comment on the selected text, where comments are open. */
+  onComment?: () => void;
   /** What the text is written in, which the spell checker follows. */
   language?: string;
 }) {
@@ -719,6 +723,7 @@ export function DocumentEditor({
         onInsert={() => setInserting(true)}
         onFiles={(files) => void addFiles(files)}
       />
+      <FloatingBars editor={editor} actions={actions.current} onComment={onComment} />
       {finding && <FindBar editor={editor} onClose={() => setFinding(false)} />}
       <div
         ref={sheet}

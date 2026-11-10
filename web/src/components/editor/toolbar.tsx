@@ -1,14 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The row of tools: one Tab stop, with arrow keys inside it (ARIA toolbar pattern).
-import {
-  useLayoutEffect,
-  useRef,
-  useState,
-  type FocusEvent,
-  type KeyboardEvent,
-  type ReactNode,
-  type RefObject,
-} from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useEditorState, type Editor } from '@tiptap/react';
 import {
@@ -49,65 +41,12 @@ import { toggleList } from './block-commands';
 import type { EditorActions } from './keys';
 import { indentBlock, setAlignment, setDirection, setTextStyle } from './marks';
 import { MARK_COLORS, TEXT_COLORS } from './palette';
+import { useRovingFocus } from './roving-focus';
 import { SelectionTools } from './selection-tools';
 import { Tool, ToolSeparator, TOOL_ICON_SIZE } from './tool';
 import { useToolFolding } from './tool-fold';
 
 const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
-// Everything that can take focus in the row, except what sits in an open menu.
-const CONTROLS = 'button:not(:disabled), select, input:not([hidden])';
-
-function controlsIn(root: HTMLElement | null): HTMLElement[] {
-  const all = Array.from(root?.querySelectorAll<HTMLElement>(CONTROLS) ?? []);
-  return all.filter((control) => !control.closest('[role=menu]'));
-}
-
-/** One Tab stop for the whole row. Tools come and go with the selection, so it runs every time. */
-function useRovingFocus(root: RefObject<HTMLDivElement | null>, onLeave: () => void) {
-  const current = useRef<HTMLElement | null>(null);
-
-  useLayoutEffect(() => {
-    const controls = controlsIn(root.current);
-    const active = current.current && controls.includes(current.current) ? current.current : controls[0];
-    controls.forEach((control) => (control.tabIndex = control === active ? 0 : -1));
-    current.current = active ?? null;
-  });
-
-  const moveTo = (control: HTMLElement | undefined) => {
-    if (!control) return;
-    controlsIn(root.current).forEach((other) => (other.tabIndex = other === control ? 0 : -1));
-    current.current = control;
-    control.focus();
-  };
-
-  return {
-    onFocus: (e: FocusEvent<HTMLDivElement>) => {
-      if (e.target.closest('[role=menu]')) return;
-      current.current = e.target;
-    },
-    onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
-      const target = e.target as HTMLElement;
-      if (target.closest('[role=menu]')) return;
-      if (e.key === 'Escape') {
-        onLeave();
-        return;
-      }
-      // A text field needs these keys itself, which is why those fields come last.
-      if (target instanceof HTMLInputElement && target.type !== 'checkbox') return;
-      const controls = controlsIn(root.current);
-      const at = controls.indexOf(target);
-      const steps: Record<string, HTMLElement | undefined> = {
-        ArrowRight: controls[(at + 1) % controls.length],
-        ArrowLeft: controls[(at - 1 + controls.length) % controls.length],
-        Home: controls[0],
-        End: controls[controls.length - 1],
-      };
-      if (!(e.key in steps)) return;
-      e.preventDefault();
-      moveTo(steps[e.key]);
-    },
-  };
-}
 
 function TextStyle({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
@@ -197,7 +136,7 @@ function MoreFormatting({ editor, actions }: { editor: Editor; actions: EditorAc
   );
 }
 
-function TextColorMenu({ editor }: { editor: Editor }) {
+export function TextColorMenu({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
   const current = useEditorState({
     editor,
@@ -235,7 +174,7 @@ function TextColorMenu({ editor }: { editor: Editor }) {
   );
 }
 
-function HighlightMenu({ editor }: { editor: Editor }) {
+export function HighlightMenu({ editor }: { editor: Editor }) {
   const { t } = useTranslation();
   const current = useEditorState({
     editor,

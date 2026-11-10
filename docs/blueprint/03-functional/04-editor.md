@@ -9,7 +9,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-003** · built · The title is a large plain input with no border. The body follows at most 50rem wide.
 - **EDT-004** · built · An active tool is solid accent, so its state is clear without reading.
 - **EDT-005** · built · Table tools appear only inside a table.
-- **EDT-006** · new · The tools can be pinned to the top or hidden. When hidden, a small floating bar appears over selected text. The choice is kept per person.
+- **EDT-006** · partly · The tools can be pinned to the top or hidden. When hidden, a small floating bar appears over selected text. The choice is kept per person. Built: a floating bar over selected text beside the row, which stays pinned (spec 047). Open: hiding the row, which the product owner put off on 2026-11-10.
 - **EDT-007** · built · Tools that do not fit fold into a **More** menu at the end of the row, in a fixed order. Nothing is ever cut off.
 - **EDT-008** · built · A person sets **Normal** or **Full width** for the page from the strip. The sheet shows the width readers will get.
 - **EDT-009** · built · The title field gets the focus on a new page, and Enter moves to the body. In the body, the first Backspace at the very start moves back to the title.
@@ -150,7 +150,7 @@ The editor is where people spend their time. The look is settled (Rail, ADR-021)
 - **EDT-077** · built · **Link:** an image can link to a page or an address.
 - **EDT-078** · built · **Inline image:** a small image can sit in a line of text, such as an icon.
 - **EDT-079** · built · **Paste from a web page:** the image is downloaded by the browser where possible and stored as an attachment, or a clear note says it could not be taken along.
-- **EDT-080** · partly · Selecting an image shows a small bar with these options, and Delete. Deleting it from the page does not delete the attachment. Built: the options, in the row of tools. New: a bar at the image.
+- **EDT-080** · built · Selecting an image shows a small bar with these options, and Delete. Deleting it from the page does not delete the attachment. Built: the options, in the row of tools and in a bar at the image, with Delete (spec 047).
 - **EDT-081** · built · If the attachment no longer exists, the block shows a clear placeholder, not a broken picture.
 - **EDT-082** · later · Basic cropping and rotating in the browser, stored as a new version of the attachment.
 - **EDT-083** · built · **Video and audio** files that the browser can play show a player. They are served only from our own origin.

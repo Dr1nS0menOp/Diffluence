@@ -396,6 +396,8 @@ export interface ArchivedPage {
 export interface CopyImpact {
   restrictions_lost: string[];
   needs_manage: boolean;
+  /** False when the target space has no room for the files of the page. */
+  fits: boolean;
 }
 
 export interface MoveImpact {
@@ -405,6 +407,8 @@ export interface MoveImpact {
   restrictions_gained: string[];
   needs_manage: boolean;
   other_space: boolean;
+  /** False when the target space has no room for the files of the branch. */
+  fits: boolean;
 }
 
 export interface TreeNode {

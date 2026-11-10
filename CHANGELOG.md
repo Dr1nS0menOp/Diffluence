@@ -8,6 +8,12 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - After 100 wrong passwords in a row, password login for that account stops until the person chooses a new password or an administrator allows it again. The person gets a mail. Passkeys and single sign-on keep working, and the right password ends a run of wrong ones
 - CI also runs Semgrep, CodeQL and a ZAP baseline against the real image
 - Upgrade impact: migration 0042 adds two columns to `local_credentials`, expand only. Send the application log somewhere the database owner cannot change, and keep it as long as the audit log
+### Added: floating bars, search that forgives a typo, and the storage limit everywhere (spec 047)
+- Selected words get a small bar above them with bold, italic, link, code, colour, highlight, headings 1 to 3, lists and Comment. A selected image gets one with its tools and Delete. The row of tools stays as it is. Alt+F10 reaches the bar and Escape leaves it
+- New dependency: `@tiptap/extension-bubble-menu` 3.32.2 (MIT), which was already installed with TipTap, and the Floating UI packages it uses (MIT)
+- Search and the Files screen also find part of a word, such as "port" in "report", and from five letters a small typo, such as "handbok". Whole words and word starts still come first
+- The storage limit of a space now counts files in the trash until they are purged, page and branch copies, pages made from a template, saving a page as a template, and moving pages to another space. A file made current again counts once. The copy and move dialogs say beforehand when the files will not fit
+- Upgrade impact: **migration 0043 creates the PostgreSQL extension `pg_trgm`** and two indexes. A node refuses to migrate where `pg_trgm` is not available, and says why. Because files in the trash now count, a space may be over its limit after the update: nothing is deleted and everything keeps working, but adding files is refused until the trash is emptied or the limit raised. Check the Files screens of limited spaces before you update
 ### Added: checks before an upgrade, and a safe way back (spec 044)
 - Before it migrates, a node checks that PostgreSQL is 16 or newer, that its data folder has 512 MiB free and that the queue answers. If not, it does not start, says every reason, and changes nothing
 - Set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, such as `26h`, and an upgrade also refuses without a recent backup. `scripts/backup.sh` notes each backup it completes; without the setting, a missing backup only gives a warning

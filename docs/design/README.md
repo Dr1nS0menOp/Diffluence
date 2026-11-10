@@ -161,7 +161,7 @@ Use these. Reuse beats a new variant.
 
 - Top strip: Close on the left with the save status beside it; on the right the summary, Discard draft and Publish.
 - Below it one row of tools: text style, marks, More formatting, colour, highlight; alignment and indent; lists and blocks; link, image or file, table, Insert, Find; undo and redo. It is one Tab stop: arrow keys move inside it, Escape returns to the text.
-- The tools for what is selected appear at the end of the same row: image, panel, section, columns, status mark, date, code block, table. There are no floating bars. Text fields come last, because they need the arrow keys themselves.
+- The tools for what is selected appear at the end of the same row: image, panel, section, columns, status mark, date, code block, table. Text fields come last, because they need the arrow keys themselves. Selected words and a selected image also get a small floating bar with the tools most used on them (ADR-038, spec 047): never a tool the row lacks, above the selection or below it on a touch screen, never over the row, Alt+F10 to reach it and Escape to leave.
 - `/` opens a list at the cursor, and Insert opens the same list in a dialog.
 - A block has a grip and a menu in the margin, outside the text. Everything the grip does is also in the menu and on the keyboard.
 - A file can be dropped anywhere below the strip. The sheet shows a dashed outline while it is above the editor.
@@ -208,7 +208,7 @@ Every chart stands beside a sentence with its total and trend, and has one serie
 `web/src/design/together.css` holds comments, reactions, mentions, the bell and the feed.
 
 - A comment on words is a soft tint with an underline, so it does not rest on colour alone. It is a `button`, and its name says who wrote what.
-- A selection in a page shows one small floating row. This is the only floating bar, because a reader has no row of tools.
+- A selection in a page shows one small floating row, because a reader has no row of tools. The floating bars of the editor share its look.
 - A person mentioned is a soft box with `@`. An overdue task date is red and says "overdue" in words.
 - The bell carries a number capped at 99+. A hidden `role="status"` line only changes when the number goes up.
 - Six common reactions come from `components/comments/common-reactions.json`. They are content, not icons.

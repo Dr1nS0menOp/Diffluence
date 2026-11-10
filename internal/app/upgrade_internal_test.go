@@ -25,6 +25,8 @@ func TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse(t *testing.T) {
 		{"no backup while none is asked for", func(f *upgradeFacts) { f.lastBackup = time.Time{} }, 0, ""},
 		{"free space this system cannot tell", func(f *upgradeFacts) { f.freeBytes, f.freeKnown = 0, false }, 0, ""},
 		{"exactly enough room", func(*upgradeFacts) {}, time.Hour, ""},
+		{"no pg_trgm on the server", func(f *upgradeFacts) { f.trigrams = extensionMissing }, 0, "pg_trgm is not available"},
+		{"pg_trgm that may not be created", func(f *upgradeFacts) { f.trigrams = extensionNotAllowed }, 0, "may not create the extension pg_trgm"},
 	} {
 		facts := healthy
 		tc.change(&facts)

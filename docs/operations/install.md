@@ -2,6 +2,8 @@
 
 Written for: operators who know Docker or Linux. Tested with PostgreSQL 16.
 
+**PostgreSQL needs the `pg_trgm` extension** (spec 047), which ships with PostgreSQL in its contrib modules and in the official `postgres` images. The role that migrates creates it, which needs the right to create objects in the database. A managed database must allow `pg_trgm`. Without it, a node refuses to migrate, says why, and changes nothing.
+
 ## Docker Compose (the reference installation)
 
 Needs Docker with the Compose plugin.

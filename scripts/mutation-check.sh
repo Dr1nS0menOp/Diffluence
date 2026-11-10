@@ -1256,6 +1256,51 @@ mutate_web "a Word file shows as text" src/components/file-preview.tsx \
   's.replace("const TEXT_FILE = /^(?:text\\/[^;]+|[^/;]+\\/(?:[^;]*\\+)?(?:json|xml|yaml|x-yaml))(?:\\s*;.*)?$/;", "const TEXT_FILE = /^text\\/|json|xml|yaml/;")' src/components/file-preview.test.ts
 mutate "the console does not show the stop" internal/identity/users.go \
   's.replace("WHERE c.user_id = u.id AND c.password_locked_at IS NOT NULL),", "WHERE c.user_id = u.id AND c.password_locked_at IS NULL AND false),")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
+# Spec 047: the storage limit everywhere, near matches for names, and the floating bars.
+mutate "a file in the trash takes no room" internal/attachments/limits.go \
+  's.replace("WHERE a.space_id = $1) stored)`", "WHERE a.space_id = $1 AND a.status = \x27active\x27) stored)`")' $app -run TestAFileInTheTrashStillTakesRoomUntilItIsPurged
+mutate "a version made current again counts twice" internal/attachments/limits.go \
+  's.replace("`(SELECT COALESCE(sum(stored.size), 0)::bigint FROM (SELECT DISTINCT", "`(SELECT COALESCE(sum(stored.size), 0)::bigint FROM (SELECT ALL")' $app -run TestAVersionMadeCurrentAgainCountsItsStoredFileOnce
+mutate "a copy stores files without room" internal/attachments/attachments.go \
+  's.replace("\tif err := requireRoomForCopy(ctx, tx, from, spaceID); err != nil {\n\t\treturn nil, err\n\t}\n", "")' $app -run 'TestEveryWayThatCopiesFilesIntoAFullSpaceIsRefusedWhole|TestALargeCopyReportsThePagesWhoseFilesNoLongerFit'
+mutate "a branch moves into a full space" internal/attachments/attachments.go \
+  's.replace("\tif err := requireRoom(ctx, tx, spaceID, size); err != nil {\n\t\treturn err\n\t}\n\t_, err := tx.Exec", "\t_ = size\n\t_, err := tx.Exec")' $app -run TestABranchMovesIntoAFullSpaceOnlyWithRoomForItsFiles
+mutate "saving as a template makes the template before the refusal" internal/templates/templates.go \
+  's.replace("s.pages.RequireRoomForFiles(ctx, pageID, detail.SpaceID)", "error(nil)")' $app -run TestEveryWayThatCopiesFilesIntoAFullSpaceIsRefusedWhole
+mutate "the Files screen ignores a name long enough for near matches" internal/attachments/versions.go \
+  's.replace("` AND (` + fileNameWords + ` OR ` + pastWords(f.Name, \"$9\", \"$10\") + `)` + filters", "filters")' $app -run TestTheFilesScreenFiltersAndOffersOnlyWhatMayBeSeen
+mutate "a dialog is told the files fit when they do not" internal/attachments/limits.go \
+  's.replace("return !limited || size <= left, nil", "return !limited || size <= left || true, nil")' $app -run 'TestTheCopyDialogIsWarnedWhenTheFilesDoNotFit|TestABranchMovesIntoAFullSpaceOnlyWithRoomForItsFiles'
+mutate "an upgrade starts without pg_trgm" internal/app/upgrade.go \
+  's.replace("\tcase extensionMissing:\n", "\tcase -1:\n")' ./internal/app/ -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate "a typed underscore matches any letter" internal/search/words.go \
+  's.replace(", `_`, `\\_`)", ")")' ./internal/search/ -run TestTypedSignsBecomeLettersInALikePattern
+mutate "two letters look for near titles" internal/search/words.go \
+  's.replace("return n >= minNearRunes && n <= maxNearRunes", "return n >= 0 && n <= maxNearRunes")' $app -run TestTheNearestTitleComesFirstAndShortTypingFindsNoNearMatch
+mutate "four letters look for typos" internal/search/words.go \
+  's.replace("minTypoRunes = 5", "minTypoRunes = 3")' $app -run TestTheNearestTitleComesFirstAndShortTypingFindsNoNearMatch
+mutate "near titles are sorted by date alone" internal/search/words.go \
+  's.replace("ORDER BY word_similarity(lower(@text), lower(w.title)) DESC, w.updated_at DESC", "ORDER BY w.updated_at DESC")' $app -run TestTheNearestTitleComesFirstAndShortTypingFindsNoNearMatch
+mutate "a title that holds the typed text is not found" internal/search/words.go \
+  's.replace("if err := p.addAll(ctx, p.sql.titles, containsTier); err != nil {", "if err := error(nil); err != nil {")' $app -run TestTitlesThatHoldTheTypedTextOrANearWordComeAfterTheWords
+mutate "a typo in a title stands before a word in the text" internal/search/words.go \
+  's.replace("if typos && q.Quick {", "if typos {")' $app -run TestTitlesThatHoldTheTypedTextOrANearWordComeAfterTheWords
+mutate "the typo threshold lets other words through" internal/search/words.go \
+  's.replace("const NearThreshold = \"0.4\"", "const NearThreshold = \"0.1\"")' $app -run TestTheThresholdFindsTheTyposAndLeavesTheDecoys
+mutate "the Files screen orders names by date alone" internal/attachments/versions.go \
+  's.replace("ORDER BY ` + fileNameWords + ` DESC, ` + nearNameOrder", "ORDER BY a.updated_at DESC, ` + nearNameOrder")' $app -run TestAFileNameIsFoundTheSameWayInTheBoxAndOnTheFilesScreen
+mutate "the box finds no near file names" internal/attachments/attachments.go \
+  's.replace("len(found) >= limit || !search.NearLength(text)", "len(found) >= 0")' $app -run TestAFileNameIsFoundTheSameWayInTheBoxAndOnTheFilesScreen
+mutate_web "a floating bar shows in a code block" src/components/editor/floating-bars.tsx \
+  's.replace("if (facts.empty || facts.inCode) return null;", "if (facts.empty) return null;")' src/components/editor/floating-bars.test.ts
+mutate_web "a floating bar shows without a selection" src/components/editor/floating-bars.tsx \
+  's.replace("if (facts.empty || facts.inCode) return null;", "if (facts.inCode) return null;")' src/components/editor/floating-bars.test.ts
+mutate_web "a touch screen gets the bar over its own menu" src/components/editor/floating-bars.tsx \
+  's.replace("placement: coarse ? (\x27bottom\x27 as const) : (\x27top\x27 as const),", "placement: \x27top\x27 as const,")' src/components/editor/floating-bars.test.ts
+mutate_web "the bar may cover the sticky row" src/components/editor/floating-bars.tsx \
+  's.replace("options.flip.padding.top = keepOut + EDGE;", "")' src/components/editor/floating-bars.test.ts
+mutate_web "the arrow keys ignore a right-to-left page" src/components/editor/roving-focus.ts \
+  's.replace("return rightToLeft ? previous : next;", "return next;")' src/components/editor/floating-bars.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

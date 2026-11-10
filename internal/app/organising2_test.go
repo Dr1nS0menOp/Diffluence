@@ -646,8 +646,13 @@ func TestSearchFiltersNeverRevealHiddenPages(t *testing.T) {
 		t.Fatalf("breadcrumbs: %v", crumbs)
 	}
 
-	suggested := viewer.ok("GET", "/api/v1/search?q=holliday", nil)["suggestion"]
-	if suggested != "holiday" {
+	// A small typo in a title finds the page itself (spec 047); the suggestion is for typing
+	// that finds nothing, such as two letters swapped at the start of a short word.
+	if got := titles(viewer, "q=holliday"); !has(got, "Quarterly holiday plan") {
+		t.Fatalf("a typo in a title: %v", got)
+	}
+	suggested := viewer.ok("GET", "/api/v1/search?q=pnal", nil)["suggestion"]
+	if suggested != "plan" {
 		t.Fatalf("suggestion: %v", suggested)
 	}
 	if got := viewer.ok("GET", "/api/v1/search?q=secretwrod", nil)["suggestion"]; got != "" {

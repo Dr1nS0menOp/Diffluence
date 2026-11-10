@@ -161,6 +161,32 @@
   box-shadow: var(--shadow-menu);
 }
 
+/* The bars over selected text and images in the editor share the look of .selection-bar
+   (spec 047, D9). BubbleMenu sets their place; we set the rest. */
+.floating-bar {
+  z-index: var(--layer-menu);
+}
+
+.floating-tools {
+  display: flex;
+  flex-wrap: wrap;
+  /* BubbleMenu gives the bar the width of its content; this makes a narrow screen wrap it. */
+  max-inline-size: calc(100vw - 16px);
+  gap: var(--space-1);
+  padding: var(--space-1);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-menu);
+}
+
+.tool-level {
+  font-size: var(--text-caption);
+  font-weight: var(--weight-strong);
+  line-height: var(--leading-title);
+  align-self: flex-end;
+}
+
 .lightbox-comment {
   align-self: center;
   margin-block-start: var(--space-2);

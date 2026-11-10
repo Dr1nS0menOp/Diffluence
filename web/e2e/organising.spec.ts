@@ -259,6 +259,28 @@ test('copying with new titles', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Plan 2027', level: 1 })).toBeVisible();
 });
 
+test('the copy dialog says before the copy when the files will not fit (spec 047)', async ({ page }) => {
+  const space = await newSpace(page, 'Full copies');
+  const id = await publishedPage(page, space.id, 'Heavy page', 'x', space.home_page_id);
+  const upload = await page.request.post(`/api/v1/pages/${id}/attachments?filename=big.txt`, {
+    headers: { 'content-type': 'application/octet-stream' },
+    data: Buffer.alloc(1 << 20, 'x'),
+  });
+  expect(upload.ok(), await upload.text()).toBeTruthy();
+  const limit = await page.request.put(`/api/v1/admin/spaces/${space.id}/storage-limit`, {
+    data: { limit_mib: 1 },
+  });
+  expect(limit.ok(), await limit.text()).toBeTruthy();
+  await page.goto(`/pages/${id}`);
+  await moreActions(page, 'Copy');
+  const dialog = page.getByRole('dialog', { name: 'Copy' });
+  await expect(
+    dialog.getByText('That space has no room for the files of this page.', { exact: false }),
+  ).toBeVisible();
+  await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
+  await expect(dialog.getByText('This space has reached its storage limit.')).toBeVisible();
+});
+
 test('several rows move together, with the keyboard', async ({ page }) => {
   const space = await newSpace(page, 'Selecting');
   const target = await newSpace(page, 'Selected target');

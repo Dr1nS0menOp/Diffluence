@@ -17,6 +17,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
@@ -370,17 +371,33 @@ func (s *Service) SpaceFiles(ctx context.Context, c identity.Caller, spaceID uui
 	if f.Uploader != uuid.Nil {
 		uploader = &f.Uploader
 	}
-	rows, err := s.pool.Query(ctx, `SELECT `+spaceFileColumns+visibleFilesSQL+`
-		AND ($3 = '' OR `+fileNameWords+`)
-		AND ($4 = '' OR `+fileKindSQL+` = $4)
+	filters := `
+		AND ($4 = '' OR ` + fileKindSQL + ` = $4)
 		AND ($5 = '' OR EXISTS (SELECT 1 FROM attachment_labels l WHERE l.attachment_id = a.id AND l.label = lower($5)))
-		AND ($6::uuid IS NULL OR a.created_by = $6)
-		ORDER BY a.updated_at DESC, a.id LIMIT $7 OFFSET $8`,
-		c.UserID, spaceID, search.Prefixes(f.Name), f.Kind, f.Label, uploader, filesPageSize, max(f.Offset, 0))
-	if err != nil {
-		return nil, err
+		AND ($6::uuid IS NULL OR a.created_by = $6)`
+	args := []any{c.UserID, spaceID, search.Prefixes(f.Name), f.Kind, f.Label, uploader, filesPageSize, max(f.Offset, 0)}
+	var out []SpaceFile
+	read := func(q db.Querier, sql string, args []any) error {
+		rows, err := q.Query(ctx, sql, args...)
+		if err != nil {
+			return err
+		}
+		out, err = pgx.CollectRows(rows, scanSpaceFile)
+		return err
 	}
-	out, err := pgx.CollectRows(rows, scanSpaceFile)
+	var err error
+	if search.NearLength(f.Name) {
+		// The words of a name first, then the names that hold the text or are near it, as
+		// in the quick box (spec 047, D14).
+		sql := `SELECT ` + spaceFileColumns + visibleFilesSQL + ` AND (` + fileNameWords + ` OR ` + pastWords(f.Name, "$9", "$10") + `)` + filters + `
+			ORDER BY ` + fileNameWords + ` DESC, ` + nearNameOrder("$9", "$10") + ` LIMIT $7 OFFSET $8`
+		err = s.withNearThreshold(ctx, func(tx pgx.Tx) error {
+			return read(tx, sql, append(args, search.LikeOf(f.Name), strings.TrimSpace(f.Name)))
+		})
+	} else {
+		err = read(s.pool, `SELECT `+spaceFileColumns+visibleFilesSQL+` AND ($3 = '' OR `+fileNameWords+`)`+filters+`
+			ORDER BY a.updated_at DESC, a.id LIMIT $7 OFFSET $8`, args)
+	}
 	if out == nil {
 		out = []SpaceFile{}
 	}

@@ -14,9 +14,11 @@ import (
 // that adds queries fails here, unless the budget is raised on purpose, in the same change,
 // with the reason in its spec (ARC-238). A screen that costs less should get a lower budget.
 var queryBudgets = map[string]int64{
-	"open a page":      25,
-	"the tree":         14,
-	"search":           17,
+	"open a page": 25,
+	"the tree":    14,
+	// Two more since spec 047: titles that hold the typed text, and titles near it, each
+	// asked only when the earlier tiers leave room on the page.
+	"search":           19,
 	"the bell":         3,
 	"a page's summary": 13,
 	"the space":        11,
