@@ -1161,6 +1161,31 @@ mutate_web "a shared node the schema does not know stays" src/components/editor/
   's.replace("parent.delete(i, 1);", "")' src/components/editor/shared-clean.test.ts
 mutate_web "changes from another client are not cleaned" src/components/editor/shared-clean.ts \
   's.replace("doc.on(\x27afterTransaction\x27, onTransaction);", "")' src/components/editor/shared-clean.test.ts
+
+# Wave O7 (spec 044): the checks before an upgrade, and a refusal to run on a database
+# a newer release contracted.
+mutate "an older release runs after a contract migration" internal/db/compat.go \
+  's.replace("WHERE phase = $1 AND version > $2", "WHERE phase = $1 AND version > $2 AND false")' ./internal/db/ -run TestOlderNodeRefusesADatabaseAfterAContractMigration
+mutate "migrate skips the check for a newer contract" internal/db/migrate.go \
+  's.replace("if err := CheckCompatible(ctx, conn, migs); err != nil {", "if err := error(nil); err != nil {")' ./internal/db/ -run TestOlderNodeRefusesADatabaseAfterAContractMigration
+mutate "a node that does not migrate skips the check" internal/app/upgrade.go \
+  's.replace("return db.CheckCompatible(ctx, a.pool, a.migrations)", "return nil")' $app -run TestANodeRefusesADatabaseANewerReleaseContracted
+mutate "an old PostgreSQL is accepted" internal/db/compat.go \
+  's.replace("if number < minPostgresVersion {", "if number < 0 {")' ./internal/db/ -run TestPostgresBelowTheMinimumIsRefused
+mutate "a full data folder does not stop an upgrade" internal/app/upgrade.go \
+  's.replace("f.freeBytes < minFreeForUpgrade", "f.freeBytes < 0")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate "a queue that does not answer does not stop an upgrade" internal/app/upgrade.go \
+  's.replace("if !f.queueHealthy {", "if false {")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate "an old backup does not stop an upgrade" internal/app/upgrade.go \
+  's.replace("case now.Sub(f.lastBackup) > backupMaxAge:", "case false:")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate "the checks are skipped before migrating" internal/app/upgrade.go \
+  's.replace("if err := a.checkBeforeUpgrade(ctx, owner); err != nil {", "if err := error(nil); err != nil {")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
+mutate "the backup the operator asked for is never read" internal/app/upgrade.go \
+  's.replace("} else if facts.lastBackup, err = lastBackup(ctx, owner); err != nil {", "} else if false {")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
+mutate "an upgrade leaves no marker" internal/app/upgrade.go \
+  's.replace("return a.markUpgrade(ctx, owner, st, facts.lastBackup)", "return nil")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
+mutate "a restart counts as an upgrade" internal/app/upgrade.go \
+  's.replace("if st.PendingExpand == 0 {", "if st.PendingExpand < 0 {")' $app -run TestARestartIsNoUpgrade
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

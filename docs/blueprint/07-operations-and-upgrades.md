@@ -21,7 +21,7 @@ Configuration is one YAML file and/or environment variables. Secrets come from f
 - PostgreSQL with Patroni (3 nodes), PgBouncer and HAProxy. Reads can go to replicas.
 - S3-compatible storage with versioning
 
-**Rough sizing, worked out:** 5,000 users × 10% active at the same time = 500 active users. Each makes about 1 request every 10 seconds: 500 ÷ 10 = **50 requests per second**. One API node handles well over 1,000 per second, so **3 nodes** is for redundancy, not capacity. The k6 load test in CI checks this.
+**Rough sizing, worked out:** 5,000 users Ã— 10% active at the same time = 500 active users. Each makes about 1 request every 10 seconds: 500 Ã· 10 = **50 requests per second**. One API node handles well over 1,000 per second, so **3 nodes** is for redundancy, not capacity. The k6 load test in CI checks this.
 
 ## Monitoring
 
@@ -41,7 +41,7 @@ Configuration is one YAML file and/or environment variables. Secrets come from f
 - **PostgreSQL** practice: `CREATE INDEX CONCURRENTLY`, a short `lock_timeout` on every migration, and no full table rewrites during working hours.
 
 **Our rules**
-1. **Expand → migrate → contract.** A release only *adds* (new columns, tables, indexes). Data is moved by **background jobs via NATS**, with progress shown in the admin console. Removal of old structures happens in a **later** release.
+1. **Expand â†’ migrate â†’ contract.** A release only *adds* (new columns, tables, indexes). Data is moved by **background jobs via NATS**, with progress shown in the admin console. Removal of old structures happens in a **later** release.
 2. **Version N and N+1 must run together.** Every release works with both the old and new schema, so rolling restarts are safe. CI tests this: the old version keeps serving traffic while the new one migrates.
 3. **No manual steps, ever.** If an upgrade needs a human, it is a bug.
 4. **Preflight checks** before migrating: disk space, Postgres version, NATS health, backup recency. If one fails, the upgrade refuses to start and says why.
@@ -62,3 +62,67 @@ Configuration is one YAML file and/or environment variables. Secrets come from f
 - Before 1.0: no support, breaking changes allowed, but the upgrade machinery is already used for every build
 - From 1.0: monthly releases (`1.x.0`), with security fixes as patch releases (`1.x.y`). Only the latest release line is supported.
 - Release notes in plain language, with an "upgrade impact" line (expected none)
+
+## Lines
+
+Spec 044 checked every promise above against the code, the guides in `docs/operations/` and the tests, on 9 November 2026. Each line has the form `OPS-012 · status · text`. A number never changes and is never reused. The statuses mean what they mean in blueprint 06: **built**, **partly** (the line says what is missing), **phase N**, **new** (in no plan yet) and **later** (left for later on purpose). Open lines carry **High**, **Medium** or **Low**. A line marked *servers* can only be proven on real servers, more than one machine or a real cluster.
+
+### Deployment targets
+
+- **OPS-001** · built · Docker Compose is the reference installation: one `compose.yaml` and one `.env`. The restore drill installs it from scratch every night (`scripts/restore-drill.sh`).
+- **OPS-002** · partly · A Helm chart in `deploy/helm/diffluence`. Never installed on a real cluster. Phase 3, *servers*. Medium.
+- **OPS-003** · later · A Kubernetes operator, only if there is demand.
+- **OPS-004** · partly · LXC on Proxmox: `deploy/install-lxc.sh` and `deploy/systemd/diffluence.service`. No `.deb` and no Ansible role, and never run on a real host. *Servers*. Medium.
+- **OPS-005** · new · `.deb` and `.rpm` packages built by GoReleaser. A new build tool, so a decision of the product owner. Low.
+- **OPS-006** · partly · Configuration from environment variables. One YAML file is not built: Go has no YAML reader of its own, so it needs a dependency, a decision of the product owner. Low.
+- **OPS-007** · built · Secrets come from files: every variable has a `_FILE` variant, and setting both is refused (`TestFileVariant`, `TestBothVariantsIsAnError`). No command takes a secret as an argument: `user create-admin` reads the password from standard input.
+
+### Topologies
+
+- **OPS-010** · built · Small: one node with `role=all`, embedded NATS, local PostgreSQL and local disk. This is what Compose runs.
+- **OPS-011** · partly · Roles `api` and `worker` exist, need one shared key (`DIFFLUENCE_MASTER_KEY_FILE`), and report themselves in the node list. Two machines behind a load balancer were never run. Phase 3, *servers*. Medium.
+- **OPS-012** · phase 3 · A NATS JetStream cluster of 3 nodes. `DIFFLUENCE_NATS_URL` accepts one; never tested. *Servers*. Medium.
+- **OPS-013** · phase 3 · PostgreSQL with Patroni, PgBouncer and HAProxy, reads to replicas. The queries that may read a copy that lags are counted already (ARC-228). *Servers*. Medium.
+- **OPS-014** · phase 3 · S3-compatible storage with versioning. Storage has one interface and a disk store; no S3 store yet. Medium.
+- **OPS-015** · partly · The sizing of 50 requests a second. A k6 script exists (`scripts/load/reading.js`, runs in `docs/operations/limits.md`), but it is run by hand, not in CI, and not with 5,000 users. Phase 3, *servers* (ARC-240). Medium.
+
+### Monitoring
+
+- **OPS-020** · built · `/livez` says the process is alive.
+- **OPS-021** · built · `/readyz` checks the database, the queue for roles that run jobs (an API node keeps serving without it, ARC-216), storage, and that no expand migration of this node is pending. It also says `busy` and `draining`.
+- **OPS-022** · built · Prometheus metrics at `/metrics`: requests, latency, the database pool, what waits in the outbox, jobs and mail, failed jobs, and the progress of migrations: `diffluence_schema_migration`, `diffluence_migrations_pending_expand`, `diffluence_migrations_pending_contract` (spec 044, `TestMetricsCountRequestsAndShowWhatWaits`).
+- **OPS-023** · partly · checkmk reads them through its Prometheus integration. The format is the standard text format, but nobody tried it with checkmk. Low.
+- **OPS-024** · new · OpenTelemetry traces. Requests carry a `trace_id` from `traceparent` into the log, but nothing exports traces: that needs a dependency, a decision of the product owner. Low.
+- **OPS-025** · built · Structured JSON logs through `slog` on standard error, ready for Graylog or Loki.
+
+### Upgrades
+
+- **OPS-030** · built · One command for Compose: `docker compose pull && docker compose up -d`, or with `--build` from a checkout (`docs/operations/upgrade.md`).
+- **OPS-031** · partly · `helm upgrade`: the chart exists, never run on a cluster. Phase 3, *servers*. Medium.
+- **OPS-032** · new · `apt upgrade`: needs the package of OPS-005. Low.
+- **OPS-033** · partly · No downtime while people work. Proven for two nodes on one database by the upgrade test in CI (OPS-036). A single Compose node restarts, which takes seconds: `upgrade.md` says so. Zero downtime on real machines behind a real load balancer: *servers*. Medium.
+- **OPS-034** · built · Expand, migrate, contract. A release only adds. Contract migrations wait until every live node knows them and the newest node has run for 10 minutes, then run by themselves and are audited as `system.contract_migrated` (`TestContract…`). Every migration runs with a `lock_timeout` of 5 seconds and retries.
+- **OPS-035** · later · Big data changes moved by background jobs, with progress in the admin console. No migration has needed one yet; build it with the first that does. Medium.
+- **OPS-036** · built · Version N and N+1 run together, and CI tests this: the job `upgrade` builds the target branch or the previous commit of main and the change itself, and `scripts/upgrade-test.sh` keeps the old one serving reads and logins while the new one migrates the same database. Any failed request fails the job (spec 044).
+- **OPS-037** · built · No manual steps: a node migrates when it starts, and contract migrations run by themselves.
+- **OPS-038** · built · Checks before migrating: PostgreSQL 16 or newer, 512 MiB free in the data folder, the queue answers, and the age of the last noted backup when `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` is set. A failed check stops the node before anything is migrated, and names every reason (`TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse`, `TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating`, `TestPostgresBelowTheMinimumIsRefused`). Whether the backup check is on by default is a decision of the product owner.
+- **OPS-039** · partly · Features can be switched off per space and for the whole instance (spec 011), which covers features people see. There is no switch for code that ships dark before anyone may turn it on. Low.
+- **OPS-040** · built · Rolling back to version N works until a contract migration ran: the upgrade test starts the old version again on the migrated database. After a contract migration, a release that does not know it refuses to start and names it, also when it does not migrate (`TestOlderNodeRefusesADatabaseAfterAContractMigration`, `TestANodeRefusesADatabaseANewerReleaseContracted`).
+- **OPS-041** · built · A pre-upgrade backup marker: `scripts/backup.sh` notes each complete backup as `system.backup_noted`, and a node that migrates a database with data first writes `system.upgrade_started` with the migrations before and after and the time of that backup (`TestAnUpgradeLeavesAMarkerNamingTheLastBackup`).
+- **OPS-042** · partly · Skipping versions: the binary runs every migration in order, also from an empty database. Announcing a maintenance window for a larger jump needs to know which migrations belong to which release, which only exists from 1.0. Low.
+- **OPS-043** · new · `CREATE INDEX CONCURRENTLY` and no full table rewrites during working hours. Each migration runs in one transaction, where `CONCURRENTLY` cannot run. Today's tables are small enough; an index on a large table needs a migration that runs outside a transaction. Low.
+
+### Backup and restore
+
+- **OPS-050** · partly · RPO and RTO of at most 4 hours. `scripts/backup.sh` makes an encrypted backup when the operator runs it; `backup-restore.md` says how often for 4 hours. Low.
+- **OPS-051** · new · pgBackRest with WAL archiving. Advised in `backup-restore.md`, not set up by anything. *Servers*. Medium.
+- **OPS-052** · partly · Stored files are in every backup, encrypted. Versioning and replication to a second location need the S3 store of OPS-014. Medium.
+- **OPS-053** · partly · Configuration and keys: `secrets/` and `master.key` are in every backup, each encrypted, and the backup key must live apart from the backups (the script refuses otherwise). Keeping `master.key` in another place than the data is left to the operator, as `backup-restore.md` explains. Low.
+- **OPS-054** · partly · The restore test runs every night in CI on a fresh installation and checks the page, the attachment, search, login, the audit chain and role separation; a failure fails the run. A weekly restore of a real installation into a scratch environment, with an alert, is not built. *Servers*. Medium.
+- **OPS-055** · partly · The runbook is `backup-restore.md`, and the drill times itself (29 seconds on a small set). The 4 hours for 100 GB were never measured. *Servers*. Medium.
+
+### Releases
+
+- **OPS-060** · built · Before 1.0, every build goes through the upgrade machinery: migrations at start, and the upgrade test in CI on every change.
+- **OPS-061** · later · From 1.0, monthly releases, security fixes as patch releases, only the latest line supported. The checklist is ready in `docs/operations/release.md` (spec 044).
+- **OPS-062** · built · Release notes in plain language with an "upgrade impact" line: every entry in `CHANGELOG.md` has one, and the release checklist asks for it.

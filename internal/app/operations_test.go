@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -56,6 +57,8 @@ func TestMetricsCountRequestsAndShowWhatWaits(t *testing.T) {
 		"diffluence_database_up 1", "diffluence_outbox_unpublished ", "diffluence_jobs_queued ", "diffluence_jobs_failed_7d ",
 		"diffluence_mail_queued ", "diffluence_storage_deletions_queued ", "diffluence_db_pool_acquired_connections ",
 		"diffluence_db_pool_max_connections ", "diffluence_goroutines ", "diffluence_queue_healthy 1",
+		"diffluence_migrations_pending_expand 0", "diffluence_migrations_pending_contract 0",
+		fmt.Sprintf("diffluence_schema_migration %d\n", newestMigration(t)),
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)
@@ -190,4 +193,13 @@ func TestTheRecentListIsTrimmedByATaskToFiftyPerPerson(t *testing.T) {
 	if n := e.count(`SELECT count(*) FROM recent_pages r JOIN pages p ON p.id = r.page_id WHERE r.user_id = $1 AND p.title = 'Page 0'`, owner.id); n != 1 {
 		t.Fatal("the newest went")
 	}
+}
+
+func newestMigration(t *testing.T) int {
+	t.Helper()
+	migs, err := db.Migrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return migs[len(migs)-1].Version
 }

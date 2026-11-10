@@ -2,7 +2,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # The upgrade promise, tested (blueprint 07): the old version serves traffic, the
 # new version starts on the same database and migrates it, both run side by side,
-# and the old one stops. Not one request may fail.
+# and the old one stops. Not one request may fail. Then the old version starts
+# again on the migrated database, as a rollback does.
 #
 #   scripts/upgrade-test.sh <old binary> <new binary>
 #
@@ -78,9 +79,23 @@ traffic &
 traffic_pid=$!
 sleep 2
 
+newest() { psql "$url" -tAc 'SELECT max(version) FROM schema_migrations'; }
+before=$(newest)
+
 echo "2. the new version starts on the same database and migrates it"
+# Every node of an installation has the same key (DIFFLUENCE_MASTER_KEY_FILE).
+mkdir -p "$work/new"
+cp "$work/old/master.key" "$work/new/master.key"
 serve "$new" 8092 "$work/new" "$work/new.log"
 printf '8091\n8092\n' >"$work/ports"
+# A real upgrade leaves one marker in the audit log before it migrates (OPS-041).
+after=$(newest)
+markers=$(psql "$url" -tAc "SELECT count(*) FROM audit_events WHERE action = 'system.upgrade_started'")
+echo "migrations $before to $after, upgrade markers: $markers"
+if [ "$after" != "$before" ] && [ "$markers" != 1 ]; then
+  echo "the upgrade left $markers markers, not one"
+  exit 1
+fi
 sleep 3
 
 echo "3. both versions serve side by side"
@@ -109,6 +124,25 @@ if [ "$failed" -gt 0 ]; then
 fi
 [ "$on_old" -gt 0 ] && [ "$on_new" -gt 0 ]
 
-echo "5. the audit chain written by both versions is intact"
+echo "5. rolling back: the old version starts again on the migrated database"
+# The new node stops first, as in a rollback; the old one keeps its own queue folder.
+for p in "${pids[@]}"; do kill -TERM "$p" 2>/dev/null || true; done
+wait 2>/dev/null || true
+pids=()
+serve "$old" 8091 "$work/old" "$work/rollback.log"
+status=$(login 8091)
+if [ "$status" = 200 ]; then
+  status=$(curl -s -o /dev/null -w '%{http_code}' -b "$cookie" http://localhost:8091/api/v1/me)
+fi
+if [ "$status" != 200 ]; then
+  echo "after the rollback, a login and a read answered $status"
+  tail -5 "$work/rollback.log"
+  exit 1
+fi
+kill -TERM "${pids[-1]}"
+wait "${pids[-1]}" || true
+pids=()
+
+echo "6. the audit chain written by both versions is intact"
 DIFFLUENCE_DATA_DIR="$work/new" "$new" audit verify
 echo "upgrade test passed"

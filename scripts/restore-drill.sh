@@ -69,6 +69,12 @@ if ls "$work"/backups/diffluence-*/ | grep -qv -e '\.gpg$' -e '^SHA256SUMS$'; th
   echo "something in the backup is not encrypted"
   exit 1
 fi
+# Only the backup that was made is noted, for the checks before an upgrade.
+noted=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SELECT count(*) FROM audit_events WHERE action = 'system.backup_noted'")
+if [ "$noted" != 1 ]; then
+  echo "the backup was noted $noted times, not once"
+  exit 1
+fi
 docker compose down -v >/dev/null 2>&1
 
 echo "3. restore on a clean installation"

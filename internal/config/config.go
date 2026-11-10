@@ -49,6 +49,9 @@ type Config struct {
 	TrustedProxies     []netip.Prefix
 	ShutdownDelay      time.Duration // time between "not ready" and closing connections
 	MasterKeyFile      string        // key-encryption key; empty = DATA_DIR/master.key
+	// UpgradeBackupMaxAge is how old the last noted backup may be before a node refuses to
+	// migrate the database (blueprint 07, rule 4). Zero = only a warning in the log.
+	UpgradeBackupMaxAge time.Duration
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
 	ExampleSpace          bool // make the example space on a new instance
@@ -167,6 +170,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		SessionMaxAge:         l.duration("SESSION_MAX_AGE", 7*24*time.Hour),
 		ShutdownDelay:         l.duration("SHUTDOWN_DELAY", 5*time.Second),
 		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
+		UpgradeBackupMaxAge:   l.duration("UPGRADE_BACKUP_MAX_AGE", 0),
 		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
 		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
 		OutwardAllowPrivate:   l.boolean("OUTWARD_ALLOW_PRIVATE", false),
@@ -226,6 +230,9 @@ func Load(lookup LookupFunc) (Config, error) {
 	}
 	if c.ShutdownDelay < 0 {
 		l.fail("SHUTDOWN_DELAY", errors.New("must not be negative"))
+	}
+	if c.UpgradeBackupMaxAge < 0 {
+		l.fail("UPGRADE_BACKUP_MAX_AGE", errors.New("must not be negative"))
 	}
 
 	pub := l.str("PUBLIC_URL", "http://localhost:8080")

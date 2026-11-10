@@ -74,6 +74,21 @@ func TestErrorsAreCollected(t *testing.T) {
 	}
 }
 
+func TestTheBackupAgeForAnUpgradeIsOffByDefaultAndNeverNegative(t *testing.T) {
+	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	if err != nil || c.UpgradeBackupMaxAge != 0 {
+		t.Fatalf("default %v, err %v", c.UpgradeBackupMaxAge, err)
+	}
+	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "26h"}))
+	if err != nil || c.UpgradeBackupMaxAge != 26*time.Hour {
+		t.Fatalf("set %v, err %v", c.UpgradeBackupMaxAge, err)
+	}
+	_, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "-1h"}))
+	if err == nil || !strings.Contains(err.Error(), "UPGRADE_BACKUP_MAX_AGE") {
+		t.Fatalf("negative: %v", err)
+	}
+}
+
 func TestHTTPSAndProxies(t *testing.T) {
 	c, err := Load(env(map[string]string{
 		"DIFFLUENCE_DATABASE_URL":    "postgres://x",

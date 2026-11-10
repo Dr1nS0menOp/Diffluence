@@ -49,12 +49,24 @@ func (a *App) Gauges(ctx context.Context) []metrics.Gauge {
 		a.log.Warn("metrics: database unavailable", "error", err)
 		return append(gauges, metrics.Gauge{Name: "diffluence_database_up", Help: "Whether the database answered this scrape.", Value: 0})
 	}
-	return append(gauges,
+	gauges = append(gauges,
 		metrics.Gauge{Name: "diffluence_database_up", Help: "Whether the database answered this scrape.", Value: 1},
 		metrics.Gauge{Name: "diffluence_outbox_unpublished", Help: "Events waiting to reach the queue.", Value: float64(outbox)},
 		metrics.Gauge{Name: "diffluence_jobs_queued", Help: "Jobs waiting for a worker.", Value: float64(jobsQueued)},
 		metrics.Gauge{Name: "diffluence_jobs_failed_7d", Help: "Jobs that failed in the last seven days.", Value: float64(jobsFailed)},
 		metrics.Gauge{Name: "diffluence_mail_queued", Help: "Mails waiting to be sent.", Value: float64(mailQueued)},
 		metrics.Gauge{Name: "diffluence_storage_deletions_queued", Help: "Stored files waiting to be removed.", Value: float64(deletions)},
+	)
+	// How far an upgrade is (blueprint 07): a contract migration that stays pending long
+	// after every node runs the new release asks for a look.
+	schema, err := db.Status(ctx, a.pool, a.migrations)
+	if err != nil {
+		a.log.Warn("metrics: migration state unavailable", "error", err)
+		return gauges
+	}
+	return append(gauges,
+		metrics.Gauge{Name: "diffluence_schema_migration", Help: "The highest migration applied to the database.", Value: float64(schema.Newest)},
+		metrics.Gauge{Name: "diffluence_migrations_pending_expand", Help: "Expand migrations of this node not applied yet.", Value: float64(schema.PendingExpand)},
+		metrics.Gauge{Name: "diffluence_migrations_pending_contract", Help: "Contract migrations of this node waiting for every node to know them.", Value: float64(schema.PendingContract)},
 	)
 }

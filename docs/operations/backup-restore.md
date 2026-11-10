@@ -31,7 +31,7 @@ chmod 600 /root/diffluence-backup.key
 bash scripts/backup.sh /backups /root/diffluence-backup.key   # run it from cron, then copy the folder off this machine
 ```
 
-The script needs `gpg`. Everything streams through it, so plain data never reaches the disk. It dumps the database first and the files second, so a backup can hold a file no page uses, but no page that points at a missing file. Every backup has a `SHA256SUMS` file, which can be checked without the key.
+The script needs `gpg`. Everything streams through it, so plain data never reaches the disk. It dumps the database first and the files second, so a backup can hold a file no page uses, but no page that points at a missing file. Every backup has a `SHA256SUMS` file, which can be checked without the key. Once every part is written, it notes the backup in the audit log as `system.backup_noted`, which the checks before an upgrade read ([upgrade.md](upgrade.md)).
 
 A daily run gives you at most a day of loss. To reach the 4-hour goal, run it every few hours, or use pgBackRest with WAL archiving for a loss of minutes, which is the advice for larger installations. pgBackRest then has its own encryption, which you must turn on.
 
@@ -94,6 +94,6 @@ What this does not do yet: it keeps the root from which the audit signing key an
 bash scripts/restore-drill.sh
 ```
 
-This installs Diffluence, adds content, starts replacing `master.key`, proves that a backup is refused without a key and with the key beside it, makes a backup halfway through the key change, destroys everything, proves that a wrong key does not open it, restores on a clean installation, and proves that the page, attachment, search, login, audit chain and database role separation all came back. Then it finishes the key change on the restored installation, and proves the file still opens with only the new key. It uses its own compose projects and removes them afterwards. CI runs it every night.
+This installs Diffluence, adds content, starts replacing `master.key`, proves that a backup is refused without a key and with the key beside it, makes a backup halfway through the key change and proves it was noted once, destroys everything, proves that a wrong key does not open it, restores on a clean installation, and proves that the page, attachment, search, login, audit chain and database role separation all came back. Then it finishes the key change on the restored installation, and proves the file still opens with only the new key. It uses its own compose projects and removes them afterwards. CI runs it every night.
 
 Last run on 2026-11-06: passed in 29 seconds on a small data set. That says the procedure works, not how long 100 GB takes. Time it on your own data before relying on the 4-hour goal.

@@ -130,19 +130,18 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	if a.pool, err = db.Open(ctx, cfg.DatabaseURL); err != nil {
 		return nil, err
 	}
-	if cfg.MigrateOnStart {
-		if err := a.migrate(ctx, db.Options{Log: log}); err != nil {
-			a.Close()
-			return nil, err
-		}
+	// The queue opens before migrating, so the checks before an upgrade can see it.
+	if a.queue, err = queue.Open(ctx, cfg.NATSURL, cfg.DataDir, log); err != nil {
+		a.Close()
+		return nil, err
+	}
+	if err := a.prepareSchema(ctx); err != nil {
+		a.Close()
+		return nil, err
 	}
 	if a.instanceID, err = instance.Ensure(ctx, a.pool, cfg.InstanceName); err != nil {
 		a.Close()
 		return nil, fmt.Errorf("app: instance: %w", err)
-	}
-	if a.queue, err = queue.Open(ctx, cfg.NATSURL, cfg.DataDir, log); err != nil {
-		a.Close()
-		return nil, err
 	}
 	if a.keyring, err = keys.LoadOrCreate(cfg.KeyFile(), cfg.MasterKeyFile == ""); err != nil {
 		a.Close()
@@ -291,16 +290,25 @@ func mailSender(cfg config.Config) mail.Sender {
 
 // migrate applies migrations, as the owner of the tables when one is configured.
 func (a *App) migrate(ctx context.Context, opts db.Options) error {
-	if a.cfg.MigrateDatabaseURL == "" {
-		_, err := db.Migrate(ctx, a.pool, a.migrations, opts)
+	return a.asOwner(ctx, func(owner *pgxpool.Pool) error {
+		_, err := db.Migrate(ctx, owner, a.migrations, opts)
 		return err
+	})
+}
+
+// asOwner runs work with the pool of the owner of the tables when one is configured, and
+// then gives the application role its rights: before that, it may not even read what a
+// migration made.
+func (a *App) asOwner(ctx context.Context, work func(*pgxpool.Pool) error) error {
+	if a.cfg.MigrateDatabaseURL == "" {
+		return work(a.pool)
 	}
 	owner, err := db.Open(ctx, a.cfg.MigrateDatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer owner.Close()
-	if _, err := db.Migrate(ctx, owner, a.migrations, opts); err != nil {
+	if err := work(owner); err != nil {
 		return err
 	}
 	role, err := db.RoleOf(a.cfg.DatabaseURL)

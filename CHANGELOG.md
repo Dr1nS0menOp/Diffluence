@@ -3,6 +3,14 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: checks before an upgrade, and a safe way back (spec 044)
+- Before it migrates, a node checks that PostgreSQL is 16 or newer, that its data folder has 512 MiB free and that the queue answers. If not, it does not start, says every reason, and changes nothing
+- Set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, such as `26h`, and an upgrade also refuses without a recent backup. `scripts/backup.sh` notes each backup it completes; without the setting, a missing backup only gives a warning
+- Before migrating a database with data, a node writes `system.upgrade_started` to the audit log, naming the last backup: the one to restore if an upgrade must be undone
+- A release refuses to start on a database a newer release has already contracted, and names the migration, instead of failing later on a missing column
+- `/metrics` shows how far migrations are. `docs/operations/release.md` is the checklist for a release
+- CI now runs the previous build and this one side by side on one database for every change, then rolls back to the previous one
+- Upgrade impact: none. No migration. A restart with nothing to migrate checks nothing
 ### Added: a note when a newer version runs (spec 041)
 - A tab that was opened before an update says so under the top bar, and offers Reload. It never reloads by itself and takes no focus, so typing goes on
 - Reload first saves the draft of an open editor, so the text is simply there afterwards

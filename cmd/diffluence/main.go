@@ -39,6 +39,7 @@ Commands:
   setup-code                print a new one-time code for the setup screen of a new install
   audit verify              verify the audit log hash chain
   audit prune               remove audit rows past their retention, as the owner of the tables
+  backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   key <step>                replace master.key without downtime; see diffluence key
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
@@ -84,6 +85,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
+	case "backup":
+		if len(args) < 2 || args[1] != "note" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdBackupNote(ctx, stdout)
 	case "setup-code":
 		err = cmdSetupCode(ctx, stdout)
 	case "key":
@@ -300,6 +307,25 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 		return err
 	}
 	fmt.Fprintf(stdout, "removed %d audit rows, up to %d\n", res.Removed, res.AnchorSeq)
+	return nil
+}
+
+// cmdBackupNote tells the checks before the next upgrade that a backup exists. It does not
+// check the backup: scripts/backup.sh runs it only after every part was written.
+func cmdBackupNote(ctx context.Context, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	if err := app.NoteBackup(ctx, pool); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "backup noted in the audit log")
 	return nil
 }
 

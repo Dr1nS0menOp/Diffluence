@@ -116,6 +116,62 @@ func TestOlderNodeAcceptsNewerDatabase(t *testing.T) {
 	}
 }
 
+// Once a newer release ran a contract migration, what it removed may be what an older
+// release still reads. That release must refuse to start, not fail on the first request.
+func TestOlderNodeRefusesADatabaseAfterAContractMigration(t *testing.T) {
+	tdb := testutil.EmptyDatabase(t)
+	ctx := context.Background()
+	v1 := []db.Migration{{Version: 1, Name: "add", Phase: db.PhaseExpand, SQL: "CREATE TABLE t (old text, new text)", Checksum: "a"}}
+	v2 := append(v1, db.Migration{Version: 2, Name: "drop_old", Phase: db.PhaseContract, SQL: "ALTER TABLE t DROP COLUMN old", Checksum: "b"})
+	if _, err := db.Migrate(ctx, tdb.Pool, v2, db.Options{IncludeContract: true}); err != nil {
+		t.Fatal(err)
+	}
+	_, err := db.Migrate(ctx, tdb.Pool, v1, db.Options{})
+	if !errors.Is(err, db.ErrNewerContract) || !strings.Contains(err.Error(), "0002_drop_old") {
+		t.Fatalf("migrate: want ErrNewerContract naming 0002_drop_old, got %v", err)
+	}
+	if err := db.CheckCompatible(ctx, tdb.Pool, v1); !errors.Is(err, db.ErrNewerContract) {
+		t.Fatalf("check: want ErrNewerContract, got %v", err)
+	}
+	if err := db.CheckCompatible(ctx, tdb.Pool, v2); err != nil {
+		t.Fatalf("the release that ran it: %v", err)
+	}
+}
+
+// A contract migration this release knows but has not run is no reason to refuse:
+// it waits until every node knows it.
+func TestPendingContractOfThisReleaseIsCompatible(t *testing.T) {
+	tdb := testutil.EmptyDatabase(t)
+	ctx := context.Background()
+	migs := []db.Migration{
+		{Version: 1, Name: "add", Phase: db.PhaseExpand, SQL: "CREATE TABLE t (old text)", Checksum: "a"},
+		{Version: 2, Name: "drop_old", Phase: db.PhaseContract, SQL: "DROP TABLE t", Checksum: "b"},
+		{Version: 3, Name: "more", Phase: db.PhaseExpand, SQL: "CREATE TABLE u (id int)", Checksum: "c"},
+	}
+	if err := db.CheckCompatible(ctx, tdb.Pool, migs); err != nil {
+		t.Fatalf("before any migration: %v", err)
+	}
+	if _, err := db.Migrate(ctx, tdb.Pool, migs[:1], db.Options{}); err != nil {
+		t.Fatal(err)
+	}
+	st, err := db.Status(ctx, tdb.Pool, migs)
+	if err != nil || st.Newest != 1 || st.PendingExpand != 1 || st.PendingContract != 1 {
+		t.Fatalf("status %+v, err %v", st, err)
+	}
+	if err := db.CheckCompatible(ctx, tdb.Pool, migs); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestStatusOfAnEmptyDatabase(t *testing.T) {
+	tdb := testutil.EmptyDatabase(t)
+	migs := []db.Migration{{Version: 1, Name: "a", Phase: db.PhaseExpand, SQL: "CREATE TABLE a (id int)", Checksum: "a"}}
+	st, err := db.Status(context.Background(), tdb.Pool, migs)
+	if err != nil || st.Newest != 0 || st.PendingExpand != 1 || st.PendingContract != 0 {
+		t.Fatalf("status %+v, err %v", st, err)
+	}
+}
+
 func TestEditedMigrationIsRefused(t *testing.T) {
 	tdb := testutil.EmptyDatabase(t)
 	ctx := context.Background()

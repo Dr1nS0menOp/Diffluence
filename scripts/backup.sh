@@ -50,4 +50,10 @@ tar -C secrets -cf - . | encrypt_to secrets.tar.gpg
 # Relative names, so the backup can be checked after moving it to another machine.
 (cd "$dir" && sha256sum -- * >SHA256SUMS)
 echo "backup written to $dir"
+# Only now is the backup complete. The checks before an upgrade read this note
+# (docs/operations/upgrade.md).
+if ! docker compose exec -T diffluence diffluence backup note >/dev/null; then
+  echo "the backup is complete, but noting it in Diffluence failed: an upgrade that asks for a recent backup will refuse" >&2
+  exit 1
+fi
 echo "keep $key away from the backups: without it they cannot be restored, and with them it opens everything."

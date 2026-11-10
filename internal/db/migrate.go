@@ -137,6 +137,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migs []Migration, opts Opt
 	}
 	defer conn.Release()
 
+	if err := RequirePostgres(ctx, conn); err != nil {
+		return rep, err
+	}
 	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
 		return rep, fmt.Errorf("db: take migration lock: %w", err)
 	}
@@ -147,6 +150,9 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migs []Migration, opts Opt
 
 	if _, err := conn.Exec(ctx, createTable); err != nil {
 		return rep, fmt.Errorf("db: create schema_migrations: %w", err)
+	}
+	if err := CheckCompatible(ctx, conn, migs); err != nil {
+		return rep, err
 	}
 	applied, err := appliedChecksums(ctx, conn)
 	if err != nil {
