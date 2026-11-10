@@ -95,7 +95,7 @@ func (s *Service) resolveTarget(ctx context.Context, q db.Querier, c identity.Ca
 }
 
 func (s *Service) reactionsOn(ctx context.Context, q db.Querier, spaceID uuid.UUID) (bool, error) {
-	values, err := s.settings.Get(ctx)
+	values, err := s.settings.GetIn(ctx, q)
 	if err != nil {
 		return false, err
 	}

@@ -118,13 +118,11 @@ func TestHTTPSAndProxies(t *testing.T) {
 // said out loud (SEC-257). On this machine alone, plain http is how people try it out.
 func TestAPlainAddressIsWeakOnlyWhenOthersReachIt(t *testing.T) {
 	for address, weak := range map[string]bool{
-		"http://wiki.example.com":   true,
-		"http://192.0.2.10:8080":    true,
-		"http://[2001:db8::1]:8080": true,
-		"https://wiki.example.com":  false,
-		"http://localhost:8080":     false,
-		"http://127.0.0.1:8080":     false,
-		"http://[::1]:8080":         false,
+		"http://wiki.example.com":  true,
+		"http://wiki.lan:8080":     true,
+		"https://wiki.example.com": false,
+		"http://localhost:8080":    false,
+		"http://LocalHost:8080":    false,
 	} {
 		c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_PUBLIC_URL": address}))
 		if err != nil {
@@ -132,6 +130,17 @@ func TestAPlainAddressIsWeakOnlyWhenOthersReachIt(t *testing.T) {
 		}
 		if got := c.PlainToOthers(); got != weak {
 			t.Errorf("%s: plain to others = %v, want %v", address, got, weak)
+		}
+	}
+}
+
+// An IP address cannot carry passkeys, which a browser binds to a name. Refused here, it
+// is one clear message at the start instead of a loop of restarts (spec 050).
+func TestAnIPAddressIsRefusedAsThePublicAddress(t *testing.T) {
+	for _, address := range []string{"http://192.0.2.10:8080", "https://192.0.2.10", "http://127.0.0.1:8080", "http://[::1]:8080", "http://[2001:db8::1]"} {
+		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_PUBLIC_URL": address}))
+		if err == nil || !strings.Contains(err.Error(), "host name") {
+			t.Errorf("%s: got %v, want a refusal that asks for a host name", address, err)
 		}
 	}
 }

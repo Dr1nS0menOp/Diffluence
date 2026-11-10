@@ -203,7 +203,7 @@ func (s *Service) ListSpaces(ctx context.Context) ([]Item, error) {
 // has no working permissions any more, so only global administrators can act on it.
 func (s *Service) authorize(ctx context.Context, q db.Querier, c identity.Caller, it Item) error {
 	if it.ObjectType == TypeSpace {
-		ok, err := s.identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
+		ok, err := s.identity.HasGlobalPermissionIn(ctx, q, c.UserID, identity.PermAdministrator)
 		if err != nil {
 			return err
 		}

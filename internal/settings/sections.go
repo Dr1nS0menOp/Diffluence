@@ -266,8 +266,13 @@ func (g *General) withDefaults() *General {
 
 // ReadSection fills one section. What was never set keeps its default.
 func (s *Service) ReadSection(ctx context.Context, name string, into any) error {
+	return s.ReadSectionIn(ctx, s.pool, name, into)
+}
+
+// ReadSectionIn is ReadSection through q, for code that holds a transaction.
+func (s *Service) ReadSectionIn(ctx context.Context, q db.Querier, name string, into any) error {
 	var raw []byte
-	err := s.pool.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", sectionKeyPrefix+name).Scan(&raw)
+	err := q.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", sectionKeyPrefix+name).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}

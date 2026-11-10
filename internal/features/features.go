@@ -60,8 +60,14 @@ func NewService(pool *pgxpool.Pool, st *settings.Service) *Service {
 
 // Instance reads the settings for all spaces.
 func (s *Service) Instance(ctx context.Context) (Instance, error) {
+	return s.instanceIn(ctx, s.pool)
+}
+
+// instanceIn reads the settings for all spaces through q. Code that holds a
+// transaction reads through it, so it never waits for a second connection (spec 050).
+func (s *Service) instanceIn(ctx context.Context, q db.Querier) (Instance, error) {
 	v := Instance{Off: []string{}, NewOff: []string{}}
-	err := s.settings.Read(ctx, instanceKey, &v)
+	err := s.settings.ReadIn(ctx, q, instanceKey, &v)
 	return v, err
 }
 
@@ -94,7 +100,7 @@ func (s *Service) Enabled(ctx context.Context, q db.Querier, spaceID uuid.UUID, 
 // ForSpace lists every feature of a space. What a space never set has its default,
 // and what an administrator turned off for all spaces stays off.
 func (s *Service) ForSpace(ctx context.Context, q db.Querier, spaceID uuid.UUID) (map[string]bool, error) {
-	v, err := s.Instance(ctx)
+	v, err := s.instanceIn(ctx, q)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +144,7 @@ func (s *Service) Set(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID, values 
 
 // Start gives a new space the defaults of the instance.
 func (s *Service) Start(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID) error {
-	v, err := s.Instance(ctx)
+	v, err := s.instanceIn(ctx, tx)
 	if err != nil {
 		return err
 	}

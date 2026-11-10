@@ -141,7 +141,7 @@ func (s *Service) Deliver(ctx context.Context, q db.Querier, r Row) error {
 	if channel != ChannelMail {
 		return nil
 	}
-	values, err := s.settings.Get(ctx)
+	values, err := s.settings.GetIn(ctx, q)
 	if err != nil || !values.MailEnabled {
 		return err
 	}

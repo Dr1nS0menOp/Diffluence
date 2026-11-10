@@ -84,11 +84,39 @@ Saving never failed in any run, and got faster under every flood. The memo of pe
 
 **What to know when you run behind a load balancer.** A node says `busy` on `/readyz` while its queues are long. With several nodes the balancer sends people to a node with room. If every node is busy at once, a balancer that only uses ready nodes may have none left, and Kubernetes then sends nobody anywhere. Give the balancer a rule for that case, such as keeping all nodes when none is ready, or let your readiness probe tolerate a few failures in a row.
 
+## A real server (10 November 2026)
+
+The first run on a real server, with 5,000 seeded people, 300 spaces with their own groups and permissions, and 60,000 pages: [the stress test](../reports/2026-11-10-stress-test.md). It corrects the picture above, which used one space and one account: with a real permission model, **PostgreSQL ran out of CPU from about 50 active people** on 8 cores of a CPU from 2012, and turned the extra work away as busy, searches first. Reading a page stayed at about 30 ms and saving at about 60 ms at every level, and no answer was wrong.
+
+| What gave way | On the server | Cause |
+|---|---|---|
+| Search on file names | 0.3 to 0.9 s a search | The permission check ran again for every candidate file |
+| The feed | 1.1 s at 20 people, 2 s at 200 | It worked out every visible page and its versions before keeping 20 |
+| The count on the bell | 80 ms each poll | It worked out every visible page on every poll |
+| Saving, all 5,000 at once | 3.7 s (p50) | The audit lock, held until a commit is on a disk that syncs about 160 times a second |
+
+### What spec 050 changed
+
+The three queries now ask the permission rule only about the few pages they could show. Measured on 10 November 2026 in PostgreSQL 16 alone, in the development container, on data of the same size made by `scripts/stress/bench-data.sql` (5,000 people, 300 spaces of which 250 open to all, 60,000 pages in trees seven levels deep, 120,000 versions, 300 restricted branches, 12,000 files, 250,000 notifications), for one member who sees 250 spaces. One run each, warm.
+
+| Query | Before | After |
+|---|---|---|
+| The feed, recent | 379 ms | 20 ms |
+| The count on the bell | 55 ms | 5.8 ms |
+| File names, a common word | 268 ms | 41 ms |
+| File names, a rare word | 277 ms | 18 ms |
+| File names, near a typo | 1,363 ms | 78 ms |
+
+The answers are the same: a test compares the new feed with the former query, row by row, for several people and every tab, and the permission tests stay as they were. **The full load test has not been repeated on the server with these changes.** Until it is, the table of the server above is the last measured state.
+
+The audit lock is not changed. A shorter lock would need another design of the chain (ADR-013, ADR-039), which this wave did not prove safe. On a disk that syncs fast it costs little: see the install guide.
+
 ## What stops everything
 
 | What | Result | What to do |
 |---|---|---|
-| Something holds the audit lock | Writes wait, which is known. With more waiting writes than the pool has connections, **reading stops too**: a page timed out after 25 s while `/readyz` still said ready | A long transaction never audits early (ARC-201). Watch for it. Set `pool_max_conns` well above your writers |
+| Something holds the audit lock | Writes wait, which is known. With more waiting writes than the pool has connections, reading waits too. Since spec 050 a request waits at most 10 seconds for a database connection and is then answered busy with `Retry-After`, instead of waiting as long as the lock is held | A long transaction never audits early (ARC-201). Watch for it. Set `pool_max_conns` well above your writers |
+| Many changes at once that each need a second connection | Since spec 050, work that holds a connection reads through it instead of asking the pool for another, so creating many spaces at once finishes, and any wait that is left ends as busy within 10 seconds | Nothing to set |
 | The disk of the data folder is full | Uploads answer 500 "Something went wrong", no half file stays, text still saves, and `/readyz` still says ready | Watch the disk yourself |
 | An account that gets 100 wrong passwords from many addresses in 15 minutes | That person cannot log in until the window ends | This limit stops a botnet from guessing. Passkeys and an identity provider do not depend on it |
 | The address of the proxy is not in `DIFFLUENCE_TRUSTED_PROXIES` | Everyone counts as one address, so 50 failed logins in 15 minutes stop all logins | Set it |

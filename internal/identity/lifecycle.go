@@ -61,7 +61,8 @@ type AccountMail struct {
 
 // Mailer sends account mail. The mail queue of wave C implements it.
 type Mailer interface {
-	Send(ctx context.Context, m AccountMail) error
+	// Send queues the mail through q, so a mail written inside a transaction goes with it.
+	Send(ctx context.Context, q db.Querier, m AccountMail) error
 }
 
 // SetMailer turns on everything that needs mail. Without it, reset links and
@@ -73,11 +74,11 @@ func (s *Service) SetMailer(m Mailer, publicOrigin string) {
 // MailReady says whether account mail can be sent.
 func (s *Service) MailReady() bool { return s.mailer != nil }
 
-func (s *Service) send(ctx context.Context, m AccountMail) error {
+func (s *Service) send(ctx context.Context, q db.Querier, m AccountMail) error {
 	if s.mailer == nil {
 		return nil
 	}
-	return s.mailer.Send(ctx, m)
+	return s.mailer.Send(ctx, q, m)
 }
 
 // tellOfChange mails a person that a way into their account changed (ASVS 6.3.7, SEC-127),
@@ -87,14 +88,14 @@ func (s *Service) tellOfChange(ctx context.Context, q db.Querier, userID uuid.UU
 	if err := q.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", userID).Scan(&email); err != nil {
 		return err
 	}
-	return s.send(ctx, AccountMail{To: email, Kind: MailSignInChanged})
+	return s.send(ctx, q, AccountMail{To: email, Kind: MailSignInChanged})
 }
 
 // Policy holds the rules an administrator sets. The settings package depends on
 // this one, so the rules are handed in as functions.
 type Policy struct {
 	IdleLimit    func(context.Context) time.Duration
-	SecondFactor func(context.Context) string
+	SecondFactor func(context.Context, db.Querier) string
 }
 
 // SetPolicy sets where the rules come from.
@@ -183,7 +184,7 @@ func (s *Service) noteLogin(ctx context.Context, tx pgx.Tx, in sessionStart) err
 	if err := tx.QueryRow(ctx, "SELECT email FROM users WHERE id = $1", in.UserID).Scan(&email); err != nil {
 		return err
 	}
-	return s.send(ctx, AccountMail{To: email, Kind: MailNewDevice})
+	return s.send(ctx, tx, AccountMail{To: email, Kind: MailNewDevice})
 }
 
 // needsSecondFactor says whether a person must set up a second factor before they
@@ -192,7 +193,7 @@ func (s *Service) noteLogin(ctx context.Context, tx pgx.Tx, in sessionStart) err
 func (s *Service) needsSecondFactor(ctx context.Context, q db.Querier, userID uuid.UUID) (bool, error) {
 	rule := ""
 	if s.secondFactorRule != nil {
-		rule = s.secondFactorRule(ctx)
+		rule = s.secondFactorRule(ctx, q)
 	}
 	if rule == "" || rule == "none" {
 		return false, nil
@@ -310,7 +311,7 @@ func (s *Service) RequestReset(ctx context.Context, email string, meta RequestMe
 	if err := audit.RecordStandalone(ctx, s.pool, event(meta, Actor{Type: audit.ActorAnonymous}, "auth.reset_requested", "user", id.String(), audit.ResultSuccess, nil)); err != nil {
 		return err
 	}
-	return s.send(ctx, AccountMail{To: email, Kind: MailReset, Link: s.link("/reset", token)})
+	return s.send(ctx, s.pool, AccountMail{To: email, Kind: MailReset, Link: s.link("/reset", token)})
 }
 
 // ResetWithLink sets a new password from a reset link, and ends every session. It
@@ -429,7 +430,7 @@ func (s *Service) InviteWithin(ctx context.Context, tx pgx.Tx, c Caller, in NewI
 	if !s.MailReady() {
 		return link, nil
 	}
-	return "", s.send(ctx, AccountMail{To: in.Email, Kind: MailInvitation, Link: link})
+	return "", s.send(ctx, tx, AccountMail{To: in.Email, Kind: MailInvitation, Link: link})
 }
 
 // Invitations lists what is waiting for an answer.
@@ -569,7 +570,7 @@ func (s *Service) RequestSignup(ctx context.Context, email string, domains []str
 	if err != nil {
 		return err
 	}
-	return s.send(ctx, AccountMail{To: email, Kind: MailSignup, Link: s.link("/signup", token)})
+	return s.send(ctx, s.pool, AccountMail{To: email, Kind: MailSignup, Link: s.link("/signup", token)})
 }
 
 // ConfirmSignup makes the account from a proven address.

@@ -18,6 +18,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/storage"
@@ -65,9 +66,15 @@ func NewService(pool *pgxpool.Pool, store storage.Store) *Service {
 
 // Get returns the current values.
 func (s *Service) Get(ctx context.Context) (Values, error) {
+	return s.GetIn(ctx, s.pool)
+}
+
+// GetIn is Get through q. Code that holds a transaction passes it, so it never waits
+// for a second connection while holding one (spec 050).
+func (s *Service) GetIn(ctx context.Context, q db.Querier) (Values, error) {
 	v := Defaults
 	v.BlockedFileTypes = []string{}
-	rows, err := s.pool.Query(ctx, "SELECT key, value FROM settings WHERE key = ANY($1)",
+	rows, err := q.Query(ctx, "SELECT key, value FROM settings WHERE key = ANY($1)",
 		[]string{keyTrashRetentionDays, keyMaxUploadMiB, keyMailEnabled, keyMailExcerpts, keyReactionsEnabled, keyGroupMentions, keyBlockedFileTypes})
 	if err != nil {
 		return v, err
@@ -105,8 +112,13 @@ func (s *Service) Get(ctx context.Context) (Values, error) {
 
 // Read fills v with one stored value, and leaves it alone when there is none.
 func (s *Service) Read(ctx context.Context, key string, v any) error {
+	return s.ReadIn(ctx, s.pool, key, v)
+}
+
+// ReadIn is Read through q, for code that holds a transaction.
+func (s *Service) ReadIn(ctx context.Context, q db.Querier, key string, v any) error {
 	var raw []byte
-	err := s.pool.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&raw)
+	err := q.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -152,7 +164,12 @@ func (s *Service) TrashRetention(ctx context.Context) (time.Duration, error) {
 // MaxUploadBytes is the largest attachment accepted.
 func (s *Service) MaxUploadBytes(ctx context.Context) (int64, error) {
 	v, err := s.Get(ctx)
-	return int64(v.MaxUploadMiB) << 20, err
+	return v.MaxUploadBytes(), err
+}
+
+// MaxUploadBytes is the largest attachment these values accept.
+func (v Values) MaxUploadBytes() int64 {
+	return int64(v.MaxUploadMiB) << 20
 }
 
 // BlockedFileTypes are the extensions no upload may have.

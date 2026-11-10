@@ -50,7 +50,7 @@ func ResealWithHookForTest(ctx context.Context, t *KeyTools, hook func(table, co
 
 // UseMailForTest sends account mail through the queue, as with a mail server.
 func (a *App) UseMailForTest() {
-	a.identity.SetMailer(accountMailer{pool: a.pool, keyring: a.keyring}, "http://example.test")
+	a.identity.SetMailer(accountMailer{keyring: a.keyring}, "http://example.test")
 }
 
 // RenderMailForTest writes a mail from the queue.

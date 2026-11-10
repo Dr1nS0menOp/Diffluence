@@ -7,8 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/keys"
 	"github.com/diffluence/diffluence/internal/mail"
@@ -21,12 +20,11 @@ const accountMailContext = "account mail"
 // accountMailer puts account mail in the mail queue. A link is a secret, so the queue
 // only ever holds it sealed, and drops it once the mail has left.
 type accountMailer struct {
-	pool    *pgxpool.Pool
 	keyring *keys.Keyring
 }
 
 // Send queues one mail about an account.
-func (m accountMailer) Send(ctx context.Context, a identity.AccountMail) error {
+func (m accountMailer) Send(ctx context.Context, q db.Querier, a identity.AccountMail) error {
 	body, err := json.Marshal(a)
 	if err != nil {
 		return fmt.Errorf("account mail: %w", err)
@@ -35,7 +33,7 @@ func (m accountMailer) Send(ctx context.Context, a identity.AccountMail) error {
 	if err != nil {
 		return fmt.Errorf("account mail: %w", err)
 	}
-	return mail.EnqueueAccount(ctx, m.pool, sealed)
+	return mail.EnqueueAccount(ctx, q, sealed)
 }
 
 // renderMail writes what the queue sends. Account mail is written here, because only

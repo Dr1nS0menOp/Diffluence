@@ -120,12 +120,15 @@ func (c Config) PlainToOthers() bool {
 	if c.SecureCookies() {
 		return false
 	}
-	host := c.PublicURL.Hostname()
-	if strings.EqualFold(host, "localhost") {
-		return false
-	}
-	ip, err := netip.ParseAddr(host)
-	return err != nil || !ip.IsLoopback()
+	// Load refuses an IP address here, so a name is all that can come: only localhost
+	// stays on this machine.
+	return !strings.EqualFold(c.PublicURL.Hostname(), "localhost")
+}
+
+// isAddress reports whether a host is an IP address rather than a name.
+func isAddress(host string) bool {
+	_, err := netip.ParseAddr(host)
+	return err == nil
 }
 
 // KeyFile is where the master key lives.
@@ -240,6 +243,11 @@ func Load(lookup LookupFunc) (Config, error) {
 		l.fail("PUBLIC_URL", err)
 	case (u.Scheme != "http" && u.Scheme != "https") || u.Host == "" || (u.Path != "" && u.Path != "/") || u.RawQuery != "" || u.User != nil:
 		l.fail("PUBLIC_URL", errors.New("must look like https://wiki.example.com (no path, query or credentials)"))
+	case isAddress(u.Hostname()):
+		// Passkeys are bound to a name, and a browser refuses an address as that name, so
+		// an address here would only fail later, in a loop of restarts (spec 050).
+		l.fail("PUBLIC_URL", errors.New("must use a host name, not an IP address: passkeys are bound to a name. "+
+			"On this machine use http://localhost:8080; on a network, a name from DNS or the hosts file"))
 	default:
 		c.PublicURL = u
 	}

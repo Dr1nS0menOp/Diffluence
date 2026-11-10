@@ -149,6 +149,18 @@ func (a *admission) middleware(next http.Handler) http.Handler {
 	})
 }
 
+// acquireLimit is the longest a request waits for a database connection. A request
+// that got through admission normally finds one at once; one that waits this long
+// meets a pool held by work that is stuck, and is better told "busy" (spec 050).
+const acquireLimit = 10 * time.Second
+
+// withAcquireLimit bounds every wait of a request for a database connection.
+func withAcquireLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		next.ServeHTTP(w, r.WithContext(db.WithAcquireLimit(r.Context(), acquireLimit)))
+	})
+}
+
 // withPermissionMemo lets a read load the facts of a person and a space once (ARC-197).
 // A write gets none: a grant it makes must count for the checks after it.
 func withPermissionMemo(next http.Handler) http.Handler {

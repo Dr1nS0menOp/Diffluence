@@ -10,6 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/testutil"
@@ -17,7 +18,7 @@ import (
 
 type sentMail struct{ mails []identity.AccountMail }
 
-func (m *sentMail) Send(_ context.Context, mail identity.AccountMail) error {
+func (m *sentMail) Send(_ context.Context, _ db.Querier, mail identity.AccountMail) error {
 	m.mails = append(m.mails, mail)
 	return nil
 }

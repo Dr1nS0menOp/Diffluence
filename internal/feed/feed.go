@@ -66,14 +66,17 @@ type Service struct {
 func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
 // One row per page: its newest version that was not silent. A silent version reached
-// nobody, so it does not show here either.
-const changesSQL = `WITH visible AS (SELECT page_id FROM perm_visible_pages($1)),
-	changes AS (
-		SELECT DISTINCT ON (v.page_id) v.page_id, v.author_id, v.created_at AS at,
+// nobody, so it does not show here either. The versions are read newest first, and each
+// is asked whether it is the newest of its page and whether its page is visible, so a
+// page of twenty items reads about twenty versions instead of every visible page
+// (spec 050). perm_visible_pages stays the rule.
+const changesSQL = `WITH changes AS (
+		SELECT v.page_id, v.author_id, v.created_at AS at,
 			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
-		FROM page_versions v JOIN visible ON visible.page_id = v.page_id
+		FROM page_versions v
 		WHERE NOT v.silent
-		ORDER BY v.page_id, v.number DESC
+		  AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)
+		  AND EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)
 	)
 	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), c.kind, c.at,
 		(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = c.page_id),
@@ -95,15 +98,24 @@ const changesSQL = `WITH visible AS (SELECT page_id FROM perm_visible_pages($1))
 	ORDER BY c.at DESC, c.page_id LIMIT $4`
 
 // Popular pages count what happened to them in the last days, among comments that
-// the person may see.
-const popularSQL = `WITH visible AS (SELECT page_id FROM perm_visible_pages($1)),
+// the person may see. Only a page with a reaction or comment in those days can score, so
+// those pages are the candidates, and only they are asked whether they are visible
+// (spec 050).
+const popularSQL = `WITH active AS (
+		SELECT r.target_id AS page_id FROM reactions r
+		WHERE r.target_type = 'page' AND r.created_at > now() - make_interval(days => $4)
+		UNION
+		SELECT m.page_id FROM comments m
+		WHERE m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only AND m.created_at > now() - make_interval(days => $4)
+	),
 	scores AS (
 		SELECT v.page_id,
 			(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = v.page_id
 				AND r.created_at > now() - make_interval(days => $4)) AS reactions,
 			(SELECT count(*) FROM comments m WHERE m.page_id = v.page_id AND m.trash_item_id IS NULL AND NOT m.purged
 				AND NOT m.editors_only AND m.created_at > now() - make_interval(days => $4)) AS comments
-		FROM visible v
+		FROM active v
+		WHERE EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)
 	)
 	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), 'popular', p.updated_at,
 		c.reactions, c.comments

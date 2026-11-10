@@ -172,7 +172,7 @@ func (s *Service) CreateUserAdmin(ctx context.Context, c Caller, in NewUser) (Us
 	if len(in.GlobalPermissions) == 0 {
 		in.GlobalPermissions = defaultPermissions(in.Type)
 	}
-	if err := s.mayGrant(ctx, c, in.GlobalPermissions, nil); err != nil {
+	if err := s.mayGrant(ctx, s.pool, c, in.GlobalPermissions, nil); err != nil {
 		return UserDetail{}, err
 	}
 	u, err := s.CreateLocalUser(ctx, in, c.Actor(), c.Meta)
@@ -190,11 +190,11 @@ func defaultPermissions(userType string) []string {
 }
 
 // mayGrant keeps the highest permission in the hands of those who already hold it.
-func (s *Service) mayGrant(ctx context.Context, c Caller, after, before []string) error {
+func (s *Service) mayGrant(ctx context.Context, q db.Querier, c Caller, after, before []string) error {
 	if c.System != "" || slices.Contains(after, PermSystemAdministrator) == slices.Contains(before, PermSystemAdministrator) {
 		return nil
 	}
-	ok, err := s.HasGlobalPermission(ctx, c.UserID, PermSystemAdministrator)
+	ok, err := s.HasGlobalPermissionIn(ctx, q, c.UserID, PermSystemAdministrator)
 	if err != nil {
 		return err
 	}
@@ -324,7 +324,7 @@ func (s *Service) SetGlobalPermissions(ctx context.Context, c Caller, subjectTyp
 		if err != nil {
 			return err
 		}
-		if err := s.mayGrant(ctx, c, perms, before); err != nil {
+		if err := s.mayGrant(ctx, tx, c, perms, before); err != nil {
 			return err
 		}
 		// The set becomes one instance role; grants follow from it (spec 036).

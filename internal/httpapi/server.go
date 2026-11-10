@@ -25,6 +25,7 @@ import (
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
 	"github.com/diffluence/diffluence/internal/failures"
@@ -185,6 +186,7 @@ func New(d Deps) (*Server, error) {
 		withClientIP(d.Config.TrustedProxies),
 		withLogAndRecover(d.Log),
 		s.admission.middleware,
+		withAcquireLimit,
 		withSecurityHeaders(d.Config.SecureCookies()),
 		cop.Handler,
 		s.withAuthentication,
@@ -329,8 +331,23 @@ func (s *Server) enforceKind(a Access, h http.Handler) http.Handler {
 }
 
 func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error) {
+	if s.answerBusyPool(w, r) {
+		return
+	}
 	s.deps.Log.Error("request failed", "error", err, "request_id", RequestIDFrom(r.Context()))
 	writeError(w, http.StatusInternalServerError, "internal_error", "Something went wrong.")
+}
+
+// answerBusyPool answers "busy" when the request found no database connection in
+// time, and reports whether it did. The person can try again, as with admission.
+func (s *Server) answerBusyPool(w http.ResponseWriter, r *http.Request) bool {
+	if !db.AcquireRanOut(r.Context()) {
+		return false
+	}
+	s.deps.Log.Warn("request found no database connection in time", "request_id", RequestIDFrom(r.Context()))
+	w.Header().Set("Retry-After", busyRetrySeconds)
+	writeError(w, http.StatusServiceUnavailable, "busy", busyMessage)
+	return true
 }
 
 // defaultPoolSize is used when there is no pool to measure, as in some tests.

@@ -160,9 +160,14 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 // Count says how many lines are unread, by the same rule as the list.
 func (s *Service) Count(ctx context.Context, c identity.Caller) (int, error) {
 	var n int
-	err := s.pool.QueryRow(ctx, `SELECT count(DISTINCT n.group_key) FROM notifications n
-		JOIN perm_visible_pages($1) v ON v.page_id = n.page_id
-		WHERE n.user_id = $1 AND n.read_at IS NULL AND n.hidden_at IS NULL`, c.UserID).Scan(&n)
+	// The bell asks often, so the rule is asked only about the pages of unread rows: a
+	// few, where perm_visible_pages over every page cost tens of milliseconds (spec 050).
+	err := s.pool.QueryRow(ctx, `WITH unread AS MATERIALIZED (
+			SELECT n.group_key, n.page_id FROM notifications n
+			WHERE n.user_id = $1 AND n.read_at IS NULL AND n.hidden_at IS NULL)
+		SELECT count(DISTINCT r.group_key) FROM unread r
+		WHERE r.page_id IN (SELECT v.page_id FROM perm_visible_pages($1) v
+			WHERE v.page_id = ANY (ARRAY(SELECT DISTINCT page_id FROM unread WHERE page_id IS NOT NULL)))`, c.UserID).Scan(&n)
 	return n, err
 }
 

@@ -189,7 +189,7 @@ func (s *Service) requireManager(ctx context.Context, q db.Querier, c identity.C
 	if spaceID != nil {
 		return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceTemplates)
 	}
-	admin, err := s.identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
+	admin, err := s.identity.HasGlobalPermissionIn(ctx, q, c.UserID, identity.PermAdministrator)
 	if err != nil {
 		return err
 	}

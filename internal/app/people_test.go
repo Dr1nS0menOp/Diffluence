@@ -22,6 +22,7 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -32,7 +33,7 @@ type fakeMail struct {
 	sent []identity.AccountMail
 }
 
-func (f *fakeMail) Send(_ context.Context, m identity.AccountMail) error {
+func (f *fakeMail) Send(_ context.Context, _ db.Querier, m identity.AccountMail) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.sent = append(f.sent, m)

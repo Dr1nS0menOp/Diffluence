@@ -300,6 +300,9 @@ func (s *Server) withAuthentication(next http.Handler) http.Handler {
 		case err == nil:
 			r = r.WithContext(context.WithValue(r.Context(), ctxPrincipal, &p))
 		case !errors.Is(err, identity.ErrNoSession):
+			if s.answerBusyPool(w, r) {
+				return
+			}
 			s.deps.Log.Error("session lookup failed", "error", err, "request_id", RequestIDFrom(r.Context()))
 			writeError(w, http.StatusServiceUnavailable, "unavailable", "Please try again shortly.")
 			return

@@ -76,9 +76,9 @@ func (s *Service) requireGlobal(ctx context.Context, c identity.Caller, perm str
 	return apperr.Forbidden()
 }
 
-func (s *Service) requireInvitationsOn(ctx context.Context) error {
+func (s *Service) requireInvitationsOn(ctx context.Context, q db.Querier) error {
 	values := settings.DefaultFeatures
-	if err := s.settings.ReadSection(ctx, settings.SectionFeatures, &values); err != nil {
+	if err := s.settings.ReadSectionIn(ctx, q, settings.SectionFeatures, &values); err != nil {
 		return err
 	}
 	if !values.Invitations {
@@ -96,8 +96,12 @@ func (s *Service) AskInvitation(ctx context.Context, c identity.Caller, pageID u
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {
 			return err
 		}
-		if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {
+		mayInvite, err := s.identity.HasGlobalPermissionIn(ctx, tx, c.UserID, identity.PermInvitePeople)
+		if err != nil {
 			return err
+		}
+		if !mayInvite {
+			return errMayNotInvite
 		}
 		space, _, err := s.perms.LoadPage(ctx, tx, pageID)
 		if err != nil {
@@ -105,8 +109,15 @@ func (s *Service) AskInvitation(ctx context.Context, c identity.Caller, pageID u
 		}
 		return s.fileInvitation(ctx, tx, c, invitationRow{id: id, email: in.Email, note: in.Note, pageID: pageID, spaceID: space.ID, requester: c.UserID})
 	})
+	if errors.Is(err, errMayNotInvite) {
+		// The refusal is audited once the transaction has let go of its connection.
+		return uuid.Nil, s.requireGlobal(ctx, c, identity.PermInvitePeople)
+	}
 	return id, err
 }
+
+// errMayNotInvite ends the transaction of a request from someone who may not invite.
+var errMayNotInvite = errors.New("sharing: may not invite people")
 
 // AskGuestInvitation files the same request from a space, for someone who manages it.
 // The answer hangs on the home page, because a notification hangs on a page.
@@ -129,7 +140,7 @@ func (s *Service) AskGuestInvitation(ctx context.Context, c identity.Caller, spa
 }
 
 func (s *Service) fileInvitation(ctx context.Context, tx pgx.Tx, c identity.Caller, r invitationRow) error {
-	if err := s.requireInvitationsOn(ctx); err != nil {
+	if err := s.requireInvitationsOn(ctx, tx); err != nil {
 		return err
 	}
 	address, err := identity.InvitationAddress(r.email)
@@ -200,10 +211,10 @@ func (s *Service) ApproveInvitation(ctx context.Context, c identity.Caller, id u
 		if err != nil {
 			return err
 		}
-		if err := s.requireInvitationsOn(ctx); err != nil {
+		if err := s.requireInvitationsOn(ctx, tx); err != nil {
 			return err
 		}
-		mayInvite, err := s.identity.HasGlobalPermission(ctx, r.requester, identity.PermInvitePeople)
+		mayInvite, err := s.identity.HasGlobalPermissionIn(ctx, tx, r.requester, identity.PermInvitePeople)
 		if err != nil {
 			return err
 		}

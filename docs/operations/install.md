@@ -29,6 +29,8 @@ printf '%s\n' 'a long password' | docker compose exec -T diffluence \
 
 `DIFFLUENCE_PUBLIC_URL` must be the address people type in their browser. It drives secure cookies, cross-site protection, passkeys and the OIDC redirect. It is also what decides whether the session cookie gets the `__Host-` prefix, so **https is required in production**.
 
+**It must use a host name, not an IP address.** Passkeys are bound to a name, and browsers do not accept an address for that, so Diffluence refuses to start with an address and says so. On the machine itself, use `http://localhost:8080`. A test machine on a network without DNS can use a name from the hosts file of each computer that opens it, such as `http://wiki.test:8080`.
+
 Put a TLS reverse proxy in front (Traefik, nginx). The app speaks plain http, so Compose publishes its port on `127.0.0.1` only, where a proxy on the same machine reaches it. If the proxy sits on another machine or network, set `DIFFLUENCE_BIND=0.0.0.0` (or the address of one network card), and set `DIFFLUENCE_TRUSTED_PROXIES` to the proxy's CIDR range, or every user appears to come from the proxy, and the login rate limit counts them all as one. When the public address starts with `http` on any host but this machine, the log at start and the admin console say so.
 
 A new instance gets an example space within seconds of its first administrator: it shows everything a page can do, and can be deleted like any other space. To start empty, set `DIFFLUENCE_EXAMPLE_SPACE=false`. An administrator can add it later under Administration, Settings.
@@ -186,7 +188,21 @@ The chart has been checked with `helm lint` and `helm template`, not yet on a cl
 
 ## How large the database must be
 
-For about 5,000 people, give PostgreSQL at least **2.5 CPUs**. With 1.5 CPUs, search had to turn away up to 3 percent of searches as busy at that size, and became slow (ADR-037, `docs/operations/limits.md`). This was measured on one machine with 50,000 pages, not on a real server. Below a few hundred people, 1 CPU is enough. When search starts to slow other work, add a PostgreSQL standby for search before anything else.
+For about 5,000 people, give PostgreSQL at least **2.5 CPUs**. With 1.5 CPUs, search had to turn away up to 3 percent of searches as busy at that size, and became slow (ADR-037, `docs/operations/limits.md`). This was measured on one machine with 50,000 pages, not on a real server. Below a few hundred people, 1 CPU is enough. When search starts to slow other work, add a PostgreSQL standby for search before anything else. CPU is what runs out first: on a test server with 8 cores for PostgreSQL, it was CPU, not memory or the disk ([the stress test](../reports/2026-11-10-stress-test.md)).
+
+**Give PostgreSQL memory settings for its machine.** Its defaults suit a very small machine, with 128 MB of shared buffers whatever the machine has. Set them in `postgresql.conf`, or as `command:` flags of the `postgres` service in a `compose.override.yaml` (`scripts/stress/compose.stress.yaml` is an example). Common starting points, from PostgreSQL's own guidance, for a machine that runs PostgreSQL and little else:
+
+| Memory for PostgreSQL | `shared_buffers` | `effective_cache_size` | `work_mem` |
+|---|---|---|---|
+| 2 GB | 512MB | 1536MB | 8MB |
+| 8 GB | 2GB | 6GB | 16MB |
+| 32 GB | 8GB | 24GB | 32MB |
+
+`shared_buffers` is about a quarter of the memory and `effective_cache_size` about three quarters. `work_mem` counts for each sort of each query, so keep it modest: the pool holds up to 20 connections a node. Keep `max_connections` above the pools of all nodes together, with room for backups and you.
+
+**To see which queries cost the most**, turn on `pg_stat_statements`: set `shared_preload_libraries = 'pg_stat_statements'`, restart PostgreSQL, and then run `CREATE EXTENSION pg_stat_statements;` once, as the owner of the database. The setting alone loads the module, but the view only exists after `CREATE EXTENSION`. `SELECT calls, mean_exec_time, left(query, 80) FROM pg_stat_statements ORDER BY total_exec_time DESC LIMIT 10;` then lists the heaviest.
+
+**Writes go at the pace of the disk's sync.** Every change that is audited takes the audit chain's lock in turn, and holds it until its commit is on disk (ADR-013). A disk that syncs 160 times a second therefore allows about 160 audited changes a second, however many CPUs there are. Put PostgreSQL on an SSD, or behind a controller with a battery-backed write cache, and leave `synchronous_commit` and `fsync` on.
 
 ## Load test
 

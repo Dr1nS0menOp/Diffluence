@@ -203,7 +203,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.mail.SetRenderer(a.renderMail)
 	a.mail.HoldWhile(a.inMaintenance)
 	if a.mail.Configured() {
-		a.identity.SetMailer(accountMailer{pool: a.pool, keyring: a.keyring}, cfg.PublicOrigin())
+		a.identity.SetMailer(accountMailer{keyring: a.keyring}, cfg.PublicOrigin())
 	}
 	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
@@ -247,27 +247,32 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 // accessPolicy hands the rules of the Access settings to identity. A failed read
 // falls back to the stricter of the two: the configured limit, and the rule on file.
 func (a *App) accessPolicy() identity.Policy {
-	read := func(ctx context.Context) settings.Access {
+	read := func(ctx context.Context, q db.Querier) settings.Access {
 		v := settings.DefaultAccess
-		if err := a.settings.ReadSection(ctx, settings.SectionAccess, &v); err != nil {
+		if err := a.settings.ReadSectionIn(ctx, q, settings.SectionAccess, &v); err != nil {
 			a.log.Error("reading access settings failed", "error", err)
 		}
 		return v
 	}
 	return identity.Policy{
-		IdleLimit:    func(ctx context.Context) time.Duration { return time.Duration(read(ctx).IdleMinutes) * time.Minute },
-		SecondFactor: func(ctx context.Context) string { return a.secondFactorRule(ctx, read(ctx).SecondFactor) },
+		IdleLimit: func(ctx context.Context) time.Duration {
+			return time.Duration(read(ctx, a.pool).IdleMinutes) * time.Minute
+		},
+		// Login asks inside its transaction, so the rule is read through it (spec 050).
+		SecondFactor: func(ctx context.Context, q db.Querier) string {
+			return a.secondFactorRule(ctx, q, read(ctx, q).SecondFactor)
+		},
 	}
 }
 
 // secondFactorRule gives the rule that holds now. A new instance gets time before its
 // administrators need a second factor. When its age cannot be read, the rule holds.
-func (a *App) secondFactorRule(ctx context.Context, rule string) string {
+func (a *App) secondFactorRule(ctx context.Context, q db.Querier, rule string) string {
 	if rule != settings.FactorAfterGrace {
 		return rule
 	}
 	var created time.Time
-	if err := a.pool.QueryRow(ctx, "SELECT created_at FROM instance").Scan(&created); err != nil {
+	if err := q.QueryRow(ctx, "SELECT created_at FROM instance").Scan(&created); err != nil {
 		a.log.Error("reading the age of the instance failed", "error", err)
 		return settings.FactorAdministrators
 	}

@@ -466,7 +466,12 @@ func (s *Service) whoToAsk(ctx context.Context, q db.Querier, pageID uuid.UUID, 
 // MayAsk reports whether a person who cannot see a page may be offered a request. It
 // stays false unless the space chose to allow that, so "not found" reveals nothing.
 func (s *Service) MayAsk(ctx context.Context, c identity.Caller, pageID uuid.UUID) (bool, error) {
-	space, page, err := s.perms.LoadPage(ctx, s.pool, pageID)
+	return s.mayAskIn(ctx, s.pool, pageID)
+}
+
+// mayAskIn is MayAsk through q, for code that holds a transaction (spec 050).
+func (s *Service) mayAskIn(ctx context.Context, q db.Querier, pageID uuid.UUID) (bool, error) {
+	space, page, err := s.perms.LoadPage(ctx, q, pageID)
 	if e, known := apperr.As(err); known && e.Kind == apperr.KindNotFound {
 		return false, nil
 	}
@@ -476,14 +481,14 @@ func (s *Service) MayAsk(ctx context.Context, c identity.Caller, pageID uuid.UUI
 	if page.Status != "published" {
 		return false, nil
 	}
-	return s.features.Enabled(ctx, s.pool, space.ID, features.AccessRequests)
+	return s.features.Enabled(ctx, q, space.ID, features.AccessRequests)
 }
 
 func (s *Service) checkMayRequest(ctx context.Context, q db.Querier, c identity.Caller, pageID uuid.UUID, kind string) error {
 	if kind == kindEdit {
 		return s.perms.RequirePage(ctx, q, c.UserID, pageID, permissions.ActionPageView, uuid.Nil)
 	}
-	allowed, err := s.MayAsk(ctx, c, pageID)
+	allowed, err := s.mayAskIn(ctx, q, pageID)
 	if err != nil {
 		return err
 	}

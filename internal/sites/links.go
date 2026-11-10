@@ -55,11 +55,12 @@ func (s *Service) requirePublisher(ctx context.Context, q db.Querier, c identity
 	if err := s.perms.RequirePage(ctx, q, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {
 		return uuid.Nil, err
 	}
-	spaceID, err := s.pages.SpaceOf(ctx, c, pageID)
+	// The space comes through q: a second connection from the pool could wait on this one.
+	space, _, err := s.perms.LoadPage(ctx, q, pageID)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	return spaceID, s.perms.RequireSpace(ctx, q, c.UserID, spaceID, permissions.SitePublish)
+	return space.ID, s.perms.RequireSpace(ctx, q, c.UserID, space.ID, permissions.SitePublish)
 }
 
 const linkSelect = `SELECT l.id, l.page_id, p.title, l.version, l.token, COALESCE(u.display_name, ''), l.created_at

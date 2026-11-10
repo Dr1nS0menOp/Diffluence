@@ -132,7 +132,7 @@ type Service struct {
 	issuer     string
 
 	idleSetting      func(context.Context) time.Duration
-	secondFactorRule func(context.Context) string
+	secondFactorRule func(context.Context, db.Querier) string
 	mailer           Mailer
 	origin           string
 	blocklist        map[string]bool
@@ -406,7 +406,7 @@ func (s *Service) recordFailedLogin(ctx context.Context, f failedLogin, meta Req
 	if err != nil || !lockedNow {
 		return err
 	}
-	return s.send(ctx, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})
+	return s.send(ctx, s.pool, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})
 }
 
 // PasswordLockAfter is how many wrong passwords in a row stop password login for an
@@ -537,8 +537,14 @@ func (s *Service) Logout(ctx context.Context, p Principal, meta RequestMeta) err
 // HasGlobalPermission reports whether the user holds perm, directly or through
 // a group.
 func (s *Service) HasGlobalPermission(ctx context.Context, userID uuid.UUID, perm string) (bool, error) {
+	return s.HasGlobalPermissionIn(ctx, s.pool, userID, perm)
+}
+
+// HasGlobalPermissionIn is HasGlobalPermission through q, for code that holds a
+// transaction: it never waits for a second connection while holding one (spec 050).
+func (s *Service) HasGlobalPermissionIn(ctx context.Context, q db.Querier, userID uuid.UUID, perm string) (bool, error) {
 	var ok bool
-	err := s.pool.QueryRow(ctx, "SELECT perm_has_global($1, $2)", userID, perm).Scan(&ok)
+	err := q.QueryRow(ctx, "SELECT perm_has_global($1, $2)", userID, perm).Scan(&ok)
 	return ok, err
 }
 

@@ -76,6 +76,60 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 
 func (*queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
 
+// The pool calls the two methods below around every wait for a connection, and uses
+// the context TraceAcquireStart returns for that wait. That is where a request's limit
+// on waiting applies, so no code path can hang on a full pool (spec 050).
+
+// TraceAcquireStart bounds the wait when the context carries a limit.
+func (*queryCounter) TraceAcquireStart(ctx context.Context, _ *pgxpool.Pool, _ pgxpool.TraceAcquireStartData) context.Context {
+	watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch)
+	if !ok {
+		return ctx
+	}
+	bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errAcquireLimit)
+	return context.WithValue(bounded, acquireCancelKey{}, cancel)
+}
+
+// TraceAcquireEnd notes a wait that ran out, and frees the timer of the wait.
+func (*queryCounter) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, data pgxpool.TraceAcquireEndData) {
+	cancel, ok := ctx.Value(acquireCancelKey{}).(context.CancelFunc)
+	if !ok {
+		return
+	}
+	if data.Err != nil && errors.Is(context.Cause(ctx), errAcquireLimit) {
+		if watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch); ok {
+			watch.ranOut.Store(true)
+		}
+	}
+	cancel()
+}
+
+// errAcquireLimit is the cause of a wait for a connection that took too long.
+var errAcquireLimit = errors.New("db: no connection free in time")
+
+type acquireLimitKey struct{}
+
+type acquireCancelKey struct{}
+
+// acquireWatch is the limit of one request, and whether a wait ran into it.
+type acquireWatch struct {
+	limit  time.Duration
+	ranOut atomic.Bool
+}
+
+// WithAcquireLimit makes every wait for a connection under ctx give up after limit.
+// Requests get one, so a full pool answers "busy" instead of hanging; background work
+// keeps waiting, because it has nobody to answer.
+func WithAcquireLimit(ctx context.Context, limit time.Duration) context.Context {
+	return context.WithValue(ctx, acquireLimitKey{}, &acquireWatch{limit: limit})
+}
+
+// AcquireRanOut reports whether a wait for a connection under ctx gave up at its limit.
+func AcquireRanOut(ctx context.Context) bool {
+	watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch)
+	return ok && watch.ranOut.Load()
+}
+
 // Queries returns how many queries a pool made by Open has sent since it started.
 // A pool made another way counts nothing.
 func Queries(pool *pgxpool.Pool) int64 {

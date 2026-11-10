@@ -334,7 +334,7 @@ mutate "the directory counts hidden pages" internal/spaces/directory.go \
 mutate "quick search shows people to everyone" internal/httpapi/handlers_reading.go \
   's.replace("if err != nil || !allowed {", "if err != nil || (!allowed && len(text) < 0) {")' $app -run TestQuickSearch
 mutate "quick search shows hidden files" internal/attachments/attachments.go \
-  's.replace("AND EXISTS (SELECT 1 FROM perm_listed_pages($1) v WHERE v.page_id = a.page_id) AND ", "AND $1::uuid IS NOT NULL AND ")' $app -run TestQuickSearch
+  's.replace("SELECT v.page_id FROM perm_listed_pages($1) v", "SELECT v.id AS page_id FROM pages v")' $app -run TestQuickSearch
 mutate "a row menu counts as a visit" internal/pages/details.go \
   's.replace("out.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err", "s.touchRecent(ctx, c.UserID, p)\n\tout.Can, err = s.capabilities(ctx, c, p)\n\treturn out, err")' $app -run TestOpeningARowMenu
 
@@ -397,7 +397,7 @@ mutate "SQL: a guest sees everyone" internal/db/migrations/0010_people.sql \
 mutate "a reset link works twice" internal/identity/factors.go \
   's.replace("\"DELETE FROM auth_challenges WHERE token_hash = $1 AND kind = $2 RETURNING user_id, data, expires_at\"", "\"SELECT user_id, data, expires_at FROM auth_challenges WHERE token_hash = $1 AND kind = $2\"")' $app -run TestAResetLink
 mutate "a reset says whether the address is known" internal/identity/lifecycle.go \
-  's.replace("if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn nil\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"", "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn s.send(ctx, AccountMail{To: email, Kind: MailReset})\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"")' $app -run TestAResetLink
+  's.replace("if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn nil\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"", "if errors.Is(err, pgx.ErrNoRows) {\n\t\treturn s.send(ctx, s.pool, AccountMail{To: email, Kind: MailReset})\n\t}\n\tif err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.pool.Exec(ctx, \"DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2\"")' $app -run TestAResetLink
 mutate "a read token writes" internal/httpapi/server.go \
   's.replace("return identity.ScopeWrite\n", "return identity.ScopeRead\n")' $app -run TestTokens
 mutate "a token reaches account security" internal/httpapi/server.go \
@@ -725,7 +725,7 @@ mutate "the office helper hears the file name" internal/exchange/office.go \
 mutate "a converted file loses its locked headers" internal/httpapi/handlers_files.go \
   's.replace("h.Set(\"Content-Security-Policy\", \"default-src \x27none\x27; sandbox\")\n\t\th.Set(\"X-Content-Type-Options\", \"nosniff\")\n\t\th.Set(\"Cache-Control\", \"private, no-store\")\n\t\th.Set(\"Content-Type\", \"application/octet-stream\")\n\t\th.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))", "h.Set(\"Content-Disposition\", attachmentHeader(a.Filename+\".pdf\"))")' $app -run TestAnOfficeFileOpensAsPDFThroughTheHelper
 mutate "a member without the role asks for an invitation" internal/sharing/invitations.go \
-  's.replace("if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tspace, _, err", "if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil \x26\x26 len(in.Email) < 0 {\n\t\t\treturn err\n\t\t}\n\t\tspace, _, err")' $app -run TestInvitationMatrix
+  's.replace("if !mayInvite {\n\t\t\treturn errMayNotInvite", "if !mayInvite \x26\x26 len(in.Email) < 0 {\n\t\t\treturn errMayNotInvite")' $app -run TestInvitationMatrix
 mutate "a space manager without the role asks for a guest" internal/sharing/invitations.go \
   's.replace("if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {\n\t\treturn uuid.Nil, err", "if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil \x26\x26 len(in.Email) < 0 {\n\t\treturn uuid.Nil, err")' $app -run TestASpaceManagerOnlyAsksForAGuest
 mutate "a space manager invites a guest without approval" internal/httpapi/handlers_people.go \
@@ -741,9 +741,9 @@ mutate "a refused invitation is approved after all" internal/sharing/invitations
 mutate "an answer needs no reason" internal/sharing/invitations.go \
   's.replace("if reason == \"\" || !utf8.ValidString(reason)", "if !utf8.ValidString(reason)")' $app -run TestAnAnswerNeedsAReason
 mutate "an approval goes through after the role is lost" internal/sharing/invitations.go \
-  's.replace("if !mayInvite {", "if !mayInvite \x26\x26 r.email == \"\" {")' $app -run TestApprovalFailsWhenTheRequesterLostTheRole
+  's.replace("if !mayInvite {\n\t\t\treturn apperr.Conflict(\"requester_lost_role\"", "if !mayInvite \x26\x26 r.email == \"\" {\n\t\t\treturn apperr.Conflict(\"requester_lost_role\"")' $app -run TestApprovalFailsWhenTheRequesterLostTheRole
 mutate "an approval goes through while invitations are off" internal/sharing/invitations.go \
-  's.replace("r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.requireInvitationsOn(ctx); err != nil {\n\t\t\treturn err\n\t\t}", "r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}")' $app -run TestRequestsWaitOnlyWhileInvitationsAreOn
+  's.replace("r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.requireInvitationsOn(ctx, tx); err != nil {\n\t\t\treturn err\n\t\t}", "r, err := lockWaitingInvitation(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}")' $app -run TestRequestsWaitOnlyWhileInvitationsAreOn
 mutate "the invitation makes a member, not a guest" internal/sharing/invitations.go \
   's.replace("identity.NewInvitation{Email: r.email, Type: identity.TypeGuest, SpaceID: \x26r.spaceID})\n\t\treturn err", "identity.NewInvitation{Email: r.email, Type: identity.TypeMember, SpaceID: \x26r.spaceID})\n\t\treturn err")' $app -run TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent
 mutate "the requester never hears the answer" internal/sharing/invitations.go \
@@ -1129,7 +1129,7 @@ mutate "one address may guess setup codes for ever" internal/httpapi/handlers_se
 mutate "turning off TOTP lets a session guess the password" internal/httpapi/handlers_identity.go \
   's.replace("\tif !s.loginByAcc.allow(\"pw:\" + PrincipalFrom(r.Context()).User.ID.String()) {", "\tif false {")' $app -run TestTurningOffTOTPCannotBeUsedToGuessThePassword
 mutate "a plain address on the network counts as safe" internal/config/config.go \
-  's.replace("return err != nil || !ip.IsLoopback()", "return err != nil || (!ip.IsLoopback() && false)")' ./internal/config/ -run TestAPlainAddressIsWeakOnlyWhenOthersReachIt
+  's.replace("return !strings.EqualFold(c.PublicURL.Hostname(), \"localhost\")", "return false && !strings.EqualFold(c.PublicURL.Hostname(), \"localhost\")")' ./internal/config/ -run TestAPlainAddressIsWeakOnlyWhenOthersReachIt
 mutate "the console keeps quiet about a plain address" internal/httpapi/handlers_console.go \
   's.replace("if s.deps.Config.PlainToOthers() {", "if false {")' $app -run TestTheConsoleWarnsOfAPlainPublicAddressThatOthersReach
 mutate "the app listens on every address" compose.yaml \
@@ -1247,7 +1247,7 @@ mutate "the right password leaves the run of wrong ones" internal/identity/ident
 mutate "a disabled account counts wrong passwords" internal/identity/identity.go \
   's.replace("if f.known && f.reason == \"bad_password\" {", "if f.known {")' $app -run TestOnlyWrongPasswordsOnALiveAccountCount
 mutate "the person is not told of the stop" internal/identity/identity.go \
-  's.replace("return s.send(ctx, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})", "return nil")' $app -run TestTheHundredthWrongPasswordStopsPasswordLogin
+  's.replace("return s.send(ctx, s.pool, AccountMail{To: f.account.Email, Kind: MailPasswordLocked})", "return nil")' $app -run TestTheHundredthWrongPasswordStopsPasswordLogin
 mutate "a new password leaves the stop" internal/identity/users.go \
   's.replace("updated_at = now(),\n\t\t\tfailed_logins_in_row = 0, password_locked_at = NULL`", "updated_at = now()`")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
 mutate "lifting the stop changes nothing" internal/identity/users.go \
@@ -1354,6 +1354,31 @@ mutate_web "adding a role takes the others away" src/views/access-roles.tsx \
   's.replace("return held.includes(added) ? held : [...held, added];", "return [added];")' src/views/access-roles.test.ts
 mutate_web "taking one role away takes them all" src/views/access-roles.tsx \
   's.replace("return held.filter((id) => id !== removed);", "return [];")' src/views/access-roles.test.ts
+# Spec 050: work that holds a connection never waits for a second one, every wait of a
+# request for a connection has a limit, and the feed, the bell and file search ask the
+# permission rule about few pages.
+mutate "a new space reads the instance through a second connection" internal/features/features.go \
+  's.replace("v, err := s.instanceIn(ctx, tx)", "v, err := s.Instance(ctx)")' $app -run TestManySpacesCreatedAtOnceAllFinish
+mutate "a wait for a connection has no limit" internal/db/db.go \
+  's.replace("bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errAcquireLimit)", "bounded, cancel := context.WithTimeoutCause(ctx, watch.limit*100000, errAcquireLimit)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
+mutate "a wait that ran out is not noted" internal/db/db.go \
+  's.replace("watch.ranOut.Store(true)", "watch.ranOut.Store(false)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
+mutate "requests wait for a connection without a limit" internal/httpapi/server.go \
+  's.replace("\t\twithAcquireLimit,\n", "")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
+mutate "a request on a full pool is not told busy" internal/httpapi/server.go \
+  's.replace("if !db.AcquireRanOut(r.Context()) {", "if !db.AcquireRanOut(r.Context()) || true {")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
+mutate "the feed shows an older version of a page" internal/feed/feed.go \
+  's.replace("AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)", "")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "the feed shows pages the reader may not see" internal/feed/feed.go \
+  's.replace("AND EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)", "")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "popular leaves out pages with only reactions" internal/feed/feed.go \
+  's.replace("WHERE r.target_type = \x27page\x27 AND r.created_at", "WHERE r.target_type = \x27none\x27 AND r.created_at")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "popular shows pages the reader may not see" internal/feed/feed.go \
+  's.replace("WHERE EXISTS (SELECT 1 FROM perm_visible_pages($1) vp", "WHERE true OR EXISTS (SELECT 1 FROM perm_visible_pages($1) vp")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "the bell counts rows about hidden pages" internal/notify/list.go \
+  's.replace("SELECT v.page_id FROM perm_visible_pages($1) v\n", "SELECT v.id AS page_id FROM pages v\n")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+mutate "an IP address is taken as the public address" internal/config/config.go \
+  's.replace("case isAddress(u.Hostname()):", "case false && isAddress(u.Hostname()):")' ./internal/config/ -run TestAnIPAddressIsRefusedAsThePublicAddress
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

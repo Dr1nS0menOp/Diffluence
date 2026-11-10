@@ -35,10 +35,11 @@ func (s *Service) AddImported(ctx context.Context, tx pgx.Tx, f ImportedFile, bo
 	if err != nil {
 		return "", err
 	}
-	limit, err := s.settings.MaxUploadBytes(ctx)
+	values, err := s.settings.GetIn(ctx, tx)
 	if err != nil {
 		return "", err
 	}
+	limit := values.MaxUploadBytes()
 	reader := bufio.NewReaderSize(body, 512)
 	head, err := reader.Peek(512)
 	if err != nil && !errors.Is(err, io.EOF) {
