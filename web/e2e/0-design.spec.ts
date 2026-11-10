@@ -503,6 +503,8 @@ test.describe('the look of every kind of screen', () => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/files');
     await expect(page.getByRole('heading', { name: 'Files', exact: true })).toBeVisible();
+    // The Changed column shows the day the file was added, so the picture would change each day.
+    await fixText(page.locator('td').filter({ hasText: /^[A-Z][a-z]{2} \d{1,2}, \d{4}$/ }), 'Nov 8, 2026');
     await picture(page, 'files');
     await page.context().close();
   });
