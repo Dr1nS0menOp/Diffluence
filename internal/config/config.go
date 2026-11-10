@@ -50,7 +50,8 @@ type Config struct {
 	ShutdownDelay      time.Duration // time between "not ready" and closing connections
 	MasterKeyFile      string        // key-encryption key; empty = DATA_DIR/master.key
 	// UpgradeBackupMaxAge is how old the last noted backup may be before a node refuses to
-	// migrate the database (blueprint 07, rule 4). Zero = only a warning in the log.
+	// migrate the database (blueprint 07, rule 4; ADR-040). It is 24 hours unless set. Zero
+	// means the operator switched the check off with "off": only a warning in the log.
 	UpgradeBackupMaxAge time.Duration
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
@@ -170,7 +171,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		SessionMaxAge:         l.duration("SESSION_MAX_AGE", 7*24*time.Hour),
 		ShutdownDelay:         l.duration("SHUTDOWN_DELAY", 5*time.Second),
 		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
-		UpgradeBackupMaxAge:   l.duration("UPGRADE_BACKUP_MAX_AGE", 0),
+		UpgradeBackupMaxAge:   l.backupAge("UPGRADE_BACKUP_MAX_AGE"),
 		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
 		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
 		OutwardAllowPrivate:   l.boolean("OUTWARD_ALLOW_PRIVATE", false),
@@ -230,9 +231,6 @@ func Load(lookup LookupFunc) (Config, error) {
 	}
 	if c.ShutdownDelay < 0 {
 		l.fail("SHUTDOWN_DELAY", errors.New("must not be negative"))
-	}
-	if c.UpgradeBackupMaxAge < 0 {
-		l.fail("UPGRADE_BACKUP_MAX_AGE", errors.New("must not be negative"))
 	}
 
 	pub := l.str("PUBLIC_URL", "http://localhost:8080")
@@ -356,6 +354,32 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 	if err != nil {
 		l.fail(key, fmt.Errorf("must be a duration like 30s or 8h, got %q", v))
 		return def
+	}
+	return d
+}
+
+// defaultUpgradeBackupMaxAge is how old the last backup may be before an upgrade, unless the
+// operator says otherwise (ADR-040).
+const defaultUpgradeBackupMaxAge = 24 * time.Hour
+
+// backupOff is the value that switches the backup check before an upgrade off on purpose.
+const backupOff = "off"
+
+// backupAge reads the backup age for an upgrade: a positive duration, or "off", which
+// gives zero. A zero or negative duration is refused rather than read as "off", so the
+// check is never switched off by a typing mistake.
+func (l *loader) backupAge(key string) time.Duration {
+	v, ok := l.raw(key)
+	if !ok || v == "" {
+		return defaultUpgradeBackupMaxAge
+	}
+	if strings.EqualFold(strings.TrimSpace(v), backupOff) {
+		return 0
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil || d <= 0 {
+		l.fail(key, fmt.Errorf("must be a positive duration like 24h, or %s to upgrade without a recent backup, got %q", backupOff, v))
+		return defaultUpgradeBackupMaxAge
 	}
 	return d
 }

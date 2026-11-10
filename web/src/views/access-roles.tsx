@@ -1,21 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
-// Who has access to a space: people and groups, each with a role chosen from a list
-// (spec 043). It replaces the matrix of ticks. Every change is previewed by the server and
-// asks first when someone would lose the space; the server audits it with before and after.
+// Who has access to a space: people and groups, each holding one or more roles (specs 043
+// and 049). It replaces the matrix of ticks. A role is added or taken away one at a time,
+// every change is previewed by the server and asks first when someone would lose the space,
+// and the server audits it with before and after.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, NIL_ID, type GrantPreview, type Me, type Space, type Subject } from '../api';
+import { IconClose } from '../components/icons';
 import { PersonPicture, personQuery } from '../components/person';
 import { SubjectPicker } from '../components/picker';
 import { Avatar, Dialog, ErrorNote, Field, Loading } from '../components/ui';
+import { permissionLabel } from '../permission-words';
 import { useRoles, type Role } from './roles';
 import { PreviewText } from './space-grants';
 
-// Migration 0036 names a combination of single permissions this way (rbac_role_for).
-const UNNAMED_PREFIX = 'Custom: ';
-// The value of a choice that is not one role, such as two roles held at once.
-const SEVERAL = '';
+// The empty first choice of a list that adds a role.
+const NO_CHOICE = '';
 
 interface Assignment {
   subject: Subject;
@@ -28,9 +29,14 @@ interface RoleChange {
   roles: string[];
 }
 
-/** Whether a role is a combination of single permissions that nobody named yet. */
-export function isUnnamed(role: Pick<Role, 'name' | 'built_in'>): boolean {
-  return !role.built_in && role.name.startsWith(UNNAMED_PREFIX);
+/** The roles a subject holds with one more, in the order they were given. */
+export function withRole(held: string[], added: string): string[] {
+  return held.includes(added) ? held : [...held, added];
+}
+
+/** The roles a subject holds without one of them. */
+export function withoutRole(held: string[], removed: string): string[] {
+  return held.filter((id) => id !== removed);
 }
 
 function subjectLabel(t: (key: string) => string, a: { subject: Subject; name: string }): string {
@@ -98,20 +104,20 @@ function RoleSelect({
   roles,
   value,
   label,
-  several,
+  placeholder,
   onChange,
 }: {
   roles: Role[];
   value: string;
   label: string;
-  several?: string;
+  placeholder?: string;
   onChange: (roleId: string) => void;
 }) {
   const { t } = useTranslation();
   const groups = [
     { label: t('access.builtInRoles'), roles: roles.filter((r) => r.built_in) },
-    { label: t('access.ownRoles'), roles: roles.filter((r) => !r.built_in && !isUnnamed(r)) },
-    { label: t('access.unnamedRoles'), roles: roles.filter(isUnnamed) },
+    { label: t('access.ownRoles'), roles: roles.filter((r) => !r.built_in && !r.unnamed) },
+    { label: t('access.unnamedRoles'), roles: roles.filter((r) => r.unnamed) },
   ].filter((g) => g.roles.length > 0);
   return (
     <select
@@ -120,9 +126,9 @@ function RoleSelect({
       value={value}
       onChange={(e) => onChange(e.target.value)}
     >
-      {several !== undefined && (
-        <option value={SEVERAL} disabled>
-          {several}
+      {placeholder !== undefined && (
+        <option value={NO_CHOICE} disabled>
+          {placeholder}
         </option>
       )}
       {groups.map((g) => (
@@ -184,6 +190,54 @@ function NameRoleDialog({ role, onClose }: { role: Role; onClose: () => void }) 
   );
 }
 
+/** One role someone holds: its name opens the permissions it gives, and a button takes it away. */
+function HeldRole({
+  role,
+  holder,
+  canRemove,
+  isAdministrator,
+  onRemove,
+  onName,
+}: {
+  role: Role;
+  holder: string;
+  canRemove: boolean;
+  isAdministrator: boolean;
+  onRemove: () => void;
+  onName: (role: Role) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <li className="held-role">
+      <details>
+        <summary>{role.name}</summary>
+        <p className="muted">{role.permissions.map((p) => permissionLabel(t, 'space', p)).join(', ')}</p>
+        {role.unnamed && (
+          <p className="muted">
+            {t('access.unnamedHelp')} {!isAdministrator && t('access.unnamedAsk')}
+          </p>
+        )}
+        {role.unnamed && isAdministrator && (
+          <button type="button" className="ghost" onClick={() => onName(role)}>
+            {t('access.nameRole')}
+          </button>
+        )}
+      </details>
+      {canRemove && (
+        <button
+          type="button"
+          className="icon ghost"
+          aria-label={t('access.takeRole', { role: role.name, name: holder })}
+          title={t('access.takeRole', { role: role.name, name: holder })}
+          onClick={onRemove}
+        >
+          <IconClose size={14} />
+        </button>
+      )}
+    </li>
+  );
+}
+
 function HolderRow({
   assignment,
   roles,
@@ -201,9 +255,11 @@ function HolderRow({
 }) {
   const { t } = useTranslation();
   const name = subjectLabel(t, assignment);
-  const held = assignment.roles;
-  const only = held.length === 1 ? roles.find((r) => r.id === held[0]?.id) : undefined;
+  const heldIds = assignment.roles.map((r) => r.id);
+  const held = heldIds.flatMap((id) => roles.filter((r) => r.id === id));
   const isOwner = assignment.subject.type === 'user' && assignment.subject.id === space.owner_id;
+  // The owner keeps at least one role here; the server also keeps every space an administrator.
+  const canRemoveOne = !isOwner || held.length > 1;
   return (
     <li className="member-row">
       <SubjectPicture subject={assignment.subject} name={name} />
@@ -212,23 +268,26 @@ function HolderRow({
         <span className="muted">
           <SubjectKind subject={assignment.subject} />
         </span>
-        {only && isUnnamed(only) && (
-          <span className="muted">
-            {t('access.unnamedHelp')} {!isAdministrator && t('access.unnamedAsk')}
-          </span>
-        )}
+        <ul className="held-roles" aria-label={t('access.rolesOf', { name })}>
+          {held.map((role) => (
+            <HeldRole
+              key={role.id}
+              role={role}
+              holder={name}
+              canRemove={canRemoveOne}
+              isAdministrator={isAdministrator}
+              onName={onName}
+              onRemove={() => onChange({ subject: assignment.subject, roles: withoutRole(heldIds, role.id) })}
+            />
+          ))}
+        </ul>
       </span>
-      {only && isUnnamed(only) && isAdministrator && (
-        <button type="button" className="ghost" onClick={() => onName(only)}>
-          {t('access.nameRole')}
-        </button>
-      )}
       <RoleSelect
-        roles={roles}
-        value={only?.id ?? SEVERAL}
-        label={t('access.roleOf', { name })}
-        several={only ? undefined : t('access.several', { names: held.map((r) => r.name).join(', ') })}
-        onChange={(roleId) => onChange({ subject: assignment.subject, roles: [roleId] })}
+        roles={roles.filter((r) => !heldIds.includes(r.id))}
+        value={NO_CHOICE}
+        label={t('access.addRoleFor', { name })}
+        placeholder={t('access.addRole')}
+        onChange={(roleId) => onChange({ subject: assignment.subject, roles: withRole(heldIds, roleId) })}
       />
       {!isOwner && (
         <button
@@ -243,8 +302,19 @@ function HolderRow({
   );
 }
 
-/** Picks a person, a group, all members or all guests, then the role they get. */
-function AddHolder({ roles, onChange }: { roles: Role[]; onChange: (next: RoleChange) => void }) {
+/**
+ * Picks a person, a group, all members or all guests, then a role they get. Someone who
+ * already holds roles here keeps them and gains this one.
+ */
+function AddHolder({
+  roles,
+  holders,
+  onChange,
+}: {
+  roles: Role[];
+  holders: Assignment[];
+  onChange: (next: RoleChange) => void;
+}) {
   const { t } = useTranslation();
   const [picked, setPicked] = useState<{ subject: Subject; name: string } | null>(null);
   const viewer = roles.find((r) => r.built_in === 'viewer') ?? roles[0];
@@ -276,7 +346,11 @@ function AddHolder({ roles, onChange }: { roles: Role[]; onChange: (next: RoleCh
           className="row"
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
-            onChange({ subject: picked.subject, roles: [roleId] });
+            const already = holders.find(
+              (h) => h.subject.type === picked.subject.type && h.subject.id === picked.subject.id,
+            );
+            const held = already?.roles.map((r) => r.id) ?? [];
+            onChange({ subject: picked.subject, roles: withRole(held, roleId) });
             setPicked(null);
           }}
         >
@@ -284,7 +358,7 @@ function AddHolder({ roles, onChange }: { roles: Role[]; onChange: (next: RoleCh
           <RoleSelect
             roles={roles}
             value={roleId}
-            label={t('access.roleOf', { name: picked.name })}
+            label={t('access.roleToGive', { name: picked.name })}
             onChange={setRoleId}
           />
           <button type="submit" className="primary" disabled={!roleId}>
@@ -350,7 +424,7 @@ export function SpaceRolesPanel({ space }: { space: Space }) {
           />
         ))}
       </ul>
-      <AddHolder roles={list} onChange={change.change} />
+      <AddHolder roles={list} holders={assignments.data.assignments} onChange={change.change} />
       {naming && <NameRoleDialog role={naming} onClose={() => setNaming(null)} />}
       {change.asking && (
         <Dialog title={t('access.confirmTitle')} onClose={change.cancel}>

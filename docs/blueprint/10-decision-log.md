@@ -153,6 +153,21 @@ Consequences: each item lands in a wave with its own study, failure paths first;
 **ADR-039: A witness of the audit log outside the database**
 Status: decided by the product owner (2026-11-09, in ADR-038), built in spec 046. Context: ADR-013 signs the head of the chain once a day, in the database. Someone who owns the database can remove the newest rows with their checkpoints, and the shortened chain still verifies. Decision: a worker signs the head every five minutes, when something happened since the last checkpoint, and writes each checkpoint to the application log once it is committed, at every log level. `diffluence audit verify --witness` reads those lines back, checks their signatures and names the first one the chain no longer matches. Consequences: an operator sends the application log to a place the database owner cannot change. At most five minutes of events have no copy. The witness holds no personal data. Supersedes: the daily checkpoint of ADR-013; the rest of ADR-013 stands.
 
+**ADR-040: The open questions of 10 November**
+Status: decided by the product owner (2026-11-10). Context: waves AR, O7 and PM, the study of spec 047 and the study of blueprints 07 and 08 (spec 048) left choices that were the product owner's. Decision:
+- **Permissions:** editing a database gets its own permission (`database.edit`), split off editing pages as `database.create` was split off creating them; whoever may edit pages today receives it, so nobody loses anything (spec 049).
+- **Roles in a space:** a person or a group may hold several roles in one space, and the Access screen shows and gives them one at a time. This reverses the one role per subject of spec 043.
+- **Combinations without a name** get a short name that is never cut off, such as "Custom combination 3 (12 permissions)", with a number that stays with the role; its permissions show when it is opened, and an administrator can still name it.
+- **Upgrades:** an upgrade refuses to start without a backup noted in the last 24 hours. An operator can change the age, or switch the check off on purpose with `off`. A new installation is never refused. This replaces decision D2 of spec 044, under which the check was off unless set.
+- **New tools:** packages for Debian and Red Hat built with GoReleaser, a configuration file in YAML, and OpenTelemetry are allowed, each after its own study, with a check of its licence.
+- **Editor:** the fixed toolbar stays and cannot be hidden for now. The floating text bar has headings 1 to 3 and lists besides bold, italic, link, code, colour, highlight and comment. The floating bars use TipTap's BubbleMenu (MIT).
+- **Search:** in a full search, exact words in the text rank before titles with a typo.
+- **Storage limit:** when the trash starts to count, there is no grace period.
+- **Donations:** the route for donations and grants is decided later.
+- **S3 storage** uses `minio-go` (Apache-2.0).
+- **Helm:** a small k3s cluster on virtual machines of the test server is enough to prove the chart.
+Consequences: items 1 to 4 are built in wave FU (spec 049), the editor, search and storage items in wave ES (spec 047), and the tools, S3 and Helm in the waves of spec 048. An installation without backups is refused at its next upgrade and must run `scripts/backup.sh` or set the check off: the changelog says so first. Supersedes: one role per subject in spec 043, decision D2 of spec 044.
+
 ---
 
 *Template for new ADRs:* `ADR-NNN: Title` · Status · Context (2 to 3 lines) · Decision (1 to 2 lines) · Consequences (1 to 3 lines) · Supersedes (if any).

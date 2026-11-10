@@ -74,18 +74,26 @@ func TestErrorsAreCollected(t *testing.T) {
 	}
 }
 
-func TestTheBackupAgeForAnUpgradeIsOffByDefaultAndNeverNegative(t *testing.T) {
+// ADR-040: an upgrade asks for a backup of at most 24 hours unless the operator switches
+// the check off on purpose with "off". Zero or a negative age is a mistake, not "off".
+func TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose(t *testing.T) {
 	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
-	if err != nil || c.UpgradeBackupMaxAge != 0 {
+	if err != nil || c.UpgradeBackupMaxAge != 24*time.Hour {
 		t.Fatalf("default %v, err %v", c.UpgradeBackupMaxAge, err)
 	}
 	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "26h"}))
 	if err != nil || c.UpgradeBackupMaxAge != 26*time.Hour {
 		t.Fatalf("set %v, err %v", c.UpgradeBackupMaxAge, err)
 	}
-	_, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "-1h"}))
-	if err == nil || !strings.Contains(err.Error(), "UPGRADE_BACKUP_MAX_AGE") {
-		t.Fatalf("negative: %v", err)
+	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "off"}))
+	if err != nil || c.UpgradeBackupMaxAge != 0 {
+		t.Fatalf("off %v, err %v", c.UpgradeBackupMaxAge, err)
+	}
+	for _, bad := range []string{"-1h", "0", "0s", "never", "yes"} {
+		_, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": bad}))
+		if err == nil || !strings.Contains(err.Error(), "UPGRADE_BACKUP_MAX_AGE") || !strings.Contains(err.Error(), "off") {
+			t.Fatalf("%q: want a refusal that names off, got %v", bad, err)
+		}
 	}
 }
 

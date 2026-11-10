@@ -40,8 +40,9 @@ func TestABundleOfVersionTwoGainsOnlyTheLaterSplit(t *testing.T) {
 	if !slices.Contains(got, permissions.SpaceLabels) || !slices.Contains(got, permissions.SpaceLook) {
 		t.Fatalf("a version 2 bundle knew nothing of labels and the look: %v", got)
 	}
-	if got := permissionsOfGrant(2, permissions.PageEdit); !slices.Equal(got, []string{permissions.PageEdit, permissions.PageMoveOut}) {
-		t.Fatalf("editing in a version 2 bundle moved pages out too: %v", got)
+	want := slices.Sorted(slices.Values([]string{permissions.PageEdit, permissions.PageMoveOut, permissions.DatabaseEdit}))
+	if got := permissionsOfGrant(2, permissions.PageEdit); !slices.Equal(got, want) {
+		t.Fatalf("editing in a version 2 bundle moved pages out and edited databases too: %v", got)
 	}
 }
 
@@ -81,5 +82,18 @@ func TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases(t *testi
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
 		t.Fatalf("a current bundle holds posts and databases itself, so pages alone must stay alone: %v", got)
+	}
+}
+
+// versionOfSpec045 is the bundle version that first held the create permissions of spec 045.
+const versionOfSpec045 = 4
+
+func TestABundleOfVersionFourGivesWhoeverEditsPagesDatabasesToo(t *testing.T) {
+	got := permissionsOfGrant(versionOfSpec045, permissions.PageEdit)
+	if want := []string{permissions.DatabaseEdit, permissions.PageEdit}; !slices.Equal(got, want) {
+		t.Fatalf("a version 4 bundle knew nothing of editing databases apart from pages: %v", got)
+	}
+	if got := permissionsOfGrant(bundleVersion, permissions.PageEdit); !slices.Equal(got, []string{permissions.PageEdit}) {
+		t.Fatalf("a current bundle holds database.edit itself, so editing pages alone must stay alone: %v", got)
 	}
 }

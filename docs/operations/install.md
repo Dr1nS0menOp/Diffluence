@@ -93,6 +93,10 @@ Diffluence creates `master.key` in the data directory on first start. It protect
 
 With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MASTER_KEY_FILE` to the same key on every node. Diffluence refuses to start without it. HA itself is phase 3: attachments are on local disk until the S3 store exists.
 
+## Backups before an upgrade
+
+Make backups from the first day with `scripts/backup.sh` ([backup and restore](backup-restore.md)). **An upgrade refuses to start when no backup was noted in the last 24 hours** (ADR-040), so a forgotten backup never meets a failed migration. `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` changes the age, such as `48h`, and `off` lets an upgrade go on without a recent backup. A new installation is never refused. See [upgrade.md](upgrade.md).
+
 ## Helpers and what they may reach
 
 Each optional helper runs in its own container on the `helpers` network, which has no way out (SEC-501, SEC-507). What each one gets:

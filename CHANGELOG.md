@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: an upgrade asks for a recent backup, databases are edited apart, and people hold several roles (spec 049)
+- **Upgrade impact first: an upgrade now refuses to start when no backup was noted in the last 24 hours.** Run `scripts/backup.sh` before you update. To change the age set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, such as `48h`; to upgrade without a recent backup set it to `off`. A new installation is never refused. The refusal names both ways on, and migrates nothing
+- Editing a database has its own permission, "Edit databases". Everyone who could edit pages gets it in the update, also through the built-in Editor, Manager and Space admin, so nobody gains or loses anything. A role can now edit pages without changing databases, or the other way round
+- A person or a group can hold several roles in a space. The Access screen shows every role they hold, adds one at a time, and takes one away at a time; taking the last one away still asks first
+- A combination of permissions nobody named has a short name, such as "Custom combination 3 (12 permissions)", instead of a long list cut off at 90 characters. Open a role on the Access screen to see its permissions
+- Upgrade impact: see the first line. Migration 0044 gives `database.edit` to every role that holds `page.edit` and renames combinations nobody named, expand only. Bundles are format 5; older bundles give `database.edit` with `page.edit`
 ### Security: a copy of the audit log outside the database, and a stop on password guessing (spec 046)
 - The head of the audit log is signed every five minutes when something happened, instead of once a day, and each signature also goes to the application log, whatever its level. Keep that log on a log server: `diffluence audit verify --witness <log>` then shows if the newest audit rows were removed from the database
 - After 100 wrong passwords in a row, password login for that account stops until the person chooses a new password or an administrator allows it again. The person gets a mail. Passkeys and single sign-on keep working, and the right password ends a run of wrong ones

@@ -64,8 +64,8 @@ services:
       DIFFLUENCE_COLLABORA_URL: ${DIFFLUENCE_COLLABORA_URL:-}
       # Public sites are written below this folder. Empty = no sites.
       DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
-      # An upgrade refuses to migrate when the last backup.sh run is older than this,
-      # such as 26h. Empty = it only warns (docs/operations/upgrade.md).
+      # An upgrade refuses to migrate when the last backup.sh run is older than this.
+      # Empty = 24h. "off" upgrades without a recent backup (docs/operations/upgrade.md).
       DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
     secrets: [database_url, migrate_database_url]
     # Plain http, so only this machine by default: the TLS proxy in front reaches it here.

@@ -72,9 +72,12 @@ const (
 
 	// PostCreate writes new blog posts, and turns an unpublished page into one (spec 045).
 	PostCreate = "post.create"
-	// DatabaseCreate makes new databases in the space, and copies or moves them in. Editing
-	// a database stays page.edit, as for every kind of page (spec 045).
+	// DatabaseCreate makes new databases in the space, and copies or moves them in (spec 045).
 	DatabaseCreate = "database.create"
+	// DatabaseEdit changes databases that are already there: their rows, columns and views,
+	// and everything page.edit allows on any other item (ADR-040, spec 049). On a database,
+	// asking for page.edit asks for this.
+	DatabaseEdit = "database.edit"
 )
 
 // Kinds of item that have a create permission of their own (ADR-038). The pages package
@@ -105,7 +108,7 @@ var AllSpacePermissions = []string{
 	RestrictionManage, AnalyticsView,
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
 	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
-	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate,
+	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit,
 }
 
 // SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
@@ -126,6 +129,7 @@ var SplitFrom = map[string]string{
 	SpaceInviteGuests: SpaceManageAccess,
 	PostCreate:        PageCreate,
 	DatabaseCreate:    PageCreate,
+	DatabaseEdit:      PageEdit,
 }
 
 // splitOffAdminister reports whether a permission was split off space administration, so
@@ -194,7 +198,7 @@ type PageFacts struct {
 	ID        uuid.UUID
 	Status    string // draft, published, trashed
 	CreatedBy uuid.UUID
-	Kind      string // page, post, folder, link, template
+	Kind      string // page, post, folder, link, database, template
 	Archived  bool
 	// ViewChain holds the page and its ancestors that carry a view restriction.
 	ViewChain []RestrictionLevel
@@ -239,10 +243,20 @@ type Decision struct {
 // isEdit reports whether an edit restriction on the page applies to action.
 func isEdit(action string) bool {
 	switch action {
-	case PageEdit, PageArchive, ActionPageDelete, AttachmentAdd, ActionAttachmentDelete, PageMoveOut:
+	case PageEdit, PageArchive, ActionPageDelete, AttachmentAdd, ActionAttachmentDelete, PageMoveOut, DatabaseEdit:
 		return true
 	}
 	return false
+}
+
+// spaceEditPermission is the space permission that edits an item: database.edit for a
+// database, page.edit for every other kind (ADR-040). Modules keep asking for page.edit,
+// so no route can forget the database.
+func spaceEditPermission(p *PageFacts) string {
+	if p != nil && p.Kind == kindDatabase {
+		return DatabaseEdit
+	}
+	return PageEdit
 }
 
 // KindTemplate marks a hidden page that holds a template. It is never a page to
@@ -309,6 +323,9 @@ func actionAllowedBySpace(in Input) (string, bool) {
 		return SpaceInviteGuests, holds(in, SpaceInviteGuests) || holds(in, SpaceAdminister)
 	case ActionCommentDelete:
 		return CommentDeleteAny, holds(in, CommentDeleteAny) || (in.Owner == in.User.ID && holds(in, CommentDeleteOwn))
+	case PageEdit:
+		perm := spaceEditPermission(in.Page)
+		return perm, holds(in, perm)
 	}
 	return in.Action, holds(in, in.Action)
 }

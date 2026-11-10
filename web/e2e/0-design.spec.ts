@@ -775,7 +775,12 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.getByRole('heading', { name: 'Give access' })).toBeVisible();
     await expect(page.locator('.member-row').first()).toBeVisible();
     await picture(page, 'space-roles');
-    // A combination without a name shows as it is, and an administrator can name it.
+    // A combination without a name opens to show its permissions, and an administrator can name it.
+    await page
+      .locator('.held-role summary', { hasText: /^Custom combination \d+ \(/ })
+      .first()
+      .click();
+    await picture(page, 'space-roles-open');
     await page.getByRole('button', { name: 'Name this role' }).first().click();
     await expect(page.getByRole('dialog', { name: 'Name this role' })).toBeVisible();
     await picture(page, 'name-role');

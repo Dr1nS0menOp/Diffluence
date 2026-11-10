@@ -82,6 +82,12 @@ sleep 2
 newest() { psql "$url" -tAc 'SELECT max(version) FROM schema_migrations'; }
 before=$(newest)
 
+# As an operator does before an upgrade, a backup is noted; an upgrade asks for one of at
+# most a day (ADR-040). A release from before "backup note" existed cannot note one, and
+# the new binary does it then.
+DIFFLUENCE_DATA_DIR="$work/old" "$old" backup note >/dev/null 2>&1 ||
+  DIFFLUENCE_DATA_DIR="$work/old" "$new" backup note >/dev/null
+
 echo "2. the new version starts on the same database and migrates it"
 # Every node of an installation has the same key (DIFFLUENCE_MASTER_KEY_FILE).
 mkdir -p "$work/new"

@@ -79,7 +79,8 @@ type grantCase struct {
 var viewerPerms = []string{permissions.SpaceView, permissions.SpaceExport, permissions.CommentAdd, permissions.CommentDeleteOwn}
 var editorPerms = []string{permissions.SpaceView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
 	permissions.PageDeleteOwn, permissions.AttachmentAdd, permissions.AttachmentDeleteOwn,
-	permissions.CommentAdd, permissions.CommentDeleteOwn, permissions.PostCreate, permissions.DatabaseCreate}
+	permissions.CommentAdd, permissions.CommentDeleteOwn, permissions.PostCreate, permissions.DatabaseCreate,
+	permissions.DatabaseEdit}
 var adminPerms = permissions.AllSpacePermissions
 var managerPerms = permissions.Templates[permissions.TemplateManager]
 
@@ -128,6 +129,10 @@ var grantCases = []grantCase{
 	{name: "databases-only", subject: "group", perms: []string{permissions.SpaceView, permissions.DatabaseCreate}, extra: true},
 	{name: "pages-without-posts-or-databases", subject: "user", perms: []string{permissions.SpaceView, permissions.PageCreate,
 		permissions.PageEdit}, extra: true},
+	// Spec 049: databases edited apart from pages, both ways round.
+	{name: "edit-pages-not-databases", subject: "group", perms: []string{permissions.SpaceView, permissions.PageEdit,
+		permissions.AttachmentAdd}, extra: true},
+	{name: "edit-databases-only", subject: "user", perms: []string{permissions.SpaceView, permissions.DatabaseEdit}, extra: true},
 }
 
 // restrictionCase places restrictions on the chain root → mid → leaf; the page
@@ -203,7 +208,7 @@ var actions = []string{
 	permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 	permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
 	permissions.SpaceLook, permissions.PageWatchers, permissions.PageMoveOut, permissions.SpaceInviteGuests,
-	permissions.PostCreate, permissions.DatabaseCreate,
+	permissions.PostCreate, permissions.DatabaseCreate, permissions.DatabaseEdit,
 }
 
 // isDeleteAction says whether the creator of the object decides, through "delete own".
@@ -312,6 +317,15 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		if !has(permissions.CommentDeleteAny) && !(ownObject && has(permissions.CommentDeleteOwn)) {
 			return false
 		}
+	case permissions.PageEdit:
+		// Editing a database needs database.edit; every other item, page.edit (spec 049).
+		need := permissions.PageEdit
+		if !ps.noPage && ps.kind == "database" {
+			need = permissions.DatabaseEdit
+		}
+		if !has(need) {
+			return false
+		}
 	default:
 		if !has(action) {
 			return false
@@ -321,7 +335,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	// parent never counts.
 	switch action {
 	case permissions.PageEdit, permissions.PageArchive, permissions.ActionPageDelete,
-		permissions.AttachmentAdd, permissions.ActionAttachmentDelete, permissions.PageMoveOut:
+		permissions.AttachmentAdd, permissions.ActionAttachmentDelete, permissions.PageMoveOut, permissions.DatabaseEdit:
 		if !ps.noPage && !matches(r.editLeaf) {
 			return false
 		}

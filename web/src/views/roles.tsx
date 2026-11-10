@@ -19,6 +19,8 @@ export interface Role {
   description: string;
   permissions: string[];
   in_use: number;
+  /** A combination of single permissions nobody named yet (spec 049). */
+  unnamed: boolean;
 }
 
 interface RoleList {

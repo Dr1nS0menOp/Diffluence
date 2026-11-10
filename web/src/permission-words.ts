@@ -16,6 +16,7 @@ const SPACE_GROUPS: [PermissionGroup, string[]][] = [
       'post.create',
       'database.create',
       'page.edit',
+      'database.edit',
       'page.archive',
       'page.delete_own',
       'page.delete_any',

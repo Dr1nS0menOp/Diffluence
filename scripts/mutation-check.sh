@@ -561,7 +561,8 @@ mutate "search shows a thread for editors" internal/db/migrations/0008_organisin
   's.replace("AND (NOT c.editors_only OR c.page_id IN (SELECT e.page_id FROM perm_editable_pages(u) e))", "")' $app -run TestCommentSearchFollowsTheRuleOfAComment
 mutate "search shows a comment in the trash" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE c.trash_item_id IS NULL AND NOT c.purged", "WHERE NOT c.purged")' $app -run TestCommentSearchFollowsTheRuleOfAComment
-mutate "an edit restriction does not count for a thread" internal/db/migrations/0008_organising.sql \
+# Migration 0044 holds the latest perm_editable_pages.
+mutate "an edit restriction does not count for a thread" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
 mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
   's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
@@ -1057,11 +1058,12 @@ mutate "moving out needs only edit again" internal/pages/move.go \
 mutate "the impact of a move out needs only edit" internal/pages/move.go \
   's.replace("action = permissions.PageMoveOut", "action = permissions.PageEdit")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
 mutate "an edit restriction does not stop a move out" internal/permissions/evaluate.go \
-  's.replace("AttachmentAdd, ActionAttachmentDelete, PageMoveOut:", "AttachmentAdd, ActionAttachmentDelete:")' $perms -run TestMatrixEvaluate
+  's.replace("AttachmentAdd, ActionAttachmentDelete, PageMoveOut, DatabaseEdit:", "AttachmentAdd, ActionAttachmentDelete, DatabaseEdit:")' $perms -run TestMatrixEvaluate
 mutate "asking for guests stops in an archived space" internal/permissions/evaluate.go \
   's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
-mutate "the migration gives editors no move out" internal/db/migrations/0041_posts_and_databases.sql \
-  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"']", "WHEN '"'"'page.edit'"'"' THEN '"'"'{}'"'"'::text[]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+# Migration 0044 holds the latest rbac_split_off, so the mutations of the split aim there.
+mutate "the migration gives editors no move out" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"']", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'database.edit'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "kept facts ignore the permission generation" internal/permissions/factcache.go \
@@ -1201,7 +1203,7 @@ mutate "a copied item asks for nothing of its kind" internal/pages/tree.go \
   's.replace("\tif err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {\n\t\treturn Page{}, err\n\t}\n", "")' $app -run TestCopyingADatabaseAsksForDatabasesWhereTheCopyGoes
 mutate "a branch moves out without the kinds in it" internal/pages/move.go \
   's.replace("append([]string{permissions.SpaceView}, needed...)", "append([]string{permissions.SpaceView, permissions.PageCreate}, needed[:0]...)")' $app -run TestMovingADatabaseToAnotherSpaceAsksForDatabasesThere
-mutate "the migration gives page creators no posts" internal/db/migrations/0041_posts_and_databases.sql \
+mutate "the migration gives page creators no posts" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"']", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves roles without posts and databases" internal/db/migrations/0041_posts_and_databases.sql \
   's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1301,6 +1303,57 @@ mutate_web "the bar may cover the sticky row" src/components/editor/floating-bar
   's.replace("options.flip.padding.top = keepOut + EDGE;", "")' src/components/editor/floating-bars.test.ts
 mutate_web "the arrow keys ignore a right-to-left page" src/components/editor/roving-focus.ts \
   's.replace("return rightToLeft ? previous : next;", "return next;")' src/components/editor/floating-bars.test.ts
+
+# Spec 049: editing a database has its own permission, people hold several roles, combinations
+# nobody named have short names, and an upgrade asks for a recent backup.
+mutate "a database is edited with page.edit" internal/permissions/evaluate.go \
+  's.replace("if p != nil && p.Kind == kindDatabase {", "if false {")' $perms -run TestDatabasesAndPagesAreEditedApart
+mutate "page.edit ignores the kind of the item" internal/permissions/evaluate.go \
+  's.replace("perm := spaceEditPermission(in.Page)", "perm := PageEdit")' $perms -run TestDatabasesAndPagesAreEditedApart
+mutate "an edit restriction does not stop editing a database" internal/permissions/evaluate.go \
+  's.replace("ActionAttachmentDelete, PageMoveOut, DatabaseEdit:", "ActionAttachmentDelete, PageMoveOut:")' $perms -run TestMatrixEvaluate
+mutate "database.edit is not split off page.edit in Go" internal/permissions/evaluate.go \
+  's.replace("\tDatabaseEdit:      PageEdit,\n", "")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the built-in editor cannot edit databases" internal/permissions/manage.go \
+  's.replace("PostCreate, DatabaseCreate,\n\t\tDatabaseEdit},", "PostCreate, DatabaseCreate},")' $perms -run TestBuiltInRolesMatchTheTemplates
+mutate "the editable list ignores the kind" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("AND CASE WHEN p.kind = '"'"'database'"'"'", "AND CASE WHEN false")' $perms -run TestDatabasesAndPagesAreEditedApart
+mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"']", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the migration gives editors no database editing" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("\nSELECT rbac_split_roles_from(", "\nSELECT 1, (")' $perms -run TestBuiltInRolesMatchTheTemplates
+mutate "the migration runs every earlier split again" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("UPDATE roles SET permissions = ARRAY(SELECT DISTINCT p FROM unnest(permissions || finer) p ORDER BY 1),", "UPDATE roles SET permissions = rbac_with_split_off(permissions || finer),")' $perms -run TestTheMigrationAddsOnlyDatabaseEditing
+mutate "a bundle from before the split gives no database editing" internal/exchange/bundlein.go \
+  's.replace("permissions.DatabaseEdit:      5,", "permissions.DatabaseEdit:      1,")' ./internal/exchange/ -run TestEverySplitPermissionKnowsTheBundleVersionThatHoldsIt
+mutate "one permission is called permissions" internal/permissions/roles.go \
+  's.replace("if permissionCount == 1 {", "if permissionCount < 1 {")' $perms -run TestUnnamedRoleNamesAreShortAndTheSameInGoAndSQL
+mutate "the database names one permission permissions" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("CASE WHEN perms = 1 THEN '"'"' permission)'"'"' ELSE '"'"' permissions)'"'"' END", "'"'"' permissions)'"'"'")' $perms -run TestUnnamedRoleNamesAreShortAndTheSameInGoAndSQL
+mutate "a combination is named after its cut list again" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("VALUES (found, sc, rbac_free_unnamed_name(sc, cardinality(wanted)),", "VALUES (found, sc, left('"'"'Custom: '"'"' || rbac_words(wanted), 90),")' $perms -run TestUnnamedRoleNamesAreShortAndTheSameInGoAndSQL
+mutate "every combination gets number zero" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("0) + 1", "0) + 0")' $perms -run TestUnnamedRoleNamesAreShortAndTheSameInGoAndSQL
+mutate "combinations named before keep the cut list" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("WHERE builtin IS NULL AND name LIKE '"'"'Custom: %'"'"'", "WHERE false AND name LIKE '"'"'Custom: %'"'"'")' $perms -run TestCombinationsNamedBeforeGetTheShortName
+mutate "a name an administrator gave is renamed" internal/db/migrations/0044_database_edit_and_role_names.sql \
+  's.replace("          AND description = '"'"'Made from permissions that were given one by one.'"'"'\n", "\n")' $perms -run TestCombinationsNamedBeforeGetTheShortName
+mutate "no role is marked unnamed" internal/permissions/roles.go \
+  's.replace("\t_, v.Unnamed = unnamedNumber(v.Name)\n", "")' $perms -run TestUnnamedRoleNamesAreShortAndTheSameInGoAndSQL
+mutate "the count in an unnamed name goes stale" internal/permissions/roles.go \
+  's.replace("unnamed && changed && in.Name == r.Name {", "false && unnamed && changed && in.Name == r.Name {")' $perms -run TestAnUnnamedRoleKeepsItsCountTrue
+mutate "an upgrade asks for no backup unless told" internal/config/config.go \
+  's.replace("if !ok || v == \"\" {\n\t\treturn defaultUpgradeBackupMaxAge", "if !ok || v == \"\" {\n\t\treturn 0")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
+mutate "off does not switch the backup check off" internal/config/config.go \
+  's.replace("if strings.EqualFold(strings.TrimSpace(v), backupOff) {", "if false {")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
+mutate "an age of zero switches the backup check off" internal/config/config.go \
+  's.replace("if err != nil || d <= 0 {", "if err != nil || d < 0 {")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
+mutate "the refusal does not say how to go on" internal/app/upgrade.go \
+  's.replace("const backupWayOut = \"run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one\"", "const backupWayOut = \"run scripts/backup.sh first\"")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate_web "adding a role takes the others away" src/views/access-roles.tsx \
+  's.replace("return held.includes(added) ? held : [...held, added];", "return [added];")' src/views/access-roles.test.ts
+mutate_web "taking one role away takes them all" src/views/access-roles.tsx \
+  's.replace("return held.filter((id) => id !== removed);", "return [];")' src/views/access-roles.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

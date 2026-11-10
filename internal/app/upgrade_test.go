@@ -79,6 +79,51 @@ func TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating(t 
 	}
 }
 
+// ADR-040: without the setting, an upgrade asks for a backup of at most a day, and the
+// refusal says both ways on.
+func TestAnUpgradeWithoutARecentBackupIsRefusedByDefault(t *testing.T) {
+	tdb, migs := previousRelease(t)
+	cfg, err := config.Load(func(key string) (string, bool) {
+		v, ok := map[string]string{"DIFFLUENCE_DATABASE_URL": tdb.URL}[key]
+		return v, ok
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cfg.HTTPAddr, cfg.DataDir = "127.0.0.1:0", t.TempDir()
+	_, err = startNode(t, cfg)
+	for _, want := range []string{"no backup was noted", "scripts/backup.sh", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("want a refusal naming %q, got %v", want, err)
+		}
+	}
+	// A backup of today lets the upgrade go on; an older one is refused in
+	// TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse.
+	if err := app.NoteBackup(context.Background(), tdb.Pool); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := startNode(t, cfg); err != nil {
+		t.Fatalf("a backup of today should let the upgrade go on: %v", err)
+	}
+	if st, err := db.Status(context.Background(), tdb.Pool, migs); err != nil || st.PendingExpand != 0 {
+		t.Fatalf("not migrated: %+v %v", st, err)
+	}
+}
+
+// With the check switched off on purpose, the upgrade goes on without a backup and still
+// leaves its marker.
+func TestAnUpgradeWithTheBackupCheckOffGoesOn(t *testing.T) {
+	tdb, _ := previousRelease(t)
+	cfg := upgradeConfig(t, tdb.URL)
+	cfg.UpgradeBackupMaxAge = 0
+	if _, err := startNode(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeStarted); n != 1 {
+		t.Fatalf("want one marker, got %d", n)
+	}
+}
+
 func TestAnUpgradeLeavesAMarkerNamingTheLastBackup(t *testing.T) {
 	tdb, migs := previousRelease(t)
 	if err := app.NoteBackup(context.Background(), tdb.Pool); err != nil {

@@ -21,6 +21,7 @@ func TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse(t *testing.T) {
 		{"the queue is down", func(f *upgradeFacts) { f.queueHealthy = false }, 0, "queue (NATS)"},
 		{"no backup while one is asked for", func(f *upgradeFacts) { f.lastBackup = time.Time{} }, 24 * time.Hour, "no backup was noted"},
 		{"a backup too old", func(f *upgradeFacts) { f.lastBackup = now.Add(-25 * time.Hour) }, 24 * time.Hour, "2026-11-08T11:00:00Z"},
+		{"a backup too old says how to go on", func(f *upgradeFacts) { f.lastBackup = now.Add(-25 * time.Hour) }, 24 * time.Hour, "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off"},
 		{"a backup just inside the age", func(f *upgradeFacts) { f.lastBackup = now.Add(-24 * time.Hour) }, 24 * time.Hour, ""},
 		{"no backup while none is asked for", func(f *upgradeFacts) { f.lastBackup = time.Time{} }, 0, ""},
 		{"free space this system cannot tell", func(f *upgradeFacts) { f.freeBytes, f.freeKnown = 0, false }, 0, ""},

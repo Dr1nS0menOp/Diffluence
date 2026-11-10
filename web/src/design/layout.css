@@ -1591,12 +1591,36 @@ span.twist {
   color: var(--color-muted);
 }
 
+/* The roles someone holds in a space: each opens to show its permissions (spec 049). */
+.held-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.held-role {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.held-role summary {
+  cursor: pointer;
+}
+
+.held-role details[open] {
+  flex-basis: 100%;
+}
+
 /* A long role name, such as a combination without a name, is cut short in its list rather
    than pushing the name of the person out of the row (spec 043). */
 .member-row .role-choice {
   max-inline-size: var(--size-card);
 }
-
 .member-row > button {
   flex: none;
   white-space: nowrap;

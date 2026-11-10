@@ -5,7 +5,10 @@ package permissions
 import (
 	"context"
 	"errors"
+	"fmt"
+	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 	"unicode/utf8"
 
@@ -41,6 +44,33 @@ type Role struct {
 	Permissions []string  `json:"permissions"`
 	// InUse is how many assignments hold the role.
 	InUse int `json:"in_use"`
+	// Unnamed marks a combination of single permissions that nobody named yet: its name is
+	// the one the database gave it (UnnamedRoleName).
+	Unnamed bool `json:"unnamed"`
+}
+
+// unnamedRolePattern matches the names rbac_unnamed_role_name gives (migration 0044).
+var unnamedRolePattern = regexp.MustCompile(`^Custom combination ([0-9]+) \(([0-9]+) permissions?\)$`)
+
+// UnnamedRoleName is the name of a combination nobody named: a number that stays with the
+// role and how many permissions it holds, never cut off (ADR-040). The database gives the
+// same name; a test holds the two equal.
+func UnnamedRoleName(number, permissionCount int) string {
+	word := "permissions"
+	if permissionCount == 1 {
+		word = "permission"
+	}
+	return fmt.Sprintf("Custom combination %d (%d %s)", number, permissionCount, word)
+}
+
+// unnamedNumber gives the number of an unnamed role's name, or false for any other name.
+func unnamedNumber(name string) (int, bool) {
+	m := unnamedRolePattern.FindStringSubmatch(name)
+	if m == nil {
+		return 0, false
+	}
+	n, err := strconv.Atoi(m[1])
+	return n, err == nil
 }
 
 // RoleInput is what an administrator sets on a role.
@@ -152,6 +182,8 @@ func (s *Service) roles(ctx context.Context, q db.Querier, scope string) ([]Role
 func scanRole(r pgx.CollectableRow) (Role, error) {
 	var v Role
 	err := r.Scan(&v.ID, &v.Scope, &v.BuiltIn, &v.Name, &v.Description, &v.Permissions, &v.InUse)
+	_, v.Unnamed = unnamedNumber(v.Name)
+	v.Unnamed = v.Unnamed && v.BuiltIn == ""
 	return v, err
 }
 
@@ -289,6 +321,11 @@ func (s *Service) UpdateRole(ctx context.Context, c identity.Caller, id uuid.UUI
 			return err
 		}
 		changed := !slices.Equal(r.Permissions, in.Permissions)
+		// An unnamed combination that keeps its given name keeps telling how many
+		// permissions it holds.
+		if n, unnamed := unnamedNumber(r.Name); unnamed && changed && in.Name == r.Name {
+			in.Name = UnnamedRoleName(n, len(in.Permissions))
+		}
 		if changed && r.InUse > 0 {
 			if r.Scope == ScopeSpace && slices.Contains(difference(in.Permissions, r.Permissions), SpaceAdminister) {
 				return apperr.Conflict("administer_in_use", "A role in use cannot gain space administration. Make someone a space admin in that space instead.")
@@ -306,7 +343,9 @@ func (s *Service) UpdateRole(ctx context.Context, c identity.Caller, id uuid.UUI
 				return err
 			}
 		}
-		out = Role{ID: id, Scope: r.Scope, Name: in.Name, Description: in.Description, Permissions: in.Permissions, InUse: r.InUse}
+		_, unnamed := unnamedNumber(in.Name)
+		out = Role{ID: id, Scope: r.Scope, Name: in.Name, Description: in.Description, Permissions: in.Permissions, InUse: r.InUse,
+			Unnamed: unnamed}
 		return recordChange(ctx, tx, c, "role.changed", "role", id.String(), "", map[string]any{
 			"before":  map[string]any{"name": r.Name, "permissions": r.Permissions},
 			"after":   map[string]any{"name": in.Name, "permissions": in.Permissions},

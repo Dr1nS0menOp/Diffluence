@@ -32,8 +32,16 @@ error: upgrade refused before migrating: the data folder has 300 MiB free and ne
 | PostgreSQL | The server is older than PostgreSQL 16. Also for `diffluence migrate` |
 | Free space | The data folder has less than 512 MiB free |
 | Queue | NATS does not answer |
-| Backup | Only when `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` is set, such as `26h`: no backup was noted, or the last one is older. Without it, an upgrade with no noted backup gives a warning in the log |
+| Backup | No backup was noted in the last 24 hours, or within `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Set it to `off` to upgrade without a recent backup: the node then only warns in the log (ADR-040) |
 | Newer database | A newer release has already run a contract migration. Also for a node with `DIFFLUENCE_MIGRATE_ON_START=false` |
+
+**Since this release an upgrade refuses to start without a backup of the last 24 hours.** Before you upgrade, run `scripts/backup.sh`. The refusal looks like this, and nothing is migrated:
+
+```
+error: upgrade refused before migrating: no backup was noted: run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one
+```
+
+A new installation is never refused: it has nothing to back up.
 
 `scripts/backup.sh` notes each complete backup in the audit log as `system.backup_noted`. A backup made another way can be noted with `docker compose exec diffluence diffluence backup note`, but only once it is complete.
 

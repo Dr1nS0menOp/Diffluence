@@ -86,8 +86,11 @@ func trigramState(ctx context.Context, q db.Querier) (extensionState, error) {
 	return extensionReady, nil
 }
 
+// backupWayOut tells an operator who has no recent backup how to go on (ADR-040).
+const backupWayOut = "run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one"
+
 // upgradeProblems lists the reasons an upgrade may not start. None = it may.
-// backupMaxAge zero means the age of the last backup is no reason to refuse.
+// backupMaxAge zero means the operator switched the backup check off.
 func upgradeProblems(f upgradeFacts, now time.Time, backupMaxAge time.Duration) []string {
 	var problems []string
 	if f.freeKnown && f.freeBytes < minFreeForUpgrade {
@@ -107,10 +110,10 @@ func upgradeProblems(f upgradeFacts, now time.Time, backupMaxAge time.Duration) 
 	}
 	switch {
 	case f.lastBackup.IsZero():
-		problems = append(problems, "no backup was noted: run scripts/backup.sh first")
+		problems = append(problems, "no backup was noted: "+backupWayOut)
 	case now.Sub(f.lastBackup) > backupMaxAge:
-		problems = append(problems, fmt.Sprintf("the last backup is from %s, longer ago than %s: run scripts/backup.sh first",
-			f.lastBackup.UTC().Format(time.RFC3339), backupMaxAge))
+		problems = append(problems, fmt.Sprintf("the last backup is from %s, longer ago than %s: %s",
+			f.lastBackup.UTC().Format(time.RFC3339), backupMaxAge, backupWayOut))
 	}
 	return problems
 }
@@ -147,8 +150,9 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 	if isNewInstall {
 		return nil
 	}
-	if facts.lastBackup.IsZero() {
-		a.log.Warn("upgrading without a noted backup; see docs/operations/backup-restore.md")
+	if maxAge == 0 {
+		a.log.Warn("upgrading with the backup check switched off (DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off)",
+			"last_backup_noted", !facts.lastBackup.IsZero())
 	}
 	return a.markUpgrade(ctx, owner, st, facts.lastBackup)
 }
