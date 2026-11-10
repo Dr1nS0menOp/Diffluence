@@ -371,7 +371,9 @@ fieldset.choices legend {
   gap: var(--space-2);
 }
 
+/* A long line of help must not squeeze the box, or the boxes stop lining up. */
 .role-permission input {
+  flex-shrink: 0;
   margin-block-start: var(--space-1);
 }
 

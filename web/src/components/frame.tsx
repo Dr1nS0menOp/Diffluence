@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type PageDetail, type PageSummary, type Shortcut, type Space } from '../api';
+import { mayCreateAnything } from '../create-permission';
 import { Link, match, useLocation } from '../router';
 import { usePreferences } from '../preferences';
 import { CopyDialog, MoveDialog } from '../views/move-dialogs';
@@ -107,10 +108,10 @@ export function useCurrentSpace(): { space: Space | null; page: PageDetail | und
   return { space: (pageId ? spaceOfPage.data : spaceAtKey.data) ?? null, page: page.data };
 }
 
-/** Where the Create button puts a new page: below what you are reading, if you may. */
+/** Where the Create button puts a new item: below what you are reading, if you may make any kind there. */
 export function useCreateTarget(): CreateTarget | null {
   const { space, page } = useCurrentSpace();
-  if (!space?.can?.['page.create']) return null;
+  if (!space || !mayCreateAnything(space.can)) return null;
   return { space, parent: page?.status === 'published' ? page.id : null };
 }
 

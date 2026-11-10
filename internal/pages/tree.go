@@ -69,7 +69,7 @@ func (s *Service) Move(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {
 			return err
 		}
-		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageCreate, uuid.Nil); err != nil {
+		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.CreatePermission(p.Kind), uuid.Nil); err != nil {
 			return err
 		}
 		sameParent := (p.ParentID == nil && in.ParentID == nil) ||
@@ -100,7 +100,7 @@ func (s *Service) reparent(ctx context.Context, tx pgx.Tx, c identity.Caller, p 
 		}
 	}
 	if parent != nil {
-		if err := s.checkParent(ctx, tx, c, p.SpaceID, *parent); err != nil {
+		if err := s.checkParent(ctx, tx, c, placement{spaceID: p.SpaceID, parent: *parent, kind: p.Kind}); err != nil {
 			return err
 		}
 		tree, err := subtree(ctx, tx, p.ID)
@@ -225,7 +225,7 @@ func (s *Service) Copy(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 		if in.SpaceID != nil {
 			plan.spaceID = *in.SpaceID
 		}
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.PageCreate); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {
 			return err
 		}
 		if p.CurrentVersion == 0 {
@@ -235,7 +235,7 @@ func (s *Service) Copy(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 			return err
 		}
 		if in.ParentID != nil {
-			if err := s.checkParent(ctx, tx, c, plan.spaceID, *in.ParentID); err != nil {
+			if err := s.checkParent(ctx, tx, c, placement{spaceID: plan.spaceID, parent: *in.ParentID, kind: p.Kind}); err != nil {
 				return err
 			}
 		}
@@ -266,6 +266,11 @@ func (s *Service) Copy(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 }
 
 func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, parent *uuid.UUID, title string, plan copyPlan) (Page, error) {
+	// Every copied item is made in the target space, so a database or a post below the
+	// page asks for its own kind there too (spec 045).
+	if err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {
+		return Page{}, err
+	}
 	if !plan.keepRestrictions() {
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {
 			return Page{}, err

@@ -246,7 +246,8 @@ func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, in n
 		UNION ALL SELECT $2::uuid, $2::uuid, 0`, in.parent, id); err != nil {
 		return p, err
 	}
-	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": in.parent})
+	// The kind says which create permission made it: a post and a database have their own.
+	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": in.parent, "kind": in.kind})
 }
 
 // NewPage is the input for Create.
@@ -261,16 +262,24 @@ type NewPage struct {
 	Link     string
 }
 
-// checkParent makes sure a page may go under parent.
-func (s *Service) checkParent(ctx context.Context, q db.Querier, c identity.Caller, spaceID uuid.UUID, parent uuid.UUID) error {
-	if err := s.perms.RequirePage(ctx, q, c.UserID, parent, permissions.PageCreate, uuid.Nil); err != nil {
+// placement is where an item of a kind goes: below parent, in a space.
+type placement struct {
+	spaceID uuid.UUID
+	parent  uuid.UUID
+	kind    string
+}
+
+// checkParent makes sure an item may go under its parent. Making it there asks for the
+// permission of its kind, so a database below a page needs database.create (spec 045).
+func (s *Service) checkParent(ctx context.Context, q db.Querier, c identity.Caller, at placement) error {
+	if err := s.perms.RequirePage(ctx, q, c.UserID, at.parent, permissions.CreatePermission(at.kind), uuid.Nil); err != nil {
 		return err
 	}
-	pp, err := load(ctx, q, parent)
+	pp, err := load(ctx, q, at.parent)
 	if err != nil {
 		return err
 	}
-	if pp.SpaceID != spaceID {
+	if pp.SpaceID != at.spaceID {
 		return apperr.Invalid("The parent page is in another space.")
 	}
 	if pp.Status != StatusPublished {
@@ -291,7 +300,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 	}
 	var p Page
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, in.SpaceID, permissions.CreatePermission(in.Kind)); err != nil {
 			return err
 		}
 		if in.Kind == KindPost {
@@ -303,7 +312,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 			return err
 		}
 		if in.ParentID != nil {
-			if err := s.checkParent(ctx, tx, c, in.SpaceID, *in.ParentID); err != nil {
+			if err := s.checkParent(ctx, tx, c, placement{spaceID: in.SpaceID, parent: *in.ParentID, kind: in.Kind}); err != nil {
 				return err
 			}
 		}
@@ -596,7 +605,7 @@ func (s *Service) capabilities(ctx context.Context, c identity.Caller, p Page) (
 	for _, action := range []string{permissions.PageEdit, permissions.PageCreate, permissions.PageArchive, permissions.ActionPageDelete,
 		permissions.AttachmentAdd, permissions.RestrictionManage, permissions.SpaceExport, permissions.SpaceAdminister,
 		permissions.CommentAdd, permissions.ActionReact, permissions.SitePublish, permissions.SpaceTemplates,
-		permissions.PageWatchers, permissions.PageMoveOut} {
+		permissions.PageWatchers, permissions.PageMoveOut, permissions.PostCreate, permissions.DatabaseCreate} {
 		d := permissions.Evaluate(permissions.Input{User: u, Space: space, Page: &page, Action: action, Owner: page.CreatedBy})
 		out[action] = d.Allowed
 	}

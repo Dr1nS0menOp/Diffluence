@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me } from './api';
 import { appearanceQuery, useAccent, useImportedFont } from './appearance';
+import { mayCreate } from './create-permission';
 import { keepSettingsTyping } from './kept-fields';
 import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './personal';
 import { Link, match, navigate, useLocation } from './router';
@@ -66,15 +67,35 @@ const PUBLIC_SCREENS: Record<string, () => ReactNode> = {
   '/setup': () => <SetupView />,
 };
 
+type Offered = Record<'page' | 'database' | 'post', boolean>;
+
+/**
+ * What the Create button makes at once: a page first, then what else the person may make in
+ * the space, so someone who may only write blog posts gets a post (spec 045).
+ */
+function mainCreation(offered: Offered, canCreateSpace: boolean): Creating {
+  for (const kind of ['page', 'database', 'post'] as const) {
+    if (offered[kind]) return kind;
+  }
+  return canCreateSpace ? 'space' : null;
+}
+
 function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => void }) {
   const { t } = useTranslation();
   const target = useCreateTarget();
   const canCreateSpace = me.global_permissions.includes('create_space');
-  const main = target ? 'page' : 'space';
+  const can = target?.space.can;
+  const blog = target?.space.features?.blog ?? true;
+  const offered: Offered = {
+    page: mayCreate(can, 'page'),
+    database: mayCreate(can, 'database'),
+    post: blog && mayCreate(can, 'post'),
+  };
+  const main = mainCreation(offered, canCreateSpace);
   useShortcut('create', () => {
-    if (target || canCreateSpace) onCreate(main);
+    if (main) onCreate(main);
   });
-  if (!target && !canCreateSpace) return null;
+  if (!main) return null;
   return (
     <span className="top-create">
       <button type="button" className="primary" onClick={() => onCreate(main)}>
@@ -87,12 +108,12 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
           className="primary top-create-more"
           trigger={<IconChevronDown size={16} />}
         >
-          <MenuItem onClick={() => onCreate('page')}>{t('space.newPage')}</MenuItem>
-          <MenuItem onClick={() => onCreate('database')}>{t('sheet.new')}</MenuItem>
-          <MenuItem onClick={() => onCreate('template')}>{t('organise.fromTemplate')}</MenuItem>
-          {(target.space.features?.blog ?? true) && (
-            <MenuItem onClick={() => onCreate('post')}>{t('blog.newPost')}</MenuItem>
+          {offered.page && <MenuItem onClick={() => onCreate('page')}>{t('space.newPage')}</MenuItem>}
+          {offered.database && <MenuItem onClick={() => onCreate('database')}>{t('sheet.new')}</MenuItem>}
+          {offered.page && (
+            <MenuItem onClick={() => onCreate('template')}>{t('organise.fromTemplate')}</MenuItem>
           )}
+          {offered.post && <MenuItem onClick={() => onCreate('post')}>{t('blog.newPost')}</MenuItem>}
           {canCreateSpace && <MenuItem onClick={() => onCreate('space')}>{t('home.newSpace')}</MenuItem>}
         </Menu>
       )}

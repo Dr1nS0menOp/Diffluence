@@ -79,7 +79,7 @@ type grantCase struct {
 var viewerPerms = []string{permissions.SpaceView, permissions.SpaceExport, permissions.CommentAdd, permissions.CommentDeleteOwn}
 var editorPerms = []string{permissions.SpaceView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
 	permissions.PageDeleteOwn, permissions.AttachmentAdd, permissions.AttachmentDeleteOwn,
-	permissions.CommentAdd, permissions.CommentDeleteOwn}
+	permissions.CommentAdd, permissions.CommentDeleteOwn, permissions.PostCreate, permissions.DatabaseCreate}
 var adminPerms = permissions.AllSpacePermissions
 var managerPerms = permissions.Templates[permissions.TemplateManager]
 
@@ -123,6 +123,11 @@ var grantCases = []grantCase{
 	{name: "invite-guests-only", subject: "user", perms: []string{permissions.SpaceView, permissions.SpaceInviteGuests}, extra: true},
 	{name: "edit-without-move-out", subject: "user", perms: []string{permissions.SpaceView, permissions.PageEdit,
 		permissions.PageCreate}, extra: true},
+	// Spec 045: each kind of item made on its own, and pages without the other two.
+	{name: "posts-only", subject: "user", perms: []string{permissions.SpaceView, permissions.PostCreate}, extra: true},
+	{name: "databases-only", subject: "group", perms: []string{permissions.SpaceView, permissions.DatabaseCreate}, extra: true},
+	{name: "pages-without-posts-or-databases", subject: "user", perms: []string{permissions.SpaceView, permissions.PageCreate,
+		permissions.PageEdit}, extra: true},
 }
 
 // restrictionCase places restrictions on the chain root → mid → leaf; the page
@@ -198,6 +203,7 @@ var actions = []string{
 	permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 	permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
 	permissions.SpaceLook, permissions.PageWatchers, permissions.PageMoveOut, permissions.SpaceInviteGuests,
+	permissions.PostCreate, permissions.DatabaseCreate,
 }
 
 // isDeleteAction says whether the creator of the object decides, through "delete own".

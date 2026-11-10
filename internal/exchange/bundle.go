@@ -33,11 +33,12 @@ const JobKindBundle = "bundle_export"
 
 const (
 	bundleFormat = "diffluence-bundle"
-	// bundleVersion 3 holds the permissions spec 040 split off broader ones, and version 2
-	// those of spec 036. Older versions are still read: see heldSince.
-	bundleVersion = 3
+	// bundleVersion 4 holds the create permissions spec 045 split off page.create, version 3
+	// the permissions spec 040 split off broader ones, and version 2 those of spec 036. Older
+	// versions are still read: see heldSince.
+	bundleVersion = 4
 	// bundleVersionBeforeSplit is the oldest version read: its grants of a broader
-	// permission bring every finer one with them, as migrations 0036 and 0040 did.
+	// permission bring every finer one with them, as migrations 0036, 0040 and 0041 did.
 	bundleVersionBeforeSplit = 1
 	manifestFile             = "manifest.json"
 	signatureFile            = "manifest.sig"

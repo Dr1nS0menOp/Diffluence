@@ -13,6 +13,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Page, type PageSummary, type TreeFound, type TreeNode } from '../api';
+import { mayCreate } from '../create-permission';
 import { BulkMoveDialog } from '../views/move-dialogs';
 import { Link } from '../router';
 import { usePreferences } from '../preferences';
@@ -148,7 +149,7 @@ function RowActions({
               </MenuItem>
             </>
           )}
-          {page.can['page.create'] && published && (
+          {mayCreate(page.can, page.kind) && published && (
             <MenuItem onClick={() => onDialog(page, 'copy')}>
               <IconCopy size={MENU_ICON_SIZE} /> {t('page.copy')}
             </MenuItem>

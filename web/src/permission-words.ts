@@ -13,6 +13,8 @@ const SPACE_GROUPS: [PermissionGroup, string[]][] = [
     [
       'space.view',
       'page.create',
+      'post.create',
+      'database.create',
       'page.edit',
       'page.archive',
       'page.delete_own',

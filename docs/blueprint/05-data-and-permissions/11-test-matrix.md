@@ -32,7 +32,7 @@ Status **built** means it is in `matrix_test.go` today.
 | **PRM-168** | built | Action, later | `space.manage_access` |
 | **PRM-169** | built | Action, later | `analytics.view` |
 
-Spec 040: 15 people × 26 grants × 23 restrictions × 13 page states (one of them no page at all) × 3 space states × 28 actions, and for deletes also a creator who differs from the page's, gives **10,046,790 cases** in `Evaluate`, in about ten seconds. The test fails if that falls below 1,000,000. A page under an archived parent is not a state of its own, because archiving takes the pages below along. The SQL half builds 93,636 pages of real rows (PRM-173).
+Spec 045: 15 people × 29 grants × 23 restrictions × 13 page states (one of them no page at all) × 3 space states × 30 actions, and for deletes also a creator who differs from the page's, gives **11,929,005 cases** in `Evaluate`, in about twelve seconds. The test fails if that falls below 1,000,000. A page under an archived parent is not a state of its own, because archiving takes the pages below along. The SQL half builds 96,444 pages of real rows (PRM-173).
 
 ## 11.3 The literal rule, for a generator
 

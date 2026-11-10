@@ -11,6 +11,7 @@ var splitInSpec = map[string]int{
 	SitePublish: 36, SpaceAutomation: 36, SpaceTemplates: 36, SpaceAudit: 36,
 	SpaceLabels: 40, SpaceStatuses: 40, SpaceApprovals: 40, SpaceBundle: 40, SpaceLook: 40,
 	PageWatchers: 40, PageMoveOut: 40, SpaceInviteGuests: 40,
+	PostCreate: 45, DatabaseCreate: 45,
 }
 
 // WithSplitOff completes a list of single permissions that may have been written before a

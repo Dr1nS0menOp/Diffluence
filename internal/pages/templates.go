@@ -61,7 +61,7 @@ func (s *Service) UsableParent(ctx context.Context, c identity.Caller, parent *u
 	if parent == nil {
 		return nil
 	}
-	if err := s.checkParent(ctx, s.pool, c, spaceID, *parent); err != nil {
+	if err := s.checkParent(ctx, s.pool, c, placement{spaceID: spaceID, parent: *parent, kind: KindPage}); err != nil {
 		return nil
 	}
 	return parent
@@ -98,7 +98,7 @@ func (s *Service) StartFromTemplate(ctx context.Context, c identity.Caller, in T
 			return err
 		}
 		if in.ParentID != nil {
-			if err := s.checkParent(ctx, tx, c, in.SpaceID, *in.ParentID); err != nil {
+			if err := s.checkParent(ctx, tx, c, placement{spaceID: in.SpaceID, parent: *in.ParentID, kind: KindPage}); err != nil {
 				return err
 			}
 		}

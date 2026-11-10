@@ -19,7 +19,7 @@ func TestEverySplitPermissionKnowsTheBundleVersionThatHoldsIt(t *testing.T) {
 }
 
 func TestABundleFromBeforeTheSplitKeepsWhatTheBroaderPermissionGave(t *testing.T) {
-	for _, broad := range []string{permissions.SpaceAdminister, permissions.PageEdit, permissions.SpaceManageAccess} {
+	for _, broad := range []string{permissions.SpaceAdminister, permissions.PageEdit, permissions.SpaceManageAccess, permissions.PageCreate} {
 		got := permissionsOfGrant(bundleVersionBeforeSplit, broad)
 		for finer, from := range permissions.SplitFrom {
 			if from == broad && !slices.Contains(got, finer) {
@@ -51,18 +51,35 @@ func TestABundleKeepsAGrantAsItIs(t *testing.T) {
 		t.Fatalf("a current grant changed on the way in: %v", got)
 	}
 	// An old grant of something nothing was split from stays alone too.
-	if got := permissionsOfGrant(bundleVersionBeforeSplit, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
+	if got := permissionsOfGrant(bundleVersionBeforeSplit, permissions.CommentAdd); !slices.Equal(got, []string{permissions.CommentAdd}) {
 		t.Fatalf("an old grant gained permissions: %v", got)
 	}
 }
 
+// versionOfSpec040 is the bundle version that first held the permissions of spec 040.
+const versionOfSpec040 = 3
+
 func TestEveryOlderBundleGivesAdministratorsTheEightOfSpec040(t *testing.T) {
-	for version := bundleVersionBeforeSplit; version < bundleVersion; version++ {
+	for version := bundleVersionBeforeSplit; version < versionOfSpec040; version++ {
 		got := permissionsOfGrant(version, permissions.SpaceAdminister)
 		for finer, v := range heldSince {
-			if v == bundleVersion && permissions.SplitFrom[finer] == permissions.SpaceAdminister && !slices.Contains(got, finer) {
+			if v == versionOfSpec040 && permissions.SplitFrom[finer] == permissions.SpaceAdminister && !slices.Contains(got, finer) {
 				t.Fatalf("a bundle of format %d gave administration without %s: %v", version, finer, got)
 			}
 		}
+	}
+}
+
+func TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases(t *testing.T) {
+	got := permissionsOfGrant(versionOfSpec040, permissions.PageCreate)
+	want := []string{permissions.PageCreate, permissions.PostCreate, permissions.DatabaseCreate}
+	if !slices.Equal(slices.Sorted(slices.Values(got)), slices.Sorted(slices.Values(want))) {
+		t.Fatalf("a version 3 bundle knew nothing of posts and databases apart from pages: %v", got)
+	}
+	if got := permissionsOfGrant(versionOfSpec040, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
+		t.Fatalf("a version 3 bundle holds the eight of spec 040 itself: %v", got)
+	}
+	if got := permissionsOfGrant(bundleVersion, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
+		t.Fatalf("a current bundle holds posts and databases itself, so pages alone must stay alone: %v", got)
 	}
 }

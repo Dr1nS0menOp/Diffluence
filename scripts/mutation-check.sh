@@ -278,7 +278,7 @@ mutate "a page returns while its parent is in the trash" internal/pages/tree.go 
 mutate "SVG shown inline" internal/attachments/attachments.go \
   's.replace(`"image/webp": true}`, `"image/webp": true, "text/xml; charset=utf-8": true, "text/plain": true, "text/xml": true}`)' $app -run '^(TestAttachmentsNeverTrustAFile|TestPageLookIsCheckedAndAudited)$'
 mutate "publish loses its audit event" internal/pages/pages.go \
-  's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
+  's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent, \"kind\": in.kind})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
   's.replace("default:\n\t\treturn \"\", bad\n\t}\n\treturn href, nil", "default:\n\t}\n\treturn href, nil")' ./internal/document/
 mutate "a file may point anywhere" internal/document/attrs.go \
@@ -756,7 +756,7 @@ mutate "link facts show a hidden page" internal/pages/links.go \
 mutate "a placeholder leads to a page the reader may not see" internal/pages/links.go \
   's.replace("JOIN perm_visible_pages($1) v ON v.page_id = h.target_id", "JOIN perm_visible_pages($1) v ON true")' $app -run TestAPlaceholderOnlyLeadsToAPageTheReaderMaySee
 mutate "following a placeholder needs no right to create" internal/pages/links.go \
-  's.replace("if err := s.checkParent(ctx, tx, c, p.SpaceID, source); err != nil {", "if err := s.checkParent(ctx, tx, c, p.SpaceID, source); err != nil \x26\x26 title == \"\" {")' $app -run TestFollowingAPlaceholderNeedsTheRightToCreate
+  's.replace("if err := s.checkParent(ctx, tx, c, placement{spaceID: p.SpaceID, parent: source, kind: KindPage}); err != nil {", "if err := s.checkParent(ctx, tx, c, placement{spaceID: p.SpaceID, parent: source, kind: KindPage}); err != nil \x26\x26 title == \"\" {")' $app -run TestFollowingAPlaceholderNeedsTheRightToCreate
 mutate "following gives the id of a page someone may not see" internal/pages/links.go \
   's.replace("return s.requireStarted(ctx, tx, c, *target)", "return nil")' $app -run TestSomeoneWhoCannotSeeTheStartedPageGetsAConflict
 mutate "any title on a page can be followed" internal/pages/links.go \
@@ -1053,17 +1053,17 @@ mutate "asking for guests needs only manage access again" internal/httpapi/handl
 mutate "administering no longer asks for guests" internal/permissions/evaluate.go \
   's.replace("holds(in, SpaceInviteGuests) || holds(in, SpaceAdminister)", "holds(in, SpaceInviteGuests)")' $perms -run TestMatrixEvaluate
 mutate "moving out needs only edit again" internal/pages/move.go \
-  's.replace("[]string{permissions.PageMoveOut, permissions.PageCreate}", "[]string{permissions.PageEdit, permissions.PageCreate}")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
+  's.replace("[]string{permissions.PageMoveOut, permissions.CreatePermission(p.Kind)}", "[]string{permissions.PageEdit, permissions.CreatePermission(p.Kind)}")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
 mutate "the impact of a move out needs only edit" internal/pages/move.go \
   's.replace("action = permissions.PageMoveOut", "action = permissions.PageEdit")' $app -run TestMovingAPageToAnotherSpaceIsItsOwnPermission
 mutate "an edit restriction does not stop a move out" internal/permissions/evaluate.go \
   's.replace("AttachmentAdd, ActionAttachmentDelete, PageMoveOut:", "AttachmentAdd, ActionAttachmentDelete:")' $perms -run TestMatrixEvaluate
 mutate "asking for guests stops in an archived space" internal/permissions/evaluate.go \
   's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
-mutate "the migration gives editors no move out" internal/db/migrations/0040_finer_permissions.sql \
+mutate "the migration gives editors no move out" internal/db/migrations/0041_posts_and_databases.sql \
   's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"']", "WHEN '"'"'page.edit'"'"' THEN '"'"'{}'"'"'::text[]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
+  's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "kept facts ignore the permission generation" internal/permissions/factcache.go \
   's.replace("\treturn gen == c.gen\n", "\treturn true\n").replace("\tif gen > c.gen {", "\tif false {")' $perms -run TestAChangeEndsKeptFactsAtOnce
 mutate "a revoked space grant does not count" internal/db/migrations/0040_finer_permissions.sql \
@@ -1186,6 +1186,31 @@ mutate "an upgrade leaves no marker" internal/app/upgrade.go \
   's.replace("return a.markUpgrade(ctx, owner, st, facts.lastBackup)", "return nil")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
 mutate "a restart counts as an upgrade" internal/app/upgrade.go \
   's.replace("if st.PendingExpand == 0 {", "if st.PendingExpand < 0 {")' $app -run TestARestartIsNoUpgrade
+# Spec 045: blog posts and databases have a create permission of their own.
+mutate "a post is made with page creation" internal/permissions/evaluate.go \
+  's.replace("\tcase kindPost:\n\t\treturn PostCreate\n", "\tcase kindPost:\n\t\treturn PageCreate\n")' $app -run TestEachKindIsMadeWithItsOwnPermissionAlone
+mutate "a database is made with page creation" internal/permissions/evaluate.go \
+  's.replace("\tcase kindDatabase:\n\t\treturn DatabaseCreate\n", "\tcase kindDatabase:\n\t\treturn PageCreate\n")' $app -run TestPagesWithoutPostsOrDatabasesCannotMakeEither
+mutate "a new item asks for page creation whatever its kind" internal/pages/pages.go \
+  's.replace("in.SpaceID, permissions.CreatePermission(in.Kind)); err != nil {", "in.SpaceID, permissions.PageCreate); err != nil {")' $app -run TestPagesWithoutPostsOrDatabasesCannotMakeEither
+mutate "below a page a database asks for page creation" internal/pages/pages.go \
+  's.replace("at.parent, permissions.CreatePermission(at.kind), uuid.Nil)", "at.parent, permissions.PageCreate, uuid.Nil)")' $app -run TestEachKindIsMadeWithItsOwnPermissionAlone
+mutate "turning a page into a post needs only edit" internal/pages/kinds.go \
+  's.replace("if made := permissions.CreatePermission(kind); made != permissions.CreatePermission(p.Kind) {", "if made := permissions.CreatePermission(kind); false \x26\x26 made != \"\" {")' $app -run TestTurningAPageIntoAPostAsksForPosts
+mutate "a copied item asks for nothing of its kind" internal/pages/tree.go \
+  's.replace("\tif err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {\n\t\treturn Page{}, err\n\t}\n", "")' $app -run TestCopyingADatabaseAsksForDatabasesWhereTheCopyGoes
+mutate "a branch moves out without the kinds in it" internal/pages/move.go \
+  's.replace("append([]string{permissions.SpaceView}, needed...)", "append([]string{permissions.SpaceView, permissions.PageCreate}, needed[:0]...)")' $app -run TestMovingADatabaseToAnotherSpaceAsksForDatabasesThere
+mutate "the migration gives page creators no posts" internal/db/migrations/0041_posts_and_databases.sql \
+  's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"']", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the migration leaves roles without posts and databases" internal/db/migrations/0041_posts_and_databases.sql \
+  's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
+mutate "an older bundle gives page creators no databases" internal/exchange/bundlein.go \
+  's.replace("\tpermissions.DatabaseCreate:    4,\n", "\tpermissions.DatabaseCreate:    1,\n")' ./internal/exchange/ -run TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases
+mutate "the page created event forgets its kind" internal/pages/pages.go \
+  's.replace("\"parent_id\": in.parent, \"kind\": in.kind}", "\"parent_id\": in.parent}")' $app -run TestThePageCreatedEventSaysWhichKindWasMade
+mutate_web "the create menu offers a database to anyone who makes pages" src/create-permission.ts \
+  's.replace("if (kind === \x27database\x27) return \x27database.create\x27;", "")' src/create-permission.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

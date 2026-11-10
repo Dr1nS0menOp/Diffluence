@@ -45,6 +45,27 @@ func isHomePage(ctx context.Context, q db.Querier, p Page) (bool, error) {
 	return home, err
 }
 
+// createPermissionsOf lists the permissions that make the kinds of item in a branch, each
+// once and in a fixed order.
+func createPermissionsOf(ctx context.Context, q db.Querier, tree []uuid.UUID) ([]string, error) {
+	rows, err := q.Query(ctx, "SELECT DISTINCT kind FROM pages WHERE id = ANY($1)", tree)
+	if err != nil {
+		return nil, err
+	}
+	kinds, err := pgx.CollectRows(rows, pgx.RowTo[string])
+	if err != nil {
+		return nil, err
+	}
+	var out []string
+	for _, kind := range kinds {
+		if p := permissions.CreatePermission(kind); !slices.Contains(out, p) {
+			out = append(out, p)
+		}
+	}
+	slices.Sort(out)
+	return out, nil
+}
+
 // branchHasHiddenPages reports whether the person cannot see all of a branch.
 func (s *Service) branchHasHiddenPages(ctx context.Context, q db.Querier, userID uuid.UUID, tree []uuid.UUID) (bool, error) {
 	for _, id := range tree {
@@ -112,13 +133,8 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := lockSpaces(ctx, tx, p.SpaceID, target); err != nil {
 		return Page{}, err
 	}
-	for _, action := range []string{permissions.PageMoveOut, permissions.PageCreate} {
+	for _, action := range []string{permissions.PageMoveOut, permissions.CreatePermission(p.Kind)} {
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, action, uuid.Nil); err != nil {
-			return Page{}, err
-		}
-	}
-	for _, action := range []string{permissions.SpaceView, permissions.PageCreate} {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, target, action); err != nil {
 			return Page{}, err
 		}
 	}
@@ -133,6 +149,17 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err != nil {
 		return Page{}, err
 	}
+	// The branch arrives as new items in the target, so each kind in it asks for the
+	// permission that makes that kind there (spec 045).
+	needed, err := createPermissionsOf(ctx, tx, tree)
+	if err != nil {
+		return Page{}, err
+	}
+	for _, action := range append([]string{permissions.SpaceView}, needed...) {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, target, action); err != nil {
+			return Page{}, err
+		}
+	}
 	hidden, err := s.branchHasHiddenPages(ctx, tx, c.UserID, tree)
 	if err != nil {
 		return Page{}, err
@@ -141,7 +168,7 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		return Page{}, apperr.Conflict("contains_hidden_pages", "This page has pages below it that you cannot see, so it cannot move to another space.")
 	}
 	if in.ParentID != nil {
-		if err := s.checkParent(ctx, tx, c, target, *in.ParentID); err != nil {
+		if err := s.checkParent(ctx, tx, c, placement{spaceID: target, parent: *in.ParentID, kind: p.Kind}); err != nil {
 			return Page{}, err
 		}
 	}

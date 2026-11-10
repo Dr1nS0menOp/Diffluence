@@ -31,6 +31,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - "0 holders" on the Roles screen stays on one line
 - A reply, a comment being changed and text in a settings form survive the Reload offered for a new version
 - Upgrade impact: none. The routes for single permissions keep working for scripts
+### Changed: blog posts and databases have their own permission (spec 045)
+- Two new permissions: "Create blog posts" and "Create databases". A role can now make one kind of item without the others, such as a role that only writes blog posts
+- Everyone who could create pages gets both in the update, also through the built-in Editor, Manager and Space admin, so nobody loses anything
+- The Create button offers only what a person may make in the space, and makes a blog post at once for someone who may only write posts
+- Turning an unpublished page into a blog post needs "Create blog posts"; copying or moving a database into a space needs "Create databases" there
+- Export stays one permission
+- Upgrade impact: migration 0041 gives the two new permissions to every role that creates pages. Bundles are now format 4; older bundles still import and give both with page creation
 
 ### Added: a setup screen for a new install (spec 038)
 - A new install opens on a setup screen: the name of the company or person it is for, which the search box shows as "Search in" that name, the first administrator and the default time zone. Right after, it asks for a passkey

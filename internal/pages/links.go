@@ -192,7 +192,7 @@ func (s *Service) Follow(ctx context.Context, c identity.Caller, source uuid.UUI
 		if err != nil {
 			return err
 		}
-		if err := s.checkParent(ctx, tx, c, p.SpaceID, source); err != nil {
+		if err := s.checkParent(ctx, tx, c, placement{spaceID: p.SpaceID, parent: source, kind: KindPage}); err != nil {
 			return err
 		}
 		if err := lockTree(ctx, tx, p.SpaceID); err != nil {

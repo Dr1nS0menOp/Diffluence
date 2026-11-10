@@ -5,6 +5,7 @@ import { useDates } from '../dates';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EditorView } from '@tiptap/pm/view';
 import { api, type CommentAnchor, type NotificationSettings, type PageDetail, type Space } from '../api';
+import { mayCreate } from '../create-permission';
 import { Link, navigate, useLocation } from '../router';
 import { usePreferences } from '../preferences';
 import type { Highlight } from '../components/comments/anchor';
@@ -344,7 +345,7 @@ function PageMenu({
           </MenuEntry>
         </>
       )}
-      {page.can['page.create'] && published && (
+      {mayCreate(page.can, page.kind) && published && (
         <MenuEntry icon={<IconCopy size={MENU_ICON_SIZE} />} onClick={() => onOpen('copy')}>
           {t('page.copy')}
         </MenuEntry>
@@ -372,12 +373,12 @@ function PageMenu({
           {t('organise.turnInto_page')}
         </MenuEntry>
       )}
-      {canEdit && !published && page.kind === 'page' && (
+      {canEdit && !published && page.kind === 'page' && mayCreate(page.can, 'post') && (
         <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('post')}>
           {t('organise.turnInto_post')}
         </MenuEntry>
       )}
-      {canEdit && !published && page.kind === 'post' && (
+      {canEdit && !published && page.kind === 'post' && mayCreate(page.can, 'page') && (
         <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
           {t('organise.turnInto_page')}
         </MenuEntry>

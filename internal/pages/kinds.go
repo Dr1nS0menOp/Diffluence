@@ -54,6 +54,13 @@ func (s *Service) SetKind(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		if err != nil {
 			return err
 		}
+		// Turning a page into a blog post makes a post, and back makes a page, so each asks
+		// for what making that kind asks (spec 045). A folder is a page in this sense.
+		if made := permissions.CreatePermission(kind); made != permissions.CreatePermission(p.Kind) {
+			if err := s.perms.RequirePage(ctx, tx, c.UserID, id, made, uuid.Nil); err != nil {
+				return err
+			}
+		}
 		if err := s.checkKindChange(ctx, tx, p, kind); err != nil {
 			return err
 		}

@@ -384,12 +384,10 @@ func (s *Service) copyOneStep(ctx context.Context, c identity.Caller, id, parent
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 			return err
 		}
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.PageCreate); err != nil {
-			return err
-		}
 		if err := lockSpaces(ctx, tx, p.SpaceID, plan.spaceID); err != nil {
 			return err
 		}
+		// copyOne asks for the right to make this kind of item in the target space.
 		made, err = s.copyOne(ctx, tx, c, p, &parent, plan.Titles.apply(p.Title), plan)
 		return err
 	})

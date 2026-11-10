@@ -69,7 +69,32 @@ const (
 	// SpaceInviteGuests asks for a guest in the space. Like manage access, administer
 	// implies it; the instance-wide invite_people still decides who may ask at all.
 	SpaceInviteGuests = "space.invite_guests"
+
+	// PostCreate writes new blog posts, and turns an unpublished page into one (spec 045).
+	PostCreate = "post.create"
+	// DatabaseCreate makes new databases in the space, and copies or moves them in. Editing
+	// a database stays page.edit, as for every kind of page (spec 045).
+	DatabaseCreate = "database.create"
 )
+
+// Kinds of item that have a create permission of their own (ADR-038). The pages package
+// names every kind; these two are spelled here so the rule needs nothing from it.
+const (
+	kindPost     = "post"
+	kindDatabase = "database"
+)
+
+// CreatePermission is the permission that makes an item of a kind: blog posts and
+// databases have their own, and pages, folders and link entries are made with page.create.
+func CreatePermission(kind string) string {
+	switch kind {
+	case kindPost:
+		return PostCreate
+	case kindDatabase:
+		return DatabaseCreate
+	}
+	return PageCreate
+}
 
 // AllSpacePermissions lists every space permission.
 var AllSpacePermissions = []string{
@@ -80,7 +105,7 @@ var AllSpacePermissions = []string{
 	RestrictionManage, AnalyticsView,
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
 	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
-	PageMoveOut, SpaceInviteGuests,
+	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate,
 }
 
 // SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
@@ -99,6 +124,8 @@ var SplitFrom = map[string]string{
 	PageWatchers:      SpaceAdminister,
 	PageMoveOut:       PageEdit,
 	SpaceInviteGuests: SpaceManageAccess,
+	PostCreate:        PageCreate,
+	DatabaseCreate:    PageCreate,
 }
 
 // splitOffAdminister reports whether a permission was split off space administration, so
