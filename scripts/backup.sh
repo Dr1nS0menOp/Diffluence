@@ -57,7 +57,8 @@ note_backup() {
   if [ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$(docker compose ps -q diffluence)" 2>/dev/null)" = "true false" ]; then
     docker compose exec -T diffluence diffluence backup note
   else
-    docker compose run --rm --no-deps -T diffluence diffluence backup note
+    # The image's entrypoint is the diffluence binary, so run takes only its arguments.
+    docker compose run --rm --no-deps -T diffluence backup note
   fi
 }
 if ! note_backup >/dev/null; then
