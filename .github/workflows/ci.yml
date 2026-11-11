@@ -13,9 +13,10 @@ on:
 permissions:
   contents: read
 
+# The nightly run has a group of its own: a push to main must not cancel it.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   dco:
@@ -267,7 +268,15 @@ jobs:
       - name: collab dependencies
         run: npm ci --no-fund --no-audit
         working-directory: collab
+      # Every mutation that is not caught becomes an annotation, readable without the log.
       - name: do the tests catch injected bugs?
-        run: make mutation
+        run: |
+          # The step shell stops at the first failure, so the status is kept instead.
+          status=0
+          make mutation 2>&1 | tee mutation.txt || status=$?
+          grep -vE '^(caught|running|all mutations)' mutation.txt | grep -E '^[A-Z]+ ' | head -40 |
+            while IFS= read -r line; do echo "::error title=mutation::$line"; done || true
+          tail -1 mutation.txt
+          exit "$status"
       - name: can an encrypted backup be restored on a clean installation?
         run: bash scripts/restore-drill.sh
