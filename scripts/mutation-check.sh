@@ -1617,6 +1617,33 @@ mutate "the test file stays in the publish folder" internal/config/probe.go \
   's.replace("if err := os.Remove(name); err != nil {\n\t\treturn errors.New(\"a test file", "if err := error(nil); err != nil {\n\t\treturn errors.New(\"a test file")' $cfgpkg -run TestTryingThePublishFolderLeavesNothingBehind
 mutate "config check passes a configuration a start refuses" cmd/diffluence/config.go \
   's.replace("\t\treturn errConfigRefused\n", "\t\treturn nil\n")' ./cmd/diffluence/ -run TestConfigCheckExitsOneOnABadFile
+
+# Spec 058: the console runs backups through a worker, shows the configuration and logs
+# people out.
+mutate "back up now can wait twice" internal/db/migrations/0048_backup_runs.sql \
+  's.replace("CREATE UNIQUE INDEX backup_requests_one_open", "CREATE INDEX backup_requests_one_open")' $app -run TestBackUpNowCanWaitOnceAndIsLimitedPerHour
+mutate "back up now has no hourly limit" internal/backups/backups.go \
+  's.replace("if lastHour >= RequestsPerHour {", "if false {")' $app -run TestBackUpNowCanWaitOnceAndIsLimitedPerHour
+mutate "a taken request is taken again" internal/backups/backups.go \
+  's.replace("case err == nil \x26\x26 (claimed == nil || time.Since(*claimed) > staleClaim):", "case err == nil:")' $app -run TestTheWorkerFollowsTheConsole
+mutate "the console keep is ignored" internal/backups/backups.go \
+  's.replace("\tif b.Keep > 0 {", "\tif false {")' $app -run TestTheWorkerFollowsTheConsole
+mutate "the worker waits the whole interval" internal/backups/backups.go \
+  's.replace("out.Wait = min(due, pollAtMost)", "out.Wait = due")' $app -run TestTheWorkerFollowsTheConsole
+mutate "a report of any name is taken" internal/backups/backups.go \
+  's.replace("\tif !backupName.MatchString(r.Name) {\n\t\treturn apperr.Invalid", "\tif false {\n\t\treturn apperr.Invalid")' $app -run TestAWorkerReportIsCheckedAndKeptPlain
+mutate "a message keeps its line breaks" internal/backups/backups.go \
+  's.replace("\t\tif unicode.IsControl(r) {", "\t\tif unicode.IsControl(r) \x26\x26 false {")' $app -run TestAWorkerReportIsCheckedAndKeptPlain
+mutate "a failed backup does not warn" internal/health/health.go \
+  's.replace("\tcase f.BackupFailed:", "\tcase false:")' $app -run TestFailedBackupsAndRestoresShowOnTheHealthPage
+mutate "a failed test restore does not warn" internal/health/health.go \
+  's.replace("\tcase f.RestoreCheckFailed:", "\tcase false:")' $app -run TestFailedBackupsAndRestoresShowOnTheHealthPage
+mutate "every failure mails at once" internal/backups/backups.go \
+  's.replace("if sentAt == nil || time.Since(*sentAt) >= mailAtMostEvery {", "if true {")' $app -run TestAFailedBackupMailsTheAdministratorsAtMostTwiceADay
+mutate "a failure mails people who are not administrators" internal/backups/backups.go \
+  's.replace("AND u.anonymised_at IS NULL AND perm_has_global(u.id, \x27administrator\x27)", "AND u.anonymised_at IS NULL")' $app -run TestAFailedBackupMailsTheAdministratorsAtMostTwiceADay
+mutate "no address logs everyone out" internal/httpapi/handlers_running.go \
+  's.replace("if (strings.TrimSpace(in.Email) == \"\") == !in.All {", "if false {")' $app -run TestAnAdministratorLogsPeopleOutFromTheConsole
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

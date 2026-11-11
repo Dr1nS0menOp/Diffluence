@@ -67,6 +67,10 @@ type Facts struct {
 	GrowthKnown bool
 	// LastBackup is when a backup was last noted; zero = never.
 	LastBackup time.Time
+	// BackupFailed says the worker's latest backup failed; RestoreCheckFailed says the
+	// latest restore into a throw-away copy failed (spec 058). Both false when none ran.
+	BackupFailed       bool
+	RestoreCheckFailed bool
 	// PendingContract counts contract migrations of this release not applied yet;
 	// LastMigrationAt is when the last migration was applied.
 	PendingContract int
@@ -175,6 +179,13 @@ func backup(f Facts) Check {
 	}
 	age := f.Now.Sub(f.LastBackup)
 	values := map[string]any{"at": f.LastBackup.UTC().Format(time.RFC3339), "hours": int(age.Hours())}
+	// A failure is the news even while an older backup is still recent.
+	switch {
+	case f.BackupFailed:
+		return check("backup", Warn, "backup_failed", values)
+	case f.RestoreCheckFailed:
+		return check("backup", Warn, "restore_check_failed", values)
+	}
 	if age > BackupWarnAfter {
 		return check("backup", Warn, "backup_old", values)
 	}

@@ -23,6 +23,7 @@ import (
 	"github.com/diffluence/diffluence/internal/analytics"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/automation"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/blocks"
 	"github.com/diffluence/diffluence/internal/collab"
 	"github.com/diffluence/diffluence/internal/comments"
@@ -112,6 +113,7 @@ type App struct {
 	failures   *failures.Service
 	setup      *setup.Service
 	notify     *notify.Service
+	backups    *backups.Service
 	mail       *mail.Service
 	sharing    *sharing.Service
 	feed       *feed.Service
@@ -207,9 +209,12 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.mail = mail.NewService(a.pool, mailSender(cfg), log)
 	a.mail.SetRenderer(a.renderMail)
 	a.mail.HoldWhile(a.inMaintenance)
+	var backupMailer backups.Mailer
 	if a.mail.Configured() {
 		a.identity.SetMailer(accountMailer{keyring: a.keyring}, cfg.PublicOrigin())
+		backupMailer = accountMailer{keyring: a.keyring}
 	}
+	a.backups = backups.NewService(a.pool, a.settings, backupMailer, cfg.PublicOrigin()+"/admin/backups")
 	a.sharing = sharing.NewService(a.pool, a.perms, a.identity, a.settings, a.notify, a.features)
 	a.search = search.NewService(a.pool)
 	a.analytics = analytics.NewService(a.pool, a.perms, a.features)
@@ -240,7 +245,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, HelpersDown: a.HelpersDown, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
-			HealthChecks: a.HealthChecks, ReadyNotes: a.ReadyNotes,
+			HealthChecks: a.HealthChecks, ReadyNotes: a.ReadyNotes, Backups: a.backups,
 			Setup: a.setup, InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
@@ -339,6 +344,9 @@ func (a *App) Setup() *setup.Service { return a.setup }
 
 // Pool exposes the database pool (used by the CLI and tests).
 func (a *App) Pool() *pgxpool.Pool { return a.pool }
+
+// Backups is the backups module, for "diffluence backup" and tests.
+func (a *App) Backups() *backups.Service { return a.backups }
 
 // StoreGuard is the guard in front of the stored files, which refuses new files when the
 // disk is nearly full (spec 051).
@@ -634,6 +642,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "check-helpers", Every: time.Minute, Run: a.checkHelpers},
 		{Name: "sample-database-size", Every: time.Hour, Run: a.sampleDatabaseSize},
 		{Name: "purge-finished-work", Every: 24 * time.Hour, Run: a.purgeFinishedWork},
+		{Name: "mail-backup-failures", Every: 5 * time.Minute, Run: a.backups.MailFailures},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

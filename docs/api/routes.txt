@@ -54,7 +54,9 @@ GET /api/v1/admin/audit-events                                 session-only perm
 GET /api/v1/admin/audit-events/export                          session-only permission:administrator
 GET /api/v1/admin/audit-events/verify                          session-only permission:administrator
 GET /api/v1/admin/automation                                   permission:administrator
+GET /api/v1/admin/backups                                      session-only permission:administrator
 GET /api/v1/admin/bundles/key                                  permission:administrator
+GET /api/v1/admin/configuration                                session-only permission:administrator
 GET /api/v1/admin/event-failures                               session-only permission:administrator
 GET /api/v1/admin/export-policy                                permission:administrator
 GET /api/v1/admin/features                                     permission:administrator
@@ -271,6 +273,7 @@ PATCH /scim/v2/Users/{id}                                      scim-token
 POST /api/v1/access-requests/{id}/allow                        object:restriction.manage
 POST /api/v1/access-requests/{id}/refuse                       object:restriction.manage
 POST /api/v1/admin/appearance/reset                            session-only permission:administrator
+POST /api/v1/admin/backups/request                             session-only permission:administrator
 POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator
@@ -288,6 +291,7 @@ POST /api/v1/admin/scim-tokens                                 sensitive permiss
 POST /api/v1/admin/scim-tokens/{id}/rotate                     sensitive permission:administrator
 POST /api/v1/admin/service-accounts                            session-only permission:administrator
 POST /api/v1/admin/service-accounts/{id}/tokens                sensitive permission:administrator
+POST /api/v1/admin/sessions/end                                sensitive permission:administrator
 POST /api/v1/admin/space-templates                             permission:administrator
 POST /api/v1/admin/spaces/{id}/handover                        session-only permission:administrator
 POST /api/v1/admin/spaces/{id}/recover                         sensitive permission:administrator

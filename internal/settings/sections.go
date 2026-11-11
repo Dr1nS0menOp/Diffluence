@@ -36,6 +36,7 @@ const (
 	SectionAccess    = "access"
 	SectionRetention = "retention"
 	SectionLook      = "look"
+	SectionBackups   = "backups"
 
 	sectionKeyPrefix = "section."
 	keyMaintenance   = "maintenance"
@@ -106,6 +107,31 @@ type Access struct {
 type Retention struct {
 	AuditDays     int    `json:"audit_days"`
 	LongerBecause string `json:"longer_because"`
+}
+
+// Backups is how often the backup worker makes a backup and how many it keeps (spec 058).
+// Zero means the default the worker was started with, such as DIFFLUENCE_BACKUP_INTERVAL,
+// so an installation that never opens this section behaves as before.
+type Backups struct {
+	IntervalHours int `json:"interval_hours"`
+	Keep          int `json:"keep"`
+}
+
+// The limits of the backup section: at least one backup a week, at most one an hour, and
+// no more kept than a year of hourly backups would need to look back a month.
+const (
+	maxBackupIntervalHours = 168
+	maxBackupKeep          = 1000
+)
+
+func (b Backups) validate() error {
+	if b.IntervalHours < 0 || b.IntervalHours > maxBackupIntervalHours {
+		return apperr.Invalid("A backup is made every 1 to 168 hours, or as the installation was started.")
+	}
+	if b.Keep < 0 || b.Keep > maxBackupKeep {
+		return apperr.Invalid("Between 1 and 1000 backups are kept, or as the installation was started.")
+	}
+	return nil
 }
 
 // Look is how the instance presents itself. An accent is a pair: no single colour
@@ -256,6 +282,8 @@ func sectionValue(name string) (section, error) {
 		return &r, nil
 	case SectionLook:
 		return &Look{}, nil
+	case SectionBackups:
+		return &Backups{}, nil
 	}
 	return nil, apperr.NotFound()
 }

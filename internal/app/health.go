@@ -27,6 +27,8 @@ const (
 	keepGoneNode = 24 * time.Hour
 	// keepSizeSamples covers the 30 days the growth is measured over, with room to spare.
 	keepSizeSamples = 40 * 24 * time.Hour
+	// keepBackupHistory is how long the console lists what the backup worker reported.
+	keepBackupHistory = 400 * 24 * time.Hour
 )
 
 // HealthSource is what reading the health facts needs, so "diffluence doctor" can read
@@ -55,7 +57,9 @@ const healthFactsSQL = `SELECT
 	(SELECT bytes FROM database_size_samples WHERE taken_at <= now() - make_interval(secs => $2)
 		ORDER BY taken_at DESC LIMIT 1),
 	(SELECT count(*) FROM audit_pending),
-	(SELECT min(occurred_at) FROM audit_pending)`
+	(SELECT min(occurred_at) FROM audit_pending),
+	COALESCE((SELECT NOT ok FROM backup_runs ORDER BY finished_at DESC LIMIT 1), false),
+	COALESCE((SELECT NOT ok FROM backup_restore_checks ORDER BY checked_at DESC LIMIT 1), false)`
 
 // ReadHealthFacts reads what the checks judge: one statfs, the statement above and the
 // migration state.
@@ -72,7 +76,7 @@ func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (heal
 	var size, sizeBefore *int64
 	err := src.Pool.QueryRow(ctx, healthFactsSQL, ActionBackupNoted, health.GrowthWindow.Seconds()).Scan(
 		&f.FailedJobs7d, &f.OutboxStuck, &f.EventFailures, &f.MailFailed1d, &f.PasswordStops,
-		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting)
+		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting, &f.BackupFailed, &f.RestoreCheckFailed)
 	if err != nil {
 		return f, fmt.Errorf("app: read the health facts: %w", err)
 	}
@@ -163,6 +167,11 @@ func PurgeFinishedWork(ctx context.Context, q db.Querier) error {
 		{"DELETE FROM mail_queue WHERE status = 'failed' AND created_at < now() - make_interval(secs => $1)", keepFailedWork},
 		{"DELETE FROM nodes WHERE last_seen_at < now() - make_interval(secs => $1)", keepGoneNode},
 		{"DELETE FROM database_size_samples WHERE taken_at < now() - make_interval(secs => $1)", keepSizeSamples},
+		// A year of backup history is enough to see a pattern; the backups themselves are
+		// pruned by the worker (spec 058).
+		{"DELETE FROM backup_runs WHERE finished_at < now() - make_interval(secs => $1)", keepBackupHistory},
+		{"DELETE FROM backup_restore_checks WHERE checked_at < now() - make_interval(secs => $1)", keepBackupHistory},
+		{"DELETE FROM backup_requests WHERE finished_at < now() - make_interval(secs => $1)", keepFailedWork},
 	} {
 		if _, err := q.Exec(ctx, step.sql, step.age.Seconds()); err != nil {
 			return fmt.Errorf("app: purge finished work: %w", err)

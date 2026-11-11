@@ -20,6 +20,7 @@ import (
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/automation"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/blocks"
 	"github.com/diffluence/diffluence/internal/collab"
 	"github.com/diffluence/diffluence/internal/comments"
@@ -101,6 +102,7 @@ type Deps struct {
 	Collab      *collab.Service
 	Failures    *failures.Service
 	Setup       *setup.Service
+	Backups     *backups.Service
 
 	// SystemStatus reports nodes, versions and queues for the admin console.
 	SystemStatus func(ctx context.Context) (any, error)

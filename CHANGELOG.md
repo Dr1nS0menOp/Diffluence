@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: running the installation from the console (spec 058)
+- Administration, System, Backups: set how often the backup service backs up and how many backups it keeps, ask for a backup now (at most 4 an hour), and see every backup with its size, the step that failed, and whether a test restore of it passed. The page says when the service last checked in and whether it holds a key, by a fingerprint only. It also spells out the command that restores a chosen backup over this installation
+- The backup service asks the console what to do and reports each backup; `scripts/restore-check.sh` reports each weekly test restore. A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service needs the release that has migration 0048; an older one keeps its own schedule
+- Administration, System, Configuration: the settings the server starts with and where each came from, secrets hidden, and what a restart would refuse
+- Administration, People, Sessions: log one person out everywhere, or everyone after an incident
+- New commands for a backup worker on any platform: `diffluence backup next`, `backup report`, `backup restore-checked`
 ### Added: backups that run by themselves, and an upgrade that waits instead of looping (spec 054)
 - **Upgrade impact first: run `sh scripts/setup-secrets.sh` once more after you update `compose.yaml`.** It makes the backup key `backup-key/backup.key` and the folder `./backups`, and overwrites nothing. Keep a copy of the key in a password safe, and copy `./backups` off the machine
 - `compose.yaml` runs a backup service: every 4 hours a backup of the database, files, keys and secrets, encrypted, into `./backups`, keeping the newest 42, and noted for the checks before an upgrade. `docker compose run --rm backup once` makes one now. Set `DIFFLUENCE_BACKUP_INTERVAL`, `DIFFLUENCE_BACKUP_KEEP`, `DIFFLUENCE_BACKUP_DIR` and `DIFFLUENCE_BACKUP_KEY_DIR` to change it

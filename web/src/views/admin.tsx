@@ -40,6 +40,7 @@ import { StorageLimitDialog } from './admin-storage';
 import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
 import { SettingsSearch, SummaryTab } from './admin-summary';
 import { HealthBand, HealthChecks } from './admin-health';
+import { BackupsTab, ConfigurationTab, SessionsTab } from './admin-running';
 import { SettingsFrame } from '../components/settings-frame';
 import { TableBox } from '../components/table-box';
 
@@ -61,6 +62,9 @@ const TABS = [
   'care',
   'scim',
   'system',
+  'backups',
+  'configuration',
+  'sessions',
   'insights',
   'analytics',
   'automation',
@@ -70,11 +74,24 @@ const TABS = [
 /** The administration in categories (ADR-034). Every tab sits in exactly one. */
 const ADMIN_GROUPS: { id: string; tabs: (typeof TABS)[number][] }[] = [
   { id: 'overview', tabs: ['summary'] },
-  { id: 'people', tabs: ['users', 'invitations', 'groups', 'permissions', 'scim'] },
+  { id: 'people', tabs: ['users', 'invitations', 'groups', 'permissions', 'scim', 'sessions'] },
   { id: 'content', tabs: ['spaces', 'templates', 'organising', 'rules', 'export'] },
   { id: 'automation', tabs: ['automation', 'webhooks', 'outgoing'] },
   { id: 'look', tabs: ['look'] },
-  { id: 'system', tabs: ['system', 'care', 'settings', 'mail', 'audit', 'insights', 'analytics'] },
+  {
+    id: 'system',
+    tabs: [
+      'system',
+      'backups',
+      'configuration',
+      'care',
+      'settings',
+      'mail',
+      'audit',
+      'insights',
+      'analytics',
+    ],
+  },
 ];
 const USER_FILTERS = ['type', 'status', 'source', 'role', 'space_id', 'group_id', 'idle_days'] as const;
 /** The global permissions the server can filter people on. */
@@ -1528,6 +1545,9 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       {tab === 'mail' && <MailTab />}
       {tab === 'scim' && <ScimTab />}
       {tab === 'system' && <SystemTab />}
+      {tab === 'backups' && <BackupsTab />}
+      {tab === 'configuration' && <ConfigurationTab />}
+      {tab === 'sessions' && <SessionsTab />}
       {tab === 'insights' && <InsightsTab />}
       {tab === 'analytics' && <AnalyticsTab />}
       {tab === 'automation' && <RuleList spaceId={null} />}

@@ -45,6 +45,8 @@ Commands:
                             checkpoints in an application log (FILE, or - for stdin)
   audit prune               remove audit rows past their retention, as the owner of the tables
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
+  backup next|report|restore-checked
+                            what the backup worker asks and tells the console; see diffluence backup
   key <step>                replace master.key without downtime; see diffluence key
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
@@ -97,11 +99,19 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 	case "backup":
-		if len(args) < 2 || args[1] != "note" {
+		switch {
+		case len(args) >= 2 && args[1] == "note":
+			err = cmdBackupNote(ctx, stdout)
+		case len(args) >= 2 && args[1] == "next":
+			err = cmdBackupNext(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "report":
+			err = cmdBackupReport(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-checked":
+			err = cmdBackupRestoreChecked(ctx, args[2:], stdout)
+		default:
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
-		err = cmdBackupNote(ctx, stdout)
 	case "setup-code":
 		err = cmdSetupCode(ctx, stdout)
 	case "key":

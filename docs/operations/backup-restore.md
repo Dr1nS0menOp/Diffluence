@@ -41,7 +41,9 @@ docker compose run --rm backup once     # one backup now
 docker compose logs backup              # what it did, and why it did not
 ```
 
-The service starts its first backup once Diffluence has made its tables, and then whenever the newest backup is older than the interval. Without a key it logs why on every interval and makes nothing; after adding the key, `docker compose restart backup` tries again at once. A backup is written under a name that starts with `.partial-` and renamed only when every part and `SHA256SUMS` are in, so a backup that died halfway is never picked for a restore. Each backup belongs to the owner of the backup folder, so that user can restore it.
+**In the console** (Administration, System, Backups; spec 058): the schedule and the number kept set there win over these two variables, which stay the default. "Back up now" asks the service for a backup, which it starts within a minute (at most 4 an hour). The page lists every backup with its size, whether it was complete or which step failed, and whether a test restore of it passed; it shows when the service last checked in and whether it holds a key (only a fingerprint, never the key). A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service talks to the console through the database, with the access it already has, so the same page works when the worker is a Kubernetes CronJob or a systemd timer that runs `diffluence backup next` and `diffluence backup report`.
+
+The service starts its first backup once Diffluence has made its tables, and then whenever the last try is older than the interval. Without a key it logs why on every interval and makes nothing; after adding the key, `docker compose restart backup` tries again at once. A backup is written under a name that starts with `.partial-` and renamed only when every part and `SHA256SUMS` are in, so a backup that died halfway is never picked for a restore. Each backup belongs to the owner of the backup folder, so that user can restore it.
 
 **Copy `./backups` off this machine**, every day: to another disk, another building, or S3-compatible storage. A backup on the same disk is gone with the disk. Copy the key to a different place than the backups.
 
@@ -150,7 +152,7 @@ A backup that was never restored is a hope. The best-known outages of the last d
 bash scripts/restore-check.sh ./backups ./backup-key/backup.key
 ```
 
-It restores the newest backup into a throw-away Compose project on port 18097 (`DIFFLUENCE_RESTORE_CHECK_PORT`), verifies the audit chain and that every key opens, counts pages, files and people, prints how long it took, and removes the project. It exits with an error when anything fails. Run it from a timer that tells a person when it fails, for example with systemd:
+It restores the newest backup into a throw-away Compose project on port 18097 (`DIFFLUENCE_RESTORE_CHECK_PORT`), verifies the audit chain and that every key opens, counts pages, files and people, prints how long it took, and removes the project. It tells the console the result, which shows it under Backups and mails the administrators when it failed. It exits with an error when anything fails. Run it from a timer that tells a person when it fails, for example with systemd:
 
 ```ini
 # /etc/systemd/system/diffluence-restore-check.service

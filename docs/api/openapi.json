@@ -344,6 +344,42 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/backups": {
+      "get": {
+        "operationId": "get /api/v1/admin/backups",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/backups/request": {
+      "post": {
+        "operationId": "post /api/v1/admin/backups/request",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/bundles": {
       "post": {
         "operationId": "post /api/v1/admin/bundles",
@@ -411,6 +447,24 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/configuration": {
+      "get": {
+        "operationId": "get /api/v1/admin/configuration",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Done. Most routes answer with JSON."
@@ -1642,6 +1696,24 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "sensitive permission:administrator"
+      }
+    },
+    "/api/v1/admin/sessions/end": {
+      "post": {
+        "operationId": "post /api/v1/admin/sessions/end",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Done. Most routes answer with JSON."
