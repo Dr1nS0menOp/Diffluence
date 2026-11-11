@@ -216,6 +216,8 @@ export function SpacePeopleView({ spaceKey }: { spaceKey: string }) {
 }
 
 interface SpaceEvent {
+  id: string;
+  /** Zero while the event waits for the sealer (ADR-041). */
   seq: number;
   occurred_at: string;
   actor_id: string;
@@ -249,7 +251,7 @@ function SpaceAuditTable({ space }: { space: Space }) {
           </thead>
           <tbody>
             {q.data?.events.map((e) => (
-              <tr key={e.seq}>
+              <tr key={e.id}>
                 <td>{dates.moment(e.occurred_at)}</td>
                 <td>
                   {e.actor_id ? (

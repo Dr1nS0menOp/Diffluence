@@ -29,6 +29,12 @@ func (a *App) CheckWitnessForTest(ctx context.Context, witness []audit.Checkpoin
 	return audit.CompareWitness(ctx, a.pool, public, witness)
 }
 
+// RunSealerForTest runs the sealing loop of a worker until ctx ends.
+func (a *App) RunSealerForTest(ctx context.Context, every time.Duration) { a.runSealer(ctx, every) }
+
+// SealEveryForTest is how often a worker seals.
+const SealEveryForTest = sealEvery
+
 // VerifyAuditForTest runs the daily job.
 func (a *App) VerifyAuditForTest(ctx context.Context) error { return a.verifyAudit(ctx) }
 

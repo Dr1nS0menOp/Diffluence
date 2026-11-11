@@ -89,7 +89,7 @@ func TestARuleRunsOnAnEventAndEveryActionIsAuditedWithItsName(t *testing.T) {
 	if got := labelsOf(owner, page); len(got) != 1 || got[0] != "discussed" {
 		t.Fatalf("labels %v", got)
 	}
-	if got := e.count(`SELECT count(*) FROM audit_events WHERE action = 'page.labelled' AND payload LIKE '%Tag commented pages%'`); got != 1 {
+	if got := e.count(`SELECT count(*) FROM audit_entries WHERE action = 'page.labelled' AND payload LIKE '%Tag commented pages%'`); got != 1 {
 		t.Fatalf("%d audit rows with the rule's name", got)
 	}
 	runs := owner.ok("GET", "/api/v1/rules/"+id+"/runs", nil)["runs"].([]any)

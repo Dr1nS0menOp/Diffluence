@@ -247,7 +247,7 @@ func TestTheKeyIsReplacedWhileTheInstanceKeepsServing(t *testing.T) {
 	defer pool.Close()
 	var steps int
 	if err := pool.Pool.QueryRow(context.Background(),
-		"SELECT count(*) FROM audit_events WHERE action = 'keys.retired'").Scan(&steps); err != nil {
+		"SELECT count(*) FROM audit_entries WHERE action = 'keys.retired'").Scan(&steps); err != nil {
 		t.Fatal(err)
 	}
 	if steps != 1 {

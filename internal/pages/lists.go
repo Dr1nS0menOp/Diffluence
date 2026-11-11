@@ -217,6 +217,8 @@ func (s *Service) OwnTitles(ctx context.Context, c identity.Caller) ([]string, e
 
 // SpaceEvent is one row of the audit of a space.
 type SpaceEvent struct {
+	ID uuid.UUID `json:"id"`
+	// Seq is zero while the event waits for the sealer (ADR-041).
 	Seq        int64          `json:"seq"`
 	OccurredAt time.Time      `json:"occurred_at"`
 	ActorID    string         `json:"actor_id"`
@@ -248,7 +250,7 @@ func (s *Service) SpaceAudit(ctx context.Context, c identity.Caller, spaceID uui
 	}
 	out := make([]SpaceEvent, 0, len(events))
 	for _, e := range events {
-		row := SpaceEvent{Seq: e.Seq, OccurredAt: e.OccurredAt, ActorID: e.ActorID, Action: e.Action,
+		row := SpaceEvent{ID: e.ID, Seq: e.Seq, OccurredAt: e.OccurredAt, ActorID: e.ActorID, Action: e.Action,
 			ObjectType: e.ObjectType, ObjectID: e.ObjectID, Result: e.Result, Details: e.Details}
 		if e.ObjectType == "page" && !slices.Contains(seen, e.ObjectID) {
 			row.ObjectID, row.Details = "", nil

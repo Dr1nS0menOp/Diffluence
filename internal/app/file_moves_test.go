@@ -29,7 +29,7 @@ func TestAFileMovesToAnotherPageAndKeepsItsID(t *testing.T) {
 	if list := owner.ok("GET", "/api/v1/pages/"+to+"/attachments", nil)["attachments"].([]any); len(list) != 1 {
 		t.Fatalf("the file did not arrive: %v", list)
 	}
-	if e.count("SELECT count(*) FROM audit_events WHERE action = 'attachment.moved'") != 1 {
+	if e.count("SELECT count(*) FROM audit_entries WHERE action = 'attachment.moved'") != 1 {
 		t.Fatal("the move left no trace in the audit log")
 	}
 }

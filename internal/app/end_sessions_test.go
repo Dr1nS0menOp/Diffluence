@@ -35,7 +35,7 @@ func TestAnOperatorEndsTheSessionsOfOnePersonOrOfEveryone(t *testing.T) {
 		t.Fatalf("ending sessions must not disable anyone: %d", code)
 	}
 	var audited int
-	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE action = 'sessions.ended'").Scan(&audited); err != nil || audited != 2 {
+	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM audit_entries WHERE action = 'sessions.ended'").Scan(&audited); err != nil || audited != 2 {
 		t.Fatalf("audited %d %v", audited, err)
 	}
 }

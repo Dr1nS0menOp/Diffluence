@@ -61,7 +61,7 @@ func TestOnlyTheOwnerChangesASavedBlock(t *testing.T) {
 	if strings.Contains(savedNames(owner), "Shared intro") {
 		t.Fatal("a deleted block is still listed")
 	}
-	if got := e.count("SELECT count(*) FROM audit_events WHERE action LIKE 'saved_block.%'"); got != 2 {
+	if got := e.count("SELECT count(*) FROM audit_entries WHERE action LIKE 'saved_block.%'"); got != 2 {
 		t.Fatalf("audit lines = %d, want 2", got)
 	}
 }

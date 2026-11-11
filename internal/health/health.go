@@ -41,10 +41,17 @@ const (
 	// GrowthWindow is how far back the growth of the database is measured, and how far
 	// ahead the disk check looks.
 	GrowthWindow = 30 * 24 * time.Hour
+	// AuditSealWarnAfter is how long an audit event may wait for the sealer before
+	// administrators are asked to look (spec 052). A worker seals every second, so a minute
+	// means no worker seals.
+	AuditSealWarnAfter = time.Minute
+	// AuditSealProblemAfter is when waiting events need a person: they are not covered by a
+	// signed checkpoint or the witness until they are sealed (ADR-041).
+	AuditSealProblemAfter = 15 * time.Minute
 )
 
 // Names are the checks, in the order the console shows them.
-var Names = []string{"disk", "database", "backup", "migrations", "work", "mail", "login", "version"}
+var Names = []string{"disk", "database", "backup", "migrations", "work", "audit", "mail", "login", "version"}
 
 // Facts is what an installation knows about itself. A zero value means "not known" and
 // never warns, except where nothing known is itself the news (no backup noted).
@@ -74,6 +81,10 @@ type Facts struct {
 	// failed in the last day.
 	MailConfigured bool
 	MailFailed1d   int
+	// AuditWaiting counts audit events that wait for the sealer; OldestAuditWaiting is when
+	// the oldest of them happened, zero when none wait.
+	AuditWaiting       int64
+	OldestAuditWaiting time.Time
 	// PasswordStops counts accounts whose password login stopped after wrong guesses.
 	PasswordStops  int
 	OIDCConfigured bool
@@ -100,8 +111,25 @@ func check(name string, state State, code string, values map[string]any) Check {
 // Evaluate judges the facts. It returns one check per name in Names.
 func Evaluate(f Facts) []Check {
 	return []Check{
-		disk(f), database(f), backup(f), migrations(f), work(f), mail(f), login(f), release(f),
+		disk(f), database(f), backup(f), migrations(f), work(f), auditSealing(f), mail(f), login(f), release(f),
 	}
+}
+
+// auditSealing says whether the worker keeps the audit chain up to date. Events that wait
+// only a moment are normal, so the line then reads the same as when none wait.
+func auditSealing(f Facts) Check {
+	if f.AuditWaiting == 0 || f.OldestAuditWaiting.IsZero() {
+		return check("audit", OK, "audit_ok", nil)
+	}
+	lag := f.Now.Sub(f.OldestAuditWaiting)
+	values := map[string]any{"count": f.AuditWaiting, "seconds": int(lag.Seconds())}
+	switch {
+	case lag > AuditSealProblemAfter:
+		return check("audit", Problem, "audit_stuck", values)
+	case lag > AuditSealWarnAfter:
+		return check("audit", Warn, "audit_lagging", values)
+	}
+	return check("audit", OK, "audit_ok", values)
 }
 
 // percentFree is the free part of a disk in whole percent, rounded down.
@@ -241,6 +269,9 @@ var Sentences = map[string]string{
 	"work_ok":          "Background work runs.",
 	"work_failed":      "{jobs} job(s) failed in the last 7 days and {events} event(s) gave up. Look under Care.",
 	"outbox_stuck":     "{outbox} event(s) have waited more than an hour to reach the queue. Check the queue and the worker.",
+	"audit_ok":         "Audit events are sealed in the chain within seconds.",
+	"audit_lagging":    "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
+	"audit_stuck":      "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",
 	"mail_off":         "No mail server is set, so nobody gets mail. Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM.",
 	"mail_ok":          "Mail is set up.",
 	"mail_failed":      "{count} mail(s) failed in the last day. Check the mail server.",

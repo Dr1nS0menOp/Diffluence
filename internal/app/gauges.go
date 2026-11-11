@@ -86,6 +86,14 @@ func unixSeconds(at time.Time) float64 {
 	return float64(at.Unix())
 }
 
+// auditLag is how long the oldest waiting audit event has waited, in seconds.
+func auditLag(f health.Facts) float64 {
+	if f.OldestAuditWaiting.IsZero() {
+		return 0
+	}
+	return f.Now.Sub(f.OldestAuditWaiting).Seconds()
+}
+
 // HealthGauges are the facts of the health checks as numbers an operator can alert on
 // (OPS-077, OPS-103, spec 051). A fact that is not known is left out, so an alert on it
 // cannot fire on a guess.
@@ -97,6 +105,8 @@ func HealthGauges(f health.Facts) []metrics.Gauge {
 		{Name: "diffluence_event_failures", Help: "Events that gave up and wait for a replay.", Value: float64(f.EventFailures)},
 		{Name: "diffluence_outbox_stuck", Help: "Events that waited more than an hour to reach the queue.", Value: float64(f.OutboxStuck)},
 		{Name: "diffluence_mail_failed_1d", Help: "Mails that failed in the last day.", Value: float64(f.MailFailed1d)},
+		{Name: "diffluence_audit_unsealed_events", Help: "Audit events that wait for the sealer.", Value: float64(f.AuditWaiting)},
+		{Name: "diffluence_audit_sealing_lag_seconds", Help: "How long the oldest unsealed audit event has waited; 0 = none waits.", Value: auditLag(f)},
 		{Name: "diffluence_health_problems", Help: "Health checks that need a person now.", Value: float64(problems)},
 		{Name: "diffluence_health_warnings", Help: "Health checks that need a look soon.", Value: float64(warnings)},
 	}

@@ -366,6 +366,10 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 		return err
 	}
 	defer pool.Close()
+	// Seal what waits first, so the check covers every event committed before it ran.
+	if _, err := audit.SealWaiting(ctx, pool); err != nil {
+		return err
+	}
 	res, err := audit.Check(ctx, pool, public)
 	if err != nil {
 		return err

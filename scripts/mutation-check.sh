@@ -463,7 +463,7 @@ mutate "an expired SCIM token works" internal/scim/scim.go \
 mutate "an administrator reads a hidden title on the screen" internal/pages/lists.go \
   's.replace("if id := auditedContent(e); id != \"\" && !visible[id] {", "if id := auditedContent(e); id != \"\" && len(id) < 0 {")' $app -run TestAnAdministratorSeesACensored
 mutate "an export shows a hidden title" internal/audit/audit.go \
-  's.replace("\t\te, err := f.read(payload, part)", "\t\tuncensored := f\n\t\tuncensored.Censor = nil\n\t\te, err := uncensored.read(payload, part)")' $app -run TestAnAdministratorSeesACensored
+  's.replace("\t\te, err := f.read(row.payload, row.part)", "\t\tuncensored := f\n\t\tuncensored.Censor = nil\n\t\te, err := uncensored.read(row.payload, row.part)")' $app -run TestAnAdministratorSeesACensored
 mutate "the note on a page shows its title" internal/pages/lists.go \
   's.replace("if !note.Readable {", "if !note.Readable && len(note.Title) < 0 {")' $app -run TestAnAdministratorSeesACensored
 mutate "the grace period never ends" internal/app/app.go \
@@ -1497,6 +1497,52 @@ mutate "an embedded section field counts as unknown" internal/settings/sections.
   's.replace("\t\tif f.Anonymous \x26\x26 !hasTag {", "\t\tif hasTag \x26\x26 false {")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
 mutate "a field left out by omitempty counts as unknown" internal/settings/sections.go \
   's.replace("\t\tname, _, _ := strings.Cut(tag, \",\")", "\t\tname := tag")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
+# Spec 052, ADR-041: the audit chain is sealed a moment after saving.
+audit=./internal/audit/
+mutate "a save takes the chain lock again" internal/audit/audit.go \
+  's.replace("\t_, err = tx.Exec(ctx, `INSERT INTO audit_pending", "\tif _, err := tx.Exec(ctx, \"SELECT pg_advisory_xact_lock($1)\", chainLockKey); err != nil {\n\t\treturn p.event, err\n\t}\n\t_, err = tx.Exec(ctx, `INSERT INTO audit_pending")' $audit -run TestASaveDoesNotWaitForTheChain
+mutate "the sealer does not wait for the chain" internal/audit/seal.go \
+  's.replace("tx.Exec(ctx, \"SELECT pg_advisory_xact_lock($1)\", chainLockKey); err != nil {\n\t\treturn 0,", "tx.Exec(ctx, \"SELECT $1::bigint\", chainLockKey); err != nil {\n\t\treturn 0,")' $audit -run TestTheSealerWaitsWhileTheChainIsHeld
+mutate "a sealed event stays waiting" internal/audit/seal.go \
+  's.replace("batch.Queue(\"DELETE FROM audit_pending WHERE pend = ANY($1)\", sealed)", "_ = sealed")' $audit -run TestVerifyCountsWaitingEvents
+mutate "a long backlog stops after one step" internal/audit/seal.go \
+  's.replace("if n < SealBatch {", "if n <= SealBatch {")' $audit -run TestABacklogLongerThanOneStepIsSealedWhole
+mutate "waiting events are sealed newest first" internal/audit/seal.go \
+  's.replace("payload, salt, data FROM audit_pending ORDER BY pend`", "payload, salt, data FROM audit_pending ORDER BY pend DESC`")' $audit -run TestEventsAreSealedInTheOrderTheyBecameVisible
+mutate "after a prune of everything the chain starts again" internal/audit/seal.go \
+  's.replace("\treturn start.prevHash, nil", "\treturn genesis, nil")' $audit -run TestTheChainGoesOnFromTheAnchorAfterEverythingWasPruned
+mutate "a prune leaves events waiting" internal/audit/prune.go \
+  's.replace("\t\t_, err = SealIn(ctx, tx, 0)", "\t\t_ = SealIn")' $audit -run TestTheChainGoesOnFromTheAnchorAfterEverythingWasPruned
+mutate "erasing leaves the part of a waiting event" internal/audit/audit.go \
+  's.replace("OR object_id = $1) AND salt IS NOT NULL`", "OR object_id = $1) AND salt IS NULL`")' $audit -run TestErasingAPersonReachesAWaitingEvent
+mutate "a waiting event can be removed" internal/db/migrations/0047_audit_pending.sql \
+  's.replace("IF EXISTS (SELECT 1 FROM audit_events WHERE id = OLD.id) THEN", "IF true THEN")' $audit -run TestAWaitingEventCannotBeRemovedOrChanged
+mutate "a waiting event can be rewritten" internal/db/migrations/0047_audit_pending.sql \
+  's.replace("IF NEW.salt IS NULL AND NEW.data IS NULL", "IF true OR NEW.salt IS NULL AND NEW.data IS NULL")' $audit -run TestAWaitingEventCannotBeRemovedOrChanged
+mutate "a list leaves out waiting events" internal/audit/audit.go \
+  's.replace("listWaitingSQL, false, f.Limit, keep)", "listWaitingSQL, false, 0, keep)")' $audit -run TestReadersSeeWaitingEventsAtOnce
+mutate "an export leaves out waiting events" internal/audit/audit.go \
+  's.replace("exportWaitingSQL, false, maxRows-sealed, write)", "exportWaitingSQL, false, 0, write)")' $audit -run TestReadersSeeWaitingEventsAtOnce
+mutate "a check does not count waiting events" internal/audit/audit.go \
+  's.replace("\"SELECT count(*) FROM audit_pending\").Scan(&res.Unsealed)", "\"SELECT 0::bigint\").Scan(&res.Unsealed)")' $audit -run TestVerifyCountsWaitingEvents
+mutate "events waiting a minute do not warn" internal/health/health.go \
+  's.replace("case lag > AuditSealWarnAfter:", "case lag > AuditSealProblemAfter:")' $health -run TestAuditEventsWaitingLongerThanAMinuteWarn
+mutate "events waiting fifteen minutes need nobody" internal/health/health.go \
+  's.replace("case lag > AuditSealProblemAfter:", "case lag > 2*AuditSealProblemAfter:")' $health -run TestAuditEventsWaitingLongerThanFifteenMinutesAreAProblem
+mutate "a worker seals once a minute" internal/app/ops.go \
+  's.replace("sealEvery = time.Second", "sealEvery = time.Minute")' $app -run TestAWorkerSealsEverySecond
+mutate "a stopping worker leaves events behind" internal/app/ops.go \
+  's.replace("if err := a.SealAudit(last); err != nil {", "if err := last.Err(); err != nil {")' $app -run TestAStoppingWorkerSealsWhatIsLeft
+mutate "a checkpoint leaves out what waits" internal/app/ops.go \
+  's.replace("// sealer already reached.\n\tif err := a.SealAudit(ctx); err != nil {\n\t\treturn err\n\t}", "// sealer already reached.")' $app -run TestTheWitnessLogShowsATailRemovedFromTheDatabase
+mutate "a check leaves out what waits" internal/app/ops.go \
+  's.replace("func (a *App) CheckAudit(ctx context.Context) (audit.VerifyResult, error) {\n\tif err := a.SealAudit(ctx); err != nil {\n\t\treturn audit.VerifyResult{}, err\n\t}", "func (a *App) CheckAudit(ctx context.Context) (audit.VerifyResult, error) {")' $app -run TestACheckSealsWhatWaitsFirst
+mutate "the health page does not see what waits" internal/app/health.go \
+  's.replace("(SELECT count(*) FROM audit_pending),\n\t(SELECT min(occurred_at) FROM audit_pending)", "(SELECT 0::bigint),\n\t(SELECT NULL::timestamptz)")' $app -run TestEventsLeftUnsealedShowOnTheHealthPage
+mutate "the metrics say nothing waits long" internal/app/gauges.go \
+  's.replace("Value: auditLag(f)}", "Value: 0}")' $app -run TestEventsLeftUnsealedShowOnTheHealthPage
+mutate "a backup note waits for the sealer" internal/app/upgrade.go \
+  's.replace("return audit.RecordSealed(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",", "return audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",")' $app -run TestTheHealthPageShowsTheBackupAndTheDisk
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

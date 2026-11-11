@@ -170,7 +170,8 @@ var idColumns = map[string]string{
 func uuidColumns(t *testing.T, e *env) []string {
 	t.Helper()
 	rows, err := e.app.Pool().Query(context.Background(), `SELECT table_name || '.' || column_name FROM information_schema.columns
-		WHERE table_schema = 'public' AND udt_name IN ('uuid', '_uuid') AND table_name NOT IN ('audit_events', 'schema_migrations')`)
+		WHERE table_schema = 'public' AND udt_name IN ('uuid', '_uuid')
+		  AND table_name NOT IN ('audit_events', 'audit_pending', 'audit_entries', 'schema_migrations')`)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -324,7 +325,7 @@ func TestPersonalDataInTheAuditLogCanBeErasedWhileTheChainHolds(t *testing.T) {
 	root.ok("PATCH", "/api/v1/admin/users/"+anna.id, map[string]any{"display_name": "Annika Visserius", "type": "member"})
 
 	var inChain int
-	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE payload ILIKE '%visserius%'").Scan(&inChain); err != nil {
+	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM audit_entries WHERE payload ILIKE '%visserius%'").Scan(&inChain); err != nil {
 		t.Fatal(err)
 	}
 	if inChain != 0 {
@@ -337,7 +338,8 @@ func TestPersonalDataInTheAuditLogCanBeErasedWhileTheChainHolds(t *testing.T) {
 
 	root.ok("POST", "/api/v1/admin/users/"+anna.id+"/anonymise", map[string]any{"reason": "Request by mail"})
 	var left int
-	if err := e.app.Pool().QueryRow(ctx, "SELECT count(*) FROM audit_personal WHERE data ILIKE '%visserius%'").Scan(&left); err != nil {
+	if err := e.app.Pool().QueryRow(ctx, `SELECT (SELECT count(*) FROM audit_personal WHERE data ILIKE '%visserius%')
+		+ (SELECT count(*) FROM audit_pending WHERE data ILIKE '%visserius%')`).Scan(&left); err != nil {
 		t.Fatal(err)
 	}
 	if left != 0 {
@@ -357,6 +359,9 @@ func TestChangingAPersonalPartOfTheAuditLogIsNoticed(t *testing.T) {
 	ctx := context.Background()
 	e.user("anna@example.com", identity.PermUseProduct)
 	root.ok("GET", "/api/v1/me", nil)
+	if err := e.app.SealAudit(ctx); err != nil {
+		t.Fatal(err)
+	}
 	e.sql("UPDATE audit_personal SET data = replace(data, 'anna', 'somebody')")
 	res, err := audit.Verify(ctx, e.app.Pool())
 	if err != nil || res.OK {

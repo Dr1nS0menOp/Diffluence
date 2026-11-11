@@ -60,7 +60,11 @@ func TestTheWitnessLogShowsATailRemovedFromTheDatabase(t *testing.T) {
 		t.Fatalf("a whole chain: %+v, %v", res, err)
 	}
 
-	// The owner of the tables removes the last checkpoint and everything after the first.
+	// The owner of the tables removes the last checkpoint and everything after the first,
+	// sealed by then (ADR-041).
+	if err := e.app.SealAudit(ctx); err != nil {
+		t.Fatal(err)
+	}
 	first := witness[0].Seq
 	e.sql("ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update_delete")
 	e.sql("DELETE FROM audit_checkpoints WHERE seq > $1", first)

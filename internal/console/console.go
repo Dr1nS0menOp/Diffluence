@@ -114,7 +114,7 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 			(SELECT count(*) FROM jobs WHERE status = 'failed'),
 			(SELECT count(*) FROM users WHERE status = 'active' AND expires_at IS NOT NULL
 				AND expires_at <= now() + $1::interval),
-			(SELECT count(*) FROM audit_events a WHERE a.action = 'user.removal_requested'
+			(SELECT count(*) FROM audit_entries a WHERE a.action = 'user.removal_requested'
 				AND NOT EXISTS (SELECT 1 FROM users u WHERE u.id::text = a.object_id AND u.anonymised_at IS NOT NULL)),
 			(SELECT GREATEST(count(DISTINCT version) - 1, 0) FROM nodes WHERE last_seen_at > now() - make_interval(mins => $2)),
 			(SELECT count(*) FROM scim_tokens WHERE revoked_at IS NULL AND expires_at > now() AND expires_at <= now() + $3::interval)
@@ -125,8 +125,8 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 			(SELECT count(*) FROM outbox_events WHERE published_at IS NULL AND created_at < now() - interval '1 day'),
 			(SELECT count(*) FROM invitation_requests WHERE status = 'waiting'),
 			(SELECT count(*) FROM helper_health WHERE NOT ok),
-			COALESCE((SELECT a.result <> 'success' FROM audit_events a
-				WHERE a.action = 'audit.verified' AND a.actor_id = 'worker' ORDER BY a.seq DESC LIMIT 1), false)`,
+			COALESCE((SELECT a.result <> 'success' FROM audit_entries a
+				WHERE a.action = 'audit.verified' AND a.actor_id = 'worker' ORDER BY a.occurred_at DESC LIMIT 1), false)`,
 		expiryWarning, staleNodeMinute, tokenWarning).Scan(&failed, &expiring, &removal, &oldNodes, &tokens, &gaveUp, &orphaned, &waiting, &invitations, &helpersDown, &damaged)
 	if err != nil {
 		return nil, err

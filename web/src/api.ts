@@ -880,7 +880,10 @@ export interface Group {
 }
 
 export interface AuditEvent {
+  id: string;
+  /** Zero while the event waits for the sealer (ADR-041). */
   seq: number;
+  sealed: boolean;
   occurred_at: string;
   actor_type: string;
   actor_id?: string;

@@ -96,7 +96,7 @@ func TestAFailedLoginStoresNoTypedAddress(t *testing.T) {
 		t.Fatal("logged in")
 	}
 
-	rows, err := e.app.Pool().Query(context.Background(), `SELECT object_id, payload FROM audit_events
+	rows, err := e.app.Pool().Query(context.Background(), `SELECT object_id, payload FROM audit_entries
 		WHERE action = 'auth.login' AND result = 'failure' ORDER BY seq`)
 	if err != nil {
 		t.Fatal(err)

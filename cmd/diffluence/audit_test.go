@@ -50,6 +50,10 @@ func TestAuditVerifyComparesTheChainWithTheWitnessLog(t *testing.T) {
 		t.Fatal(err)
 	}
 	log := slog.New(slog.NewJSONHandler(logFile, nil))
+	// A worker seals the events of create-admin within a second (ADR-041).
+	if _, err := audit.SealWaiting(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
 	cp, signed, err := audit.SignCheckpoint(ctx, pool, key)
 	if err != nil || !signed {
 		t.Fatalf("signed %v: %v", signed, err)

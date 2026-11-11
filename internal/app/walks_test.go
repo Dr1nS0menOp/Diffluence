@@ -229,7 +229,7 @@ func TestAPurgedPageLeavesNothingBehind(t *testing.T) {
 	pool := w.e.app.Pool()
 	rows, err := pool.Query(ctx, `SELECT table_name, column_name, udt_name FROM information_schema.columns
 		WHERE table_schema = 'public' AND udt_name IN ('uuid', '_uuid', 'text', '_text', 'varchar', 'json', 'jsonb', 'tsvector')
-		  AND table_name NOT IN ('audit_events', 'schema_migrations')
+		  AND table_name NOT IN ('audit_events', 'audit_pending', 'schema_migrations')
 		  AND table_name IN (SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE')
 		ORDER BY 1, 2`)
 	if err != nil {

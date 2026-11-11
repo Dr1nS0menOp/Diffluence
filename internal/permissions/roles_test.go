@@ -484,7 +484,7 @@ func TestRolesRefuseWhatWouldChangeAccessQuietly(t *testing.T) {
 	noDrift(t, ctx, w.pool)
 
 	var details string
-	if err := w.pool.QueryRow(ctx, `SELECT payload FROM audit_events WHERE action = 'role.changed' ORDER BY seq DESC LIMIT 1`).Scan(&details); err != nil {
+	if err := w.pool.QueryRow(ctx, `SELECT payload FROM audit_entries WHERE action = 'role.changed' ORDER BY occurred_at DESC LIMIT 1`).Scan(&details); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"before"`, `"after"`, permissions.PageCreate} {
@@ -543,7 +543,7 @@ func TestAssigningRolesKeepsTheLimitsOfManagingAccess(t *testing.T) {
 	noDrift(t, ctx, w.pool)
 
 	var details string
-	if err := w.pool.QueryRow(ctx, `SELECT payload FROM audit_events WHERE action = 'role.assigned' ORDER BY seq DESC LIMIT 1`).Scan(&details); err != nil {
+	if err := w.pool.QueryRow(ctx, `SELECT payload FROM audit_entries WHERE action = 'role.assigned' ORDER BY occurred_at DESC LIMIT 1`).Scan(&details); err != nil {
 		t.Fatal(err)
 	}
 	for _, want := range []string{`"before"`, `"after"`, "Editor"} {

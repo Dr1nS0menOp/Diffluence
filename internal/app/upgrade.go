@@ -177,14 +177,17 @@ func (a *App) markUpgrade(ctx context.Context, owner *pgxpool.Pool, st db.Schema
 	if !backupAt.IsZero() {
 		details["backup_noted_at"] = backupAt.UTC().Format(time.RFC3339)
 	}
-	return audit.RecordStandalone(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: "node",
+	// Straight into the chain: this runs before migrating, when the database may be of a
+	// release without audit_pending (ADR-041).
+	return audit.RecordSealed(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: "node",
 		Action: ActionUpgradeStarted, ObjectType: "migration", ObjectID: fmt.Sprintf("%04d", a.maxMigration()),
 		Result: audit.ResultSuccess, Details: details})
 }
 
 // NoteBackup records that a complete backup was just made, for the checks before the
-// next upgrade.
+// next upgrade. The note goes straight into the chain, so the check before migrating reads
+// it at once, and a newer binary can note a backup of a database it has not migrated yet.
 func NoteBackup(ctx context.Context, pool *pgxpool.Pool) error {
-	return audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "cli",
+	return audit.RecordSealed(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "cli",
 		Action: ActionBackupNoted, ObjectType: "backup", Result: audit.ResultSuccess})
 }

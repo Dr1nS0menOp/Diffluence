@@ -255,7 +255,9 @@ func parseAuditFilter(r *http.Request) (audit.Filter, error) {
 }
 
 type auditEventJSON struct {
-	Seq int64 `json:"seq"`
+	// Seq is zero, and Sealed false, while the event waits for the sealer (ADR-041).
+	Seq    int64 `json:"seq"`
+	Sealed bool  `json:"sealed"`
 	audit.Event
 }
 
@@ -280,11 +282,17 @@ func (s *Server) handleAuditList(w http.ResponseWriter, r *http.Request) {
 	}
 	out := make([]auditEventJSON, 0, len(events))
 	for _, e := range events {
-		out = append(out, auditEventJSON{Seq: e.Seq, Event: e.Event})
+		out = append(out, auditEventJSON{Seq: e.Seq, Sealed: e.Sealed, Event: e.Event})
 	}
+	// The next page starts below the last event of this one. A full page that ends on a
+	// waiting event has no position yet; it is sealed within seconds, so asking again then
+	// gives one.
 	var next any
 	if len(events) > 0 && len(events) == f.Limit {
-		next = events[len(events)-1].Seq
+		last := events[len(events)-1]
+		if last.Sealed {
+			next = last.Seq
+		}
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"events": out, "next_before_seq": next})
 }

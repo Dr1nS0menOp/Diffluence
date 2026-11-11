@@ -60,7 +60,7 @@ func TestPlantedSecretsAppearInNoLogAuditOrEvent(t *testing.T) {
 	var stored strings.Builder
 	ctx := context.Background()
 	for _, query := range []string{
-		"SELECT coalesce(string_agg(payload, ' '), '') FROM audit_events",
+		"SELECT coalesce(string_agg(payload, ' '), '') FROM audit_entries",
 		"SELECT coalesce(string_agg(payload::text, ' '), '') FROM outbox_events",
 	} {
 		var text string

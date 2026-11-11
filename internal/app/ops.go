@@ -25,6 +25,12 @@ const (
 	// How often the head of the audit chain is signed. It bounds what an owner of the
 	// database can remove from the tail before the witness holds a copy (ADR-039).
 	checkpointEvery = 5 * time.Minute
+	// sealEvery is how often a worker seals the audit events that wait (ADR-041). It is the
+	// usual delay between a save and its place in the chain; the health page warns from
+	// health.AuditSealWarnAfter.
+	sealEvery = time.Second
+	// sealOnStop is how long a stopping worker spends sealing what is left.
+	sealOnStop = 5 * time.Second
 )
 
 // alwaysEnabled passes every record to its handler, whatever level that was set to, so
@@ -108,8 +114,39 @@ func (a *App) runContractMigrations(ctx context.Context) error {
 	return err
 }
 
-// CheckAudit verifies the chain and the signatures on its checkpoints.
+// SealAudit puts the audit events that wait into the chain now.
+func (a *App) SealAudit(ctx context.Context) error {
+	_, err := audit.SealWaiting(ctx, a.pool)
+	return err
+}
+
+// runSealer seals the waiting audit events every interval until ctx ends, then once more,
+// so a worker that stops leaves as little as it can for the next one. Every worker runs it;
+// the lock of the chain lets one seal at a time.
+func (a *App) runSealer(ctx context.Context, interval time.Duration) {
+	for {
+		if err := a.SealAudit(ctx); err != nil && ctx.Err() == nil {
+			a.log.Error("sealing the audit log failed", "error", err)
+		}
+		select {
+		case <-ctx.Done():
+			last, cancel := context.WithTimeout(context.WithoutCancel(ctx), sealOnStop)
+			defer cancel()
+			if err := a.SealAudit(last); err != nil {
+				a.log.Warn("sealing the audit log on stop failed", "error", err)
+			}
+			return
+		case <-time.After(interval):
+		}
+	}
+}
+
+// CheckAudit seals what waits, then verifies the chain and the signatures on its
+// checkpoints, so the answer covers every event committed before it was asked.
 func (a *App) CheckAudit(ctx context.Context) (audit.VerifyResult, error) {
+	if err := a.SealAudit(ctx); err != nil {
+		return audit.VerifyResult{}, err
+	}
 	key, err := a.keyring.SigningKey()
 	if err != nil {
 		return audit.VerifyResult{}, err
@@ -150,6 +187,11 @@ func resultOf(ok bool) string {
 func (a *App) signCheckpoint(ctx context.Context) error {
 	key, err := a.keyring.SigningKey()
 	if err != nil {
+		return err
+	}
+	// First, so the checkpoint covers what happened up to now and not only what the
+	// sealer already reached.
+	if err := a.SealAudit(ctx); err != nil {
 		return err
 	}
 	cp, signed, err := audit.SignCheckpoint(ctx, a.pool, key)

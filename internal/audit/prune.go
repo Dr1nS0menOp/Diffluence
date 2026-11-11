@@ -71,6 +71,11 @@ func Prune(ctx context.Context, owner *pgxpool.Pool, before time.Time, key ed255
 	}
 	var out Pruned
 	err = pgx.BeginFunc(ctx, owner, func(tx pgx.Tx) error {
+		// The chain stays still until this ends: nothing is sealed or appended between the
+		// anchor and the event that records the prune.
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", chainLockKey); err != nil {
+			return fmt.Errorf("audit: lock chain: %w", err)
+		}
 		var lastHash []byte
 		err := tx.QueryRow(ctx, "SELECT seq, hash FROM audit_events WHERE occurred_at < $1 ORDER BY seq DESC LIMIT 1", before).
 			Scan(&out.AnchorSeq, &lastHash)
@@ -80,7 +85,6 @@ func Prune(ctx context.Context, owner *pgxpool.Pool, before time.Time, key ed255
 		if err != nil {
 			return err
 		}
-		// First, so the chain goes on after the rows below are gone.
 		if _, err := Record(ctx, tx, Event{ActorType: ActorSystem, Action: "audit.pruned", Result: ResultSuccess,
 			Details: map[string]any{"up_to_seq": out.AnchorSeq}}); err != nil {
 			return err
@@ -102,7 +106,12 @@ func Prune(ctx context.Context, owner *pgxpool.Pool, before time.Time, key ed255
 			return err
 		}
 		out.Removed = tag.RowsAffected()
-		_, err = tx.Exec(ctx, "ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update_delete")
+		if _, err = tx.Exec(ctx, "ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update_delete"); err != nil {
+			return err
+		}
+		// Sealed in this transaction, so the chain goes on from the anchor even when every
+		// event was removed, and no release that appends directly finds an empty table.
+		_, err = SealIn(ctx, tx, 0)
 		return err
 	})
 	return out, err

@@ -17,6 +17,7 @@ Diffluence watches itself (spec 051). You see the same checks in three places:
 | Backup | Noted in the last 26 hours | None noted, or older than 26 hours | |
 | Migrations | All applied, or contract migrations waiting during an upgrade | A contract migration waited a day longer than `DIFFLUENCE_CONTRACT_GRACE` | |
 | Background work | Runs | A job failed in 7 days, or an event gave up | An event waited more than an hour to reach the queue |
+| Audit log | Events are sealed into the chain within seconds | An event waited more than a minute to be sealed: no worker seals | An event waited more than 15 minutes, so no checkpoint covers it |
 | Mail | Set up | No mail server, or a mail failed in the last day | |
 | Login | As set up | An account's password login stopped after many wrong guesses | |
 | Release | Built less than 60 days ago, or a developer build | Built more than 60 days ago | |
@@ -40,6 +41,7 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 | `diffluence_jobs_queued`, `diffluence_jobs_failed_7d` | Jobs waiting; jobs failed in 7 days |
 | `diffluence_event_failures` | Events that gave up and wait for a replay |
 | `diffluence_mail_queued`, `diffluence_mail_failed_1d` | Mail waiting; mail failed in a day |
+| `diffluence_audit_unsealed_events`, `diffluence_audit_sealing_lag_seconds` | Audit events waiting for the sealer; how long the oldest has waited (ADR-041) |
 | `diffluence_storage_deletions_queued` | Stored files waiting to be removed |
 | `diffluence_disk_free_bytes`, `diffluence_disk_total_bytes` | The disk of the stored files, when the store knows it |
 | `diffluence_database_size_bytes` | The database at the last hourly measurement |
@@ -51,7 +53,7 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 
 ## Alerts
 
-[`deploy/monitoring/diffluence-rules.yml`](../../deploy/monitoring/diffluence-rules.yml) holds two objectives, over 30 days: 99.5% of requests succeed, and 99.5% take less than 300 ms. A fast burn of the error budget pages within minutes and a slow one opens a ticket, as the Google SRE workbook describes. The other alerts are causes that need a person: Diffluence or its database down, the disk above 85% and above 98% full, no backup in 26 hours, jobs failing, an outbox that does not drain, events that gave up, a contract migration waiting a day, the queue unreachable, mail failing, a release older than 60 days. Change the numbers to your own objective.
+[`deploy/monitoring/diffluence-rules.yml`](../../deploy/monitoring/diffluence-rules.yml) holds two objectives, over 30 days: 99.5% of requests succeed, and 99.5% take less than 300 ms. A fast burn of the error budget pages within minutes and a slow one opens a ticket, as the Google SRE workbook describes. The other alerts are causes that need a person: Diffluence or its database down, the disk above 85% and above 98% full, no backup in 26 hours, jobs failing, an outbox that does not drain, audit events not sealed for 15 minutes, events that gave up, a contract migration waiting a day, the queue unreachable, mail failing, a release older than 60 days. Change the numbers to your own objective.
 
 ## What grows, and what keeps it small
 
@@ -73,4 +75,5 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 | The queue's files | 7 days per stream | NATS itself |
 | Stored files nothing points at | Until an administrator removes them | Care in the console |
 | The audit log | The retention set in the console | `diffluence audit prune`, by the owner of the tables |
+| Audit events waiting for the sealer | Seconds | The sealer of every worker, every second |
 | Pages, versions and files | For good: they are what people keep | People and the trash |

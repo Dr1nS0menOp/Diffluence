@@ -172,9 +172,9 @@ func TestLeavingNameModeDeletesNamesForGoodAndIsAudited(t *testing.T) {
 func TestPageViewsStayOutOfTheAuditLog(t *testing.T) {
 	e := newEnv(t)
 	_, reader, _, page := analyticsTeam(t, e, "names")
-	before := e.count("SELECT count(*) FROM audit_events")
+	before := e.count("SELECT count(*) FROM audit_entries")
 	reader.ok("POST", "/api/v1/pages/"+page+"/views", map[string]any{})
-	if got := e.count("SELECT count(*) FROM audit_events"); got != before {
+	if got := e.count("SELECT count(*) FROM audit_entries"); got != before {
 		t.Fatal("a page view entered the audit log")
 	}
 }

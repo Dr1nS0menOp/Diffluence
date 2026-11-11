@@ -1172,6 +1172,9 @@ func TestPruningADamagedChainIsRefused(t *testing.T) {
 	e := newEnv(t)
 	ctx := context.Background()
 	admin(e)
+	if err := e.app.SealAudit(ctx); err != nil {
+		t.Fatal(err)
+	}
 	if _, err := e.app.Pool().Exec(ctx, "ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update_delete"); err != nil {
 		t.Fatal(err)
 	}

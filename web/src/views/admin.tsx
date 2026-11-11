@@ -1063,7 +1063,7 @@ function AuditTab() {
           </thead>
           <tbody>
             {q.data?.events.map((e) => (
-              <tr key={e.seq}>
+              <tr key={e.id}>
                 <td>
                   <button type="button" className="ghost" onClick={() => setOpen(e)}>
                     {dates.moment(e.occurred_at)}

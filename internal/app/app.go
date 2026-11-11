@@ -415,7 +415,8 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log, Refused: func(ctx context.Context, data []byte, cause error) error {
 			return a.failures.Record(ctx, "relay", data, cause)
 		}}
-		wg.Add(4)
+		wg.Add(5)
+		go func() { defer wg.Done(); a.runSealer(workCtx, sealEvery) }()
 		go func() { defer wg.Done(); relay.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.RunPeriodic(workCtx, a.PeriodicTasks()) }()

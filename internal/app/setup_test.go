@@ -244,7 +244,7 @@ func TestNoSetupCodeIsKeptOrAudited(t *testing.T) {
 	}
 	plain := strings.ReplaceAll(code, "-", "")
 	for _, needle := range []string{code, plain, "DDDD-DDDD", "DDDDDDDD"} {
-		if n := e.count("SELECT count(*) FROM audit_events WHERE payload::text LIKE '%' || $1 || '%'", needle); n != 0 {
+		if n := e.count("SELECT count(*) FROM audit_entries WHERE payload::text LIKE '%' || $1 || '%'", needle); n != 0 {
 			t.Fatalf("a code appears in the audit log %d times", n)
 		}
 	}

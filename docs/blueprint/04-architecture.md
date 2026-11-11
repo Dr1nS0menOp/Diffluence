@@ -83,7 +83,7 @@ In total 241 lines.
 
 The most important findings, in order.
 
-1. **All changes pass through one lock.** `audit.Record` holds a global lock until commit. Normal use is far below its limit, but a long transaction that audits early stops every login and every change in the instance. Copying a large branch does that today (ARC-201).
+1. **All changes pass through one lock.** `audit.Record` holds a global lock until commit. Normal use is far below its limit, but a long transaction that audits early stops every login and every change in the instance. Copying a large branch does that today (ARC-201). Resolved since ADR-041: a save no longer takes the lock, and a worker seals events into the chain a moment later (ARC-203).
 2. **The worker does one job at a time, and all periodic tasks in one loop.** That is fine for imports alone. Waves D, F, G and H all add long jobs, so this must change first (ARC-063, ARC-068).
 3. **Fan-out needs a new question.** "Who may see this page" does not exist yet, and without it one publish in a watched space means thousands of permission checks (ARC-058, ARC-059).
 4. **JetStream's defaults redeliver for ever.** Each consumer must set a limit and keep its failures (ARC-050).

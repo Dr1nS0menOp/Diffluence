@@ -111,11 +111,24 @@ The answers are the same: a test compares the new feed with the former query, ro
 
 The audit lock is not changed. A shorter lock would need another design of the chain (ADR-013, ADR-039), which this wave did not prove safe. On a disk that syncs fast it costs little: see the install guide.
 
+### What spec 052 changed
+
+A save no longer takes the audit lock: it writes its event to `audit_pending`, and a worker seals waiting events into the chain every second (ADR-041). Measured on 11 November 2026 in the development container (16 CPUs, a pool of 20), with `TestMeasureSavesUnderTheChainLock`: 32 writers save 1,280 times at once, each save one transaction with one audit event, three runs.
+
+| Saves | Before (lock held to commit) | After |
+|---|---|---|
+| Saves a second | 1,940 to 2,060 | 16,100 to 18,200 |
+| p50 | 15.1 to 15.8 ms | 1.4 to 1.5 ms |
+| p95 | 17.4 to 18.4 ms | 2.7 to 3.0 ms |
+| p99 | 27.0 to 29.0 ms | 9.1 to 12.9 ms |
+
+The database of the development container runs with `fsync` and `synchronous_commit` off, so no commit waits for the disk there. That is the step the lock was held across, so on a real disk the old way is slower still and these numbers understate the gain. **The stress test has not been repeated on the server with this change.** Until it is, the 3.7 seconds above is the last measured state for all 5,000 at once.
+
 ## What stops everything
 
 | What | Result | What to do |
 |---|---|---|
-| Something holds the audit lock | Writes wait, which is known. With more waiting writes than the pool has connections, reading waits too. Since spec 050 a request waits at most 10 seconds for a database connection and is then answered busy with `Retry-After`, instead of waiting as long as the lock is held | A long transaction never audits early (ARC-201). Watch for it. Set `pool_max_conns` well above your writers |
+| Something holds the audit lock | Since spec 052 no save takes it: only the sealer, the upgrade marker, a backup note, a prune and a release from before ADR-041 do. While it is held, events wait unsealed, and saves go on | Nothing for saves. If events wait more than a minute, System health says so: check that a worker runs |
 | Many changes at once that each need a second connection | Since spec 050, work that holds a connection reads through it instead of asking the pool for another, so creating many spaces at once finishes, and any wait that is left ends as busy within 10 seconds | Nothing to set |
 | The disk of the data folder is full | Uploads answer 500 "Something went wrong", no half file stays, text still saves, and `/readyz` still says ready | Watch the disk yourself |
 | An account that gets 100 wrong passwords from many addresses in 15 minutes | That person cannot log in until the window ends | This limit stops a botnet from guessing. Passkeys and an identity provider do not depend on it |

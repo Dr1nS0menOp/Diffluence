@@ -53,7 +53,9 @@ const healthFactsSQL = `SELECT
 	(SELECT max(applied_at) FROM schema_migrations),
 	(SELECT bytes FROM database_size_samples ORDER BY taken_at DESC LIMIT 1),
 	(SELECT bytes FROM database_size_samples WHERE taken_at <= now() - make_interval(secs => $2)
-		ORDER BY taken_at DESC LIMIT 1)`
+		ORDER BY taken_at DESC LIMIT 1),
+	(SELECT count(*) FROM audit_pending),
+	(SELECT min(occurred_at) FROM audit_pending)`
 
 // ReadHealthFacts reads what the checks judge: one statfs, the statement above and the
 // migration state.
@@ -66,13 +68,16 @@ func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (heal
 			f.DiskFree, f.DiskTotal = free, total
 		}
 	}
-	var lastBackup, lastMigration *time.Time
+	var lastBackup, lastMigration, oldestWaiting *time.Time
 	var size, sizeBefore *int64
 	err := src.Pool.QueryRow(ctx, healthFactsSQL, ActionBackupNoted, health.GrowthWindow.Seconds()).Scan(
 		&f.FailedJobs7d, &f.OutboxStuck, &f.EventFailures, &f.MailFailed1d, &f.PasswordStops,
-		&lastBackup, &lastMigration, &size, &sizeBefore)
+		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting)
 	if err != nil {
 		return f, fmt.Errorf("app: read the health facts: %w", err)
+	}
+	if oldestWaiting != nil {
+		f.OldestAuditWaiting = *oldestWaiting
 	}
 	if lastBackup != nil {
 		f.LastBackup = *lastBackup

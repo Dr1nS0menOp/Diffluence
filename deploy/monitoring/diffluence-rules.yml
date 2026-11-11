@@ -100,6 +100,12 @@ groups:
         labels: {severity: page}
         annotations:
           summary: "Events wait more than an hour to reach the queue: check the queue (NATS) and the worker."
+      - alert: DiffluenceAuditNotSealed
+        expr: diffluence_audit_sealing_lag_seconds > 900
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "Audit events have waited more than 15 minutes to be sealed into the chain: start a worker (ADR-041)."
       - alert: DiffluenceEventsGaveUp
         expr: diffluence_event_failures > 0
         for: 30m

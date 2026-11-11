@@ -943,7 +943,7 @@ func TestSharingOnlyNotifies(t *testing.T) {
 		t.Fatal("not audited")
 	}
 	var details string
-	if err := e.app.Pool().QueryRow(context.Background(), "SELECT payload FROM audit_events WHERE action = 'page.shared'").Scan(&details); err != nil {
+	if err := e.app.Pool().QueryRow(context.Background(), "SELECT payload FROM audit_entries WHERE action = 'page.shared'").Scan(&details); err != nil {
 		t.Fatal(err)
 	}
 	if strings.Contains(details, "have a look") {

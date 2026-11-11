@@ -16,6 +16,7 @@ test('System health shows every check, and the summary repeats what needs a look
     'Backup',
     'Migrations',
     'Background work',
+    'Audit log',
     'Mail',
     'Login',
     'Release',
@@ -25,6 +26,10 @@ test('System health shows every check, and the summary repeats what needs a look
   // The test server has no mail server, so its check says what to set.
   await expect(checks.getByRole('row', { name: /^Mail/ })).toContainText(
     'Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM',
+  );
+  // The worker of the test server seals audit events within a second (ADR-041).
+  await expect(checks.getByRole('row', { name: /^Audit log/ })).toContainText(
+    'sealed in the chain within seconds',
   );
   await checkAccessibility(page);
 

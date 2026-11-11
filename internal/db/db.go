@@ -172,6 +172,9 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_anchors FROM " + ident,
 			// A personal part can be erased, and never changed.
 			"REVOKE UPDATE, TRUNCATE ON audit_personal FROM " + ident,
+			// A waiting event is sealed and then removed, or its personal part is erased;
+			// the trigger of audit_pending allows nothing else (ADR-041).
+			"REVOKE TRUNCATE ON audit_pending FROM " + ident,
 			// Grants are what roles add up to. Only the role triggers, which run as the
 			// owner, write them, so no code path can grant past a role (spec 036).
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON space_grants FROM " + ident,

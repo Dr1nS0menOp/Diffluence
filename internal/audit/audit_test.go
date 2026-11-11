@@ -16,9 +16,18 @@ import (
 	"github.com/diffluence/diffluence/internal/testutil"
 )
 
+// record records an event and seals it, as a worker would within a second.
 func record(t *testing.T, tdb testutil.TestDB, e audit.Event) {
 	t.Helper()
 	if err := audit.RecordStandalone(context.Background(), tdb.Pool, e); err != nil {
+		t.Fatal(err)
+	}
+	seal(t, tdb)
+}
+
+func seal(t *testing.T, tdb testutil.TestDB) {
+	t.Helper()
+	if _, err := audit.SealWaiting(context.Background(), tdb.Pool); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -50,6 +59,7 @@ func TestConcurrentAppendsKeepTheChainIntact(t *testing.T) {
 		}()
 	}
 	wg.Wait()
+	seal(t, tdb)
 	res, err := audit.Verify(context.Background(), tdb.Pool)
 	if err != nil || !res.OK || res.Checked != 20 {
 		t.Fatalf("res=%+v err=%v", res, err)

@@ -82,10 +82,10 @@ func TestInvitationMatrix(t *testing.T) {
 			t.Errorf("%s: got %d, want %d: %s", line.name, got, line.want, out)
 		}
 	}
-	if got := e.count("SELECT count(*) FROM audit_events WHERE action = 'access.denied' AND payload LIKE '%' || $1 || '%'", identity.PermInvitePeople); got != 1 {
+	if got := e.count("SELECT count(*) FROM audit_entries WHERE action = 'access.denied' AND payload LIKE '%' || $1 || '%'", identity.PermInvitePeople); got != 1 {
 		t.Errorf("%d refusals of the permission in the audit log", got)
 	}
-	if got := e.count("SELECT count(*) FROM audit_events WHERE action = 'access.denied' AND payload LIKE '%' || $1 || '%'", identity.PermAdministrator); got != 5 {
+	if got := e.count("SELECT count(*) FROM audit_entries WHERE action = 'access.denied' AND payload LIKE '%' || $1 || '%'", identity.PermAdministrator); got != 5 {
 		t.Errorf("%d refusals of the administrator in the audit log", got)
 	}
 }
@@ -346,7 +346,7 @@ func TestTheAddressOfAnOutsiderIsNotKept(t *testing.T) {
 	if got := e.count("SELECT count(*) FROM invitation_requests WHERE email <> '' OR note <> ''"); got != 0 {
 		t.Fatalf("%d answered requests keep the address or the note", got)
 	}
-	if got := e.count("SELECT count(*) FROM audit_events WHERE payload LIKE '%example.org%'"); got != 0 {
+	if got := e.count("SELECT count(*) FROM audit_entries WHERE payload LIKE '%example.org%'"); got != 0 {
 		t.Fatalf("%d audit lines hold an address", got)
 	}
 }

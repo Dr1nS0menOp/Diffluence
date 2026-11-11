@@ -185,6 +185,29 @@ func TestFailedJobsOrEventsWarn(t *testing.T) {
 	expect(t, f, "work", Warn, "work_failed")
 }
 
+func TestAuditEventsWaitingLongerThanAMinuteWarn(t *testing.T) {
+	f := healthy()
+	f.AuditWaiting, f.OldestAuditWaiting = 3, now.Add(-AuditSealWarnAfter-time.Second)
+	c := expect(t, f, "audit", Warn, "audit_lagging")
+	if c.Values["count"] != int64(3) || c.Values["seconds"] != 61 {
+		t.Fatalf("values %+v", c.Values)
+	}
+}
+
+func TestAuditEventsWaitingAMomentAreNormal(t *testing.T) {
+	f := healthy()
+	f.AuditWaiting, f.OldestAuditWaiting = 40, now.Add(-AuditSealWarnAfter)
+	expect(t, f, "audit", OK, "audit_ok")
+}
+
+func TestAuditEventsWaitingLongerThanFifteenMinutesAreAProblem(t *testing.T) {
+	f := healthy()
+	f.AuditWaiting, f.OldestAuditWaiting = 1, now.Add(-AuditSealProblemAfter-time.Second)
+	expect(t, f, "audit", Problem, "audit_stuck")
+	f.OldestAuditWaiting = now.Add(-AuditSealProblemAfter)
+	expect(t, f, "audit", Warn, "audit_lagging")
+}
+
 func TestMailThatIsOffOrFailingWarns(t *testing.T) {
 	f := healthy()
 	f.MailConfigured = false

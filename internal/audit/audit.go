@@ -13,7 +13,6 @@ import (
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"maps"
@@ -141,14 +140,23 @@ func (e *Event) restorePersonal(data *string) error {
 // ErasePersonal removes the personal parts of the events by and about a person. The
 // chain holds, because it only knows their digest.
 func ErasePersonal(ctx context.Context, tx pgx.Tx, personID string) error {
+	// An event that still waits for the sealer carries its personal part with it. This goes
+	// first: if the sealer is moving such a part right now, the update waits for it, and the
+	// delete below, a statement of its own, then sees the part in audit_personal.
+	if _, err := tx.Exec(ctx, `UPDATE audit_pending SET salt = NULL, data = NULL
+		WHERE (actor_id = $1 OR object_id = $1) AND salt IS NOT NULL`, personID); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx, `DELETE FROM audit_personal p USING audit_events e
 		WHERE e.seq = p.seq AND (e.actor_id = $1 OR e.object_id = $1)`, personID)
 	return err
 }
 
-// Stored is an event as read back from the database.
+// Stored is an event as read back from the database. An event that still waits for the
+// sealer has no Seq yet and Sealed is false.
 type Stored struct {
-	Seq int64
+	Seq    int64
+	Sealed bool
 	Event
 }
 
@@ -169,9 +177,39 @@ func (e *Event) validate() error {
 	return nil
 }
 
-// Record appends an event inside tx, so it commits or rolls back together with
-// the change it describes.
+// Record writes an event inside tx, so it commits or rolls back together with the
+// change it describes. It takes no lock: the event waits in audit_pending until the
+// sealer puts it in the chain a moment after it commits (ADR-041), so saves no longer
+// queue behind each other's commit.
 func Record(ctx context.Context, tx pgx.Tx, e Event) (Event, error) {
+	p, err := prepare(e)
+	if err != nil {
+		return p.event, err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO audit_pending
+		(id, occurred_at, actor_type, actor_id, action, object_type, object_id, space_id, result, ip, request_id, payload, salt, data)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+		p.event.ID, p.event.OccurredAt, p.event.ActorType, p.event.ActorID, p.event.Action, p.event.ObjectType,
+		p.event.ObjectID, p.event.SpaceID, p.event.Result, p.chainedIP, p.event.RequestID, p.payload, p.salt, p.data)
+	if err != nil {
+		return p.event, fmt.Errorf("audit: insert: %w", err)
+	}
+	return p.event, nil
+}
+
+// prepared is an event as it goes into the log: the payload the chain hashes and the
+// personal part kept apart.
+type prepared struct {
+	event     Event
+	chainedIP string
+	payload   string
+	salt      []byte
+	data      *string
+}
+
+// prepare fills in what the caller left out, checks the event and splits off its
+// personal part.
+func prepare(e Event) (prepared, error) {
 	if e.ID == uuid.Nil {
 		e.ID = ids.New()
 	}
@@ -181,56 +219,29 @@ func Record(ctx context.Context, tx pgx.Tx, e Event) (Event, error) {
 	// PostgreSQL stores microseconds; truncate so payload and column agree.
 	e.OccurredAt = e.OccurredAt.UTC().Truncate(time.Microsecond)
 	if err := e.validate(); err != nil {
-		return e, err
+		return prepared{event: e}, err
 	}
 	chained, part := splitPersonal(e)
-	var salt []byte
-	var partData string
+	out := prepared{event: e, chainedIP: chained.IP}
 	if !part.isEmpty() {
 		body, err := json.Marshal(part)
 		if err != nil {
-			return e, fmt.Errorf("audit: encode: %w", err)
+			return out, fmt.Errorf("audit: encode: %w", err)
 		}
-		salt = make([]byte, personalSaltSize)
-		if _, err := rand.Read(salt); err != nil {
-			return e, fmt.Errorf("audit: salt: %w", err)
+		out.salt = make([]byte, personalSaltSize)
+		if _, err := rand.Read(out.salt); err != nil {
+			return out, fmt.Errorf("audit: salt: %w", err)
 		}
-		partData = string(body)
-		chained.PersonalDigest = personalDigest(salt, partData)
+		partData := string(body)
+		out.data = &partData
+		chained.PersonalDigest = personalDigest(out.salt, partData)
 	}
 	payload, err := json.Marshal(chained)
 	if err != nil {
-		return e, fmt.Errorf("audit: encode: %w", err)
+		return out, fmt.Errorf("audit: encode: %w", err)
 	}
-
-	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", chainLockKey); err != nil {
-		return e, fmt.Errorf("audit: lock chain: %w", err)
-	}
-	var prev []byte
-	err = tx.QueryRow(ctx, "SELECT hash FROM audit_events ORDER BY seq DESC LIMIT 1").Scan(&prev)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-		prev = genesis
-	case err != nil:
-		return e, fmt.Errorf("audit: read chain head: %w", err)
-	}
-	hash := chainHash(prev, payload)
-
-	var seq int64
-	err = tx.QueryRow(ctx, `INSERT INTO audit_events
-		(id, occurred_at, actor_type, actor_id, action, object_type, object_id, space_id, result, ip, request_id, payload, prev_hash, hash)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING seq`,
-		e.ID, e.OccurredAt, e.ActorType, e.ActorID, e.Action, e.ObjectType, e.ObjectID, e.SpaceID,
-		e.Result, chained.IP, e.RequestID, string(payload), prev, hash).Scan(&seq)
-	if err != nil {
-		return e, fmt.Errorf("audit: insert: %w", err)
-	}
-	if salt != nil {
-		if _, err := tx.Exec(ctx, "INSERT INTO audit_personal (seq, salt, data) VALUES ($1, $2, $3)", seq, salt, partData); err != nil {
-			return e, fmt.Errorf("audit: insert personal part: %w", err)
-		}
-	}
-	return e, nil
+	out.payload = string(payload)
+	return out, nil
 }
 
 // RecordStandalone records an event in its own transaction. Use it only for
@@ -240,6 +251,42 @@ func RecordStandalone(ctx context.Context, pool *pgxpool.Pool, e Event) error {
 	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		_, err := Record(ctx, tx, e)
 		return err
+	})
+}
+
+// RecordSealed appends an event straight to the chain in its own transaction, under the
+// lock of the chain, as every event was before ADR-041. It is for the rare events written
+// before migrations run, when a database of an older release has no audit_pending yet:
+// the marker of an upgrade and the note of a backup. Never use it on the path of a save.
+func RecordSealed(ctx context.Context, pool *pgxpool.Pool, e Event) error {
+	p, err := prepare(e)
+	if err != nil {
+		return err
+	}
+	return pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", chainLockKey); err != nil {
+			return fmt.Errorf("audit: lock chain: %w", err)
+		}
+		prev, err := chainHead(ctx, tx)
+		if err != nil {
+			return err
+		}
+		var seq int64
+		err = tx.QueryRow(ctx, `INSERT INTO audit_events
+			(id, occurred_at, actor_type, actor_id, action, object_type, object_id, space_id, result, ip, request_id, payload, prev_hash, hash)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14) RETURNING seq`,
+			p.event.ID, p.event.OccurredAt, p.event.ActorType, p.event.ActorID, p.event.Action, p.event.ObjectType,
+			p.event.ObjectID, p.event.SpaceID, p.event.Result, p.chainedIP, p.event.RequestID, p.payload,
+			prev, chainHash(prev, []byte(p.payload))).Scan(&seq)
+		if err != nil {
+			return fmt.Errorf("audit: insert: %w", err)
+		}
+		if p.data != nil {
+			if _, err := tx.Exec(ctx, "INSERT INTO audit_personal (seq, salt, data) VALUES ($1, $2, $3)", seq, p.salt, *p.data); err != nil {
+				return fmt.Errorf("audit: insert personal part: %w", err)
+			}
+		}
+		return nil
 	})
 }
 
@@ -261,12 +308,19 @@ type VerifyResult struct {
 	Reason      string `json:"reason,omitempty"`
 	// Checkpoints counts the signed checkpoints that held, when Check looked at them.
 	Checkpoints int `json:"checkpoints"`
+	// Unsealed counts the events that still wait for the sealer, so are not in the chain
+	// that was checked yet (ADR-041).
+	Unsealed int64 `json:"unsealed"`
 }
 
 // Verify walks the chain and reports the first inconsistency. After pruning it starts
-// at the signed anchor that pruning left.
+// at the signed anchor that pruning left. It also counts the events that wait for the
+// sealer; they are not part of the chain yet.
 func Verify(ctx context.Context, q db.Querier) (VerifyResult, error) {
 	res := VerifyResult{OK: true}
+	if err := q.QueryRow(ctx, "SELECT count(*) FROM audit_pending").Scan(&res.Unsealed); err != nil {
+		return VerifyResult{}, err
+	}
 	prev := genesis
 	start, err := latestAnchor(ctx, q)
 	if err != nil {
@@ -367,6 +421,64 @@ const selectSQL = `SELECT e.seq, e.payload, p.data
 const listSQL = selectSQL + " ORDER BY e.seq DESC LIMIT $6"
 const exportSQL = selectSQL + " ORDER BY e.seq LIMIT $6"
 
+// waitingSQL finds events that wait for the sealer, with the same filters. They are the
+// newest there are, so a list shows them first and an export writes them last. Paging
+// back ($5) only ever reaches sealed events.
+const waitingSQL = `SELECT w.payload, w.data
+	FROM audit_pending w
+	WHERE $5::bigint = 0
+	  AND ($1 = '' OR w.actor_id = $1)
+	  AND ($2 = '' OR w.action = $2)
+	  AND ($3::timestamptz IS NULL OR w.occurred_at >= $3)
+	  AND ($4::timestamptz IS NULL OR w.occurred_at < $4)
+	  AND ($7 = '' OR w.object_type = $7)
+	  AND ($8 = '' OR w.space_id = $8)
+	  AND ($9 = '' OR w.result = $9)
+	  AND ($10 = '' OR w.object_id = $10)`
+
+const listWaitingSQL = waitingSQL + " ORDER BY w.pend DESC LIMIT $6"
+const exportWaitingSQL = waitingSQL + " ORDER BY w.pend LIMIT $6"
+
+// scanned is one row of either table, before it is read for a reader.
+type scanned struct {
+	seq     int64
+	sealed  bool
+	payload string
+	part    *string
+}
+
+// each runs one of the queries above with the filter's arguments and hands every row to
+// fn as it comes, so an export of a million rows is never held whole. The sealed queries
+// also give the seq. It returns how many rows it handed on.
+func (f Filter) each(ctx context.Context, q db.Querier, sql string, sealed bool, limit int, fn func(scanned) error) (int, error) {
+	if limit <= 0 {
+		return 0, nil
+	}
+	rows, err := q.Query(ctx, sql, f.ActorID, f.Action, optTime(f.Since), optTime(f.Until), f.BeforeSeq, limit,
+		f.ObjectType, f.SpaceID, f.Result, f.ObjectID)
+	if err != nil {
+		return 0, err
+	}
+	defer rows.Close()
+	n := 0
+	for rows.Next() {
+		s := scanned{sealed: sealed}
+		if sealed {
+			err = rows.Scan(&s.seq, &s.payload, &s.part)
+		} else {
+			err = rows.Scan(&s.payload, &s.part)
+		}
+		if err != nil {
+			return n, err
+		}
+		if err := fn(s); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, rows.Err()
+}
+
 // read turns a row into the event a reader may see.
 func (f Filter) read(payload string, part *string) (Event, error) {
 	var e Event
@@ -382,81 +494,73 @@ func (f Filter) read(payload string, part *string) (Event, error) {
 	return e, nil
 }
 
-// List returns matching events, newest first.
+// List returns matching events, newest first: those still waiting for the sealer, then
+// the sealed ones.
 func List(ctx context.Context, q db.Querier, f Filter) ([]Stored, error) {
 	if f.Limit <= 0 || f.Limit > 500 {
 		f.Limit = 100
 	}
-	rows, err := q.Query(ctx, listSQL, f.ActorID, f.Action, optTime(f.Since), optTime(f.Until), f.BeforeSeq, f.Limit,
-		f.ObjectType, f.SpaceID, f.Result, f.ObjectID)
+	var out []Stored
+	keep := func(row scanned) error {
+		event, err := f.read(row.payload, row.part)
+		if err != nil {
+			return fmt.Errorf("audit: decode seq %d: %w", row.seq, err)
+		}
+		out = append(out, Stored{Seq: row.seq, Sealed: row.sealed, Event: event})
+		return nil
+	}
+	waiting, err := f.each(ctx, q, listWaitingSQL, false, f.Limit, keep)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
-	var out []Stored
-	for rows.Next() {
-		var s Stored
-		var payload string
-		var part *string
-		if err := rows.Scan(&s.Seq, &payload, &part); err != nil {
-			return nil, err
-		}
-		if s.Event, err = f.read(payload, part); err != nil {
-			return nil, fmt.Errorf("audit: decode seq %d: %w", s.Seq, err)
-		}
-		out = append(out, s)
+	if _, err := f.each(ctx, q, listSQL, true, f.Limit-waiting, keep); err != nil {
+		return nil, err
 	}
-	return out, rows.Err()
+	return out, nil
 }
 
 // CSVHeader is the column order of ExportCSV.
 var CSVHeader = []string{"seq", "id", "occurred_at", "actor_type", "actor_id", "action", "object_type",
 	"object_id", "space_id", "result", "ip", "user_agent", "request_id", "details"}
 
-// ExportCSV writes matching events (oldest first, up to maxRows) as CSV.
+// ExportCSV writes matching events (oldest first, up to maxRows) as CSV. Events that still
+// wait for the sealer come last, with an empty seq.
 func ExportCSV(ctx context.Context, q db.Querier, f Filter, maxRows int, w io.Writer) (int, error) {
-	rows, err := q.Query(ctx, exportSQL, f.ActorID, f.Action, optTime(f.Since), optTime(f.Until), f.BeforeSeq, maxRows,
-		f.ObjectType, f.SpaceID, f.Result, f.ObjectID)
-	if err != nil {
-		return 0, err
-	}
-	defer rows.Close()
-
 	cw := csv.NewWriter(w)
 	if err := cw.Write(CSVHeader); err != nil {
 		return 0, err
 	}
-	n := 0
-	for rows.Next() {
-		var seq int64
-		var payload string
-		var part *string
-		if err := rows.Scan(&seq, &payload, &part); err != nil {
-			return n, err
-		}
-		e, err := f.read(payload, part)
+	write := func(row scanned) error {
+		e, err := f.read(row.payload, row.part)
 		if err != nil {
-			return n, fmt.Errorf("audit: decode seq %d: %w", seq, err)
+			return fmt.Errorf("audit: decode seq %d: %w", row.seq, err)
 		}
 		details := ""
 		if len(e.Details) > 0 {
 			b, _ := json.Marshal(e.Details)
 			details = string(b)
 		}
-		rec := []string{strconv.FormatInt(seq, 10), e.ID.String(), e.OccurredAt.Format(time.RFC3339Nano),
+		seq := ""
+		if row.sealed {
+			seq = strconv.FormatInt(row.seq, 10)
+		}
+		rec := []string{seq, e.ID.String(), e.OccurredAt.Format(time.RFC3339Nano),
 			e.ActorType, e.ActorID, e.Action, e.ObjectType, e.ObjectID, e.SpaceID, e.Result, e.IP,
 			e.UserAgent, e.RequestID, details}
 		for i := range rec {
 			rec[i] = csvout.Cell(rec[i])
 		}
-		if err := cw.Write(rec); err != nil {
-			return n, err
-		}
-		n++
+		return cw.Write(rec)
 	}
-	cw.Flush()
-	if err := cw.Error(); err != nil {
+	sealed, err := f.each(ctx, q, exportSQL, true, maxRows, write)
+	if err != nil {
+		return sealed, err
+	}
+	waiting, err := f.each(ctx, q, exportWaitingSQL, false, maxRows-sealed, write)
+	n := sealed + waiting
+	if err != nil {
 		return n, err
 	}
-	return n, rows.Err()
+	cw.Flush()
+	return n, cw.Error()
 }

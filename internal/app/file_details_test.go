@@ -90,7 +90,7 @@ func TestOneVersionOfAFileHasItsOwnAddressThatGivesNoAccess(t *testing.T) {
 	if !strings.HasPrefix(resp.Header.Get("Content-Disposition"), "attachment") || resp.Header.Get("Content-Type") != "application/octet-stream" {
 		t.Fatalf("an old version is always a download: %v", resp.Header)
 	}
-	if e.count("SELECT count(*) FROM audit_events WHERE action = 'attachment.downloaded'") != 1 {
+	if e.count("SELECT count(*) FROM audit_entries WHERE action = 'attachment.downloaded'") != 1 {
 		t.Fatal("the download left no trace")
 	}
 	if resp, _ := e.do(viewer.c, http.MethodGet, "/api/v1/attachments/"+file+"/versions/9/content", ""); resp.StatusCode != 404 {
@@ -447,7 +447,7 @@ func TestOnlyAnAdministratorSetsTheLimitOfASpace(t *testing.T) {
 	admin.want(400, "PUT", "/api/v1/admin/spaces/"+space+"/storage-limit", map[string]any{"limit_mib": -1})
 	admin.want(404, "PUT", "/api/v1/admin/spaces/00000000-0000-0000-0000-000000000001/storage-limit", map[string]any{"limit_mib": 5})
 	admin.setLimit(space, 5)
-	if e.count("SELECT count(*) FROM audit_events WHERE action = 'space.storage_limit_set'") != 1 {
+	if e.count("SELECT count(*) FROM audit_entries WHERE action = 'space.storage_limit_set'") != 1 {
 		t.Fatal("the limit left no trace")
 	}
 	if got := owner.ok("GET", "/api/v1/spaces/"+space+"/files/usage", nil)["limit_bytes"]; got != float64(5<<20) {

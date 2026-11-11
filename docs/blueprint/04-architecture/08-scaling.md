@@ -47,7 +47,7 @@ With a commit of a few milliseconds that door passes a few hundred changes a sec
 
 - **ARC-201** · built · Rule: in a transaction, audit comes last, and long work runs as one transaction per page (ARC-064). `pages.Copy` of a large branch moves to a job in wave D, which also removes today's worst case.
 - **ARC-202** · built · A test holds a long transaction and measures what waits (spec 025). With more waiting writes than connections in the pool, reading waits too, while `/readyz` says ready.
-- **ARC-203** · later · If the lock ever limits real use, events can be written without a hash in the transaction, and a single worker chains them seconds later. The log stays complete and tamper-evident, with a short tail that is not chained yet. That changes ADR-013, so it only happens with a measurement and the product owner's agreement.
+- **ARC-203** · built · Events are written without a hash in the transaction of the change, into `audit_pending`, and a worker seals them into the chain every second, under the lock, in the order they became visible (ADR-041, spec 052). The log stays complete and tamper-evident, with a tail of about a second that is not sealed yet; the health page warns after a minute. The stress test measured the need: saves of 3.7 s at 5,000 people at once.
 
 ### The tree, the lists, the directory
 
@@ -110,7 +110,7 @@ Written after the self-test of spec 025 and ADR-036. Section 8.1 assumed 10 perc
 - **ARC-234** · built · Each class has a limit on what waits. Past it the app answers at once with 503 and `Retry-After`, and the screen says the system is busy. Text being written stays in the browser, as it does today, so nothing is lost. Built for every class: saving waits up to 15 s, reading 3 s, search and reports 1 s, each with a limit on how many wait (spec 031). The screen shows the message of the refusal.
 - **ARC-235** · built · `/readyz` tells the truth under load: a node with a full pool or a long queue says so, so a load balancer can send people elsewhere. It stays separate from `/livez`, so a busy node is not restarted (ARC-009). Built: the answer is `busy` when every connection is taken, checked before the ping, or when saving or reading has more than half its limit waiting (spec 031).
 - **ARC-236** · built · Logins have their own limit on how many hash at once per node, so a morning rush waits briefly and leaves the rest of the node alone. Built: half the cores, at least one (spec 031).
-- **ARC-237** · later · If writes come near what the audit lock passes, events are chained after the commit (ARC-203). That needs a measurement and the product owner's agreement, because it changes ADR-013.
+- **ARC-237** · built · Events are chained after the commit (ARC-203, ADR-041), so the audit lock no longer bounds how many writes a second pass.
 
 ### Keeping the room
 

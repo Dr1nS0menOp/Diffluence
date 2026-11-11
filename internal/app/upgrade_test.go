@@ -56,6 +56,8 @@ func startNode(t *testing.T, cfg config.Config) (*app.App, error) {
 func auditCount(t *testing.T, tdb testutil.TestDB, action string) int {
 	t.Helper()
 	var n int
+	// The marker goes straight into the chain, before migrations, so audit_events has it
+	// also on the schema of the previous release (ADR-041).
 	if err := tdb.Pool.QueryRow(context.Background(), "SELECT count(*) FROM audit_events WHERE action = $1", action).Scan(&n); err != nil {
 		t.Fatal(err)
 	}

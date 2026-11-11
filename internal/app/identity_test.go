@@ -1013,7 +1013,7 @@ func TestAuditCheckpointsAndDailyVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 	var result string
-	if err := pool.QueryRow(ctx, "SELECT result FROM audit_events WHERE action = 'audit.verified' ORDER BY seq DESC LIMIT 1").Scan(&result); err != nil {
+	if err := pool.QueryRow(ctx, "SELECT result FROM audit_entries WHERE action = 'audit.verified' ORDER BY occurred_at DESC LIMIT 1").Scan(&result); err != nil {
 		t.Fatal(err)
 	}
 	if result != "failure" {
@@ -1055,6 +1055,12 @@ func TestApplicationRoleCannotTamperWithTheAuditLog(t *testing.T) {
 		"DROP TABLE audit_events",
 		"DELETE FROM schema_migrations",
 		"DELETE FROM audit_checkpoints",
+		// Events that wait for the sealer (ADR-041): the work above left some.
+		"DELETE FROM audit_pending",
+		"UPDATE audit_pending SET action = 'x.y'",
+		"TRUNCATE audit_pending",
+		"ALTER TABLE audit_pending DISABLE TRIGGER audit_pending_guard",
+		"DROP TABLE audit_pending",
 	} {
 		if _, err := pool.Exec(ctx, sql); err == nil {
 			t.Errorf("the application role may run: %s", sql)
@@ -1065,6 +1071,7 @@ func TestApplicationRoleCannotTamperWithTheAuditLog(t *testing.T) {
 		"audit_checkpoints": {"UPDATE", "DELETE", "TRUNCATE"},
 		"audit_anchors":     {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
 		"audit_personal":    {"UPDATE", "TRUNCATE"},
+		"audit_pending":     {"TRUNCATE"},
 		"schema_migrations": {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
 	} {
 		for _, privilege := range privileges {
@@ -1083,6 +1090,10 @@ func TestApplicationRoleCannotTamperWithTheAuditLog(t *testing.T) {
 	}
 	if owns != 0 {
 		t.Errorf("the application role owns %d tables", owns)
+	}
+	// With only its own rights, the application seals what waits.
+	if err := e.app.SealAudit(ctx); err != nil {
+		t.Fatal(err)
 	}
 	res, err := audit.Verify(ctx, pool)
 	if err != nil || !res.OK || res.Checked == 0 {
