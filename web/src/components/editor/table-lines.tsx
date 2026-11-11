@@ -222,7 +222,7 @@ function LineHandle(props: LineProps) {
     <>
       <div
         ref={handle}
-        className={`table-line ${kind}`}
+        className={`table-line ${kind}-line`}
         {...dragging}
         onClickCapture={(e) => {
           if (wasDragged()) {
@@ -247,7 +247,7 @@ function LineHandle(props: LineProps) {
       <button
         ref={plus}
         type="button"
-        className={`table-plus ${kind}`}
+        className={`table-plus ${kind}-line`}
         aria-label={addLabel}
         title={addLabel}
         onClick={() => {
@@ -258,7 +258,8 @@ function LineHandle(props: LineProps) {
       >
         <IconPlus size={LINE_ICON_SIZE} />
       </button>
-      <div ref={drop} className={`table-drop ${kind}`} hidden />
+      {/* Not "row" or "column": those are layout classes whose display would beat hidden. */}
+      <div ref={drop} className={`table-drop ${kind}-line`} hidden />
     </>
   );
 }

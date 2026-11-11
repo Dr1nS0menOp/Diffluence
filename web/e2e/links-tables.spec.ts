@@ -305,7 +305,7 @@ test('dragging a handle moves a row', async ({ page }) => {
   await rows.nth(1).locator('td').first().click();
   await editorSettled(page);
   await page.keyboard.type('moved');
-  const handle = page.locator('.table-line.row');
+  const handle = page.locator('.table-line.row-line');
   const from = await handle.boundingBox();
   const to = await rows.nth(3).boundingBox();
   if (!from || !to) throw new Error('nothing to drag');
@@ -317,15 +317,40 @@ test('dragging a handle moves a row', async ({ page }) => {
   await expect(page.getByRole('menu')).toHaveCount(0);
 });
 
+// The line that shows where a dragged row or column lands appears only during the drag. It
+// used to show all the time, through the first row, because the global .row and .column
+// layout classes beat the hidden attribute (spec 055).
+test('the drop line shows only while a row is dragged', async ({ page }) => {
+  await editing(page, 'Drop line');
+  await newTable(page, 4, 2);
+  const rows = body(page).locator('tr');
+  await rows.nth(1).locator('td').first().click();
+  await editorSettled(page);
+  const drops = page.locator('.table-frame .table-drop');
+  await expect(drops.first()).toBeAttached();
+  await expect(drops.filter({ visible: true })).toHaveCount(0);
+
+  const handle = page.getByRole('button', { name: 'Row options' });
+  const from = await handle.boundingBox();
+  const to = await rows.nth(3).boundingBox();
+  if (!from || !to) throw new Error('nothing to drag');
+  await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(from.x + from.width / 2, to.y + to.height / 2, { steps: 8 });
+  await expect(drops.filter({ visible: true })).toHaveCount(1);
+  await page.mouse.up();
+  await expect(drops.filter({ visible: true })).toHaveCount(0);
+});
+
 test('shift on a handle selects several rows', async ({ page }) => {
   await editing(page, 'Several');
   await newTable(page, 4, 2);
   const rows = body(page).locator('tr');
   await rows.nth(1).locator('td').first().click();
-  await page.locator('.table-line.row button').click();
+  await page.locator('.table-line.row-line button').click();
   await page.keyboard.press('Escape');
   await rows.nth(3).locator('td').first().hover();
-  await page.locator('.table-line.row button').click({ modifiers: ['Shift'] });
+  await page.locator('.table-line.row-line button').click({ modifiers: ['Shift'] });
   await expect(body(page).locator('.selectedCell')).toHaveCount(6);
   await expect(page.getByRole('menu')).toHaveCount(0);
 });

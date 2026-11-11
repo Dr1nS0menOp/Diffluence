@@ -3,6 +3,10 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Fixed: a line through a table while editing it (spec 055)
+- While a table was in use, the marker that shows where a dragged row or column lands was always visible, as a line through the first row and down the first column. It now shows only during a drag. The handles of a column scrolled out of view hide again too
+- Upgrade impact: none
+
 ### Changed: upgrades made stronger (spec 053)
 - Contract migrations, which remove what an older release needs, now wait a day after every node runs the new release instead of 10 minutes, so a problem found the next working day can still be rolled back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it
 - Every migration has a time limit of a minute. One that runs longer stops and rolls back instead of holding a busy table; a migration that needs longer says so in its first lines. Indexes on large tables can now be built alongside the traffic, and a failed build is named at the next start
