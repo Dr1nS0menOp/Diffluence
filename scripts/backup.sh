@@ -51,8 +51,16 @@ tar -C secrets -cf - . | encrypt_to secrets.tar.gpg
 (cd "$dir" && sha256sum -- * >SHA256SUMS)
 echo "backup written to $dir"
 # Only now is the backup complete. The checks before an upgrade read this note
-# (docs/operations/upgrade.md).
-if ! docker compose exec -T diffluence diffluence backup note >/dev/null; then
+# (docs/operations/upgrade.md). A node that refuses to upgrade without a backup keeps
+# restarting, so the note cannot wait for it: then a one-off container writes it.
+note_backup() {
+  if [ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$(docker compose ps -q diffluence)" 2>/dev/null)" = "true false" ]; then
+    docker compose exec -T diffluence diffluence backup note
+  else
+    docker compose run --rm --no-deps -T diffluence diffluence backup note
+  fi
+}
+if ! note_backup >/dev/null; then
   echo "the backup is complete, but noting it in Diffluence failed: an upgrade that asks for a recent backup will refuse" >&2
   exit 1
 fi
