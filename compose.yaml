@@ -43,20 +43,25 @@ services:
       DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
       # Empty = no /metrics.
       DIFFLUENCE_METRICS_TOKEN: ${DIFFLUENCE_METRICS_TOKEN:-}
-      DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-http://localhost:8080}
+      # A YAML file with settings, mounted below; empty = none (docs/operations/install.md).
+      # A value set here and not empty wins over the file.
+      DIFFLUENCE_CONFIG_FILE: ${DIFFLUENCE_CONFIG_FILE:-}
+      # Empty = http://localhost:8080.
+      DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-}
       # The application connects as a role that does not own the tables, so it
       # cannot disable the audit log's protection. Migrations use the owner.
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
       DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
       # Mail. Without a host it is off, and mail waits in the queue.
       DIFFLUENCE_SMTP_HOST: ${DIFFLUENCE_SMTP_HOST:-}
-      DIFFLUENCE_SMTP_PORT: ${DIFFLUENCE_SMTP_PORT:-587}
+      # Empty = 587, and starttls below.
+      DIFFLUENCE_SMTP_PORT: ${DIFFLUENCE_SMTP_PORT:-}
       DIFFLUENCE_SMTP_USERNAME: ${DIFFLUENCE_SMTP_USERNAME:-}
       DIFFLUENCE_SMTP_PASSWORD: ${DIFFLUENCE_SMTP_PASSWORD:-}
       DIFFLUENCE_SMTP_FROM: ${DIFFLUENCE_SMTP_FROM:-}
       DIFFLUENCE_SMTP_REPLY_TO: ${DIFFLUENCE_SMTP_REPLY_TO:-}
       DIFFLUENCE_DRAWING_URL: ${DIFFLUENCE_DRAWING_URL:-}
-      DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-starttls}
+      DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-}
       # PDF files need the helper below. Empty = no PDF, and browser print remains.
       DIFFLUENCE_PDF_URL: ${DIFFLUENCE_PDF_URL:-}
       # The password the helper asks for. Set the same value for the helper below.
@@ -73,7 +78,10 @@ services:
     # Plain http, so only this machine by default: the TLS proxy in front reaches it here.
     # Set DIFFLUENCE_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).
     ports: ["${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080"]
-    volumes: [data:/var/lib/diffluence]
+    volumes:
+      - data:/var/lib/diffluence
+      # A configuration file: uncomment, and set DIFFLUENCE_CONFIG_FILE=/etc/diffluence/diffluence.yaml.
+      # - ./diffluence.yaml:/etc/diffluence/diffluence.yaml:ro
     networks: [default, helpers]
     read_only: true
     security_opt: ["no-new-privileges:true"]

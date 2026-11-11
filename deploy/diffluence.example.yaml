@@ -1,0 +1,43 @@
+# Diffluence configuration file (spec 056). Copy it, set DIFFLUENCE_CONFIG_FILE to its path,
+# and run "diffluence config check" before you restart.
+#
+# - Every key is the name of an environment variable in lower case, without DIFFLUENCE_.
+#   A group may nest them: "smtp: {host: ...}" is the same as "smtp_host".
+# - Order: the built-in default, then this file, then the environment. A variable that is
+#   set and not empty wins over the file.
+# - Unknown keys, a key written twice and a value of the wrong kind refuse the start, with
+#   the line. Write true or false, never yes, no, on or off.
+# - Secrets: give a path with a _file key, such as password_file, so this file holds none
+#   and may be read by others. A secret written here is only accepted when the file can be
+#   read by its owner alone (chmod 600), and the owner must be the user Diffluence runs as.
+
+# Every installation sets these.
+public_url: https://wiki.example.com
+database_url_file: /run/secrets/database_url
+migrate_database_url_file: /run/secrets/migrate_database_url
+
+# Mail. Without a host, mail is off and waits in the queue.
+smtp:
+  host: mail.example.com
+  port: 587
+  tls: starttls            # starttls, implicit or none
+  from: wiki@example.com
+  username: wiki
+  password_file: /run/secrets/smtp_password
+
+# Login through an identity provider. Without an issuer it is off.
+# oidc:
+#   issuer: https://login.example.com/realms/main
+#   client_id: diffluence
+#   client_secret_file: /run/secrets/oidc_client_secret
+#   display_name: Company login
+
+# Rarely needed: the defaults fit most installations.
+# instance_name: Diffluence
+# log_level: info          # debug, info, warn or error
+# trusted_proxies: 10.0.0.0/8, 192.168.0.0/16
+# session_idle_timeout: 8h
+# session_max_age: 168h
+# upgrade_backup_max_age: 24h
+# contract_grace: 24h
+# publish_dir: /srv/sites

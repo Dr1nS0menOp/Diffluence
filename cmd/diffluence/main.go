@@ -45,6 +45,9 @@ Commands:
   key <step>                replace master.key without downtime; see diffluence key
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
+  config check [--offline]  check the environment and DIFFLUENCE_CONFIG_FILE as a start would,
+                            print each setting and where it came from, secrets hidden, and
+                            try the mail server, identity provider and publish folder
   healthcheck               ask a running server on this machine whether it is ready
   doctor                    check disk, database, backup, migrations, work, mail, login,
                             release, configuration and keys, and print a report that
@@ -106,6 +109,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		err = cmdEndSessions(ctx, args[2:], stdout)
+	case "config":
+		if len(args) < 2 || args[1] != "check" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdConfigCheck(ctx, args[2:], stdout)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
 	case "doctor":
@@ -159,6 +168,13 @@ func cmdServe(ctx context.Context) error {
 		return err
 	}
 	log := app.NewLogger(cfg.LogLevel)
+	// Settings used only later are tried now, in the background, so a wrong one shows
+	// before the mail, login or publish that needs it (OPS-101). A warning never stops a start.
+	go func() {
+		for _, w := range config.Probe(ctx, cfg) {
+			log.Warn("a setting does not work yet", "setting", "DIFFLUENCE_"+w.Setting, "reason", w.Message)
+		}
+	}()
 	a, err := app.New(ctx, cfg, log)
 	if err != nil {
 		return err

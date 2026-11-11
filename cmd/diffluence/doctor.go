@@ -41,6 +41,8 @@ func cmdDoctor(ctx context.Context, stdout io.Writer) error {
 		return errDoctorFound
 	}
 	fmt.Fprintf(stdout, "configuration: ok (role %s)\n", cfg.Role)
+	warnings := config.Probe(ctx, cfg)
+	printWarnings(stdout, warnings)
 
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
@@ -68,11 +70,12 @@ func cmdDoctor(ctx context.Context, stdout io.Writer) error {
 	for _, c := range checks {
 		fmt.Fprintf(stdout, "%s  %-10s  %s\n", stateLabels[c.State], c.Name, health.Describe(c))
 	}
-	problems, warnings := health.Count(checks)
+	problems, warned := health.Count(checks)
+	warned += len(warnings)
 	if !doctorKeys(ctx, cfg, stdout) {
 		problems++
 	}
-	fmt.Fprintf(stdout, "summary: %d problem(s), %d warning(s)\n", problems, warnings)
+	fmt.Fprintf(stdout, "summary: %d problem(s), %d warning(s)\n", problems, warned)
 	if problems > 0 {
 		return errDoctorFound
 	}

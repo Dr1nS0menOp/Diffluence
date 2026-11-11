@@ -17,6 +17,7 @@ Every direct dependency is listed with its licence and the reason it exists. Lic
 | `pquerna/otp` | Apache-2.0 | TOTP codes and the QR code for enrolment. Replaced the planned hand-written TOTP and the frontend QR library. | The product owner, 2026-11-04 |
 | `yuin/goldmark` | MIT | Markdown parser, no dependencies of its own | The product owner, 2026-11-04 |
 | `golang.org/x/net/html` | BSD-3 | HTML import. Parsing hostile HTML must not be hand-written. | The product owner, ADR-026 |
+| `go.yaml.in/yaml/v3` 3.0.6 | MIT and Apache-2.0, read from its `LICENSE` and `NOTICE` | The configuration file (spec 056). Parsing YAML must not be hand-written. The maintained successor of the archived `gopkg.in/yaml.v3`; it needs no other module, and was already in the build through a test library | The product owner, ADR-040; spec 048 D4 |
 | `golang.org/x/text/unicode/norm` | BSD-3 | Unicode NFC for passwords (SEC-107). It was already in the build through other modules; only its listing is new. Unicode tables must not be hand-written. | Spec 035 |
 
 ## Data

@@ -1350,7 +1350,7 @@ mutate "no role is marked unnamed" internal/permissions/roles.go \
 mutate "the count in an unnamed name goes stale" internal/permissions/roles.go \
   's.replace("unnamed && changed && in.Name == r.Name {", "false && unnamed && changed && in.Name == r.Name {")' $perms -run TestAnUnnamedRoleKeepsItsCountTrue
 mutate "an upgrade asks for no backup unless told" internal/config/config.go \
-  's.replace("if !ok || v == \"\" {\n\t\treturn defaultUpgradeBackupMaxAge", "if !ok || v == \"\" {\n\t\treturn 0")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
+  's.replace("l.note(key, defaultUpgradeBackupMaxAge.String())\n\t\treturn defaultUpgradeBackupMaxAge", "l.note(key, defaultUpgradeBackupMaxAge.String())\n\t\treturn 0")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
 mutate "off does not switch the backup check off" internal/config/config.go \
   's.replace("if strings.EqualFold(strings.TrimSpace(v), backupOff) {", "if false {")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
 mutate "an age of zero switches the backup check off" internal/config/config.go \
@@ -1543,6 +1543,47 @@ mutate "the metrics say nothing waits long" internal/app/gauges.go \
   's.replace("Value: auditLag(f)}", "Value: 0}")' $app -run TestEventsLeftUnsealedShowOnTheHealthPage
 mutate "a backup note waits for the sealer" internal/app/upgrade.go \
   's.replace("return audit.RecordSealed(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",", "return audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",")' $app -run TestTheHealthPageShowsTheBackupAndTheDisk
+
+# Spec 056: the configuration file and diffluence config check.
+cfgpkg=./internal/config/
+mutate "an unknown key in the file is taken" internal/config/report.go \
+  's.replace("\t\tif !l.asked[name] {", "\t\tif false {")' $cfgpkg -run TestAnUnknownKeyInTheFileIsRefusedWithItsLine
+mutate "a setting written twice keeps the first" internal/config/file.go \
+  's.replace("if earlier, ok := f.entries[name]; ok {", "if earlier, ok := f.entries[name]; ok \x26\x26 false {")' $cfgpkg -run TestASettingWrittenTwiceIsRefused
+mutate "a group written twice is merged" internal/config/file.go \
+  's.replace("if line, ok := seen[strings.ToUpper(k.Value)]; ok {", "if line, ok := seen[strings.ToUpper(k.Value)]; ok \x26\x26 false {")' $cfgpkg -run TestASettingWrittenTwiceIsRefused
+mutate "a list is taken as one value" internal/config/file.go \
+  's.replace("\t\tcase yaml.ScalarNode:\n", "\t\tcase yaml.ScalarNode, yaml.SequenceNode:\n")' $cfgpkg -run TestAListWhereOneValueBelongsIsRefused
+mutate "the file wins over the environment" internal/config/config.go \
+  's.replace("if (ok \x26\x26 v != \"\") || fok {", "if fok {")' $cfgpkg -run TestTheEnvironmentWinsOverTheFile
+mutate "an empty variable hides the file" internal/config/config.go \
+  's.replace("if (ok \x26\x26 v != \"\") || fok {", "if ok || fok {")' $cfgpkg -run TestAnEmptyVariableLeavesTheFileInEffect
+mutate "a key and its _file both in the file are taken" internal/config/config.go \
+  's.replace("\tcase has \x26\x26 hasFile:\n", "\tcase false:\n")' $cfgpkg -run TestAKeyAndItsFileVariantBothInTheFileAreRefused
+mutate "a secret in a file others read is taken" internal/config/report.go \
+  's.replace("if secretKeys[name] \x26\x26 e.text != \"\" \x26\x26 !l.file.private {", "if false {")' $cfgpkg -run TestASecretInAFileOthersCanReadIsRefused
+mutate "every file counts as private" internal/config/file.go \
+  's.replace("f.private = info.Mode().Perm()\x260o077 == 0", "f.private = info.Mode().Perm()\x260o077 == 0 || true")' $cfgpkg -run TestASecretInAFileOthersCanReadIsRefused
+mutate "an error does not name the line of the file" internal/config/config.go \
+  's.replace("if o := l.origins[key]; o.source == sourceFile {", "if o := l.origins[key]; false {")' $cfgpkg -run TestYAMLGuessesAreNotTaken
+mutate "the report shows secrets" internal/config/report.go \
+  's.replace("\tif !secretKeys[key] {\n\t\treturn value", "\tif true {\n\t\treturn value")' $cfgpkg -run TestTheReportNamesEverySourceAndHidesSecrets
+mutate "a database address shows its password" internal/config/report.go \
+  's.replace("return u.Redacted()", "return u.String()")' $cfgpkg -run TestTheReportNamesEverySourceAndHidesSecrets
+mutate "the report hides that the environment overrides the file" internal/config/report.go \
+  's.replace("\t\tif o.overruns {", "\t\tif false {")' $cfgpkg -run TestTheReportNamesEverySourceAndHidesSecrets
+mutate "the mail server is not tried" internal/config/probe.go \
+  's.replace("\tif c.SMTP.Host != \"\" {\n\t\trun(", "\tif false {\n\t\trun(")' $cfgpkg -run TestAMailServerThatDoesNotAnswerWarns
+mutate "a discovery document of another issuer passes" internal/config/probe.go \
+  's.replace("if strings.TrimSuffix(doc.Issuer, \"/\") != strings.TrimSuffix(issuer, \"/\") {", "if false {")' $cfgpkg -run TestADiscoveryDocumentOfAnotherIssuerWarns
+mutate "a failed status of the provider is not named" internal/config/probe.go \
+  's.replace("if resp.StatusCode != http.StatusOK {", "if false {")' $cfgpkg -run TestAnIdentityProviderWithoutADiscoveryDocumentWarns
+mutate "the publish folder is not tried" internal/config/probe.go \
+  's.replace("\tif c.PublishDir != \"\" {\n\t\trun(", "\tif false {\n\t\trun(")' $cfgpkg -run TestAPublishFolderThatCannotBeWrittenWarns
+mutate "the test file stays in the publish folder" internal/config/probe.go \
+  's.replace("if err := os.Remove(name); err != nil {\n\t\treturn errors.New(\"a test file", "if err := error(nil); err != nil {\n\t\treturn errors.New(\"a test file")' $cfgpkg -run TestTryingThePublishFolderLeavesNothingBehind
+mutate "config check passes a configuration a start refuses" cmd/diffluence/config.go \
+  's.replace("\t\treturn errConfigRefused\n", "\t\treturn nil\n")' ./cmd/diffluence/ -run TestConfigCheckExitsOneOnABadFile
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

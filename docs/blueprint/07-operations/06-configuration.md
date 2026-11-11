@@ -23,16 +23,16 @@ Blueprint 07 says configuration is "one YAML file and/or environment variables",
 | Every setting from the environment, each with `_FILE` | Built | `internal/config/config.go`, OPS-007 |
 | Both set at once is refused | Built | `TestBothVariantsIsAnError` |
 | A wrong shape of an installation is named at start, passwords stay out of errors | Built | `docs/operations/limits.md` |
-| A configuration file | Not built | OPS-006 |
-| A command that checks a configuration without starting | Not built | |
+| A configuration file | Built in spec 056 | OPS-006, OPS-099 |
+| A command that checks a configuration without starting | Built in spec 056: `diffluence config check` | OPS-100 |
 | Settings that only matter in an emergency checked at start | Partly: the key, database and folders are; the identity provider is looked up on first use (`internal/sso/sso.go`), and the mail server is first reached when a mail goes out | |
 
 ## 6.4 Recommendations
 
-- **OPS-099** · new · **Medium.** A configuration file, `DIFFLUENCE_CONFIG_FILE`, in YAML, read with `go.yaml.in/yaml/v3` in strict mode: unknown or duplicate keys refuse the start and name the key and line. The keys are the environment names in lower case without the prefix, nested where that helps (`smtp.host`). Order: default, file, environment. A secret may be given as a path (`smtp.password_file`); a secret written in the file itself is allowed only when the file is readable by its owner alone, otherwise the start is refused. This closes OPS-006.
-- **OPS-100** · new · **Medium.** `diffluence config check` reads the environment and the file, checks every setting as a start would, and prints the effective configuration with each secret replaced by `(set)`. It also says where each value came from: default, file or environment. Operators and the release checklist use it before an upgrade.
-- **OPS-101** · new · **Medium.** Check the settings that are only used in an emergency or later, at start, without side effects: the SMTP host resolves and its port answers, the identity provider's discovery document loads, the publish folder is writable. A failure is a warning in the log and on the System health page, not a refused start, because the outside system may be down for its own reasons.
-- **OPS-102** · new · **Low.** Review the list of settings against the knobs study: each setting that nobody needs to change gets a fixed value or is worked out by the software, and the guide lists the few that every installation sets.
+- **OPS-099** · built (spec 056) · **Medium.** A configuration file, `DIFFLUENCE_CONFIG_FILE`, in YAML, read with `go.yaml.in/yaml/v3` in strict mode: unknown or duplicate keys refuse the start and name the key and line. The keys are the environment names in lower case without the prefix, nested where that helps (`smtp.host`). Order: default, file, environment. A secret may be given as a path (`smtp.password_file`); a secret written in the file itself is allowed only when the file is readable by its owner alone, otherwise the start is refused. This closes OPS-006.
+- **OPS-100** · built (spec 056) · **Medium.** `diffluence config check` reads the environment and the file, checks every setting as a start would, and prints the effective configuration with each secret replaced by `(set)`. It also says where each value came from: default, file or environment. Operators and the release checklist use it before an upgrade.
+- **OPS-101** · partly (spec 056: warnings in the log, config check and doctor; not yet on System health) · **Medium.** Check the settings that are only used in an emergency or later, at start, without side effects: the SMTP host resolves and its port answers, the identity provider's discovery document loads, the publish folder is writable. A failure is a warning in the log and on the System health page, not a refused start, because the outside system may be down for its own reasons.
+- **OPS-102** · partly (spec 056: the guide names what every installation sets; nothing removed) · **Low.** Review the list of settings against the knobs study: each setting that nobody needs to change gets a fixed value or is worked out by the software, and the guide lists the few that every installation sets.
 
 ## Sources
 

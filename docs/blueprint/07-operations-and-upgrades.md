@@ -76,7 +76,7 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 - **OPS-003** · later · A Kubernetes operator, only if there is demand.
 - **OPS-004** · partly · LXC on Proxmox: `deploy/install-lxc.sh` and `deploy/systemd/diffluence.service`. No `.deb` and no Ansible role, and never run on a real host. *Servers*. Medium.
 - **OPS-005** · new · `.deb` and `.rpm` packages built by GoReleaser. A new build tool, so a decision of the product owner. Low.
-- **OPS-006** · partly · Configuration from environment variables. One YAML file is not built: Go has no YAML reader of its own, so it needs a dependency, a decision of the product owner. Low.
+- **OPS-006** · built · Configuration from environment variables and one YAML file, `DIFFLUENCE_CONFIG_FILE` (spec 056, OPS-099).
 - **OPS-007** · built · Secrets come from files: every variable has a `_FILE` variant, and setting both is refused (`TestFileVariant`, `TestBothVariantsIsAnError`). No command takes a secret as an argument: `user create-admin` reads the password from standard input.
 
 ### Topologies
@@ -190,7 +190,7 @@ Built since the study (spec 051, wave 1 of spec 048):
 - **OPS-104** · built · Below 10% free, a band on every page of the console; below 2%, every new file is refused with HTTP 507 while text saves, and `/readyz` adds `"notes": ["disk_low"]` (`TestANearlyFullDiskRefusesFilesButTextStillSaves`). A disk that really fills was not tried: the test stands in for one.
 - **OPS-105** · built · Finished jobs, sent mail, nodes that crashed and size samples now have a daily cleaner, and `docs/operations/monitoring.md` lists everything that grows with what keeps it small (`TestTheCleanerRemovesOnlyOldFinishedWork`).
 - **OPS-106** · built · The binary carries the date of its commit (`version.Date`, set by `make build` and by the image's `BUILD_DATE`); the console warns past 60 days, and nothing asks an outside server. The opt-in check of the public release feed is not built. A developer build has no date and never warns.
-- **OPS-107** · built · `diffluence doctor` runs the health checks, a configuration check and a shallow key check, prints states, counts and dates only, and exits 1 on a problem (`TestDoctorReportsEveryCheckAndNoSecret`). `config check` (OPS-100) is still its own line: doctor only loads the configuration.
+- **OPS-107** · built · `diffluence doctor` runs the health checks, a configuration check and a shallow key check, prints states, counts and dates only, and exits 1 on a problem (`TestDoctorReportsEveryCheckAndNoSecret`). Since spec 056 it also prints the warnings of the settings tried at start (OPS-101); `config check` (OPS-100) prints the whole configuration.
 
 Built since the study (spec 053, wave 2 of spec 048):
 
@@ -201,3 +201,10 @@ Built since the study (spec 053, wave 2 of spec 048):
 - **OPS-074** · built · Every migration runs with `statement_timeout` of a minute, or the duration its header gives (`TestAMigrationThatRunsTooLongIsStoppedAndRolledBack`, `TestTheHeaderGivesAMigrationMoreTime`).
 - **OPS-075** · built · [`docs/operations/version-skew.md`](../operations/version-skew.md): what may differ by how much and for how long, and the test that proves each line. Contract migrations wait a day by default (`DIFFLUENCE_CONTRACT_GRACE`, spec 048 D1), and a contract migration only removes what the previous release already stopped using (D2, in `migrate.go` and the release checklist).
 - **OPS-076** · later · The six-month jump (D3) is written in the policy; its test waits for a release that old, from 1.0.
+
+Built since the study (spec 056, wave 4 of spec 048):
+
+- **OPS-099** · built · `DIFFLUENCE_CONFIG_FILE` names one YAML file, read with `go.yaml.in/yaml/v3`. Keys are the variable names in lower case without the prefix, nested or flat. The order is default, file, environment; an empty variable lets the file through. Unknown keys, a key written twice, a list or mapping where one value belongs, and a value of the wrong kind refuse the start with the line; values are read as written, so `no` and `012` are never `false` or octal. A secret comes from a `_file` key, or is written in a file its owner alone may read (`internal/config/file_test.go`, `TestTheExampleFileLoads`). This closes OPS-006.
+- **OPS-100** · built · `diffluence config check [--offline]` loads the configuration through the same validator as a start, prints every setting with its value in effect and its source (default, file and line, environment, or environment over the file), each secret as `(set)` and a database address without its password, and exits 1 when a start would be refused (`TestConfigCheckPrintsEverySettingWithItsSourceAndNoSecret`, `TestConfigCheckExitsOneOnABadFile`, `TestTheReportNamesEverySourceAndHidesSecrets`). The release checklist runs it.
+- **OPS-101** · partly · At start, in the background, and in `config check` and `doctor`: the mail server's name and port, the identity provider's discovery document, and a test file in the publish folder, each within 5 seconds, a failure being a warning (`internal/config/probe_test.go`). Missing: a line on System health; a start only logs the warning.
+- **OPS-102** · partly · No setting removed or renamed, because installations set them. The guide names the few every installation sets, and the example file marks the rest as rarely needed; fixing settings nobody changes is left for a later review.

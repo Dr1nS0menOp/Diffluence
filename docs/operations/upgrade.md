@@ -6,7 +6,7 @@ Written for: operators.
 git pull && docker compose up -d --build     # or: docker compose pull && docker compose up -d
 ```
 
-That is all. There are no manual steps.
+That is all. There are no manual steps. If you changed a setting or the configuration file, check it first: `docker compose run --rm --no-deps -T diffluence config check` refuses what a start would refuse, without starting ([install.md](install.md#checking-a-change-before-a-restart)).
 
 With one node, Compose stops the old container and starts the new one, so people wait a few seconds. Zero downtime needs two or more nodes behind a load balancer, replaced one at a time.
 

@@ -55,6 +55,27 @@ It installs PostgreSQL, creates the two database roles, writes `/etc/diffluence/
 
 Every setting is in `.env.example`. Any variable can come from a file by adding `_FILE`, for Docker and Kubernetes secrets. Runtime options (trash retention, upload limit) are in the admin console.
 
+**Every installation sets** `DIFFLUENCE_PUBLIC_URL`, the database addresses, and the mail server if mail should go out. The other settings have defaults that fit most installations; change one only for a reason you can name.
+
+### A configuration file
+
+Settings can also live in one YAML file. Set `DIFFLUENCE_CONFIG_FILE` to its path; `deploy/diffluence.example.yaml` is a commented example.
+
+- **Keys:** each key is the name of a variable in lower case, without `DIFFLUENCE_`. A group may nest them: `smtp: {host: mail.example.com}` is `smtp_host`.
+- **Order:** the built-in default, then the file, then the environment. A variable that is set and not empty wins over the file, so a container platform can still override any value.
+- **Strict:** an unknown key, a key written twice, and a value of the wrong kind refuse the start and name the line. A true/false setting takes `true` or `false`, never `yes`, `no`, `on` or `off`, and a number is read as written, never as octal.
+- **Secrets:** give a path with a `_file` key (`smtp: {password_file: /run/secrets/smtp}`), so the file holds none. A secret written in the file itself is only accepted when the file can be read by its owner alone (`chmod 600`), and that owner must be the user Diffluence runs as.
+
+With Docker Compose, put the file next to `compose.yaml`, uncomment its line under `volumes:` and set `DIFFLUENCE_CONFIG_FILE=/etc/diffluence/diffluence.yaml` in `.env`.
+
+### Checking a change before a restart
+
+```
+docker compose run --rm --no-deps -T diffluence config check
+```
+
+It reads the environment and the file as a start would, starts nothing, and prints every setting with the value in effect and where it came from (default, the file and its line, or the environment), with each secret shown as `(set)`. It exits 1 when a start would be refused. It then tries the settings that are otherwise only used later: whether the mail server's name resolves and its port answers, whether the identity provider's discovery document loads, and whether the publish folder can be written. Those are warnings, because the other system may be down for its own reasons; `--offline` skips them. A start tries them too and logs a warning, and `diffluence doctor` prints them.
+
 Identity providers: see `identity-providers.md`.
 
 ## The database connection

@@ -3,6 +3,13 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: a configuration file, and diffluence config check (spec 056)
+- Settings can live in one YAML file named by `DIFFLUENCE_CONFIG_FILE`, beside the environment. The order is the default, then the file, then the environment, so nothing changes for an installation without a file. Unknown keys, a key written twice and a value of the wrong kind refuse the start and name the line; secrets come from paths, or from a file only its owner may read. `deploy/diffluence.example.yaml` is an example
+- `diffluence config check` checks the configuration without starting, prints each setting with the value in effect and where it came from, secrets hidden, and exits 1 when a start would be refused. It also tries the mail server, the identity provider and the publish folder; a start does the same and logs a warning, and `diffluence doctor` prints it
+- `compose.yaml` no longer repeats the defaults of `DIFFLUENCE_PUBLIC_URL`, `DIFFLUENCE_SMTP_PORT` and `DIFFLUENCE_SMTP_TLS`, so a file can set them; the values in effect are the same
+- New dependency: `go.yaml.in/yaml/v3` 3.0.6 (MIT and Apache-2.0), the maintained successor of `gopkg.in/yaml.v3`
+- Upgrade impact: none. An empty environment variable still means the default; it now also lets the file's value through
+
 ### Fixed: a line through a table while editing it (spec 055)
 - While a table was in use, the marker that shows where a dragged row or column lands was always visible, as a line through the first row and down the first column. It now shows only during a drag. The handles of a column scrolled out of view hide again too
 - Upgrade impact: none

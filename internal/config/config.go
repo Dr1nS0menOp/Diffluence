@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
-// Package config loads settings from environment variables. Every variable can
-// instead be read from a file by appending _FILE (for Docker/Kubernetes secrets).
+// Package config loads settings from environment variables and, when
+// DIFFLUENCE_CONFIG_FILE names one, a YAML file. Every setting can instead be read from
+// a file of its own by appending _FILE (for Docker/Kubernetes secrets). The order is the
+// default, then the file, then the environment (spec 056).
 package config
 
 import (
@@ -163,7 +165,29 @@ func FromEnvironment() (Config, error) { return Load(os.LookupEnv) }
 
 // Load builds a Config, collecting every problem instead of stopping at the first.
 func Load(lookup LookupFunc) (Config, error) {
-	l := loader{lookup: lookup}
+	c, _, err := Inspect(lookup)
+	return c, err
+}
+
+// Inspect builds a Config as Load does, and also says which value each setting has and
+// where it came from, with secrets hidden, for diffluence config check. Load and Inspect
+// are one validator, so the server and the check cannot disagree.
+func Inspect(lookup LookupFunc) (Config, []Setting, error) {
+	l := loader{lookup: lookup, asked: map[string]bool{}, origins: map[string]origin{}}
+	if path, ok := lookup(prefix + "CONFIG_FILE"); ok && path != "" {
+		f, errs := readConfigFile(path)
+		l.file, l.errs = &f, append(l.errs, errs...)
+	}
+	c := l.load()
+	l.checkFile()
+	if len(l.errs) > 0 {
+		return Config{}, l.settings, errors.Join(l.errs...)
+	}
+	return c, l.settings, nil
+}
+
+// load reads every setting. Every setting it asks for is a key the file may hold.
+func (l *loader) load() Config {
 	c := Config{
 		Role:                  Role(l.str("ROLE", string(RoleAll))),
 		HTTPAddr:              l.str("HTTP_ADDR", ":8080"),
@@ -289,84 +313,166 @@ func Load(lookup LookupFunc) (Config, error) {
 		}
 		c.TrustedProxies = append(c.TrustedProxies, p.Masked())
 	}
-
-	if len(l.errs) > 0 {
-		return Config{}, errors.Join(l.errs...)
-	}
-	return c, nil
+	return c
 }
 
 type loader struct {
-	lookup LookupFunc
-	errs   []error
+	lookup   LookupFunc
+	file     *configFile // nil = no configuration file
+	errs     []error
+	asked    map[string]bool   // every setting load asked for, and its _FILE variant
+	origins  map[string]origin // where the value of each setting came from
+	settings []Setting         // in the order load asked, for the report
 }
 
+// origin is where the value of a setting came from.
+type origin struct {
+	source   string // sourceDefault, sourceFile or sourceEnvironment
+	line     int    // the line in the configuration file, when it came from there
+	overruns bool   // the environment set it and the file did too
+}
+
+const (
+	sourceDefault     = "default"
+	sourceFile        = "file"
+	sourceEnvironment = "environment"
+)
+
 func (l *loader) fail(key string, err error) {
+	if o := l.origins[key]; o.source == sourceFile {
+		// The variable name says which setting, the line where to look in the file.
+		l.errs = append(l.errs, fmt.Errorf("%s%s (config file line %d): %w", prefix, key, o.line, err))
+		return
+	}
 	l.errs = append(l.errs, fmt.Errorf("%s%s: %w", prefix, key, err))
 }
 
-// raw returns the value of KEY or the contents of the file named by KEY_FILE.
+// raw returns the value of a setting: from the environment, KEY or the file named by
+// KEY_FILE, or else from the configuration file, key or key_file.
 func (l *loader) raw(key string) (string, bool) {
+	l.asked[key], l.asked[key+"_FILE"] = true, true
 	v, ok := l.lookup(prefix + key)
 	f, fok := l.lookup(prefix + key + "_FILE")
 	if ok && fok {
 		l.fail(key, errors.New("set either the variable or its _FILE variant, not both"))
 		return "", false
 	}
-	if fok {
-		b, err := os.ReadFile(f)
-		if err != nil {
-			l.fail(key+"_FILE", err)
+	// An empty variable has always meant the default, and Compose passes most settings as
+	// one, so it leaves the file in effect.
+	if (ok && v != "") || fok {
+		l.origins[key] = origin{source: sourceEnvironment, overruns: l.fileHas(key)}
+		if fok {
+			return l.readSecret(key, f)
+		}
+		return v, ok
+	}
+	if l.file == nil {
+		return "", false
+	}
+	e, has := l.file.entries[key]
+	ef, hasFile := l.file.entries[key+"_FILE"]
+	switch {
+	case has && hasFile:
+		l.origins[key] = origin{source: sourceFile, line: ef.line}
+		l.fail(key, fmt.Errorf("set either %s or %s in the config file, not both", e.key, ef.key))
+		return "", false
+	case hasFile:
+		l.origins[key] = origin{source: sourceFile, line: ef.line}
+		if ef.text == "" {
 			return "", false
 		}
-		return strings.TrimRight(string(b), "\r\n"), true
+		return l.readSecret(key, ef.text)
+	case has:
+		l.origins[key] = origin{source: sourceFile, line: e.line}
+		return e.text, true
 	}
-	return v, ok
+	return "", false
+}
+
+// fileHas reports whether the configuration file sets key, directly or through key_file.
+func (l *loader) fileHas(key string) bool {
+	if l.file == nil {
+		return false
+	}
+	_, has := l.file.entries[key]
+	_, hasFile := l.file.entries[key+"_FILE"]
+	return has || hasFile
+}
+
+// readSecret reads the value of a setting from the file at path.
+func (l *loader) readSecret(key, path string) (string, bool) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		l.fail(key+"_FILE", err)
+		return "", false
+	}
+	return strings.TrimRight(string(b), "\r\n"), true
+}
+
+// note keeps the value in effect of a setting for the report.
+func (l *loader) note(key, value string) {
+	o, ok := l.origins[key]
+	if !ok {
+		o.source = sourceDefault
+	}
+	l.settings = append(l.settings, Setting{Name: key, Value: shown(key, value), Source: o.describe()})
 }
 
 func (l *loader) str(key, def string) string {
-	if v, ok := l.raw(key); ok && v != "" {
-		return v
+	v, ok := l.raw(key)
+	if !ok || v == "" {
+		v = def
+		delete(l.origins, key) // an empty value means the default, wherever it was written
 	}
-	return def
+	l.note(key, v)
+	return v
 }
 
 func (l *loader) boolean(key string, def bool) bool {
-	v, ok := l.raw(key)
-	if !ok || v == "" {
-		return def
+	b := def
+	if v, ok := l.raw(key); ok && v != "" {
+		parsed, err := strconv.ParseBool(v)
+		if err != nil {
+			l.fail(key, fmt.Errorf("must be true or false, got %q", v))
+		} else {
+			b = parsed
+		}
+	} else {
+		delete(l.origins, key)
 	}
-	b, err := strconv.ParseBool(v)
-	if err != nil {
-		l.fail(key, fmt.Errorf("must be true or false, got %q", v))
-		return def
-	}
+	l.note(key, strconv.FormatBool(b))
 	return b
 }
 
 func (l *loader) integer(key string, def int) int {
-	v, ok := l.raw(key)
-	if !ok || v == "" {
-		return def
+	n := def
+	if v, ok := l.raw(key); ok && v != "" {
+		parsed, err := strconv.Atoi(v)
+		if err != nil {
+			l.fail(key, fmt.Errorf("must be a number, got %q", v))
+		} else {
+			n = parsed
+		}
+	} else {
+		delete(l.origins, key)
 	}
-	n, err := strconv.Atoi(v)
-	if err != nil {
-		l.fail(key, fmt.Errorf("must be a number, got %q", v))
-		return def
-	}
+	l.note(key, strconv.Itoa(n))
 	return n
 }
 
 func (l *loader) duration(key string, def time.Duration) time.Duration {
-	v, ok := l.raw(key)
-	if !ok || v == "" {
-		return def
+	d := def
+	if v, ok := l.raw(key); ok && v != "" {
+		parsed, err := time.ParseDuration(v)
+		if err != nil {
+			l.fail(key, fmt.Errorf("must be a duration like 30s or 8h, got %q", v))
+		} else {
+			d = parsed
+		}
+	} else {
+		delete(l.origins, key)
 	}
-	d, err := time.ParseDuration(v)
-	if err != nil {
-		l.fail(key, fmt.Errorf("must be a duration like 30s or 8h, got %q", v))
-		return def
-	}
+	l.note(key, d.String())
 	return d
 }
 
@@ -397,16 +503,20 @@ const backupOff = "off"
 func (l *loader) backupAge(key string) time.Duration {
 	v, ok := l.raw(key)
 	if !ok || v == "" {
+		delete(l.origins, key)
+		l.note(key, defaultUpgradeBackupMaxAge.String())
 		return defaultUpgradeBackupMaxAge
 	}
 	if strings.EqualFold(strings.TrimSpace(v), backupOff) {
+		l.note(key, backupOff)
 		return 0
 	}
 	d, err := time.ParseDuration(v)
 	if err != nil || d <= 0 {
 		l.fail(key, fmt.Errorf("must be a positive duration like 24h, or %s to upgrade without a recent backup, got %q", backupOff, v))
-		return defaultUpgradeBackupMaxAge
+		d = defaultUpgradeBackupMaxAge
 	}
+	l.note(key, d.String())
 	return d
 }
 
