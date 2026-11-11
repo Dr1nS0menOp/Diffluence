@@ -37,6 +37,8 @@ type HealthSource struct {
 	Migrations     []db.Migration
 	MailConfigured bool
 	OIDCConfigured bool
+	// ContractGrace is the configured wait before contract migrations run.
+	ContractGrace time.Duration
 }
 
 // healthFactsSQL reads every count the checks need in one statement. Each part is cheap:
@@ -57,7 +59,7 @@ const healthFactsSQL = `SELECT
 // migration state.
 func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (health.Facts, error) {
 	f := health.Facts{Now: now, MailConfigured: src.MailConfigured, OIDCConfigured: src.OIDCConfigured,
-		Version: version.Version, BuildDate: version.BuildDate()}
+		ContractGrace: src.ContractGrace, Version: version.Version, BuildDate: version.BuildDate()}
 	if spacer, ok := src.Store.(storage.Spacer); ok {
 		// A store that cannot tell its room leaves the disk unknown, which never warns.
 		if free, total, err := spacer.Space(ctx); err == nil {
@@ -108,7 +110,7 @@ func (a *App) HealthFacts(ctx context.Context) (health.Facts, error) {
 		return a.healthCache.facts, nil
 	}
 	facts, err := ReadHealthFacts(ctx, HealthSource{Pool: a.pool, Store: a.store, Migrations: a.migrations,
-		MailConfigured: a.mail.Configured(), OIDCConfigured: a.sso != nil}, now)
+		MailConfigured: a.mail.Configured(), OIDCConfigured: a.sso != nil, ContractGrace: a.cfg.ContractGrace}, now)
 	if err != nil {
 		return facts, err
 	}

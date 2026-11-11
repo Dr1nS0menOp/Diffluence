@@ -81,6 +81,15 @@ func (s *Service) RegisterLong(kind string, h Handler) {
 	s.longKinds = append(s.longKinds, kind)
 }
 
+// kinds lists the job kinds this node has a handler for.
+func (s *Service) kinds() []string {
+	out := make([]string, 0, len(s.handlers))
+	for kind := range s.handlers {
+		out = append(out, kind)
+	}
+	return out
+}
+
 // Enqueue adds a job.
 func (s *Service) Enqueue(ctx context.Context, tx pgx.Tx, kind string, payload any, createdBy uuid.UUID) (uuid.UUID, error) {
 	body, err := json.Marshal(payload)
@@ -174,8 +183,11 @@ func (s *Service) runNext(ctx context.Context, skippedKinds []string) (bool, err
 	}
 	var j Job
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		// Only kinds this node has a handler for: during an upgrade a newer node may queue a
+		// kind this release does not know, which must wait for a node that does (OPS-070).
 		err := tx.QueryRow(ctx, `SELECT id, kind, status, payload, created_by, created_at FROM jobs
-			WHERE status = 'queued' AND NOT kind = ANY($1) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`, append([]string{}, skippedKinds...)).
+			WHERE status = 'queued' AND kind = ANY($2) AND NOT kind = ANY($1) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
+			append([]string{}, skippedKinds...), s.kinds()).
 			Scan(&j.ID, &j.Kind, &j.Status, &j.Payload, &j.CreatedBy, &j.CreatedAt)
 		if err != nil {
 			return err

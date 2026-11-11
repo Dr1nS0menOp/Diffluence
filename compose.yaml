@@ -67,6 +67,8 @@ services:
       # An upgrade refuses to migrate when the last backup.sh run is older than this.
       # Empty = 24h. "off" upgrades without a recent backup (docs/operations/upgrade.md).
       DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
+      # Empty = 24h: how long contract migrations wait after an upgrade (docs/operations/upgrade.md).
+      DIFFLUENCE_CONTRACT_GRACE: ${DIFFLUENCE_CONTRACT_GRACE:-}
     secrets: [database_url, migrate_database_url]
     # Plain http, so only this machine by default: the TLS proxy in front reaches it here.
     # Set DIFFLUENCE_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).

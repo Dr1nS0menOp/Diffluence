@@ -15,7 +15,7 @@ Diffluence watches itself (spec 051). You see the same checks in three places:
 | Disk of the stored files | 10% or more free | Less than 10% free, or the growth of the last 30 days would fill it within a month | Less than 2% free: uploads, imports and exports are refused, text still saves |
 | Database | Its size, and its growth over 30 days (measured once an hour) | | |
 | Backup | Noted in the last 26 hours | None noted, or older than 26 hours | |
-| Migrations | All applied, or contract migrations waiting during an upgrade | A contract migration waited more than a day | |
+| Migrations | All applied, or contract migrations waiting during an upgrade | A contract migration waited a day longer than `DIFFLUENCE_CONTRACT_GRACE` | |
 | Background work | Runs | A job failed in 7 days, or an event gave up | An event waited more than an hour to reach the queue |
 | Mail | Set up | No mail server, or a mail failed in the last day | |
 | Login | As set up | An account's password login stopped after many wrong guesses | |

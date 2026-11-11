@@ -53,6 +53,9 @@ type Config struct {
 	// migrate the database (blueprint 07, rule 4; ADR-040). It is 24 hours unless set. Zero
 	// means the operator switched the check off with "off": only a warning in the log.
 	UpgradeBackupMaxAge time.Duration
+	// ContractGrace is how long every live node must have run a release before its contract
+	// migrations run, the window in which a rollback stays possible (spec 048 D1).
+	ContractGrace time.Duration
 	// PasswordBlocklistFile holds known bad passwords, one per line. Empty = none.
 	PasswordBlocklistFile string
 	ExampleSpace          bool // make the example space on a new instance
@@ -175,6 +178,7 @@ func Load(lookup LookupFunc) (Config, error) {
 		ShutdownDelay:         l.duration("SHUTDOWN_DELAY", 5*time.Second),
 		MasterKeyFile:         l.str("MASTER_KEY_FILE", ""),
 		UpgradeBackupMaxAge:   l.backupAge("UPGRADE_BACKUP_MAX_AGE"),
+		ContractGrace:         l.notNegative("CONTRACT_GRACE", defaultContractGrace),
 		PasswordBlocklistFile: l.str("PASSWORD_BLOCKLIST_FILE", ""),
 		ExampleSpace:          l.boolean("EXAMPLE_SPACE", true),
 		OutwardAllowPrivate:   l.boolean("OUTWARD_ALLOW_PRIVATE", false),
@@ -361,6 +365,20 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 	d, err := time.ParseDuration(v)
 	if err != nil {
 		l.fail(key, fmt.Errorf("must be a duration like 30s or 8h, got %q", v))
+		return def
+	}
+	return d
+}
+
+// defaultContractGrace leaves a working day to notice a bad upgrade and roll it back
+// before a contract migration removes what the previous release needs (spec 048 D1).
+const defaultContractGrace = 24 * time.Hour
+
+// notNegative reads a duration that may be zero but not below.
+func (l *loader) notNegative(key string, def time.Duration) time.Duration {
+	d := l.duration(key, def)
+	if d < 0 {
+		l.fail(key, fmt.Errorf("must not be negative, got %v", d))
 		return def
 	}
 	return d

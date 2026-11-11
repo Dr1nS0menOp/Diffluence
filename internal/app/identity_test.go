@@ -927,7 +927,7 @@ func TestOIDCProviderErrorIsRecorded(t *testing.T) {
 }
 
 func TestContractMigrationsWaitForOlderNodes(t *testing.T) {
-	e := newEnv(t)
+	e := newEnvWith(t, func(c *config.Config) { c.ContractGrace = 24 * time.Hour })
 	ctx := context.Background()
 	pool := e.app.Pool()
 	if err := e.app.RegisterNode(ctx); err != nil {
@@ -941,29 +941,33 @@ func TestContractMigrationsWaitForOlderNodes(t *testing.T) {
 	e.app.AddMigrationForTest(db.Migration{Version: next, Name: "drop_old", Phase: db.PhaseContract, Checksum: "x",
 		SQL: "-- phase: contract\nCREATE TABLE contract_ran (id int);"})
 
-	// This node now knows the migration, but an older one is still alive.
-	if _, err := pool.Exec(ctx, "UPDATE nodes SET max_migration = $1, started_at = now() - interval '1 hour'", next); err != nil {
+	// This node now knows the migration, but an older one is still alive. Both started
+	// longer ago than the grace, so only the older node holds the migration back.
+	if _, err := pool.Exec(ctx, "UPDATE nodes SET max_migration = $1, started_at = now() - interval '2 days'", next); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := pool.Exec(ctx, `INSERT INTO nodes (id, role, version, max_migration, started_at)
-		VALUES ('00000000-0000-0000-0000-00000000000a', 'all', 'old', $1, now() - interval '2 hours')`, known); err != nil {
+		VALUES ('00000000-0000-0000-0000-00000000000a', 'all', 'old', $1, now() - interval '3 days')`, known); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := e.app.RunContractMigrations(ctx); err != nil || n != 0 {
 		t.Fatalf("ran with an older node alive: %d %v", n, err)
 	}
 
-	// The old node stops. A new node needs the grace period first.
+	// The old node stops. Every node must have run the release for a day first (D1): an
+	// hour, or ten minutes as before, is not enough.
 	if _, err := pool.Exec(ctx, "DELETE FROM nodes WHERE version = 'old'"); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, "UPDATE nodes SET started_at = now()"); err != nil {
-		t.Fatal(err)
+	for _, since := range []string{"0 seconds", "1 hour", "23 hours 59 minutes"} {
+		if _, err := pool.Exec(ctx, "UPDATE nodes SET started_at = now() - $1::interval", since); err != nil {
+			t.Fatal(err)
+		}
+		if n, err := e.app.RunContractMigrations(ctx); err != nil || n != 0 {
+			t.Fatalf("ran %s into the grace period of a day: %d %v", since, n, err)
+		}
 	}
-	if n, err := e.app.RunContractMigrations(ctx); err != nil || n != 0 {
-		t.Fatalf("ran inside the grace period: %d %v", n, err)
-	}
-	if _, err := pool.Exec(ctx, "UPDATE nodes SET started_at = now() - interval '1 hour'"); err != nil {
+	if _, err := pool.Exec(ctx, "UPDATE nodes SET started_at = now() - interval '24 hours 1 minute'"); err != nil {
 		t.Fatal(err)
 	}
 	if n, err := e.app.RunContractMigrations(ctx); err != nil || n != 1 {

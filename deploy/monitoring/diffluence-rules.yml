@@ -107,11 +107,11 @@ groups:
         annotations:
           summary: "Events gave up after their retries: replay them under Care."
       - alert: DiffluenceContractMigrationWaiting
-        expr: diffluence_migrations_pending_contract > 0 and time() - diffluence_migration_applied_timestamp_seconds > 86400
+        expr: diffluence_migrations_pending_contract > 0 and time() - diffluence_migration_applied_timestamp_seconds > 172800
         for: 30m
         labels: {severity: ticket}
         annotations:
-          summary: "A contract migration has waited more than a day: check that every node was upgraded."
+          summary: "A contract migration has waited a day past the default grace of a day: check that every node was upgraded."
       - alert: DiffluenceQueueUnreachable
         expr: diffluence_queue_healthy == 0
         for: 5m

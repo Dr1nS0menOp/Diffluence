@@ -15,9 +15,17 @@ With one node, Compose stops the old container and starts the new one, so people
 1. The new version starts and first checks that it may migrate (below). Then it applies **expand** migrations. They only add things, so the running version keeps working.
 2. With several nodes, you replace them one at a time. Old and new run side by side on the same database.
 3. Every node reports its version and the migrations it knows, every 15 seconds.
-4. When every live node knows a pending **contract** migration, and the newest node has been up for 10 minutes, the worker runs it automatically. It is recorded in the audit log as `system.contract_migrated`. The 10 minutes leave room to roll back right after an upgrade.
+4. When every live node knows a pending **contract** migration, and the newest node has been up for a day, the worker runs it automatically. It is recorded in the audit log as `system.contract_migrated`. The day leaves room to notice a problem the next working day and still roll back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it, such as `72h` for a longer window, or `0s` on a test installation.
 
 `diffluence migrate --contract` runs them by hand if you ever need to.
+
+Every migration runs with a time limit of a minute (`statement_timeout`), besides the five seconds it may wait for a lock. A migration that runs longer stops, rolls back and names itself in the log, so it cannot hold a busy table; nothing is half done. A migration that needs longer says so in its first lines, with the reason. Indexes on large tables are built alongside the traffic (`CREATE INDEX CONCURRENTLY`), outside a transaction; if such a build fails, it leaves an invalid index behind, and the next start names it and stops until it is dropped:
+
+```
+error: db: migration 0050_example failed: index pages_title_idx was left invalid by a failed concurrent build; drop it with DROP INDEX CONCURRENTLY and start again
+```
+
+Which releases may run side by side, and for how long, is in [version-skew.md](version-skew.md).
 
 ## The checks before migrating
 
@@ -63,7 +71,7 @@ error: db: a newer release already removed what this release may need: contract 
 
 ## Skipping versions
 
-A jump over several releases is allowed: the binary runs every migration in order. Zero downtime is only promised between consecutive releases. For a larger jump, stop the old nodes first.
+A jump over several releases is allowed: the binary runs every migration in order. Zero downtime is only promised between consecutive releases. An installation up to six months old may jump straight to the newest release, with a short stop: stop the old nodes first, then start the new ones. Older than that, upgrade in steps of at most six months ([version-skew.md](version-skew.md)).
 
 ## Watching an upgrade
 
@@ -77,7 +85,9 @@ A jump over several releases is allowed: the binary runs every migration in orde
 
 ## Proof
 
-`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request. Then it stops the new one and starts the old one again on the migrated database, as a rollback, and checks the audit chain both wrote.
+`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request.
+
+It also writes across versions: the old version publishes a page, saves a draft, comments and uploads a file; the new one reads all of it, writes its own, and the old one reads that while both run. Then it stops the new one and starts the old one again on the migrated database, as a rollback, which reads everything both wrote. At the end no job may have failed, no event may be set aside and the outbox must be empty, and the audit chain both wrote must hold.
 
 CI runs it on every pull request and every push to main, with the target branch or the previous commit of main as release N.
 

@@ -11,6 +11,7 @@ import (
 	"io"
 	"math"
 	"net/url"
+	"reflect"
 	"regexp"
 	"slices"
 	"strconv"
@@ -314,17 +315,81 @@ func (s *Service) SetSection(ctx context.Context, c identity.Caller, name string
 		return nil, err
 	}
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		stored, err := keepNewerFields(ctx, tx, sectionKeyPrefix+name, raw, v)
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, sectionKeyPrefix+name, raw); err != nil {
+			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, sectionKeyPrefix+name, stored); err != nil {
 			return err
 		}
 		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", name, "", map[string]any{"section": name})); err != nil {
 			return err
 		}
-		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
+		_, err = outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
 		return err
 	})
 	return v, err
+}
+
+// keepNewerFields adds to raw the fields of the stored section that this release does not
+// know. During an upgrade a node of the previous release may save a section a newer node
+// already extended; without this it would erase what the newer node stored (OPS-070).
+func keepNewerFields(ctx context.Context, tx pgx.Tx, key string, raw []byte, section any) ([]byte, error) {
+	var old []byte
+	err := tx.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1 FOR UPDATE", key).Scan(&old)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return raw, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var stored map[string]json.RawMessage
+	if json.Unmarshal(old, &stored) != nil {
+		return raw, nil // not an object: there are no fields to keep
+	}
+	var fresh map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fresh); err != nil {
+		return nil, err
+	}
+	known := jsonFields(reflect.TypeOf(section))
+	for name, value := range stored {
+		if _, ok := fresh[name]; !ok && !known[name] {
+			fresh[name] = value
+		}
+	}
+	return json.Marshal(fresh)
+}
+
+// jsonFields names the fields a struct reads and writes as JSON, so a field this release
+// knows but left out (omitempty) is not mistaken for one of a newer release.
+func jsonFields(t reflect.Type) map[string]bool {
+	for t.Kind() == reflect.Pointer {
+		t = t.Elem()
+	}
+	out := map[string]bool{}
+	if t.Kind() != reflect.Struct {
+		return out
+	}
+	for i := range t.NumField() {
+		f := t.Field(i)
+		tag, hasTag := f.Tag.Lookup("json")
+		name, _, _ := strings.Cut(tag, ",")
+		if f.Anonymous && !hasTag {
+			for inner := range jsonFields(f.Type) {
+				out[inner] = true
+			}
+			continue
+		}
+		if !f.IsExported() || name == "-" {
+			continue
+		}
+		if name == "" {
+			name = f.Name
+		}
+		out[name] = true
+	}
+	return out
 }
 
 // SetOrganisationName stores the name of the organisation, as the first setup gives it,

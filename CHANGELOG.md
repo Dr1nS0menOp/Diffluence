@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: upgrades made stronger (spec 053)
+- Contract migrations, which remove what an older release needs, now wait a day after every node runs the new release instead of 10 minutes, so a problem found the next working day can still be rolled back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it
+- Every migration has a time limit of a minute. One that runs longer stops and rolls back instead of holding a busy table; a migration that needs longer says so in its first lines. Indexes on large tables can now be built alongside the traffic, and a failed build is named at the next start
+- During an upgrade, an older node no longer takes and fails a background job a newer node queued, and saving a section of settings on an older node keeps what a newer one stored there
+- The upgrade test in CI now also writes on both releases and reads it on the other, and checks that no job failed and no event was set aside. Which releases may meet, and for how long, is in `docs/operations/version-skew.md`
+- Upgrade impact: none to do. Contract migrations run a day later than before; `diffluence migrate --contract` still runs them at once
 ### Added: the installation watches itself (spec 051)
 - System health in the console now lists disk, database size and growth, backup, migrations, background work, mail, login and the age of the release, each with what it means and what to do. The summary repeats what needs a look, such as a backup older than 26 hours or none at all
 - When the disk for files has less than 10% free, every console page says so. Below 2% free, uploads, imports and exports are refused with a clear message, while text still saves; `/readyz` stays ready and adds `"notes": ["disk_low"]`

@@ -143,6 +143,17 @@ func TestABackupOfTwentySixHoursIsStillFine(t *testing.T) {
 	expect(t, f, "backup", OK, "backup_ok")
 }
 
+// A contract migration waits for its grace period on purpose (spec 048 D1); only a day on
+// top of that is news.
+func TestAContractMigrationWarnsADayAfterItsGrace(t *testing.T) {
+	f := healthy()
+	f.PendingContract, f.ContractGrace = 1, 24*time.Hour
+	f.LastMigrationAt = now.Add(-47 * time.Hour)
+	expect(t, f, "migrations", OK, "contract_pending")
+	f.LastMigrationAt = now.Add(-48*time.Hour - time.Second)
+	expect(t, f, "migrations", Warn, "contract_waiting")
+}
+
 func TestAContractMigrationWaitingMoreThanADayWarns(t *testing.T) {
 	f := healthy()
 	f.PendingContract, f.LastMigrationAt = 1, now.Add(-24*time.Hour-time.Second)

@@ -58,5 +58,14 @@ func (a *App) RenderMailForTest(ctx context.Context, j mail.Job) (mail.Rendered,
 	return a.renderMail(ctx, j)
 }
 
+// EventListenersForTest gives every durable listener of the queue by name.
+func (a *App) EventListenersForTest() map[string]func(context.Context, []byte) error {
+	out := map[string]func(context.Context, []byte) error{}
+	for name, handle := range a.eventListeners() {
+		out[name] = handle
+	}
+	return out
+}
+
 // InMaintenanceForTest tells whether mail and jobs wait.
 func (a *App) InMaintenanceForTest(ctx context.Context) (bool, error) { return a.inMaintenance(ctx) }

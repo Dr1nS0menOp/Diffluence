@@ -7,7 +7,7 @@ Before 1.0 there are no releases with support: every build on main is upgraded t
 ## Checklist
 
 1. **Main is green.** The last CI run on main passed, including `upgrade`, and so did the last nightly run: fuzzing, the mutation check and the restore drill.
-2. **Migrations follow the rules.** Each new file in `internal/db/migrations/` starts with `-- phase: expand` or `-- phase: contract`, and no merged file was changed (the migration test refuses that). A contract migration only removes what the previous release no longer reads: it runs as soon as every node knows it, and from then on that previous release refuses to start.
+2. **Migrations follow the rules.** Each new file in `internal/db/migrations/` starts with `-- phase: expand` or `-- phase: contract`, and no merged file was changed (the migration test refuses that). A contract migration only removes what the **previous** release already stopped reading and writing (spec 048 D2): it runs a day after every node knows it, and from then on that previous release refuses to start, so it must not need what is gone. The rewrite check (`TestNoMigrationRewritesATable`) passes, with every `-- rewrite-ok:` exception explained. Every format that crosses versions still reads what the previous release wrote ([version-skew.md](version-skew.md)).
 3. **The upgrade from the previous release works.** Run it from that release's tag, not from the commit before:
 
    ```sh

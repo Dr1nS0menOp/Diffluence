@@ -33,21 +33,21 @@ An older study, Dumitraș and Narasimhan (Middleware 2009), found that errors in
 | Old and new version on one database, in CI | Built for HTTP reads and logins | `scripts/upgrade-test.sh`, OPS-036 |
 | Refusal of a database a newer release contracted | Built | `internal/db/compat.go`, OPS-040 |
 | Checks before migrating | Built | spec 044, OPS-038 |
-| Each migration in one transaction | Built, so `CONCURRENTLY` cannot run | OPS-043 |
-| A rule that refuses table rewrites | Not built | |
-| Writes during the upgrade test, and formats other than tables | Not tested | |
+| Each migration in one transaction | Built; `-- transaction: none` for `CONCURRENTLY` (spec 053) | OPS-043, OPS-073 |
+| A rule that refuses table rewrites | Built (spec 053) | OPS-072 |
+| Writes during the upgrade test, and formats other than tables | Built for pages, drafts, comments, files, jobs, events and settings (spec 053) | OPS-070, OPS-071 |
 | A map from release to migrations, for skipping versions | Not built (needs 1.0) | OPS-042 |
 | Large data moves as background jobs | Later, with the first that needs it | OPS-035 |
 
 ## 1.4 Recommendations
 
-- **OPS-070** · new · **High.** Test every format that crosses versions, not only tables. DUPTester's finding is that the persisted formats fail. For Diffluence those are: the JSON document of a page and its versions, export bundles (format numbers already exist), events in the outbox and the queue, jobs in the jobs table, settings stored as JSON, and the shared document of the editing service. Each gets a test that reads what release N wrote with release N+1, and the reverse where a rollback is promised.
-- **OPS-071** · new · **High.** The upgrade test also **writes** while the new version migrates: autosave, publish, comment and upload on the old node, then read them on the new one, and the reverse. Reads and logins alone miss the 40% of failures that come through messages.
-- **OPS-072** · new · **Medium.** A check in CI refuses migrations that rewrite or lock a table for long: `ALTER COLUMN ... TYPE`, `ADD COLUMN` with a volatile default, `SET NOT NULL` without a `CHECK ... NOT VALID` first, `CREATE INDEX` without `CONCURRENTLY` on a table that holds user data, and `VACUUM FULL` or `CLUSTER`. An exception is a comment on the line with the reason, the same rule as for scanners.
-- **OPS-073** · new · **Medium.** Migrations that cannot run in a transaction, such as `CREATE INDEX CONCURRENTLY`, get a header (`-- transaction: none`) and run on their own, with the same lock, a retry, and a check afterwards that the index is valid (a failed concurrent build leaves an invalid index behind). This closes OPS-043.
-- **OPS-074** · new · **Medium.** Every migration also runs with a `statement_timeout`, so one that holds its lock longer than planned fails and rolls back instead of holding the site. Background migrations (OPS-035) are the place for long work.
-- **OPS-075** · new · **Medium.** Write the version-skew policy down, as Kubernetes does: which versions of the application, the editing service, the queue messages and the export bundle may meet, and for how long. The upgrade test proves exactly that policy.
-- **OPS-076** · new · **Low.** Once 1.0 exists, CI also upgrades from the **oldest release that may still jump straight to this one** (decided below: six months), with a short stop allowed. That makes OPS-042 a tested promise instead of a sentence.
+- **OPS-070** · partly · **High.** Test every format that crosses versions, not only tables. DUPTester's finding is that the persisted formats fail. For Diffluence those are: the JSON document of a page and its versions, export bundles (format numbers already exist), events in the outbox and the queue, jobs in the jobs table, settings stored as JSON, and the shared document of the editing service. Each gets a test that reads what release N wrote with release N+1, and the reverse where a rollback is promised.
+- **OPS-071** · built · **High.** The upgrade test also **writes** while the new version migrates: autosave, publish, comment and upload on the old node, then read them on the new one, and the reverse. Reads and logins alone miss the 40% of failures that come through messages.
+- **OPS-072** · built · **Medium.** A check in CI refuses migrations that rewrite or lock a table for long: `ALTER COLUMN ... TYPE`, `ADD COLUMN` with a volatile default, `SET NOT NULL` without a `CHECK ... NOT VALID` first, `CREATE INDEX` without `CONCURRENTLY` on a table that holds user data, and `VACUUM FULL` or `CLUSTER`. An exception is a comment on the line with the reason, the same rule as for scanners.
+- **OPS-073** · built · **Medium.** Migrations that cannot run in a transaction, such as `CREATE INDEX CONCURRENTLY`, get a header (`-- transaction: none`) and run on their own, with the same lock, a retry, and a check afterwards that the index is valid (a failed concurrent build leaves an invalid index behind). This closes OPS-043.
+- **OPS-074** · built · **Medium.** Every migration also runs with a `statement_timeout`, so one that holds its lock longer than planned fails and rolls back instead of holding the site. Background migrations (OPS-035) are the place for long work.
+- **OPS-075** · built · **Medium.** Write the version-skew policy down, as Kubernetes does: which versions of the application, the editing service, the queue messages and the export bundle may meet, and for how long. The upgrade test proves exactly that policy.
+- **OPS-076** · later · **Low.** Once 1.0 exists, CI also upgrades from the **oldest release that may still jump straight to this one** (decided below: six months), with a short stop allowed. That makes OPS-042 a tested promise instead of a sentence.
 
 ## Sources
 

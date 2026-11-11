@@ -59,7 +59,7 @@ func cmdDoctor(ctx context.Context, stdout io.Writer) error {
 		return errDoctorFound
 	}
 	facts, err := app.ReadHealthFacts(ctx, app.HealthSource{Pool: pool, Store: disk, Migrations: migs,
-		MailConfigured: cfg.SMTP.Host != "", OIDCConfigured: cfg.OIDC.Issuer != ""}, time.Now())
+		MailConfigured: cfg.SMTP.Host != "", OIDCConfigured: cfg.OIDC.Issuer != "", ContractGrace: cfg.ContractGrace}, time.Now())
 	if err != nil {
 		fmt.Fprintln(stdout, "health: PROBLEM: the health facts cannot be read; is the database migrated?")
 		return errDoctorFound

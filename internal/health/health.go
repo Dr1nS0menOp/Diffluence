@@ -33,7 +33,8 @@ const (
 	DiskRefusePercent = 2
 	// BackupWarnAfter tolerates a daily backup that runs a little late.
 	BackupWarnAfter = 26 * time.Hour
-	// ContractWaitWarnAfter is how long a contract migration may wait for every node.
+	// ContractWaitWarnAfter is how long a contract migration may wait for every node, on top
+	// of the grace it waits on purpose.
 	ContractWaitWarnAfter = 24 * time.Hour
 	// ReleaseWarnAfter is when a release counts as behind, from its own build date.
 	ReleaseWarnAfter = 60 * 24 * time.Hour
@@ -63,7 +64,9 @@ type Facts struct {
 	// LastMigrationAt is when the last migration was applied.
 	PendingContract int
 	LastMigrationAt time.Time
-	FailedJobs7d    int
+	// ContractGrace is how long contract migrations wait on purpose (DIFFLUENCE_CONTRACT_GRACE).
+	ContractGrace time.Duration
+	FailedJobs7d  int
 	// OutboxStuck counts events that waited more than an hour to reach the queue.
 	OutboxStuck   int
 	EventFailures int
@@ -155,7 +158,7 @@ func migrations(f Facts) Check {
 		return check("migrations", OK, "migrations_ok", nil)
 	}
 	values := map[string]any{"count": f.PendingContract}
-	if !f.LastMigrationAt.IsZero() && f.Now.Sub(f.LastMigrationAt) > ContractWaitWarnAfter {
+	if !f.LastMigrationAt.IsZero() && f.Now.Sub(f.LastMigrationAt) > f.ContractGrace+ContractWaitWarnAfter {
 		return check("migrations", Warn, "contract_waiting", values)
 	}
 	return check("migrations", OK, "contract_pending", values)
@@ -234,7 +237,7 @@ var Sentences = map[string]string{
 	"backup_old":       "The last backup was noted {hours} hours ago. Check that the scheduled backup still runs.",
 	"migrations_ok":    "Every migration of this release is applied.",
 	"contract_pending": "{count} contract migration(s) wait until every node runs this release. That is normal during an upgrade.",
-	"contract_waiting": "{count} contract migration(s) have waited more than a day. Check that every node was upgraded.",
+	"contract_waiting": "{count} contract migration(s) have waited a day longer than their grace period. Check that every node was upgraded.",
 	"work_ok":          "Background work runs.",
 	"work_failed":      "{jobs} job(s) failed in the last 7 days and {events} event(s) gave up. Look under Care.",
 	"outbox_stuck":     "{outbox} event(s) have waited more than an hour to reach the queue. Check the queue and the worker.",

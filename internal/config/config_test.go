@@ -97,6 +97,25 @@ func TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose(t *testing.T
 	}
 }
 
+// Spec 048 D1: a contract migration waits a day by default, so a problem found the next
+// working day can still be rolled back. Zero is for a test installation; negative is a mistake.
+func TestContractMigrationsWaitADayByDefault(t *testing.T) {
+	for _, bad := range []string{"-1h", "soon"} {
+		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_CONTRACT_GRACE": bad}))
+		if err == nil || !strings.Contains(err.Error(), "CONTRACT_GRACE") {
+			t.Fatalf("%q: want a refusal, got %v", bad, err)
+		}
+	}
+	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	if err != nil || c.ContractGrace != 24*time.Hour {
+		t.Fatalf("default %v, err %v", c.ContractGrace, err)
+	}
+	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_CONTRACT_GRACE": "0s"}))
+	if err != nil || c.ContractGrace != 0 {
+		t.Fatalf("zero %v, err %v", c.ContractGrace, err)
+	}
+}
+
 func TestHTTPSAndProxies(t *testing.T) {
 	c, err := Load(env(map[string]string{
 		"DIFFLUENCE_DATABASE_URL":    "postgres://x",

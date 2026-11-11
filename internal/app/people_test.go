@@ -24,6 +24,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -1186,7 +1187,9 @@ func TestPruningADamagedChainIsRefused(t *testing.T) {
 func TestMaintenanceHoldsQueuedJobs(t *testing.T) {
 	e := newEnv(t)
 	a := admin(e)
-	e.sql("INSERT INTO jobs (id, kind, status, created_by) VALUES (gen_random_uuid(), 'nothing', 'queued', $1)", a.id)
+	// A kind this node knows: a worker leaves kinds it does not know for a node that does.
+	e.app.Jobs().Register("test.nothing", func(context.Context, jobs.Job) (any, error) { return nil, nil })
+	e.sql("INSERT INTO jobs (id, kind, status, created_by) VALUES (gen_random_uuid(), 'test.nothing', 'queued', $1)", a.id)
 	a.ok("PUT", "/api/v1/admin/maintenance", map[string]any{"on": true, "message": ""})
 	ran, err := e.app.Jobs().RunOnce(context.Background())
 	if err != nil || ran {

@@ -22,9 +22,6 @@ const (
 	heartbeatEvery = 15 * time.Second
 	// A node that was not seen for this long counts as gone.
 	nodeLiveWindow = time.Minute
-	// How long every live node must have known a contract migration before it
-	// runs: leaves room for a rollback in the first minutes after an upgrade.
-	contractGrace = 10 * time.Minute
 	// How often the head of the audit chain is signed. It bounds what an owner of the
 	// database can remove from the tail before the witness holds a copy (ADR-039).
 	checkpointEvery = 5 * time.Minute
@@ -88,7 +85,9 @@ func (a *App) RunContractMigrations(ctx context.Context) (int, error) {
 	if oldest < pending[len(pending)-1].Version {
 		return 0, nil // an older node is still alive, or no node reported yet
 	}
-	if youngestStart != nil && time.Since(*youngestStart) < contractGrace {
+	// Every node must have run this release for the grace period (DIFFLUENCE_CONTRACT_GRACE),
+	// so a problem found the next day can still be rolled back (spec 048 D1).
+	if youngestStart != nil && time.Since(*youngestStart) < a.cfg.ContractGrace {
 		return 0, nil
 	}
 	if err := a.migrate(ctx, db.Options{IncludeContract: true, Log: a.log}); err != nil {

@@ -1405,7 +1405,7 @@ mutate "no backup noted is fine" internal/health/health.go \
 mutate "a backup of exactly 26 hours warns" internal/health/health.go \
   's.replace("if age > BackupWarnAfter {", "if age >= BackupWarnAfter {")' $health -run TestABackupOfTwentySixHoursIsStillFine
 mutate "a contract migration of exactly a day warns" internal/health/health.go \
-  's.replace("f.Now.Sub(f.LastMigrationAt) > ContractWaitWarnAfter", "f.Now.Sub(f.LastMigrationAt) >= ContractWaitWarnAfter")' $health -run TestAContractMigrationWaitingMoreThanADayWarns
+  's.replace("f.Now.Sub(f.LastMigrationAt) > f.ContractGrace+ContractWaitWarnAfter", "f.Now.Sub(f.LastMigrationAt) >= f.ContractGrace+ContractWaitWarnAfter")' $health -run TestAContractMigrationWaitingMoreThanADayWarns
 mutate "an event stuck in the outbox is only a warning" internal/health/health.go \
   's.replace("case f.OutboxStuck > 0:", "case false:")' $health -run TestAnEventStuckInTheOutboxIsAProblem
 mutate "failed jobs are fine" internal/health/health.go \
@@ -1440,6 +1440,63 @@ mutate "doctor passes with a problem" cmd/diffluence/doctor.go \
   's.replace("\tif problems > 0 {\n\t\treturn errDoctorFound", "\tif false {\n\t\treturn errDoctorFound")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
 mutate "doctor forgets a key it cannot read" cmd/diffluence/doctor.go \
   's.replace("if !doctorKeys(ctx, cfg, stdout) {", "if false \x26\x26 !doctorKeys(ctx, cfg, stdout) {")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
+
+# Spec 053: upgrades made stronger.
+db=./internal/db/
+mutate "a migration runs without a time limit" internal/db/migrate.go \
+  's.replace("SET LOCAL statement_timeout = %d", "SET LOCAL statement_timeout = 0 -- %d")' $db -run TestAMigrationThatRunsTooLongIsStoppedAndRolledBack
+mutate "the header of a migration gives it no more time" internal/db/migrate.go \
+  's.replace("\tif m.StatementTimeout > 0 {\n\t\treturn m.StatementTimeout", "\tif false {\n\t\treturn m.StatementTimeout")' $db -run TestTheHeaderGivesAMigrationMoreTime
+mutate "a file without a transaction runs in one" internal/db/migrate.go \
+  's.replace("\t\tif m.NoTransaction {\n\t\t\terr = applyAlone", "\t\tif false {\n\t\t\terr = applyAlone")' $db -run TestAConcurrentIndexIsBuiltOutsideATransaction
+mutate "an index left invalid passes" internal/db/migrate.go \
+  's.replace("\tif len(invalid) > 0 {", "\tif false {")' $db -run TestAnIndexLeftInvalidIsNamed
+mutate "a file without a transaction may hold two statements" internal/db/migrate.go \
+  's.replace("statementCount(m.SQL) != 1", "statementCount(m.SQL) < 1")' $db -run TestHeadersThatMakeNoSenseAreRefused
+mutate "any word after transaction means none" internal/db/migrate.go \
+  's.replace("; value != \"none\" {", "; value == \"\" \x26\x26 false {")' $db -run TestHeadersThatMakeNoSenseAreRefused
+mutate "a new column type passes the rewrite check" internal/db/lint.go \
+  's.replace("\t\tcase newType.MatchString(code):", "\t\tcase false:")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "SET NOT NULL passes the rewrite check" internal/db/lint.go \
+  's.replace("\t\tcase setNotNull.MatchString(code):", "\t\tcase false:")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "a volatile default passes the rewrite check" internal/db/lint.go \
+  's.replace("\t\tcase volatileDflt.MatchString(code):", "\t\tcase false:")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "a stored column passes the rewrite check" internal/db/lint.go \
+  's.replace("\t\tcase storedColumn.MatchString(code):", "\t\tcase false:")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "an index that blocks writes passes the rewrite check" internal/db/lint.go \
+  's.replace(" \x26\x26 !concurrently.MatchString(match[1]) {", " \x26\x26 false {")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "a constraint checked at once passes the rewrite check" internal/db/lint.go \
+  's.replace("\t\tcase checkedAtOnce.MatchString(code) \x26\x26 !notValid.MatchString(code):", "\t\tcase false:")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "a constraint added NOT VALID is refused" internal/db/lint.go \
+  's.replace(" \x26\x26 !notValid.MatchString(code):", ":")' $db -run TestSafeChangesPass
+mutate "VACUUM FULL passes the rewrite check" internal/db/lint.go \
+  's.replace("\tif vacuumFull.MatchString(code) {", "\tif false {")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "CLUSTER passes the rewrite check" internal/db/lint.go \
+  's.replace("} else if cluster.MatchString(code) {", "} else if false {")' $db -run TestStatementsThatRewriteOrLongLockATableAreRefused
+mutate "a table made in the same file counts as busy" internal/db/lint.go \
+  's.replace("\t\tcreated[tableKey(match[1])] = true", "\t\t_ = match")' $db -run TestSafeChangesPass
+mutate "an exception without a reason passes" internal/db/lint.go \
+  's.replace("rewrite-ok:[ \\t]*\\S", "rewrite-ok:")' $db -run TestAnExceptionNeedsAReason
+mutate "an exception covers the whole file" internal/db/lint.go \
+  's.replace("\t\tif rewriteOK.MatchString(statement) {", "\t\tif rewriteOK.MatchString(m.SQL) {")' $db -run TestAnExceptionNeedsAReason
+mutate "migrations from before the rule are checked" internal/db/lint.go \
+  's.replace("\tif m.Version < LintFrom {", "\tif false {")' $db -run TestEarlierMigrationsAreNotChecked
+mutate "contract migrations ignore the grace" internal/app/ops.go \
+  's.replace("time.Since(*youngestStart) < a.cfg.ContractGrace", "time.Since(*youngestStart) < 10*time.Minute")' $app -run TestContractMigrationsWaitForOlderNodes
+mutate "the health check forgets the grace" internal/health/health.go \
+  's.replace("> f.ContractGrace+ContractWaitWarnAfter", "> ContractWaitWarnAfter")' $health -run TestAContractMigrationWarnsADayAfterItsGrace
+mutate "a negative grace is taken" internal/config/config.go \
+  's.replace("\tif d < 0 {\n\t\tl.fail(key", "\tif false {\n\t\tl.fail(key")' ./internal/config/ -run TestContractMigrationsWaitADayByDefault
+mutate "the grace is not a day by default" internal/config/config.go \
+  's.replace("const defaultContractGrace = 24 * time.Hour", "const defaultContractGrace = 10 * time.Minute")' ./internal/config/ -run TestContractMigrationsWaitADayByDefault
+mutate "a worker takes a job of any kind" internal/jobs/jobs.go \
+  's.replace("AND kind = ANY($2) AND NOT kind", "AND $2::text[] IS NOT NULL AND NOT kind")' $app -run TestAJobOfANewerReleaseWaitsForANodeThatKnowsIt
+mutate "saving settings drops the fields of a newer release" internal/settings/sections.go \
+  's.replace("if _, ok := fresh[name]; !ok \x26\x26 !known[name] {", "if known[name] \x26\x26 false {")' $app -run TestSavingSettingsKeepsFieldsOfANewerRelease
+mutate "an embedded section field counts as unknown" internal/settings/sections.go \
+  's.replace("\t\tif f.Anonymous \x26\x26 !hasTag {", "\t\tif hasTag \x26\x26 false {")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
+mutate "a field left out by omitempty counts as unknown" internal/settings/sections.go \
+  's.replace("\t\tname, _, _ := strings.Cut(tag, \",\")", "\t\tname := tag")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

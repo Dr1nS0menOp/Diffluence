@@ -27,6 +27,14 @@ import (
 //   - expand migrations only ADD things, so the previous release keeps working
 //   - contract migrations REMOVE things and only run when explicitly allowed,
 //     in a later release, after every node runs code that no longer needs them
+//   - a contract migration only removes what the PREVIOUS release already stopped
+//     reading and writing, so rolling back one release stays safe after it ran (spec 048 D2)
+//   - every migration runs with a statement_timeout of a minute; a header line
+//     "-- statement_timeout: <duration>" gives one more, with the reason below it
+//   - a header line "-- transaction: none" runs a file of exactly one statement outside a
+//     transaction, for CREATE INDEX CONCURRENTLY (OPS-073)
+//   - from 0048 on, a statement that rewrites or long locks a table is refused by
+//     TestNoMigrationRewritesATable unless a "-- rewrite-ok: <reason>" comment allows it
 
 //go:embed migrations/*.sql
 var embedded embed.FS
@@ -46,7 +54,21 @@ type Migration struct {
 	Phase    Phase
 	SQL      string
 	Checksum string
+	// NoTransaction runs the one statement of the file outside a transaction (OPS-073).
+	NoTransaction bool
+	// StatementTimeout is the header's own limit; zero means the run's default (OPS-074).
+	StatementTimeout time.Duration
 }
+
+// DefaultStatementTimeout stops a migration that holds its lock longer than planned. Long
+// work belongs in a background job (OPS-035), not in a migration that holds a table.
+const DefaultStatementTimeout = time.Minute
+
+// The header lines a migration may carry after its phase.
+const (
+	headerTransaction      = "-- transaction:"
+	headerStatementTimeout = "-- statement_timeout:"
+)
 
 // ErrChecksumMismatch means an applied migration file was changed afterwards.
 var ErrChecksumMismatch = errors.New("db: an applied migration was modified")
@@ -90,7 +112,11 @@ func Parse(fsys fs.FS, dir string) ([]Migration, error) {
 		}
 		v, _ := strconv.Atoi(m[1])
 		sum := sha256.Sum256(body)
-		out = append(out, Migration{Version: v, Name: m[2], Phase: phase, SQL: string(body), Checksum: hex.EncodeToString(sum[:])})
+		mig := Migration{Version: v, Name: m[2], Phase: phase, SQL: string(body), Checksum: hex.EncodeToString(sum[:])}
+		if err := readHeaders(&mig); err != nil {
+			return nil, fmt.Errorf("db: migration %q: %w", e.Name(), err)
+		}
+		out = append(out, mig)
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i].Version < out[j].Version })
 	for i, m := range out {
@@ -101,10 +127,59 @@ func Parse(fsys fs.FS, dir string) ([]Migration, error) {
 	return out, nil
 }
 
+// readHeaders reads the comment lines at the top of a migration, after its phase.
+func readHeaders(m *Migration) error {
+	for _, line := range strings.Split(m.SQL, "\n")[1:] {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "--") {
+			break
+		}
+		switch {
+		case strings.HasPrefix(line, headerTransaction):
+			if value := strings.TrimSpace(strings.TrimPrefix(line, headerTransaction)); value != "none" {
+				return fmt.Errorf("%s may only say none, not %q", headerTransaction, value)
+			}
+			m.NoTransaction = true
+		case strings.HasPrefix(line, headerStatementTimeout):
+			value := strings.TrimSpace(strings.TrimPrefix(line, headerStatementTimeout))
+			d, err := time.ParseDuration(value)
+			if err != nil || d <= 0 {
+				return fmt.Errorf("%s needs a positive duration such as 5m, not %q", headerStatementTimeout, value)
+			}
+			m.StatementTimeout = d
+		}
+	}
+	if m.NoTransaction && statementCount(m.SQL) != 1 {
+		return fmt.Errorf("a migration with %s none must hold exactly one statement, ending in a semicolon", headerTransaction)
+	}
+	return nil
+}
+
+// statementCount counts the statements of a file without a transaction: whole-line
+// comments do not count, and the text must end with the last semicolon. It is meant for the
+// one-line statements such files hold, not for SQL with semicolons inside strings.
+func statementCount(sql string) int {
+	var code strings.Builder
+	for _, line := range strings.Split(sql, "\n") {
+		if t := strings.TrimSpace(line); t != "" && !strings.HasPrefix(t, "--") {
+			code.WriteString(t)
+			code.WriteString("\n")
+		}
+	}
+	text := strings.TrimSpace(code.String())
+	if text == "" || !strings.HasSuffix(text, ";") {
+		return 0
+	}
+	return strings.Count(text, ";")
+}
+
 // Options control a migration run.
 type Options struct {
 	IncludeContract bool
 	Log             *slog.Logger
+	// StatementTimeout replaces DefaultStatementTimeout for migrations without a header of
+	// their own. Zero means the default.
+	StatementTimeout time.Duration
 }
 
 // Report says what a run did.
@@ -183,7 +258,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migs []Migration, opts Opt
 			rep.PendingContract = append(rep.PendingContract, m)
 			continue
 		}
-		if err := applyWithRetry(ctx, conn, m, log); err != nil {
+		if err := applyWithRetry(ctx, conn, m, statementTimeout(m, opts), log); err != nil {
 			return rep, err
 		}
 		rep.Applied = append(rep.Applied, m)
@@ -213,10 +288,15 @@ func appliedChecksums(ctx context.Context, q Querier) (map[int]string, error) {
 // applyWithRetry runs one migration in a transaction with a short lock_timeout,
 // so a migration never blocks live traffic for long. On a lock timeout it waits
 // and tries again instead of queueing behind (and in front of) user queries.
-func applyWithRetry(ctx context.Context, conn *pgxpool.Conn, m Migration, log *slog.Logger) error {
+func applyWithRetry(ctx context.Context, conn *pgxpool.Conn, m Migration, timeout time.Duration, log *slog.Logger) error {
 	const attempts = 6
 	for i := 1; ; i++ {
-		err := applyOnce(ctx, conn, m)
+		var err error
+		if m.NoTransaction {
+			err = applyAlone(ctx, conn, m, timeout)
+		} else {
+			err = applyOnce(ctx, conn, m, timeout)
+		}
 		if err == nil {
 			return nil
 		}
@@ -233,24 +313,84 @@ func applyWithRetry(ctx context.Context, conn *pgxpool.Conn, m Migration, log *s
 	}
 }
 
-func applyOnce(ctx context.Context, conn *pgxpool.Conn, m Migration) error {
+// statementTimeout is the limit one migration runs under: its own header, else the run's.
+func statementTimeout(m Migration, opts Options) time.Duration {
+	if m.StatementTimeout > 0 {
+		return m.StatementTimeout
+	}
+	if opts.StatementTimeout > 0 {
+		return opts.StatementTimeout
+	}
+	return DefaultStatementTimeout
+}
+
+const recordMigration = "INSERT INTO schema_migrations (version, name, phase, checksum) VALUES ($1, $2, $3, $4)"
+
+func applyOnce(ctx context.Context, conn *pgxpool.Conn, m Migration, timeout time.Duration) error {
 	tx, err := conn.Begin(ctx)
 	if err != nil {
 		return err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, "SET LOCAL lock_timeout = '5s'"); err != nil {
+	// The values are numbers made here, not input, so they can be part of the text: SET
+	// takes no parameters.
+	if _, err := tx.Exec(ctx, fmt.Sprintf("SET LOCAL lock_timeout = '5s'; SET LOCAL statement_timeout = %d", timeout.Milliseconds())); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, m.SQL); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx,
-		"INSERT INTO schema_migrations (version, name, phase, checksum) VALUES ($1, $2, $3, $4)",
-		m.Version, m.Name, string(m.Phase), m.Checksum); err != nil {
+	if _, err := tx.Exec(ctx, recordMigration, m.Version, m.Name, string(m.Phase), m.Checksum); err != nil {
 		return err
 	}
 	return tx.Commit(ctx)
+}
+
+// applyAlone runs a migration of one statement outside a transaction, with the same limits,
+// then checks that it left no index invalid: a concurrent build that fails leaves one
+// behind, and IF NOT EXISTS would skip it quietly the next time (OPS-073).
+func applyAlone(ctx context.Context, conn *pgxpool.Conn, m Migration, timeout time.Duration) error {
+	defer func() {
+		// A fresh context, so the session's limits are reset even when ctx was cancelled.
+		_, _ = conn.Exec(context.Background(), "RESET lock_timeout; RESET statement_timeout")
+	}()
+	if _, err := conn.Exec(ctx, fmt.Sprintf("SET lock_timeout = '5s'; SET statement_timeout = %d", timeout.Milliseconds())); err != nil {
+		return err
+	}
+	if _, err := conn.Exec(ctx, m.SQL); err != nil {
+		return err
+	}
+	invalid, err := invalidIndexes(ctx, conn)
+	if err != nil {
+		return err
+	}
+	if len(invalid) > 0 {
+		return fmt.Errorf("index %s was left invalid by a failed concurrent build; drop it with DROP INDEX CONCURRENTLY and start again",
+			strings.Join(invalid, ", "))
+	}
+	_, err = conn.Exec(ctx, recordMigration, m.Version, m.Name, string(m.Phase), m.Checksum)
+	return err
+}
+
+// invalidIndexes names the indexes of this schema PostgreSQL marks as not valid.
+func invalidIndexes(ctx context.Context, q Querier) ([]string, error) {
+	rows, err := q.Query(ctx, `SELECT c.relname FROM pg_index i
+		JOIN pg_class c ON c.oid = i.indexrelid
+		JOIN pg_namespace n ON n.oid = c.relnamespace
+		WHERE NOT i.indisvalid AND n.nspname = current_schema() ORDER BY c.relname`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		out = append(out, name)
+	}
+	return out, rows.Err()
 }
 
 // PendingContract lists contract migrations of this binary that are not applied.
