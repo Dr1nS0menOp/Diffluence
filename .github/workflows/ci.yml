@@ -236,6 +236,56 @@ jobs:
             exit 1
           fi
 
+  # Spec 057: a release still builds, installs and reproduces. Not on pull requests, so a
+  # review is not held up by it (D5); on main after every push, and at night.
+  release-dry-run:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    needs: go
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: the binary and the web assets reproduce
+        run: bash scripts/reproducible.sh
+      - name: web assets, embedded in the binary
+        run: npm ci --no-fund --no-audit && npx vite build
+        working-directory: web
+      - name: the release configuration is valid
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.1
+          args: check
+      - name: archives and packages, twice
+        uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.1
+          args: release --snapshot --clean --skip=sign,sbom
+      - name: keep the first run
+        run: mv dist dist-first
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.1
+          args: release --snapshot --clean --skip=sign,sbom
+      - name: the two runs are the same, byte for byte
+        run: diff dist-first/checksums.txt dist/checksums.txt
+      - name: the .deb installs on Debian and the .rpm on Fedora
+        run: |
+          docker run --rm -v "$PWD/dist:/dist:ro" debian:12 sh -c \
+            'dpkg -i /dist/*_amd64.deb && id diffluence && test -d /var/lib/diffluence && diffluence version'
+          docker run --rm -v "$PWD/dist:/dist:ro" fedora:41 sh -c \
+            'rpm -i /dist/*_amd64.rpm && id diffluence && test -d /var/lib/diffluence && diffluence version'
+
   nightly:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest

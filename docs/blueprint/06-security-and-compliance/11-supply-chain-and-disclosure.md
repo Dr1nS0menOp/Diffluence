@@ -10,7 +10,7 @@
 - **SEC-1003** · partly · `renovate.json` asks for weekly updates, and at once for known holes. No Renovate change has ever landed in the history, so it may not be switched on for the repository. Medium. Check it.
 - **SEC-1004** · partly · Most actions in `ci.yml` use a moving tag such as `actions/checkout@v5`. Only Trivy is pinned to a commit. Renovate is set up to pin them, and that has not landed, so a poisoned tag would run in CI. Medium. `permissions: contents: read` limits the damage.
 - **SEC-1005** · partly · Images use tags, not digests: `golang:1.26`, `node:22-bookworm-slim`, the distroless base, `postgres:16`. Pin by digest, and let Renovate update them. Low.
-- **SEC-1006** · new · **Medium.** There is no SBOM. ASVS 15.1.2 asks for an inventory, and customers and the Cyber Resilience Act will too. Generate one per release, for Go, npm and the image. Belongs before the first beta.
+- **SEC-1006** · partly (spec 057: every release builds SBOMs in SPDX and CycloneDX for each binary, the source with its npm lock files, and each image; proven by a snapshot build, the image SBOM only by the first tagged release) · **Medium.** There was no SBOM. ASVS 15.1.2 asks for an inventory, and customers and the Cyber Resilience Act will too. Generate one per release, for Go, npm and the image. Belongs before the first beta.
 - **SEC-1007** · new · ASVS 15.1.1 asks for time limits for fixing vulnerable components. Proposal: critical 7 days, high 30, medium 90, and a yearly check on abandoned packages.
 - **SEC-1008** · new · A list of risky components (ASVS 15.1.4), which this document starts in chapter 6: anything that parses hostile files, and anything alpha.
 - **SEC-1009** · built · The leaked password list is data from SecLists (MIT), with a generator so it can be rebuilt, and an entry in `docs/dependencies.md`.
@@ -19,7 +19,7 @@
 
 **What can go wrong:** a release that was not built from the code people read.
 
-- **SEC-1015** · partly · Releases are not signed yet, and no provenance is published. The blueprint promises cosign and SLSA. GitHub's build provenance reaches SLSA Build Level 2 with little work. Belongs before the first beta.
+- **SEC-1015** · partly · Spec 057 signs `checksums.txt` and the image keylessly with cosign, and attests SLSA provenance for every file and the image through GitHub; written in `.github/workflows/release.yml`, proven only by the first tagged release. The blueprint promises cosign and SLSA. GitHub's build provenance reaches SLSA Build Level 2 with little work. Belongs before the first beta.
 - **SEC-1016** · built · The image build uses `-trimpath`, and `scripts/ci-local.sh` fails when a frontend build touches tracked files.
 - **SEC-1017** · partly · `main` takes direct pushes in this phase, while `09-way-of-working.md` says pull requests with all checks required. The product owner chose direct pushes per wave, and CI runs after the push, so a bad commit is noticed, not stopped. The product owner decided (ADR-029): branch protection goes on before the first outside contribution.
 - **SEC-1018** · partly · Commits have a DCO sign-off, and are not signed with a key, which the blueprint promised.

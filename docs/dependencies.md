@@ -52,6 +52,17 @@ Only in the `collab` container, and only where an operator installs it. Pinned i
 | `crossws` 0.4.17, `async-mutex` 0.5.0, `isomorphic.js` 0.2.5, `kleur` 4.1.5 | MIT | Come with Hocuspocus | ADR-026 |
 | `tslib` 2.9.1 | 0BSD | Comes with `async-mutex` | ADR-026 |
 
+## Release tools (CI only, never in the product)
+
+They build, list and sign a release in `.github/workflows/release.yml` and the CI job `release-dry-run` (spec 057). Nothing of them ends up in the binary, the packages or the image. Each is pinned by version, and each action by commit SHA.
+
+| Tool | Licence | Why | Approved |
+|---|---|---|---|
+| GoReleaser 2.20.1 (OSS), with nFPM | MIT, read from its `LICENSE.md` | Archives, `.deb` and `.rpm`, checksums | The product owner, ADR-040 |
+| cosign 3.1.4 | Apache-2.0 | Keyless Sigstore signatures of `checksums.txt` and the image | Spec 048 D7 |
+| syft 1.57.1 | Apache-2.0 | The SBOMs in SPDX and CycloneDX | Spec 048, OPS-094 |
+| `actions/attest-build-provenance` 4.2.2 | MIT | SLSA provenance through GitHub | Spec 048, OPS-094 |
+
 ## Deliberately not a dependency
 
 | Part | Decision | Why |

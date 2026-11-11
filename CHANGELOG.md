@@ -17,6 +17,16 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - `diffluence migrate` asks for a recent backup too. `diffluence migrate --without-backup` upgrades once without one and records that in the audit log
 - `scripts/restore-check.sh` restores your newest backup into a throw-away project, checks it and removes it: run it every week from a timer. The backup guide now covers pgBackRest with point-in-time recovery, and why a standby is not a backup
 - Upgrade impact: see the first line. No migration. The backup service needs nothing else; until the key exists, it logs why it makes no backup
+### Added: releases with packages, signatures and an SBOM (spec 057)
+- **Packages.** A release now comes as archives and as `.deb` and `.rpm` packages for Linux amd64 and arm64. They have the sandboxed systemd unit and the `diffluence` user, and never start the service on a first install. Removing a package keeps the data. `docs/operations/install.md` has the steps
+- **Signatures and provenance.** Every file of a release is listed in `checksums.txt`, signed with Sigstore by the release workflow, without a long-lived key, and has SLSA provenance from GitHub. The image on `ghcr.io` is signed and attested the same way
+- **SBOM.** Each release lists its parts in SPDX and CycloneDX: per binary, for the source with the npm packages, and per image
+- **Reproducibility.** CI checks on every push to `main` that two builds of the binary, the web assets, the archives and the packages are the same byte for byte
+- **Base images.** The build and runtime images in `Dockerfile` are pinned by digest
+- **Support policy.** From 1.0 only the newest release line is supported, a security fix ships within days, and an installation up to six months old upgrades in one step (`SECURITY.md`)
+- New release tools, only in the release workflow and CI, never in the product: GoReleaser 2.20.1 (MIT), cosign 3.1.4 and syft 1.57.1 (Apache-2.0)
+- Upgrade impact: none
+
 ### Added: a configuration file, and diffluence config check (spec 056)
 - Settings can live in one YAML file named by `DIFFLUENCE_CONFIG_FILE`, beside the environment. The order is the default, then the file, then the environment, so nothing changes for an installation without a file. Unknown keys, a key written twice and a value of the wrong kind refuse the start and name the line; secrets come from paths, or from a file only its owner may read. `deploy/diffluence.example.yaml` is an example
 - `diffluence config check` checks the configuration without starting, prints each setting with the value in effect and where it came from, secrets hidden, and exits 1 when a start would be refused. It also tries the mail server, the identity provider and the publish folder; a start does the same and logs a warning, and `diffluence doctor` prints it

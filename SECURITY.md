@@ -2,7 +2,13 @@
 
 ## Supported versions
 
-Diffluence is **pre-alpha**. No version is supported before 1.0. From 1.0 on, only the latest release line receives fixes.
+Diffluence is **pre-alpha**. No version is supported before 1.0. From 1.0 on:
+
+- only the newest release line receives fixes;
+- a security fix ships as a patch of that line within days of its confirmation;
+- an installation up to six months old upgrades to the newest release in one step.
+
+Releases are signed with Sigstore and carry SLSA provenance and an SBOM; `docs/operations/install.md` says how to check them.
 
 ## Reporting a vulnerability
 

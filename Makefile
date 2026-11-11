@@ -6,7 +6,7 @@ LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
-.PHONY: all build web run test test-race fmt fmt-check vet staticcheck vuln licenses web-check collab-check mutation fuzz check clean
+.PHONY: all build web run test test-race fmt fmt-check vet staticcheck vuln licenses web-check collab-check mutation reproducible fuzz check clean
 
 all: web build
 
@@ -49,6 +49,10 @@ collab-check:
 
 web-check:
 	cd web && npx tsc --noEmit && npx eslint src e2e && npx prettier --check src e2e && npm run -s strings && npm run -s design && npx vitest run
+
+# Do two builds of the binary and the web assets match byte for byte? (spec 057)
+reproducible:
+	bash scripts/reproducible.sh
 
 # Do the tests catch real bugs? Slow, so not part of every check.
 mutation:

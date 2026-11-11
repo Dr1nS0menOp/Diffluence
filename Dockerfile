@@ -1,12 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
-FROM node:22-bookworm-slim AS web
+# Base images are pinned by digest, with the tag kept for reading; Renovate moves the
+# digests (OPS-096).
+FROM node:22-bookworm-slim@sha256:18052396bf1d0c6e0a8c58181b5c1457da19409efbd5032a3f4d86974e74d13c AS web
 WORKDIR /src/web
 COPY web/package.json web/package-lock.json ./
 RUN npm ci --no-fund --no-audit
 COPY web/ ./
 RUN npx vite build
 
-FROM golang:1.26 AS build
+FROM golang:1.26@sha256:5ebd6e7dc13f9e273ed9470679eb295d8b6e7de3b6379c8a5e17a9e6c3eabd38 AS build
 WORKDIR /src
 COPY go.mod go.sum ./
 RUN go mod download
@@ -35,7 +37,7 @@ ENTRYPOINT ["bash", "/usr/local/bin/diffluence-backup"]
 CMD ["loop"]
 
 # Distroless: no shell, no package manager, runs as non-root.
-FROM gcr.io/distroless/static-debian12:nonroot
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:afa5c872c891853ca7fcf1f12c3edb23f7eeef36189728842dd51042ff57f7ab
 COPY --from=build /out/diffluence /usr/local/bin/diffluence
 COPY --from=build --chown=nonroot:nonroot /out/data /var/lib/diffluence
 ENV DIFFLUENCE_HTTP_ADDR=:8080 \

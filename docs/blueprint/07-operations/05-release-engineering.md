@@ -48,12 +48,12 @@ GoReleaser builds release archives for many platforms and, through its nFPM part
 
 ## 5.6 Recommendations
 
-- **OPS-093** · new · **High.** A release workflow with GoReleaser: archives for Linux amd64 and arm64, `.deb` and `.rpm` through nFPM with the systemd unit of `deploy/systemd/`, checksums, and the container image. Approved by the product owner on 2026-11-10. It runs only on a tag. This closes OPS-005 and is the base of OPS-032.
-- **OPS-094** · new · **High.** Each release gets an SBOM in CycloneDX and SPDX for the Go module, the web packages and the image, a keyless Sigstore signature, and a SLSA provenance attestation from GitHub. The release notes say how to verify them. This answers SEC-1006 and SEC-1015.
-- **OPS-095** · new · **Medium.** CI builds the release twice in different places and compares the results byte for byte. A difference fails the build and names the file. Start with the Go binary, then the web assets, then the packages.
-- **OPS-096** · new · **Medium.** Pin the build and runtime base images by digest and let Renovate update the digests, as for actions.
-- **OPS-097** · new · **Low.** Dark features: a small list of named toggles in configuration (chapter 6), each with an owner and an issue for its removal, read once at start. No toggle service and no dependency.
-- **OPS-098** · new · **Low.** Write the support policy in `SECURITY.md` and `release.md`: the newest line is supported, a security fix ships as a patch of that line within days, and an installation up to six months old upgrades in one step.
+- **OPS-093** · built (spec 057; the release workflow first runs on the first tag) · **High.** A release workflow with GoReleaser: archives for Linux amd64 and arm64, `.deb` and `.rpm` through nFPM with the systemd unit of `deploy/systemd/`, checksums, and the container image. Approved by the product owner on 2026-11-10. It runs only on a tag. This closes OPS-005 and is the base of OPS-032.
+- **OPS-094** · partly (spec 057: SBOMs built and proven; signing and provenance written, proven only by the first tagged release) · **High.** Each release gets an SBOM in CycloneDX and SPDX for the Go module, the web packages and the image, a keyless Sigstore signature, and a SLSA provenance attestation from GitHub. The release notes say how to verify them. This answers SEC-1006 and SEC-1015.
+- **OPS-095** · built (spec 057: binary, web assets, archives and `.deb` and `.rpm`; SBOMs carry a time and an id by design) · **Medium.** CI builds the release twice in different places and compares the results byte for byte. A difference fails the build and names the file. Start with the Go binary, then the web assets, then the packages.
+- **OPS-096** · partly (spec 057: the three base images of `Dockerfile`; the images of `compose.yaml` and the backup stage still use tags) · **Medium.** Pin the build and runtime base images by digest and let Renovate update the digests, as for actions.
+- **OPS-097** · partly (spec 057: the rule is in `release.md`; no feature ships dark, so no toggle exists) · **Low.** Dark features: a small list of named toggles in configuration (chapter 6), each with an owner and an issue for its removal, read once at start. No toggle service and no dependency.
+- **OPS-098** · built (spec 057) · **Low.** Write the support policy in `SECURITY.md` and `release.md`: the newest line is supported, a security fix ships as a patch of that line within days, and an installation up to six months old upgrades in one step.
 
 ## Sources
 

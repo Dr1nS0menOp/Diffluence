@@ -1,0 +1,164 @@
+# SPDX-License-Identifier: Apache-2.0
+# How a release is built (spec 057). Run only by .github/workflows/release.yml on a tag, and
+# as a dry run in CI. The web assets are built before GoReleaser runs, because the binary
+# embeds them.
+version: 2
+
+project_name: diffluence
+
+before:
+  hooks:
+    # The package unit is the unit of deploy/systemd with the path a package uses: one unit
+    # to keep (spec 057, D2).
+    - mkdir -p build/package
+    - sh -c "sed 's#/usr/local/bin/diffluence#/usr/bin/diffluence#' deploy/systemd/diffluence.service > build/package/diffluence.service"
+
+builds:
+  - id: diffluence
+    main: ./cmd/diffluence
+    binary: diffluence
+    env:
+      - CGO_ENABLED=0
+    goos: [linux]
+    goarch: [amd64, arm64]
+    flags: [-trimpath]
+    # The same values as the Makefile: the version with a v, and the date of the commit, so
+    # the console's warning about an old release reads the commit, not the build (spec 051).
+    ldflags:
+      - -s -w
+      - -X github.com/diffluence/diffluence/internal/version.Version=v{{ .Version }}
+      - -X github.com/diffluence/diffluence/internal/version.Date={{ slice .CommitDate 0 10 }}
+    # Files carry the time of the commit, never of the build, so two builds are the same.
+    mod_timestamp: "{{ .CommitTimestamp }}"
+
+archives:
+  - id: diffluence
+    formats: [tar.gz]
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - src: LICENSE
+        info: &fileinfo
+          mtime: "{{ .CommitDate }}"
+      - src: NOTICE
+        info: *fileinfo
+      - src: README.md
+        info: *fileinfo
+      - src: CHANGELOG.md
+        info: *fileinfo
+      - src: deploy/systemd/diffluence.service
+        dst: deploy/systemd/diffluence.service
+        info: *fileinfo
+      - src: deploy/install-lxc.sh
+        dst: deploy/install-lxc.sh
+        info: *fileinfo
+      - src: deploy/diffluence.example.yaml
+        dst: deploy/diffluence.example.yaml
+        info: *fileinfo
+
+nfpms:
+  - id: packages
+    package_name: diffluence
+    file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
+    formats: [deb, rpm]
+    vendor: Diffluence
+    homepage: https://github.com/Dr1nS0menOp/Diffluence
+    maintainer: Diffluence <DiffluenceCreator@protonmail.com>
+    description: |-
+      A self-hosted wiki for teams.
+      Pages, spaces, permissions, search and an audit log, on PostgreSQL.
+    license: Apache-2.0
+    section: web
+    priority: optional
+    bindir: /usr/bin
+    mtime: "{{ .CommitDate }}"
+    recommends:
+      - postgresql
+    contents:
+      - src: build/package/diffluence.service
+        dst: /usr/lib/systemd/system/diffluence.service
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: deploy/diffluence.example.yaml
+        dst: /usr/share/doc/diffluence/diffluence.example.yaml
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: LICENSE
+        dst: /usr/share/doc/diffluence/LICENSE
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+      - src: NOTICE
+        dst: /usr/share/doc/diffluence/NOTICE
+        file_info:
+          mode: 0644
+          mtime: "{{ .CommitDate }}"
+    # An RPM records the machine that built it; a fixed name keeps two builds the same.
+    rpm:
+      buildhost: diffluence-release
+    scripts:
+      postinstall: deploy/packaging/postinstall.sh
+      preremove: deploy/packaging/preremove.sh
+      postremove: deploy/packaging/postremove.sh
+
+checksum:
+  name_template: checksums.txt
+  algorithm: sha256
+
+# One SBOM per binary, from the module list Go writes into it, and one for the source,
+# from go.mod and the npm lock files. Both in SPDX and CycloneDX (OPS-094). GoReleaser runs
+# syft inside dist/, so the source is the folder above it.
+sboms:
+  - id: binary-spdx
+    artifacts: binary
+    documents: ["{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.spdx.json"]
+    args: ["$artifact", "--output", "spdx-json=$document"]
+  - id: binary-cyclonedx
+    artifacts: binary
+    documents: ["{{ .Binary }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}.cdx.json"]
+    args: ["$artifact", "--output", "cyclonedx-json=$document"]
+  - id: source-spdx
+    artifacts: any
+    documents: ["{{ .ProjectName }}_{{ .Version }}_source.spdx.json"]
+    args: ["dir:..", "--exclude", "./dist/**", "--exclude", "./build/**", "--exclude", "./web/node_modules/**", "--exclude", "./collab/node_modules/**", "--output", "spdx-json=$document"]
+  - id: source-cyclonedx
+    artifacts: any
+    documents: ["{{ .ProjectName }}_{{ .Version }}_source.cdx.json"]
+    args: ["dir:..", "--exclude", "./dist/**", "--exclude", "./build/**", "--exclude", "./web/node_modules/**", "--exclude", "./collab/node_modules/**", "--output", "cyclonedx-json=$document"]
+
+# Keyless: cosign gets a short-lived certificate for the release workflow through GitHub's
+# OIDC token, and the signature is logged in Rekor. Every file is in checksums.txt, so one
+# signature covers them all (spec 048 D7).
+signs:
+  - id: checksums
+    cmd: cosign
+    artifacts: checksum
+    signature: "${artifact}.sigstore.json"
+    args: ["sign-blob", "--yes", "--bundle=${signature}", "${artifact}"]
+    output: true
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-dev.{{ .ShortCommit }}"
+
+changelog:
+  disable: true
+
+release:
+  draft: true
+  prerelease: auto
+  footer: |
+    ## Verify what you downloaded
+
+    Every file is listed in `checksums.txt`, and that file is signed by the release workflow of this repository, without a long-lived key:
+
+    ```sh
+    cosign verify-blob checksums.txt \
+      --bundle checksums.txt.sigstore.json \
+      --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+      --certificate-identity "https://github.com/{{ .Env.GITHUB_REPOSITORY }}/.github/workflows/release.yml@refs/tags/{{ .Tag }}"
+    sha256sum --ignore-missing -c checksums.txt
+    gh attestation verify diffluence_{{ .Version }}_amd64.deb --repo {{ .Env.GITHUB_REPOSITORY }}
+    ```
+
+    The image `ghcr.io/{{ .Env.IMAGE_OWNER }}/diffluence:{{ .Version }}` is signed the same way: `cosign verify` with the same issuer and identity. See `docs/operations/install.md`.

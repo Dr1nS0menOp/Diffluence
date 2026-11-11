@@ -74,8 +74,8 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 - **OPS-001** · built · Docker Compose is the reference installation: one `compose.yaml` and one `.env`. The restore drill installs it from scratch every night (`scripts/restore-drill.sh`).
 - **OPS-002** · partly · A Helm chart in `deploy/helm/diffluence`. Never installed on a real cluster. Phase 3, *servers*. Medium.
 - **OPS-003** · later · A Kubernetes operator, only if there is demand.
-- **OPS-004** · partly · LXC on Proxmox: `deploy/install-lxc.sh` and `deploy/systemd/diffluence.service`. No `.deb` and no Ansible role, and never run on a real host. *Servers*. Medium.
-- **OPS-005** · new · `.deb` and `.rpm` packages built by GoReleaser. A new build tool, so a decision of the product owner. Low.
+- **OPS-004** · partly · LXC on Proxmox: `deploy/install-lxc.sh` and `deploy/systemd/diffluence.service`. No Ansible role (the `.deb` and `.rpm` of OPS-005 are a second route), and never run on a real host. *Servers*. Medium.
+- **OPS-005** · built · `.deb` and `.rpm` packages for amd64 and arm64, built by GoReleaser through nFPM on a tag (spec 057, OPS-093), with the sandboxed systemd unit, the `diffluence` user and the folders. Installed in clean Debian and Fedora containers by the CI job `release-dry-run`. Files of the release; an `apt` or `dnf` repository is later.
 - **OPS-006** · built · Configuration from environment variables and one YAML file, `DIFFLUENCE_CONFIG_FILE` (spec 056, OPS-099).
 - **OPS-007** · built · Secrets come from files: every variable has a `_FILE` variant, and setting both is refused (`TestFileVariant`, `TestBothVariantsIsAnError`). No command takes a secret as an argument: `user create-admin` reads the password from standard input.
 
@@ -101,7 +101,7 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 
 - **OPS-030** · built · One command for Compose: `docker compose pull && docker compose up -d`, or with `--build` from a checkout (`docs/operations/upgrade.md`).
 - **OPS-031** · partly · `helm upgrade`: the chart exists, never run on a cluster. Phase 3, *servers*. Medium.
-- **OPS-032** · new · `apt upgrade`: needs the package of OPS-005. Low.
+- **OPS-032** · partly · An upgrade is the next package: `apt install ./diffluence_<version>_amd64.deb` restarts a running service, and the checks before an upgrade decide (spec 057). `apt upgrade` itself needs a package repository, which is later. Low.
 - **OPS-033** · partly · No downtime while people work. Proven for two nodes on one database by the upgrade test in CI (OPS-036). A single Compose node restarts, which takes seconds: `upgrade.md` says so. Zero downtime on real machines behind a real load balancer: *servers*. Medium.
 - **OPS-034** · built · Expand, migrate, contract. A release only adds. Contract migrations wait until every live node knows them and the newest node has run for `DIFFLUENCE_CONTRACT_GRACE`, a day by default (spec 053), then run by themselves and are audited as `system.contract_migrated` (`TestContract…`). Every migration runs with a `lock_timeout` of 5 seconds and retries.
 - **OPS-035** · later · Big data changes moved by background jobs, with progress in the admin console. No migration has needed one yet; build it with the first that does. Medium.

@@ -51,6 +51,47 @@ sh deploy/install-lxc.sh https://wiki.example.com
 
 It installs PostgreSQL, creates the two database roles, writes `/etc/diffluence/diffluence.env` and starts a sandboxed systemd service on `127.0.0.1:8080`. Status: written to the same design as the Compose setup, but **not yet run on a real LXC container**. Try it on a scratch container first.
 
+## Packages (.deb and .rpm)
+
+Each release has `.deb` and `.rpm` packages for amd64 and arm64, beside the archives (spec 057). Check them first (see "Checking what you downloaded" below), then:
+
+```sh
+sudo apt install ./diffluence_1.2.3_amd64.deb      # Debian, Ubuntu
+sudo dnf install ./diffluence_1.2.3_amd64.rpm      # Fedora, RHEL, Rocky, Alma
+```
+
+The package puts the binary in `/usr/bin/diffluence` and the sandboxed systemd unit in `/usr/lib/systemd/system/`. The unit sets `DIFFLUENCE_DATA_DIR=/var/lib/diffluence`, the only folder the sandbox lets it write, and `DIFFLUENCE_HTTP_ADDR=127.0.0.1:8080` for a reverse proxy on the same machine. It creates the system user `diffluence`, `/var/lib/diffluence` (0700) and `/etc/diffluence` (0750, `root:diffluence`). It does **not** start the service, because it has no database yet:
+
+1. Create the database and its two roles, as `deploy/install-lxc.sh` does, on this machine or elsewhere.
+2. Write `/etc/diffluence/diffluence.env` with `DIFFLUENCE_PUBLIC_URL`, `DIFFLUENCE_DATABASE_URL` and `DIFFLUENCE_MIGRATE_DATABASE_URL`, or with only `DIFFLUENCE_CONFIG_FILE=/etc/diffluence/diffluence.yaml` and the settings in that file (`/usr/share/doc/diffluence/diffluence.example.yaml`). Make it `chmod 640` and `chgrp diffluence`.
+3. `sudo -u diffluence sh -c 'set -a; . /etc/diffluence/diffluence.env; diffluence config check'`, then `sudo systemctl enable --now diffluence`.
+
+An upgrade is the next package: `apt install ./diffluence_1.2.4_amd64.deb`. It restarts a service that runs, and the checks before an upgrade then decide whether it may migrate (spec 054). Removing the package stops the service but keeps `/var/lib/diffluence`, `/etc/diffluence` and the user: a wiki is never removed with its package. Remove them by hand when you mean to. There is no `apt` or `dnf` repository yet; a package is a file of the release.
+
+## Checking what you downloaded
+
+Every file of a release is listed in `checksums.txt`. That file is signed by the release workflow of this repository with Sigstore, without a key the project could lose (spec 057). With [cosign](https://docs.sigstore.dev/cosign/system_config/installation/):
+
+```sh
+cosign verify-blob checksums.txt \
+  --bundle checksums.txt.sigstore.json \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/Dr1nS0menOp/Diffluence/.github/workflows/release.yml@refs/tags/v1.2.3"
+sha256sum --ignore-missing -c checksums.txt
+```
+
+The first command says `Verified OK` only for a signature made by that workflow on that tag. The second then checks each file you downloaded against the list.
+
+GitHub also records where each file was built, as SLSA provenance. With the GitHub CLI: `gh attestation verify diffluence_1.2.3_amd64.deb --repo Dr1nS0menOp/Diffluence`. The image is signed and attested the same way:
+
+```sh
+cosign verify ghcr.io/dr1ns0menop/diffluence:v1.2.3 \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+  --certificate-identity "https://github.com/Dr1nS0menOp/Diffluence/.github/workflows/release.yml@refs/tags/v1.2.3"
+```
+
+Each release also lists its parts as an SBOM, in SPDX and CycloneDX: one per binary (the Go modules), one for the source (the Go modules and the npm packages of the web app and the editing service), and one per image.
+
 ## Settings
 
 Every setting is in `.env.example`. Any variable can come from a file by adding `_FILE`, for Docker and Kubernetes secrets. Runtime options (trash retention, upload limit) are in the admin console.
@@ -176,7 +217,7 @@ Anonymising does not reach backups. After a restore, anonymise the same people a
 
 ## New releases
 
-Diffluence never calls home. Follow the release feed of the project to hear about updates.
+Diffluence never calls home. Follow the release feed of the project to hear about updates. The console warns when the release that runs is more than 60 days old, from the date of its commit. From 1.0, only the newest release line is supported, and an installation up to six months old upgrades to the newest release in one step ([SECURITY.md](../../SECURITY.md)).
 
 ## Editing together
 

@@ -10,6 +10,11 @@ Wants=network-online.target
 Type=exec
 User=diffluence
 Group=diffluence
+# Defaults that fit the sandbox below: the data, the key and the queue's store live in the
+# one folder the service may write, and it listens for a reverse proxy on this machine.
+# The environment file is read after these, so it may change them.
+Environment=DIFFLUENCE_DATA_DIR=/var/lib/diffluence
+Environment=DIFFLUENCE_HTTP_ADDR=127.0.0.1:8080
 EnvironmentFile=/etc/diffluence/diffluence.env
 ExecStart=/usr/local/bin/diffluence serve
 Restart=on-failure
