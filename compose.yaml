@@ -87,6 +87,38 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
 
+  # Backups every 4 hours, encrypted with backup-key/backup.key, which scripts/setup-secrets.sh
+  # makes (spec 054). Each is noted, so an upgrade finds a recent backup (ADR-040). Copy
+  # ./backups off this machine, and keep the key away from that copy: see
+  # docs/operations/backup-restore.md. One backup now: docker compose run --rm backup once
+  backup:
+    image: ${DIFFLUENCE_BACKUP_IMAGE:-diffluence-backup:local}
+    build:
+      context: .
+      target: backup
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DIFFLUENCE_BACKUP_INTERVAL: ${DIFFLUENCE_BACKUP_INTERVAL:-4h}
+      # How many backups to keep: 42 is a week at one every 4 hours.
+      DIFFLUENCE_BACKUP_KEEP: ${DIFFLUENCE_BACKUP_KEEP:-42}
+      DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
+    secrets: [database_url, migrate_database_url]
+    volumes:
+      - data:/data:ro
+      - ./secrets:/secrets:ro
+      - ${DIFFLUENCE_BACKUP_DIR:-./backups}:/backups
+      - ${DIFFLUENCE_BACKUP_KEY_DIR:-./backup-key}:/key:ro
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    # Root, but only allowed past file modes, to read master.key of the app (mode 600), and
+    # to give each backup to the owner of the backup folder.
+    cap_drop: [ALL]
+    cap_add: [DAC_OVERRIDE, CHOWN]
+
   # The helper for PDF files and office previews. It reads hostile files, so it can only
   # reach the app: no database, no internet (ARC-074).
   # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000 and a long

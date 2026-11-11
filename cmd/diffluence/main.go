@@ -11,6 +11,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"os"
@@ -34,7 +35,9 @@ const usage = `Usage: diffluence <command> [flags]
 
 Commands:
   serve                     run the server (role from DIFFLUENCE_ROLE)
-  migrate [--contract]      apply pending migrations
+  migrate [--contract] [--without-backup]
+                            apply pending migrations; --without-backup upgrades once
+                            without a recent backup and records that in the audit log
   user create-admin         create a local administrator (password on stdin)
   setup-code                print a new one-time code for the setup screen of a new install
   audit verify [--witness FILE]
@@ -157,7 +160,9 @@ func cmdHealthcheck(ctx context.Context) error {
 	}
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("not ready: status %d", resp.StatusCode)
+		// The body says why, such as a node waiting before an upgrade; docker inspect shows it.
+		body, _ := io.ReadAll(io.LimitReader(resp.Body, 512))
+		return fmt.Errorf("not ready: status %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 	return nil
 }
@@ -175,17 +180,58 @@ func cmdServe(ctx context.Context) error {
 			log.Warn("a setting does not work yet", "setting", "DIFFLUENCE_"+w.Setting, "reason", w.Message)
 		}
 	}()
-	a, err := app.New(ctx, cfg, log)
-	if err != nil {
-		return err
+	// SIGHUP asks a waiting node to check again at once; backup.sh sends it after a backup.
+	hup := make(chan os.Signal, 1)
+	signal.Notify(hup, syscall.SIGHUP)
+	defer signal.Stop(hup)
+	for {
+		a, err := app.New(ctx, cfg, log)
+		var refused *app.UpgradeRefused
+		if errors.As(err, &refused) {
+			if err := waitBeforeUpgrade(ctx, cfg.HTTPAddr, refused, hup, log); err != nil {
+				return stoppedCleanly(err)
+			}
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		defer a.Close()
+		return a.Run(ctx)
 	}
-	defer a.Close()
-	return a.Run(ctx)
+}
+
+// waitBeforeUpgrade serves the waiting page until a minute passes or SIGHUP arrives.
+func waitBeforeUpgrade(ctx context.Context, addr string, refused *app.UpgradeRefused, hup <-chan os.Signal, log *slog.Logger) error {
+	retry := make(chan struct{})
+	timer := time.NewTimer(app.RetryUpgradeEvery)
+	defer timer.Stop()
+	waitCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	go func() {
+		select {
+		case <-timer.C:
+		case <-hup:
+		case <-waitCtx.Done():
+			return
+		}
+		close(retry)
+	}()
+	return app.WaitWhileRefused(ctx, addr, refused, retry, log)
+}
+
+// stoppedCleanly turns the end of a waiting node by a stop signal into a clean exit.
+func stoppedCleanly(err error) error {
+	if errors.Is(err, context.Canceled) {
+		return nil
+	}
+	return err
 }
 
 func cmdMigrate(ctx context.Context, args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("migrate", flag.ContinueOnError)
 	contract := fs.Bool("contract", false, "also apply contract migrations (only after every node runs this version)")
+	withoutBackup := fs.Bool("without-backup", false, "upgrade this once without a recent backup; the audit log records it")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -197,12 +243,35 @@ func cmdMigrate(ctx context.Context, args []string, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	rep, err := migrateDatabase(ctx, cfg, migs, db.Options{IncludeContract: *contract, Log: app.NewLogger(cfg.LogLevel)})
+	log := app.NewLogger(cfg.LogLevel)
+	override := app.BackupRequired
+	if *withoutBackup {
+		override = app.WithoutBackupOnce
+	}
+	if err := checkBackupBeforeMigrating(ctx, cfg, migs, override, log); err != nil {
+		return err
+	}
+	rep, err := migrateDatabase(ctx, cfg, migs, db.Options{IncludeContract: *contract, Log: log})
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "applied %d migration(s); %d contract migration(s) pending\n", len(rep.Applied), len(rep.PendingContract))
 	return nil
+}
+
+// checkBackupBeforeMigrating runs the backup part of the checks before an upgrade as the
+// owner of the tables, the role that migrates.
+func checkBackupBeforeMigrating(ctx context.Context, cfg config.Config, migs []db.Migration, override app.BackupOverride, log *slog.Logger) error {
+	url := cfg.DatabaseURL
+	if cfg.MigrateDatabaseURL != "" {
+		url = cfg.MigrateDatabaseURL
+	}
+	pool, err := db.Open(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	return app.CheckBackupBeforeMigrating(ctx, pool, migs, cfg.UpgradeBackupMaxAge, override, log)
 }
 
 // migrateDatabase applies migrations, as the owner of the tables when one is

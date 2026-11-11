@@ -16,24 +16,78 @@ A backup holds all of these, each encrypted with AES-256. The queue data (`nats/
 
 ## The backup key
 
-Make it once, and keep it away from the backups:
+`sh scripts/setup-secrets.sh` makes it as `backup-key/backup.key`, beside `compose.yaml` but outside `secrets/`, which every backup holds. On an installation from before spec 054, run the script once more: it makes what is missing and overwrites nothing. To make a key by hand:
 
 ```sh
 head -c 32 /dev/urandom | base64 >/root/diffluence-backup.key
 chmod 600 /root/diffluence-backup.key
 ```
 
-**Without this key a backup cannot be restored.** Keep a second copy in a password safe or on paper. Whoever has both the key and a backup can read everything, including TOTP seeds, so never store them together. The script refuses a key inside the backup folder, and refuses to run without one.
+**Without this key a backup cannot be restored.** Keep a second copy in a password safe or on paper. Whoever has both the key and a backup can read everything, including TOTP seeds, so never store them together. The backup service and the script refuse a key inside the backup folder, and refuse to run without one.
 
-## Docker Compose
+## Docker Compose: the backup service
+
+`compose.yaml` runs a backup service by default (spec 054). Every 4 hours it backs up into `./backups`, keeps the newest 42 (a week), and notes each one, so an upgrade always finds a recent backup.
+
+| Setting in `.env` | Default | Meaning |
+|---|---|---|
+| `DIFFLUENCE_BACKUP_INTERVAL` | `4h` | How often: `30m`, `4h`, `1d` |
+| `DIFFLUENCE_BACKUP_KEEP` | `42` | How many backups stay in the folder |
+| `DIFFLUENCE_BACKUP_DIR` | `./backups` | Where backups are written |
+| `DIFFLUENCE_BACKUP_KEY_DIR` | `./backup-key` | The folder that holds `backup.key` |
+
+```sh
+docker compose run --rm backup once     # one backup now
+docker compose logs backup              # what it did, and why it did not
+```
+
+The service starts its first backup once Diffluence has made its tables, and then whenever the newest backup is older than the interval. Without a key it logs why on every interval and makes nothing; after adding the key, `docker compose restart backup` tries again at once. A backup is written under a name that starts with `.partial-` and renamed only when every part and `SHA256SUMS` are in, so a backup that died halfway is never picked for a restore. Each backup belongs to the owner of the backup folder, so that user can restore it.
+
+**Copy `./backups` off this machine**, every day: to another disk, another building, or S3-compatible storage. A backup on the same disk is gone with the disk. Copy the key to a different place than the backups.
+
+## Docker Compose: the script
+
+Where backups are run from cron or another scheduler instead, the script does the same:
 
 ```sh
 bash scripts/backup.sh /backups /root/diffluence-backup.key   # run it from cron, then copy the folder off this machine
 ```
 
-The script needs `gpg`. Everything streams through it, so plain data never reaches the disk. It dumps the database first and the files second, so a backup can hold a file no page uses, but no page that points at a missing file. Every backup has a `SHA256SUMS` file, which can be checked without the key. Once every part is written, it notes the backup in the audit log as `system.backup_noted`, which the checks before an upgrade read ([upgrade.md](upgrade.md)).
+The script needs `gpg`. Everything streams through it, so plain data never reaches the disk. It dumps the database first and the files second, so a backup can hold a file no page uses, but no page that points at a missing file. Every backup has a `SHA256SUMS` file, which can be checked without the key. Once every part is written, it notes the backup in the audit log as `system.backup_noted`, which the checks before an upgrade read ([upgrade.md](upgrade.md)). When the node is not running, it notes the backup through a one-off container. When the node waits before an upgrade, it asks it to check again at once.
 
-A daily run gives you at most a day of loss. To reach the 4-hour goal, run it every few hours, or use pgBackRest with WAL archiving for a loss of minutes, which is the advice for larger installations. pgBackRest then has its own encryption, which you must turn on.
+A backup every 4 hours loses at most 4 hours of work. For a loss of minutes, use pgBackRest with WAL archiving, below.
+
+## A standby is not a backup
+
+A standby server, RAID or a snapshot on the same storage protects against a broken disk, not against a mistake: a deleted page is deleted on the standby too, within a second. Keep the **3-2-1 rule**: three copies of the data, on two kinds of storage, one of them away from the building. For a small installation that means: the database, the backups in `./backups` on a second disk, and a copy in another place, encrypted, which the backup files already are.
+
+## pgBackRest and point-in-time recovery
+
+For a loss of minutes, or to go back to a chosen moment before a mistake, PostgreSQL archives its write-ahead log continuously. pgBackRest (MIT) is the common tool for it: parallel, compressed, incremental, checked, encrypted, and able to send to S3-compatible storage. Diffluence itself needs nothing for it; it runs beside PostgreSQL. It is not part of `compose.yaml`, because it changes the PostgreSQL image, and has not been proven here yet on a real server (OPS-079).
+
+The outline, from the pgBackRest user guide:
+
+```ini
+# /etc/pgbackrest/pgbackrest.conf
+[global]
+repo1-path=/var/lib/pgbackrest
+repo1-cipher-type=aes-256-cbc
+repo1-cipher-pass=<a long random secret, kept like the backup key>
+repo1-retention-full=2
+start-fast=y
+
+[diffluence]
+pg1-path=/var/lib/postgresql/16/main
+```
+
+```ini
+# postgresql.conf
+archive_mode = on
+archive_command = 'pgbackrest --stanza=diffluence archive-push %p'
+wal_level = replica
+```
+
+Then `pgbackrest --stanza=diffluence stanza-create`, a full backup weekly and a differential one daily from a timer, and `pgbackrest --stanza=diffluence --type=time "--target=2026-11-11 09:30:00" restore` to go back to a moment. Two alerts are not optional: one on failed archiving (`pg_stat_archiver.failed_count` rising), and one on the size of `pg_wal`. When archiving fails, PostgreSQL keeps every WAL file until the disk is full and the database stops. Keep `backup-key`, `master.key` and `secrets/` in the backups of the backup service as well: pgBackRest saves the database only.
 
 Backups from before this format were plain folders. Restore those with the `restore.sh` of that version.
 
@@ -88,12 +142,44 @@ What this does not do yet: it keeps the root from which the audit signing key an
 3. **Run `diffluence key check --deep`.** If everything opens, start Diffluence. If files written after that backup do not open, restore the whole backup as above: the key and the data must belong together.
 4. **If no copy of the key exists, the stored files and authenticator seeds are lost.** Pages and their history in the database stay readable. Restore the files from a backup whose key you do have, ask everyone to set up their authenticator app again, and make new secrets for webhooks.
 
+## Check every week that your backups restore
+
+A backup that was never restored is a hope. The best-known outages of the last decade lost data because backups had silently stopped working. Restore your own newest backup every week, on the same machine, without touching the live installation:
+
+```sh
+bash scripts/restore-check.sh ./backups ./backup-key/backup.key
+```
+
+It restores the newest backup into a throw-away Compose project on port 18097 (`DIFFLUENCE_RESTORE_CHECK_PORT`), verifies the audit chain and that every key opens, counts pages, files and people, prints how long it took, and removes the project. It exits with an error when anything fails. Run it from a timer that tells a person when it fails, for example with systemd:
+
+```ini
+# /etc/systemd/system/diffluence-restore-check.service
+[Unit]
+Description=Restore the newest Diffluence backup into a throw-away project
+OnFailure=notify-admin@%n.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/diffluence
+ExecStart=/usr/bin/bash scripts/restore-check.sh ./backups ./backup-key/backup.key
+
+# /etc/systemd/system/diffluence-restore-check.timer
+[Timer]
+OnCalendar=Sun 03:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+```
+
+With cron, `MAILTO` sends the output of a failed run: `0 3 * * 0 cd /opt/diffluence && bash scripts/restore-check.sh ./backups ./backup-key/backup.key >/dev/null`. Leave room on the disk for a second copy of the database and files while it runs.
+
 ## Practise it
 
 ```sh
 bash scripts/restore-drill.sh
 ```
 
-This installs Diffluence, adds content, starts replacing `master.key`, proves that a backup is refused without a key and with the key beside it, makes a backup halfway through the key change and proves it was noted once, destroys everything, proves that a wrong key does not open it, restores on a clean installation, and proves that the page, attachment, search, login, audit chain and database role separation all came back. Then it finishes the key change on the restored installation, and proves the file still opens with only the new key. It uses its own compose projects and removes them afterwards. CI runs it every night.
+This installs Diffluence, adds content, starts replacing `master.key`, proves that a backup is refused without a key and with the key beside it, makes a backup halfway through the key change and proves it was noted once, and makes one more while the node is stopped and proves it was noted too. It runs the backup service once, proves it refuses without a key, and that its backup is complete and encrypted. It destroys everything, proves that a wrong key does not open the service's backup, restores it on a clean installation, and proves that the page, attachment, search, login, audit chain and database role separation all came back. Then it finishes the key change on the restored installation, proves the file still opens with only the new key, and runs the weekly restore check on the service's backups. It uses its own compose projects and removes them afterwards. CI runs it every night.
 
 Last run on 2026-11-06: passed in 29 seconds on a small data set. That says the procedure works, not how long 100 GB takes. Time it on your own data before relying on the 4-hour goal.

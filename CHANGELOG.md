@@ -3,6 +3,14 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: backups that run by themselves, and an upgrade that waits instead of looping (spec 054)
+- **Upgrade impact first: run `sh scripts/setup-secrets.sh` once more after you update `compose.yaml`.** It makes the backup key `backup-key/backup.key` and the folder `./backups`, and overwrites nothing. Keep a copy of the key in a password safe, and copy `./backups` off the machine
+- `compose.yaml` runs a backup service: every 4 hours a backup of the database, files, keys and secrets, encrypted, into `./backups`, keeping the newest 42, and noted for the checks before an upgrade. `docker compose run --rm backup once` makes one now. Set `DIFFLUENCE_BACKUP_INTERVAL`, `DIFFLUENCE_BACKUP_KEEP`, `DIFFLUENCE_BACKUP_DIR` and `DIFFLUENCE_BACKUP_KEY_DIR` to change it
+- An upgrade that may not start no longer exits and restarts in a loop. The node waits: every page says why and how to go on, `/readyz` answers not ready, and it migrates by itself within a minute once the cause is fixed. `scripts/backup.sh` makes it check at once
+- The first upgrade of an installation that never noted a backup goes on once, with a warning and an entry in the audit log, instead of stopping (ADR-042). From the next upgrade on, a backup of the last 24 hours is asked for
+- `diffluence migrate` asks for a recent backup too. `diffluence migrate --without-backup` upgrades once without one and records that in the audit log
+- `scripts/restore-check.sh` restores your newest backup into a throw-away project, checks it and removes it: run it every week from a timer. The backup guide now covers pgBackRest with point-in-time recovery, and why a standby is not a backup
+- Upgrade impact: see the first line. No migration. The backup service needs nothing else; until the key exists, it logs why it makes no backup
 ### Added: a configuration file, and diffluence config check (spec 056)
 - Settings can live in one YAML file named by `DIFFLUENCE_CONFIG_FILE`, beside the environment. The order is the default, then the file, then the environment, so nothing changes for an installation without a file. Unknown keys, a key written twice and a value of the wrong kind refuse the start and name the line; secrets come from paths, or from a file only its owner may read. `deploy/diffluence.example.yaml` is an example
 - `diffluence config check` checks the configuration without starting, prints each setting with the value in effect and where it came from, secrets hidden, and exits 1 when a start would be refused. It also tries the mail server, the identity provider and the publish folder; a start does the same and logs a warning, and `diffluence doctor` prints it

@@ -116,11 +116,11 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 
 ### Backup and restore
 
-- **OPS-050** · partly · RPO and RTO of at most 4 hours. `scripts/backup.sh` makes an encrypted backup when the operator runs it; `backup-restore.md` says how often for 4 hours. Low.
+- **OPS-050** · partly · RPO and RTO of at most 4 hours. The backup service of `compose.yaml` backs up every 4 hours by default (OPS-080, spec 054); the restore time of 4 hours for a large installation is not measured (OPS-055). Low.
 - **OPS-051** · new · pgBackRest with WAL archiving. Advised in `backup-restore.md`, not set up by anything. *Servers*. Medium.
 - **OPS-052** · partly · Stored files are in every backup, encrypted. Versioning and replication to a second location need the S3 store of OPS-014. Medium.
 - **OPS-053** · partly · Configuration and keys: `secrets/` and `master.key` are in every backup, each encrypted, and the backup key must live apart from the backups (the script refuses otherwise). Keeping `master.key` in another place than the data is left to the operator, as `backup-restore.md` explains. Low.
-- **OPS-054** · partly · The restore test runs every night in CI on a fresh installation and checks the page, the attachment, search, login, the audit chain and role separation; a failure fails the run. A weekly restore of a real installation into a scratch environment, with an alert, is not built. *Servers*. Medium.
+- **OPS-054** · built · The restore test runs every night in CI on a fresh installation and checks the page, the attachment, search, login, the audit chain and role separation; a failure fails the run. The weekly restore of a real installation is `scripts/restore-check.sh` from a timer with an alert (OPS-081, spec 054). Medium.
 - **OPS-055** · partly · The runbook is `backup-restore.md`, and the drill times itself (29 seconds on a small set). The 4 hours for 100 GB were never measured. *Servers*. Medium.
 
 ### Releases
@@ -201,6 +201,14 @@ Built since the study (spec 053, wave 2 of spec 048):
 - **OPS-074** · built · Every migration runs with `statement_timeout` of a minute, or the duration its header gives (`TestAMigrationThatRunsTooLongIsStoppedAndRolledBack`, `TestTheHeaderGivesAMigrationMoreTime`).
 - **OPS-075** · built · [`docs/operations/version-skew.md`](../operations/version-skew.md): what may differ by how much and for how long, and the test that proves each line. Contract migrations wait a day by default (`DIFFLUENCE_CONTRACT_GRACE`, spec 048 D1), and a contract migration only removes what the previous release already stopped using (D2, in `migrate.go` and the release checklist).
 - **OPS-076** · later · The six-month jump (D3) is written in the policy; its test waits for a release that old, from 1.0.
+
+Built since the study (spec 054, wave 3 of spec 048):
+
+- **OPS-079** · partly · `backup-restore.md` gives the pgBackRest configuration for WAL archiving, encrypted, with point-in-time recovery and the two alerts on archiving and WAL size. Not shipped and not run: it changes the PostgreSQL image, and the drill against it needs the test server (wave 7). This leaves OPS-051 open.
+- **OPS-080** · built · The `backup` service of `compose.yaml`, on by default: every 4 hours (`DIFFLUENCE_BACKUP_INTERVAL`), keeping 42, written under a partial name and renamed when complete, noted each time, refused without a key or with the key in the backup folder. The restore drill runs it, checks the refusal without a key, and restores its backup (`scripts/restore-drill.sh`).
+- **OPS-081** · built · `scripts/restore-check.sh` restores the newest backup into a throw-away project, checks the audit chain and the keys, counts pages, files and people, prints the time, removes the project and exits non-zero on failure; the guide gives a systemd timer with `OnFailure=` and a cron line. The drill runs it, and checks that it fails without a backup.
+- **OPS-082** · built · `backup-restore.md` says that a standby, RAID or a snapshot is not a backup, and what 3-2-1 asks of a small installation.
+- Also (ADR-042): a node whose upgrade is refused waits and shows why instead of restarting in a loop (`TestAWaitingNodeIsAliveButNotReady`, `TestTheWaitingPageNamesTheFixButNoDetails`, `TestAWaitingNodeTriesAgainOnSIGHUP`); the first upgrade without any backup goes on once, on the record (`TestTheFirstUpgradeWithoutAnyBackupGoesOnOnceAndIsRecorded`); `diffluence migrate` asks for the backup and `--without-backup` goes on once, recorded (`TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo`); a backup is noted while the node is down (the drill).
 
 Built since the study (spec 056, wave 4 of spec 048):
 

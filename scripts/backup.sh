@@ -34,7 +34,7 @@ encrypt_to() {
 docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc | encrypt_to database.dump.gpg
 
 # Stored files and the encryption key, read through a throw-away container.
-volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -q diffluence)")
+volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq diffluence)")
 docker run --rm -v "$volume:/data:ro" busybox tar -C /data -czf - --exclude=./master.key --exclude=./master.key.next \
   --exclude=./master.key.previous --exclude=./nats . | encrypt_to files.tar.gz.gpg
 docker run --rm -v "$volume:/data:ro" busybox cat /data/master.key | encrypt_to master.key.gpg
@@ -51,10 +51,12 @@ tar -C secrets -cf - . | encrypt_to secrets.tar.gpg
 (cd "$dir" && sha256sum -- * >SHA256SUMS)
 echo "backup written to $dir"
 # Only now is the backup complete. The checks before an upgrade read this note
-# (docs/operations/upgrade.md). A node that refuses to upgrade without a backup keeps
-# restarting, so the note cannot wait for it: then a one-off container writes it.
+# (docs/operations/upgrade.md). An older release that refuses to upgrade without a backup
+# keeps restarting, so the note cannot wait for it: then a one-off container writes it.
+# -a: a stopped node is listed too, and its volume is still the one to back up.
+node=$(docker compose ps -aq diffluence)
 note_backup() {
-  if [ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$(docker compose ps -q diffluence)" 2>/dev/null)" = "true false" ]; then
+  if [ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$node" 2>/dev/null)" = "true false" ]; then
     docker compose exec -T diffluence diffluence backup note
   else
     # The image's entrypoint is the diffluence binary, so run takes only its arguments.
@@ -64,5 +66,15 @@ note_backup() {
 if ! note_backup >/dev/null; then
   echo "the backup is complete, but noting it in Diffluence failed: an upgrade that asks for a recent backup will refuse" >&2
   exit 1
+fi
+# A node waiting before an upgrade is running but not healthy. SIGHUP makes it check again
+# now instead of within the minute (spec 054). A healthy node is left alone: a release
+# from before spec 054 would stop on SIGHUP.
+if [ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$node" 2>/dev/null)" = unhealthy ]; then
+  if docker compose kill -s HUP diffluence >/dev/null 2>&1; then
+    echo "asked the waiting node to check again"
+  else
+    echo "could not signal the node; it checks again within a minute" >&2
+  fi
 fi
 echo "keep $key away from the backups: without it they cannot be restored, and with them it opens everything."

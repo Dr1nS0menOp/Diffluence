@@ -8,6 +8,8 @@ coverage.*
 node_modules/
 .DS_Store
 /secrets/
+/backups/
+/backup-key/
 /internal/webui/dist/*
 !/internal/webui/dist/.placeholder
 /web/test-results/

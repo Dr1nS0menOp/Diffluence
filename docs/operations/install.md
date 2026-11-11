@@ -118,7 +118,7 @@ With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MAST
 
 ## Backups before an upgrade
 
-Make backups from the first day with `scripts/backup.sh` ([backup and restore](backup-restore.md)). **An upgrade refuses to start when no backup was noted in the last 24 hours** (ADR-040), so a forgotten backup never meets a failed migration. `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` changes the age, such as `48h`, and `off` lets an upgrade go on without a recent backup. A new installation is never refused. See [upgrade.md](upgrade.md).
+Backups run from the first day: the backup service of `compose.yaml` makes one every 4 hours into `./backups`, encrypted with `backup-key/backup.key`, which `scripts/setup-secrets.sh` made. **Copy `./backups` off this machine, and keep a copy of the key in a password safe** ([backup and restore](backup-restore.md)). Check once a week that the newest backup restores, with `scripts/restore-check.sh`. **An upgrade waits when no backup was noted in the last 24 hours** (ADR-040), so a forgotten backup never meets a failed migration; the browser then shows why and how to go on. `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` changes the age, such as `48h`. A new installation is never asked for a backup. See [upgrade.md](upgrade.md).
 
 ## Helpers and what they may reach
 

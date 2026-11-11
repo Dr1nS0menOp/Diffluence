@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"slices"
 	"strings"
 	"time"
 
@@ -29,6 +31,67 @@ const (
 	// ActionUpgradeStarted marks the point before a node migrates a database that holds
 	// data: the backup it names is the one a full restore goes back to.
 	ActionUpgradeStarted = "system.upgrade_started"
+	// ActionUpgradeWithoutBackup records an upgrade that went on without a recent backup:
+	// the first one under the backup rule, or one an operator asked for (ADR-042).
+	ActionUpgradeWithoutBackup = "system.upgrade_without_backup"
+)
+
+// The reasons recorded with ActionUpgradeWithoutBackup.
+const (
+	waiverFirstUpgrade = "first_upgrade_under_the_backup_rule"
+	waiverOperator     = "operator_override"
+)
+
+// ProblemKind names what stops an upgrade, without its details, for the waiting page.
+type ProblemKind string
+
+// The kinds of problem the checks before an upgrade find.
+const (
+	ProblemBackup    ProblemKind = "backup"
+	ProblemDisk      ProblemKind = "disk"
+	ProblemQueue     ProblemKind = "queue"
+	ProblemExtension ProblemKind = "extension"
+)
+
+// UpgradeProblem is one reason an upgrade may not start.
+type UpgradeProblem struct {
+	Kind ProblemKind
+	Text string
+}
+
+// UpgradeRefused is the error of a node that may not migrate yet. The node waits and
+// tries again instead of exiting (spec 054).
+type UpgradeRefused struct {
+	Problems []UpgradeProblem
+}
+
+func (e *UpgradeRefused) Error() string {
+	texts := make([]string, len(e.Problems))
+	for i, p := range e.Problems {
+		texts[i] = p.Text
+	}
+	return "upgrade refused before migrating: " + strings.Join(texts, "; ")
+}
+
+// Kinds lists the kinds of the problems, each once, in the order found.
+func (e *UpgradeRefused) Kinds() []ProblemKind {
+	var kinds []ProblemKind
+	for _, p := range e.Problems {
+		if !slices.Contains(kinds, p.Kind) {
+			kinds = append(kinds, p.Kind)
+		}
+	}
+	return kinds
+}
+
+// BackupOverride says whether an operator chose to upgrade once without a recent backup.
+type BackupOverride int
+
+const (
+	// BackupRequired applies the backup rule of ADR-040 and ADR-042.
+	BackupRequired BackupOverride = iota
+	// WithoutBackupOnce upgrades this once without a backup and records that it did.
+	WithoutBackupOnce
 )
 
 // prepareSchema makes sure this release may use the database. It refuses a database a
@@ -69,7 +132,10 @@ type upgradeFacts struct {
 	freeKnown    bool // false where the system cannot tell
 	queueHealthy bool
 	lastBackup   time.Time // zero = no backup noted
-	trigrams     extensionState
+	// firstWithoutBackup is true when no backup was ever noted and no earlier upgrade
+	// went on without one: the one upgrade the backup rule waives (ADR-042).
+	firstWithoutBackup bool
+	trigrams           extensionState
 }
 
 func trigramState(ctx context.Context, q db.Querier) (extensionState, error) {
@@ -86,36 +152,56 @@ func trigramState(ctx context.Context, q db.Querier) (extensionState, error) {
 	return extensionReady, nil
 }
 
-// backupWayOut tells an operator who has no recent backup how to go on (ADR-040).
-const backupWayOut = "run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one"
+// backupWayOut tells an operator who has no recent backup how to go on (ADR-040, ADR-042).
+const backupWayOut = "run scripts/backup.sh or the backup service first (docker compose run --rm backup once), " +
+	"or upgrade once without one with diffluence migrate --without-backup, " +
+	"or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one"
 
 // upgradeProblems lists the reasons an upgrade may not start. None = it may.
 // backupMaxAge zero means the operator switched the backup check off.
-func upgradeProblems(f upgradeFacts, now time.Time, backupMaxAge time.Duration) []string {
-	var problems []string
+func upgradeProblems(f upgradeFacts, now time.Time, backupMaxAge time.Duration) []UpgradeProblem {
+	var problems []UpgradeProblem
 	if f.freeKnown && f.freeBytes < minFreeForUpgrade {
-		problems = append(problems, fmt.Sprintf("the data folder has %d MiB free and needs %d MiB", f.freeBytes>>20, minFreeForUpgrade>>20))
+		problems = append(problems, UpgradeProblem{ProblemDisk,
+			fmt.Sprintf("the data folder has %d MiB free and needs %d MiB", f.freeBytes>>20, minFreeForUpgrade>>20)})
 	}
 	if !f.queueHealthy {
-		problems = append(problems, "the queue (NATS) does not answer")
+		problems = append(problems, UpgradeProblem{ProblemQueue, "the queue (NATS) does not answer"})
 	}
 	switch f.trigrams {
 	case extensionMissing:
-		problems = append(problems, "the PostgreSQL extension pg_trgm is not available: install the PostgreSQL contrib modules, or ask the provider of a managed database to allow pg_trgm")
+		problems = append(problems, UpgradeProblem{ProblemExtension, "the PostgreSQL extension pg_trgm is not available: install the PostgreSQL contrib modules, or ask the provider of a managed database to allow pg_trgm"})
 	case extensionNotAllowed:
-		problems = append(problems, "the role that migrates may not create the extension pg_trgm: give it CREATE on the database, or create the extension once as a superuser")
+		problems = append(problems, UpgradeProblem{ProblemExtension, "the role that migrates may not create the extension pg_trgm: give it CREATE on the database, or create the extension once as a superuser"})
 	}
-	if backupMaxAge == 0 {
-		return problems
-	}
-	switch {
-	case f.lastBackup.IsZero():
-		problems = append(problems, "no backup was noted: "+backupWayOut)
-	case now.Sub(f.lastBackup) > backupMaxAge:
-		problems = append(problems, fmt.Sprintf("the last backup is from %s, longer ago than %s: %s",
-			f.lastBackup.UTC().Format(time.RFC3339), backupMaxAge, backupWayOut))
+	if p, refused := backupProblem(f, now, backupMaxAge); refused {
+		problems = append(problems, p)
 	}
 	return problems
+}
+
+// backupProblem is the backup part of the checks: whether the last noted backup is too
+// old for an upgrade. The first upgrade of an installation that never noted one is let
+// through once (ADR-042).
+func backupProblem(f upgradeFacts, now time.Time, maxAge time.Duration) (UpgradeProblem, bool) {
+	switch {
+	case maxAge == 0:
+		return UpgradeProblem{}, false
+	case f.lastBackup.IsZero() && f.firstWithoutBackup:
+		return UpgradeProblem{}, false
+	case f.lastBackup.IsZero():
+		return UpgradeProblem{ProblemBackup, "no backup was noted: " + backupWayOut}, true
+	case now.Sub(f.lastBackup) > maxAge:
+		return UpgradeProblem{ProblemBackup, fmt.Sprintf("the last backup is from %s, longer ago than %s: %s",
+			f.lastBackup.UTC().Format(time.RFC3339), maxAge, backupWayOut)}, true
+	}
+	return UpgradeProblem{}, false
+}
+
+// waivesFirstUpgrade is whether these facts let the upgrade through only because it is the
+// first under the backup rule, so the waiver must be recorded.
+func waivesFirstUpgrade(f upgradeFacts, maxAge time.Duration) bool {
+	return maxAge > 0 && f.lastBackup.IsZero() && f.firstWithoutBackup
 }
 
 // checkBeforeUpgrade runs before this node migrates (blueprint 07, rule 4). It only looks
@@ -141,11 +227,11 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 	maxAge := a.cfg.UpgradeBackupMaxAge
 	if isNewInstall {
 		maxAge = 0
-	} else if facts.lastBackup, err = lastBackup(ctx, owner); err != nil {
+	} else if err := readBackupFacts(ctx, owner, &facts); err != nil {
 		return err
 	}
 	if problems := upgradeProblems(facts, time.Now(), maxAge); len(problems) > 0 {
-		return fmt.Errorf("upgrade refused before migrating: %s", strings.Join(problems, "; "))
+		return &UpgradeRefused{Problems: problems}
 	}
 	if isNewInstall {
 		return nil
@@ -154,7 +240,73 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 		a.log.Warn("upgrading with the backup check switched off (DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off)",
 			"last_backup_noted", !facts.lastBackup.IsZero())
 	}
-	return a.markUpgrade(ctx, owner, st, facts.lastBackup)
+	if waivesFirstUpgrade(facts, maxAge) {
+		if err := recordWaiver(ctx, owner, a.log, "node", waiverFirstUpgrade); err != nil {
+			return err
+		}
+	}
+	return markUpgrade(ctx, owner, st, facts.lastBackup, a.maxMigration())
+}
+
+// CheckBackupBeforeMigrating is the backup part of the checks before an upgrade, for
+// diffluence migrate. It used to check nothing, which made it a silent way around the
+// backup rule (spec 054). The other checks need the node's queue and data folder, so they
+// stay with the node. On a database that holds data it leaves the upgrade marker.
+func CheckBackupBeforeMigrating(ctx context.Context, owner *pgxpool.Pool, migs []db.Migration, maxAge time.Duration,
+	override BackupOverride, log *slog.Logger) error {
+	st, err := db.Status(ctx, owner, migs)
+	if err != nil {
+		return fmt.Errorf("app: read the state of the database: %w", err)
+	}
+	if st.PendingExpand == 0 || st.Newest == 0 {
+		return nil
+	}
+	var facts upgradeFacts
+	if err := readBackupFacts(ctx, owner, &facts); err != nil {
+		return err
+	}
+	switch {
+	case override == WithoutBackupOnce:
+		if err := recordWaiver(ctx, owner, log, "cli", waiverOperator); err != nil {
+			return err
+		}
+	case waivesFirstUpgrade(facts, maxAge):
+		if err := recordWaiver(ctx, owner, log, "cli", waiverFirstUpgrade); err != nil {
+			return err
+		}
+	default:
+		if p, refused := backupProblem(facts, time.Now(), maxAge); refused {
+			return &UpgradeRefused{Problems: []UpgradeProblem{p}}
+		}
+	}
+	return markUpgrade(ctx, owner, st, facts.lastBackup, migs[len(migs)-1].Version)
+}
+
+// readBackupFacts reads when the last backup was noted, and whether an upgrade already went
+// on without one.
+func readBackupFacts(ctx context.Context, q db.Querier, f *upgradeFacts) error {
+	var err error
+	if f.lastBackup, err = lastBackup(ctx, q); err != nil {
+		return err
+	}
+	var waived bool
+	err = q.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM audit_events WHERE action = $1)", ActionUpgradeWithoutBackup).Scan(&waived)
+	if err != nil {
+		return fmt.Errorf("app: read earlier upgrades without a backup: %w", err)
+	}
+	f.firstWithoutBackup = f.lastBackup.IsZero() && !waived
+	return nil
+}
+
+// recordWaiver writes that an upgrade goes on without a recent backup, and says so loudly.
+func recordWaiver(ctx context.Context, owner *pgxpool.Pool, log *slog.Logger, actor, reason string) error {
+	log.Warn("UPGRADING WITHOUT A RECENT BACKUP: make backups before the next upgrade, which will refuse without one",
+		"reason", reason)
+	// Straight into the chain, as markUpgrade: this runs before migrating, and the next
+	// upgrade must see the waiver at once (ADR-041).
+	return audit.RecordSealed(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: actor,
+		Action: ActionUpgradeWithoutBackup, ObjectType: "backup", Result: audit.ResultSuccess,
+		Details: map[string]any{"reason": reason}})
 }
 
 // lastBackup is when the last backup was noted, or zero when none was.
@@ -170,17 +322,17 @@ func lastBackup(ctx context.Context, q db.Querier) (time.Time, error) {
 	return at, nil
 }
 
-// markUpgrade records where the database stood before this node migrates it, and which
-// backup holds that state.
-func (a *App) markUpgrade(ctx context.Context, owner *pgxpool.Pool, st db.SchemaStatus, backupAt time.Time) error {
-	details := map[string]any{"from_migration": st.Newest, "to_migration": a.maxMigration(), "version": version.Version}
+// markUpgrade records where the database stood before it is migrated to toMigration, and
+// which backup holds that state.
+func markUpgrade(ctx context.Context, owner *pgxpool.Pool, st db.SchemaStatus, backupAt time.Time, toMigration int) error {
+	details := map[string]any{"from_migration": st.Newest, "to_migration": toMigration, "version": version.Version}
 	if !backupAt.IsZero() {
 		details["backup_noted_at"] = backupAt.UTC().Format(time.RFC3339)
 	}
 	// Straight into the chain: this runs before migrating, when the database may be of a
 	// release without audit_pending (ADR-041).
 	return audit.RecordSealed(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: "node",
-		Action: ActionUpgradeStarted, ObjectType: "migration", ObjectID: fmt.Sprintf("%04d", a.maxMigration()),
+		Action: ActionUpgradeStarted, ObjectType: "migration", ObjectID: fmt.Sprintf("%04d", toMigration),
 		Result: audit.ResultSuccess, Details: details})
 }
 

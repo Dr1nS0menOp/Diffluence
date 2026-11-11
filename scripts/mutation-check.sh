@@ -1186,13 +1186,13 @@ mutate "a full data folder does not stop an upgrade" internal/app/upgrade.go \
 mutate "a queue that does not answer does not stop an upgrade" internal/app/upgrade.go \
   's.replace("if !f.queueHealthy {", "if false {")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
 mutate "an old backup does not stop an upgrade" internal/app/upgrade.go \
-  's.replace("case now.Sub(f.lastBackup) > backupMaxAge:", "case false:")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+  's.replace("case now.Sub(f.lastBackup) > maxAge:", "case false:")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
 mutate "the checks are skipped before migrating" internal/app/upgrade.go \
   's.replace("if err := a.checkBeforeUpgrade(ctx, owner); err != nil {", "if err := error(nil); err != nil {")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
 mutate "the backup the operator asked for is never read" internal/app/upgrade.go \
-  's.replace("} else if facts.lastBackup, err = lastBackup(ctx, owner); err != nil {", "} else if false {")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
+  's.replace("} else if err := readBackupFacts(ctx, owner, &facts); err != nil {", "} else if false {")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
 mutate "an upgrade leaves no marker" internal/app/upgrade.go \
-  's.replace("return a.markUpgrade(ctx, owner, st, facts.lastBackup)", "return nil")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
+  's.replace("return markUpgrade(ctx, owner, st, facts.lastBackup, a.maxMigration())", "return nil")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
 mutate "a restart counts as an upgrade" internal/app/upgrade.go \
   's.replace("if st.PendingExpand == 0 {", "if st.PendingExpand < 0 {")' $app -run TestARestartIsNoUpgrade
 # Spec 045: blog posts and databases have a create permission of their own.
@@ -1356,7 +1356,7 @@ mutate "off does not switch the backup check off" internal/config/config.go \
 mutate "an age of zero switches the backup check off" internal/config/config.go \
   's.replace("if err != nil || d <= 0 {", "if err != nil || d < 0 {")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
 mutate "the refusal does not say how to go on" internal/app/upgrade.go \
-  's.replace("const backupWayOut = \"run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one\"", "const backupWayOut = \"run scripts/backup.sh first\"")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+  's.replace("\"or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one\"", "\"or switch the check off\"")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
 mutate_web "adding a role takes the others away" src/views/access-roles.tsx \
   's.replace("return held.includes(added) ? held : [...held, added];", "return [added];")' src/views/access-roles.test.ts
 mutate_web "taking one role away takes them all" src/views/access-roles.tsx \
@@ -1497,6 +1497,39 @@ mutate "an embedded section field counts as unknown" internal/settings/sections.
   's.replace("\t\tif f.Anonymous \x26\x26 !hasTag {", "\t\tif hasTag \x26\x26 false {")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
 mutate "a field left out by omitempty counts as unknown" internal/settings/sections.go \
   's.replace("\t\tname, _, _ := strings.Cut(tag, \",\")", "\t\tname := tag")' ./internal/settings/ -run TestTheFieldsASectionKnowsIncludeOmittedAndEmbeddedOnes
+
+# Spec 054: a node waits instead of looping, the first upgrade without any backup goes on
+# once on the record, and migrate asks for the backup too.
+mutate "the first upgrade without any backup is refused" internal/app/upgrade.go \
+  's.replace("case f.lastBackup.IsZero() \x26\x26 f.firstWithoutBackup:", "case false:")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+mutate "every upgrade without a backup is waived" internal/app/upgrade.go \
+  's.replace("f.firstWithoutBackup = f.lastBackup.IsZero() \x26\x26 !waived", "f.firstWithoutBackup = f.lastBackup.IsZero()")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
+mutate "the first upgrade without a backup leaves no record" internal/app/upgrade.go \
+  's.replace("return maxAge > 0 \x26\x26 f.lastBackup.IsZero() \x26\x26 f.firstWithoutBackup", "return false")' $app -run TestTheFirstUpgradeWithoutAnyBackupGoesOnOnceAndIsRecorded
+mutate "a refusal is a plain error a node cannot wait on" internal/app/upgrade.go \
+  's.replace("return \x26UpgradeRefused{Problems: problems}", "return errors.New(\"upgrade refused before migrating: no backup was noted\")")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
+mutate "migrate asks for no backup" internal/app/upgrade.go \
+  's.replace("if p, refused := backupProblem(facts, time.Now(), maxAge); refused {\n\t\t\treturn", "if p, refused := backupProblem(facts, time.Now(), maxAge); false \x26\x26 refused {\n\t\t\treturn")' $app -run TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo
+mutate "migrate --without-backup leaves no record" internal/app/upgrade.go \
+  's.replace("if err := recordWaiver(ctx, owner, log, \"cli\", waiverOperator); err != nil {", "if err := error(nil); err != nil {")' $app -run TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo
+mutate "the waiver of an upgrade waits for the sealer" internal/app/upgrade.go \
+  's.replace("return audit.RecordSealed(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: actor,", "return audit.RecordStandalone(ctx, owner, audit.Event{ActorType: audit.ActorSystem, ActorID: actor,")' $app -run TestTheFirstUpgradeWithoutAnyBackupGoesOnOnceAndIsRecorded
+mutate "a refusal names a kind twice" internal/app/upgrade.go \
+  's.replace("if !slices.Contains(kinds, p.Kind) {", "if !slices.Contains(kinds[:0], p.Kind) {")' $app -run TestARefusalNamesEachKindOnce
+mutate "a waiting node is not alive" internal/app/waiting.go \
+  's.replace("case r.URL.Path == \"/livez\":", "case false:")' $app -run TestAWaitingNodeIsAliveButNotReady
+mutate "a waiting node gives no reasons to a load balancer" internal/app/waiting.go \
+  's.replace("case r.URL.Path == \"/readyz\":", "case false:")' $app -run TestAWaitingNodeIsAliveButNotReady
+mutate "the API of a waiting node says nothing of when to try again" internal/app/waiting.go \
+  's.replace("h.Set(\"Retry-After\", waitingRetryAfter)\n\t\t\twriteWaitingJSON", "writeWaitingJSON")' $app -run TestTheAPIOfAWaitingNodeSaysToTryAgain
+mutate "the waiting page shows the reasons in full" internal/app/waiting.go \
+  's.replace("_ = waitingPage.Execute(w, waitingFixes(kinds))", "_ = waitingPage.Execute(w, []waitingFix{{Title: refused.Error()}})")' $app -run TestTheWaitingPageNamesTheFixButNoDetails
+mutate "a retry keeps the waiting node" internal/app/waiting.go \
+  's.replace("\tcase <-retry:\n", "\tcase <-make(chan struct{}):\n")' $app -run TestAWaitingNodeFreesItsAddressWhenItTriesAgain
+mutate "SIGHUP does not end the wait" cmd/diffluence/main.go \
+  's.replace("\t\tcase <-hup:\n", "\t\tcase <-make(chan os.Signal):\n")' ./cmd/diffluence/ -run TestAWaitingNodeTriesAgainOnSIGHUP
+mutate "a stopped waiting node reports a failure" cmd/diffluence/main.go \
+  's.replace("if errors.Is(err, context.Canceled) {\n\t\treturn nil", "if false {\n\t\treturn nil")' ./cmd/diffluence/ -run TestAWaitingNodeStoppedBySIGTERMExitsCleanly
 # Spec 052, ADR-041: the audit chain is sealed a moment after saving.
 audit=./internal/audit/
 mutate "a save takes the chain lock again" internal/audit/audit.go \

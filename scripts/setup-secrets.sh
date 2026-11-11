@@ -19,3 +19,12 @@ app=$(cat secrets/db_app_password.txt)
 # The containers read these as a non-root user.
 chmod 644 secrets/*.txt
 echo "secrets are in ./secrets. Keep this folder out of git and back it up."
+
+# The key of the backup service (spec 054). It stays out of ./secrets, which every backup
+# holds: a backup must never carry the key that opens it. The service gives every backup
+# to the owner of ./backups, so this user can restore it.
+mkdir -p backup-key backups
+if [ ! -s backup-key/backup.key ]; then
+  head -c 32 /dev/urandom | base64 >backup-key/backup.key
+  echo "the backup key is backup-key/backup.key. Keep a copy in a password safe: without it no backup can be restored."
+fi

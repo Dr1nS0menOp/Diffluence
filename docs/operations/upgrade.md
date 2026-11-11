@@ -29,31 +29,46 @@ Which releases may run side by side, and for how long, is in [version-skew.md](v
 
 ## The checks before migrating
 
-A node only checks when it has something to migrate, so a plain restart never waits for them. If a check fails, the node does not start, and the log names every reason at once, such as:
+A node only checks when it has something to migrate, so a plain restart never waits for them. If a check fails, nothing is migrated and the node **waits** (spec 054): it stays running, logs every reason at once, and checks again every minute, such as:
 
 ```
-error: upgrade refused before migrating: the data folder has 300 MiB free and needs 512 MiB; the queue (NATS) does not answer
+waiting before the upgrade: upgrade refused before migrating: the data folder has 300 MiB free and needs 512 MiB; the queue (NATS) does not answer
 ```
+
+While it waits:
+
+- every page in the browser shows "Waiting before an upgrade", with the kind of problem and the commands that fix it, but no figures or dates, since anyone can open it;
+- `/readyz` answers 503 with the kinds of problem, so a load balancer sends nobody, and `/livez` answers 200;
+- `docker compose ps` shows it running and unhealthy, and `docker inspect` shows the reason in its health log;
+- it touches nothing in the database.
+
+Once the cause is fixed it migrates by itself within a minute. `docker compose kill -s HUP diffluence` makes it check at once; `scripts/backup.sh` does that after a backup. Releases before spec 054 exited instead, and Compose restarted them in a loop.
 
 | Check | Refuses when |
 |---|---|
 | PostgreSQL | The server is older than PostgreSQL 16. Also for `diffluence migrate` |
 | Free space | The data folder has less than 512 MiB free |
 | Queue | NATS does not answer |
-| Backup | No backup was noted in the last 24 hours, or within `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Set it to `off` to upgrade without a recent backup: the node then only warns in the log (ADR-040) |
-| Newer database | A newer release has already run a contract migration. Also for a node with `DIFFLUENCE_MIGRATE_ON_START=false` |
+| Backup | No backup was noted in the last 24 hours, or within `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Also for `diffluence migrate`. The first upgrade of an installation that never noted a backup goes on once, below (ADR-040, ADR-042) |
+| Newer database | A newer release has already run a contract migration. Also for a node with `DIFFLUENCE_MIGRATE_ON_START=false`. This one stops the node, as the database is beyond what it can read |
 
-**Since this release an upgrade refuses to start without a backup of the last 24 hours.** Before you upgrade, run `scripts/backup.sh`. The refusal looks like this, and nothing is migrated:
+**An upgrade waits without a backup of the last 24 hours.** The backup service of `compose.yaml` makes one every 4 hours ([backup-restore.md](backup-restore.md)), so an installation that runs it never waits. The reason in the log looks like this:
 
 ```
-error: upgrade refused before migrating: no backup was noted: run scripts/backup.sh first, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one
+waiting before the upgrade: upgrade refused before migrating: no backup was noted: run scripts/backup.sh or the backup service first (docker compose run --rm backup once), or upgrade once without one with diffluence migrate --without-backup, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one
 ```
 
-A new installation is never refused: it has nothing to back up.
+The ways on, best first:
 
-`scripts/backup.sh` notes each complete backup in the audit log as `system.backup_noted`. A backup made another way can be noted with `docker compose exec diffluence diffluence backup note`, but only once it is complete.
+1. **Make a backup:** `docker compose run --rm backup once`, or `bash scripts/backup.sh <folder> <key>`. The node migrates within a minute.
+2. **Upgrade once without one:** `docker compose run --rm diffluence migrate --without-backup`. It writes `system.upgrade_without_backup` with the reason `operator_override` to the audit log. The next upgrade asks for a backup again.
+3. **Switch the check off:** `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off`. Every later upgrade then goes on without a backup too, with only a warning in the log, so prefer the first two.
 
-Fix the cause and start the node again. Nothing was migrated.
+**The first upgrade under the rule** (ADR-042): an installation that holds data, never noted a backup, and never upgraded without one, is not stopped by the backup check once. The node logs `UPGRADING WITHOUT A RECENT BACKUP` as a warning, writes `system.upgrade_without_backup` with the reason `first_upgrade_under_the_backup_rule`, and migrates. The health page keeps warning that no backup was ever noted. From the next upgrade on, the rule holds in full. The other checks are never waived.
+
+A new installation is never asked for a backup: it has nothing to back up.
+
+The backup service and `scripts/backup.sh` note each complete backup in the audit log as `system.backup_noted`. A backup made another way can be noted with `docker compose exec diffluence diffluence backup note`, or `docker compose run --rm --no-deps diffluence backup note` when the node is not running, but only once it is complete.
 
 ## The marker before an upgrade
 

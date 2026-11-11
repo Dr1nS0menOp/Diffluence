@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/app"
+	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/testutil"
@@ -64,13 +65,31 @@ func auditCount(t *testing.T, tdb testutil.TestDB, action string) int {
 	return n
 }
 
+// earlierUpgradeWithoutBackup leaves the waiver an earlier upgrade wrote, so the next one
+// meets the backup rule in full (ADR-042).
+func earlierUpgradeWithoutBackup(t *testing.T, tdb testutil.TestDB) {
+	t.Helper()
+	// Sealed, as recordWaiver writes it: the check reads the chain.
+	err := audit.RecordSealed(context.Background(), tdb.Pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "node",
+		Action: app.ActionUpgradeWithoutBackup, ObjectType: "backup", Result: audit.ResultSuccess,
+		Details: map[string]any{"reason": "first_upgrade_under_the_backup_rule"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating(t *testing.T) {
 	tdb, migs := previousRelease(t)
+	earlierUpgradeWithoutBackup(t, tdb)
 	cfg := upgradeConfig(t, tdb.URL)
 	cfg.UpgradeBackupMaxAge = 24 * time.Hour
 	_, err := startNode(t, cfg)
-	if err == nil || !strings.Contains(err.Error(), "upgrade refused before migrating: no backup was noted") {
+	var refused *app.UpgradeRefused
+	if !errors.As(err, &refused) || !strings.Contains(err.Error(), "upgrade refused before migrating: no backup was noted") {
 		t.Fatalf("want a refusal that names the backup, got %v", err)
+	}
+	if kinds := refused.Kinds(); len(kinds) != 1 || kinds[0] != app.ProblemBackup {
+		t.Fatalf("kinds %v", kinds)
 	}
 	st, err := db.Status(context.Background(), tdb.Pool, migs)
 	if err != nil || st.PendingExpand != 1 {
@@ -81,10 +100,50 @@ func TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating(t 
 	}
 }
 
+// ADR-042: an installation that never noted a backup is let through on its first upgrade
+// under the rule, loudly and on the record, and only once.
+func TestTheFirstUpgradeWithoutAnyBackupGoesOnOnceAndIsRecorded(t *testing.T) {
+	tdb, migs := previousRelease(t)
+	cfg := upgradeConfig(t, tdb.URL)
+	cfg.UpgradeBackupMaxAge = 24 * time.Hour
+	if _, err := startNode(t, cfg); err != nil {
+		t.Fatalf("the first upgrade under the rule was refused: %v", err)
+	}
+	if st, err := db.Status(context.Background(), tdb.Pool, migs); err != nil || st.PendingExpand != 0 {
+		t.Fatalf("not migrated: %+v %v", st, err)
+	}
+	var payload string
+	err := tdb.Pool.QueryRow(context.Background(), "SELECT payload FROM audit_events WHERE action = $1",
+		app.ActionUpgradeWithoutBackup).Scan(&payload)
+	if err != nil || !strings.Contains(payload, "first_upgrade_under_the_backup_rule") {
+		t.Fatalf("the waiver is not recorded: %q %v", payload, err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeStarted); n != 1 {
+		t.Fatalf("want one marker, got %d", n)
+	}
+}
+
+// A first upgrade that does have a backup is no waiver.
+func TestAnUpgradeWithABackupRecordsNoWaiver(t *testing.T) {
+	tdb, _ := previousRelease(t)
+	if err := app.NoteBackup(context.Background(), tdb.Pool); err != nil {
+		t.Fatal(err)
+	}
+	cfg := upgradeConfig(t, tdb.URL)
+	cfg.UpgradeBackupMaxAge = 24 * time.Hour
+	if _, err := startNode(t, cfg); err != nil {
+		t.Fatal(err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeWithoutBackup); n != 0 {
+		t.Fatalf("an upgrade with a backup left %d waivers", n)
+	}
+}
+
 // ADR-040: without the setting, an upgrade asks for a backup of at most a day, and the
-// refusal says both ways on.
+// refusal says every way on.
 func TestAnUpgradeWithoutARecentBackupIsRefusedByDefault(t *testing.T) {
 	tdb, migs := previousRelease(t)
+	earlierUpgradeWithoutBackup(t, tdb)
 	cfg, err := config.Load(func(key string) (string, bool) {
 		v, ok := map[string]string{"DIFFLUENCE_DATABASE_URL": tdb.URL}[key]
 		return v, ok
@@ -94,7 +153,7 @@ func TestAnUpgradeWithoutARecentBackupIsRefusedByDefault(t *testing.T) {
 	}
 	cfg.HTTPAddr, cfg.DataDir = "127.0.0.1:0", t.TempDir()
 	_, err = startNode(t, cfg)
-	for _, want := range []string{"no backup was noted", "scripts/backup.sh", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off"} {
+	for _, want := range []string{"no backup was noted", "scripts/backup.sh", "migrate --without-backup", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("want a refusal naming %q, got %v", want, err)
 		}
@@ -150,6 +209,50 @@ func TestAnUpgradeLeavesAMarkerNamingTheLastBackup(t *testing.T) {
 	}
 	if objectID != fmt.Sprintf("%04d", last) {
 		t.Errorf("object %q", objectID)
+	}
+}
+
+// diffluence migrate used to check nothing. Now it asks for the backup too, and
+// --without-backup goes on once, on the record (spec 054).
+func TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo(t *testing.T) {
+	tdb, migs := previousRelease(t)
+	earlierUpgradeWithoutBackup(t, tdb)
+	log := slog.New(slog.DiscardHandler)
+	ctx := context.Background()
+	err := app.CheckBackupBeforeMigrating(ctx, tdb.Pool, migs, 24*time.Hour, app.BackupRequired, log)
+	var refused *app.UpgradeRefused
+	if !errors.As(err, &refused) {
+		t.Fatalf("migrate without a backup was not refused: %v", err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeStarted); n != 0 {
+		t.Fatalf("a refusal left %d markers", n)
+	}
+	if err := app.CheckBackupBeforeMigrating(ctx, tdb.Pool, migs, 24*time.Hour, app.WithoutBackupOnce, log); err != nil {
+		t.Fatalf("--without-backup was refused: %v", err)
+	}
+	var operator int
+	err = tdb.Pool.QueryRow(ctx, "SELECT count(*) FROM audit_events WHERE action = $1 AND payload LIKE '%operator_override%'",
+		app.ActionUpgradeWithoutBackup).Scan(&operator)
+	if err != nil || operator != 1 {
+		t.Fatalf("the override is not recorded: %d %v", operator, err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeStarted); n != 1 {
+		t.Fatalf("want one marker, got %d", n)
+	}
+}
+
+// With nothing to migrate, migrate has nothing to protect and asks for no backup.
+func TestMigrateWithNothingToDoAsksForNoBackup(t *testing.T) {
+	tdb := testutil.Database(t)
+	migs, err := db.Migrations()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := app.CheckBackupBeforeMigrating(context.Background(), tdb.Pool, migs, time.Hour, app.BackupRequired, slog.New(slog.DiscardHandler)); err != nil {
+		t.Fatal(err)
+	}
+	if n := auditCount(t, tdb, app.ActionUpgradeStarted); n != 0 {
+		t.Fatalf("left %d markers", n)
 	}
 }
 

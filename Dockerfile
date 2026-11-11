@@ -21,6 +21,19 @@ RUN CGO_ENABLED=0 go build -trimpath \
       -o /out/diffluence ./cmd/diffluence
 RUN mkdir -p /out/data
 
+# The backup service of compose.yaml (spec 054): pg_dump of the same major version as the
+# database, gpg to encrypt, and the diffluence binary of this build to note each backup.
+# docker build . skips this stage; compose.yaml builds it with target: backup.
+FROM postgres:16 AS backup
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends gnupg \
+ && rm -rf /var/lib/apt/lists/*
+COPY --from=build /out/diffluence /usr/local/bin/diffluence
+COPY deploy/backup/backup-service.sh /usr/local/bin/diffluence-backup
+# Through bash, so the file needs no executable bit from the checkout.
+ENTRYPOINT ["bash", "/usr/local/bin/diffluence-backup"]
+CMD ["loop"]
+
 # Distroless: no shell, no package manager, runs as non-root.
 FROM gcr.io/distroless/static-debian12:nonroot
 COPY --from=build /out/diffluence /usr/local/bin/diffluence

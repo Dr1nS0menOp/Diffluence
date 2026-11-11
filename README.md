@@ -45,7 +45,7 @@ For a real installation, read [the install guide](docs/operations/install.md).
 | Command | What it does |
 |---|---|
 | `diffluence serve` | Runs the server. `DIFFLUENCE_ROLE` = `all` (default), `api` or `worker`. |
-| `diffluence migrate` | Applies pending *expand* migrations |
+| `diffluence migrate` | Applies pending *expand* migrations, after asking for a recent backup; `--without-backup` goes on once without one, recorded in the audit log |
 | `diffluence user create-admin` | Creates a local administrator account |
 | `diffluence setup-code` | Prints a new one-time code for the setup screen of a new install |
 | `diffluence audit verify` | Verifies the audit log hash chain |

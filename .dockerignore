@@ -5,6 +5,8 @@ data
 dist
 docs
 secrets
+backups
+backup-key
 web/node_modules
 web/test-results
 web/playwright-report
