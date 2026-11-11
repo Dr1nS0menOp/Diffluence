@@ -94,6 +94,7 @@ type App struct {
 	templates  *templates.Service
 	store      storage.Store
 	encrypted  *storage.Encrypted
+	guard      *storage.Guarded
 	attach     *attachments.Service
 	pages      *pages.Service
 	spaces     *spaces.Service
@@ -120,6 +121,8 @@ type App struct {
 	instanceID uuid.UUID
 	migrations []db.Migration
 	draining   atomic.Bool
+	// healthCache keeps the facts of the health checks for 30 seconds (spec 051).
+	healthCache healthCache
 }
 
 // New connects to the database and queue and builds the modules.
@@ -173,7 +176,9 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		return nil, err
 	}
 	a.encrypted = storage.NewEncrypted(disk, a.keyring, a.everyFileEncrypted)
-	a.store = a.encrypted
+	// New files are refused when the disk is nearly full, so the room left goes to text.
+	a.guard = storage.NewGuarded(a.encrypted)
+	a.store = a.guard
 	a.perms = permissions.NewService(a.pool)
 	a.settings = settings.NewService(a.pool, a.store)
 	a.identity.SetPolicy(a.accessPolicy())
@@ -235,6 +240,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, HelpersDown: a.HelpersDown, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
+			HealthChecks: a.HealthChecks, ReadyNotes: a.ReadyNotes,
 			Setup: a.setup, InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
@@ -334,6 +340,10 @@ func (a *App) Setup() *setup.Service { return a.setup }
 // Pool exposes the database pool (used by the CLI and tests).
 func (a *App) Pool() *pgxpool.Pool { return a.pool }
 
+// StoreGuard is the guard in front of the stored files, which refuses new files when the
+// disk is nearly full (spec 051).
+func (a *App) StoreGuard() *storage.Guarded { return a.guard }
+
 // Routes lists the API routes and their access rules (nil for role=worker).
 func (a *App) Routes() []httpapi.Route {
 	if a.api == nil {
@@ -347,7 +357,7 @@ func (a *App) Handler() http.Handler {
 	if a.api != nil {
 		return a.api.Handler()
 	}
-	return httpapi.HealthOnly(a.Ready, a.log)
+	return httpapi.HealthOnly(a.Ready, a.ReadyNotes, a.log)
 }
 
 // Ready reports whether this node should receive traffic.
@@ -621,6 +631,8 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "build-sites", Every: time.Minute, Run: a.sites.RunDue},
 		{Name: "build-sites-daily", Every: 24 * time.Hour, Run: a.sites.RunDaily},
 		{Name: "check-helpers", Every: time.Minute, Run: a.checkHelpers},
+		{Name: "sample-database-size", Every: time.Hour, Run: a.sampleDatabaseSize},
+		{Name: "purge-finished-work", Every: 24 * time.Hour, Run: a.purgeFinishedWork},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

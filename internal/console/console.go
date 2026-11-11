@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/health"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/storage"
@@ -163,17 +164,14 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	return out, nil
 }
 
-// diskWarnPercent is how much room is left when the console starts to warn.
-const diskWarnPercent = 10
-
-// DiskNearlyFull says whether the free part of a disk is below the warning, and gives
-// the free percentage. An unknown size never warns.
+// DiskNearlyFull says whether the free part of a disk is below the warning of the health
+// checks, and gives the free percentage. An unknown size never warns.
 func DiskNearlyFull(free, total uint64) (percent int, full bool) {
 	if total == 0 {
 		return 0, false
 	}
 	percent = int(free * 100 / total)
-	return percent, percent < diskWarnPercent
+	return percent, percent < health.DiskWarnPercent
 }
 
 // Sized is one entry of a report: a name and a size, and nothing of the content.

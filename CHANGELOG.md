@@ -3,6 +3,13 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: the installation watches itself (spec 051)
+- System health in the console now lists disk, database size and growth, backup, migrations, background work, mail, login and the age of the release, each with what it means and what to do. The summary repeats what needs a look, such as a backup older than 26 hours or none at all
+- When the disk for files has less than 10% free, every console page says so. Below 2% free, uploads, imports and exports are refused with a clear message, while text still saves; `/readyz` stays ready and adds `"notes": ["disk_low"]`
+- `diffluence doctor` runs the same checks on the command line, with the configuration and the keys, and prints a report without secrets that you can paste into a question
+- Prometheus rules with objectives and alerts, and a Grafana dashboard, in `deploy/monitoring/`; every metric and everything that grows is listed in `docs/operations/monitoring.md`
+- Finished jobs and sent mail are removed after 30 days, failed ones after 90, and nodes that stopped without leaving after a day
+- Upgrade impact: migration 0046 adds the table `database_size_samples`, expand only. Build images with `--build-arg BUILD_DATE=$(git log -1 --format=%cs)` so the console knows the age of the release; without it, the age is unknown and never warns
 ### Changed: an upgrade asks for a recent backup, databases are edited apart, and people hold several roles (spec 049)
 - **Upgrade impact first: an upgrade now refuses to start when no backup was noted in the last 24 hours.** Run `scripts/backup.sh` before you update. To change the age set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, such as `48h`; to upgrade without a recent backup set it to `off`. A new installation is never refused. The refusal names both ways on, and migrates nothing
 - Editing a database has its own permission, "Edit databases". Everyone who could edit pages gets it in the update, also through the built-in Editor, Manager and Space admin, so nobody gains or loses anything. A role can now edit pages without changing databases, or the other way round

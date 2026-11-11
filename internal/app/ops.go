@@ -221,7 +221,7 @@ func (a *App) SystemStatus(ctx context.Context) (any, error) {
 	}
 	return map[string]any{
 		"helpers": helpers,
-		"version": version.Version, "ready": ready, "storage": storageState, "queue_healthy": a.queue.Healthy(),
+		"version": version.Version, "build_date": version.Date, "ready": ready, "storage": storageState, "queue_healthy": a.queue.Healthy(),
 		"nodes": nodes, "migrations_applied": applied, "contract_pending": len(pending),
 		"outbox_unpublished": unpublished, "jobs_queued": queuedJobs, "jobs_failed_7d": failedJobs,
 		"storage_queue": storageQueue, "trash_items": trashItems,

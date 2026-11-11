@@ -70,6 +70,7 @@ func (s *Server) registerIdentityRoutes() {
 	r.HandleFunc("POST /api/v1/admin/scim-tokens/{id}/rotate", Sensitive(admin), s.handleScimTokenRotate)
 	r.HandleFunc("DELETE /api/v1/admin/scim-tokens/{id}", admin, s.handleScimTokenRevoke)
 	r.HandleFunc("GET /api/v1/admin/system", admin, s.handleSystem)
+	r.HandleFunc("GET /api/v1/admin/health", admin, s.handleHealth)
 
 	if s.deps.SCIM == nil {
 		return
@@ -690,4 +691,15 @@ func (s *Server) handleSystem(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, status)
+}
+
+// handleHealth answers the checks of the health page, which every page of the console
+// also reads for its band about the disk (spec 051). The answer is at most 30 seconds old.
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	checks, err := s.deps.HealthChecks(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"checks": checks})
 }

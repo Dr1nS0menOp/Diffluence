@@ -1,0 +1,97 @@
+{
+  "__comment": "SPDX-License-Identifier: Apache-2.0. One Grafana dashboard for Diffluence (OPS-090, spec 051), built only on the metrics /metrics sends. Import it in Grafana and choose your Prometheus.",
+  "title": "Diffluence",
+  "uid": "diffluence-overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-24h", "to": "now" },
+  "refresh": "1m",
+  "templating": {
+    "list": [
+      { "name": "datasource", "label": "Prometheus", "type": "datasource", "query": "prometheus" }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1, "type": "stat", "title": "Health checks that need a person now",
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "max(diffluence_health_problems)" }]
+    },
+    {
+      "id": 2, "type": "stat", "title": "Health checks that need a look soon",
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "max(diffluence_health_warnings)" }]
+    },
+    {
+      "id": 3, "type": "stat", "title": "Hours since the last backup",
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "(time() - max(diffluence_backup_last_noted_timestamp_seconds)) / 3600" }]
+    },
+    {
+      "id": 4, "type": "gauge", "title": "Disk of the stored files, free",
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit", "min": 0, "max": 1 } },
+      "targets": [{ "refId": "A", "expr": "min(diffluence_disk_free_bytes / diffluence_disk_total_bytes)" }]
+    },
+    {
+      "id": 5, "type": "timeseries", "title": "Requests a second, by class of status",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "sum by (status) (rate(diffluence_http_requests_total[5m]))", "legendFormat": "{{status}}" }]
+    },
+    {
+      "id": 6, "type": "timeseries", "title": "Share of requests slower than 300 ms, and failed",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "percentunit" } },
+      "targets": [
+        { "refId": "A", "expr": "1 - sum(rate(diffluence_http_request_duration_seconds_bucket{le=\"0.3\"}[5m])) / sum(rate(diffluence_http_request_duration_seconds_count[5m]))", "legendFormat": "slower than 300 ms" },
+        { "refId": "B", "expr": "sum(rate(diffluence_http_requests_total{status=\"5xx\"}[5m])) / sum(rate(diffluence_http_requests_total[5m]))", "legendFormat": "failed" }
+      ]
+    },
+    {
+      "id": 7, "type": "timeseries", "title": "Database connections",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "sum(diffluence_db_pool_acquired_connections)", "legendFormat": "in use" },
+        { "refId": "B", "expr": "sum(diffluence_db_pool_max_connections)", "legendFormat": "most" }
+      ]
+    },
+    {
+      "id": 8, "type": "timeseries", "title": "Background work waiting",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [
+        { "refId": "A", "expr": "max(diffluence_jobs_queued)", "legendFormat": "jobs queued" },
+        { "refId": "B", "expr": "max(diffluence_outbox_unpublished)", "legendFormat": "events waiting" },
+        { "refId": "C", "expr": "max(diffluence_mail_queued)", "legendFormat": "mails waiting" },
+        { "refId": "D", "expr": "max(diffluence_event_failures)", "legendFormat": "events that gave up" }
+      ]
+    },
+    {
+      "id": 9, "type": "timeseries", "title": "Size of the database",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "fieldConfig": { "defaults": { "unit": "bytes" } },
+      "targets": [{ "refId": "A", "expr": "max(diffluence_database_size_bytes)" }]
+    },
+    {
+      "id": 10, "type": "stat", "title": "Days since this release was built",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "(time() - min(diffluence_build_timestamp_seconds)) / 86400" }]
+    },
+    {
+      "id": 11, "type": "stat", "title": "Migrations waiting for every node",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 20 },
+      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "targets": [{ "refId": "A", "expr": "max(diffluence_migrations_pending_contract)" }]
+    }
+  ]
+}

@@ -91,8 +91,8 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 ### Monitoring
 
 - **OPS-020** · built · `/livez` says the process is alive.
-- **OPS-021** · built · `/readyz` checks the database, the queue for roles that run jobs (an API node keeps serving without it, ARC-216), storage, and that no expand migration of this node is pending. It also says `busy` and `draining`.
-- **OPS-022** · built · Prometheus metrics at `/metrics`: requests, latency, the database pool, what waits in the outbox, jobs and mail, failed jobs, and the progress of migrations: `diffluence_schema_migration`, `diffluence_migrations_pending_expand`, `diffluence_migrations_pending_contract` (spec 044, `TestMetricsCountRequestsAndShowWhatWaits`).
+- **OPS-021** · built · `/readyz` checks the database, the queue for roles that run jobs (an API node keeps serving without it, ARC-216), storage, and that no expand migration of this node is pending. It also says `busy` and `draining`, and a ready node adds the note `disk_low` while new files are refused (spec 051).
+- **OPS-022** · built · Prometheus metrics at `/metrics`: requests, latency, the database pool, what waits in the outbox, jobs and mail, failed jobs, and the progress of migrations: `diffluence_schema_migration`, `diffluence_migrations_pending_expand`, `diffluence_migrations_pending_contract` (spec 044, `TestMetricsCountRequestsAndShowWhatWaits`), and since spec 051 the facts of the health checks: disk, database size, backup, build date and how many checks need a look. The full list is in `docs/operations/monitoring.md`.
 - **OPS-023** · partly · checkmk reads them through its Prometheus integration. The format is the standard text format, but nobody tried it with checkmk. Low.
 - **OPS-024** · new · OpenTelemetry traces. Requests carry a `trace_id` from `traceparent` into the log, but nothing exports traces: that needs a dependency, a decision of the product owner. Low.
 - **OPS-025** · built · Structured JSON logs through `slog` on standard error, ready for Graylog or Loki.
@@ -131,7 +131,7 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 
 ### From the study of 2026-11-10
 
-Each line is explained in the chapter named after it, in [`07-operations/`](07-operations/). All are **new**; spec 048 orders them into waves.
+Each line is explained in the chapter named after it, in [`07-operations/`](07-operations/). All are **new** unless the list under the table says otherwise; spec 048 orders them into waves.
 
 | Line | Priority | What | Chapter |
 |---|---|---|---|
@@ -180,3 +180,14 @@ Each line is explained in the chapter named after it, in [`07-operations/`](07-o
 | OPS-112 | Medium | A small load test in CI that catches slow queries | 8 |
 | OPS-113 | Medium | CPU of PostgreSQL per active person, turned into sizing | 8 |
 | OPS-114 | Low | A rolling upgrade under load on several VMs | 8 |
+
+Built since the study (spec 051, wave 1 of spec 048):
+
+- **OPS-077** · built · The age of the last noted backup is the metric `diffluence_backup_last_noted_timestamp_seconds`, a line on System health, a line on the summary when it needs a look (none noted, or older than 26 hours), an alert in the shipped rules, and a line of `diffluence doctor` (`TestNoBackupNotedWarns`, `TestABackupOlderThanTwentySixHoursWarns`, `TestTheHealthPageShowsTheBackupAndTheDisk`).
+- **OPS-089** · built · `deploy/monitoring/diffluence-rules.yml`: availability and latency objectives of 99.5% over 30 days, burn-rate alerts over two windows, and alerts for causes, each saying what to do. A test checks that every metric they use is one `/metrics` sends (`TestTheMonitoringFilesUseOnlyMetricsTheServerSends`). Never loaded into a running Prometheus: wave 7.
+- **OPS-090** · built · `deploy/monitoring/diffluence-dashboard.json`, on the same metrics and checked by the same test. Never opened in a running Grafana: wave 7.
+- **OPS-103** · built · System health lists disk, database size and growth over 30 days, backup, migrations, background work, mail, login and the age of the release, each with a sentence and what to do, and each is a metric (`internal/health`, `GET /api/v1/admin/health`, `web/e2e/health.spec.ts`). The identity provider is not asked whether it answers: that would be a call to an outside server on every look. Login shows accounts whose password login stopped.
+- **OPS-104** · built · Below 10% free, a band on every page of the console; below 2%, every new file is refused with HTTP 507 while text saves, and `/readyz` adds `"notes": ["disk_low"]` (`TestANearlyFullDiskRefusesFilesButTextStillSaves`). A disk that really fills was not tried: the test stands in for one.
+- **OPS-105** · built · Finished jobs, sent mail, nodes that crashed and size samples now have a daily cleaner, and `docs/operations/monitoring.md` lists everything that grows with what keeps it small (`TestTheCleanerRemovesOnlyOldFinishedWork`).
+- **OPS-106** · built · The binary carries the date of its commit (`version.Date`, set by `make build` and by the image's `BUILD_DATE`); the console warns past 60 days, and nothing asks an outside server. The opt-in check of the public release feed is not built. A developer build has no date and never warns.
+- **OPS-107** · built · `diffluence doctor` runs the health checks, a configuration check and a shallow key check, prints states, counts and dates only, and exits 1 on a problem (`TestDoctorReportsEveryCheckAndNoSecret`). `config check` (OPS-100) is still its own line: doctor only loads the configuration.

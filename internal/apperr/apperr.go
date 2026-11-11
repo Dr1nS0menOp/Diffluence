@@ -17,6 +17,7 @@ const (
 	KindConflict
 	KindTooLarge
 	KindBusy
+	KindNoRoom
 )
 
 // Denied describes a refused action, so it can be audited after the
@@ -66,6 +67,12 @@ func TooLarge(message string) *Error {
 // Busy means there is too much work right now, and the same request can work in a moment.
 func Busy(message string) *Error {
 	return &Error{Kind: KindBusy, Code: "busy", Message: message}
+}
+
+// NoRoom means the server has too little disk left to store this, while smaller work,
+// such as saving text, still goes on (spec 051, D4).
+func NoRoom(message string) *Error {
+	return &Error{Kind: KindNoRoom, Code: "no_room", Message: message}
 }
 
 // As extracts an *Error from err.

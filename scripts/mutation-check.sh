@@ -1379,6 +1379,60 @@ mutate "the bell counts rows about hidden pages" internal/notify/list.go \
   's.replace("SELECT v.page_id FROM perm_visible_pages($1) v\n", "SELECT v.id AS page_id FROM pages v\n")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "an IP address is taken as the public address" internal/config/config.go \
   's.replace("case isAddress(u.Hostname()):", "case false && isAddress(u.Hostname()):")' ./internal/config/ -run TestAnIPAddressIsRefusedAsThePublicAddress
+
+# Spec 051: the installation watches itself. Every threshold of the health checks, the guard
+# that refuses files on a nearly full disk, the cleaner, and doctor.
+health=./internal/health/
+mutate "files are refused at exactly 2% free" internal/health/health.go \
+  's.replace("percentFree(free, total) < DiskRefusePercent", "percentFree(free, total) <= DiskRefusePercent")' $health -run TestADiskAtTwoPercentWarnsButStillTakesFiles
+mutate "an unknown disk size refuses files" internal/health/health.go \
+  's.replace("return total > 0 && percentFree", "return total >= 0 \x26\x26 percentFree")' $health -run TestADiskOfUnknownSizeNeverWarnsAndNeverRefuses
+mutate "a disk at 10% free warns" internal/health/health.go \
+  's.replace("case percent < DiskWarnPercent:", "case percent <= DiskWarnPercent:")' $health -run TestADiskAtTenPercentIsFine
+mutate "growth equal to the free room warns" internal/health/health.go \
+  's.replace("uint64(f.Growth30d) > f.DiskFree:", "uint64(f.Growth30d) >= f.DiskFree:")' $health -run TestADiskThatAMonthOfGrowthWouldFillWarns
+mutate "growth that is not known warns" internal/health/health.go \
+  's.replace("case f.GrowthKnown \x26\x26 f.Growth30d > 0", "case f.Growth30d > 0")' $health -run TestGrowthThatIsNotKnownYetNeverWarns
+mutate "no backup noted is fine" internal/health/health.go \
+  's.replace("if f.LastBackup.IsZero() {\n\t\treturn check(\"backup\", Warn", "if false {\n\t\treturn check(\"backup\", Warn")' $health -run TestNoBackupNotedWarns
+mutate "a backup of exactly 26 hours warns" internal/health/health.go \
+  's.replace("if age > BackupWarnAfter {", "if age >= BackupWarnAfter {")' $health -run TestABackupOfTwentySixHoursIsStillFine
+mutate "a contract migration of exactly a day warns" internal/health/health.go \
+  's.replace("f.Now.Sub(f.LastMigrationAt) > ContractWaitWarnAfter", "f.Now.Sub(f.LastMigrationAt) >= ContractWaitWarnAfter")' $health -run TestAContractMigrationWaitingMoreThanADayWarns
+mutate "an event stuck in the outbox is only a warning" internal/health/health.go \
+  's.replace("case f.OutboxStuck > 0:", "case false:")' $health -run TestAnEventStuckInTheOutboxIsAProblem
+mutate "failed jobs are fine" internal/health/health.go \
+  's.replace("case f.FailedJobs7d > 0 || f.EventFailures > 0:", "case f.EventFailures > 0:")' $health -run TestFailedJobsOrEventsWarn
+mutate "no mail server is fine" internal/health/health.go \
+  's.replace("case !f.MailConfigured:", "case false:")' $health -run TestMailThatIsOffOrFailingWarns
+mutate "a stopped password login is fine" internal/health/health.go \
+  's.replace("if f.PasswordStops > 0 {", "if false {")' $health -run TestAnAccountWhosePasswordLoginStoppedWarns
+mutate "a release of exactly 60 days warns" internal/health/health.go \
+  's.replace("if age > ReleaseWarnAfter {", "if age >= ReleaseWarnAfter {")' $health -run TestAReleaseOlderThanSixtyDaysWarns
+mutate "the guard lets every file through" internal/storage/guard.go \
+  's.replace("\tif g.Refusing(ctx) {\n\t\treturn Object{}, errNoRoom", "\tif false {\n\t\treturn Object{}, errNoRoom")' ./internal/storage/ -run TestAStoreBelowTwoPercentRefusesFilesWithNoRoom
+mutate "the guard reads the disk on every file" internal/storage/guard.go \
+  's.replace("g.now().Sub(g.readAt) < roomFreshFor", "g.now().Sub(g.readAt) < 0")' ./internal/storage/ -run TestTheRoomIsReadAtMostEveryThirtySeconds
+mutate "a refused file is a bad request" internal/httpapi/handlers_content.go \
+  's.replace("\tcase apperr.KindNoRoom:\n\t\tstatus = http.StatusInsufficientStorage\n", "")' $app -run TestANearlyFullDiskRefusesFilesButTextStillSaves
+mutate "a nearly full disk leaves no note on readyz" internal/app/health.go \
+  's.replace("if a.guard != nil \x26\x26 a.guard.Refusing(ctx) {", "if false {")' $app -run TestANearlyFullDiskRefusesFilesButTextStillSaves
+mutate "readyz drops its notes" internal/httpapi/server.go \
+  's.replace("len(list) > 0 {", "len(list) > 99 {")' $app -run TestANearlyFullDiskRefusesFilesButTextStillSaves
+mutate "the health page takes any event for a backup" internal/app/health.go \
+  's.replace("FROM audit_events WHERE action = $1 ORDER BY seq DESC LIMIT 1", "FROM audit_events WHERE action <> $1 ORDER BY seq DESC LIMIT 1")' $app -run TestTheHealthPageShowsTheBackupAndTheDisk
+mutate "the growth is measured from the newest sample" internal/app/health.go \
+  's.replace("WHERE taken_at <= now() - make_interval(secs => $2)", "WHERE taken_at >= now() - make_interval(secs => $2)")' $app -run TestTheDatabaseGrowthComesFromTheHourlySamples
+mutate "the cleaner keeps finished jobs" internal/app/health.go \
+  's.replace("status = \x27done\x27 AND finished_at < now()", "status = \x27done\x27 AND finished_at > now()")' $app -run TestTheCleanerRemovesOnlyOldFinishedWork
+mutate "failed mail goes as soon as sent mail" internal/app/health.go \
+  's.replace("status = \x27failed\x27 AND created_at < now() - make_interval(secs => $1)\", keepFailedWork}", "status = \x27failed\x27 AND created_at < now() - make_interval(secs => $1)\", keepFinishedWork}")' $app -run TestTheCleanerRemovesOnlyOldFinishedWork
+mutate "the cleaner keeps nodes that are gone" internal/app/health.go \
+  's.replace("DELETE FROM nodes WHERE last_seen_at < now()", "DELETE FROM nodes WHERE last_seen_at > now()")' $app -run TestTheCleanerRemovesOnlyOldFinishedWork
+mutate "doctor passes with a problem" cmd/diffluence/doctor.go \
+  's.replace("\tif problems > 0 {\n\t\treturn errDoctorFound", "\tif false {\n\t\treturn errDoctorFound")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
+mutate "doctor forgets a key it cannot read" cmd/diffluence/doctor.go \
+  's.replace("if !doctorKeys(ctx, cfg, stdout) {", "if false \x26\x26 !doctorKeys(ctx, cfg, stdout) {")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

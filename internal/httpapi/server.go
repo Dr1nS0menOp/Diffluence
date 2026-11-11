@@ -31,6 +31,7 @@ import (
 	"github.com/diffluence/diffluence/internal/failures"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/feed"
+	"github.com/diffluence/diffluence/internal/health"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/mail"
@@ -109,6 +110,12 @@ type Deps struct {
 	Gauges func(ctx context.Context) []metrics.Gauge
 	// CheckAudit verifies the audit chain and the signed checkpoints.
 	CheckAudit func(ctx context.Context) (audit.VerifyResult, error)
+	// HealthChecks judges disk, database, backup, migrations, work, mail, login and the
+	// age of the release for the console (spec 051).
+	HealthChecks func(ctx context.Context) ([]health.Check, error)
+	// ReadyNotes are what /readyz adds while this node is ready but not at its best, such
+	// as a nearly full disk. Nil means none.
+	ReadyNotes func(ctx context.Context) []string
 
 	InstanceID uuid.UUID
 	Log        *slog.Logger
@@ -370,10 +377,10 @@ func (s *Server) ready(ctx context.Context) error {
 }
 
 // HealthOnly serves just /livez and /readyz, for processes with role=worker.
-func HealthOnly(ready func(context.Context) error, log *slog.Logger) http.Handler {
+func HealthOnly(ready func(context.Context) error, notes func(context.Context) []string, log *slog.Logger) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /livez", handleLivez)
-	mux.HandleFunc("GET /readyz", readyzHandler(ready, log))
+	mux.HandleFunc("GET /readyz", readyzHandler(ready, notes, log))
 	return mux
 }
 
@@ -381,7 +388,10 @@ func handleLivez(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-func readyzHandler(ready func(context.Context) error, log *slog.Logger) http.HandlerFunc {
+// readyzHandler answers 503 with a reason when this node should get no traffic, and 200
+// otherwise. A ready node may add notes, such as "disk_low": it still serves, and a load
+// balancer with another node to choose can prefer that one (spec 051, D5).
+func readyzHandler(ready func(context.Context) error, notes func(context.Context) []string, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if err := ready(r.Context()); err != nil {
 			reason := "unknown"
@@ -394,7 +404,13 @@ func readyzHandler(ready func(context.Context) error, log *slog.Logger) http.Han
 			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "not_ready", "reason": reason})
 			return
 		}
-		writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+		body := map[string]any{"status": "ready"}
+		if notes != nil {
+			if list := notes(r.Context()); len(list) > 0 {
+				body["notes"] = list
+			}
+		}
+		writeJSON(w, http.StatusOK, body)
 	}
 }
 

@@ -39,6 +39,7 @@ import { PermissionsTab, RulesTab } from './admin-rules';
 import { StorageLimitDialog } from './admin-storage';
 import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
 import { SettingsSearch, SummaryTab } from './admin-summary';
+import { HealthBand, HealthChecks } from './admin-health';
 import { SettingsFrame } from '../components/settings-frame';
 import { TableBox } from '../components/table-box';
 
@@ -1405,6 +1406,7 @@ function ScimTab() {
 
 interface System {
   version: string;
+  build_date: string;
   ready: string;
   storage: string;
   queue_healthy: boolean;
@@ -1431,6 +1433,7 @@ function SystemTab() {
   const state = (ok: boolean) => (ok ? t('admin.ok') : t('admin.problem'));
   const rows: [string, string | number][] = [
     [t('admin.version'), s.version],
+    ...(s.build_date ? [[t('health.builtOn'), s.build_date] as [string, string]] : []),
     [t('admin.ready'), s.ready],
     [t('admin.storage'), state(s.storage === 'ok')],
     [t('admin.queue'), state(s.queue_healthy)],
@@ -1443,6 +1446,8 @@ function SystemTab() {
   ];
   return (
     <>
+      <HealthChecks />
+      <h2>{t('admin.nodesAndQueues')}</h2>
       <TableBox>
         <table>
           <tbody>
@@ -1505,6 +1510,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       current={tab}
     >
       <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
+      <HealthBand />
       {tab === 'summary' && <SummaryTab />}
       {tab === 'users' && <UsersTab />}
       {tab === 'invitations' && <InvitationsTab />}

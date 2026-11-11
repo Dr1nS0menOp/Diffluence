@@ -126,6 +126,8 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case apperr.KindBusy:
 		status = http.StatusServiceUnavailable
 		w.Header().Set("Retry-After", busyRetrySeconds)
+	case apperr.KindNoRoom:
+		status = http.StatusInsufficientStorage
 	}
 	writeError(w, status, e.Code, e.Message)
 }

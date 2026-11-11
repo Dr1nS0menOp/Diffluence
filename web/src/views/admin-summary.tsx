@@ -8,6 +8,7 @@ import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { findSettings, SETTINGS_INDEX } from './admin-search';
+import { HealthAttention, summaryChecks, useHealth } from './admin-health';
 
 interface OrphanedPage {
   id: string;
@@ -54,7 +55,7 @@ const ATTENTION_LINKS: Record<string, string> = {
   events_failed: '/admin/care',
   events_waiting: '/admin/care',
   audit_damaged: '/admin/audit',
-  disk_nearly_full: '/admin/care',
+  disk_nearly_full: '/admin/system',
 };
 
 function SummaryTiles() {
@@ -141,14 +142,19 @@ function AttentionList() {
     queryKey: ['admin-attention'],
     queryFn: () => api.get<Attention>('/admin/attention'),
   });
+  const health = useHealth();
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
   const { items, unmanaged_spaces: unmanaged, orphaned_pages: orphaned } = q.data;
+  const checks = summaryChecks(health.data?.checks);
   return (
     <section>
       <h2>{t('summary.attention')}</h2>
-      {items.length === 0 && unmanaged.length === 0 && <p className="muted">{t('summary.allFine')}</p>}
+      {items.length === 0 && unmanaged.length === 0 && checks.length === 0 && (
+        <p className="muted">{t('summary.allFine')}</p>
+      )}
       <ul className="plain-list attention">
+        <HealthAttention checks={checks} />
         {items.map((item) => (
           <li key={item.kind} className="note note-error">
             <span className="grow">{t(`summary.item_${item.kind}`, { count: item.count })}</span>

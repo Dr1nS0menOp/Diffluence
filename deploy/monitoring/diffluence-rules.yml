@@ -1,0 +1,132 @@
+# SPDX-License-Identifier: Apache-2.0
+# Prometheus recording and alert rules for Diffluence (OPS-089, spec 051).
+# Load with rule_files: in prometheus.yml. Every metric used here is one /metrics sends;
+# a test in internal/app checks that. Recording rules are named diffluence:...
+#
+# Objectives (spec 048, D11), over 30 days: 99.5% of requests succeed, and 99.5% of
+# requests take less than 300 ms. Change the numbers below to your own objective.
+# The burn-rate alerts follow the multiwindow pattern of the Google SRE workbook: a fast
+# burn pages within minutes, a slow burn opens a ticket.
+
+groups:
+  - name: diffluence-slo
+    rules:
+      # Share of requests that failed (5xx), over several windows.
+      - record: diffluence:request_errors:ratio_rate5m
+        expr: sum(rate(diffluence_http_requests_total{status="5xx"}[5m])) / clamp_min(sum(rate(diffluence_http_requests_total[5m])), 1e-9)
+      - record: diffluence:request_errors:ratio_rate30m
+        expr: sum(rate(diffluence_http_requests_total{status="5xx"}[30m])) / clamp_min(sum(rate(diffluence_http_requests_total[30m])), 1e-9)
+      - record: diffluence:request_errors:ratio_rate1h
+        expr: sum(rate(diffluence_http_requests_total{status="5xx"}[1h])) / clamp_min(sum(rate(diffluence_http_requests_total[1h])), 1e-9)
+      - record: diffluence:request_errors:ratio_rate6h
+        expr: sum(rate(diffluence_http_requests_total{status="5xx"}[6h])) / clamp_min(sum(rate(diffluence_http_requests_total[6h])), 1e-9)
+      # Share of requests slower than 300 ms, over the same windows.
+      - record: diffluence:request_slow:ratio_rate5m
+        expr: 1 - sum(rate(diffluence_http_request_duration_seconds_bucket{le="0.3"}[5m])) / clamp_min(sum(rate(diffluence_http_request_duration_seconds_count[5m])), 1e-9)
+      - record: diffluence:request_slow:ratio_rate30m
+        expr: 1 - sum(rate(diffluence_http_request_duration_seconds_bucket{le="0.3"}[30m])) / clamp_min(sum(rate(diffluence_http_request_duration_seconds_count[30m])), 1e-9)
+      - record: diffluence:request_slow:ratio_rate1h
+        expr: 1 - sum(rate(diffluence_http_request_duration_seconds_bucket{le="0.3"}[1h])) / clamp_min(sum(rate(diffluence_http_request_duration_seconds_count[1h])), 1e-9)
+      - record: diffluence:request_slow:ratio_rate6h
+        expr: 1 - sum(rate(diffluence_http_request_duration_seconds_bucket{le="0.3"}[6h])) / clamp_min(sum(rate(diffluence_http_request_duration_seconds_count[6h])), 1e-9)
+
+      # The error budget is 0.5%. A burn rate of 14.4 spends 2% of a 30-day budget in an
+      # hour; 6 spends 5% in six hours.
+      - alert: DiffluenceErrorBudgetFastBurn
+        expr: diffluence:request_errors:ratio_rate1h > (14.4 * 0.005) and diffluence:request_errors:ratio_rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "Many requests fail: look at the server log and System health now."
+      - alert: DiffluenceErrorBudgetSlowBurn
+        expr: diffluence:request_errors:ratio_rate6h > (6 * 0.005) and diffluence:request_errors:ratio_rate30m > (6 * 0.005)
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Requests fail more often than the objective allows: look at the server log today."
+      - alert: DiffluenceLatencyBudgetFastBurn
+        expr: diffluence:request_slow:ratio_rate1h > (14.4 * 0.005) and diffluence:request_slow:ratio_rate5m > (14.4 * 0.005)
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "Many requests take more than 300 ms: look at the database and the busy answers now."
+      - alert: DiffluenceLatencyBudgetSlowBurn
+        expr: diffluence:request_slow:ratio_rate6h > (6 * 0.005) and diffluence:request_slow:ratio_rate30m > (6 * 0.005)
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Requests are slower than the objective allows: look at docs/operations/limits.md today."
+
+  - name: diffluence-causes
+    rules:
+      - alert: DiffluenceDown
+        expr: up{job="diffluence"} == 0
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "Prometheus cannot reach Diffluence: check that the server runs."
+      - alert: DiffluenceDatabaseUnreachable
+        expr: diffluence_database_up == 0
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "Diffluence cannot reach PostgreSQL: check the database."
+      - alert: DiffluenceDiskNearlyFull
+        expr: diffluence_disk_free_bytes / diffluence_disk_total_bytes < 0.15
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Less than 15% of the disk of the stored files is free: make room before files are refused at 2%."
+      - alert: DiffluenceDiskFull
+        expr: diffluence_disk_free_bytes / diffluence_disk_total_bytes < 0.02
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: "Less than 2% of the disk is free, so new files are refused: make room now."
+      - alert: DiffluenceBackupOld
+        expr: time() - diffluence_backup_last_noted_timestamp_seconds > 26 * 3600
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "No backup was noted in 26 hours (or ever): check that scripts/backup.sh still runs."
+      - alert: DiffluenceJobsFailing
+        expr: increase(diffluence_jobs_failed_7d[1h]) > 0
+        labels: {severity: ticket}
+        annotations:
+          summary: "Background jobs failed in the last hour: look under Care in the console."
+      - alert: DiffluenceOutboxNotDraining
+        expr: diffluence_outbox_stuck > 0
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "Events wait more than an hour to reach the queue: check the queue (NATS) and the worker."
+      - alert: DiffluenceEventsGaveUp
+        expr: diffluence_event_failures > 0
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Events gave up after their retries: replay them under Care."
+      - alert: DiffluenceContractMigrationWaiting
+        expr: diffluence_migrations_pending_contract > 0 and time() - diffluence_migration_applied_timestamp_seconds > 86400
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: "A contract migration has waited more than a day: check that every node was upgraded."
+      - alert: DiffluenceQueueUnreachable
+        expr: diffluence_queue_healthy == 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "A node cannot reach the queue (NATS): events stop reaching anyone."
+      - alert: DiffluenceMailFailing
+        expr: diffluence_mail_failed_1d > 0
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Mail failed in the last day: check the mail server and its password."
+      - alert: DiffluenceReleaseOld
+        expr: time() - diffluence_build_timestamp_seconds > 60 * 86400
+        for: 1h
+        labels: {severity: ticket}
+        annotations:
+          summary: "This release is more than 60 days old: read the release notes and plan an upgrade."

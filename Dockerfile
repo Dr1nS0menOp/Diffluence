@@ -14,8 +14,10 @@ COPY cmd/ cmd/
 COPY internal/ internal/
 COPY --from=web /src/internal/webui/dist/ internal/webui/dist/
 ARG VERSION=dev
+# The date of the commit (git log -1 --format=%cs); empty for a developer build (spec 051).
+ARG BUILD_DATE=
 RUN CGO_ENABLED=0 go build -trimpath \
-      -ldflags "-s -w -X github.com/diffluence/diffluence/internal/version.Version=${VERSION}" \
+      -ldflags "-s -w -X github.com/diffluence/diffluence/internal/version.Version=${VERSION} -X github.com/diffluence/diffluence/internal/version.Date=${BUILD_DATE}" \
       -o /out/diffluence ./cmd/diffluence
 RUN mkdir -p /out/data
 

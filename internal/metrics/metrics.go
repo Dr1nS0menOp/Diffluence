@@ -18,8 +18,9 @@ import (
 // ContentType is the media type of the text format.
 const ContentType = "text/plain; version=0.0.4; charset=utf-8"
 
-// durationBuckets are the upper bounds of the request histogram, in seconds.
-var durationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5, 10}
+// durationBuckets are the upper bounds of the request histogram, in seconds. 0.3 is the
+// latency objective of the shipped rules (spec 048, D11), so it is measured exactly.
+var durationBuckets = []float64{0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.3, 0.5, 1, 2.5, 5, 10}
 
 // knownMethods bounds the method label, since a client can send any word.
 var knownMethods = []string{"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}

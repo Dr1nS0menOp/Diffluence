@@ -1,5 +1,8 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
-LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(VERSION)
+# The date of the commit, not of the build, so two builds of one commit are the same (spec 051).
+BUILD_DATE ?= $(shell git log -1 --format=%cs 2>/dev/null)
+LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(VERSION) \
+	-X github.com/diffluence/diffluence/internal/version.Date=$(BUILD_DATE)
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 

@@ -16,7 +16,7 @@ Before 1.0 there are no releases with support: every build on main is upgraded t
 
    It must end with `upgrade test passed`. For a jump that is allowed but not promised without downtime, say so in the notes.
 4. **The notes are written.** Move the `Unreleased` part of `CHANGELOG.md` under the new version and date. Every entry is plain language and has an `Upgrade impact` line: `none`, a migration, or what an operator must do before updating. Anything an operator must do comes first, in bold.
-5. **Tag and build.** Tag the commit `v1.x.y`. `make build` takes the version from the tag; check it with `diffluence version`. Build the image and let the scan in CI pass.
+5. **Tag and build.** Tag the commit `v1.x.y`. `make build` takes the version from the tag and the build date from the date of the commit; check them with `diffluence version` and `diffluence doctor`. For the image, pass both: `docker build --build-arg VERSION=v1.x.y --build-arg BUILD_DATE=$(git log -1 --format=%cs) .`. The console warns when a release is more than 60 days old, from this date, so a release without it never warns (spec 051). Let the scan in CI pass.
 6. **Restore from the new version.** Run `bash scripts/restore-drill.sh` on the tagged commit, so the backup of this release is known to restore.
 7. **Announce it.** Point to the notes, and to [upgrade.md](upgrade.md). From 1.0, say that the release line before it is no longer supported.
 

@@ -46,6 +46,9 @@ Commands:
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
   healthcheck               ask a running server on this machine whether it is ready
+  doctor                    check disk, database, backup, migrations, work, mail, login,
+                            release, configuration and keys, and print a report that
+                            holds no secret; exits 1 when something needs a person now
   client <command>          use the API of a server with a token; see diffluence client
   version                   print the version
 `
@@ -105,6 +108,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = cmdEndSessions(ctx, args[2:], stdout)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
+	case "doctor":
+		err = cmdDoctor(ctx, stdout)
 	case "help", "-h", "--help":
 		fmt.Fprint(stdout, usage)
 		return 0
