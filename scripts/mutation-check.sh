@@ -16,7 +16,13 @@ trap 'rm -rf "$work"' EXIT
 survived=0
 jobs_max=${MUTATION_JOBS:-4}
 changed_list=${MUTATION_CHANGED:-}
+# A list that cannot be read would select nothing, and nothing caught reads like a pass.
+if [ -n "$changed_list" ] && [ ! -r "$changed_list" ]; then
+  echo "MUTATION_CHANGED names $changed_list, which cannot be read" >&2
+  exit 2
+fi
 count=0
+ran=0
 declare -a kinds names files exprs argv
 
 # apply <file> <expression on s>: changes a file, and fails when nothing changed.
@@ -193,8 +199,9 @@ finish_mutations() {
   for ((i = 0; i < count; i++)); do
     if needed "$i"; then picked+=("$i"); fi
   done
+  ran=${#picked[@]}
   if [ -n "$changed_list" ]; then
-    echo "running ${#picked[@]} of $count mutations for the changed paths in $changed_list"
+    echo "running $ran of $count mutations for the changed paths in $changed_list"
   fi
   take_snapshot
   while [ "$printed" -lt "${#picked[@]}" ]; do
@@ -1438,4 +1445,9 @@ if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
   exit 1
 fi
-echo "all mutations were caught"
+# Nothing run is not a pass: say so, so a builder never reads it as one.
+if [ "$ran" -eq 0 ]; then
+  echo "no mutation ran for the changed paths"
+  exit 2
+fi
+echo "all mutations were caught ($ran run)"
