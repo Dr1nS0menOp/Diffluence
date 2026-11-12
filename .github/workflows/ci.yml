@@ -277,8 +277,20 @@ jobs:
           distribution: goreleaser
           version: v2.20.1
           args: release --snapshot --clean --skip=sign,sbom
+      # A difference becomes an annotation naming the file, readable without the log.
       - name: the two runs are the same, byte for byte
-        run: diff dist-first/checksums.txt dist/checksums.txt
+        run: |
+          if diff dist-first/checksums.txt dist/checksums.txt >checksums.diff; then exit 0; fi
+          grep -E '^[<>]' checksums.diff | while IFS= read -r line; do
+            echo "::error title=not reproducible::$line"
+          done
+          for f in $(grep -E '^<' checksums.diff | awk '{print $3}'); do
+            case "$f" in
+              *.tar.gz) diff <(tar -tvzf "dist-first/$f") <(tar -tvzf "dist/$f") | head -5 |
+                while IFS= read -r line; do echo "::error title=$f::$line"; done || true ;;
+            esac
+          done
+          exit 1
       - name: the .deb installs on Debian and the .rpm on Fedora
         run: |
           docker run --rm -v "$PWD/dist:/dist:ro" debian:12 sh -c \
