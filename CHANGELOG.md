@@ -14,6 +14,13 @@ Plain-language notes per release. Every entry has an "Upgrade impact" line.
 - No read can hold the database for long: a query of a read stops after 15 seconds, and the person is told the server is busy and may try again
 - `scripts/stress/real-data.sh` measures the feed on a dump of real data
 - Upgrade impact: none to do. Each query is planned anew, which costs about a millisecond
+### Added: traces with OpenTelemetry, off by default (spec 060)
+- `DIFFLUENCE_TRACING=true` sends traces to an OpenTelemetry collector over OTLP, at the address in the standard `OTEL_EXPORTER_OTLP_ENDPOINT`. One new trace in ten is kept (`DIFFLUENCE_TRACING_SAMPLE`); a request that arrives inside a sampled trace stays in it
+- Spans for every request by route pattern, every query by operation and table, every event sent and handled (the trace crosses the queue in its headers), every job and periodic task, the audit sealer and the backup worker's commands. They never hold a path, an id, a statement, a value, a name, an address, text or a token, and a failure records its kind, not its message
+- While tracing is on, log lines written inside a request or a job carry `trace_id` and `span_id`
+- The operations guide lists the log messages an operator may build on; they change only with a note here
+- New dependency: the OpenTelemetry Go SDK 1.47.0 and its OTLP exporter (Apache-2.0), with the modules they bring (listed in `docs/dependencies.md`)
+- Upgrade impact: none. Off by default; nothing leaves the machine until you switch it on
 ### Added: running the installation from the console (spec 058)
 - Administration, System, Backups: set how often the backup service backs up and how many backups it keeps, ask for a backup now (at most 4 an hour), and see every backup with its size, the step that failed, and whether a test restore of it passed. The page says when the service last checked in and whether it holds a key, by a fingerprint only. It also spells out the command that restores a chosen backup over this installation
 - The backup service asks the console what to do and reports each backup; `scripts/restore-check.sh` reports each weekly test restore. A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service needs the release that has migration 0048; an older one keeps its own schedule

@@ -83,8 +83,13 @@ type Config struct {
 	PublishDir string
 	// DrawingURL is the optional draw.io service. Nil = off, and nothing is framed.
 	DrawingURL *url.URL
-	OIDC       OIDC
-	SMTP       SMTP
+	// Tracing sends traces to an OpenTelemetry collector, which the standard OTEL_EXPORTER_OTLP_*
+	// variables name (spec 060). Off by default: then nothing leaves the machine.
+	Tracing bool
+	// TracingSample is the share of new traces kept, from 0 to 1 (spec 048 D5).
+	TracingSample float64
+	OIDC          OIDC
+	SMTP          SMTP
 }
 
 // The ways a connection to a mail server is encrypted.
@@ -213,6 +218,8 @@ func (l *loader) load() Config {
 		PDFPassword:           l.str("PDF_PASSWORD", ""),
 		CollaboraURL:          l.str("COLLABORA_URL", ""),
 		PublishDir:            l.str("PUBLISH_DIR", ""),
+		Tracing:               l.boolean("TRACING", false),
+		TracingSample:         l.fraction("TRACING_SAMPLE", defaultTracingSample),
 		OIDC: OIDC{
 			Issuer:       l.str("OIDC_ISSUER", ""),
 			ClientID:     l.str("OIDC_CLIENT_ID", ""),
@@ -474,6 +481,27 @@ func (l *loader) duration(key string, def time.Duration) time.Duration {
 	}
 	l.note(key, d.String())
 	return d
+}
+
+// defaultTracingSample keeps one new trace in ten (spec 048 D5).
+const defaultTracingSample = 0.1
+
+// fraction reads a share from 0 to 1. Anything else is a typing mistake and refuses the start.
+func (l *loader) fraction(key string, def float64) float64 {
+	f := def
+	if v, ok := l.raw(key); ok && v != "" {
+		parsed, err := strconv.ParseFloat(v, 64)
+		// Written so NaN fails too: every comparison with it is false.
+		if err != nil || !(parsed >= 0 && parsed <= 1) {
+			l.fail(key, fmt.Errorf("must be a number from 0 to 1, such as 0.1, got %q", v))
+		} else {
+			f = parsed
+		}
+	} else {
+		delete(l.origins, key)
+	}
+	l.note(key, strconv.FormatFloat(f, 'g', -1, 64))
+	return f
 }
 
 // defaultContractGrace leaves a working day to notice a bad upgrade and roll it back

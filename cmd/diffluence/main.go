@@ -111,11 +111,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		case len(args) >= 2 && args[1] == "note":
 			err = cmdBackupNote(ctx, stdout)
 		case len(args) >= 2 && args[1] == "next":
-			err = cmdBackupNext(ctx, args[2:], stdout)
+			err = traced(ctx, "backup next", func(ctx context.Context) error { return cmdBackupNext(ctx, args[2:], stdout) })
 		case len(args) >= 2 && args[1] == "report":
-			err = cmdBackupReport(ctx, args[2:], stdout)
+			err = traced(ctx, "backup report", func(ctx context.Context) error { return cmdBackupReport(ctx, args[2:], stdout) })
 		case len(args) >= 2 && args[1] == "restore-checked":
-			err = cmdBackupRestoreChecked(ctx, args[2:], stdout)
+			err = traced(ctx, "backup restore-checked", func(ctx context.Context) error {
+				return cmdBackupRestoreChecked(ctx, args[2:], stdout)
+			})
 		case len(args) >= 2 && args[1] == "restore-request":
 			err = cmdBackupRestoreRequest(ctx, args[2:], stdout)
 		case len(args) >= 2 && args[1] == "restore-prepare":
@@ -200,6 +202,11 @@ func cmdServe(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	stopTracing, err := startTracing(ctx, cfg)
+	if err != nil {
+		return err
+	}
+	defer stopTracing()
 	log := app.NewLogger(cfg.LogLevel)
 	// Settings used only later are tried now, in the background, so a wrong one shows
 	// before the mail, login or publish that needs it (OPS-101). A warning never stops a start.

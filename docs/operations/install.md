@@ -233,7 +233,8 @@ Diffluence passes `/collab` on to the service, so your reverse proxy must allow 
 
 - `/livez` says the process runs. `/readyz` says this node may get traffic: it checks the database, migrations and storage. A node with role `worker` or `all` also needs the queue. A node with role `api` does not, because events wait in the database, so people can go on working through a queue outage.
 - `/metrics` gives numbers for Prometheus: requests by method and class of status, how long they took, the database pool, what waits in the outbox, jobs and mail, and how far the migrations of an upgrade are ([upgrade.md](upgrade.md)). It is off until you set `DIFFLUENCE_METRICS_TOKEN` to a long random token. Prometheus sends it as `authorization: { credentials_file: ... }`. Numbers about the queues are for the whole instance, so scrape one node for those. Request numbers are per node.
-- Logs are JSON with a `request_id`. A proxy that sends a W3C `traceparent` header also gets its `trace_id` in the log line, so one request can be followed through both. Diffluence does not export spans.
+- Logs are JSON with a `request_id`. A proxy that sends a W3C `traceparent` header also gets its `trace_id` in the log line, so one request can be followed through both. The messages an operator may build on are listed in [monitoring.md](monitoring.md#log-events).
+- Traces: set `DIFFLUENCE_TRACING=true` and `OTEL_EXPORTER_OTLP_ENDPOINT` to your OpenTelemetry collector (OTLP over HTTP, such as `http://collector:4318`). One new trace in ten is kept (`DIFFLUENCE_TRACING_SAMPLE`), and spans hold route patterns, table names and kinds of work, never content. Off by default; see [monitoring.md](monitoring.md#traces).
 - The pool opens at most 20 database connections per node. Add `pool_max_conns` to the database address to change that, and keep the total of all nodes below `max_connections`.
 
 ## Kubernetes

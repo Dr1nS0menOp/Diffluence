@@ -15,6 +15,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/tracing"
 	"github.com/diffluence/diffluence/internal/version"
 )
 
@@ -116,7 +117,10 @@ func (a *App) runContractMigrations(ctx context.Context) error {
 
 // SealAudit puts the audit events that wait into the chain now.
 func (a *App) SealAudit(ctx context.Context) error {
-	_, err := audit.SealWaiting(ctx, a.pool)
+	ctx, end := tracing.Span(ctx, "audit seal", "")
+	sealed, err := audit.SealWaiting(ctx, a.pool)
+	tracing.Count(ctx, "diffluence.audit.sealed", sealed)
+	end(err)
 	return err
 }
 

@@ -23,6 +23,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // Job statuses.
@@ -202,7 +203,9 @@ func (s *Service) runNext(ctx context.Context, skippedKinds []string) (bool, err
 		return false, err
 	}
 
-	result, runErr := s.run(ctx, j)
+	spanCtx, end := tracing.Span(ctx, "job", j.Kind)
+	result, runErr := s.run(spanCtx, j)
+	end(runErr)
 	status := StatusDone
 	if runErr != nil {
 		status = StatusFailed
@@ -310,7 +313,10 @@ func (s *Service) runIfDue(ctx context.Context, t Task) {
 	}
 	taskCtx, cancel := context.WithTimeout(ctx, lease)
 	defer cancel()
-	if err := t.Run(taskCtx); err != nil && ctx.Err() == nil {
+	taskCtx, end := tracing.Span(taskCtx, "task", t.Name)
+	err = t.Run(taskCtx)
+	end(err)
+	if err != nil && ctx.Err() == nil {
 		s.log.Error("periodic task failed", "task", t.Name, "error", err)
 	}
 	release, stop := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)

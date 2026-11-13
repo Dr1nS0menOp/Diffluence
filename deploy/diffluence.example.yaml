@@ -41,3 +41,8 @@ smtp:
 # upgrade_backup_max_age: 24h
 # contract_grace: 24h
 # publish_dir: /srv/sites
+
+# Traces to an OpenTelemetry collector, off by default. Where they go is the standard
+# variable OTEL_EXPORTER_OTLP_ENDPOINT in the environment, such as http://collector:4318.
+# tracing: false
+# tracing_sample: 0.1       # the share of new traces kept, from 0 to 1

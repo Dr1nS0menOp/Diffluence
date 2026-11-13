@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 type accessKind int
@@ -126,7 +128,20 @@ func (r *Router) Handle(pattern string, a Access, h http.Handler) {
 		panic(fmt.Sprintf("httpapi: route %q registered without an access rule", pattern))
 	}
 	r.routes = append(r.routes, Route{Pattern: pattern, Access: a})
-	r.mux.Handle(pattern, r.enforce(a, h))
+	r.mux.Handle(pattern, namedSpan(pattern, r.enforce(a, h)))
+}
+
+// namedSpan names the span of a request after its route pattern, before any access rule
+// can refuse it, so a refused request is traced by its route too (spec 060 D7). With tracing
+// off it returns h itself.
+func namedSpan(pattern string, h http.Handler) http.Handler {
+	if !tracing.On() {
+		return h
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		tracing.NameRoute(req.Context(), pattern)
+		h.ServeHTTP(w, req)
+	})
 }
 
 // HandleFunc is Handle for plain functions.

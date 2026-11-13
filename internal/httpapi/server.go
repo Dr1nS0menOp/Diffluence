@@ -54,6 +54,7 @@ import (
 	"github.com/diffluence/diffluence/internal/sso"
 	"github.com/diffluence/diffluence/internal/tasks"
 	"github.com/diffluence/diffluence/internal/templates"
+	"github.com/diffluence/diffluence/internal/tracing"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/watches"
 	"github.com/diffluence/diffluence/internal/webhooks"
@@ -189,7 +190,12 @@ func New(d Deps) (*Server, error) {
 		writeError(w, http.StatusForbidden, "cross_origin_blocked", "Cross-origin requests are not allowed.")
 	}))
 
-	s.handler = chain(s.router,
+	var traced []func(http.Handler) http.Handler
+	if tracing.On() {
+		// First, so the span holds everything the request does (spec 060).
+		traced = append(traced, tracing.Middleware)
+	}
+	s.handler = chain(s.router, append(traced,
 		withRequestID,
 		withMetrics(s.requests),
 		withClientIP(d.Config.TrustedProxies),
@@ -204,7 +210,7 @@ func New(d Deps) (*Server, error) {
 		// After authentication, so a session is always read current (ARC-228).
 		withReadFreshness,
 		s.withMaintenance,
-	)
+	)...)
 	return s, nil
 }
 

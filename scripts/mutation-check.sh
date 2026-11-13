@@ -1709,6 +1709,58 @@ mutate "the feed shows what one may not see" internal/feed/feed.go \
   's.replace("THEN true END)", "THEN true ELSE true END)")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "popular counts no comments" internal/feed/feed.go \
   's.replace("SELECT m.page_id, 0, 1 FROM comments m", "SELECT m.page_id, 0, 0 FROM comments m")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+# Spec 060: traces with OpenTelemetry, off by default, never with content.
+tracing=./internal/tracing/
+mutate "a share of NaN is taken" internal/config/config.go \
+  's.replace("if err != nil || !(parsed >= 0 \x26\x26 parsed <= 1) {", "if err != nil || parsed > 1 {")' ./internal/config/ -run TestTracingIsOffByDefaultAndItsShareIsFromZeroToOne
+mutate "every new trace is kept by default" internal/config/config.go \
+  's.replace("const defaultTracingSample = 0.1", "const defaultTracingSample = 1")' ./internal/config/ -run TestTracingIsOffByDefaultAndItsShareIsFromZeroToOne
+mutate "a span runs while tracing is off" internal/tracing/tracing.go \
+  's.replace("func Span(ctx context.Context, what, which string) (context.Context, End) {\n\tif !On() {", "func Span(ctx context.Context, what, which string) (context.Context, End) {\n\tif false {")' $tracing -run TestOffDoesNothingAndChangesNothing
+mutate "a failed span is not marked" internal/tracing/tracing.go \
+  's.replace("span.SetStatus(codes.Error, \"error\")", "span.SetStatus(codes.Unset, \"error\")")' $tracing -run TestSpanRecordsAFailureWithoutItsMessageAndACount
+mutate "a count is not recorded" internal/tracing/tracing.go \
+  's.replace("trace.SpanFromContext(ctx).SetAttributes(attribute.Int(key, n))", "_ = n")' $tracing -run TestSpanRecordsAFailureWithoutItsMessageAndACount
+mutate "a sampled trace that arrives is cut" internal/tracing/tracing.go \
+  's.replace("sdktrace.WithSampler(sdktrace.ParentBased(sdktrace.TraceIDRatioBased(o.Sample))))", "sdktrace.WithSampler(sdktrace.TraceIDRatioBased(o.Sample)))")' $tracing -run TestATraceThatArrivesSampledStaysSampled
+mutate "export failures fill the log" internal/tracing/tracing.go \
+  's.replace("if now := time.Now(); now.Sub(q.last) >= q.every {", "if now := time.Now(); now.After(q.last) {")' $tracing -run TestExportFailuresAreLoggedAtMostOncePerPeriod
+mutate "a request span is not named by its route" internal/tracing/http.go \
+  's.replace("\tspan.SetName(pattern)\n", "")' $tracing -run TestARequestSpanIsNamedByItsRouteAndHoldsNoPath
+mutate "a request span holds the path" internal/tracing/http.go \
+  's.replace("trace.WithAttributes(attribute.String(\"http.request.method\", method)))", "trace.WithAttributes(attribute.String(\"http.request.method\", method), attribute.String(\"url.path\", r.URL.String())))")' $tracing -run TestARequestSpanIsNamedByItsRouteAndHoldsNoPath
+mutate "any method names a span" internal/tracing/http.go \
+  's.replace("method := methodName(r.Method)", "method := r.Method")' $tracing -run TestARequestWithoutARouteKeepsItsMethod
+mutate "a server error does not mark its span" internal/tracing/http.go \
+  's.replace("if rec.status >= http.StatusInternalServerError {", "if rec.status > 999 {")' $tracing -run TestAServerErrorMarksTheSpan
+mutate "a query span names what follows FROM" internal/tracing/db.go \
+  's.replace("if after[strings.ToUpper(w)] \x26\x26 isIdentifier(words[i+1]) {", "if after[strings.ToUpper(w)] {")' $tracing -run TestAStatementIsNamedByOperationAndTableOnly
+mutate "a query span names any first word" internal/tracing/db.go \
+  's.replace("if !operations[operation] {", "if false {")' $tracing -run TestAStatementIsNamedByOperationAndTableOnly
+mutate "a database error is described by its detail" internal/tracing/db.go \
+  's.replace("return \"sqlstate \" + pg.Code", "return pg.Detail")' $tracing -run TestAnErrorIsDescribedByItsKindOnly
+mutate "a query in a trace not kept makes a span" internal/tracing/db.go \
+  's.replace("parent.IsValid() \x26\x26 !parent.IsSampled() {", "false \x26\x26 parent.IsValid() {")' $tracing -run TestAQueryInATraceNotKeptMakesNoSpan
+mutate "the end of a query ends the span around it" internal/tracing/db.go \
+  's.replace("span, ok := ctx.Value(querySpan{}).(trace.Span)\n\tif !ok {\n\t\treturn\n\t}", "span := trace.SpanFromContext(ctx)")' $tracing -run TestAQueryInATraceNotKeptMakesNoSpan
+mutate "an event leaves without its trace" internal/tracing/queue.go \
+  's.replace("\tpropagator.Inject(ctx, propagation.HeaderCarrier(http.Header(headers)))\n", "")' $tracing -run TestAnEventCarriesItsTraceThroughTheQueue
+mutate "an event is handled outside its trace" internal/tracing/queue.go \
+  's.replace("\tctx = propagator.Extract(ctx, propagation.HeaderCarrier(http.Header(headers)))\n", "")' $tracing -run TestAnEventCarriesItsTraceThroughTheQueue
+mutate "a log line does not name its span" internal/tracing/log.go \
+  's.replace("r.AddAttrs(slog.String(\"trace_id\", sc.TraceID().String()), slog.String(\"span_id\", sc.SpanID().String()))", "_ = sc")' $tracing -run TestALogLineNamesItsSpan
+mutate "a logger with attributes loses the span" internal/tracing/log.go \
+  's.replace("return logHandler{h.Handler.WithAttrs(attrs)}", "return h.Handler.WithAttrs(attrs)")' $tracing -run TestALogLineNamesItsSpan
+mutate "the pool makes no query spans" internal/db/db.go \
+  's.replace("\t\tctx = q.trace.TraceQueryStart(ctx, conn, d)\n", "")' $app -run TestTracesOfTheWholeApplicationHoldNoContent
+mutate "requests are not traced" internal/httpapi/server.go \
+  's.replace("\t\ttraced = append(traced, tracing.Middleware)\n", "\t\t_ = traced\n")' $app -run TestTracesOfTheWholeApplicationHoldNoContent
+mutate "the router does not name the span" internal/httpapi/router.go \
+  's.replace("\t\ttracing.NameRoute(req.Context(), pattern)\n", "")' $app -run TestTracesOfTheWholeApplicationHoldNoContent
+mutate "a listed log event is renamed" internal/queue/queue.go \
+  's.replace("\"nats disconnected\"", "\"the queue went away\"")' $app -run TestEveryListedLogEventIsStillWritten
+mutate "the sealer is not traced" internal/app/ops.go \
+  's.replace("ctx, end := tracing.Span(ctx, \"audit seal\", \"\")", "ctx, end := tracing.Span(ctx, \"audit\", \"\")")' $app -run TestTracesOfTheWholeApplicationHoldNoContent
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

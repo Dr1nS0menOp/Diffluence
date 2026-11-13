@@ -116,6 +116,31 @@ func TestContractMigrationsWaitADayByDefault(t *testing.T) {
 	}
 }
 
+// Spec 060 D1: tracing is off unless switched on, keeps one new trace in ten, and a share
+// outside 0 to 1 is a typing mistake that refuses the start.
+func TestTracingIsOffByDefaultAndItsShareIsFromZeroToOne(t *testing.T) {
+	for _, bad := range []string{"1.5", "-0.1", "NaN", "Inf", "ten", "10%"} {
+		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_TRACING_SAMPLE": bad}))
+		if err == nil || !strings.Contains(err.Error(), "TRACING_SAMPLE") {
+			t.Fatalf("%q: want a refusal, got %v", bad, err)
+		}
+	}
+	if _, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_TRACING": "sometimes"})); err == nil {
+		t.Fatal("a switch that is not true or false was taken")
+	}
+	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	if err != nil || c.Tracing || c.TracingSample != 0.1 {
+		t.Fatalf("default on=%v share=%v, err %v", c.Tracing, c.TracingSample, err)
+	}
+	for value, want := range map[string]float64{"0": 0, "1": 1, "0.25": 0.25} {
+		c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x",
+			"DIFFLUENCE_TRACING": "true", "DIFFLUENCE_TRACING_SAMPLE": value}))
+		if err != nil || !c.Tracing || c.TracingSample != want {
+			t.Fatalf("%q: on=%v share=%v, err %v", value, c.Tracing, c.TracingSample, err)
+		}
+	}
+}
+
 func TestHTTPSAndProxies(t *testing.T) {
 	c, err := Load(env(map[string]string{
 		"DIFFLUENCE_DATABASE_URL":    "postgres://x",

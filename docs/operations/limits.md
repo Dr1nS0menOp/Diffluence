@@ -149,6 +149,17 @@ What changed, besides the feed itself:
 - **No read holds the database for long.** Each query of a read stops after 15 seconds and the person is told the server is busy, as when no connection is free. Writes are not limited, so a change is never cut off halfway.
 
 Budgets on that data, checked by `TestTheFeedIsFastOnRealData` when it runs against the dump: recent 150 ms, for you 500 ms, popular 250 ms. **The stress test has not been repeated on the server with these changes.**
+### What traces cost (spec 060)
+
+Measured on 12 November 2026 in the development container (16 CPUs) with `go test ./internal/tracing -bench . -benchmem`, spans going to an exporter that drops them, so the cost of sending to a collector is not in it.
+
+| | Off (the default) | On, one trace in ten kept (default) | On, every trace kept |
+|---|---|---|---|
+| A request, the tracing part | nothing: not in the chain | about 1.3 µs, 12 allocations | about 2.2 µs, 17 allocations |
+| A query in a request whose trace is kept | 0.5 ns, nothing allocated | about 1.6 µs, 14 allocations | about 2.4 µs, 17 allocations |
+| A query in a request whose trace is not kept (nine in ten at the default) | 0.5 ns | 33 ns, nothing allocated | |
+
+Off, nothing of tracing runs: the middleware is not in the chain, the pool has no span tracer and events carry no headers, which tests prove. On at the default share, a request of about ten queries costs about 1.3 µs plus 10 times 33 ns in nine requests of ten, and about 17 µs in the tenth: well under a hundredth of a millisecond, against requests of milliseconds. Spans leave in batches in the background; a collector that is down costs a full queue of 2,048 spans and nothing more. **Not measured under load on the server**: wave 7.
 
 ## What stops everything
 

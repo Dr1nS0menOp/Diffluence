@@ -15,6 +15,8 @@ import (
 	"github.com/nats-io/nats-server/v2/server"
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
+
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // StreamEvents holds all domain events published by the outbox relay.
@@ -100,7 +102,9 @@ func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queu
 
 // deliver runs the listener on one event, and tells the server what became of it.
 func (q *Queue) deliver(ctx context.Context, l Listener, m jetstream.Msg) {
+	ctx, end := tracing.Consume(ctx, m.Subject(), l.Durable, m.Headers())
 	cause := l.Handle(ctx, m.Data())
+	end(cause)
 	if cause == nil {
 		q.settle(m.Ack(), l.Durable)
 		return
@@ -139,7 +143,16 @@ func (q *Queue) settle(err error, durable string) {
 
 // Publish sends data with a de-duplication id (satisfies outbox.Publisher).
 func (q *Queue) Publish(ctx context.Context, subject string, data []byte, msgID string) error {
-	_, err := q.js.Publish(ctx, subject, data, jetstream.WithMsgID(msgID))
+	if !tracing.On() {
+		_, err := q.js.Publish(ctx, subject, data, jetstream.WithMsgID(msgID))
+		return err
+	}
+	// The trace goes with the event in its headers, so the listener's work shows under the
+	// publish that caused it (spec 060 D8).
+	msg := &nats.Msg{Subject: subject, Data: data, Header: nats.Header{}}
+	ctx, end := tracing.Publish(ctx, subject, msg.Header)
+	_, err := q.js.PublishMsg(ctx, msg, jetstream.WithMsgID(msgID))
+	end(err)
 	return err
 }
 

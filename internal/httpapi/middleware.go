@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/metrics"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 type ctxKey int
@@ -224,7 +225,8 @@ func withLogAndRecover(log *slog.Logger) func(http.Handler) http.Handler {
 				attrs := []any{"method", r.Method, "path", loggedPath(r.URL.Path),
 					"status", rec.status, "duration_ms", time.Since(start).Milliseconds(),
 					"ip", ClientIPFrom(r.Context()), "request_id", RequestIDFrom(r.Context())}
-				if traceID, _ := r.Context().Value(ctxTraceID).(string); traceID != "" {
+				// While tracing is on, the log handler adds the ids of the span instead (spec 060 D9).
+				if traceID, _ := r.Context().Value(ctxTraceID).(string); traceID != "" && !tracing.On() {
 					attrs = append(attrs, "trace_id", traceID)
 				}
 				// The handler writes JSON, which escapes a line break in the path, so a path

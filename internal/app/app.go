@@ -62,15 +62,17 @@ import (
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/tasks"
 	"github.com/diffluence/diffluence/internal/templates"
+	"github.com/diffluence/diffluence/internal/tracing"
 	"github.com/diffluence/diffluence/internal/trash"
 	"github.com/diffluence/diffluence/internal/version"
 	"github.com/diffluence/diffluence/internal/watches"
 	"github.com/diffluence/diffluence/internal/webhooks"
 )
 
-// NewLogger returns the JSON logger used everywhere.
+// NewLogger returns the JSON logger used everywhere. While tracing is on, a line written with
+// a context carries the ids of its trace and span (spec 060 D9).
 func NewLogger(level slog.Level) *slog.Logger {
-	return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level}))
+	return slog.New(tracing.LogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 }
 
 // App is one running Diffluence process.

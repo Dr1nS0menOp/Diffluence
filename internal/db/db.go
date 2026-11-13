@@ -14,6 +14,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // Querier is satisfied by *pgxpool.Pool, *pgxpool.Conn and pgx.Tx.
@@ -53,7 +55,7 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	if !strings.Contains(url, "pool_max_conns") {
 		cfg.MaxConns = defaultMaxConns
 	}
-	cfg.ConnConfig.Tracer = &queryCounter{}
+	cfg.ConnConfig.Tracer = &queryCounter{trace: tracing.QueryTracer()}
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
@@ -73,12 +75,17 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 type queryCounter struct {
 	n   atomic.Int64
 	lag atomic.Int64
+	// trace makes a span of every query while tracing is on (spec 060); nil when it is off.
+	trace pgx.QueryTracer
 }
 
-func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.TraceQueryStartData) context.Context {
+func (q *queryCounter) TraceQueryStart(ctx context.Context, conn *pgx.Conn, d pgx.TraceQueryStartData) context.Context {
 	q.n.Add(1)
 	if FreshnessOf(ctx) == MayLag {
 		q.lag.Add(1)
+	}
+	if q.trace != nil {
+		ctx = q.trace.TraceQueryStart(ctx, conn, d)
 	}
 	// pgx runs the query under the context returned here, so a request's limit on one
 	// query applies here; a deadline makes pgx cancel the statement on the server.
@@ -90,8 +97,12 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 	return context.WithValue(bounded, queryCancelKey{}, cancel)
 }
 
-// TraceQueryEnd notes a query that ran out, and frees the timer of the query.
-func (*queryCounter) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
+// TraceQueryEnd ends the span of the query, notes a query that ran out, and frees the
+// timer of the query.
+func (q *queryCounter) TraceQueryEnd(ctx context.Context, conn *pgx.Conn, data pgx.TraceQueryEndData) {
+	if q.trace != nil {
+		q.trace.TraceQueryEnd(ctx, conn, data)
+	}
 	cancel, ok := ctx.Value(queryCancelKey{}).(context.CancelFunc)
 	if !ok {
 		return

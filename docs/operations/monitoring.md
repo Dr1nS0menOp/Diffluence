@@ -51,6 +51,60 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 | `diffluence_build_timestamp_seconds` | The date of the commit the release was built from |
 | `diffluence_health_problems`, `diffluence_health_warnings` | How many checks need a person now, and how many a look |
 
+## Traces
+
+Diffluence can send traces to an OpenTelemetry collector (spec 060). It is **off** by default, and then nothing leaves the machine and nothing of it runs.
+
+| Setting | Default | What |
+|---|---|---|
+| `DIFFLUENCE_TRACING` | `false` | Switch traces on |
+| `DIFFLUENCE_TRACING_SAMPLE` | `0.1` | The share of new traces kept, from 0 to 1. A request that arrives inside a sampled trace (a `traceparent` from your proxy) is always kept |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `http://localhost:4318` | Where the collector takes OTLP over HTTP |
+| `OTEL_EXPORTER_OTLP_HEADERS`, `_CERTIFICATE`, `_TIMEOUT`, `_COMPRESSION` | | Authentication and transport, as OpenTelemetry documents them |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | `diffluence` | The name and labels of this service in your tracing back end |
+
+The first two are settings of Diffluence: they may sit in the configuration file and show in `diffluence config check`. The `OTEL_*` variables are the standard ones every collector documents; the exporter reads them itself, so put them in the environment.
+
+What a trace holds:
+
+| Span | Name | Attributes |
+|---|---|---|
+| A request | The route pattern, such as `GET /api/v1/pages/{id}`; `GET` alone for a request without a route | `http.request.method`, `http.route`, `http.response.status_code` |
+| A query | The operation and the first table, such as `SELECT pages` | `db.system.name`, `db.operation.name`, `db.collection.name` |
+| An event sent and handled | `queue publish diffluence.events.page.created`, `queue consume notify` | `messaging.system`, `messaging.destination.name`, `messaging.consumer.group.name` |
+| A job and a periodic task | `job page.export`, `task purge-trash` | |
+| The audit sealer | `audit seal` | `diffluence.audit.sealed`: how many events it sealed |
+| The backup worker's commands | `backup next`, `backup report`, `backup restore-checked` | |
+
+**Never in a span:** a path, a query string, an id, a statement or its values, a title, page text, a name, an email address, a token, a client address or a user agent. A failure sets the span's status to `error`, or for a database error to its SQLSTATE code, never to the error's message, which can quote a value. A test runs the whole application with tracing on and fails if any span holds such content.
+
+While tracing is on, every log line written inside a request or a job carries `trace_id` and `span_id`, so you can go from a line to its trace and back. While it is off, the request line still carries `trace_id` when your proxy sent a `traceparent`.
+
+What it costs is in [limits.md](limits.md). When the collector cannot be reached, spans are dropped after a queue of 2,048, a request never waits for it, and the log says so at most once a minute.
+
+## Log events
+
+Every line is JSON on standard error, with `time`, `level` and `msg`. The messages below are an interface: they change only with a note in the changelog, and a test checks that each one still exists in the code. Other messages may change without notice.
+
+| `msg` | Level | When |
+|---|---|---|
+| `http request` | info (debug for `/livez`, `/readyz`, `/metrics`) | Every request: `method`, `path` without query or token, `status`, `duration_ms`, `ip`, `request_id`, `trace_id` |
+| `audit checkpoint` | always written, whatever the level | Each signed checkpoint of the audit chain, for a witness outside the database (ADR-039) |
+| `AUDIT LOG TAMPERING DETECTED` | error | The check of the audit chain found a change |
+| `sealing the audit log failed` | error | The sealer could not put waiting events into the chain |
+| `job failed` | error | A queued job ended in failure: `job`, `kind` |
+| `periodic task failed` | error | A periodic task failed: `task` |
+| `queue: gave up on an event` | warn | An event failed every try and waits for a replay in the console |
+| `outbox relay failed, retrying` | error | Events cannot reach the queue |
+| `nats disconnected` | warn | The node lost the queue |
+| `sending a mail failed` | warn | One mail failed and will be tried again |
+| `request found no database connection in time` | warn | The pool was full for 10 seconds; the request got 503 |
+| `readiness check failed` | warn | `/readyz` answered not ready |
+| `panic in handler` | error | A request crashed; it got 500 |
+| `a setting does not work yet` | warn | A setting tried at start failed (OPS-101): `setting`, `reason` |
+| `UPGRADING WITHOUT A RECENT BACKUP: make backups before the next upgrade, which will refuse without one` | warn | The first upgrade of an installation that never noted a backup (ADR-042) |
+| `tracing: spans could not be sent` | warn | The collector cannot be reached, at most once a minute |
+
 ## Alerts
 
 [`deploy/monitoring/diffluence-rules.yml`](../../deploy/monitoring/diffluence-rules.yml) holds two objectives, over 30 days: 99.5% of requests succeed, and 99.5% take less than 300 ms. A fast burn of the error budget pages within minutes and a slow one opens a ticket, as the Google SRE workbook describes. The other alerts are causes that need a person: Diffluence or its database down, the disk above 85% and above 98% full, no backup in 26 hours, jobs failing, an outbox that does not drain, audit events not sealed for 15 minutes, events that gave up, a contract migration waiting a day, the queue unreachable, mail failing, a release older than 60 days. Change the numbers to your own objective.
