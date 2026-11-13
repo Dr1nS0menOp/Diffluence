@@ -1277,7 +1277,7 @@ mutate "an older release runs after a contract migration" internal/db/compat.go 
 mutate "migrate skips the check for a newer contract" internal/db/migrate.go \
   's.replace("if err := CheckCompatible(ctx, conn, migs); err != nil {", "if err := error(nil); err != nil {")' ./internal/db/ -run TestOlderNodeRefusesADatabaseAfterAContractMigration
 mutate "a node that does not migrate skips the check" internal/app/upgrade.go \
-  's.replace("return db.CheckCompatible(ctx, a.pool, a.migrations)", "return nil")' $app -run TestANodeRefusesADatabaseANewerReleaseContracted
+  's.replace("if err := db.CheckCompatible(ctx, a.pool, a.migrations); err != nil {", "if err := error(nil); err != nil {")' $app -run TestANodeRefusesADatabaseANewerReleaseContracted
 mutate "an old PostgreSQL is accepted" internal/db/compat.go \
   's.replace("if number < minPostgresVersion {", "if number < 0 {")' ./internal/db/ -run TestPostgresBelowTheMinimumIsRefused
 mutate "a full data folder does not stop an upgrade" internal/app/upgrade.go \
@@ -1333,7 +1333,7 @@ mutate "a quiet instance signs the same head again" internal/audit/checkpoint.go
 mutate "a removed tail passes the witness" internal/audit/witness.go \
   's.replace("if c.Seq > head {", "if c.Seq > head && head < 0 {")' $app -run TestTheWitnessLogShowsATailRemovedFromTheDatabase
 mutate "a forged witness line passes" internal/audit/witness.go \
-  's.replace("if !ed25519.Verify(public, checkpointMessage(c.Seq, c.Hash), c.Signature) {", "if len(c.Signature) < 0 {")' $app -run TestAForgedWitnessLineIsRefused
+  's.replace("if !ed25519.Verify(keys.at(c.Seq), checkpointMessage(c.Seq, c.Hash), c.Signature) {", "if !ed25519.Verify(keys.at(c.Seq), checkpointMessage(c.Seq, c.Hash), c.Signature) \x26\x26 false {")' $app -run TestAForgedWitnessLineIsRefused
 mutate "a chain that differs from the witness passes" internal/audit/witness.go \
   's.replace("if !bytes.Equal(chain, c.Hash) {", "if len(chain) < 0 {")' ./internal/audit/ -run TestAChainThatDiffersFromTheWitnessIsNamed
 mutate "a broken witness line is skipped" internal/audit/witness.go \
@@ -1581,7 +1581,7 @@ mutate "an exception covers the whole file" internal/db/lint.go \
 mutate "migrations from before the rule are checked" internal/db/lint.go \
   's.replace("\tif m.Version < LintFrom {", "\tif false {")' $db -run TestEarlierMigrationsAreNotChecked
 mutate "contract migrations ignore the grace" internal/app/ops.go \
-  's.replace("time.Since(*youngestStart) < a.cfg.ContractGrace", "time.Since(*youngestStart) < 10*time.Minute")' $app -run TestContractMigrationsWaitForOlderNodes
+  's.replace("time.Since(*youngestStart) < grace", "time.Since(*youngestStart) < 10*time.Minute")' $app -run TestContractMigrationsWaitForOlderNodes
 mutate "the health check forgets the grace" internal/health/health.go \
   's.replace("> f.ContractGrace+ContractWaitWarnAfter", "> ContractWaitWarnAfter")' $health -run TestAContractMigrationWarnsADayAfterItsGrace
 mutate "a negative grace is taken" internal/config/config.go \
@@ -2070,6 +2070,51 @@ mutate "a space export needs only the read scope" internal/httpapi/server.go \
   's.replace("\t\"GET /api/v1/spaces/{id}/export.zip\",\n", "")' $app -run TestEveryExportRouteNeedsMoreThanTheReadScope
 mutate "an unrouted request needs no admin scope" internal/httpapi/server.go \
   's.replace("case r.Pattern == \"\" || strings.HasPrefix(path,", "case strings.HasPrefix(path,")' ./internal/httpapi/ -run TestTheScopeOfARequestComesFromItsRoute
+# Spec 070: migrations, checkpoint signing and restore orders in the backup service.
+mutate "a short backup key is taken" internal/keys/worker.go \
+  's.replace("if len(secret) < minWorkerSecret {", "if len(secret) < 0 {")' ./internal/keys/ -run TestAWorkerKeyThatIsMissingOrShortIsRefused
+mutate "two purposes of the backup key share a MAC key" internal/keys/worker.go \
+  's.replace("w.derive(\"mac \"+purpose, sha256.Size)", "w.derive(\"mac\", sha256.Size)")' ./internal/keys/ -run TestTheWorkerKeysAreStableAndApartPerPurpose
+mutate "a checkpoint key without the installation's endorsement passes" internal/audit/keychain.go \
+  's.replace("if len(public) != ed25519.PublicKeySize || !ed25519.Verify(root, keyChangeMessage(e.from, public), endorsement) {", "if len(public) != ed25519.PublicKeySize {")' ./internal/audit/ -run TestAKeyWithoutTheInstallationsEndorsementFails
+mutate "the installation's key still verifies after the change" internal/audit/keychain.go \
+  's.replace("\t\tkey = e.public\n", "\t\t_ = e.public\n")' ./internal/audit/ -run TestTheInstallationKeySignsNothingAfterTheChange
+mutate "an anchor of a stranger's key passes" internal/audit/checkpoint.go \
+  's.replace("if !keys.knows(start.publicKey) {", "if false {")' ./internal/audit/ -run TestAnAnchorFollowsTheKeysOfTheChain
+mutate "the database takes a checkpoint of a key no longer in force" internal/db/migrations/0055_worker_keys_and_restore_codes.sql \
+  's.replace("IF in_force IS NOT NULL AND in_force <> NEW.public_key THEN", "IF false THEN")' ./internal/audit/ -run TestTheInstallationKeySignsNothingAfterTheChange
+mutate "a change of key leaves no record" internal/audit/keychain.go \
+  's.replace("ActorID: \"backup\", Action: checkpointKeyChangedAction,", "ActorID: \"backup\", Action: \"audit.other\",")' ./internal/audit/ -run TestCheckpointsVerifyAcrossTheChangeOfKey
+mutate "a change of key lands on a signed position" internal/audit/keychain.go \
+  's.replace("(SELECT COALESCE(max(from_seq), 0) FROM audit_signing_keys)) + 1`", "(SELECT COALESCE(max(from_seq), 0) FROM audit_signing_keys)) + 0`")' ./internal/audit/ -run TestCheckpointsVerifyAcrossTheChangeOfKey
+mutate "the backup service signs every round" internal/audit/keychain.go \
+  's.replace("return newest == nil || time.Since(*newest) >= every, nil", "return true, nil")' ./internal/audit/ -run TestACheckpointIsDueOnlyAfterItsInterval
+mutate "a wrong code confirms a restore" internal/restore/gate.go \
+  's.replace("if hmac.Equal([]byte(normaliseCode(entered)), []byte(want)) {", "if hmac.Equal([]byte(normaliseCode(entered)), []byte(want)) || true {")' $app -run TestThreeWrongCodesEndTheRestore
+mutate "wrong codes are tried without end" internal/restore/gate.go \
+  's.replace("if wrong >= CodeTries {", "if wrong >= CodeTries*1000 {")' $app -run TestThreeWrongCodesEndTheRestore
+mutate "a code waits for ever" internal/restore/gate.go \
+  's.replace("\tcase expired:\n", "\tcase false:\n")' $app -run TestARestoreWithoutItsCodeEndsAfterHalfAnHour
+mutate "the console takes a code the worker never showed" internal/restore/gate.go \
+  's.replace(" AND code_shown_at IS NOT NULL AND confirmation IS NULL", " AND confirmation IS NULL")' $app -run TestThreeWrongCodesEndTheRestore
+mutate "an entered code reaches the audit log" internal/restore/gate.go \
+  's.replace("c.Event(ActionCodeEntered, \"backup\", name, \"\", nil)", "c.Event(ActionCodeEntered, \"backup\", name+code, \"\", nil)")' $app -run TestThreeWrongCodesEndTheRestore
+mutate "the seal leaves the backup out" internal/restore/gate.go \
+  's.replace("return append(id[:], []byte(name)...)", "return id[:]")' $app -run TestARestoreWrittenStraightIntoTheTableIsRefused
+mutate "a restore goes on without the worker's seal" internal/restore/run.go \
+  's.replace("if !r.Gate.sealHolds(\"restore\", id, rs.BackupName, sealed) {", "if !r.Gate.sealHolds(\"restore\", id, rs.BackupName, sealed) \x26\x26 false {")' $app -run TestARestoreWrittenStraightIntoTheTableIsRefused
+mutate "the way back restores a safety backup the worker never made" internal/restore/run.go \
+  's.replace("if !r.Gate.sealHolds(\"safety\", failed.ID, failed.SafetyName, safetySeal) {", "if !r.Gate.sealHolds(\"safety\", failed.ID, failed.SafetyName, safetySeal) \x26\x26 false {")' $app -run TestARestoreWrittenStraightIntoTheTableIsRefused
+mutate "a server without the owner tries to migrate" internal/config/config.go \
+  's.replace("return !c.MigrateOnStart \x26\x26 c.MigrateDatabaseURL == \"\"", "return false")' ./internal/config/ -run TestOnlyAProcessWithoutTheOwnerThatDoesNotMigrateLeavesMigrations
+mutate "a server that does not migrate serves an unmigrated database" internal/app/upgrade.go \
+  's.replace("\t\treturn a.waitForMigrations(ctx)\n", "\t\treturn nil\n")' $app -run TestAServerWithoutTheOwnerWaitsUntilTheBackupServiceMigrated
+mutate "a server without the owner runs contract migrations" internal/app/ops.go \
+  's.replace("\tif a.cfg.LeavesMigrations() {\n\t\treturn 0, nil\n\t}\n", "")' $app -run TestContractMigrationsRunInTheBackupServiceAfterTheGrace
+mutate "the server's checkpoint job fails once the backup service signs" internal/app/ops.go \
+  's.replace("if errors.Is(err, audit.ErrKeyNotInForce) {", "if false {")' $app -run TestTheServerStopsSigningOnceTheBackupServiceDoes
+mutate "migrate in the server tries as the application role" cmd/diffluence/worker.go \
+  's.replace("\tcase cfg.LeavesMigrations():\n\t\treturn \"\", errNoOwner\n", "")' ./cmd/diffluence/ -run TestAContainerWithoutTheOwnerSaysWhereToMigrate
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

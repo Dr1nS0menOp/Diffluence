@@ -242,7 +242,8 @@ func (f *fakeSteps) Record(_ context.Context, r restore.Restore) error {
 }
 func (f *fakeSteps) Verify(context.Context) error { return f.step("verify") }
 
-// claimed asks for a restore by command line and has the worker claim it.
+// claimed asks for a restore by command line, has the worker show its code, enters that
+// code as the console does, and has the worker claim it (spec 070).
 func claimed(t *testing.T, e *env) (*restore.Restore, string) {
 	t.Helper()
 	ctx := context.Background()
@@ -251,15 +252,19 @@ func claimed(t *testing.T, e *env) (*restore.Restore, string) {
 		CallerName: "the command line"}); err != nil {
 		t.Fatal(err)
 	}
-	rs, err := restore.Claim(ctx, e.app.Pool())
-	if err != nil || rs == nil || rs.State != restore.StatePreparing {
-		t.Fatalf("the worker takes the restore: %+v %v", rs, err)
+	code := shownCode(t, e.app.Pool(), testGate(t))
+	if err := restore.EnterCode(ctx, e.app.Pool(), identity.SystemCaller("test"), code); err != nil {
+		t.Fatal(err)
 	}
-	return rs, name
+	c, err := restore.Claim(ctx, e.app.Pool(), testGate(t))
+	if err != nil || c.Restore == nil || c.Restore.State != restore.StatePreparing {
+		t.Fatalf("the worker takes the restore: %+v %v", c, err)
+	}
+	return c.Restore, name
 }
 
 func runner(e *env, f *fakeSteps) restore.Runner {
-	return restore.Runner{Pool: e.app.Pool(), Steps: f, NewestKnown: 100, StopWithin: 300 * time.Millisecond,
+	return restore.Runner{Pool: e.app.Pool(), Steps: f, Gate: testGate(e.t), NewestKnown: 100, StopWithin: 300 * time.Millisecond,
 		Poll: 50 * time.Millisecond, Log: slog.New(slog.DiscardHandler)}
 }
 
@@ -469,7 +474,7 @@ func TestARestoreThatStoodStillLongBeforeAnyChangeIsNotWaitedFor(t *testing.T) {
 	if mustWait(t, e) != nil {
 		t.Fatal("the nodes wait for a worker that stopped hours ago")
 	}
-	if _, err := restore.Claim(ctx, e.app.Pool()); err != nil {
+	if _, err := restore.Claim(ctx, e.app.Pool(), testGate(t)); err != nil {
 		t.Fatal(err)
 	}
 	got, _ := restore.Get(ctx, e.app.Pool(), rs.ID)

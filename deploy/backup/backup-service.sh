@@ -11,6 +11,10 @@
 # from /key/backup.key. Backups go to /backups, encrypted with gpg as backup.sh does, so
 # scripts/restore.sh restores them.
 #
+# Every round, at most a minute apart, it also does what the server no longer may (spec 070):
+# it runs the migrations of a new release, signs the audit checkpoints with a key derived
+# from the backup key, and writes the code that confirms a restore to this log.
+#
 # Every step checks its own result: these functions also run on the left of ||, where
 # set -e does not apply.
 set -uo pipefail
@@ -46,6 +50,19 @@ setup_problem() {
     case "$keep" in
       '' | *[!0-9]* | 0) echo "DIFFLUENCE_BACKUP_KEEP must be a whole number above 0, not $keep" ;;
     esac
+  fi
+}
+
+# tend does, every round, what only this service may do since spec 070: the migrations of a
+# new release, as the owner of the tables, and a checkpoint of the audit chain with the key
+# derived from the backup key. A failure is logged and tried again the next round; backups go
+# on meanwhile, because a backup may be what an upgrade waits for.
+tend() {
+  if ! diffluence worker migrate; then
+    log "the migrations did not run; the server shows why on its page. Trying again within a minute"
+  fi
+  if [ -s "$key" ] && schema_ready; then
+    diffluence worker checkpoint --key "$key" || log "no audit checkpoint was signed this round"
   fi
 }
 
@@ -208,21 +225,28 @@ case "${1:-loop}" in
       exit 2
     fi
     log "backing up every $interval unless the console chose otherwise, keeping the newest $keep"
+    retry_at=0
     while true; do
+      tend
       if ! schema_ready; then
-        log "waiting for Diffluence to make its tables before the first backup"
+        log "waiting for the tables of Diffluence before the first backup"
         sleep 60
         continue
       fi
       # The console decides when (its schedule, or "back up now") and how many to keep.
       # A release from before spec 058 has no answer; then the folder decides, as before.
       if answer=$(diffluence backup next --default-interval "${every}s" --default-keep "$keep" \
-        --key-fingerprint "$(key_fingerprint)" 2>/dev/null); then
-        read -r what value keep_now <<<"$answer"
+        --key-fingerprint "$(key_fingerprint)" --key "$key" 2>/dev/null); then
+        read -r what value keep_now minutes <<<"$answer"
         case "$what" in
           restore)
             # value is the restore, keep_now the backup it restores.
             restore "$value" "$keep_now" || true
+            ;;
+          code)
+            # The restore of value waits for this code, typed into the console by someone who
+            # can read this log; the server never holds what makes it (spec 070).
+            log "To restore $value, enter this confirmation code in the console: $keep_now (valid $minutes minutes)"
             ;;
           now)
             keep=$keep_now
@@ -237,13 +261,21 @@ case "${1:-loop}" in
         esac
         continue
       fi
+      # Rounds stay a minute apart here too, so migrations and checkpoints do not wait for
+      # the next backup; a failed backup is tried again after the interval.
       wait=$(due_in)
+      now=$(date +%s)
+      if [ "$now" -lt "$retry_at" ]; then
+        wait=$((retry_at - now))
+      fi
       if [ "$wait" -gt 0 ]; then
         sleep "$((wait < 60 ? wait : 60))"
         continue
       fi
-      attempt schedule || log "the next try is in $interval"
-      sleep "$every"
+      if ! attempt schedule; then
+        log "the next try is in $interval"
+        retry_at=$(($(date +%s) + every))
+      fi
     done
     ;;
   *)

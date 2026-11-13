@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
@@ -75,39 +76,58 @@ func (a *App) heartbeat(ctx context.Context) {
 }
 
 // RunContractMigrations applies pending contract migrations once every live node
-// knows them, so no node still needs what they remove (docs/blueprint/07). It is
-// exported for tests.
+// knows them, so no node still needs what they remove (docs/blueprint/07). A node that
+// leaves migrations to another process runs none: in Compose the backup service does (spec
+// 070). It is exported for tests.
 func (a *App) RunContractMigrations(ctx context.Context) (int, error) {
-	pending, err := db.PendingContract(ctx, a.pool, a.migrations)
-	if err != nil || len(pending) == 0 {
-		return 0, err
-	}
-	var oldest int
-	var youngestStart *time.Time
-	err = a.pool.QueryRow(ctx, `SELECT COALESCE(min(max_migration), 0), max(started_at) FROM nodes
-		WHERE last_seen_at > now() - make_interval(secs => $1)`, nodeLiveWindow.Seconds()).Scan(&oldest, &youngestStart)
-	if err != nil {
-		return 0, err
-	}
-	if oldest < pending[len(pending)-1].Version {
-		return 0, nil // an older node is still alive, or no node reported yet
-	}
-	// Every node must have run this release for the grace period (DIFFLUENCE_CONTRACT_GRACE),
-	// so a problem found the next day can still be rolled back (spec 048 D1).
-	if youngestStart != nil && time.Since(*youngestStart) < a.cfg.ContractGrace {
+	if a.cfg.LeavesMigrations() {
 		return 0, nil
+	}
+	pending, due, err := contractDue(ctx, a.pool, a.migrations, a.cfg.ContractGrace)
+	if err != nil || !due {
+		return 0, err
 	}
 	if err := a.migrate(ctx, db.Options{IncludeContract: true, Log: a.log}); err != nil {
 		return 0, err
 	}
-	for _, m := range pending {
-		if err := audit.RecordStandalone(ctx, a.pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "worker",
+	return len(pending), recordContracts(ctx, a.pool, "worker", pending)
+}
+
+// contractDue lists the pending contract migrations and says whether they may run now:
+// every live node knows them, and every node has run this release for the grace period
+// (DIFFLUENCE_CONTRACT_GRACE), so a problem found the next day can still be rolled back
+// (spec 048 D1).
+func contractDue(ctx context.Context, q db.Querier, migs []db.Migration, grace time.Duration) ([]db.Migration, bool, error) {
+	pending, err := db.PendingContract(ctx, q, migs)
+	if err != nil || len(pending) == 0 {
+		return nil, false, err
+	}
+	var oldest int
+	var youngestStart *time.Time
+	err = q.QueryRow(ctx, `SELECT COALESCE(min(max_migration), 0), max(started_at) FROM nodes
+		WHERE last_seen_at > now() - make_interval(secs => $1)`, nodeLiveWindow.Seconds()).Scan(&oldest, &youngestStart)
+	if err != nil {
+		return nil, false, err
+	}
+	if oldest < pending[len(pending)-1].Version {
+		return pending, false, nil // an older node is still alive, or no node reported yet
+	}
+	if youngestStart != nil && time.Since(*youngestStart) < grace {
+		return pending, false, nil
+	}
+	return pending, true, nil
+}
+
+// recordContracts writes each contract migration that ran into the audit log.
+func recordContracts(ctx context.Context, pool *pgxpool.Pool, actor string, ran []db.Migration) error {
+	for _, m := range ran {
+		if err := audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: actor,
 			Action: "system.contract_migrated", ObjectType: "migration", ObjectID: fmt.Sprintf("%04d_%s", m.Version, m.Name),
 			Result: audit.ResultSuccess}); err != nil {
-			return len(pending), err
+			return err
 		}
 	}
-	return len(pending), nil
+	return nil
 }
 
 func (a *App) runContractMigrations(ctx context.Context) error {
@@ -188,6 +208,8 @@ func resultOf(ok bool) string {
 // the whole chain cannot forge these without the key. Each checkpoint also goes to the
 // application log once it is committed, as the witness outside the database (ADR-039):
 // a line for a checkpoint that was rolled back would look like a removed tail.
+//
+// Once the backup service signs with a key of its own, this job stops by itself (spec 070).
 func (a *App) signCheckpoint(ctx context.Context) error {
 	key, err := a.keyring.SigningKey()
 	if err != nil {
@@ -199,6 +221,10 @@ func (a *App) signCheckpoint(ctx context.Context) error {
 		return err
 	}
 	cp, signed, err := audit.SignCheckpoint(ctx, a.pool, key)
+	if errors.Is(err, audit.ErrKeyNotInForce) {
+		a.log.Debug("the backup service signs the audit checkpoints")
+		return nil
+	}
 	if err != nil || !signed {
 		return err
 	}

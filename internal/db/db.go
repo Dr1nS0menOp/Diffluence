@@ -229,6 +229,9 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 			"REVOKE UPDATE, DELETE, TRUNCATE ON audit_checkpoints FROM " + ident,
 			// Verification starts at an anchor, so the application may only read it.
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_anchors FROM " + ident,
+			// The keys that sign checkpoints after the installation's own are added by the
+			// backup service, as the owner (spec 070).
+			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_signing_keys FROM " + ident,
 			// A personal part can be erased, and never changed.
 			"REVOKE UPDATE, TRUNCATE ON audit_personal FROM " + ident,
 			// A waiting event is sealed and then removed, or its personal part is erased;

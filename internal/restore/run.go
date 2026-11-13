@@ -7,10 +7,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/diffluence/diffluence/internal/audit"
 )
 
 // Steps are what the worker does to an installation. The real ones run gpg, pg_restore
@@ -43,6 +46,8 @@ type Runner struct {
 	// Pool connects as the owner of the tables.
 	Pool  *pgxpool.Pool
 	Steps Steps
+	// Gate checks that the backup service confirmed the restore it is asked to run.
+	Gate Gate
 	// NewestKnown is the newest migration of this release.
 	NewestKnown int
 	// StopWithin is how long the nodes get to stop serving; Poll is how often to look.
@@ -59,12 +64,32 @@ func (r Runner) open(ctx context.Context, id uuid.UUID, want ...string) (Restore
 	if !rs.Open() {
 		return Restore{}, fmt.Errorf("restore: %s is already finished (%s)", id, rs.State)
 	}
-	for _, s := range want {
-		if rs.State == s {
-			return rs, nil
-		}
+	if !slices.Contains(want, rs.State) {
+		return Restore{}, fmt.Errorf("restore: %s is %s, not %v", id, rs.State, want)
 	}
-	return Restore{}, fmt.Errorf("restore: %s is %s, not %v", id, rs.State, want)
+	// What the application role wrote is not an order: only a restore this backup service
+	// confirmed, of the backup it confirmed, goes on (spec 070).
+	sealed, _, err := seals(ctx, r.Pool, id)
+	if err != nil {
+		return Restore{}, err
+	}
+	if !r.Gate.sealHolds("restore", id, rs.BackupName, sealed) {
+		return Restore{}, r.reject(ctx, rs, "the backup service did not confirm this restore of this backup")
+	}
+	return rs, nil
+}
+
+// reject stops a restore the backup service never confirmed and records it. Nothing was
+// changed by this worker, so a restore that had not changed anything ends refused; one marked
+// changed keeps the nodes waiting for a person, as any failed restore does.
+func (r Runner) reject(ctx context.Context, rs Restore, why string) error {
+	write, cancel := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
+	defer cancel()
+	err := r.fail(write, rs.ID, why+"; nothing was changed", ErrNotConfirmed)
+	if recErr := audit.RecordStandalone(write, r.Pool, refusal(rs, "not_confirmed")); recErr != nil {
+		return errors.Join(err, recErr)
+	}
+	return err
 }
 
 // fail writes down the step that failed, and returns the error.
@@ -123,7 +148,7 @@ func (r Runner) Run(ctx context.Context, id uuid.UUID, safety string) error {
 	if err != nil {
 		return err
 	}
-	if err := SetSafety(ctx, r.Pool, id, safety); err != nil {
+	if err := setSafety(ctx, r.Pool, r.Gate, id, safety); err != nil {
 		return err
 	}
 	rs.SafetyName = safety
@@ -139,10 +164,24 @@ func (r Runner) WayBack(ctx context.Context) (Restore, error) {
 	if failed == nil {
 		return Restore{}, errors.New("restore: no failed restore waits for the way back")
 	}
+	// Only a safety backup this backup service made. A failure written by hand keeps the
+	// nodes waiting: a person decides what happened (spec 070).
+	_, safetySeal, err := seals(ctx, r.Pool, failed.ID)
+	if err != nil {
+		return *failed, err
+	}
+	if !r.Gate.sealHolds("safety", failed.ID, failed.SafetyName, safetySeal) {
+		r.Log.Error("the way back was refused: the backup service did not make this safety backup", "restore", failed.ID)
+		if err := audit.RecordStandalone(ctx, r.Pool, refusal(*failed, "safety_not_sealed")); err != nil {
+			return *failed, errors.Join(ErrNotConfirmed, err)
+		}
+		return *failed, fmt.Errorf("%w: the safety backup %s was not made by this backup service; restore by hand with scripts/restore.sh",
+			ErrNotConfirmed, failed.SafetyName)
+	}
 	if err := r.Steps.Check(ctx, failed.SafetyName); err != nil {
 		return *failed, fmt.Errorf("restore: the safety backup %s is not whole: %w", failed.SafetyName, err)
 	}
-	if err := TakeOver(ctx, r.Pool, failed.ID); err != nil {
+	if err := takeOver(ctx, r.Pool, r.Gate, failed.ID, failed.SafetyName); err != nil {
 		return *failed, err
 	}
 	rs, err := Get(ctx, r.Pool, failed.ID)

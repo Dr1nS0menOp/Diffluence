@@ -48,7 +48,7 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 **Do not rely on these, because they are not there or not finished:**
 
 - **Page text is not encrypted by Diffluence at rest.** Search needs the text. Stored files are encrypted, but the database is not: use disk encryption on the server.
-- **Without `master.key`, no file can be read.** Files are encrypted with keys that `master.key` protects. Back it up apart from the data, and do not lose it. Replace it when someone who knew it leaves, or when you suspect it leaked: [backup and restore](../operations/backup-restore.md#replace-it) says how. Replacing it does not change the key that signs audit checkpoints, so a stolen key file still lets a thief forge those.
+- **Without `master.key`, no file can be read.** Files are encrypted with keys that `master.key` protects. Back it up apart from the data, and do not lose it. Replace it when someone who knew it leaves, or when you suspect it leaked: [backup and restore](../operations/backup-restore.md#replace-it) says how. In Compose the audit checkpoints are signed by the backup service with a key derived from the backup key (spec 070), so `master.key` alone no longer signs one that verifies. Together with the owner's database password it still lets a thief bring in a key of their own: the copies of the checkpoints in your log server show that.
 - **Files are served from the same address as the app.** Other measures cover the known attacks, but a separate address would be stronger.
 - **Limits on login attempts per minute are counted per node.** A restart clears them, and two nodes count apart. The stop after a long run of wrong passwords is different: it is stored with the account, so it holds on every node and after a restart, until a new password is set or an administrator lifts it (ADR-038).
 - **Optional helpers** run as separate programs, each with its own flaws and updates. Only turn on what you need.
@@ -73,7 +73,7 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 3. **Update the rest too:** the operating system, Docker, PostgreSQL and every helper.
 4. **Make backups, and test restoring them.** Keep the backup key apart from the backups. Without it, a backup cannot be read. See [backup and restore](../operations/backup-restore.md).
 5. **Log in through an identity provider or with passkeys**, certainly for administrators. Keep the number of administrators small.
-6. **Keep secrets in files or environment variables**, as the install guide says, and limit who can reach the server. Anyone with access to the server or the database can get around everything in the app.
+6. **Keep secrets in files or environment variables**, as the install guide says, and limit who can reach the server. Anyone with access to the server or the database can get around everything in the app. In Compose the server's container holds only the application's database role: the backup service holds the owner's password and the backup key, so protect its log and the folders `secrets/` and `backup-key/` most of all. Reading its log is also what confirms a restore from the console.
 7. **Check the audit log.** Run `diffluence audit verify`, and keep a copy of the log elsewhere.
 8. **Limit resources**, so one heavy task cannot stop the whole server.
 9. **Try it with data you can lose** before you trust it with data you cannot.

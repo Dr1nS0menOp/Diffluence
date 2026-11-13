@@ -414,6 +414,24 @@
         "x-access": "sensitive permission:system_administrator"
       }
     },
+    "/api/v1/admin/backups/restore/code": {
+      "post": {
+        "operationId": "post /api/v1/admin/backups/restore/code",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:system_administrator"
+      }
+    },
     "/api/v1/admin/bundles": {
       "post": {
         "operationId": "post /api/v1/admin/bundles",

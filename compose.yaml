@@ -55,10 +55,11 @@ services:
       # With DIFFLUENCE_BIND=0.0.0.0, set this to the address of the proxy alone, or anyone
       # on such a network could pass any address (docs/operations/install.md).
       DIFFLUENCE_TRUSTED_PROXIES: ${DIFFLUENCE_TRUSTED_PROXIES:-127.0.0.0/8,::1/128,172.16.0.0/12}
-      # The application connects as a role that does not own the tables, so it
-      # cannot disable the audit log's protection. Migrations use the owner.
+      # The application connects as a role that does not own the tables, so it cannot
+      # disable the audit log's protection. It holds no other: the backup service below
+      # migrates as the owner, and this node waits on its page until that is done (spec 070).
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
-      DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+      DIFFLUENCE_MIGRATE_ON_START: "false"
       # Mail. Without a host it is off, and mail waits in the queue.
       DIFFLUENCE_SMTP_HOST: ${DIFFLUENCE_SMTP_HOST:-}
       # Empty = 587, and starttls below.
@@ -81,7 +82,7 @@ services:
       DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
       # Empty = 24h: how long contract migrations wait after an upgrade (docs/operations/upgrade.md).
       DIFFLUENCE_CONTRACT_GRACE: ${DIFFLUENCE_CONTRACT_GRACE:-}
-    secrets: [database_url, migrate_database_url]
+    secrets: [database_url]
     # Plain http, so only this machine by default: the TLS proxy in front reaches it here.
     # Set DIFFLUENCE_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).
     ports: ["${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080"]
@@ -98,6 +99,9 @@ services:
   # makes (spec 054). Each is noted, so an upgrade finds a recent backup (ADR-040). Copy
   # ./backups off this machine, and keep the key away from that copy: see
   # docs/operations/backup-restore.md. One backup now: docker compose run --rm backup once
+  # It is also the only process with the owner of the tables (spec 070): every round it runs
+  # the migrations of a new release, signs the audit checkpoints with a key derived from the
+  # backup key, and carries out a restore only with the code it writes to its own log.
   backup:
     image: ${DIFFLUENCE_BACKUP_IMAGE:-diffluence-backup:local}
     build:
@@ -112,11 +116,15 @@ services:
       # How many backups to keep: 42 is a week at one every 4 hours.
       DIFFLUENCE_BACKUP_KEEP: ${DIFFLUENCE_BACKUP_KEEP:-42}
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
-      # A restore from the console runs as the owner of the tables and writes the data
-      # folder: the backup service is the worker that carries it out (spec 059).
+      # Migrations, checkpoints and a restore from the console run as the owner of the
+      # tables: the backup service is the worker that carries them out (specs 059 and 070).
       DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
       DIFFLUENCE_DATA_DIR: /data
       DIFFLUENCE_INSTANCE_NAME: ${DIFFLUENCE_INSTANCE_NAME:-}
+      # The checks before an upgrade and the wait before contract migrations, as the server
+      # read them before spec 070 (docs/operations/upgrade.md).
+      DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
+      DIFFLUENCE_CONTRACT_GRACE: ${DIFFLUENCE_CONTRACT_GRACE:-}
     secrets: [database_url, migrate_database_url]
     volumes:
       - data:/data

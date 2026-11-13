@@ -8,14 +8,26 @@ git pull && docker compose up -d --build     # or: docker compose pull && docker
 
 That is all. There are no manual steps. If you changed a setting or the configuration file, check it first: `docker compose run --rm --no-deps -T diffluence config check` refuses what a start would refuse, without starting ([install.md](install.md#checking-a-change-before-a-restart)).
 
+**Build the backup service too.** Since spec 070 it runs the migrations, so `docker compose up -d --build` must rebuild it with the server. With pulled images, set `DIFFLUENCE_BACKUP_IMAGE` to the backup image of the same release. A server whose database waits for a backup service of an older release shows "The database waits for the backup service to migrate it", with the command that fixes it.
+
+### Upgrading to the layout of spec 070
+
+`compose.yaml` no longer gives the server the owner of the tables; the backup service holds it alone, and the server waits until it has migrated. What to do depends on how you upgrade:
+
+- **With the `compose.yaml` of the repository** (`git pull`): nothing more. The server loses the secret `migrate_database_url` and gets `DIFFLUENCE_MIGRATE_ON_START: "false"`; the backup service migrates, signs the checkpoints and asks for a code before a restore.
+- **With a `compose.yaml` of your own**, kept from before: it keeps working. The server still holds both addresses and migrates as before, beside the backup service, and logs at each upgrade that the new layout leaves this to the backup service. To move: remove `DIFFLUENCE_MIGRATE_DATABASE_URL_FILE` and `migrate_database_url` from the `diffluence` service, add `DIFFLUENCE_MIGRATE_ON_START: "false"` to it, and add `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` and `DIFFLUENCE_CONTRACT_GRACE` to the `backup` service if you set them.
+- **Without the backup service:** keep the server's owner address, as before; it migrates and signs as it did.
+
+Nothing is lost either way: the change of checkpoint key is a position in the chain, and older checkpoints keep verifying with the key they were made with.
+
 With one node, Compose stops the old container and starts the new one, so people wait a few seconds. Zero downtime needs two or more nodes behind a load balancer, replaced one at a time.
 
 ## What happens
 
-1. The new version starts and first checks that it may migrate (below). Then it applies **expand** migrations. They only add things, so the running version keeps working.
+1. The new version starts and first checks that it may migrate (below). Then it applies **expand** migrations. They only add things, so the running version keeps working. In Compose the backup service does this, within a minute, and the server waits on its page until it is done (spec 070); elsewhere the node itself does.
 2. With several nodes, you replace them one at a time. Old and new run side by side on the same database.
 3. Every node reports its version and the migrations it knows, every 15 seconds.
-4. When every live node knows a pending **contract** migration, and the newest node has been up for a day, the worker runs it automatically. It is recorded in the audit log as `system.contract_migrated`. The day leaves room to notice a problem the next working day and still roll back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it, such as `72h` for a longer window, or `0s` on a test installation.
+4. When every live node knows a pending **contract** migration, and the newest node has been up for a day, the worker runs it automatically: in Compose the backup service, elsewhere a node's worker. It is recorded in the audit log as `system.contract_migrated`. The day leaves room to notice a problem the next working day and still roll back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it, such as `72h` for a longer window, or `0s` on a test installation.
 
 `diffluence migrate --contract` runs them by hand if you ever need to.
 
@@ -51,6 +63,7 @@ Once the cause is fixed it migrates by itself within a minute. `docker compose k
 | Queue | NATS does not answer |
 | Backup | No backup was noted in the last 24 hours, or within `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Also for `diffluence migrate`. The first upgrade of an installation that never noted a backup goes on once, below (ADR-040, ADR-042) |
 | Newer database | A newer release has already run a contract migration. Also for a node with `DIFFLUENCE_MIGRATE_ON_START=false`. This one stops the node, as the database is beyond what it can read |
+| Migrations elsewhere | A node with `DIFFLUENCE_MIGRATE_ON_START=false` finds migrations of its release not run yet. It waits with the kind `migrations` and looks again every 5 seconds, until the backup service or `diffluence migrate` ran them (spec 070). It names the backup too when that is what the migration waits for |
 
 **An upgrade waits without a backup of the last 24 hours.** The backup service of `compose.yaml` makes one every 4 hours ([backup-restore.md](backup-restore.md)), so an installation that runs it never waits. The reason in the log looks like this:
 
@@ -61,7 +74,7 @@ waiting before the upgrade: upgrade refused before migrating: no backup was note
 The ways on, best first:
 
 1. **Make a backup:** `docker compose run --rm backup once`, or `bash scripts/backup.sh <folder> <key>`. The node migrates within a minute.
-2. **Upgrade once without one:** `docker compose run --rm diffluence migrate --without-backup`. It writes `system.upgrade_without_backup` with the reason `operator_override` to the audit log. The next upgrade asks for a backup again.
+2. **Upgrade once without one:** `docker compose run --rm --entrypoint diffluence backup migrate --without-backup`, in the backup service, which holds the owner of the tables (with an old `compose.yaml`: `docker compose run --rm diffluence migrate --without-backup`). It writes `system.upgrade_without_backup` with the reason `operator_override` to the audit log. The next upgrade asks for a backup again.
 3. **Switch the check off:** `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off`. Every later upgrade then goes on without a backup too, with only a warning in the log, so prefer the first two.
 
 **The first upgrade under the rule** (ADR-042): an installation that holds data, never noted a backup, and never upgraded without one, is not stopped by the backup check once. The node logs `UPGRADING WITHOUT A RECENT BACKUP` as a warning, writes `system.upgrade_without_backup` with the reason `first_upgrade_under_the_backup_rule`, and migrates. The health page keeps warning that no backup was ever noted. From the next upgrade on, the rule holds in full. The other checks are never waived.

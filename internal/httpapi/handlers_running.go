@@ -30,6 +30,10 @@ func (s *Server) registerRunningRoutes() {
 	// Restore from the console is an experimental part (spec 069). Cancelling stays open,
 	// so a restore asked for before the part was turned off can still be stopped.
 	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(system), s.experimental(features.ExperimentalConsoleRestore, s.handleRestoreRequest))
+	// The backup service goes on only with the code it wrote to its own log (spec 070): the
+	// code is the proof, and the request before it already asked for a fresh login. Like
+	// cancelling, it stays open with the part off, for a request asked for before.
+	r.HandleFunc("POST /api/v1/admin/backups/restore/code", system, s.handleRestoreCode)
 	r.HandleFunc("DELETE /api/v1/admin/backups/restore", admin, s.handleRestoreCancel)
 	r.HandleFunc("GET /api/v1/admin/configuration", admin, s.handleConfiguration)
 	// Logging everyone out is an incident action; asking for the password again first
@@ -53,7 +57,8 @@ func (s *Server) handleBackups(w http.ResponseWriter, r *http.Request) {
 		Restore          *restore.Restore `json:"restore"`
 		InstallationName string           `json:"installation_name"`
 		RestoresPerDay   int              `json:"restores_per_day"`
-	}{overview, latest, s.deps.Config.InstanceName, restore.PerDay})
+		RestoreCodeTries int              `json:"restore_code_tries"`
+	}{overview, latest, s.deps.Config.InstanceName, restore.PerDay, restore.CodeTries})
 }
 
 // handleRestoreRequest asks the backup worker to restore a backup over the installation.
@@ -92,6 +97,22 @@ func (s *Server) handleRestoreRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusAccepted, rs)
+}
+
+// handleRestoreCode passes the code from the backup service's log on to it.
+func (s *Server) handleRestoreCode(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code string `json:"code"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	if err := restore.EnterCode(r.Context(), s.deps.Pool, s.caller(r), in.Code); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleRestoreCancel(w http.ResponseWriter, r *http.Request) {

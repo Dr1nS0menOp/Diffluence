@@ -15,6 +15,9 @@ const BACKUPS_POLL_MS = 15_000;
 /** Restores the safety backup after a restore that stopped halfway (spec 059). A command, not text. */
 const WAY_BACK_COMMAND = 'docker compose run --rm backup way-back';
 
+/** Shows the log where the backup service writes the code that confirms a restore (spec 070). */
+const CODE_LOG_COMMAND = 'docker compose logs backup';
+
 interface BackupRun {
   name: string;
   reason: 'schedule' | 'request' | 'manual';
@@ -51,6 +54,7 @@ interface BackupOverview {
   restore: Restore | null;
   installation_name: string;
   restores_per_day: number;
+  restore_code_tries: number;
 }
 
 interface Restore {
@@ -73,6 +77,11 @@ interface Restore {
   changed: boolean;
   updated_at: string;
   finished_at: string | null;
+  /** The backup service wrote the confirmation code to its log (spec 070). */
+  code_shown: boolean;
+  /** A code was entered and waits for the backup service to compare it. */
+  code_entered: boolean;
+  wrong_codes: number;
 }
 
 /** A whole number of 1 or more from a field, or 0 for "as the installation was started". */
@@ -259,8 +268,57 @@ function RestoreCheck({ data }: { data: BackupOverview }) {
   );
 }
 
+/** The code the backup service wrote to its log, typed in by someone who can read that log
+ * (spec 070). Only a system administrator, who could ask for the restore, enters it. */
+function RestoreCode({ r, tries }: { r: Restore; tries: number }) {
+  const { t } = useTranslation();
+  const qc = useQueryClient();
+  const [code, setCode] = useState('');
+  const enter = useMutation({
+    mutationFn: () => api.post('/admin/backups/restore/code', { code }),
+    onSuccess: () => {
+      setCode('');
+      return qc.invalidateQueries({ queryKey: ['backups'] });
+    },
+  });
+  if (r.code_entered) {
+    return <p role="status">{t('running.restoreCodeWaits')}</p>;
+  }
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    enter.mutate();
+  };
+  return (
+    <form onSubmit={submit} className="settings-form">
+      {r.wrong_codes > 0 && (
+        <p role="alert" className="note">
+          {t('running.restoreCodeWrong', { count: Math.max(tries - r.wrong_codes, 0) })}
+        </p>
+      )}
+      <p>{t('running.restoreCodeShown')}</p>
+      <pre>
+        <code>{CODE_LOG_COMMAND}</code>
+      </pre>
+      <Field label={t('running.restoreCodeLabel')}>
+        <input
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+          autoComplete="off"
+          inputMode="numeric"
+        />
+      </Field>
+      <ErrorNote error={enter.error} />
+      <div>
+        <button type="submit" disabled={enter.isPending || code.trim() === ''}>
+          {t('running.restoreCodeButton')}
+        </button>
+      </div>
+    </form>
+  );
+}
+
 /** Where the latest restore stands: waiting for the worker, running, done, or stopped. */
-function RestoreState({ r }: { r: Restore }) {
+function RestoreState({ r, tries, canConfirm }: { r: Restore; tries: number; canConfirm: boolean }) {
   const { t } = useTranslation();
   const dates = useDates();
   const qc = useQueryClient();
@@ -274,6 +332,7 @@ function RestoreState({ r }: { r: Restore }) {
         <p role="status">
           {t('running.restoreAsked', { name: r.backup_name, when: dates.moment(r.requested_at) })}
         </p>
+        {canConfirm && r.code_shown && <RestoreCode r={r} tries={tries} />}
         <p>
           <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
             {t('running.restoreCancel')}
@@ -343,7 +402,7 @@ function RestoreOver({ data }: { data: BackupOverview }) {
   return (
     <>
       <h2>{t('running.restoreHowTitle')}</h2>
-      {data.restore && <RestoreState r={data.restore} />}
+      {data.restore && <RestoreState r={data.restore} tries={data.restore_code_tries} canConfirm />}
       {!open && chosen && (
         <form onSubmit={submit} className="settings-form">
           <Field label={t('running.restoreWhich')}>
@@ -387,7 +446,7 @@ function RestoreOver({ data }: { data: BackupOverview }) {
         <>
           <p>{t('running.restoreByCommand')}</p>
           <pre>
-            <code>{`docker compose run --rm diffluence backup restore-request --name ${chosen.name} --confirm '${data.installation_name}'`}</code>
+            <code>{`docker compose exec backup diffluence backup restore-request --name ${chosen.name} --confirm '${data.installation_name}'`}</code>
           </pre>
         </>
       )}
@@ -421,7 +480,9 @@ export function BackupsTab({ me }: { me: Me }) {
       ) : (
         <>
           <h2>{t('running.restoreHowTitle')}</h2>
-          {q.data.restore && <RestoreState r={q.data.restore} />}
+          {q.data.restore && (
+            <RestoreState r={q.data.restore} tries={q.data.restore_code_tries} canConfirm={false} />
+          )}
           {capabilities.console_restore ? (
             <p className="muted">{t('running.restoreSystemOnly')}</p>
           ) : (

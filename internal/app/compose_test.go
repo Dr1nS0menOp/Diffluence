@@ -30,6 +30,32 @@ func TestHelpersHaveNoWayOut(t *testing.T) {
 	}
 }
 
+// The server holds only the application role; the backup service alone holds the owner of
+// the tables, and migrates (spec 070).
+func TestOnlyTheBackupServiceHoldsTheOwnerOfTheTables(t *testing.T) {
+	raw, err := os.ReadFile("../../compose.yaml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	service := func(name string) string {
+		found := regexp.MustCompile(`(?m)^  ` + name + `:\n(?:(?:    .*|\s*)\n)*`).FindString(string(raw))
+		if found == "" {
+			t.Fatalf("no service %s", name)
+		}
+		return found
+	}
+	server, backup := service("diffluence"), service("backup")
+	if strings.Contains(server, "migrate_database_url") || strings.Contains(server, "MIGRATE_DATABASE_URL") {
+		t.Errorf("the server holds the owner of the tables:\n%s", server)
+	}
+	if !strings.Contains(server, `DIFFLUENCE_MIGRATE_ON_START: "false"`) {
+		t.Error("the server would try to migrate as the application role")
+	}
+	if !strings.Contains(backup, "migrate_database_url") {
+		t.Error("the backup service cannot migrate")
+	}
+}
+
 // The app speaks plain http, so by default only a proxy on the same machine reaches it (SEC-627).
 func TestEveryPublishedPortListensOnThisMachineByDefault(t *testing.T) {
 	raw, err := os.ReadFile("../../compose.yaml")

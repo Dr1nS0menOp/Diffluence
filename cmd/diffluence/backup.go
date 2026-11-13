@@ -45,14 +45,17 @@ func openBackupsPool(ctx context.Context) (*backups.Service, *pgxpool.Pool, func
 
 // cmdBackupNext prints what the worker should do now, as one line it can read in a shell:
 //
-//	restore <id> <backup>   restore <backup> over the installation (spec 059)
-//	now <reason> <keep>     make a backup now, then keep the newest <keep>
-//	wait <seconds> <keep>   ask again after <seconds>
-func cmdBackupNext(ctx context.Context, args []string, stdout io.Writer) error {
+//	restore <id> <backup>          restore <backup> over the installation (spec 059)
+//	code <backup> <code> <minutes> write the code that confirms the restore of <backup> to the
+//	                               log; it lasts <minutes> (spec 070)
+//	now <reason> <keep>            make a backup now, then keep the newest <keep>
+//	wait <seconds> <keep>          ask again after <seconds>
+func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer) error {
 	fs := flag.NewFlagSet("backup next", flag.ContinueOnError)
 	interval := fs.Duration("default-interval", 4*time.Hour, "how often to back up when the console did not choose")
 	keep := fs.Int("default-keep", 42, "how many backups to keep when the console did not choose")
 	key := fs.String("key-fingerprint", "", "the first 16 hexadecimal characters of a SHA-256 of the backup key; empty when there is no key")
+	keyPath := fs.String("key", defaultBackupKey, "the backup key, which makes and checks the code that confirms a restore")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -62,13 +65,17 @@ func cmdBackupNext(ctx context.Context, args []string, stdout io.Writer) error {
 	}
 	defer done()
 	// A restore goes before any backup: the console asked for it, and it makes its own
-	// safety backup.
-	rs, err := restore.Claim(ctx, pool)
+	// safety backup. It goes on only with the code this service wrote to its log.
+	c, err := restore.Claim(ctx, pool, workerGate(*keyPath, stderr))
 	if err != nil {
 		return err
 	}
-	if rs != nil {
-		fmt.Fprintf(stdout, "restore %s %s\n", rs.ID, rs.BackupName)
+	if c.Restore != nil {
+		fmt.Fprintf(stdout, "restore %s %s\n", c.Restore.ID, c.Restore.BackupName)
+		return nil
+	}
+	if c.Show != nil {
+		fmt.Fprintf(stdout, "code %s %s %d\n", c.Show.BackupName, c.Code, int(restore.CodeLifetime.Minutes()))
 		return nil
 	}
 	d, err := svc.Next(ctx, backups.Defaults{Interval: *interval, Keep: *keep, KeyFingerprint: *key})

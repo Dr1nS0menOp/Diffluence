@@ -51,7 +51,14 @@ const (
 	ProblemDisk      ProblemKind = "disk"
 	ProblemQueue     ProblemKind = "queue"
 	ProblemExtension ProblemKind = "extension"
+	// ProblemMigrations is a node that does not migrate, on a database another process has
+	// not migrated yet: in Compose, the backup service (spec 070).
+	ProblemMigrations ProblemKind = "migrations"
 )
+
+// retryWhenMigrated is how soon a node that waits only for another process to migrate looks
+// again: that takes seconds, and a new installation should not stand still for a minute.
+const retryWhenMigrated = 5 * time.Second
 
 // UpgradeProblem is one reason an upgrade may not start.
 type UpgradeProblem struct {
@@ -84,6 +91,14 @@ func (e *UpgradeRefused) Kinds() []ProblemKind {
 	return kinds
 }
 
+// RetryAfter is how long the node waits before it looks again.
+func (e *UpgradeRefused) RetryAfter() time.Duration {
+	if kinds := e.Kinds(); len(kinds) == 1 && kinds[0] == ProblemMigrations {
+		return retryWhenMigrated
+	}
+	return RetryUpgradeEvery
+}
+
 // BackupOverride says whether an operator chose to upgrade once without a recent backup.
 type BackupOverride int
 
@@ -95,10 +110,14 @@ const (
 )
 
 // prepareSchema makes sure this release may use the database. It refuses a database a
-// newer release already contracted, and migrates when this node is configured to.
+// newer release already contracted, and migrates when this node is configured to; a node
+// that does not migrate waits until another process did (spec 070).
 func (a *App) prepareSchema(ctx context.Context) error {
 	if !a.cfg.MigrateOnStart {
-		return db.CheckCompatible(ctx, a.pool, a.migrations)
+		if err := db.CheckCompatible(ctx, a.pool, a.migrations); err != nil {
+			return err
+		}
+		return a.waitForMigrations(ctx)
 	}
 	return a.asOwner(ctx, func(owner *pgxpool.Pool) error {
 		if err := a.checkBeforeUpgrade(ctx, owner); err != nil {
@@ -110,6 +129,34 @@ func (a *App) prepareSchema(ctx context.Context) error {
 		// A database restored into a fresh one lost what 0050 set, though it is recorded.
 		return db.ApplySessionSettings(ctx, owner)
 	})
+}
+
+// waitForMigrations refuses a database whose expand migrations of this release have not run,
+// for a node that does not run them itself. It names the backup too when the process that
+// migrates would refuse for want of one, as a node that migrates would.
+func (a *App) waitForMigrations(ctx context.Context) error {
+	st, err := db.Status(ctx, a.pool, a.migrations)
+	if err != nil {
+		return fmt.Errorf("app: read the state of the database: %w", err)
+	}
+	if st.PendingExpand == 0 {
+		return nil
+	}
+	var problems []UpgradeProblem
+	if st.Newest > 0 {
+		var facts upgradeFacts
+		if err := readBackupFacts(ctx, a.pool, &facts); err != nil {
+			return err
+		}
+		if p, refused := backupProblem(facts, time.Now(), a.cfg.UpgradeBackupMaxAge); refused {
+			problems = append(problems, p)
+		}
+	}
+	problems = append(problems, UpgradeProblem{ProblemMigrations, fmt.Sprintf(
+		"%d migration(s) of this release have not run, and this node does not migrate (DIFFLUENCE_MIGRATE_ON_START=false): "+
+			"in Compose the backup service runs them (docker compose up -d --build backup), elsewhere diffluence migrate",
+		st.PendingExpand)})
+	return &UpgradeRefused{Problems: problems}
 }
 
 // extensionState is whether a migration can create a PostgreSQL extension it needs.
@@ -217,6 +264,10 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 	}
 	if st.PendingExpand == 0 {
 		return nil
+	}
+	if a.cfg.MigrateDatabaseURL != "" {
+		a.log.Info("this node migrates as the owner of the tables; the compose.yaml of spec 070 leaves that to the backup " +
+			"service, so the node holds only the application role (docs/operations/upgrade.md)")
 	}
 	facts := upgradeFacts{queueHealthy: a.queue.Healthy()}
 	if facts.freeBytes, facts.freeKnown, err = freeSpace(a.cfg.DataDir); err != nil {

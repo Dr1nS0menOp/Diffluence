@@ -111,7 +111,8 @@ func waitingFixes(kinds []ProblemKind) []waitingFix {
 			fixes = append(fixes, waitingFix{"No recent backup was noted", []string{
 				"docker compose run --rm backup once",
 				"bash scripts/backup.sh /path/to/backups /path/to/backup.key",
-				"docker compose run --rm diffluence migrate --without-backup   (once, without a backup)",
+				// The backup service holds the owner of the tables since spec 070.
+				"docker compose run --rm --entrypoint diffluence backup migrate --without-backup   (once, without a backup)",
 			}})
 		case ProblemDisk:
 			fixes = append(fixes, waitingFix{"The data folder is nearly full", []string{"docker compose logs diffluence"}})
@@ -119,6 +120,11 @@ func waitingFixes(kinds []ProblemKind) []waitingFix {
 			fixes = append(fixes, waitingFix{"The queue does not answer", []string{"docker compose logs diffluence"}})
 		case ProblemExtension:
 			fixes = append(fixes, waitingFix{"A PostgreSQL extension is missing", []string{"docker compose logs diffluence"}})
+		case ProblemMigrations:
+			fixes = append(fixes, waitingFix{"The database waits for the backup service to migrate it", []string{
+				"docker compose up -d --build backup",
+				"docker compose logs backup",
+			}})
 		}
 	}
 	return fixes

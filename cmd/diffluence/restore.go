@@ -30,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/keys"
 	"github.com/diffluence/diffluence/internal/restore"
 )
 
@@ -66,16 +67,17 @@ func openRunner(ctx context.Context, f restoreFlags, log *slog.Logger) (restore.
 	if err != nil {
 		return restore.Runner{}, nil, err
 	}
-	url := cfg.DatabaseURL
-	if cfg.MigrateDatabaseURL != "" {
-		url = cfg.MigrateDatabaseURL
+	url, err := ownerURL(cfg)
+	if err != nil {
+		return restore.Runner{}, nil, err
 	}
 	owner, err := db.Open(ctx, url)
 	if err != nil {
 		return restore.Runner{}, nil, err
 	}
 	steps := &shellSteps{cfg: cfg, ownerURL: url, owner: owner, dir: *f.dir, key: *f.key, migs: migs, log: log}
-	r := restore.Runner{Pool: owner, Steps: steps, NewestKnown: migs[len(migs)-1].Version,
+	// The key that opens the backups also confirms the restore (spec 070).
+	r := restore.Runner{Pool: owner, Steps: steps, Gate: workerGate(*f.key, os.Stderr), NewestKnown: migs[len(migs)-1].Version,
 		StopWithin: 3 * time.Minute, Poll: 2 * time.Second, Log: log}
 	return r, owner.Close, nil
 }
@@ -184,11 +186,14 @@ func cmdBackupRestoreWayBack(ctx context.Context, args []string, stdout io.Write
 
 // cmdBackupRestoreRequest asks for a restore from the command line, for an operator who
 // has the machine and no console. Shell access to the worker is more than the console's
-// second factor, so none is asked; the audit log says it came from the command line.
+// second factor, so none is asked; the audit log says it came from the command line. Run
+// inside the backup service, it holds the backup key and fills in the confirmation code
+// itself; elsewhere the request waits for the code in the backup service's log (spec 070).
 func cmdBackupRestoreRequest(ctx context.Context, args []string, stdout io.Writer) error {
 	fs := flag.NewFlagSet("backup restore-request", flag.ContinueOnError)
 	name := fs.String("name", "", "the backup to restore, such as diffluence-20261111T071618Z")
 	confirm := fs.String("confirm", "", "the name of this installation, to confirm")
+	keyPath := fs.String("key", defaultBackupKey, "the backup key; when it can be read, the request needs no code")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -206,7 +211,15 @@ func cmdBackupRestoreRequest(ctx context.Context, args []string, stdout io.Write
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "restore %s of %s asked for; the backup worker takes it within a minute\n", rs.ID, rs.BackupName)
+	if w, err := keys.LoadWorker(*keyPath); err == nil {
+		if err := restore.PresetCode(ctx, pool, restore.NewGate(w.MAC), rs); err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "restore %s of %s asked for and confirmed; the backup worker takes it within a minute\n", rs.ID, rs.BackupName)
+		return nil
+	}
+	fmt.Fprintf(stdout, "restore %s of %s asked for; within a minute the backup service writes a confirmation code to "+
+		"its log (docker compose logs backup): enter it in the console\n", rs.ID, rs.BackupName)
 	return nil
 }
 

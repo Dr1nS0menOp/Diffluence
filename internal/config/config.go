@@ -156,6 +156,13 @@ func (c Config) KeyFile() string {
 	return filepath.Join(c.DataDir, "master.key")
 }
 
+// LeavesMigrations says whether another process migrates the database: this one does not
+// migrate on start and holds no owner of the tables, as the server of compose.yaml since
+// spec 070, where the backup service migrates. Such a process runs no migration at all.
+func (c Config) LeavesMigrations() bool {
+	return !c.MigrateOnStart && c.MigrateDatabaseURL == ""
+}
+
 // ListenURL is where a worker listens for new events: LISTEN_DATABASE_URL, else the
 // database the pool uses.
 func (c Config) ListenURL() string {

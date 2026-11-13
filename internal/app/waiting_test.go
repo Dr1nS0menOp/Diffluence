@@ -82,6 +82,23 @@ func TestTheWaitingPageNamesTheFixButNoDetails(t *testing.T) {
 	}
 }
 
+// A node that waits for the backup service to migrate says where the migration runs, and
+// the backup service's command for an upgrade without a backup (spec 070).
+func TestTheWaitingPageNamesTheBackupServiceThatMigrates(t *testing.T) {
+	refused := &UpgradeRefused{Problems: []UpgradeProblem{
+		{ProblemBackup, "no backup was noted"}, {ProblemMigrations, "3 migration(s) of this release have not run"}}}
+	page := get(t, waitingHandler(refused), "/").Body.String()
+	for _, want := range []string{"waits for the backup service to migrate", "docker compose up -d --build backup",
+		"docker compose logs backup", "--entrypoint diffluence backup migrate --without-backup"} {
+		if !strings.Contains(page, want) {
+			t.Errorf("the page lacks %q", want)
+		}
+	}
+	if refused.RetryAfter() != RetryUpgradeEvery {
+		t.Errorf("a node that also waits for a backup looks again after %s", refused.RetryAfter())
+	}
+}
+
 // A retry lets go of the address, so the real server can take it straight after.
 func TestAWaitingNodeFreesItsAddressWhenItTriesAgain(t *testing.T) {
 	ln, err := net.Listen("tcp", "127.0.0.1:0")

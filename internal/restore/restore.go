@@ -80,18 +80,27 @@ type Restore struct {
 	Changed         bool       `json:"changed"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	FinishedAt      *time.Time `json:"finished_at"`
+	// CodeShown says the backup service wrote the confirmation code to its log; CodeEntered,
+	// that a code waits for it to compare (spec 070).
+	CodeShown   bool `json:"code_shown"`
+	CodeEntered bool `json:"code_entered"`
+	WrongCodes  int  `json:"wrong_codes"`
 }
 
 // Open says whether the restore is still on its way, or failed after it changed something.
 func (r Restore) Open() bool { return r.FinishedAt == nil }
 
 const columns = `id, backup_name, requested_by_name, requested_at, state, step, coalesce(safety_name, ''),
-	changed, updated_at, finished_at`
+	changed, updated_at, finished_at, code_shown_at IS NOT NULL, confirmation IS NOT NULL, wrong_codes`
 
-func scan(row pgx.Row) (Restore, error) {
+func scan(row pgx.Row) (Restore, error) { return scanWith(row) }
+
+// scanWith reads the columns of a restore, then extra.
+func scanWith(row pgx.Row, extra ...any) (Restore, error) {
 	var r Restore
-	err := row.Scan(&r.ID, &r.BackupName, &r.RequestedByName, &r.RequestedAt, &r.State, &r.Step, &r.SafetyName,
-		&r.Changed, &r.UpdatedAt, &r.FinishedAt)
+	dest := append([]any{&r.ID, &r.BackupName, &r.RequestedByName, &r.RequestedAt, &r.State, &r.Step, &r.SafetyName,
+		&r.Changed, &r.UpdatedAt, &r.FinishedAt, &r.CodeShown, &r.CodeEntered, &r.WrongCodes}, extra...)
+	err := row.Scan(dest...)
 	return r, err
 }
 
@@ -275,10 +284,12 @@ func WaitForNodes(ctx context.Context, q db.Querier, timeout, every time.Duratio
 	}
 }
 
-// Claim hands a requested restore to the worker, or returns nil. It first ends a restore
-// whose worker stopped long ago before anything changed.
-func Claim(ctx context.Context, pool *pgxpool.Pool) (*Restore, error) {
-	var out *Restore
+// Claim looks at the requested restore for the worker (spec 070). It hands over a restore
+// whose confirmation code was entered right; it asks the worker to write the code of a new
+// request to its log; and it ends a request without a key, with wrong codes, or with none
+// in time. First it ends a restore whose worker stopped long ago before anything changed.
+func Claim(ctx context.Context, pool *pgxpool.Pool, g Gate) (Claimed, error) {
+	var out Claimed
 	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
 		if _, err := tx.Exec(ctx, `UPDATE ops.restores SET state = $1, finished_at = now(), updated_at = now(),
 				step = 'the worker stopped before it changed anything'
@@ -287,19 +298,12 @@ func Claim(ctx context.Context, pool *pgxpool.Pool) (*Restore, error) {
 			StateRefused, StatePreparing, StateStopping, StateBackingUp, abandonedAfter.Seconds()); err != nil {
 			return err
 		}
-		r, err := scan(tx.QueryRow(ctx, `UPDATE ops.restores SET state = $1, step = 'checking the backup', updated_at = now()
-			WHERE finished_at IS NULL AND state = $2 RETURNING `+columns, StatePreparing, StateRequested))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil
-		}
-		if err != nil {
-			return err
-		}
-		out = &r
-		return nil
+		var err error
+		out, err = gateClaim(ctx, tx, g)
+		return err
 	})
 	if missing(err) {
-		return nil, nil
+		return Claimed{}, nil
 	}
 	return out, err
 }
@@ -325,9 +329,11 @@ func Move(ctx context.Context, q db.Querier, id uuid.UUID, state, step string) e
 	return err
 }
 
-// SetSafety names the safety backup made before the restore changed anything.
-func SetSafety(ctx context.Context, q db.Querier, id uuid.UUID, name string) error {
-	_, err := q.Exec(ctx, "UPDATE ops.restores SET safety_name = $2, updated_at = now() WHERE id = $1", id, name)
+// setSafety names the safety backup made before the restore changed anything, sealed by the
+// worker that made it, so the way back restores only a backup it made (spec 070).
+func setSafety(ctx context.Context, q db.Querier, g Gate, id uuid.UUID, name string) error {
+	_, err := q.Exec(ctx, "UPDATE ops.restores SET safety_name = $2, safety_seal = $3, updated_at = now() WHERE id = $1",
+		id, name, g.seal("safety", id, name))
 	return err
 }
 
@@ -360,11 +366,13 @@ func FailedOpen(ctx context.Context, q db.Querier) (*Restore, error) {
 	return &r, nil
 }
 
-// TakeOver turns a failed restore into the restore of its safety backup: the way back.
-func TakeOver(ctx context.Context, q db.Querier, id uuid.UUID) error {
+// takeOver turns a failed restore into the restore of its safety backup: the way back. The
+// restore is sealed again for the backup it now restores.
+func takeOver(ctx context.Context, q db.Querier, g Gate, id uuid.UUID, safety string) error {
 	tag, err := q.Exec(ctx, `UPDATE ops.restores SET backup_name = safety_name, state = $2,
-			step = 'restoring the safety backup', updated_at = now()
-		WHERE id = $1 AND finished_at IS NULL AND state = $3 AND safety_name IS NOT NULL`, id, StateRestoring, StateFailed)
+			step = 'restoring the safety backup', updated_at = now(), worker_seal = $4
+		WHERE id = $1 AND finished_at IS NULL AND state = $3 AND safety_name = $5`,
+		id, StateRestoring, StateFailed, g.seal("restore", id, safety), safety)
 	if err == nil && tag.RowsAffected() != 1 {
 		err = errors.New("restore: no failed restore with a safety backup to go back to")
 	}

@@ -36,6 +36,13 @@ done
 decrypt master.key.gpg | docker run --rm -i -v "$volume:/data" busybox \
   sh -c 'cat >/data/master.key && chmod 600 /data/master.key && chown -R 65532:65532 /data'
 
+# The server holds only the application role (spec 070), so a backup from an older release
+# is brought up to this one first, as the owner, in a one-off container. The backup is the
+# one being restored, so the check for a recent backup does not apply.
+docker compose run --rm --no-deps -T \
+  -v "$PWD/secrets/migrate_database_url.txt:/run/secrets/migrate_database_url:ro" \
+  -e DIFFLUENCE_MIGRATE_DATABASE_URL_FILE=/run/secrets/migrate_database_url \
+  -e DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off diffluence migrate
 docker compose up -d --wait diffluence
 docker compose exec -T diffluence diffluence audit verify
 # Every secret and stored file must open with the restored keys.

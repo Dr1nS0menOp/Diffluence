@@ -1077,9 +1077,11 @@ func TestApplicationRoleCannotTamperWithTheAuditLog(t *testing.T) {
 		"audit_events":      {"UPDATE", "DELETE", "TRUNCATE"},
 		"audit_checkpoints": {"UPDATE", "DELETE", "TRUNCATE"},
 		"audit_anchors":     {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
-		"audit_personal":    {"UPDATE", "TRUNCATE"},
-		"audit_pending":     {"TRUNCATE"},
-		"schema_migrations": {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
+		// Only the backup service, as the owner, brings in a checkpoint key (spec 070).
+		"audit_signing_keys": {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
+		"audit_personal":     {"UPDATE", "TRUNCATE"},
+		"audit_pending":      {"TRUNCATE"},
+		"schema_migrations":  {"INSERT", "UPDATE", "DELETE", "TRUNCATE"},
 	} {
 		for _, privilege := range privileges {
 			var may bool

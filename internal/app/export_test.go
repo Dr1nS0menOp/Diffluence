@@ -15,6 +15,16 @@ import (
 // AddMigrationForTest makes this binary know one more migration.
 func (a *App) AddMigrationForTest(m db.Migration) { a.migrations = append(a.migrations, m) }
 
+// InstallationKeyForTest is the checkpoint key derived from master.key, which endorses the
+// backup service's key (spec 070).
+func (a *App) InstallationKeyForTest() ed25519.PrivateKey {
+	key, err := a.keyring.SigningKey()
+	if err != nil {
+		panic(err)
+	}
+	return key
+}
+
 // SignCheckpointForTest runs the daily job.
 func (a *App) SignCheckpointForTest(ctx context.Context) error { return a.signCheckpoint(ctx) }
 

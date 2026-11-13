@@ -25,6 +25,8 @@ chmod 600 /root/diffluence-backup.key
 
 **Without this key a backup cannot be restored.** Keep a second copy in a password safe or on paper. Whoever has both the key and a backup can read everything, including TOTP seeds, so never store them together. The backup service and the script refuse a key inside the backup folder, and refuse to run without one.
 
+The backup service also derives two more keys from it (spec 070): the key that signs the audit checkpoints, and the key of the codes that confirm a restore. The server never reads this file. Replacing the backup key replaces the checkpoint key too; the backup service records the change in the audit chain on its next round, and older checkpoints keep verifying.
+
 ## Docker Compose: the backup service
 
 `compose.yaml` runs a backup service by default (spec 054). Every 4 hours it backs up into `./backups`, keeps the newest 42 (a week), and notes each one, so an upgrade always finds a recent backup.
@@ -43,7 +45,9 @@ docker compose logs backup              # what it did, and why it did not
 
 **In the console** (Administration, System, Backups; spec 058): the schedule and the number kept set there win over these two variables, which stay the default. "Back up now" asks the service for a backup, which it starts within a minute (at most 4 an hour). The page lists every backup with its size, whether it was complete or which step failed, and whether a test restore of it passed; it shows when the service last checked in and whether it holds a key (only a fingerprint, never the key). A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service talks to the console through the database, with the access it already has, so the same page works when the worker is a Kubernetes CronJob or a systemd timer that runs `diffluence backup next` and `diffluence backup report`.
 
-The service starts its first backup once Diffluence has made its tables, and then whenever the last try is older than the interval. Without a key it logs why on every interval and makes nothing; after adding the key, `docker compose restart backup` tries again at once. A backup is written under a name that starts with `.partial-` and renamed only when every part and `SHA256SUMS` are in, so a backup that died halfway is never picked for a restore. Each backup belongs to the owner of the backup folder, so that user can restore it.
+The service is also the only process that holds the owner of the tables (spec 070). Every round, at most a minute apart, it runs the migrations of a new release, then the contract migrations once their grace period is over, and signs the head of the audit chain every five minutes. It writes those checkpoints to its own log as witness lines.
+
+The service starts its first backup once the tables exist, and then whenever the last try is older than the interval. Without a key it logs why on every interval and makes nothing; after adding the key, `docker compose restart backup` tries again at once. A backup is written under a name that starts with `.partial-` and renamed only when every part and `SHA256SUMS` are in, so a backup that died halfway is never picked for a restore. Each backup belongs to the owner of the backup folder, so that user can restore it.
 
 **Copy `./backups` off this machine**, every day: to another disk, another building, or S3-compatible storage. A backup on the same disk is gone with the disk. Copy the key to a different place than the backups.
 
@@ -102,13 +106,21 @@ git clone https://github.com/Dr1nS0menOp/Diffluence.git && cd Diffluence
 bash scripts/restore.sh /backups/diffluence-20261104T182225Z /root/diffluence-backup.key
 ```
 
-The script checks the checksums, checks the key before it changes anything, restores the database and files, starts Diffluence, verifies the audit chain, and runs `diffluence key check` to prove that every stored file and secret opens with the restored `master.key`. Log in afterwards and open a few pages.
+The script checks the checksums, checks the key before it changes anything, restores the database and files, brings a backup of an older release up to this one as the owner of the tables in a one-off container, starts Diffluence, verifies the audit chain, and runs `diffluence key check` to prove that every stored file and secret opens with the restored `master.key`. Then start the backup service with `docker compose up -d backup`. Log in afterwards and open a few pages.
 
 The dump does not carry the defaults of the database itself, the settings `plan_cache_mode` and `jit` that make every session plan its queries well (specs 061 and 063). A restore into a fresh database would lose them, so every run of migrations sets them again: the node that starts after the restore, `diffluence migrate`, and the restore from the console. Nothing needs doing by hand. To check, `SHOW plan_cache_mode` gives `force_custom_plan` and `SHOW jit` gives `off` in a plain `psql` session. On a managed database whose owner is not Diffluence's owner role, the settings cannot be stored in the database; the node still sends both when it connects, and only a connection through PgBouncer goes without them.
 
 ### Over the live installation, from the console
 
 To put a running installation back to an earlier backup, an administrator uses Administration, System, Backups (spec 059). The page says what is lost, asks for the installation's name typed out, and asks for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day.
+
+**The backup service asks for a code first** (spec 070). Within a minute of the request it writes one line to its own log, which the server cannot read or write:
+
+```
+To restore diffluence-20261104T182225Z, enter this confirmation code in the console: 12345-67890 (valid 30 minutes)
+```
+
+Read it with `docker compose logs backup`, or in the log collector that keeps that log, and enter it on the same page. The code is made from the backup key, so only the backup service can make it, and it fits this one request. Spaces and dashes do not matter. A wrong code is counted and recorded, and the page says how many tries are left; after the third, or without a code for 30 minutes, the restore ends and nothing changes. A request that did not come through the console, or whose backup changed after it was confirmed, ends the same way, recorded as `backup.restore_refused`.
 
 The backup service does the work:
 1. It checks the backup while people still work: the checksums, that the key opens it, and that this release knows its database. A backup that fails here changes nothing.
@@ -124,7 +136,9 @@ If it stops halfway, every node keeps waiting and the page says so. Go back to t
 docker compose run --rm backup way-back
 ```
 
-Without the console, an operator on the machine asks for the same restore with `docker compose run --rm diffluence backup restore-request --name diffluence-20261104T182225Z --confirm "<installation name>"`. The backup service picks it up within a minute. The schema `ops` steers a restore and is never restored itself; backups hold its tables without rows.
+The way back restores only a safety backup the backup service made itself for that restore. For anything else it refuses, records it, and leaves the nodes waiting: restore by hand with `scripts/restore.sh` once you know what happened.
+
+Without the console, an operator on the machine asks for the same restore inside the backup service, which holds the key and so needs no code: `docker compose exec backup diffluence backup restore-request --name diffluence-20261104T182225Z --confirm "<installation name>"` (or `docker compose run --rm --entrypoint diffluence backup backup restore-request ...` while the service is stopped). The backup service picks it up within a minute. The same command in the server's container makes a request that waits for the code in the log, as one from the console does. The schema `ops` steers a restore and is never restored itself; backups hold its tables without rows, so a confirmation code never reaches a backup.
 
 ## master.key
 

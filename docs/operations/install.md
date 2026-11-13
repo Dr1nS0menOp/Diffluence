@@ -45,7 +45,7 @@ Outgoing calls only reach public addresses over https, and only hosts an adminis
 
 Drawing is optional. Run the jgraph/drawio image on its own address, and set DIFFLUENCE_DRAWING_URL to it, such as https://draw.example.com. It must be another origin than DIFFLUENCE_PUBLIC_URL, and the app refuses to start otherwise. Only that address may be framed. Serve it over HTTPS from the same kind of network as the wiki: a browser can block a public page from framing a private address.
 
-What you get: the container runs as non-root on a read-only filesystem with no capabilities, and the application connects with a database role that does not own the tables, so it cannot change or delete audit events.
+What you get: the container runs as non-root on a read-only filesystem with no capabilities, and the application connects with a database role that does not own the tables, so it cannot change or delete audit events. It holds no other address: the backup service alone holds the owner of the tables, runs the migrations, signs the audit checkpoints and carries out a restore (spec 070). On a new installation the server shows "Waiting before an upgrade" for a few seconds, until the backup service has made the tables.
 
 ## LXC on Proxmox, or bare Linux
 
@@ -159,7 +159,7 @@ Mailpit is a tool for developers and catches mail without delivering it, so it i
 
 ## The encryption key
 
-Diffluence creates `master.key` in the data directory on first start. It protects every stored file and secret, and derives the key that signs audit checkpoints. **Back it up separately from your data.** Without it, no file can be read and users must set up their authenticator app again. To replace it, see [backup and restore](backup-restore.md#replace-it).
+Diffluence creates `master.key` in the data directory on first start. It protects every stored file and secret, and derives the installation's checkpoint key, which signs the audit checkpoints until the backup service's key takes over, and endorses that key (spec 070). **Back it up separately from your data.** Without it, no file can be read and users must set up their authenticator app again. To replace it, see [backup and restore](backup-restore.md#replace-it).
 
 With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MASTER_KEY_FILE` to the same key on every node. Diffluence refuses to start without it. HA itself is phase 3: attachments are on local disk until the S3 store exists.
 
@@ -201,7 +201,7 @@ The first two end by themselves after 15 minutes. The third does not: the person
 
 ## Audit retention
 
-The console stores how many days audit rows stay: a year by default, and longer only with a stated reason. The application cannot delete them. To remove older rows, an operator runs `diffluence audit prune` with `DIFFLUENCE_MIGRATE_DATABASE_URL` set to the owner of the tables. It verifies the chain, leaves an anchor signed with the instance key, and removes the rows. Verification then starts at the anchor.
+The console stores how many days audit rows stay: a year by default, and longer only with a stated reason. The application cannot delete them. To remove older rows, an operator runs `diffluence audit prune` with `DIFFLUENCE_MIGRATE_DATABASE_URL` set to the owner of the tables; in Compose that is the backup service, so `docker compose exec backup diffluence audit prune`. It verifies the chain, leaves an anchor signed with the instance key, and removes the rows. Verification then starts at the anchor.
 
 ## A copy of the audit log outside the database
 
@@ -215,7 +215,9 @@ diffluence audit verify --witness /path/to/application.log
 
 It reads every witness line, also with a prefix from the container runtime, checks each signature, and names the first checkpoint the chain no longer matches. `-` reads the log from standard input, for example `docker compose logs --no-log-prefix diffluence | diffluence audit verify --witness -`. Checkpoints older than the last prune are skipped. A log without any checkpoint is refused, because that is the wrong file or a collector that kept nothing. At most the last five minutes of events have no copy yet.
 
-Whoever holds both the database and `master.key` can still sign new checkpoints, but cannot change the lines the log server already has.
+**Who signs** (spec 070). In Compose, the backup service signs the checkpoints with a key derived from the backup key, and writes the witness lines to its own log: compare with `docker compose logs --no-log-prefix backup | diffluence audit verify --witness -`, and send that log to the log server too. The first time it runs, it records `audit.checkpoint_key_changed` at a position of the chain, endorsed by the key derived from `master.key`; checkpoints before that position keep that older key, and the server stops signing by itself. The server needs only public keys to verify. Without the backup service, or without its key, the server signs as before.
+
+What this holds against: the server's process and its database role cannot sign a checkpoint that verifies after that position, nor add a key. Someone with the owner of the tables but neither key cannot either. Whoever holds both `master.key` and the owner of the tables can endorse a key of their own and sign new checkpoints, but cannot change the lines the log server already has.
 
 ## After restoring a backup
 

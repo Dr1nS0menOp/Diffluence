@@ -41,8 +41,18 @@ cd "$work/first"
 export COMPOSE_PROJECT_NAME=dfldrillfirst
 sh scripts/setup-secrets.sh >/dev/null
 # Without the backup service: the drill counts the backups it makes itself, then runs the
-# service once in step 2c.
-docker compose up -d --build --wait --wait-timeout 120 postgres diffluence >/dev/null 2>&1
+# service once in step 2c. The server holds only the application role and waits for the
+# migrations (spec 070), so the drill runs the backup service's step for them once.
+docker compose build diffluence backup >/dev/null 2>&1
+docker compose up -d --wait postgres >/dev/null 2>&1
+docker compose run --rm --entrypoint diffluence backup worker migrate >/dev/null
+docker compose up -d --wait --wait-timeout 120 diffluence >/dev/null 2>&1
+server=$(docker compose ps -q diffluence)
+if docker inspect --format '{{range .Mounts}}{{.Destination}} {{end}}' "$server" | grep -q migrate_database_url ||
+  docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$server" | grep -q '^DIFFLUENCE_MIGRATE_DATABASE_URL'; then
+  echo "the server holds the address of the owner of the tables"
+  exit 1
+fi
 printf '%s\n' 'correct horse battery staple' | docker compose exec -T diffluence diffluence user create-admin --email admin@example.com --name Admin >/dev/null
 api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
 space=$(api -d '{"key":"ENG","name":"Engineering"}' "$url/api/v1/spaces" | first_id)
@@ -184,28 +194,63 @@ rm -f "$jar"
 api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
 later=$(api -d "{\"space_id\":\"$space\",\"title\":\"Made after the backup\"}" "$url/api/v1/pages" | first_id)
 restores() { docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SELECT $1 FROM ops.restores ORDER BY requested_at DESC LIMIT 1"; }
+refusals() { docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SELECT count(*) FROM audit_entries WHERE action = 'backup.restore_refused'"; }
+# In the backup service, which holds the backup key, a request needs no code (spec 070).
+ask_in_backup_service() { docker compose run --rm --entrypoint diffluence backup backup restore-request --name "$1" --confirm Diffluence >/dev/null; }
+wait_for_end() {
+  for _ in $(seq 1 "$1"); do
+    state=$(restores state)
+    case "$state" in done | failed | refused) return 0 ;; esac
+    sleep 2
+  done
+}
 if docker compose run --rm diffluence backup restore-request --name "$target" --confirm 'Not this one' >/dev/null 2>&1; then
   echo "a restore was asked for with the wrong name"
   exit 1
 fi
-# A backup that is not whole is refused before any node stops.
+# A request the application role writes straight into the table, past the console, is not an
+# order: without the code in time, the backup service refuses it and records that (spec 070).
+app_password=$(cat secrets/db_app_password.txt)
+docker compose exec -T -e PGPASSWORD="$app_password" postgres psql -h localhost -U diffluence_app -d diffluence -qc \
+  "INSERT INTO ops.restores (id, backup_name, requested_by_name, state, code_shown_at)
+   VALUES (gen_random_uuid(), '$target', 'nobody', 'requested', now() - interval '31 minutes')"
+docker compose up -d backup >/dev/null 2>&1
+wait_for_end 60
+if [ "$(restores state)" != refused ] || [ "$(refusals)" -lt 1 ]; then
+  echo "a restore written straight into the table was not refused and recorded: $(restores state) $(restores step)"
+  exit 1
+fi
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc "UPDATE ops.restores SET requested_at = now() - interval '2 days'"
+# A backup that is not whole is refused before any node stops. This one goes the way of the
+# console: the request waits for the code in the backup service's log, entered over the API.
 broken=diffluence-20200101T000000Z
 docker run --rm -v "$PWD/backups:/b" busybox sh -c "cp -r /b/$target /b/$broken && echo tampered >>/b/$broken/files.tar.gz.gpg"
 docker compose run --rm diffluence backup report --name "$broken" --reason manual --started 2020-01-01T00:00:00Z --size 1 >/dev/null
 docker compose run --rm diffluence backup restore-request --name "$broken" --confirm Diffluence >/dev/null
-docker compose up -d backup >/dev/null 2>&1
+code=
 for _ in $(seq 1 60); do
-  case "$(restores state)" in refused | failed | done) break ;; esac
+  code=$(docker compose logs --no-log-prefix backup | grep -o "To restore $broken, enter this confirmation code in the console: [0-9-]*" |
+    tail -n 1 | awk '{print $NF}') || true
+  [ -n "$code" ] && break
   sleep 2
 done
-if [ "$(restores state)" != refused ] || [ "$(restores changed)" != f ]; then
+[ -n "$code" ] || { echo "the backup service wrote no confirmation code to its log"; exit 1; }
+# A wrong code is counted and allows another try.
+wrong=00000-00000
+[ "$code" != "$wrong" ] || wrong=11111-11111
+api -d "{\"code\":\"$wrong\"}" "$url/api/v1/admin/backups/restore/code" >/dev/null
+for _ in $(seq 1 60); do [ "$(restores wrong_codes)" = 1 ] && break; sleep 2; done
+[ "$(restores wrong_codes)" = 1 ] || { echo "a wrong code was not counted: $(restores step)"; exit 1; }
+api -d "{\"code\":\"$code\"}" "$url/api/v1/admin/backups/restore/code" >/dev/null
+wait_for_end 90
+if [ "$(restores state)" != refused ] || [ "$(restores changed)" != f ] || ! restores step | grep -q 'not whole'; then
   echo "a restore of a broken backup was not refused before it changed anything: $(restores state) $(restores step)"
   exit 1
 fi
 curl -sf "$url/readyz" >/dev/null || { echo "the nodes stopped for a broken backup"; exit 1; }
 # One restore a day: the drill moves the refused one back a day to ask again.
 docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc "UPDATE ops.restores SET requested_at = now() - interval '2 days'"
-docker compose run --rm diffluence backup restore-request --name "$target" --confirm Diffluence >/dev/null
+ask_in_backup_service "$target"
 saw_waiting=
 for _ in $(seq 1 150); do
   state=$(restores state)
@@ -240,7 +285,7 @@ docker run --rm -v "$PWD/backups:/b" busybox sh -c "cp -r /b/$target /b/$cut && 
   head -c 100 files.tar.gz.gpg >short && mv short files.tar.gz.gpg && sha256sum *.gpg >SHA256SUMS"
 docker compose run --rm diffluence backup report --name "$cut" --reason manual --started 2020-01-02T00:00:00Z --size 1 >/dev/null
 docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc "UPDATE ops.restores SET requested_at = now() - interval '2 days'"
-docker compose run --rm diffluence backup restore-request --name "$cut" --confirm Diffluence >/dev/null
+ask_in_backup_service "$cut"
 for _ in $(seq 1 150); do
   state=$(restores state)
   case "$state" in done | failed | refused) break ;; esac
@@ -265,4 +310,4 @@ api -d '{"email":"admin@example.com","password":"correct horse battery staple"}'
 api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
 docker compose exec -T diffluence diffluence audit verify >/dev/null
 docker compose stop backup >/dev/null 2>&1
-echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a key change finished after the restore, a backup noted while the node was down, the backup service, a restore from the console with its safety backup, and the way back from a restore that stopped halfway"
+echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a key change finished after the restore, a backup noted while the node was down, the backup service, a restore from the console with its safety backup, and the way back from a restore that stopped halfway; migrations, checkpoints and the confirmation code of a restore in the backup service (spec 070)"

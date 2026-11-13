@@ -59,6 +59,11 @@ Commands:
                             every node, makes a safety backup, restores and checks (spec 059)
   backup restore-prepare|restore-run|restore-abort|restore-way-back
                             the steps of a restore, which the backup worker runs
+  worker migrate            what the backup service runs every round as the owner of the tables:
+                            this release's migrations, and contract migrations after the grace
+  worker checkpoint [--key FILE]
+                            sign the head of the audit chain with the backup service's key,
+                            derived from the backup key FILE (spec 070)
   key <step>                replace master.key without downtime; see diffluence key
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
@@ -115,7 +120,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		case len(args) >= 2 && args[1] == "note":
 			err = cmdBackupNote(ctx, stdout)
 		case len(args) >= 2 && args[1] == "next":
-			err = traced(ctx, "backup next", func(ctx context.Context) error { return cmdBackupNext(ctx, args[2:], stdout) })
+			err = traced(ctx, "backup next", func(ctx context.Context) error { return cmdBackupNext(ctx, args[2:], stdout, stderr) })
 		case len(args) >= 2 && args[1] == "report":
 			err = traced(ctx, "backup report", func(ctx context.Context) error { return cmdBackupReport(ctx, args[2:], stdout) })
 		case len(args) >= 2 && args[1] == "restore-checked":
@@ -144,6 +149,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 		err = cmdEventsCheck(ctx, stdout)
 	case "setup-code":
 		err = cmdSetupCode(ctx, stdout)
+	case "worker":
+		err = cmdWorker(ctx, args[1:], stdout, stderr)
 	case "key":
 		err = cmdKey(ctx, args[1:], stdout, stderr)
 	case "session":
@@ -289,10 +296,11 @@ func sayStarting(ctx context.Context, databaseURL string) func() {
 	return func() { cancel(); <-done }
 }
 
-// waitBeforeUpgrade serves the waiting page until a minute passes or SIGHUP arrives.
+// waitBeforeUpgrade serves the waiting page until it is time to look again (a minute, or a
+// few seconds while only migrations elsewhere are awaited) or SIGHUP arrives.
 func waitBeforeUpgrade(ctx context.Context, addr string, refused *app.UpgradeRefused, hup <-chan os.Signal, log *slog.Logger) error {
 	retry := make(chan struct{})
-	timer := time.NewTimer(app.RetryUpgradeEvery)
+	timer := time.NewTimer(refused.RetryAfter())
 	defer timer.Stop()
 	waitCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -350,9 +358,9 @@ func cmdMigrate(ctx context.Context, args []string, stdout io.Writer) error {
 // checkBackupBeforeMigrating runs the backup part of the checks before an upgrade as the
 // owner of the tables, the role that migrates.
 func checkBackupBeforeMigrating(ctx context.Context, cfg config.Config, migs []db.Migration, override app.BackupOverride, log *slog.Logger) error {
-	url := cfg.DatabaseURL
-	if cfg.MigrateDatabaseURL != "" {
-		url = cfg.MigrateDatabaseURL
+	url, err := ownerURL(cfg)
+	if err != nil {
+		return err
 	}
 	pool, err := db.Open(ctx, url)
 	if err != nil {
@@ -366,9 +374,9 @@ func checkBackupBeforeMigrating(ctx context.Context, cfg config.Config, migs []d
 // configured, and gives the application role its rights. Safe to run next to a
 // starting server: an advisory lock makes them take turns.
 func migrateDatabase(ctx context.Context, cfg config.Config, migs []db.Migration, opts db.Options) (db.Report, error) {
-	url := cfg.DatabaseURL
-	if cfg.MigrateDatabaseURL != "" {
-		url = cfg.MigrateDatabaseURL
+	url, err := ownerURL(cfg)
+	if err != nil {
+		return db.Report{}, err
 	}
 	pool, err := db.Open(ctx, url)
 	if err != nil {
@@ -420,15 +428,22 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 	if err != nil {
 		return err
 	}
-	// The server may still be starting, so this does not rely on it having migrated.
-	if _, err := migrateDatabase(ctx, cfg, migs, db.Options{}); err != nil {
-		return err
+	// The server may still be starting, so this does not rely on it having migrated. Where
+	// another process migrates (spec 070), it waits for that instead of trying as the
+	// application role.
+	if !cfg.LeavesMigrations() {
+		if _, err := migrateDatabase(ctx, cfg, migs, db.Options{}); err != nil {
+			return err
+		}
 	}
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
 		return err
 	}
 	defer pool.Close()
+	if err := requireMigrated(ctx, pool, migs); err != nil {
+		return err
+	}
 	instID, err := instance.Ensure(ctx, pool, cfg.InstanceName)
 	if err != nil {
 		return err
@@ -452,6 +467,19 @@ func cmdCreateAdmin(ctx context.Context, args []string, stdin io.Reader, stdout 
 	return nil
 }
 
+// requireMigrated refuses a database whose migrations of this release have not run yet.
+func requireMigrated(ctx context.Context, q db.Querier, migs []db.Migration) error {
+	st, err := db.Status(ctx, q, migs)
+	if err != nil {
+		return err
+	}
+	if st.PendingExpand > 0 {
+		return fmt.Errorf("the database waits for %d migration(s) of this release: wait until the backup service ran them "+
+			"(docker compose logs backup), then try again", st.PendingExpand)
+	}
+	return nil
+}
+
 // signingKey loads the key of this installation, without starting anything else: this
 // runs beside a server, also in restore.sh.
 func signingKey(cfg config.Config) (ed25519.PrivateKey, error) {
@@ -469,9 +497,9 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	url := cfg.MigrateDatabaseURL
-	if url == "" {
-		url = cfg.DatabaseURL
+	url, err := ownerURL(cfg)
+	if err != nil {
+		return err
 	}
 	pool, err := db.Open(ctx, url)
 	if err != nil {

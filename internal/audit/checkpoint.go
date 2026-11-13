@@ -10,6 +10,7 @@ import (
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/db"
@@ -37,6 +38,7 @@ type Checkpoint struct {
 // be rewritten end to end by someone with database access; a signature cannot be forged
 // without the key, which is not in the database. It reports false when there was nothing
 // new to sign, so a quiet instance does not grow its log by a checkpoint every few minutes.
+// A key that a later one replaced gets ErrKeyNotInForce (spec 070).
 func SignCheckpoint(ctx context.Context, pool *pgxpool.Pool, key ed25519.PrivateKey) (Checkpoint, bool, error) {
 	public, ok := key.Public().(ed25519.PublicKey)
 	if !ok {
@@ -45,8 +47,15 @@ func SignCheckpoint(ctx context.Context, pool *pgxpool.Pool, key ed25519.Private
 	var out Checkpoint
 	signed := false
 	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
+		inForce, err := KeyInForce(ctx, tx)
+		if err != nil {
+			return err
+		}
+		if inForce != nil && !inForce.Equal(public) {
+			return ErrKeyNotInForce
+		}
 		var action string
-		err := tx.QueryRow(ctx, "SELECT seq, hash, action FROM audit_events ORDER BY seq DESC LIMIT 1").Scan(&out.Seq, &out.Hash, &action)
+		err = tx.QueryRow(ctx, "SELECT seq, hash, action FROM audit_events ORDER BY seq DESC LIMIT 1").Scan(&out.Seq, &out.Hash, &action)
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil
 		}
@@ -61,6 +70,11 @@ func SignCheckpoint(ctx context.Context, pool *pgxpool.Pool, key ed25519.Private
 		out.PublicKey = public
 		tag, err := tx.Exec(ctx, `INSERT INTO audit_checkpoints (seq, hash, signature, public_key) VALUES ($1, $2, $3, $4)
 			ON CONFLICT (seq) DO NOTHING`, out.Seq, out.Hash, out.Signature, []byte(public))
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == "23514" {
+			// The trigger of migration 0055: another key came in force after the read above.
+			return ErrKeyNotInForce
+		}
 		if err != nil || tag.RowsAffected() == 0 {
 			return err
 		}
@@ -104,16 +118,27 @@ func Check(ctx context.Context, q db.Querier, public ed25519.PublicKey) (VerifyR
 	return res, err
 }
 
-// VerifyCheckpoints checks every checkpoint against the key and the chain itself.
-// It returns how many are valid, and a BadCheckpointError for the first one that is not.
-func VerifyCheckpoints(ctx context.Context, q db.Querier, public ed25519.PublicKey) (int, error) {
+// VerifyCheckpoints checks every checkpoint against the key in force at its position and the
+// chain itself; installation is the public key derived from master.key, which endorses every
+// later key (spec 070). It returns how many are valid, and a BadCheckpointError for the first
+// one that is not.
+func VerifyCheckpoints(ctx context.Context, q db.Querier, installation ed25519.PublicKey) (int, error) {
+	keys, err := loadKeyChain(ctx, q, installation)
+	if err != nil {
+		return 0, err
+	}
 	start, err := latestAnchor(ctx, q)
 	if err != nil {
 		return 0, err
 	}
 	var prunedUpTo int64
 	if start != nil {
-		if !ed25519.Verify(public, anchorMessage(start.seq, start.prevHash), start.signature) {
+		// A prune is signed by the key in force when it ran, which may be later than the
+		// key of its position.
+		if !keys.knows(start.publicKey) {
+			return 0, &BadCheckpointError{Seq: start.seq, Reason: "the anchor is signed by a key the chain does not know"}
+		}
+		if !ed25519.Verify(start.publicKey, anchorMessage(start.seq, start.prevHash), start.signature) {
 			return 0, &BadCheckpointError{Seq: start.seq, Reason: "the anchor has a bad signature"}
 		}
 		prunedUpTo = start.seq
@@ -131,7 +156,7 @@ func VerifyCheckpoints(ctx context.Context, q db.Querier, public ed25519.PublicK
 		if err := rows.Scan(&seq, &hash, &sig, &chain); err != nil {
 			return n, err
 		}
-		if !ed25519.Verify(public, checkpointMessage(seq, hash), sig) {
+		if !ed25519.Verify(keys.at(seq), checkpointMessage(seq, hash), sig) {
 			return n, &BadCheckpointError{Seq: seq, Reason: "the checkpoint has a bad signature"}
 		}
 		if seq > prunedUpTo && string(chain) != string(hash) {

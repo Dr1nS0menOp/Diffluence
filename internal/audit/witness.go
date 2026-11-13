@@ -107,13 +107,18 @@ type WitnessResult struct {
 	Reason      string `json:"reason,omitempty"`
 }
 
-// CompareWitness checks every checkpoint of the witness against the key and against
-// the chain in the database, oldest first, and names the first that disagrees. Run it
+// CompareWitness checks every checkpoint of the witness against the key in force at its
+// position and against the chain in the database, oldest first, and names the first that
+// disagrees. installation is the public key derived from master.key (spec 070). Run it
 // after Check: it trusts that the chain itself is whole.
-func CompareWitness(ctx context.Context, q db.Querier, public ed25519.PublicKey, witness []Checkpoint) (WitnessResult, error) {
+func CompareWitness(ctx context.Context, q db.Querier, installation ed25519.PublicKey, witness []Checkpoint) (WitnessResult, error) {
 	res := WitnessResult{OK: true}
 	sorted := slices.Clone(witness)
 	slices.SortFunc(sorted, func(a, b Checkpoint) int { return cmp.Compare(a.Seq, b.Seq) })
+	keys, err := loadKeyChain(ctx, q, installation)
+	if err != nil {
+		return res, err
+	}
 	start, err := latestAnchor(ctx, q)
 	if err != nil {
 		return res, err
@@ -136,7 +141,7 @@ func CompareWitness(ctx context.Context, q db.Querier, public ed25519.PublicKey,
 			return res, err
 		}
 		for _, c := range batch {
-			if !ed25519.Verify(public, checkpointMessage(c.Seq, c.Hash), c.Signature) {
+			if !ed25519.Verify(keys.at(c.Seq), checkpointMessage(c.Seq, c.Hash), c.Signature) {
 				return fail(c.Seq, "a checkpoint in the witness log has a bad signature")
 			}
 			if c.Seq <= prunedUpTo {
