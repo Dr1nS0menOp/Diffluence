@@ -43,6 +43,9 @@ type Config struct {
 	DatabaseURL        string
 	MigrateDatabaseURL string // owner of the tables; empty = use DatabaseURL
 	NATSURL            string // empty = embedded NATS (only allowed with role "all")
+	// NATSReplicas is how many NATS nodes keep a copy of each event: 1 for the embedded
+	// server, 3 or 5 for a cluster, so losing one node loses no event (spec 063).
+	NATSReplicas       int
 	DataDir            string
 	MigrateOnStart     bool
 	LogLevel           slog.Level
@@ -200,6 +203,7 @@ func (l *loader) load() Config {
 		DatabaseURL:           l.str("DATABASE_URL", ""),
 		MigrateDatabaseURL:    l.str("MIGRATE_DATABASE_URL", ""),
 		NATSURL:               l.str("NATS_URL", ""),
+		NATSReplicas:          l.integer("NATS_REPLICAS", 1),
 		DataDir:               l.str("DATA_DIR", "./data"),
 		MigrateOnStart:        l.boolean("MIGRATE_ON_START", true),
 		SessionIdleTimeout:    l.duration("SESSION_IDLE_TIMEOUT", 8*time.Hour),
@@ -263,6 +267,14 @@ func (l *loader) load() Config {
 	}
 	if c.NATSURL == "" && c.Role != RoleAll {
 		l.fail("NATS_URL", errors.New("is required when ROLE is api or worker (embedded NATS only works with ROLE=all)"))
+	}
+	// JetStream keeps an odd number of copies, so a majority can always agree; a cluster
+	// of more than five gains nothing for one stream.
+	switch {
+	case c.NATSReplicas != 1 && c.NATSReplicas != 3 && c.NATSReplicas != 5:
+		l.fail("NATS_REPLICAS", fmt.Errorf("must be 1, 3 or 5, got %d", c.NATSReplicas))
+	case c.NATSReplicas > 1 && c.NATSURL == "":
+		l.fail("NATS_REPLICAS", errors.New("above 1 needs a NATS cluster in NATS_URL: the embedded server is one node"))
 	}
 	if c.SessionIdleTimeout <= 0 || c.SessionMaxAge <= 0 || c.SessionIdleTimeout > c.SessionMaxAge {
 		l.fail("SESSION_IDLE_TIMEOUT", errors.New("must be positive and not longer than SESSION_MAX_AGE"))

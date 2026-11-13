@@ -141,7 +141,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		return nil, err
 	}
 	// The queue opens before migrating, so the checks before an upgrade can see it.
-	if a.queue, err = queue.Open(ctx, cfg.NATSURL, cfg.DataDir, log); err != nil {
+	if a.queue, err = queue.Open(ctx, cfg.NATSURL, cfg.DataDir, cfg.NATSReplicas, log); err != nil {
 		a.Close()
 		return nil, err
 	}

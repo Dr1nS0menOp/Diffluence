@@ -110,8 +110,8 @@ Checked by reading the code at `503220b`.
 
 | | Finding | Needed |
 |---|---|---|
-| F1 | `queue.Open` creates the stream without `Replicas`, so in a cluster it has 1 replica, and losing that node loses it | **Yes:** a setting `DIFFLUENCE_NATS_REPLICAS` (default 1, 3 for a cluster). `CreateOrUpdateStream` also raises it on an existing stream. With a test. |
-| F2 | `db.Open` sends `plan_cache_mode` and `jit` as startup parameters (spec 061). PgBouncer refuses unknown startup parameters, and with `ignore_startup_parameters` it drops them. | **Yes:** a migration sets both for the database with `ALTER DATABASE … SET`, so they hold behind PgBouncer too. Until then, the Patroni template sets them server-wide and PgBouncer ignores them (D6). |
+| F1 | `queue.Open` creates the stream without `Replicas`, so in a cluster it has 1 replica, and losing that node loses it | **Built in spec 063:** `DIFFLUENCE_NATS_REPLICAS` (1, 3 or 5; default 1). A node raises the copies of an existing stream, never lowers them. |
+| F2 | `db.Open` sends `plan_cache_mode` and `jit` as startup parameters (spec 061). PgBouncer refuses unknown startup parameters, and with `ignore_startup_parameters` it drops them. | **Built in spec 063:** migration 0050 sets both for the database with `ALTER DATABASE … SET`, so they hold behind PgBouncer too. The Patroni template still sets them server-wide (D6). |
 | F3 | After a hard reset of the queue, published events may be gone (T6 shows how many) | **If T6 loses events under the chosen policy:** `diffluence outbox resend --since <time>`, sending published rows again with the event id as the message id, so the queue's two-minute duplicate window and idempotent consumers drop repeats. Check first that the relay sets the message id. |
 | F4 | `DIFFLUENCE_NATS_URL` with a comma-separated list | **No:** `nats.Connect` takes a list as it is. |
 | F5 | Several database hosts or `target_session_attrs` | **No:** HAProxy routes to the leader. pgx can also take a host list, if an operator wants that without HAProxy. |

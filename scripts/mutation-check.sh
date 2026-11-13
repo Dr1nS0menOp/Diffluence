@@ -1694,9 +1694,9 @@ mutate "a query that ran out is not noticed" internal/db/db.go \
 mutate "a query that failed on its own counts as running out" internal/db/db.go \
   's.replace("data.Err != nil \x26\x26 errors.Is(context.Cause(ctx), errQueryLimit)", "data.Err != nil")' ./internal/db/ -run TestAQueryThatFailsForAnotherReasonDoesNotCountAsRunningOut
 mutate "the pool reuses generic plans" internal/db/db.go \
-  's.replace("cfg.ConnConfig.RuntimeParams[\"plan_cache_mode\"] = \"force_custom_plan\"", "")' ./internal/db/ -run TestThePoolPlansEveryQueryWithItsValues
+  's.replace("cfg.ConnConfig.RuntimeParams[\"plan_cache_mode\"] = \"force_custom_plan\"", "")' ./internal/db/ -run TestThePoolStillAsksForBothSettings
 mutate "the pool compiles plans" internal/db/db.go \
-  's.replace("cfg.ConnConfig.RuntimeParams[\"jit\"] = \"off\"", "")' ./internal/db/ -run TestThePoolCompilesNoPlans
+  's.replace("cfg.ConnConfig.RuntimeParams[\"jit\"] = \"off\"", "")' ./internal/db/ -run TestThePoolStillAsksForBothSettings
 mutate "for you leaves out watched spaces" internal/feed/feed.go \
   's.replace("WHERE w.user_id = $1 AND w.target_type = \x27space\x27", "WHERE w.user_id = $1 AND w.target_type = \x27none\x27")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "for you leaves out watched branches" internal/feed/feed.go \
@@ -1761,6 +1761,23 @@ mutate "a listed log event is renamed" internal/queue/queue.go \
   's.replace("\"nats disconnected\"", "\"the queue went away\"")' $app -run TestEveryListedLogEventIsStillWritten
 mutate "the sealer is not traced" internal/app/ops.go \
   's.replace("ctx, end := tracing.Span(ctx, \"audit seal\", \"\")", "ctx, end := tracing.Span(ctx, \"audit\", \"\")")' $app -run TestTracesOfTheWholeApplicationHoldNoContent
+
+# Spec 063: the event stream keeps a copy per NATS node, and the database holds the
+# settings PgBouncer would drop at connect.
+mutate "five copies are refused" internal/config/config.go \
+  's.replace("c.NATSReplicas != 3 \x26\x26 c.NATSReplicas != 5:", "c.NATSReplicas != 3:")' ./internal/config/ -run TestAClusterKeepsThreeOrFiveCopies
+mutate "the embedded server takes three copies" internal/config/config.go \
+  's.replace("case c.NATSReplicas > 1 \x26\x26 c.NATSURL == \"\":", "case false:")' ./internal/config/ -run TestTheEmbeddedServerRefusesMoreThanOneCopy
+mutate "the stream ignores the copies it is told to keep" internal/queue/queue.go \
+  's.replace("\t\tReplicas:   want,\n", "\t\tReplicas:   1,\n")' ./internal/queue/ -run TestOneServerRefusesThreeCopies
+mutate "a node lowers the copies of the stream" internal/queue/queue.go \
+  's.replace("return max(existing, configured)", "return configured")' ./internal/queue/ -run TestTheStreamGetsMoreCopiesButNeverFewer
+mutate "the database does not hold plan_cache_mode" internal/db/migrations/0050_session_settings.sql \
+  's.replace("SET plan_cache_mode = force_custom_plan", "SET application_name = force_custom_plan")' ./internal/db/ -run TestANewSessionPlansWithItsValuesWithoutAskingForIt
+mutate "the database does not hold jit" internal/db/migrations/0050_session_settings.sql \
+  's.replace("SET jit = off", "SET application_name = off")' ./internal/db/ -run TestANewSessionPlansWithItsValuesWithoutAskingForIt
+mutate "a role that does not own the database stops the migration" internal/db/migrations/0050_session_settings.sql \
+  's.replace("EXCEPTION WHEN insufficient_privilege THEN", "EXCEPTION WHEN division_by_zero THEN")' ./internal/db/ -run TestTheSessionSettingsAskNothingTheOwnerMayNotDo
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

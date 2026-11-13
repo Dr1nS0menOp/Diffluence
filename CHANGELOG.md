@@ -3,6 +3,10 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: ready for a NATS cluster and for PgBouncer (spec 063)
+- `DIFFLUENCE_NATS_REPLICAS` sets how many NATS nodes keep a copy of each event: 1 (the default, and the only value for the embedded server), 3 or 5 for a cluster. Any other value is refused at start. A node raises the copies of an existing event stream to this setting, and never lowers them by itself
+- The database now holds `plan_cache_mode = force_custom_plan` and `jit = off` as its own defaults, so every session has them, also through PgBouncer in transaction mode, which drops what a client sends at connect. The pool still sends both, for a direct connection
+- Upgrade impact: migration 0050 sets those two defaults on the database. It needs the owner of the database; when the migration role is not the owner, as on some managed databases, it notes that and goes on, and only direct connections get both settings. A NATS cluster must run this release on every node before `DIFFLUENCE_NATS_REPLICAS` is raised, because an older release asks for one copy
 ### Added: restoring over the live installation from the console (spec 059)
 - Administration, System, Backups: choose a complete backup and restore it over the whole installation. The page says what is lost, asks for the installation's name typed out and for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day
 - The backup service carries it out: it checks the backup while people still work, stops every node, makes a safety backup of the installation as it is, restores the database in one transaction and the files with their keys, brings the database up to this release, and checks the audit log and the keys. Every node shows a waiting page meanwhile, and serves again once it is done. The restore and who asked for it are written into the restored audit log

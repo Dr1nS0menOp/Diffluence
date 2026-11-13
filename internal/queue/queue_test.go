@@ -13,7 +13,7 @@ import (
 
 func embedded(t *testing.T) *Queue {
 	t.Helper()
-	q, err := Open(context.Background(), "", t.TempDir(), slog.New(slog.DiscardHandler))
+	q, err := Open(context.Background(), "", t.TempDir(), 1, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -86,7 +86,7 @@ func TestAnEventThatCouldNotBeSetAsideStaysInTheOutbox(t *testing.T) {
 func TestRelayPublishesCommittedEventsOnce(t *testing.T) {
 	tdb := testutil.Database(t)
 	ctx := context.Background()
-	q, err := queue.Open(ctx, "", t.TempDir(), slog.New(slog.DiscardHandler))
+	q, err := queue.Open(ctx, "", t.TempDir(), 1, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestRelayPublishesCommittedEventsOnce(t *testing.T) {
 
 func TestDuplicatePublishIsDeduplicated(t *testing.T) {
 	ctx := context.Background()
-	q, err := queue.Open(ctx, "", t.TempDir(), slog.New(slog.DiscardHandler))
+	q, err := queue.Open(ctx, "", t.TempDir(), 1, slog.New(slog.DiscardHandler))
 	if err != nil {
 		t.Fatal(err)
 	}

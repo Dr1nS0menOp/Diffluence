@@ -33,8 +33,9 @@ type Queue struct {
 }
 
 // Open connects to natsURL, or starts an embedded server (no network listener)
-// storing its data under dataDir when natsURL is empty.
-func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queue, error) {
+// storing its data under dataDir when natsURL is empty. The event stream keeps replicas
+// copies, one per NATS node, so a cluster loses no event with one node (spec 063).
+func Open(ctx context.Context, natsURL, dataDir string, replicas int, log *slog.Logger) (*Queue, error) {
 	q := &Queue{log: log, retryWaits: defaultRetryWaits}
 	opts := []nats.Option{
 		nats.Name("diffluence"),
@@ -85,6 +86,15 @@ func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queu
 	}
 	sctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
+	existing := 0
+	if s, serr := q.js.Stream(sctx, StreamEvents); serr == nil {
+		existing = s.CachedInfo().Config.Replicas
+	}
+	want := streamReplicas(existing, replicas)
+	if want > replicas {
+		log.Warn("queue: the event stream keeps more copies than NATS_REPLICAS asks; left as it is",
+			"copies", existing, "setting", replicas)
+	}
 	_, err = q.js.CreateOrUpdateStream(sctx, jetstream.StreamConfig{
 		Name:       StreamEvents,
 		Subjects:   []string{"diffluence.events.>"},
@@ -92,12 +102,21 @@ func Open(ctx context.Context, natsURL, dataDir string, log *slog.Logger) (*Queu
 		Retention:  jetstream.LimitsPolicy,
 		MaxAge:     7 * 24 * time.Hour,
 		Duplicates: 2 * time.Minute,
+		Replicas:   want,
 	})
 	if err != nil {
 		q.Close()
-		return nil, fmt.Errorf("queue: create stream: %w", err)
+		return nil, fmt.Errorf("queue: create stream with %d copies: %w", want, err)
 	}
 	return q, nil
+}
+
+// streamReplicas is the copies the stream gets: the setting, or more when the stream has
+// more. Lowering is left to an operator, because one node started with the setting left
+// out would otherwise take copies away from the whole cluster. A release from before this
+// setting still asks for one copy: a cluster must run this release on every node first.
+func streamReplicas(existing, configured int) int {
+	return max(existing, configured)
 }
 
 // deliver runs the listener on one event, and tells the server what became of it.

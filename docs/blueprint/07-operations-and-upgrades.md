@@ -83,7 +83,7 @@ Spec 044 checked every promise above against the code, the guides in `docs/opera
 
 - **OPS-010** · built · Small: one node with `role=all`, embedded NATS, local PostgreSQL and local disk. This is what Compose runs.
 - **OPS-011** · partly · Roles `api` and `worker` exist, need one shared key (`DIFFLUENCE_MASTER_KEY_FILE`), and report themselves in the node list. Two machines behind a load balancer were never run. Phase 3, *servers*. Medium.
-- **OPS-012** · phase 3 · A NATS JetStream cluster of 3 nodes. `DIFFLUENCE_NATS_URL` accepts one; never tested. *Servers*. Medium.
+- **OPS-012** · phase 3 · A NATS JetStream cluster of 3 nodes. `DIFFLUENCE_NATS_URL` accepts one, and `DIFFLUENCE_NATS_REPLICAS` (1, 3 or 5) makes the event stream keep a copy per node (spec 063); never run on a cluster. *Servers*. Medium.
 - **OPS-013** · phase 3 · PostgreSQL with Patroni, PgBouncer and HAProxy, reads to replicas. The queries that may read a copy that lags are counted already (ARC-228). *Servers*. Medium.
 - **OPS-014** · phase 3 · S3-compatible storage with versioning. Storage has one interface and a disk store; no S3 store yet. Medium.
 - **OPS-015** · partly · The sizing of 50 requests a second. A k6 script exists (`scripts/load/reading.js`, runs in `docs/operations/limits.md`), but it is run by hand, not in CI, and not with 5,000 users. Phase 3, *servers* (ARC-240). Medium.
