@@ -37,8 +37,10 @@ const minutes = (n) => `${n}m`;
 const plans = {
   mix: { executor: "ramping-vus", stages: [
     { duration: minutes(3), target: 500 }, { duration: minutes(10), target: 500 }, { duration: "1m", target: 0 }] },
+  // RAMP and HOLD shorten a run when time is short, as in the second test.
   worst: { executor: "ramping-vus", stages: [
-    { duration: minutes(6), target: 5000 }, { duration: minutes(6), target: 5000 }, { duration: "1m", target: 0 }] },
+    { duration: __ENV.RAMP || minutes(6), target: 5000 }, { duration: __ENV.HOLD || minutes(6), target: 5000 },
+    { duration: "1m", target: 0 }] },
   search: { executor: "ramping-vus", stages: [
     { duration: minutes(1), target: 200 }, { duration: minutes(5), target: 200 }, { duration: "30s", target: 0 }] },
   // On a server like the one in the report, 500 active people already fill PostgreSQL,
@@ -53,7 +55,7 @@ const plans = {
   samepage: { executor: "constant-vus", vus: 50, duration: minutes(3) },
   smoke: { executor: "constant-vus", vus: 20, duration: minutes(1) },
   // One level of the step test on its own, so each level has its own summary.
-  level: { executor: "constant-vus", vus: Number(__ENV.VUS || 100), duration: minutes(4) },
+  level: { executor: "constant-vus", vus: Number(__ENV.VUS || 100), duration: __ENV.HOLD || minutes(4) },
 };
 
 // The whole summary goes to a file, for summarise.py.

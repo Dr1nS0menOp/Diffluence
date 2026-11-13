@@ -19,5 +19,10 @@ while true; do
             count(*) FILTER (WHERE state LIKE 'idle in%'), count(*) FILTER (WHERE wait_event_type='Lock')
      FROM pg_stat_activity WHERE datname='diffluence'" | tr '|' ',' >> "$out.db"
   echo "$t,$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://127.0.0.1:8080/readyz)" >> "$out.ready"
+  # How far the audit sealer is behind (spec 052); needs the metrics token from .env.
+  token=$(grep -E '^DIFFLUENCE_METRICS_TOKEN=' .env | cut -d= -f2)
+  lag=$(curl -s --max-time 5 -H "Authorization: Bearer $token" http://127.0.0.1:8080/metrics |
+    awk '/^diffluence_audit_sealing_lag_seconds /{print $2}')
+  echo "$t,${lag:-}" >> "$out.seal"
   sleep 3
 done
