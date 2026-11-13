@@ -19,3 +19,5 @@ node_modules/
 
 # Archives dropped into the checkout by hand never belong in the repository.
 /*.zip
+# Reviews dropped into the checkout may name weaknesses that are not fixed yet.
+/*review*.md
