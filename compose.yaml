@@ -48,6 +48,13 @@ services:
       DIFFLUENCE_CONFIG_FILE: ${DIFFLUENCE_CONFIG_FILE:-}
       # Empty = http://localhost:8080.
       DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-}
+      # Who may say, in X-Forwarded-For, which address a request came from. The default
+      # fits the port below on 127.0.0.1: a proxy on this machine reaches the app through
+      # Docker's gateway, and one in this Compose project from its own network, both in
+      # 172.16.0.0/12, where Docker takes its networks from. Nobody else can reach the port.
+      # With DIFFLUENCE_BIND=0.0.0.0, set this to the address of the proxy alone, or anyone
+      # on such a network could pass any address (docs/operations/install.md).
+      DIFFLUENCE_TRUSTED_PROXIES: ${DIFFLUENCE_TRUSTED_PROXIES:-127.0.0.0/8,::1/128,172.16.0.0/12}
       # The application connects as a role that does not own the tables, so it
       # cannot disable the audit log's protection. Migrations use the owner.
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url

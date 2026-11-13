@@ -22,8 +22,11 @@ func (s *Server) registerRunningRoutes() {
 	r.HandleFunc("GET /api/v1/admin/backups", admin, s.handleBackups)
 	r.HandleFunc("POST /api/v1/admin/backups/request", admin, s.handleBackupRequest)
 	// A restore over the live installation is the most dangerous action there is: it asks
-	// for a fresh login and, on top of it, a second factor or a passkey (spec 059).
-	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(admin), s.handleRestoreRequest)
+	// for a fresh login and, on top of it, a second factor or a passkey (spec 059). It
+	// brings back every account and grant of the backup, so it is for system
+	// administrators only (spec 066).
+	system := SessionOnly(Permission(identity.PermSystemAdministrator))
+	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(system), s.handleRestoreRequest)
 	r.HandleFunc("DELETE /api/v1/admin/backups/restore", admin, s.handleRestoreCancel)
 	r.HandleFunc("GET /api/v1/admin/configuration", admin, s.handleConfiguration)
 	// Logging everyone out is an incident action; asking for the password again first
@@ -69,6 +72,12 @@ func (s *Server) handleRestoreRequest(w http.ResponseWriter, r *http.Request) {
 	}
 	p := PrincipalFrom(r.Context())
 	c := s.caller(r)
+	// A code is six digits: without a limit per account, a stolen session that passed
+	// the password could keep guessing.
+	if strings.TrimSpace(in.Code) != "" && !s.loginByAcc.allow("2fa:"+p.User.ID.String()) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Try again later.")
+		return
+	}
 	if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {
 		s.fail(w, r, err)
 		return

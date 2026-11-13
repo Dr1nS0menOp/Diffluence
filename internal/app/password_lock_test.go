@@ -127,7 +127,12 @@ func TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo(t *testing.T) {
 	root.want(http.StatusConflict, "POST", "/api/v1/admin/users/"+anna.id+"/unlock-password", nil)
 
 	lock()
-	root.ok("POST", "/api/v1/admin/users/"+anna.id+"/reset-password", map[string]any{"password": "a passphrase the admin chose"})
+	sent := root.ok("POST", "/api/v1/admin/users/"+anna.id+"/reset-password", nil)
+	link, _ := sent["link"].(string)
+	token := link[strings.Index(link, "token=")+len("token="):]
+	if status, out := publicPost(e, "/api/v1/auth/reset", map[string]any{"token": token, "password": "a sturdy passphrase of her own"}); status != http.StatusNoContent {
+		t.Fatalf("reset through the link: %d %s", status, out)
+	}
 	if _, locked := e.lockedState(anna.id); locked {
 		t.Fatal("a new password left the stop in place")
 	}

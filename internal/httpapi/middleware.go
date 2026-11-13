@@ -105,6 +105,12 @@ func traceIDFrom(header string) string {
 func withMetrics(requests *metrics.Requests) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// An editing socket lasts as long as its editor; timed as a request it would
+			// count as one that took hours and set off the latency alerts.
+			if r.URL.Path == collabSocketPath {
+				next.ServeHTTP(w, r)
+				return
+			}
 			start := time.Now()
 			rec := &statusRecorder{ResponseWriter: w}
 			defer func() { requests.Observe(r.Method, rec.finalStatus(), time.Since(start)) }()

@@ -112,8 +112,10 @@ func newAdmission(poolSize int) *admission {
 	}}
 }
 
-// unqueued are probes and metrics: a probe that waits on a full node reports too late.
-var unqueued = []string{"/livez", "/readyz", "/metrics"}
+// unqueued are probes and metrics, because a probe that waits on a full node reports too
+// late, and the editing socket, which holds no connection and stays open as long as its
+// editor: in a queue it would keep a place of reading for hours (it has its own cap).
+var unqueued = []string{"/livez", "/readyz", "/metrics", collabSocketPath}
 
 func (a *admission) middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

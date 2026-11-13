@@ -924,6 +924,9 @@ export interface UserDetail {
   spaces?: string[];
 }
 
+/** A reset link an administrator sent: mailed, or handed back once to pass on. */
+export type ResetLink = { mailed: true } | { mailed: false; link: string };
+
 export interface Group {
   id: string;
   name: string;

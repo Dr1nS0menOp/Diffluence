@@ -472,6 +472,36 @@ test('anonymising needs a reason, and leaves a neutral name on the work', async 
   expect(await after.text()).not.toContain(name);
 });
 
+test('an administrator sends a reset link, and the person chooses the password', async ({
+  page,
+  browser,
+}) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  const email = `${unique('forgetful')}@example.com`;
+  await createUser(browser, email);
+  await page.goto('/admin/users');
+  const name = email.split('@')[0] ?? '';
+  await page.getByRole('searchbox', { name: 'Search' }).fill(email);
+  await page.getByRole('button', { name, exact: true }).click();
+  // No field for a password: the administrator never chooses one.
+  await expect(page.getByRole('dialog').getByLabel('New password')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Send a password reset link' }).click();
+  // Mail is off in these tests, so the link shows once, to pass on.
+  const status = page.getByRole('status').filter({ hasText: 'Mail is off' });
+  await expect(status).toBeVisible();
+  await checkAccessibility(page);
+  const link = /\/reset\?token=\S+/.exec((await status.textContent()) ?? '')?.[0] ?? '';
+  expect(link).not.toBe('');
+
+  const fresh = await (await browser.newContext(BASE)).newPage();
+  await fresh.goto(link);
+  await fresh.getByLabel('New password').fill('a long and fine new passphrase');
+  await fresh.getByRole('button', { name: 'Save' }).click();
+  await expect(fresh.getByRole('status')).toBeVisible();
+  await login(fresh, email, 'a long and fine new passphrase');
+  await fresh.context().close();
+});
+
 test('a failing accent is refused by name, and a good pair is used before login', async ({
   page,
   browser,

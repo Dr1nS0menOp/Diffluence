@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/backups"
+	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/restore"
 )
 
@@ -87,6 +88,55 @@ func TestARestoreAsksForASecondFactor(t *testing.T) {
 		map[string]any{"name": name, "confirm": "Test", "code": recovery[0]})
 	if e.auditActions("backup.restore_requested") != 1 {
 		t.Fatal("the restore is not in the audit log")
+	}
+}
+
+// A restore brings back every account and grant of the backup, so an administrator
+// without system administration does not reach it.
+func TestOnlyASystemAdministratorRestores(t *testing.T) {
+	e := newEnv(t)
+	clerk := e.user("clerk@example.com", identity.PermUseProduct, identity.PermAdministrator)
+	_, recovery := clerk.enrolTOTP()
+	name := madeBackup(t, e, time.Now().Add(-time.Hour))
+	clerk.want(http.StatusForbidden, "POST", "/api/v1/admin/backups/restore",
+		map[string]any{"name": name, "confirm": "Test", "code": recovery[0]})
+	if openRestores(t, e) != 0 {
+		t.Fatal("an administrator without system administration asked for a restore")
+	}
+}
+
+// Every wrong code leaves a trace, and guessing stops after a few.
+func TestWrongCodesForARestoreAreAuditedAndLimited(t *testing.T) {
+	e := newEnv(t)
+	root := admin(e)
+	_, recovery := root.enrolTOTP()
+	name := madeBackup(t, e, time.Now().Add(-time.Hour))
+	wrong := func() int {
+		resp, _ := root.do("POST", "/api/v1/admin/backups/restore", map[string]any{"name": name, "confirm": "Test", "code": "000000"})
+		return resp
+	}
+	if got := wrong(); got != http.StatusForbidden {
+		t.Fatalf("a wrong code: %d", got)
+	}
+	if e.auditActions("auth.second_factor_failed") != 1 {
+		t.Fatal("a wrong code left no trace")
+	}
+	refused := false
+	for range 20 {
+		if wrong() == http.StatusTooManyRequests {
+			refused = true
+			break
+		}
+	}
+	if !refused {
+		t.Fatal("twenty wrong codes in a row were all tried")
+	}
+	if out := root.want(http.StatusTooManyRequests, "POST", "/api/v1/admin/backups/restore",
+		map[string]any{"name": name, "confirm": "Test", "code": recovery[0]}); !strings.Contains(out, "rate_limited") {
+		t.Fatalf("after the limit: %s", out)
+	}
+	if openRestores(t, e) != 0 {
+		t.Fatal("a restore got through after the limit")
 	}
 }
 

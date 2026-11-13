@@ -171,6 +171,9 @@ func (s *Service) DeleteGroup(ctx context.Context, c Caller, id uuid.UUID) error
 		if err := s.managedGuard(ctx, tx, c, id); err != nil {
 			return err
 		}
+		if err := s.mayActOnGroup(ctx, tx, c, id); err != nil {
+			return err
+		}
 		// Its roles go, everywhere, and with them every grant they added (spec 036).
 		if _, err := tx.Exec(ctx, "DELETE FROM role_assignments WHERE subject_type = 'group' AND subject_id = $1", id); err != nil {
 			return err
@@ -320,6 +323,9 @@ func (s *Service) AddGroupMember(ctx context.Context, c Caller, groupID, userID 
 }
 
 func (s *Service) addMember(ctx context.Context, tx pgx.Tx, c Caller, groupID, userID uuid.UUID) error {
+	if err := s.mayActOnGroup(ctx, tx, c, groupID); err != nil {
+		return err
+	}
 	if _, err := s.GetUser(ctx, tx, userID); err != nil {
 		return err
 	}
@@ -341,6 +347,13 @@ func (s *Service) RemoveGroupMember(ctx context.Context, c Caller, groupID, user
 }
 
 func (s *Service) removeMember(ctx context.Context, tx pgx.Tx, c Caller, groupID, userID uuid.UUID) error {
+	// Every way out of a group, by an administrator or by its owner, passes here. Taking
+	// someone out can take their access away, so it counts as acting on their account.
+	// That also covers a group that holds system administration: each of its members
+	// holds it through the group. Adding only gives, so addMember checks the group.
+	if err := s.mayActOn(ctx, tx, c, userID); err != nil {
+		return err
+	}
 	tag, err := tx.Exec(ctx, "DELETE FROM group_members WHERE group_id = $1 AND user_id = $2", groupID, userID)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err

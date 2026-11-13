@@ -3,6 +3,14 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: rules for administration, editing sockets and logins (spec 066)
+- Open editors no longer wait in the order of work or count as requests in the metrics. They have caps of their own: 512 per node and 8 per login.
+- Only a system administrator acts on an account or group that holds system administration: its name, status, reset link, second factor, password stop, end date, anonymising, and who is in such a group. Only a system administrator starts a restore from the console
+- An administrator now sends a reset link instead of typing a new password: mailed when mail is on, otherwise shown once in the console to pass on. The person chooses their own password. Accounts from an identity provider get no link
+- A wrong code given for a restore is written to the audit log, and codes count against a limit per account
+- Discovery of the OIDC provider stops after 10 seconds, runs once for every login waiting on it, and a failure is remembered for 30 seconds
+- `compose.yaml` passes `DIFFLUENCE_TRUSTED_PROXIES` on, and trusts a proxy on the same machine or in the same Compose project by default. System health warns when every login of a day came from one private address
+- Upgrade impact: take the new `compose.yaml`. With the port on `127.0.0.1`, as by default, there is nothing more to do. With `DIFFLUENCE_BIND=0.0.0.0`, set `DIFFLUENCE_TRUSTED_PROXIES` to the proxy's own address. Administrators without system administration lose the restore and the actions above on system administrators. A script that sent a password to `POST /api/v1/admin/users/{id}/reset-password` gets a link back instead. No migration
 ### Changed: pinned and scanned builds, and a ticket for editing together (spec 067)
 - The service for editing together now gets a signed ticket for one person and one page from the API, which checks the session and the right to edit when the socket opens. The browser's cookies stay with the API. The service asks again with the ticket every minute and gets a new one each time; these checks do not count as activity, so a session still ends at its idle limit while an editor is open
 - Every GitHub action is pinned by commit, and the base images `postgres:16` and `node:22-slim` by digest. CI builds and scans the app, backup and editing-together images with Trivy, and runs `npm audit` for the editing-together service. A release signs and attests all three images

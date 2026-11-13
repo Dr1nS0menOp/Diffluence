@@ -6,7 +6,7 @@
 
 - **SEC-600** · built · Every admin route needs a global permission, and the router shows that in the route list.
 - **SEC-601** · built · Administrators see metadata, not content. To read, they use Recover access, with a reason, and that is audited.
-- **SEC-602** · built · *System administrator* is separate, and only one can grant it.
+- **SEC-602** · built · *System administrator* is separate, and only one can grant it. Since spec 066 only a system administrator acts on an account or a group that holds it (its name, status, reset link, second factor, password stop, end date, anonymising, and membership), and only a system administrator starts a restore from the console.
 - **SEC-603** · built · Settings changes are audited with what changed.
 - **SEC-604** · built · Reading and exporting the audit log is itself audited.
 - **SEC-605** · built · Heavy actions need a recent proof of identity, through the `Sensitive` route wrapper: granting *administrator*, resets, anonymising, recover access, SCIM and service tokens, maintenance mode, audit retention and the rule for second factors (ASVS 7.5.1, 7.5.3).

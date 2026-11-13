@@ -22,7 +22,7 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-113** · built · Medium. `POST /me/totp/disable` checks the password but has no limit, unlike the routes for changing a password and starting TOTP. Someone with a stolen session can use it to guess the password. Add the same limit. Belongs in wave F. Built (spec 042): `TestTurningOffTOTPCannotBeUsedToGuessThePassword`.
 - **SEC-114** · built · Password fields use `type="password"` and the right `autocomplete`, and paste is not blocked (ASVS 6.2.6, 6.2.7).
 - **SEC-115** · built · Changing a password needs the current one, and ends all other sessions (ASVS 6.2.3).
-- **SEC-116** · partly · An administrator sets a new password for someone, so the administrator knows it, and it can stay in use. ASVS 6.4.6 (Level 3) wants a reset without that. Once wave F has reset mail, this route should send a link when mail is set up, and the person must choose their own password (ASVS 6.4.1).
+- **SEC-116** · built · An administrator sends a reset link and never chooses a password: mailed when mail is set up, otherwise shown once to pass on. The person chooses their own password (ASVS 6.4.1, 6.4.6). Spec 066.
 
 ## 2.2 Authenticator codes and recovery codes
 

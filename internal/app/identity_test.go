@@ -34,6 +34,18 @@ import (
 	"github.com/diffluence/diffluence/internal/testutil"
 )
 
+// givePassword sets a password for an account directly, as only a test does: no route
+// lets anyone choose a password for someone else.
+func (e *env) givePassword(userID, password string) {
+	e.t.Helper()
+	hash, err := identity.HashPassword(password, identity.DefaultParams)
+	if err != nil {
+		e.t.Fatal(err)
+	}
+	e.sql(`INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)
+		ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash`, userID, hash)
+}
+
 func (u *user) password(path string) map[string]any {
 	u.e.t.Helper()
 	return u.ok("POST", path, map[string]any{"password": adminPassword})
@@ -734,9 +746,7 @@ func TestSCIMAuthentikUserFlow(t *testing.T) {
 	}
 
 	// Deactivating ends the session at once.
-	if err := e.app.Identity().ResetPassword(context.Background(), identity.SystemCaller("test"), uuid.MustParse(id), adminPassword); err != nil {
-		t.Fatal(err)
-	}
+	e.givePassword(id, adminPassword)
 	c := e.client()
 	if e.login(c, "jane@example.com", adminPassword) != 200 {
 		t.Fatal("login failed")
@@ -891,11 +901,8 @@ func TestOIDCLinksAccountsCreatedThroughSCIM(t *testing.T) {
 	}
 
 	// An account with a password is never linked, whatever the id says.
-	if err := e.app.Identity().ResetPassword(context.Background(), identity.SystemCaller("test"), uuid.MustParse(s.want(201, "POST", "/Users",
-		map[string]any{"userName": "pw", "active": true, "externalId": "uid-pw",
-			"emails": []any{map[string]any{"value": "pw@example.com", "primary": true}}})["id"].(string)), adminPassword); err != nil {
-		t.Fatal(err)
-	}
+	e.givePassword(s.want(201, "POST", "/Users", map[string]any{"userName": "pw", "active": true, "externalId": "uid-pw",
+		"emails": []any{map[string]any{"value": "pw@example.com", "primary": true}}})["id"].(string), adminPassword)
 	if to := e.oidcLogin(p, noRedirect(), map[string]any{"sub": "uid-pw", "email": "pw@example.com", "email_verified": true}); !strings.Contains(to, "oidc_account_exists") {
 		t.Fatalf("an account with a password must not link: %q", to)
 	}

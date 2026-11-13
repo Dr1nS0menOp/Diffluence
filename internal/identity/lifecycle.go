@@ -71,6 +71,10 @@ func (s *Service) SetMailer(m Mailer, publicOrigin string) {
 	s.mailer, s.origin = m, publicOrigin
 }
 
+// SetPublicOrigin sets the address links start with. SetMailer sets it too; without mail
+// it is still needed for a reset link an administrator copies to the person.
+func (s *Service) SetPublicOrigin(publicOrigin string) { s.origin = publicOrigin }
+
 // MailReady says whether account mail can be sent.
 func (s *Service) MailReady() bool { return s.mailer != nil }
 
@@ -312,6 +316,55 @@ func (s *Service) RequestReset(ctx context.Context, email string, meta RequestMe
 		return err
 	}
 	return s.send(ctx, s.pool, AccountMail{To: email, Kind: MailReset, Link: s.link("/reset", token)})
+}
+
+// ResetLink is what an administrator gets back after asking for a reset link: either the
+// link went out by mail, or, when mail is not set up, the link itself, shown once.
+type ResetLink struct {
+	Mailed bool   `json:"mailed"`
+	Link   string `json:"link,omitempty"`
+}
+
+// SendResetLink lets a person choose a new password, at an administrator's request. The
+// administrator never learns the password. Only an account that signs in here with a
+// password can get one; an account of an identity provider signs in there. The route
+// requires administrator.
+func (s *Service) SendResetLink(ctx context.Context, c Caller, id uuid.UUID) (ResetLink, error) {
+	var out ResetLink
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		u, err := s.GetUser(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if u.Source != SourceLocal || u.Type == TypeService {
+			return apperr.Conflict("not_local", "This account signs in through its identity provider, so it has no password here.")
+		}
+		if u.Status != StatusActive {
+			return apperr.Conflict("not_active", "Enable this account first.")
+		}
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM auth_challenges WHERE kind = $1 AND user_id = $2", challengeReset, id); err != nil {
+			return err
+		}
+		token, err := s.NewChallenge(ctx, tx, challengeReset, &id, map[string]any{}, resetTTL)
+		if err != nil {
+			return err
+		}
+		link := s.link("/reset", token)
+		out.Mailed = s.MailReady()
+		if out.Mailed {
+			if err := s.send(ctx, tx, AccountMail{To: u.Email, Kind: MailReset, Link: link}); err != nil {
+				return err
+			}
+		} else {
+			out.Link = link
+		}
+		return s.record(ctx, tx, c, "auth.reset_link_sent", "user", id.String(), map[string]any{
+			"by_administrator": true, "mailed": out.Mailed})
+	})
+	return out, err
 }
 
 // ResetWithLink sets a new password from a reset link, and ends every session. It
@@ -628,6 +681,9 @@ func (s *Service) CreateServiceToken(ctx context.Context, c Caller, id uuid.UUID
 // SetExpiry sets the date an account ends. Nil means it does not end.
 func (s *Service) SetExpiry(ctx context.Context, c Caller, id uuid.UUID, at *time.Time) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, "UPDATE users SET expires_at = $2, updated_at = now() WHERE id = $1", id, at)
 		if err != nil {
 			return err
@@ -684,6 +740,9 @@ func (s *Service) Anonymise(ctx context.Context, c Caller, id uuid.UUID, reason 
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		u, err := s.GetUser(ctx, tx, id)
 		if err != nil {
+			return err
+		}
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
 			return err
 		}
 		code := strings.ReplaceAll(id.String(), "-", "")[:8]

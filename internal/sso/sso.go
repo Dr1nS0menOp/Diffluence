@@ -8,6 +8,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net/http"
 	"regexp"
 	"strings"
 	"sync"
@@ -52,15 +53,32 @@ type Provider struct {
 	pool     *pgxpool.Pool
 	identity *identity.Service
 
+	// discoveryTimeout bounds one request to the provider; a field so tests can shorten it.
+	discoveryTimeout time.Duration
+	now              func() time.Time
+
 	mu       sync.Mutex
 	verifier *oidc.IDTokenVerifier
 	oauth    *oauth2.Config
+	// inFlight is closed when the discovery that is running ends; nil when none runs.
+	inFlight chan struct{}
+	// failedAt and failure remember the last failed discovery for failurePause.
+	failedAt time.Time
+	failure  error
 }
+
+// discoveryTimeout is the longest one request to the provider may take. A provider that
+// accepts a connection and then says nothing must not hold a login, or the logins behind it.
+const discoveryTimeout = 10 * time.Second
+
+// failurePause is how long a failed discovery is remembered, so a provider that is down
+// is asked once in this time and not by every click on "Single sign-on".
+const failurePause = 30 * time.Second
 
 // New creates a provider. Discovery happens on first use, so a provider that is
 // down cannot stop Diffluence from starting.
 func New(cfg Config, pool *pgxpool.Pool, id *identity.Service) *Provider {
-	return &Provider{cfg: cfg, pool: pool, identity: id}
+	return &Provider{cfg: cfg, pool: pool, identity: id, discoveryTimeout: discoveryTimeout, now: time.Now}
 }
 
 // DisplayName is what the login button says.
@@ -69,16 +87,58 @@ func (p *Provider) DisplayName() string { return p.cfg.DisplayName }
 // Issuer shows where logins go, for the admin console. It is not a secret.
 func (p *Provider) Issuer() string { return p.cfg.Issuer }
 
+// discover finds the provider's endpoints and keys once. The network call runs outside
+// the lock, one at a time: logins that arrive meanwhile wait for its answer instead of
+// queueing behind the lock, and a failure is remembered for failurePause.
 func (p *Provider) discover(ctx context.Context) (*oidc.IDTokenVerifier, *oauth2.Config, error) {
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.verifier != nil {
-		return p.verifier, p.oauth, nil
+	for {
+		p.mu.Lock()
+		switch {
+		case p.verifier != nil:
+			verifier, config := p.verifier, p.oauth
+			p.mu.Unlock()
+			return verifier, config, nil
+		case p.failure != nil && p.now().Sub(p.failedAt) < failurePause:
+			err := p.failure
+			p.mu.Unlock()
+			return nil, nil, err
+		case p.inFlight != nil:
+			wait := p.inFlight
+			p.mu.Unlock()
+			select {
+			case <-wait:
+				continue
+			case <-ctx.Done():
+				return nil, nil, fmt.Errorf("sso: discovery: %w", ctx.Err())
+			}
+		}
+		done := make(chan struct{})
+		p.inFlight = done
+		p.mu.Unlock()
+
+		verifier, config, err := p.fetch(ctx)
+
+		p.mu.Lock()
+		if err != nil {
+			p.failure, p.failedAt = err, p.now()
+		} else {
+			p.verifier, p.oauth, p.failure = verifier, config, nil
+		}
+		p.inFlight = nil
+		close(done)
+		p.mu.Unlock()
+		return verifier, config, err
 	}
-	// Keys are refreshed in the background with this context, so it must outlive the request.
-	// Discovery uses the library's own client, outside internal/outward, and follows redirects:
-	// the issuer is an address the operator configured, not one a person types (SEC-434).
-	provider, err := oidc.NewProvider(context.WithoutCancel(ctx), p.cfg.Issuer)
+}
+
+// fetch asks the provider for its configuration.
+func (p *Provider) fetch(ctx context.Context) (*oidc.IDTokenVerifier, *oauth2.Config, error) {
+	// Keys are refreshed in the background with this context, so it must outlive the request;
+	// the client's timeout bounds every request made with it, discovery and key refresh alike.
+	// Discovery uses its own client, outside internal/outward, and follows redirects: the
+	// issuer is an address the operator configured, not one a person types (SEC-434).
+	client := &http.Client{Timeout: p.discoveryTimeout}
+	provider, err := oidc.NewProvider(oidc.ClientContext(context.WithoutCancel(ctx), client), p.cfg.Issuer)
 	if err != nil {
 		return nil, nil, fmt.Errorf("sso: discovery: %w", err)
 	}
@@ -86,10 +146,9 @@ func (p *Provider) discover(ctx context.Context) (*oidc.IDTokenVerifier, *oauth2
 	if p.cfg.GroupsClaim != "" {
 		scopes = append(scopes, "groups")
 	}
-	p.oauth = &oauth2.Config{ClientID: p.cfg.ClientID, ClientSecret: p.cfg.ClientSecret, RedirectURL: p.cfg.RedirectURL,
+	config := &oauth2.Config{ClientID: p.cfg.ClientID, ClientSecret: p.cfg.ClientSecret, RedirectURL: p.cfg.RedirectURL,
 		Endpoint: provider.Endpoint(), Scopes: scopes}
-	p.verifier = provider.Verifier(&oidc.Config{ClientID: p.cfg.ClientID})
-	return p.verifier, p.oauth, nil
+	return provider.Verifier(&oidc.Config{ClientID: p.cfg.ClientID}), config, nil
 }
 
 type flow struct {

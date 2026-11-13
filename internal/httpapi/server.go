@@ -149,6 +149,8 @@ type Server struct {
 	markdownBusy chan struct{}
 	// admission keeps the order of work when the database is full (ARC-233).
 	admission *admission
+	// sockets caps the open editing sockets of this node and of each login.
+	sockets *socketCap
 }
 
 // New builds the API.
@@ -170,6 +172,7 @@ func New(d Deps) (*Server, error) {
 		mailsTo:       newLimiter(accountMailsPerRecipient, loginWindow),
 		markdownBusy:  make(chan struct{}, markdownSlots),
 		admission:     newAdmission(poolSize(d)),
+		sockets:       newSocketCap(socketsPerNode, socketsPerLogin),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is

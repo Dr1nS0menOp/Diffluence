@@ -411,7 +411,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "sensitive permission:administrator"
+        "x-access": "sensitive permission:system_administrator"
       }
     },
     "/api/v1/admin/bundles": {

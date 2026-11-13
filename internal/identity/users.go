@@ -204,6 +204,46 @@ func (s *Service) mayGrant(ctx context.Context, q db.Querier, c Caller, after, b
 	return nil
 }
 
+// mayActOn keeps an account that holds system administration in the hands of those who
+// hold it too: resetting its sign-in, disabling it, ending it or changing its groups is
+// as strong as granting the permission itself, which mayGrant already guards.
+func (s *Service) mayActOn(ctx context.Context, q db.Querier, c Caller, target uuid.UUID) error {
+	if c.System != "" {
+		return nil
+	}
+	held, err := s.HasGlobalPermissionIn(ctx, q, target, PermSystemAdministrator)
+	if err != nil || !held {
+		return err
+	}
+	return s.callerIsSystemAdministrator(ctx, q, c)
+}
+
+// mayActOnGroup applies the same rule to a group that holds system administration: a
+// member added to it would get the permission.
+func (s *Service) mayActOnGroup(ctx context.Context, q db.Querier, c Caller, groupID uuid.UUID) error {
+	if c.System != "" {
+		return nil
+	}
+	var held bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM global_grants
+		WHERE subject_type = 'group' AND subject_id = $1 AND permission = $2)`, groupID, PermSystemAdministrator).Scan(&held)
+	if err != nil || !held {
+		return err
+	}
+	return s.callerIsSystemAdministrator(ctx, q, c)
+}
+
+func (s *Service) callerIsSystemAdministrator(ctx context.Context, q db.Querier, c Caller) error {
+	ok, err := s.HasGlobalPermissionIn(ctx, q, c.UserID, PermSystemAdministrator)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return apperr.Conflict("needs_system_administrator", "Only a system administrator can do this to an account or group that holds system administration.")
+	}
+	return nil
+}
+
 // keepsAnAdministrator stops people from removing the last administrator by
 // accident. It does not apply to identity providers: they are leading, and a sync
 // that fails here would lock users out of logging in. If a provider removes the
@@ -248,6 +288,9 @@ func (s *Service) UpdateUserDetails(ctx context.Context, c Caller, id uuid.UUID,
 		return UserDetail{}, apperr.Invalid("A user is a member or a guest.")
 	}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, "UPDATE users SET display_name = $2, type = $3, updated_at = now() WHERE id = $1", id, in.DisplayName, in.Type)
 		if err != nil {
 			return err
@@ -269,6 +312,9 @@ func (s *Service) SetUserStatus(ctx context.Context, c Caller, id uuid.UUID, sta
 		return apperr.Conflict("cannot_disable_self", "You cannot disable your own account.")
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, "UPDATE users SET status = $2, updated_at = now() WHERE id = $1 AND status <> $2", id, status)
 		if err != nil {
 			return err
@@ -358,7 +404,7 @@ func (s *Service) storePassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 		return err
 	}
 	// A new password ends a stop after wrong ones: it was chosen by the person through a
-	// reset link or a session, or by an administrator (ADR-038).
+	// reset link or a session (ADR-038).
 	_, err = tx.Exec(ctx, `INSERT INTO local_credentials (user_id, password_hash) VALUES ($1, $2)
 		ON CONFLICT (user_id) DO UPDATE SET password_hash = EXCLUDED.password_hash, updated_at = now(),
 			failed_logins_in_row = 0, password_locked_at = NULL`, userID, hash)
@@ -369,6 +415,9 @@ func (s *Service) storePassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID
 // too many wrong passwords. The route requires administrator.
 func (s *Service) LiftPasswordLock(ctx context.Context, c Caller, id uuid.UUID) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, `UPDATE local_credentials SET failed_logins_in_row = 0, password_locked_at = NULL
 			WHERE user_id = $1 AND password_locked_at IS NOT NULL`, id)
 		if err != nil {
@@ -425,30 +474,6 @@ func (s *Service) ChangePassword(ctx context.Context, c Caller, sessionID uuid.U
 			return err
 		}
 		return s.tellOfChange(ctx, tx, c.UserID)
-	})
-}
-
-// ResetPassword sets a new password for someone else and ends all their sessions.
-// The route requires administrator.
-func (s *Service) ResetPassword(ctx context.Context, c Caller, id uuid.UUID, next string) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		u, err := s.GetUser(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if err := s.validateNewPassword(next, u.Email, u.DisplayName); err != nil {
-			return err
-		}
-		if err := s.storePassword(ctx, tx, id, next); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "DELETE FROM sessions WHERE user_id = $1", id); err != nil {
-			return err
-		}
-		if err := s.record(ctx, tx, c, "auth.password_changed", "user", id.String(), map[string]any{"by_administrator": true}); err != nil {
-			return err
-		}
-		return s.tellOfChange(ctx, tx, id)
 	})
 }
 

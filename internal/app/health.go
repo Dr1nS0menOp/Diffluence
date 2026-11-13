@@ -5,6 +5,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"net/netip"
 	"sync"
 	"time"
 
@@ -59,7 +60,19 @@ const healthFactsSQL = `SELECT
 	(SELECT count(*) FROM audit_pending),
 	(SELECT min(occurred_at) FROM audit_pending),
 	COALESCE((SELECT NOT ok FROM backup_runs ORDER BY finished_at DESC LIMIT 1), false),
-	COALESCE((SELECT NOT ok FROM backup_restore_checks ORDER BY checked_at DESC LIMIT 1), false)`
+	COALESCE((SELECT NOT ok FROM backup_restore_checks ORDER BY checked_at DESC LIMIT 1), false),
+	(SELECT CASE WHEN count(DISTINCT ip) = 1 AND count(DISTINCT user_id) > 1 THEN min(ip) ELSE '' END
+		FROM sessions WHERE created_at > now() - interval '1 day' AND ip <> '')`
+
+// oneProxyAddress keeps the one address all logins came from only when it is private or
+// loopback: a public one is a shared office line, which is no sign of an untrusted proxy.
+func oneProxyAddress(address string) string {
+	a, err := netip.ParseAddr(address)
+	if err != nil || (!a.IsPrivate() && !a.IsLoopback()) {
+		return ""
+	}
+	return address
+}
 
 // ReadHealthFacts reads what the checks judge: one statfs, the statement above and the
 // migration state.
@@ -74,12 +87,15 @@ func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (heal
 	}
 	var lastBackup, lastMigration, oldestWaiting *time.Time
 	var size, sizeBefore *int64
+	var loginAddress string
 	err := src.Pool.QueryRow(ctx, healthFactsSQL, ActionBackupNoted, health.GrowthWindow.Seconds()).Scan(
 		&f.FailedJobs7d, &f.OutboxStuck, &f.EventFailures, &f.MailFailed1d, &f.PasswordStops,
-		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting, &f.BackupFailed, &f.RestoreCheckFailed)
+		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting, &f.BackupFailed, &f.RestoreCheckFailed,
+		&loginAddress)
 	if err != nil {
 		return f, fmt.Errorf("app: read the health facts: %w", err)
 	}
+	f.OneLoginAddress = oneProxyAddress(loginAddress)
 	if oldestWaiting != nil {
 		f.OldestAuditWaiting = *oldestWaiting
 	}

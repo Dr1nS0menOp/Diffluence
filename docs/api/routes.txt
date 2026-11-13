@@ -278,7 +278,7 @@ POST /api/v1/access-requests/{id}/allow                        object:restrictio
 POST /api/v1/access-requests/{id}/refuse                       object:restriction.manage
 POST /api/v1/admin/appearance/reset                            session-only permission:administrator
 POST /api/v1/admin/backups/request                             session-only permission:administrator
-POST /api/v1/admin/backups/restore                             sensitive permission:administrator
+POST /api/v1/admin/backups/restore                             sensitive permission:system_administrator
 POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator

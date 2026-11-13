@@ -152,6 +152,9 @@ func (s *Server) collabProxy() http.Handler {
 	proxy := httputil.NewSingleHostReverseProxy(target)
 	origin := s.deps.Config.PublicOrigin()
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// The origin stops a page on another site in a browser. A client that is not a
+		// browser can send any origin; it still needs a session and the right to edit the
+		// page, and the caps below bound what it can hold.
 		if r.Header.Get("Origin") != origin {
 			writeError(w, http.StatusForbidden, "cross_origin_blocked", "Cross-origin requests are not allowed.")
 			return
@@ -176,6 +179,15 @@ func (s *Server) collabProxy() http.Handler {
 		r.Header.Del("Cookie")
 		r.Header.Del("Authorization")
 		r.Header.Set(collab.TicketHeader, ticket)
+		// A socket stays open as long as its editor, outside admission (spec 066), so it
+		// has caps of its own: per node, and per login, by the id of the session.
+		key := p.SessionID.String()
+		if !s.sockets.acquire(key) {
+			w.Header().Set("Retry-After", "5")
+			writeError(w, http.StatusServiceUnavailable, "busy", busyMessage)
+			return
+		}
+		defer s.sockets.release(key)
 		// The service listens on its root, as it serves nothing else on this socket.
 		r.URL.Path = "/"
 		r.URL.RawQuery = ""

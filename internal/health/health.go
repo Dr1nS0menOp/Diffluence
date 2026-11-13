@@ -92,6 +92,10 @@ type Facts struct {
 	// PasswordStops counts accounts whose password login stopped after wrong guesses.
 	PasswordStops  int
 	OIDCConfigured bool
+	// OneLoginAddress is the address every login of the last day came from, when there
+	// were logins of more than one person and that address is a private or loopback one;
+	// empty otherwise. It is the trace of a reverse proxy that is not trusted.
+	OneLoginAddress string
 	// BuildDate is the date of the commit this release was built from; zero = unknown.
 	BuildDate time.Time
 	Version   string
@@ -230,6 +234,11 @@ func login(f Facts) Check {
 		values["count"] = f.PasswordStops
 		return check("login", Warn, "password_stopped", values)
 	}
+	// Then every person counts as one address, so the login limits of one count for all.
+	if f.OneLoginAddress != "" {
+		values["address"] = f.OneLoginAddress
+		return check("login", Warn, "proxy_not_trusted", values)
+	}
 	return check("login", OK, "login_ok", values)
 }
 
@@ -264,33 +273,34 @@ func Count(checks []Check) (problems, warnings int) {
 // console has the same sentences in its translation strings. A {name} is replaced by a
 // value of the check.
 var Sentences = map[string]string{
-	"disk_unknown":     "This store cannot tell how much room it has.",
-	"disk_ok":          "{percent}% of the disk is free.",
-	"disk_low":         "Only {percent}% of the disk is free. Make room or add space before files are refused at 2%.",
-	"disk_full":        "Only {percent}% of the disk is free, so uploads, imports and exports are refused. Text still saves. Make room now.",
-	"disk_fills":       "{percent}% of the disk is free, but at the growth of the last 30 days it fills within a month. Plan more space.",
-	"database_unknown": "The size of the database is measured once an hour; it has not been measured yet.",
-	"database_size":    "The database holds {bytes} bytes.",
-	"backup_none":      "No backup was ever noted. Run scripts/backup.sh, or the backup service, on a schedule.",
-	"backup_ok":        "The last backup was noted {hours} hours ago.",
-	"backup_old":       "The last backup was noted {hours} hours ago. Check that the scheduled backup still runs.",
-	"migrations_ok":    "Every migration of this release is applied.",
-	"contract_pending": "{count} contract migration(s) wait until every node runs this release. That is normal during an upgrade.",
-	"contract_waiting": "{count} contract migration(s) have waited a day longer than their grace period. Check that every node was upgraded.",
-	"work_ok":          "Background work runs.",
-	"work_failed":      "{jobs} job(s) failed in the last 7 days and {events} event(s) gave up. Look under Care.",
-	"outbox_stuck":     "{outbox} event(s) have waited more than an hour to reach the queue. Check the queue and the worker.",
-	"audit_ok":         "Audit events are sealed in the chain within seconds.",
-	"audit_lagging":    "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
-	"audit_stuck":      "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",
-	"mail_off":         "No mail server is set, so nobody gets mail. Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM.",
-	"mail_ok":          "Mail is set up.",
-	"mail_failed":      "{count} mail(s) failed in the last day. Check the mail server.",
-	"login_ok":         "Logging in works as set up.",
-	"password_stopped": "{count} account(s) can no longer log in with a password after many wrong guesses. Look under Users.",
-	"version_unknown":  "This build has no build date, so its age is not known.",
-	"version_ok":       "Release {version} is {days} days old.",
-	"version_old":      "Release {version} is {days} days old. A newer release probably exists; see the release notes.",
+	"disk_unknown":      "This store cannot tell how much room it has.",
+	"disk_ok":           "{percent}% of the disk is free.",
+	"disk_low":          "Only {percent}% of the disk is free. Make room or add space before files are refused at 2%.",
+	"disk_full":         "Only {percent}% of the disk is free, so uploads, imports and exports are refused. Text still saves. Make room now.",
+	"disk_fills":        "{percent}% of the disk is free, but at the growth of the last 30 days it fills within a month. Plan more space.",
+	"database_unknown":  "The size of the database is measured once an hour; it has not been measured yet.",
+	"database_size":     "The database holds {bytes} bytes.",
+	"backup_none":       "No backup was ever noted. Run scripts/backup.sh, or the backup service, on a schedule.",
+	"backup_ok":         "The last backup was noted {hours} hours ago.",
+	"backup_old":        "The last backup was noted {hours} hours ago. Check that the scheduled backup still runs.",
+	"migrations_ok":     "Every migration of this release is applied.",
+	"contract_pending":  "{count} contract migration(s) wait until every node runs this release. That is normal during an upgrade.",
+	"contract_waiting":  "{count} contract migration(s) have waited a day longer than their grace period. Check that every node was upgraded.",
+	"work_ok":           "Background work runs.",
+	"work_failed":       "{jobs} job(s) failed in the last 7 days and {events} event(s) gave up. Look under Care.",
+	"outbox_stuck":      "{outbox} event(s) have waited more than an hour to reach the queue. Check the queue and the worker.",
+	"audit_ok":          "Audit events are sealed in the chain within seconds.",
+	"audit_lagging":     "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
+	"audit_stuck":       "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",
+	"mail_off":          "No mail server is set, so nobody gets mail. Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM.",
+	"mail_ok":           "Mail is set up.",
+	"mail_failed":       "{count} mail(s) failed in the last day. Check the mail server.",
+	"login_ok":          "Logging in works as set up.",
+	"password_stopped":  "{count} account(s) can no longer log in with a password after many wrong guesses. Look under Users.",
+	"proxy_not_trusted": "Every login of the last day came from {address}, probably the reverse proxy. Add its address to DIFFLUENCE_TRUSTED_PROXIES, or the login limits treat everyone as one.",
+	"version_unknown":   "This build has no build date, so its age is not known.",
+	"version_ok":        "Release {version} is {days} days old.",
+	"version_old":       "Release {version} is {days} days old. A newer release probably exists; see the release notes.",
 }
 
 // Codes lists every code a check can give.

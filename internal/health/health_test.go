@@ -222,6 +222,15 @@ func TestAnAccountWhosePasswordLoginStoppedWarns(t *testing.T) {
 	expect(t, f, "login", Warn, "password_stopped")
 }
 
+func TestLoginsThatAllComeFromOnePrivateAddressWarn(t *testing.T) {
+	f := healthy()
+	f.OneLoginAddress = "172.18.0.1"
+	c := expect(t, f, "login", Warn, "proxy_not_trusted")
+	if c.Values["address"] != "172.18.0.1" {
+		t.Fatalf("address: %v", c.Values["address"])
+	}
+}
+
 func TestAReleaseOlderThanSixtyDaysWarns(t *testing.T) {
 	f := healthy()
 	f.BuildDate = now.AddDate(0, 0, -60).Add(-time.Second)

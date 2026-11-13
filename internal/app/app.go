@@ -213,6 +213,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.mail.SetRenderer(a.renderMail)
 	a.mail.HoldWhile(a.inMaintenance)
 	var backupMailer backups.Mailer
+	a.identity.SetPublicOrigin(cfg.PublicOrigin())
 	if a.mail.Configured() {
 		a.identity.SetMailer(accountMailer{keyring: a.keyring}, cfg.PublicOrigin())
 		backupMailer = accountMailer{keyring: a.keyring}

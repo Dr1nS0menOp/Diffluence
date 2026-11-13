@@ -2,7 +2,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api } from '../api';
+import { api, type Me } from '../api';
 import { ConfirmButton, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
@@ -393,7 +393,7 @@ function RestoreOver({ data }: { data: BackupOverview }) {
   );
 }
 
-export function BackupsTab() {
+export function BackupsTab({ me }: { me: Me }) {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['backups'],
@@ -411,7 +411,16 @@ export function BackupsTab() {
       <h2>{t('running.list')}</h2>
       <BackupList runs={q.data.runs} />
       <RestoreCheck data={q.data} />
-      <RestoreOver data={q.data} />
+      {/* A restore brings back every account and grant of the backup (spec 066). */}
+      {me.global_permissions.includes('system_administrator') ? (
+        <RestoreOver data={q.data} />
+      ) : (
+        <>
+          <h2>{t('running.restoreHowTitle')}</h2>
+          {q.data.restore && <RestoreState r={q.data.restore} />}
+          <p className="muted">{t('running.restoreSystemOnly')}</p>
+        </>
+      )}
     </>
   );
 }

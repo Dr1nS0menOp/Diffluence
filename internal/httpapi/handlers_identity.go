@@ -493,16 +493,14 @@ func (s *Server) handleUserResetPassword(w http.ResponseWriter, r *http.Request)
 	if !ok {
 		return
 	}
-	var in passwordBody
-	if decodeJSON(w, r, 4<<10, &in) != nil {
-		badBody(w)
-		return
-	}
-	if err := s.deps.Identity.ResetPassword(r.Context(), s.caller(r), id, in.Password); err != nil {
+	// An administrator never chooses someone else's password: the person gets a
+	// reset link, mailed when mail is on, or shown here once to hand over.
+	sent, err := s.deps.Identity.SendResetLink(r.Context(), s.caller(r), id)
+	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusOK, sent)
 }
 
 func (s *Server) handleUserResetMFA(w http.ResponseWriter, r *http.Request) {

@@ -237,7 +237,8 @@ func (s *Service) confirmSession(ctx context.Context, c Caller, sessionID uuid.U
 // recovery code given now, or a passkey confirmed in this session within ReauthWindow.
 func (s *Service) ConfirmSecondFactor(ctx context.Context, c Caller, sessionID uuid.UUID, code string) error {
 	if code != "" {
-		return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		wrong := false
+		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 			on, err := s.hasTOTP(ctx, tx, c.UserID)
 			if err != nil {
 				return err
@@ -250,10 +251,21 @@ func (s *Service) ConfirmSecondFactor(ctx context.Context, c Caller, sessionID u
 				return err
 			}
 			if method == "" {
+				wrong = true
 				return secondFactorRequired("The code is wrong or was used already.")
 			}
 			return s.record(ctx, tx, c, "auth.second_factor_confirmed", "session", sessionID.String(), map[string]any{"method": method})
 		})
+		if wrong {
+			// The refusal rolled its transaction back, so the trace of a wrong code gets
+			// one of its own: a run of them is how a guessed code shows in the audit log.
+			if rerr := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+				return s.record(ctx, tx, c, "auth.second_factor_failed", "session", sessionID.String(), nil)
+			}); rerr != nil {
+				return rerr
+			}
+		}
+		return err
 	}
 	var method *string
 	var at *time.Time

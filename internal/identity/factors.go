@@ -299,6 +299,9 @@ func (s *Service) ResetMFA(ctx context.Context, c Caller, id uuid.UUID) error {
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		if err := s.mayActOn(ctx, tx, c, id); err != nil {
+			return err
+		}
 		if err := s.removeTOTP(ctx, tx, c, id, map[string]any{"by_administrator": true}); err != nil {
 			return err
 		}

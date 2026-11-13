@@ -10,6 +10,7 @@ import {
   type Group,
   type MailEntry,
   type Me,
+  type ResetLink,
   type Space,
   type TrashItem,
   type UserDetail,
@@ -159,7 +160,6 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
   const { t } = useTranslation();
   const client = useQueryClient();
   const [perms, setPerms] = useState(user.global_permissions);
-  const [password, setPassword] = useState('');
   const refresh = () => client.invalidateQueries({ queryKey: ['admin-users'] });
   const finish = async () => {
     await refresh();
@@ -176,9 +176,10 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
     mutationFn: (next: string[]) => api.put(`/admin/users/${user.id}/permissions`, { permissions: next }),
     onSuccess: refresh,
   });
+  // The person sets their own password through a link: mailed when mail is on,
+  // otherwise shown here once for the administrator to hand over.
   const reset = useMutation({
-    mutationFn: () => api.post(`/admin/users/${user.id}/reset-password`, { password }),
-    onSuccess: () => setPassword(''),
+    mutationFn: () => api.post<ResetLink>(`/admin/users/${user.id}/reset-password`),
   });
   return (
     <Dialog title={user.display_name} onClose={onClose}>
@@ -221,23 +222,20 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
         <AnonymiseButton user={user} onDone={() => void finish()} />
       </div>
       <ExpiryField user={user} onDone={() => void finish()} />
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          reset.mutate();
-        }}
-      >
-        <Field label={t('admin.newPassword')}>
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            autoComplete="new-password"
-            required
-          />
-        </Field>
-        <button type="submit">{t('admin.resetPassword')}</button>
-      </form>
+      {user.source === 'local' && user.type !== 'service' && user.status === 'active' && (
+        <div className="row">
+          <button type="button" onClick={() => reset.mutate()} disabled={reset.isPending}>
+            {t('admin.sendResetLink')}
+          </button>
+        </div>
+      )}
+      {reset.data && (
+        <p role="status" className="note">
+          {reset.data.mailed
+            ? t('admin.resetLinkMailed')
+            : t('admin.resetLinkOnce', { link: reset.data.link })}
+        </p>
+      )}
     </Dialog>
   );
 }
@@ -1545,7 +1543,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       {tab === 'mail' && <MailTab />}
       {tab === 'scim' && <ScimTab />}
       {tab === 'system' && <SystemTab />}
-      {tab === 'backups' && <BackupsTab />}
+      {tab === 'backups' && <BackupsTab me={me} />}
       {tab === 'configuration' && <ConfigurationTab />}
       {tab === 'sessions' && <SessionsTab />}
       {tab === 'insights' && <InsightsTab />}

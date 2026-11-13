@@ -1149,8 +1149,8 @@ mutate "a new second factor goes unmentioned" internal/identity/factors.go \
   's.replace("return s.tellOfChange(ctx, tx, c.UserID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
 mutate "a new password goes unmentioned" internal/identity/users.go \
   's.replace("return s.tellOfChange(ctx, tx, c.UserID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
-mutate "a password an administrator set goes unmentioned" internal/identity/users.go \
-  's.replace("return s.tellOfChange(ctx, tx, id)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
+mutate "a password set through a reset link goes unmentioned" internal/identity/lifecycle.go \
+  's.replace("return s.tellOfChange(ctx, tx, u.ID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
 mutate "a reset by link goes unmentioned" internal/identity/lifecycle.go \
   's.replace("return s.tellOfChange(ctx, tx, u.ID)", "return nil")' $app -run TestAResetMailGoesThroughTheQueueWithItsLinkSealed
 mutate "the login flow cookie has no secure prefix" internal/httpapi/server.go \
@@ -1668,7 +1668,7 @@ mutate "the worker restores under a serving node" internal/restore/run.go \
 mutate "a password alone confirms a restore" internal/identity/tokens.go \
   's.replace("if method != nil && *method == ConfirmedByPasskey && at != nil && s.now().Sub(*at) <= ReauthWindow {", "if true {")' $app -run TestARestoreAsksForASecondFactor
 mutate "a wrong code confirms a restore" internal/identity/tokens.go \
-  's.replace("\t\t\tif method == \"\" {\n\t\t\t\treturn secondFactorRequired(", "\t\t\tif false {\n\t\t\t\treturn secondFactorRequired(")' $app -run TestARestoreAsksForASecondFactor
+  's.replace("\t\t\tif method == \"\" {\n\t\t\t\twrong = true\n", "\t\t\tif false {\n\t\t\t\twrong = true\n")' $app -run TestARestoreAsksForASecondFactor
 mutate "a typing error costs the code" internal/httpapi/handlers_running.go \
   's.replace("if strings.TrimSpace(in.Confirm) != installation {", "if false {")' $app -run TestARestoreAsksForTheNameOfTheInstallation
 mutate "a node starts to serve during a restore" internal/app/app.go \
@@ -1866,6 +1866,70 @@ mutate_collab "a failed API at the recheck keeps the connection" access.mjs \
   's.replace(".catch(() =\x3e null)", ".catch(() =\x3e ({ ticket: entry.ticket }))")' access.test.mjs
 mutate_collab "the service reads the cookie" access.mjs \
   's.replace("return requestHeaders.get(TICKET_HEADER) ?? \x27\x27;", "return requestHeaders.get(TICKET_HEADER) ?? requestHeaders.get(\x27cookie\x27) ?? \x27\x27;")' access.test.mjs
+
+# Spec 066, wave RV1: an editing socket holds no place of reading and has caps of its own,
+# only a system administrator acts on one, an administrator sends a reset link, a provider
+# that does not answer holds no login, a restore is for system administrators, a wrong code
+# is counted and audited, and an untrusted proxy shows in System health.
+httpapi=./internal/httpapi/
+mutate "an editing socket waits in the order of reading" internal/httpapi/admission.go \
+  's.replace("\"/metrics\", collabSocketPath}", "\"/metrics\"}")' $httpapi -run TestOpenEditorSocketsLeaveReadingFree
+mutate "an editing socket is timed as a request" internal/httpapi/middleware.go \
+  's.replace("if r.URL.Path == collabSocketPath {", "if false {")' $httpapi -run TestEditorSocketsAreNotTimedAsRequests
+mutate "one login takes every socket of a node" internal/httpapi/collab_sockets.go \
+  's.replace(" || c.perKey[key] >= c.maxPerKey", "")' $httpapi -run TestOnePersonCannotTakeEverySocketOfANode
+mutate "a node takes sockets without end" internal/httpapi/collab_sockets.go \
+  's.replace("c.total >= c.maxTotal || ", "")' $httpapi -run TestOnePersonCannotTakeEverySocketOfANode
+mutate "an administrator acts on a system administrator" internal/identity/users.go \
+  's.replace("\treturn s.callerIsSystemAdministrator(ctx, q, c)\n}\n\n// mayActOnGroup", "\treturn nil\n}\n\n// mayActOnGroup")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator changes a group that holds system administration" internal/identity/users.go \
+  's.replace("\treturn s.callerIsSystemAdministrator(ctx, q, c)\n}\n\nfunc (s *Service) callerIsSystemAdministrator", "\treturn nil\n}\n\nfunc (s *Service) callerIsSystemAdministrator")' $app -run TestOnlyASystemAdministratorChangesASystemAdministrationGroup
+mutate "an administrator renames a system administrator" internal/identity/users.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET display_name", "\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET display_name")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator disables a system administrator" internal/identity/users.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET status", "\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET status")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator lifts the password stop of a system administrator" internal/identity/users.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\ttag, err := tx.Exec(ctx, `UPDATE local_credentials", "\t\ttag, err := tx.Exec(ctx, `UPDATE local_credentials")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator resets the second factor of a system administrator" internal/identity/factors.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif err := s.removeTOTP(", "\t\tif err := s.removeTOTP(")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator sets the end date of a system administrator" internal/identity/lifecycle.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET expires_at", "\t\ttag, err := tx.Exec(ctx, \"UPDATE users SET expires_at")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator anonymises a system administrator" internal/identity/lifecycle.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tcode := strings.ReplaceAll", "\t\tcode := strings.ReplaceAll")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an administrator sends a reset link to a system administrator" internal/identity/lifecycle.go \
+  's.replace("\t\tif err := s.mayActOn(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif _, err := tx.Exec(ctx, \"DELETE FROM auth_challenges", "\t\tif _, err := tx.Exec(ctx, \"DELETE FROM auth_challenges")' $app -run TestOnlyASystemAdministratorActsOnASystemAdministrator
+mutate "an owner or administrator adds to a group that holds system administration" internal/identity/groups.go \
+  's.replace("userID uuid.UUID) error {\n\tif err := s.mayActOnGroup(ctx, tx, c, groupID); err != nil {\n\t\treturn err\n\t}\n\tif _, err := s.GetUser(", "userID uuid.UUID) error {\n\tif _, err := s.GetUser(")' $app -run TestOnlyASystemAdministratorChangesASystemAdministrationGroup
+mutate "an administrator takes a system administrator out of a group" internal/identity/groups.go \
+  's.replace("\tif err := s.mayActOn(ctx, tx, c, userID); err != nil {\n\t\treturn err\n\t}\n", "")' $app -run TestOnlyASystemAdministratorChangesASystemAdministrationGroup
+mutate "an administrator deletes a group that holds system administration" internal/identity/groups.go \
+  's.replace("\t\tif err := s.mayActOnGroup(ctx, tx, c, id); err != nil {\n\t\t\treturn err\n\t\t}\n", "")' $app -run TestOnlyASystemAdministratorChangesASystemAdministrationGroup
+mutate "an account from a provider gets a reset link" internal/identity/lifecycle.go \
+  's.replace("u.Source != SourceLocal || u.Type == TypeService", "u.Type == TypeService")' $app -run TestAResetLinkIsOnlyForLocalAccounts
+mutate "without mail the reset link is lost" internal/identity/lifecycle.go \
+  's.replace("\t\t\tout.Link = link\n", "")' $app -run TestAnAdministratorSendsAResetLinkAndNeverChoosesThePassword
+mutate "with mail the reset link shows too" internal/identity/lifecycle.go \
+  's.replace("\t\t} else {\n\t\t\tout.Link = link\n\t\t}", "\t\t}\n\t\tout.Link = link")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
+mutate "a reset link from an administrator leaves no trace" internal/identity/lifecycle.go \
+  's.replace("\"auth.reset_link_sent\"", "\"auth.reset_link_made\"")' $app -run TestAnAdministratorSendsAResetLinkAndNeverChoosesThePassword
+mutate "a silent provider holds a login for ever" internal/sso/sso.go \
+  's.replace("client := \x26http.Client{Timeout: p.discoveryTimeout}", "client := \x26http.Client{}")' ./internal/sso/ -run TestAProviderThatNeverAnswersDoesNotHoldLoginsForEver
+mutate "every login asks the provider again at once" internal/sso/sso.go \
+  's.replace("\t\tcase p.inFlight != nil:", "\t\tcase false:")' ./internal/sso/ -run TestOneSlowDiscoveryDoesNotQueueEveryLoginBehindIt
+mutate "a failed discovery is not remembered" internal/sso/sso.go \
+  's.replace("case p.failure != nil \x26\x26 p.now().Sub(p.failedAt) < failurePause:", "case false:")' ./internal/sso/ -run TestAFailedDiscoveryIsRememberedForAWhile
+mutate "an administrator restores a backup" internal/httpapi/handlers_running.go \
+  's.replace("system := SessionOnly(Permission(identity.PermSystemAdministrator))", "system := admin")' $app -run TestOnlyASystemAdministratorRestores
+mutate "codes for a restore are tried without end" internal/httpapi/handlers_running.go \
+  's.replace("strings.TrimSpace(in.Code) != \"\" \x26\x26 !s.loginByAcc.allow(", "false \x26\x26 !s.loginByAcc.allow(")' $app -run TestWrongCodesForARestoreAreAuditedAndLimited
+mutate "a wrong code leaves no trace" internal/identity/tokens.go \
+  's.replace("\t\tif wrong {", "\t\tif wrong \x26\x26 false {")' $app -run TestWrongCodesForARestoreAreAuditedAndLimited
+mutate "logins from one address do not warn" internal/health/health.go \
+  's.replace("if f.OneLoginAddress != \"\" {", "if false {")' ./internal/health/ -run TestLoginsThatAllComeFromOnePrivateAddressWarn
+mutate "a shared public address warns of a proxy" internal/app/health.go \
+  's.replace("(!a.IsPrivate() \x26\x26 !a.IsLoopback())", "!a.IsValid()")' $app -run TestLoginsThatAllComeFromOnePrivateAddressAreSeen
+mutate "one person alone warns of a proxy" internal/app/health.go \
+  's.replace(" AND count(DISTINCT user_id) > 1", "")' $app -run TestLoginsThatAllComeFromOnePrivateAddressAreSeen
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

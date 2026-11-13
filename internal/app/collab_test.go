@@ -336,3 +336,12 @@ func TestASocketFromAnotherSiteIsRefused(t *testing.T) {
 		t.Fatalf("status %d", resp.StatusCode)
 	}
 }
+
+// Only someone logged in edits, so a socket without a session never reaches the service.
+func TestASocketWithoutALoginIsRefused(t *testing.T) {
+	c := newCollabTeam(t)
+	resp, out := c.e.do(c.e.client(), "GET", "/collab", "", "Origin", "http://localhost")
+	if resp.StatusCode != http.StatusUnauthorized || !strings.Contains(out, "unauthenticated") {
+		t.Fatalf("status %d: %s", resp.StatusCode, out)
+	}
+}

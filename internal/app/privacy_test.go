@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"testing"
 
@@ -102,8 +103,19 @@ func TestAPersonIsToldOfEveryChangeToTheirSignIn(t *testing.T) {
 	told("a second factor removed")
 	anna.ok("POST", "/api/v1/me/password", map[string]any{"current_password": adminPassword, "new_password": "another fine passphrase here"})
 	told("a new password")
-	root.ok("POST", "/api/v1/admin/users/"+anna.id+"/reset-password", map[string]any{"password": "a passphrase the admin chose"})
-	told("a password set by an administrator")
+	// An administrator sends a link; the person chooses the password.
+	if sent := root.ok("POST", "/api/v1/admin/users/"+anna.id+"/reset-password", nil); sent["mailed"] != true || sent["link"] != nil {
+		t.Fatalf("with mail on, the link goes by mail and does not show: %v", sent)
+	}
+	if n, err := queue.RunOnce(ctx); n != 1 || err != nil {
+		t.Fatalf("sent %d: %v", n, err)
+	}
+	link := linkIn(t, f.sent[len(f.sent)-1].Text)
+	token := link[strings.Index(link, "token=")+len("token="):]
+	if status, out := publicPost(e, "/api/v1/auth/reset", map[string]any{"token": token, "password": "a sturdy passphrase of her own"}); status != http.StatusNoContent {
+		t.Fatalf("reset: %d %s", status, out)
+	}
+	told("a password set through a link from an administrator")
 }
 
 func TestAnInvitationGoesThroughTheQueueToSomeoneWithoutAnAccount(t *testing.T) {

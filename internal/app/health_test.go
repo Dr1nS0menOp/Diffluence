@@ -166,6 +166,41 @@ func TestOnlyAdministratorsSeeTheHealthPage(t *testing.T) {
 	member.want(http.StatusForbidden, "GET", "/api/v1/admin/health", nil)
 }
 
+// When the reverse proxy is not trusted, everyone logs in from its address. That shows,
+// but only for a private address and only when more than one person logged in.
+func TestLoginsThatAllComeFromOnePrivateAddressAreSeen(t *testing.T) {
+	e := newEnv(t)
+	ctx := context.Background()
+	src := app.HealthSource{Pool: e.app.Pool(), Migrations: mustMigrations(t)}
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+	bob := e.user("bob@example.com", identity.PermUseProduct)
+	seen := func() string {
+		t.Helper()
+		facts, err := app.ReadHealthFacts(ctx, src, time.Now())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return facts.OneLoginAddress
+	}
+	e.sql("UPDATE sessions SET ip = '172.18.0.1'")
+	if got := seen(); got != "172.18.0.1" {
+		t.Fatalf("logins of two people from one private address: %q", got)
+	}
+	e.sql("UPDATE sessions SET ip = '203.0.113.7'")
+	if got := seen(); got != "" {
+		t.Fatalf("a shared public address is no proxy: %q", got)
+	}
+	e.sql("UPDATE sessions SET ip = '172.18.0.1' WHERE user_id = $1", anna.id)
+	e.sql("UPDATE sessions SET ip = '172.18.0.2' WHERE user_id = $1", bob.id)
+	if got := seen(); got != "" {
+		t.Fatalf("two addresses: %q", got)
+	}
+	e.sql("DELETE FROM sessions WHERE user_id = $1", bob.id)
+	if got := seen(); got != "" {
+		t.Fatalf("one person alone: %q", got)
+	}
+}
+
 // The size of the database is measured once an hour, and its growth over 30 days comes
 // from the measurement nearest to 30 days ago (spec 051, D3).
 func TestTheDatabaseGrowthComesFromTheHourlySamples(t *testing.T) {
