@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: Apache-2.0
+# HAProxy of the HA topology (spec 062): the PostgreSQL leader chosen by Patroni's REST
+# API, the replicas, and the app's api nodes by their readiness. Filled in by roles/edge.sh.
+global
+    maxconn 4000
+    log stdout format raw local0
+
+defaults
+    log global
+    timeout connect 5s
+    timeout client 30m
+    timeout server 30m
+    timeout check 3s
+
+# Writes: only the node Patroni calls the primary answers 200 on /primary.
+listen pg-primary
+    bind *:5000
+    mode tcp
+    option httpchk GET /primary
+    http-check expect status 200
+    default-server inter 2s fall 3 rise 2 on-marked-down shutdown-sessions
+    server db1 ${HA_DB1}:5432 check port 8008
+    server db2 ${HA_DB2}:5432 check port 8008
+    server db3 ${HA_DB3}:5432 check port 8008
+
+# Reads that may lag (ARC-228): any healthy replica.
+listen pg-replicas
+    bind *:5001
+    mode tcp
+    balance roundrobin
+    option httpchk GET /replica
+    http-check expect status 200
+    default-server inter 2s fall 3 rise 2 on-marked-down shutdown-sessions
+    server db1 ${HA_DB1}:5432 check port 8008
+    server db2 ${HA_DB2}:5432 check port 8008
+    server db3 ${HA_DB3}:5432 check port 8008
+
+# The app: any api node that says it is ready. No stickiness is needed (spec 062, D4).
+frontend app
+    bind *:80
+    mode http
+    default_backend api
+
+backend api
+    mode http
+    balance leastconn
+    option httpchk GET /readyz
+    http-check expect status 200
+    default-server inter 2s fall 2 rise 2
+    server api1 ${HA_API1}:8080 check
+    server api2 ${HA_API2}:8080 check
+
+listen stats
+    bind *:8404
+    mode http
+    stats enable
+    stats uri /

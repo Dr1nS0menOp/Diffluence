@@ -1,0 +1,17 @@
+#cloud-config
+# SPDX-License-Identifier: Apache-2.0
+# Vendor data every VM of the HA topology gets (spec 062). The operator's key and the
+# address come from the VM's own cloud-init settings; this adds what every role needs.
+package_update: true
+packages:
+  - chrony
+  - nftables
+  - curl
+  - jq
+  - python3
+  - qemu-guest-agent
+runcmd:
+  - systemctl enable --now chrony qemu-guest-agent nftables
+  # The watchdog Patroni uses on the database nodes; harmless elsewhere.
+  - echo softdog > /etc/modules-load.d/softdog.conf
+  - modprobe softdog

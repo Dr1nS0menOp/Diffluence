@@ -1,0 +1,23 @@
+; SPDX-License-Identifier: Apache-2.0
+; PgBouncer of the HA topology (spec 062): transaction pooling in front of the leader that
+; HAProxy routes to. Migrations do not pass here: they need a session lock (OPS-086).
+[databases]
+diffluence = host=127.0.0.1 port=5000 dbname=diffluence
+
+[pgbouncer]
+listen_addr = 0.0.0.0
+listen_port = 6432
+auth_type = scram-sha-256
+auth_file = /etc/pgbouncer/userlist.txt
+pool_mode = transaction
+max_client_conn = 2000
+default_pool_size = 40
+reserve_pool_size = 10
+server_reset_query =
+; pgx prepares statements; PgBouncer 1.21 and later keeps them across pooled servers.
+max_prepared_statements = 200
+; The app sets these per connection; the database holds them instead (spec 062, D6).
+ignore_startup_parameters = extra_float_digits,plan_cache_mode,jit
+; A cut connection to the leader must not hang requests for long.
+server_connect_timeout = 5
+query_wait_timeout = 15

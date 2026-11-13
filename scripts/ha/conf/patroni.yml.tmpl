@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: Apache-2.0
+# Patroni for one database node of the HA topology (spec 062, decision D13 of spec 048):
+# 3 etcd members, the watchdog required, synchronous replication, and a bound on lag at
+# fail-over. Filled in by roles/db.sh.
+scope: diffluence
+name: ${NODE_NAME}
+
+restapi:
+  listen: 0.0.0.0:8008
+  connect_address: ${NODE_ADDR}:8008
+  authentication:
+    username: patroni
+    password: ${HA_PATRONI_REST_PASSWORD}
+
+etcd3:
+  hosts: ${HA_DB1}:2379,${HA_DB2}:2379,${HA_DB3}:2379
+
+bootstrap:
+  dcs:
+    ttl: 30
+    loop_wait: 10
+    retry_timeout: 10
+    # A replica further behind than 1 MiB is never promoted (OPS-085).
+    maximum_lag_on_failover: 1048576
+    # No acknowledged write may be lost: the primary waits for one standby.
+    synchronous_mode: true
+    synchronous_mode_strict: false
+    postgresql:
+      use_pg_rewind: true
+      parameters:
+        wal_level: replica
+        hot_standby: "on"
+        max_wal_senders: 10
+        max_replication_slots: 10
+        wal_keep_size: 1GB
+        synchronous_commit: "on"
+        shared_buffers: 1536MB
+        effective_cache_size: 4GB
+        work_mem: 16MB
+        max_connections: 200
+        # What the app sets per connection does not reach the server through PgBouncer in
+        # transaction mode, so the server holds the same settings (spec 062, D6).
+        plan_cache_mode: force_custom_plan
+        jit: "off"
+  initdb:
+    - encoding: UTF8
+    - data-checksums
+  pg_hba:
+    - host replication replicator 0.0.0.0/0 scram-sha-256
+    - host all all 0.0.0.0/0 scram-sha-256
+
+postgresql:
+  listen: 0.0.0.0:5432
+  connect_address: ${NODE_ADDR}:5432
+  data_dir: /var/lib/postgresql/16/ha
+  bin_dir: /usr/lib/postgresql/16/bin
+  authentication:
+    superuser:
+      username: postgres
+      password: ${HA_PG_SUPERUSER_PASSWORD}
+    replication:
+      username: replicator
+      password: ${HA_PG_REPLICATION_PASSWORD}
+
+watchdog:
+  mode: required
+  device: /dev/watchdog
+  safety_margin: 5
+
+tags:
+  nofailover: false
+  noloadbalance: false
+  clonefrom: false
+  nosync: false

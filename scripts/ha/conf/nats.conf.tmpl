@@ -1,0 +1,24 @@
+# SPDX-License-Identifier: Apache-2.0
+# One member of the NATS JetStream cluster of the HA topology (spec 062). The sync policy
+# is the variable of the OPS-083 measurement: "default" leaves the lazy fsync of NATS,
+# "1s" flushes every second, "always" flushes before every acknowledgement.
+server_name: ${NODE_NAME}
+listen: 0.0.0.0:4222
+http: 0.0.0.0:8222
+
+jetstream {
+  store_dir: /var/lib/nats
+  max_memory_store: 256MB
+  max_file_store: 8GB
+  ${NATS_SYNC_LINE}
+}
+
+cluster {
+  name: diffluence
+  listen: 0.0.0.0:6222
+  routes: [
+    nats-route://${HA_NATS1}:6222
+    nats-route://${HA_NATS2}:6222
+    nats-route://${HA_NATS3}:6222
+  ]
+}
