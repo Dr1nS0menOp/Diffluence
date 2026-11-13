@@ -57,3 +57,17 @@ func TestGaugesAreWrittenWithTheirType(t *testing.T) {
 		t.Fatal(got)
 	}
 }
+
+// Series of one name share one HELP and TYPE, as the text format requires.
+func TestGaugesOfOneNameAreWrittenAsOneMetric(t *testing.T) {
+	got := text(t, NewRequests(),
+		Gauge{Name: "diffluence_lag", Help: "A lag.", Value: 1, Label: Label{"consumer", "webhooks"}},
+		Gauge{Name: "diffluence_lag", Help: "A lag.", Value: 0, Label: Label{"consumer", "collab"}},
+		Gauge{Name: "diffluence_y", Help: "A y.", Value: 3})
+	want := "# HELP diffluence_lag A lag.\n# TYPE diffluence_lag gauge\n" +
+		"diffluence_lag{consumer=\"webhooks\"} 1\ndiffluence_lag{consumer=\"collab\"} 0\n" +
+		"# HELP diffluence_y A y.\n# TYPE diffluence_y gauge\ndiffluence_y 3\n"
+	if !strings.HasSuffix(got, want) {
+		t.Fatal(got)
+	}
+}

@@ -40,6 +40,8 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 | `diffluence_outbox_unpublished`, `diffluence_outbox_stuck` | Events waiting; those waiting more than an hour |
 | `diffluence_jobs_queued`, `diffluence_jobs_failed_7d` | Jobs waiting; jobs failed in 7 days |
 | `diffluence_event_failures` | Events that gave up and wait for a replay |
+| `diffluence_events_waiting` | Events in the outbox, waiting for the relay or the sequencer (spec 068) |
+| `diffluence_event_lag_seconds{consumer}`, `diffluence_event_retries{consumer}` | Once events run through PostgreSQL: how old the oldest event a consumer has not passed is, and its events waiting for a retry |
 | `diffluence_mail_queued`, `diffluence_mail_failed_1d` | Mail waiting; mail failed in a day |
 | `diffluence_audit_unsealed_events`, `diffluence_audit_sealing_lag_seconds` | Audit events waiting for the sealer; how long the oldest has waited (ADR-041) |
 | `diffluence_storage_deletions_queued` | Stored files waiting to be removed |
@@ -95,6 +97,7 @@ Every line is JSON on standard error, with `time`, `level` and `msg`. The messag
 | `job failed` | error | A queued job ended in failure: `job`, `kind` |
 | `periodic task failed` | error | A periodic task failed: `task` |
 | `queue: gave up on an event` | warn | An event failed every try and waits for a replay in the console |
+| `events: gave up on an event` | warn | The same, once events run through PostgreSQL (spec 068) |
 | `outbox relay failed, retrying` | error | Events cannot reach the queue |
 | `nats disconnected` | warn | The node lost the queue |
 | `sending a mail failed` | warn | One mail failed and will be tried again |
@@ -119,6 +122,7 @@ Every line is JSON on standard error, with `time`, `level` and `msg`. The messag
 | Exports | Their download window | `purge-exports`, every 10 minutes |
 | Imports | Until they are done | `purge-imports`, hourly |
 | Published events in the outbox | 7 days | `purge-outbox`, hourly |
+| The event log, once events run through PostgreSQL | 7 days, and never an event a consumer has not passed | `clean-up-event-log`, hourly, 10,000 at a time |
 | Events that gave up | Their retention | `purge-event-failures`, daily |
 | Rule runs, the webhook log, notifications | Their retention | `purge-rule-runs`, `purge-webhook-log`, `purge-notifications`, daily |
 | Sessions and one-time codes | Until they expire | `purge-identity`, every 10 minutes |

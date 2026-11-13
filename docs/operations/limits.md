@@ -174,6 +174,22 @@ Through the whole application, the median of seven requests (`TestDocumentContro
 | Open a page, as an author who sees the working version | 6.7 ms | 7.5 ms |
 
 The tree of the largest space took 17 ms, search on a common word 28 ms, and the recent feed 28 ms. An approval that makes a working version current, with search, links and tasks, took 12.1 ms as the median of seven, 15.8 ms at most. Spec 064 allows a controlled read 5 ms more than an ordinary one, and a step 20 ms. The visible set is still built once per query as a hash, and the hidden pages are looked up by key: as a join, PostgreSQL first read all 60,385 pages for it.
+
+### Events through PostgreSQL on the real data set (spec 068, wave EV1)
+
+Measured on 13 November 2026 on the same dump in a PostgreSQL 16 of its own with `fsync` on, by `TestEventsOnRealData`: the new event path with the four real consumers, 32 writers, 20 seconds a stage. This path is built but not switched on in this release; the numbers are for the decision to switch.
+
+| Events a second | Lag p95, every consumer | Database time of the queue |
+|---|---|---|
+| 5 (the model) | 261 ms | 3.2 ms a second |
+| 20 (four times) | 258 ms | 8.1 ms a second, under 1% of a core |
+| 85 (the peak) | 258 ms | 13.5 ms a second |
+| 170 | 282 ms | 94 ms a second |
+| 340 | 7.7 s for notifications, 64 ms for the others | 163 ms a second |
+| 20, without LISTEN | 1.19 s | 5.2 ms a second |
+
+The sequencer costs about 0.2 ms of database time per event at four times the model and the cursors as much; at the peak both fall below 0.1 ms. The notifications consumer is the first to fall behind, between 170 and 340 events a second. A backlog of 10,000 events went through all four consumers in 31 seconds. A `page.published` in a space with 1,000 watchers takes the notifications consumer 5 seconds, about 200 notifications a second per lane, as it does through NATS today. **Not measured on the server**: the stress series with events (B3), a transaction held open for 15 minutes, and a restart of PostgreSQL under load (B5).
+
 ### What traces cost (spec 060)
 
 Measured on 12 November 2026 in the development container (16 CPUs) with `go test ./internal/tracing -bench . -benchmem`, spans going to an exporter that drops them, so the cost of sending to a collector is not in it.

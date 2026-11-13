@@ -1,6 +1,7 @@
 # Spec 068: events without NATS
 
-Status: study and plan, 2026-11-13. Nothing in this spec is built yet. Blueprint lines: ADR-007,
+Status: study and plan, 2026-11-13. Wave EV1 is built (section 6): the PostgreSQL path stands
+beside NATS and stays off, since the transport stays `nats` until EV2. Blueprint lines: ADR-007,
 ADR-018, OPS-012, OPS-083; spec 062 (F1, F3, T6) and spec 063 (F1).
 
 Written for: the people who build and run Diffluence, and the product owner, who decides.
@@ -542,6 +543,107 @@ release A first.
 - LISTEN across a Patroni failover, and through HAProxy (B4, in wave 8).
 - Autovacuum of `outbox_events` with a long transaction open (B5).
 
+## 6. Wave EV1 as built
+
+### 6.1 What runs, and what stays off
+
+| Part | Where | State in this release |
+|---|---|---|
+| Tables `event_head`, `event_transport`, `event_log`, `event_cursors`, `event_retries`; the vacuum setting of `outbox_events` | migration 0053 | Created; `event_transport` holds `nats` |
+| The sequencer (D1) | `internal/events/sequencer.go`, called by the relay through `outbox.Sequencer` | Takes the events lock on every batch, then reads the transport. Under `nats` the relay publishes as before |
+| Consumer loops: four lanes per consumer, leases, cursors, retries (D3 to D5) | `internal/events/consumer.go`, `retries.go` | The worker reads the transport once a minute and starts them only on `postgres` |
+| The listening connection and polling (D6, D8) | `internal/events/listen.go`; `DIFFLUENCE_LISTEN_DATABASE_URL` | Starts with the consumer loops |
+| Cleanup (D10) | `clean-up-event-log`, hourly | Runs; with no cursor it deletes nothing |
+| `diffluence events check` (L1 to L3) | `cmd/diffluence` | Works under both transports |
+| Gauges and System health (2.9) | `diffluence_events_waiting`, `diffluence_event_lag_seconds{consumer}`, `diffluence_event_retries{consumer}`; codes `events_waiting`, `events_lagging` | `events_waiting` warns under both transports |
+
+Nothing sets the transport to `postgres` in this release: that is the switch of EV2, which also
+drains NATS. The tests and the measurement set it on a throw-away database.
+
+### 6.2 Details the design left open
+
+- **The lane** is `abs(hashtext(key)::bigint) % 4`: `abs` of the lowest `int4` does not fit an
+  `int4`, so the hash is widened first (D15).
+- **Cursors start at the head** when a consumer first starts, as the switch needs; a consumer added
+  in a later release begins with the events after it (D16).
+- **A retry is claimed by moving its time** two minutes on, with `FOR UPDATE SKIP LOCKED`, so no
+  transaction stays open while its handler runs; a worker that dies meanwhile delays the retry by
+  two minutes and loses nothing (D17). Six runs in all: the first, then after 10 s, 1, 5, 15 and
+  60 minutes, as NATS gave.
+- **A lease is renewed inside a batch** once 20 s have passed, so a batch of slow handlers keeps its
+  lane; a renewal that finds another holder stops the batch, which the holder runs again (D18).
+- **The cleanup deletes a run from the start only**: up to the lowest cursor, the position before
+  the first retry, the position before the first event younger than seven days, and at most 10,000
+  per statement. Positions do not follow `sequenced_at` exactly, since two sequencer transactions
+  may start in one order and take the lock in the other, so a rule by age alone could leave a hole.
+  Without any cursor nothing goes (D19).
+- **L2 as built**: no cursor past the head, and every retry names a kept event of its own id at or
+  below its lane's cursor. Whether an event below a cursor was handled is not stored per event; the
+  witness L4 proves delivery, in EV2 and the measurement wave (D20).
+- **L3** counts a worker that was seen in the last minute and started more than a minute ago, so a
+  backlog right after a start is not a breach (D21).
+
+### 6.3 Tests and mutations
+
+Written before the code, failure paths first, all in `internal/events`:
+`TestALateCommitIsNotSkipped`, `TestPositionsHaveNoGaps`, `TestOnlyOneSequencerRunsAtATime`,
+`TestUnderNATSTheRelayPublishesAndTheLogStaysEmpty`, `TestAPublishedEventIsNotSequencedAgain`,
+`TestEveryEventReachesEveryConsumer`, `TestAFailedEventDoesNotHoldItsLane`,
+`TestARetryEndsInFailures`, `TestARetryThatSucceedsIsDone`, `TestARetryRunsOnlyForItsConsumer`,
+`TestAnEndedLeaseIsTakenOver` (a worker that crashed holding its leases), `TestALiveLeaseIsNotTaken`,
+`TestALostCursorCommitRepeatsAndNeverSkips`, `TestAStoppedWorkerGivesItsLeasesBack`,
+`TestPollingDeliversWithoutNotify` (a lost notification), `TestANotificationWakesTheConsumers`,
+`TestASaveDoesNotNotify`, `TestAListenerThatCannotConnectLeavesPolling`,
+`TestEventsOfOnePageKeepTheirOrder`, `TestABacklogAfterDowntimeIsDelivered`,
+`TestCursorsStartAtTheHeadOnce`, six tests of the cleanup, eight of the check and one of the lag. In
+`internal/app`, `TestTheConsumersOfTheWorkerTakeEventsFromTheLog` runs the real four consumers.
+`scripts/mutation-check.sh` has a mutation on each SQL condition and each check.
+
+### 6.4 Measured on the real data set (B1, B2, B4, part of B5)
+
+Measured on 13 November 2026 by `TestEventsOnRealData`, on PF's dump of the seeded data (5,001
+people, 60,385 pages, 91,316 watches), restored into its own PostgreSQL 16 with `fsync` on, from
+the development container (16 CPUs). The test migrates the dump, sets the transport to `postgres`,
+and runs what a worker runs: the relay with the sequencer every 250 ms, the four real consumers,
+LISTEN. 32 writers each commit `page.published` events of real pages and people for 20 seconds per
+stage. Lag is from the commit of the event to the end of its handler. The machine was quiet at the
+start; another wave's build started during the later stages.
+
+| Stage | Written | Lag p50 / p95, notifications | Lag p95, the other three | Queue statements per event, sequencer + cursors | Queue database time |
+|---|---|---|---|---|---|
+| 5/s, the model | 5.0/s | 139 / 261 ms | 248 ms | 8 + 24 | 3.2 ms a second |
+| 20/s, four times | 20.0/s | 146 / 258 ms | 247 ms | 2 + 10 | 8.1 ms a second |
+| 85/s, the peak | 85.0/s | 157 / 258 ms | 245 ms | 0.6 + 3.1 | 13.5 ms a second |
+| 170/s | 170.0/s | 191 / 282 ms | 249 ms | 1.7 + 6.4 | 94 ms a second |
+| 340/s | 340.0/s | 4.5 / 7.7 s | 64 ms | 2.4 + 10 | 163 ms a second |
+| 20/s without LISTEN (B4) | 20.0/s | 727 ms / 1.19 s | 1.12 s | 2.1 + 2.7 | 5.2 ms a second |
+
+- **Time per event of the queue** at four times the model: the sequencer 0.21 ms of database time
+  per event, the cursors 0.20 ms. At the peak the batches grow and both fall below 0.1 ms. Most
+  statements at low rates are the idle polls of 16 lanes and four retry loops, about 20 a second
+  per worker, whatever the rate.
+- **The lag is the sequencer's tick.** Up to 170 events a second the p95 stays near 250 ms, which is
+  the 250 ms between sequencer runs. Without LISTEN the one-second poll adds its own wait: p95
+  1.19 s, over D9's mark, so LISTEN is needed to meet it.
+- **The notifications consumer is the first to fall behind**, between 170 and 340 events a second;
+  it caught up within 7 seconds of the stage's end. The other three kept a p95 under 70 ms.
+- **WAL** about 2.9 kB per event once batches fill (22 kB at 5/s, where the idle polls dominate).
+- **A backlog after downtime** (part of B5): 10,000 events written while no worker ran went through
+  all four consumers in 31 s, 324 events a second.
+- **B2, fan-out**: no space in the dump has a watcher of its own, so 1,000 people were made to watch
+  the largest one. 100 `page.published` events there took 5.0 s each for the notifications consumer
+  alone, 199 notifications a second: one lane carries 0.2 such events a second, four lanes 0.8. The
+  cost is the consumer's own (one row and its checks per person), the same under NATS, where one
+  durable also runs one event at a time; the lanes make it four times wider, not cheaper. Whether
+  four lanes are enough at four times the model depends on how many events reach that many
+  watchers, which the next stress series must count (5.4).
+
+Gates (5.2) as far as one machine shows them: **G1** B1 passes its mark (lag p95 258 ms at four
+times the model, against 1 s; the queue about 0.8% of one core there, against 2%); B2 is measured,
+and its answer is the open question above. **G2 to G4** need the stress server and the switch of
+EV2. **G5** is met for this wave: every one of the 48 mutations it added is caught, 45 on
+`internal/events` and its callers and three on the worker's wiring.
+
 ## Decisions
 
 Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
@@ -560,3 +662,14 @@ Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
 | D10 | `event_log` kept 7 days and never below a cursor; batched delete, no partitioning unless B1 or B3 asks for it; own autovacuum settings for `outbox_events` |
 | D11 | The queue is code of our own on pgx, following the jobs, mail queue and audit sealer patterns, rather than a job library |
 | D12 | Build both paths, measure, switch, then remove NATS in the release after, gated on G1 to G5 |
+| D13 | Wave EV1: `event_transport` is a table of one row, `nats` from the migration; this release has no way to change it, so only the switch of EV2 does |
+| D14 | Wave EV1: the relay takes the events lock on every batch, under `nats` too, so release A's relays are already one at a time when EV2 switches. It keeps its 500 ms tick until the switch; the measurement ran the sequencer at D1's 250 ms |
+| D15 | Wave EV1: the lane is `abs(hashtext(key)::bigint) % 4`, widened so the lowest hash cannot overflow |
+| D16 | Wave EV1: a consumer's cursors start at the head when it first starts |
+| D17 | Wave EV1: a retry is claimed by moving its time two minutes on, so no transaction is open while its handler runs |
+| D18 | Wave EV1: a lease is renewed inside a batch once 20 s have passed |
+| D19 | Wave EV1: the cleanup deletes only a run from the start, bounded by every cursor, every retry, the first event younger than seven days and 10,000 rows; hourly; nothing without a cursor |
+| D20 | Wave EV1: L2 checks cursors against the head and retries against their events and cursors; delivery itself is L4's to prove |
+| D21 | Wave EV1: L3 counts a worker only after it has run a minute |
+| D22 | Wave EV1: System health warns in its "work" line when an event waits over a minute (both transports) or a consumer lags over five minutes; a gauge may carry one label, here the consumer |
+| D23 | Wave EV1: migration 0052 is a placeholder on this branch for the number wave RV1 holds; it goes when RV1 merges |

@@ -5,6 +5,7 @@ package health
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -175,6 +176,36 @@ func TestAnEventStuckInTheOutboxIsAProblem(t *testing.T) {
 	f := healthy()
 	f.OutboxStuck, f.FailedJobs7d = 1, 3
 	expect(t, f, "work", Problem, "outbox_stuck")
+}
+
+// The relay or the sequencer takes an event within a second while a worker runs.
+func TestAnEventWaitingLongerThanAMinuteWarns(t *testing.T) {
+	f := healthy()
+	f.FailedJobs7d = 1
+	f.OldestEventWaiting = now.Add(-EventWaitWarnAfter - time.Second)
+	c := expect(t, f, "work", Warn, "events_waiting")
+	if c.Values["seconds"] != 61 {
+		t.Fatalf("values %+v", c.Values)
+	}
+	f.OldestEventWaiting = now.Add(-EventWaitWarnAfter)
+	expect(t, f, "work", Warn, "work_failed")
+	f.OutboxStuck = 1
+	f.OldestEventWaiting = now.Add(-2 * time.Hour)
+	expect(t, f, "work", Problem, "outbox_stuck")
+}
+
+func TestAConsumerLaggingMoreThanFiveMinutesWarns(t *testing.T) {
+	f := healthy()
+	f.EventLag, f.EventLagConsumer = EventLagWarnAfter+time.Second, "webhooks"
+	c := expect(t, f, "work", Warn, "events_lagging")
+	if c.Values["consumer"] != "webhooks" || c.Values["seconds"] != 301 {
+		t.Fatalf("values %+v", c.Values)
+	}
+	if !strings.Contains(Describe(c), "webhooks consumer") {
+		t.Fatalf("says %q", Describe(c))
+	}
+	f.EventLag = EventLagWarnAfter
+	expect(t, f, "work", OK, "work_ok")
 }
 
 func TestFailedJobsOrEventsWarn(t *testing.T) {

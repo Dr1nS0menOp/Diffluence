@@ -20,12 +20,12 @@ type Setting struct {
 // secretKeys are the settings whose value must never be shown or written in a file
 // others may read. The database addresses hold a password.
 var secretKeys = map[string]bool{
-	"DATABASE_URL": true, "MIGRATE_DATABASE_URL": true, "SMTP_PASSWORD": true,
+	"DATABASE_URL": true, "MIGRATE_DATABASE_URL": true, "LISTEN_DATABASE_URL": true, "SMTP_PASSWORD": true,
 	"OIDC_CLIENT_SECRET": true, "COLLAB_TOKEN": true, "METRICS_TOKEN": true, "PDF_PASSWORD": true,
 }
 
 // addressKeys are the secrets whose value is an address worth seeing without its password.
-var addressKeys = map[string]bool{"DATABASE_URL": true, "MIGRATE_DATABASE_URL": true}
+var addressKeys = map[string]bool{"DATABASE_URL": true, "MIGRATE_DATABASE_URL": true, "LISTEN_DATABASE_URL": true}
 
 // shown is the value of a setting as the report may show it.
 func shown(key, value string) string {

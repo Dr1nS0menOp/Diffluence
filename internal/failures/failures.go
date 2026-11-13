@@ -63,10 +63,22 @@ func shortened(message string) string {
 	return message[:cut]
 }
 
+// ShortError is the text of an error as the failure tables keep it.
+func ShortError(cause error) string { return shortened(cause.Error()) }
+
+// recordSQL stores one failure.
+const recordSQL = "INSERT INTO event_failures (id, consumer, payload, error) VALUES ($1, $2, $3, $4)"
+
 // Record stores an event its listener gave up on.
 func (s *Service) Record(ctx context.Context, consumer string, data []byte, cause error) error {
-	_, err := s.pool.Exec(ctx, "INSERT INTO event_failures (id, consumer, payload, error) VALUES ($1, $2, $3, $4)",
-		ids.New(), consumer, data, shortened(cause.Error()))
+	_, err := s.pool.Exec(ctx, recordSQL, ids.New(), consumer, data, ShortError(cause))
+	return err
+}
+
+// RecordIn stores an event its listener gave up on inside tx, so that the event leaves its
+// retry table in the same transaction (spec 068).
+func RecordIn(ctx context.Context, tx pgx.Tx, consumer string, data []byte, cause error) error {
+	_, err := tx.Exec(ctx, recordSQL, ids.New(), consumer, data, ShortError(cause))
 	return err
 }
 
@@ -145,7 +157,7 @@ func (s *Service) replay(ctx context.Context, w waitingReplay, handle Handler) e
 	}
 	if cause := handle(ctx, w.payload); cause != nil {
 		s.log.Warn("event replay failed", "failure", w.id, "consumer", w.consumer, "error", cause)
-		_, err := s.pool.Exec(ctx, "UPDATE event_failures SET replay_requested_at = NULL, error = $2 WHERE id = $1", w.id, shortened(cause.Error()))
+		_, err := s.pool.Exec(ctx, "UPDATE event_failures SET replay_requested_at = NULL, error = $2 WHERE id = $1", w.id, ShortError(cause))
 		return err
 	}
 	_, err := s.pool.Exec(ctx, "UPDATE event_failures SET replayed_at = now() WHERE id = $1", w.id)

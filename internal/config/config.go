@@ -42,7 +42,11 @@ type Config struct {
 	InstanceName       string
 	DatabaseURL        string
 	MigrateDatabaseURL string // owner of the tables; empty = use DatabaseURL
-	NATSURL            string // empty = embedded NATS (only allowed with role "all")
+	// ListenDatabaseURL is the session a worker listens for new events on, with the
+	// application role. LISTEN needs a session, so behind PgBouncer in transaction mode it
+	// points at the database directly (spec 068 D8). Empty = DatabaseURL.
+	ListenDatabaseURL string
+	NATSURL           string // empty = embedded NATS (only allowed with role "all")
 	// NATSReplicas is how many NATS nodes keep a copy of each event: 1 for the embedded
 	// server, 3 or 5 for a cluster, so losing one node loses no event (spec 063).
 	NATSReplicas       int
@@ -152,6 +156,15 @@ func (c Config) KeyFile() string {
 	return filepath.Join(c.DataDir, "master.key")
 }
 
+// ListenURL is where a worker listens for new events: LISTEN_DATABASE_URL, else the
+// database the pool uses.
+func (c Config) ListenURL() string {
+	if c.ListenDatabaseURL != "" {
+		return c.ListenDatabaseURL
+	}
+	return c.DatabaseURL
+}
+
 // PublicOrigin returns scheme://host[:port] of the public URL.
 func (c Config) PublicOrigin() string { return c.PublicURL.Scheme + "://" + c.PublicURL.Host }
 
@@ -202,6 +215,7 @@ func (l *loader) load() Config {
 		InstanceName:          l.str("INSTANCE_NAME", "Diffluence"),
 		DatabaseURL:           l.str("DATABASE_URL", ""),
 		MigrateDatabaseURL:    l.str("MIGRATE_DATABASE_URL", ""),
+		ListenDatabaseURL:     l.str("LISTEN_DATABASE_URL", ""),
 		NATSURL:               l.str("NATS_URL", ""),
 		NATSReplicas:          l.integer("NATS_REPLICAS", 1),
 		DataDir:               l.str("DATA_DIR", "./data"),

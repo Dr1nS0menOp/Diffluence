@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/events"
 	"github.com/diffluence/diffluence/internal/health"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/version"
@@ -62,7 +63,8 @@ const healthFactsSQL = `SELECT
 	COALESCE((SELECT NOT ok FROM backup_runs ORDER BY finished_at DESC LIMIT 1), false),
 	COALESCE((SELECT NOT ok FROM backup_restore_checks ORDER BY checked_at DESC LIMIT 1), false),
 	(SELECT CASE WHEN count(DISTINCT ip) = 1 AND count(DISTINCT user_id) > 1 THEN min(ip) ELSE '' END
-		FROM sessions WHERE created_at > now() - interval '1 day' AND ip <> '')`
+		FROM sessions WHERE created_at > now() - interval '1 day' AND ip <> ''),
+	(SELECT min(created_at) FROM outbox_events WHERE published_at IS NULL)`
 
 // oneProxyAddress keeps the one address all logins came from only when it is private or
 // loopback: a public one is a shared office line, which is no sign of an untrusted proxy.
@@ -85,19 +87,31 @@ func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (heal
 			f.DiskFree, f.DiskTotal = free, total
 		}
 	}
-	var lastBackup, lastMigration, oldestWaiting *time.Time
+	var lastBackup, lastMigration, oldestWaiting, oldestEvent *time.Time
 	var size, sizeBefore *int64
 	var loginAddress string
 	err := src.Pool.QueryRow(ctx, healthFactsSQL, ActionBackupNoted, health.GrowthWindow.Seconds()).Scan(
 		&f.FailedJobs7d, &f.OutboxStuck, &f.EventFailures, &f.MailFailed1d, &f.PasswordStops,
 		&lastBackup, &lastMigration, &size, &sizeBefore, &f.AuditWaiting, &oldestWaiting, &f.BackupFailed, &f.RestoreCheckFailed,
-		&loginAddress)
+		&loginAddress, &oldestEvent)
 	if err != nil {
 		return f, fmt.Errorf("app: read the health facts: %w", err)
 	}
 	f.OneLoginAddress = oneProxyAddress(loginAddress)
 	if oldestWaiting != nil {
 		f.OldestAuditWaiting = *oldestWaiting
+	}
+	if oldestEvent != nil {
+		f.OldestEventWaiting = *oldestEvent
+	}
+	consumers, err := events.ReadConsumers(ctx, src.Pool)
+	if err != nil {
+		return f, err
+	}
+	for _, c := range consumers {
+		if c.Lag > f.EventLag {
+			f.EventLag, f.EventLagConsumer = c.Lag, c.Consumer
+		}
 	}
 	if lastBackup != nil {
 		f.LastBackup = *lastBackup

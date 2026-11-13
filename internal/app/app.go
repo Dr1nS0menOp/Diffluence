@@ -30,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/console"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/events"
 	"github.com/diffluence/diffluence/internal/example"
 	"github.com/diffluence/diffluence/internal/exchange"
 	"github.com/diffluence/diffluence/internal/failures"
@@ -439,10 +440,11 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	if a.cfg.Role.RunsWorker() {
 		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log, Refused: func(ctx context.Context, data []byte, cause error) error {
 			return a.failures.Record(ctx, "relay", data, cause)
-		}}
-		wg.Add(5)
+		}, Sequencer: events.Sequencer{}}
+		wg.Add(6)
 		go func() { defer wg.Done(); a.runSealer(workCtx, sealEvery) }()
 		go func() { defer wg.Done(); relay.Run(workCtx) }()
+		go func() { defer wg.Done(); a.runEventLog(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.Run(workCtx) }()
 		go func() { defer wg.Done(); a.jobs.RunPeriodic(workCtx, a.PeriodicTasks()) }()
 		go func() { defer wg.Done(); a.mail.Run(workCtx) }()
@@ -647,6 +649,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "purge-outbox", Every: time.Hour, Run: func(ctx context.Context) error {
 			return outbox.PurgePublished(ctx, a.pool, 7*24*time.Hour)
 		}},
+		{Name: "clean-up-event-log", Every: time.Hour, Run: a.cleanUpEventLog},
 		{Name: "audit-verify", Every: 24 * time.Hour, Run: a.verifyAudit},
 		{Name: "audit-checkpoint", Every: checkpointEvery, Run: a.signCheckpoint},
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},

@@ -123,6 +123,7 @@ Who listens: **N** notifications, **A** automation rules, **W** webhooks, **S** 
 | `fail-stale-jobs` | 10 minutes | built |
 | `purge-identity` | 10 minutes | built |
 | `purge-outbox` | Hour | built |
+| `clean-up-event-log` (spec 068) | Hour | built; deletes only once events run through PostgreSQL |
 | `audit-verify` | Day | built |
 | `audit-checkpoint`, with a copy in the application log (ADR-039) | 5 minutes, when something happened | built |
 | `contract-migrations` | Minute | built |

@@ -26,6 +26,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/events"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/keys"
@@ -47,6 +48,9 @@ Commands:
                             verify the audit log hash chain, and compare it with the
                             checkpoints in an application log (FILE, or - for stdin)
   audit prune               remove audit rows past their retention, as the owner of the tables
+  events check              check that the event log lost nothing: no gap in its positions, no
+                            cursor past an event it did not hand over, nothing waiting long
+                            while a worker runs (spec 068); exits 1 at the first breach
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   backup next|report|restore-checked
                             what the backup worker asks and tells the console; see diffluence backup
@@ -132,6 +136,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
+	case "events":
+		if len(args) < 2 || args[1] != "check" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdEventsCheck(ctx, stdout)
 	case "setup-code":
 		err = cmdSetupCode(ctx, stdout)
 	case "key":
@@ -489,6 +499,27 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 
 // cmdBackupNote tells the checks before the next upgrade that a backup exists. It does not
 // check the backup: scripts/backup.sh runs it only after every part was written.
+func cmdEventsCheck(ctx context.Context, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	breach, err := events.Check(ctx, pool)
+	if err != nil {
+		return err
+	}
+	if breach != nil {
+		return fmt.Errorf("the event log breaks %s", breach)
+	}
+	fmt.Fprintln(stdout, "the event log holds: no gap, no cursor past a lost event, nothing waiting long")
+	return nil
+}
+
 func cmdBackupNote(ctx context.Context, stdout io.Writer) error {
 	cfg, err := config.FromEnvironment()
 	if err != nil {

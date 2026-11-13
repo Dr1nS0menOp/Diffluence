@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/events"
 	"github.com/diffluence/diffluence/internal/health"
 	"github.com/diffluence/diffluence/internal/metrics"
 )
@@ -57,7 +58,13 @@ func (a *App) Gauges(ctx context.Context) []metrics.Gauge {
 		metrics.Gauge{Name: "diffluence_jobs_failed_7d", Help: "Jobs that failed in the last seven days.", Value: float64(jobsFailed)},
 		metrics.Gauge{Name: "diffluence_mail_queued", Help: "Mails waiting to be sent.", Value: float64(mailQueued)},
 		metrics.Gauge{Name: "diffluence_storage_deletions_queued", Help: "Stored files waiting to be removed.", Value: float64(deletions)},
+		metrics.Gauge{Name: "diffluence_events_waiting", Help: "Events in the outbox, waiting for the relay or the sequencer.", Value: float64(outbox)},
 	)
+	if consumers, err := events.ReadConsumers(ctx, a.pool); err != nil {
+		a.log.Warn("metrics: event consumers unavailable", "error", err)
+	} else {
+		gauges = append(gauges, EventGauges(consumers)...)
+	}
 	// How far an upgrade is (blueprint 07): a contract migration that stays pending long
 	// after every node runs the new release asks for a look.
 	schema, err := db.Status(ctx, a.pool, a.migrations)
@@ -76,6 +83,21 @@ func (a *App) Gauges(ctx context.Context) []metrics.Gauge {
 		return gauges
 	}
 	return append(gauges, HealthGauges(facts)...)
+}
+
+// EventGauges are the lag and the retries of each consumer of the event log (spec 068,
+// 2.9), the series of one name together. A consumer without cursors is not listed.
+func EventGauges(consumers []events.ConsumerState) []metrics.Gauge {
+	out := make([]metrics.Gauge, 0, 2*len(consumers))
+	for _, c := range consumers {
+		out = append(out, metrics.Gauge{Name: "diffluence_event_lag_seconds", Help: "Age of the oldest event a consumer has not passed; 0 = at the head.",
+			Value: c.Lag.Seconds(), Label: metrics.Label{Name: "consumer", Value: c.Consumer}})
+	}
+	for _, c := range consumers {
+		out = append(out, metrics.Gauge{Name: "diffluence_event_retries", Help: "Events of a consumer waiting for a retry.",
+			Value: float64(c.Retries), Label: metrics.Label{Name: "consumer", Value: c.Consumer}})
+	}
+	return out
 }
 
 // unixSeconds is a time as Prometheus expects it, with zero for "never".

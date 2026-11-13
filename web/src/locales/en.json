@@ -2454,6 +2454,8 @@
     "work_failed": "Jobs that failed in the last 7 days: {{jobs}}. Events that gave up: {{events}}. Look under Care.",
     "outbox_stuck_one": "{{count}} event has waited more than an hour to reach the queue. Check the queue and the worker.",
     "outbox_stuck_other": "{{count}} events have waited more than an hour to reach the queue. Check the queue and the worker.",
+    "events_waiting": "An event has waited {{seconds}} seconds to be passed on. Check that a worker runs.",
+    "events_lagging": "The {{consumer}} consumer of events is {{seconds}} seconds behind. Check the worker and its log.",
     "audit_ok": "Audit events are sealed in the chain within seconds.",
     "audit_lagging_one": "{{count}} audit event has waited {{seconds}} seconds to be sealed. Check that a worker runs.",
     "audit_lagging_other": "{{count}} audit events have waited {{seconds}} seconds to be sealed. Check that a worker runs.",

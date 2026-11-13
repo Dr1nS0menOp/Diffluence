@@ -857,6 +857,105 @@ mutate "pastes have no slots" internal/httpapi/handlers_organising.go \
   's.replace("case s.markdownBusy <- struct{}{}:\n\t\tdefer func() { <-s.markdownBusy }()\n\tdefault:\n\t\twriteError(w, http.StatusTooManyRequests, \"rate_limited\", \"Too much text is being converted right now. Try again shortly.\")\n\t\treturn\n\t}", "default:\n\t}")' ./internal/httpapi -run TestPastesWaitForAFreeSlot
 mutate "an event too large stops the relay" internal/outbox/outbox.go \
   's.replace("if len(body) > MaxEventBytes {", "if false {")' ./internal/outbox -run TestAnEventTooLargeForTheQueueDoesNotStopTheOthers
+# Spec 068, wave EV1: the event path in PostgreSQL. Every SQL condition of the sequencer, the
+# cursors, the leases, the retries, the cleanup and the ledger check has a mutation.
+ev=./internal/events/
+mutate "the relay never hands over to the sequencer" internal/outbox/outbox.go \
+  's.replace("if takes {", "if takes && false {")' $ev -run '^(TestASequencedEventLeavesTheOutbox|TestEveryEventReachesEveryConsumer)$'
+mutate "two sequencers run at once" internal/events/sequencer.go \
+  's.replace("\"SELECT pg_advisory_xact_lock($1)\", lockKey", "\"SELECT $1::bigint\", lockKey")' $ev -run '^TestOnlyOneSequencerRunsAtATime$'
+mutate "the sequencer ignores the transport" internal/events/sequencer.go \
+  's.replace("return t == TransportPostgres, nil", "return len(t) > 0, nil")' $ev -run '^TestUnderNATSTheRelayPublishesAndTheLogStaysEmpty$'
+mutate "a published event is sequenced again" internal/events/sequencer.go \
+  's.replace("SELECT id FROM outbox_events WHERE published_at IS NULL", "SELECT id FROM outbox_events WHERE true")' $ev -run '^TestAPublishedEventIsNotSequencedAgain$'
+mutate "a sequenced event stays in the outbox" internal/events/sequencer.go \
+  's.replace("DELETE FROM outbox_events WHERE id = ANY($1)", "DELETE FROM outbox_events WHERE false AND id = ANY($1)")' $ev -run '^TestASequencedEventLeavesTheOutbox$'
+mutate "events of one page go to different lanes" internal/events/sequencer.go \
+  's.replace("coalesce(o.payload->>\x27page_id\x27, ", "coalesce(")' $ev -run '^TestEventsOfOnePageKeepTheirOrder$'
+mutate "the sequencer notifies nobody" internal/events/sequencer.go \
+  's.replace("\"SELECT pg_notify($1, $2)\", Channel", "\"SELECT pg_notify($1 || \x27x\x27, $2)\", Channel")' $ev -run '^(TestASaveDoesNotNotify|TestANotificationWakesTheConsumers)$'
+mutate "a notification wakes nothing" internal/events/listen.go \
+  's.replace("return err\n\t\t}\n\t\tw.wakeAll()", "return err\n\t\t}")' $ev -run '^TestANotificationWakesTheConsumers$'
+mutate "a lane reads from its start" internal/events/consumer.go \
+  's.replace("WHERE lane = $1 AND pos > $2", "WHERE lane = $1 AND pos > 0 * $2")' $ev -run '^(TestEveryEventReachesEveryConsumer|TestABacklogAfterDowntimeIsDelivered)$'
+mutate "a lane reads every lane" internal/events/consumer.go \
+  's.replace("WHERE lane = $1 AND pos > $2", "WHERE $1 >= 0 AND pos > $2")' $ev -run '^TestEveryEventReachesEveryConsumer$'
+mutate "a live lease is taken" internal/events/consumer.go \
+  's.replace(" AND (lease_until IS NULL OR lease_until < now() OR lease_owner = $3)", "")' $ev -run '^(TestALiveLeaseIsNotTaken|TestAnEndedLeaseIsTakenOver)$'
+mutate "an ended lease is never taken over" internal/events/consumer.go \
+  's.replace("OR lease_until < now() OR", "OR lease_until < now() - interval \x271 hour\x27 OR")' $ev -run '^TestAnEndedLeaseIsTakenOver$'
+mutate "the cursor moves without the lease" internal/events/consumer.go \
+  's.replace("AND lane = $2 AND lease_owner = $4\"", "AND lane = $2 AND $4::uuid IS NOT NULL\"")' $ev -run '^TestALostCursorCommitRepeatsAndNeverSkips$'
+mutate "a lost lease commits anyway" internal/events/consumer.go \
+  's.replace("if tag.RowsAffected() == 0 {\n\t\t\treturn errLeaseLost", "if tag.RowsAffected() < 0 {\n\t\t\treturn errLeaseLost")' $ev -run '^TestALostCursorCommitRepeatsAndNeverSkips$'
+mutate "a failed event is not kept for a retry" internal/events/consumer.go \
+  's.replace("cause, ok := failed[e.pos]", "cause, ok := failed[-e.pos]")' $ev -run '^TestAFailedEventDoesNotHoldItsLane$'
+mutate "a new consumer starts at the first event" internal/events/consumer.go \
+  's.replace("SELECT $1, lane, (SELECT pos FROM event_head) FROM", "SELECT $1, lane, 0 FROM")' $ev -run '^TestCursorsStartAtTheHeadOnce$'
+mutate "a second start resets the cursors" internal/events/consumer.go \
+  's.replace("ON CONFLICT (consumer, lane) DO NOTHING", "ON CONFLICT (consumer, lane) DO UPDATE SET pos = EXCLUDED.pos")' $ev -run '^TestCursorsStartAtTheHeadOnce$'
+mutate "a stopping worker keeps its leases" internal/events/consumer.go \
+  's.replace("SET lease_owner = NULL, lease_until = NULL", "SET lease_until = NULL")' $ev -run '^TestAStoppedWorkerGivesItsLeasesBack$'
+mutate "a retry runs before its time" internal/events/retries.go \
+  's.replace("WHERE consumer = $1 AND next_at <= now()", "WHERE consumer = $1")' $ev -run '^TestARetryThatSucceedsIsDone$'
+mutate "a consumer runs the retries of others" internal/events/retries.go \
+  's.replace("WHERE consumer = $1 AND next_at <= now()", "WHERE $1 <> \x27\x27 AND next_at <= now()")' $ev -run '^TestARetryRunsOnlyForItsConsumer$'
+mutate "a successful retry stays" internal/events/retries.go \
+  's.replace("\"DELETE FROM event_retries WHERE consumer = $1 AND pos = $2\", c.Name, t.pos)\n\t\treturn err", "\"DELETE FROM event_retries WHERE consumer = $1 AND pos = $2 AND false\", c.Name, t.pos)\n\t\treturn err")' $ev -run '^TestARetryThatSucceedsIsDone$'
+mutate "a retry never gives up" internal/events/retries.go \
+  's.replace("case t.tries < len(retryWaits):", "case t.tries < 2*len(retryWaits):")' $ev -run '^TestARetryEndsInFailures$'
+mutate "every retry waits the first wait" internal/events/retries.go \
+  's.replace("retryWaits[t.tries].Seconds()", "retryWaits[0].Seconds()")' $ev -run '^TestARetryEndsInFailures$'
+mutate "a given-up event stays in the retries" internal/events/retries.go \
+  's.replace("tx.Exec(ctx, \"DELETE FROM event_retries WHERE consumer = $1 AND pos = $2\"", "tx.Exec(ctx, \"DELETE FROM event_retries WHERE consumer = $1 AND pos = $2 AND false\"")' $ev -run '^TestARetryEndsInFailures$'
+mutate "a given-up event is not stored" internal/failures/failures.go \
+  's.replace("_, err := tx.Exec(ctx, recordSQL, ids.New(), consumer, data, ShortError(cause))\n\treturn err", "return nil")' $ev -run '^TestARetryEndsInFailures$'
+mutate "the cleanup passes a cursor" internal/events/upkeep.go \
+  's.replace("(SELECT min(pos) FROM event_cursors),\n", "")' $ev -run '^TestCleanupKeepsWhatACursorHasNotPassed$'
+mutate "the cleanup deletes what a retry needs" internal/events/upkeep.go \
+  's.replace("(SELECT min(pos) - 1 FROM event_retries),\n", "")' $ev -run '^TestCleanupKeepsWhatARetryNames$'
+mutate "the cleanup deletes events younger than seven days" internal/events/upkeep.go \
+  's.replace("ORDER BY pos LIMIT 1),", "AND false ORDER BY pos LIMIT 1),")' $ev -run '^(TestCleanupKeepsTheLastSevenDays|TestCleanupKeepsEventsJustInsideTheirDays)$'
+mutate "the cleanup runs without cursors" internal/events/upkeep.go \
+  's.replace("\n\tWHERE EXISTS (SELECT 1 FROM event_cursors))", ")")' $ev -run '^TestCleanupWithoutCursorsDeletesNothing$'
+mutate "the cleanup stops after one batch" internal/events/upkeep.go \
+  's.replace("if tag.RowsAffected() < int64(batch) {", "if true {")' $ev -run '^TestCleanupDeletesInBatchesUntilDone$'
+mutate "the check misses a gap" internal/events/upkeep.go \
+  's.replace("case count != highest-lowest+1:", "case false:")' $ev -run '^TestTheCheckFindsAGap$'
+mutate "the check misses a head behind the log" internal/events/upkeep.go \
+  's.replace("case highest != head:", "case false:")' $ev -run '^TestTheCheckFindsAHeadBehindTheLog$'
+mutate "the check misses a cursor past the head" internal/events/upkeep.go \
+  's.replace("WHERE c.pos > h.pos ORDER BY", "WHERE c.pos > h.pos + 1000 ORDER BY")' $ev -run '^TestTheCheckFindsACursorPastTheHead$'
+mutate "the check misses a retry above its cursor" internal/events/upkeep.go \
+  's.replace(" OR r.pos > c.pos", "")' $ev -run '^TestTheCheckFindsARetryAboveItsCursor$'
+mutate "the check misses a retry without its event" internal/events/upkeep.go \
+  's.replace("WHERE c.pos IS NULL OR ", "WHERE ")' $ev -run '^TestTheCheckFindsARetryWithoutItsEvent$'
+mutate "the check misses a retry of another event" internal/events/upkeep.go \
+  's.replace(" OR l.id <> r.event_id", "")' $ev -run '^TestTheCheckFindsARetryOfAnotherEvent$'
+mutate "the check blames a worker that just started" internal/events/upkeep.go \
+  's.replace(" AND started_at < now() - make_interval(secs => $1)", "")' $ev -run '^TestTheCheckFindsAnEventWaitingTooLongWhileAWorkerRuns$'
+mutate "the check counts an API node as a worker" internal/events/upkeep.go \
+  's.replace("role IN (\x27all\x27, \x27worker\x27)", "role IN (\x27all\x27, \x27worker\x27, \x27api\x27)")' $ev -run '^TestAnAPINodeDoesNotCountAsAWorker$'
+mutate "the check counts a gone node as a worker" internal/events/upkeep.go \
+  's.replace("AND last_seen_at > now() - make_interval(secs => $1) ", "")' $ev -run '^TestAnAPINodeDoesNotCountAsAWorker$'
+mutate "the lag counts an event the cursor passed" internal/events/upkeep.go \
+  's.replace("l.lane = c.lane AND l.pos > c.pos", "l.lane = c.lane AND l.pos >= c.pos")' $ev -run '^TestTheLagIsTheOldestEventPastACursor$'
+mutate "the worker leaves a consumer out of the log" internal/app/events.go \
+  's.replace("webhookConsumer, collabConsumer}", "webhookConsumer}")' $app -run '^TestTheConsumersOfTheWorkerTakeEventsFromTheLog$'
+mutate "system health misses the slowest consumer" internal/app/health.go \
+  's.replace("if c.Lag > f.EventLag {", "if c.Lag < f.EventLag {")' $app -run '^TestSystemHealthReadsTheEventLag$'
+mutate "the gauges of the event lag lose their consumer" internal/app/gauges.go \
+  's.replace("Value: c.Lag.Seconds(), Label: metrics.Label{Name: \"consumer\", Value: c.Consumer}", "Value: c.Lag.Seconds()")' $app -run '^TestEventGaugesNameEachConsumer$'
+mutate "an event waiting a minute is not news" internal/health/health.go \
+  's.replace("f.Now.Sub(f.OldestEventWaiting) > EventWaitWarnAfter", "f.Now.Sub(f.OldestEventWaiting) > 2*EventWaitWarnAfter")' ./internal/health -run '^TestAnEventWaitingLongerThanAMinuteWarns$'
+mutate "a consumer warns at exactly five minutes" internal/health/health.go \
+  's.replace("f.EventLag > EventLagWarnAfter", "f.EventLag >= EventLagWarnAfter")' ./internal/health -run '^TestAConsumerLaggingMoreThanFiveMinutesWarns$'
+mutate "every series repeats its help" internal/metrics/metrics.go \
+  's.replace("if i == 0 || gauges[i-1].Name != g.Name {", "if i >= 0 {")' ./internal/metrics -run '^TestGaugesOfOneNameAreWrittenAsOneMetric$'
+mutate "the listen address ignores its setting" internal/config/config.go \
+  's.replace("if c.ListenDatabaseURL != \"\" {", "if false {")' ./internal/config -run '^TestTheListenAddressFallsBackToTheDatabase$'
+mutate "the listen address shows its password" internal/config/report.go \
+  's.replace("\"LISTEN_DATABASE_URL\": true, \"SMTP_PASSWORD\"", "\"SMTP_PASSWORD\"")' ./internal/config -run '^TestTheListenAddressIsShownWithoutItsPassword$'
 mutate "a helper gets the network of the database" compose.yaml \
   's.replace("    networks: [helpers]\n", "")' $app -run TestHelpersHaveNoWayOut
 mutate "a private saved block reaches everyone" internal/savedblocks/savedblocks.go \

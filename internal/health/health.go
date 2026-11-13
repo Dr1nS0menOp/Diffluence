@@ -48,6 +48,11 @@ const (
 	// AuditSealProblemAfter is when waiting events need a person: they are not covered by a
 	// signed checkpoint or the witness until they are sealed (ADR-041).
 	AuditSealProblemAfter = 15 * time.Minute
+	// EventWaitWarnAfter is how long an event may wait for the relay or the sequencer, which
+	// take it within a second while a worker runs (spec 068, 2.9).
+	EventWaitWarnAfter = time.Minute
+	// EventLagWarnAfter is how far a consumer of the event log may fall behind.
+	EventLagWarnAfter = 5 * time.Minute
 )
 
 // Names are the checks, in the order the console shows them.
@@ -81,6 +86,13 @@ type Facts struct {
 	// OutboxStuck counts events that waited more than an hour to reach the queue.
 	OutboxStuck   int
 	EventFailures int
+	// OldestEventWaiting is when the oldest event still in the outbox was written; zero when
+	// none waits.
+	OldestEventWaiting time.Time
+	// EventLag is how far the slowest consumer of the event log is behind, and
+	// EventLagConsumer which one; zero when every consumer is at the head (spec 068).
+	EventLag         time.Duration
+	EventLagConsumer string
 	// MailConfigured says whether a mail server is set; MailFailed1d counts mails that
 	// failed in the last day.
 	MailConfigured bool
@@ -212,6 +224,10 @@ func work(f Facts) Check {
 	switch {
 	case f.OutboxStuck > 0:
 		return check("work", Problem, "outbox_stuck", values)
+	case !f.OldestEventWaiting.IsZero() && f.Now.Sub(f.OldestEventWaiting) > EventWaitWarnAfter:
+		return check("work", Warn, "events_waiting", map[string]any{"seconds": int(f.Now.Sub(f.OldestEventWaiting).Seconds())})
+	case f.EventLag > EventLagWarnAfter:
+		return check("work", Warn, "events_lagging", map[string]any{"consumer": f.EventLagConsumer, "seconds": int(f.EventLag.Seconds())})
 	case f.FailedJobs7d > 0 || f.EventFailures > 0:
 		return check("work", Warn, "work_failed", values)
 	}
@@ -289,6 +305,8 @@ var Sentences = map[string]string{
 	"work_ok":           "Background work runs.",
 	"work_failed":       "{jobs} job(s) failed in the last 7 days and {events} event(s) gave up. Look under Care.",
 	"outbox_stuck":      "{outbox} event(s) have waited more than an hour to reach the queue. Check the queue and the worker.",
+	"events_waiting":    "An event has waited {seconds} seconds to be passed on. Check that a worker runs.",
+	"events_lagging":    "The {consumer} consumer of events is {seconds} seconds behind. Check the worker and its log.",
 	"audit_ok":          "Audit events are sealed in the chain within seconds.",
 	"audit_lagging":     "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
 	"audit_stuck":       "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",

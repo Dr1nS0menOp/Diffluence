@@ -70,6 +70,16 @@ type Publisher interface {
 	Publish(ctx context.Context, subject string, data []byte, msgID string) error
 }
 
+// Sequencer moves events into the event log of PostgreSQL in place of the publisher, once
+// the events run through PostgreSQL (spec 068).
+type Sequencer interface {
+	// Takes reports inside tx whether the events go to the event log now. It holds the
+	// events lock until tx ends, so one batch goes one way only.
+	Takes(ctx context.Context, tx pgx.Tx) (bool, error)
+	// Sequence moves one batch inside tx and returns how many events it moved.
+	Sequence(ctx context.Context, tx pgx.Tx) (int, error)
+}
+
 // Relay moves events from the outbox table to the publisher.
 type Relay struct {
 	Pool      *pgxpool.Pool
@@ -80,6 +90,9 @@ type Relay struct {
 	// Refused keeps an event the queue can never take, so that it is not lost and does
 	// not stop the events behind it. Without it, such an event is only logged.
 	Refused func(ctx context.Context, data []byte, cause error) error
+	// Sequencer takes the batch when the events run through PostgreSQL. Nil = always the
+	// publisher.
+	Sequencer Sequencer
 }
 
 // setAside takes a message the queue would refuse out of the way.
@@ -102,6 +115,16 @@ func (r *Relay) RunOnce(ctx context.Context) (int, error) {
 	}
 	n := 0
 	err := pgx.BeginFunc(ctx, r.Pool, func(tx pgx.Tx) error {
+		if r.Sequencer != nil {
+			takes, err := r.Sequencer.Takes(ctx, tx)
+			if err != nil {
+				return err
+			}
+			if takes {
+				n, err = r.Sequencer.Sequence(ctx, tx)
+				return err
+			}
+		}
 		rows, err := tx.Query(ctx, `SELECT id, type, payload, created_at FROM outbox_events
 			WHERE published_at IS NULL ORDER BY created_at, id LIMIT $1 FOR UPDATE SKIP LOCKED`, batch)
 		if err != nil {

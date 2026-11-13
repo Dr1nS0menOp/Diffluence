@@ -30,6 +30,16 @@ type Gauge struct {
 	Name  string
 	Help  string
 	Value float64
+	// Label tells gauges of one name apart, such as the lag of each event consumer; the zero
+	// value = none. Gauges of one name stand next to each other.
+	Label Label
+}
+
+// Label is one label of a gauge. Its value comes from the code, never from a request, so
+// the labels cannot grow without bound.
+type Label struct {
+	Name  string
+	Value string
 }
 
 type requestKey struct {
@@ -89,8 +99,18 @@ func (r *Requests) Write(w io.Writer, gauges []Gauge) error {
 	if _, err := io.WriteString(w, text); err != nil {
 		return err
 	}
-	for _, g := range gauges {
-		if _, err := fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s gauge\n%s %s\n", g.Name, g.Help, g.Name, g.Name, number(g.Value)); err != nil {
+	for i, g := range gauges {
+		// The format names a metric once, before all its series.
+		if i == 0 || gauges[i-1].Name != g.Name {
+			if _, err := fmt.Fprintf(w, "# HELP %s %s\n# TYPE %s gauge\n", g.Name, g.Help, g.Name); err != nil {
+				return err
+			}
+		}
+		series := g.Name
+		if g.Label.Name != "" {
+			series += fmt.Sprintf("{%s=%q}", g.Label.Name, g.Label.Value)
+		}
+		if _, err := fmt.Fprintf(w, "%s %s\n", series, number(g.Value)); err != nil {
 			return err
 		}
 	}
