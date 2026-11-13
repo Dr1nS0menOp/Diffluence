@@ -322,6 +322,13 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in NewPage) (Pa
 				return err
 			}
 		}
+		// Databases are an experimental part (spec 069): while off, no new one is made,
+		// and one made before keeps working.
+		if in.Kind == KindDatabase {
+			if err := s.features.RequireExperimental(ctx, tx, features.ExperimentalDatabases); err != nil {
+				return err
+			}
+		}
 		if err := lockTree(ctx, tx, in.SpaceID); err != nil {
 			return err
 		}

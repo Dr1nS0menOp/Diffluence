@@ -258,12 +258,29 @@ func (s *Server) allowedByCredential(w http.ResponseWriter, r *http.Request, a A
 	return false
 }
 
-// scopeFor maps a request to the scope a token needs (spec 015, H9).
+// exportRoutes hand out content in bulk, so a token needs the export scope for them
+// (spec 015, H9). They are named by route pattern, so an address that only contains the
+// word, such as the pages of a label called export, needs no more than its own scope.
+var exportRoutes = []string{
+	"GET /api/v1/export-formats",
+	"GET /api/v1/exports/{id}",
+	"GET /api/v1/exports/{id}/file",
+	"GET /api/v1/pages/{id}/export.md",
+	"GET /api/v1/pages/{id}/export.zip",
+	"GET /api/v1/spaces/{id}/export.zip",
+	"GET /api/v1/templates/{id}/export",
+	"POST /api/v1/exports",
+	"POST /api/v1/me/export",
+}
+
+// scopeFor maps a request to the scope a token needs, by the pattern of its route
+// (spec 015, H9). A request without a pattern was not routed, and needs the most.
 func scopeFor(r *http.Request) string {
+	_, path, _ := strings.Cut(r.Pattern, " ")
 	switch {
-	case strings.HasPrefix(r.URL.Path, "/api/v1/admin/"):
+	case r.Pattern == "" || strings.HasPrefix(path, "/api/v1/admin/"):
 		return identity.ScopeAdmin
-	case strings.Contains(r.URL.Path, "/export"):
+	case slices.Contains(exportRoutes, r.Pattern):
 		return identity.ScopeExport
 	case isRead(r):
 		return identity.ScopeRead

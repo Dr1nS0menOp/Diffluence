@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -371,6 +373,53 @@ func TestAScopeLimitsATokenAndATokenNeverExceedsItsOwner(t *testing.T) {
 		t.Fatal("refusals were not audited")
 	}
 	admin.want(400, "POST", "/api/v1/me/tokens", map[string]any{"name": "t", "scopes": []string{"everything"}})
+}
+
+// The scope follows the route, not words in the address: a label that happens to be
+// called export is read with the read scope, and a real export still needs its own.
+func TestTheScopeOfATokenFollowsTheRouteNotTheAddress(t *testing.T) {
+	e := newEnv(t)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := owner.space("TOK")
+	read := owner.ok("POST", "/api/v1/me/tokens", map[string]any{"name": "t", "scopes": []string{"read"}})["secret"].(string)
+	if status, out := e.bearer("GET", "/api/v1/labels/export/pages", read, ""); status != 200 {
+		t.Fatalf("a read token could not read the label export: %d %s", status, out)
+	}
+	if status, _ := e.bearer("GET", "/api/v1/labels/x-export/pages", read, ""); status != 200 {
+		t.Fatalf("a read token could not read the label x-export: %d", status)
+	}
+	if status, _ := e.bearer("GET", "/api/v1/pages/"+uuid.NewString()+"/export.md", read, ""); status != 403 {
+		t.Fatalf("a read token reached a page export: %d", status)
+	}
+	if status, _ := e.bearer("GET", "/api/v1/export-formats", read, ""); status != 403 {
+		t.Fatalf("a read token listed export formats: %d", status)
+	}
+	if status, _ := e.bearer("GET", "/api/v1/spaces/"+space+"/export.zip", read, ""); status != 403 {
+		t.Fatalf("a read token exported a space: %d", status)
+	}
+}
+
+// Every route that exports, now and later, needs more than the read scope: a new export
+// route that is missing from the list fails here.
+func TestEveryExportRouteNeedsMoreThanTheReadScope(t *testing.T) {
+	e := newEnv(t)
+	owner := e.user("owner@example.com", identity.PermUseProduct)
+	read := owner.ok("POST", "/api/v1/me/tokens", map[string]any{"name": "t", "scopes": []string{"read", "write"}})["secret"].(string)
+	checked := 0
+	for _, r := range e.app.Routes() {
+		method, path, _ := strings.Cut(r.Pattern, " ")
+		if !strings.Contains(path, "export") || strings.HasPrefix(path, "/api/v1/admin/") {
+			continue
+		}
+		path = strings.ReplaceAll(path, "{id}", uuid.NewString())
+		if status, out := e.bearer(method, path, read, ""); status != 403 {
+			t.Errorf("%s with a read and write token: %d %s", r.Pattern, status, out)
+		}
+		checked++
+	}
+	if checked < 5 {
+		t.Fatalf("only %d export routes", checked)
+	}
 }
 
 func TestTheUseOfATokenIsRecordedOnceAMinute(t *testing.T) {

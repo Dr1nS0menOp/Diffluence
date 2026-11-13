@@ -9,6 +9,7 @@ import {
   grant,
   login,
   newSpace,
+  PASSWORD,
   publishedPage,
   realFont,
   test,
@@ -197,6 +198,20 @@ test('a passkey logs in without a password', async ({ page, browser }) => {
   await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
   const me = await page.request.get('/api/v1/me');
   expect(await me.text()).toContain(email);
+
+  // With a passkey as the only second factor, the password alone no longer logs in: the
+  // login asks for the passkey after it (spec 069).
+  await page.getByRole('button', { name: 'Account' }).click();
+  await page.getByRole('menuitem', { name: 'Log out' }).click();
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(PASSWORD);
+  await page.getByRole('button', { name: 'Log in', exact: true }).click();
+  await expect(page.getByText('This account also asks for its passkey.')).toBeVisible();
+  await expect(page.getByLabel(/authenticator app/)).toHaveCount(0);
+  await checkAccessibility(page);
+  expect((await page.request.get('/api/v1/me')).status()).toBe(401);
+  await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
+  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
 });
 
 test('every tab of the admin console works and is accessible', async ({ page }) => {

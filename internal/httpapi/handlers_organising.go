@@ -83,6 +83,10 @@ func (s *Server) registerOrganisingRoutes() {
 
 	r.HandleFunc("GET /api/v1/admin/features", admin, s.handleInstanceFeatures)
 	r.HandleFunc("PUT /api/v1/admin/features", admin, s.handleInstanceFeaturesSet)
+	// Turning on an experimental part is a choice for the whole installation (spec 069),
+	// so a token cannot make it.
+	r.HandleFunc("GET /api/v1/admin/experimental", admin, s.handleExperimental)
+	r.HandleFunc("PUT /api/v1/admin/experimental", SessionOnly(admin), s.handleExperimentalSet)
 	r.HandleFunc("DELETE /api/v1/admin/pages/{id}/versions/{number}", admin, s.handleVersionRemove)
 }
 

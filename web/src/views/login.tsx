@@ -18,6 +18,8 @@ interface Providers {
 interface LoginAnswer {
   mfa_required?: boolean;
   mfa_token?: string;
+  /** The second factors the account has: a code, a passkey, or both. */
+  mfa_methods?: string[];
 }
 
 const OIDC_ERRORS = ['oidc_failed', 'oidc_unavailable', 'oidc_account_exists', 'oidc_no_account'];
@@ -83,6 +85,7 @@ export function LoginView() {
   const [password, setPassword] = useState('');
   const [code, setCode] = useState('');
   const [mfaToken, setMfaToken] = useState('');
+  const [mfaMethods, setMfaMethods] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   // A new install has nobody to log in yet: send the visitor to the setup, which asks for
@@ -118,6 +121,7 @@ export function LoginView() {
       const a = await api.post<LoginAnswer>('/auth/login', { email, password });
       if (a.mfa_required && a.mfa_token) {
         setMfaToken(a.mfa_token);
+        setMfaMethods(a.mfa_methods ?? ['code']);
         return;
       }
       await done();
@@ -138,6 +142,13 @@ export function LoginView() {
       await done();
     }, t('login.passkeyFailed'));
 
+  // The second step with the passkey of the account whose password was right.
+  const secondPasskey = () =>
+    run(async () => {
+      await provePasskey('/auth/login/passkey', { mfa_token: mfaToken });
+      await done();
+    }, t('login.passkeyFailed'));
+
   return (
     <LoginCard title={t('login.title')}>
       {appearance?.login_welcome && <p className="login-welcome">{appearance.login_welcome}</p>}
@@ -147,20 +158,41 @@ export function LoginView() {
         </p>
       )}
       {mfaToken ? (
-        <form onSubmit={submitCode}>
-          <Field label={t('login.code')}>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              autoComplete="one-time-code"
-              autoFocus
-              required
-            />
-          </Field>
-          <button type="submit" className="primary" disabled={busy}>
-            {t('login.codeSubmit')}
-          </button>
-        </form>
+        <>
+          {mfaMethods.includes('code') && (
+            <form onSubmit={submitCode}>
+              <Field label={t('login.code')}>
+                <input
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  autoComplete="one-time-code"
+                  autoFocus
+                  required
+                />
+              </Field>
+              <button type="submit" className="primary" disabled={busy}>
+                {t('login.codeSubmit')}
+              </button>
+            </form>
+          )}
+          {mfaMethods.includes('passkey') && (
+            <>
+              {mfaMethods.includes('code') ? (
+                <p className="muted center login-or">{t('login.orWith')}</p>
+              ) : (
+                <p>{t('login.secondPasskeyHelp')}</p>
+              )}
+              <button
+                type="button"
+                className={mfaMethods.includes('code') ? undefined : 'primary'}
+                onClick={() => void secondPasskey()}
+                disabled={busy}
+              >
+                {t('login.secondPasskey')}
+              </button>
+            </>
+          )}
+        </>
       ) : (
         <>
           <form onSubmit={submit}>

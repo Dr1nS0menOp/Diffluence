@@ -2,13 +2,13 @@
 
 Read this before you put real information in Diffluence. The first part is for everyone. After that come a part for people who run it and a part for people who write and read in it.
 
-Last updated: 6 November 2026. Diffluence is **alpha** software.
+Last updated: 13 November 2026. Diffluence is **alpha** software, sized for one node and a few hundred people, measured on your own hardware.
 
 ## The short version
 
 - **There is no guarantee.** Diffluence comes as it is, without warranty. It may contain security flaws, known or unknown, and they can lead to data being lost, changed or read by the wrong people.
 - **Security updates are not guaranteed.** Nobody promises that the software is actively kept up to date, that a flaw is fixed within a set time, or that this project still exists next year. There is no support contract and no help desk.
-- **It has not been independently tested.** No outside company has done a penetration test or an audit, and Diffluence holds no certification. All testing so far was done by the project itself.
+- **It has not been independently tested.** No outside company has done a penetration test or an audit, and Diffluence holds no certification. All testing so far was done by the project itself. For 1.0, one outside reader is planned for permissions, login and restore (ADR-043).
 - **You carry the risk.** Whoever installs Diffluence is responsible for the server, the backups, the updates and the data, and for meeting the law that applies to that data.
 
 If you need guarantees, a support contract or a certified product, Diffluence is not that today.
@@ -50,8 +50,21 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 - **Page text is not encrypted by Diffluence at rest.** Search needs the text. Stored files are encrypted, but the database is not: use disk encryption on the server.
 - **Without `master.key`, no file can be read.** Files are encrypted with keys that `master.key` protects. Back it up apart from the data, and do not lose it. Replace it when someone who knew it leaves, or when you suspect it leaked: [backup and restore](../operations/backup-restore.md#replace-it) says how. Replacing it does not change the key that signs audit checkpoints, so a stolen key file still lets a thief forge those.
 - **Files are served from the same address as the app.** Other measures cover the known attacks, but a separate address would be stronger.
-- **Limits on login attempts are counted per node.** A restart clears them, and two nodes count apart.
+- **Limits on login attempts per minute are counted per node.** A restart clears them, and two nodes count apart. The stop after a long run of wrong passwords is different: it is stored with the account, so it holds on every node and after a restart, until a new password is set or an administrator lifts it (ADR-038).
 - **Optional helpers** run as separate programs, each with its own flaws and updates. Only turn on what you need.
+
+**Experimental parts.** These are off on a new installation; each one you turn on brings its own risk (ADR-043):
+
+| Part | What turning it on adds |
+|---|---|
+| Automation rules | Rules act as their account without a person watching, and an incoming hook is an address that outside systems can call |
+| Public sites | Pages you choose become files anyone can read, outside every permission of the app |
+| Analytics | The installation records who read what, as counts or with names, for as long as you keep it |
+| Databases and sheets | Structured data in pages, with filters and sums that are newer and less tested than ordinary pages |
+| Bundles between instances | A space leaves this installation as a signed file, and a bundle from elsewhere brings its pages in |
+| Restore from the console | A system administrator can replace every page, account and grant with a backup from the browser, after a fresh login and a second factor or passkey |
+
+**Measures added since the first version of this page:** a restore from the console is for system administrators only, and asks for a fresh login and a second factor or passkey; an account with a passkey is asked for it after its password; acting on an account or group that holds system administration needs that role; the reference installation makes a backup every 4 hours and refuses an upgrade without a recent one; the audit log is sealed into its chain within a second and checked against a witness outside the database; the editing service receives a short ticket instead of a person's session; and a token's scope follows the route it calls.
 
 **What you should do:**
 

@@ -26,9 +26,28 @@ type TestDB struct {
 	URL  string
 }
 
-// Database creates an empty, migrated database and drops it after the test.
-// The test is skipped when DIFFLUENCE_TEST_DATABASE_URL is not set.
+// AllExperimentalOn is the stored value that turns every experimental part on (spec 069).
+// It is written out here because the features package, which owns the names, sits above
+// this one; a test in features keeps the two equal.
+const AllExperimentalOn = `{"on": ["automation", "bundles", "console_restore", "databases"]}`
+
+// Database creates a migrated database with every experimental part on, and drops it
+// after the test. The suites test each part itself, so they start with it on; the
+// switch itself is tested on InstalledDatabase. The test is skipped when
+// DIFFLUENCE_TEST_DATABASE_URL is not set.
 func Database(t testing.TB) TestDB {
+	t.Helper()
+	tdb := InstalledDatabase(t)
+	if _, err := tdb.Pool.Exec(context.Background(), `INSERT INTO settings (key, value) VALUES ('experimental', $1)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`, AllExperimentalOn); err != nil {
+		t.Fatal(err)
+	}
+	return tdb
+}
+
+// InstalledDatabase creates an empty, migrated database exactly as a new installation
+// starts, and drops it after the test.
+func InstalledDatabase(t testing.TB) TestDB {
 	t.Helper()
 	tdb := EmptyDatabase(t)
 	migs, err := db.Migrations()

@@ -59,6 +59,7 @@ GET /api/v1/admin/backups                                      session-only perm
 GET /api/v1/admin/bundles/key                                  permission:administrator
 GET /api/v1/admin/configuration                                session-only permission:administrator
 GET /api/v1/admin/event-failures                               session-only permission:administrator
+GET /api/v1/admin/experimental                                 permission:administrator
 GET /api/v1/admin/export-policy                                permission:administrator
 GET /api/v1/admin/features                                     permission:administrator
 GET /api/v1/admin/global-permissions                           session-only permission:administrator
@@ -323,6 +324,8 @@ POST /api/v1/attachments/{id}/versions/{number}/current        object:attachment
 POST /api/v1/auth/forgot                                       public
 POST /api/v1/auth/invitation                                   public
 POST /api/v1/auth/login                                        public
+POST /api/v1/auth/login/passkey/begin                          public
+POST /api/v1/auth/login/passkey/finish                         public
 POST /api/v1/auth/login/totp                                   public
 POST /api/v1/auth/logout                                       authenticated
 POST /api/v1/auth/passkey/begin                                public
@@ -427,6 +430,7 @@ PUT /api/v1/admin/analytics                                    session-only perm
 PUT /api/v1/admin/appearance/font                              session-only permission:administrator
 PUT /api/v1/admin/appearance/logo                              session-only permission:administrator
 PUT /api/v1/admin/automation                                   session-only permission:administrator
+PUT /api/v1/admin/experimental                                 session-only permission:administrator
 PUT /api/v1/admin/export-policy                                permission:administrator
 PUT /api/v1/admin/features                                     permission:administrator
 PUT /api/v1/admin/groups/{id}/members/{user}                   session-only permission:administrator

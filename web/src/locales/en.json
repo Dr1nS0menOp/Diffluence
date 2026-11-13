@@ -605,6 +605,8 @@
     "wrongCode": "That code is not correct.",
     "failed": "Email or password is incorrect.",
     "passkeyFailed": "This passkey could not be used.",
+    "secondPasskey": "Confirm with your passkey",
+    "secondPasskeyHelp": "This account also asks for its passkey.",
     "forgot": "Forgot your password?",
     "forgotTitle": "Forgot your password",
     "forgotSubmit": "Send a link",
@@ -3227,6 +3229,18 @@
     "more_one": "and {{count}} more",
     "more_other": "and {{count}} more",
     "editing": "Also editing: {{names}}. Your work is kept, and the last to publish is asked to compare."
+  },
+  "experimental": {
+    "title": "Experimental parts",
+    "help": "These parts are still experimental and start off on a new installation. Turning one off hides it and stops it, and deletes nothing. Public sites and analytics are experimental too, and have their own switches.",
+    "on": "On",
+    "onNamed": "{{name}} on",
+    "label": "(experimental)",
+    "off": "This is an experimental part, and it is off on this installation. An administrator can turn it on under Administration, Organising.",
+    "part_automation": "Automation rules",
+    "part_databases": "Databases",
+    "part_bundles": "Bundles between instances",
+    "part_console_restore": "Restore from the console"
   },
   "exchange": {
     "export": "Export",

@@ -21,11 +21,15 @@ import (
 	"github.com/diffluence/diffluence/internal/webhooks"
 )
 
-// sealedColumn is one column whose values the keyring seals (spec 034). Table and column
-// names come from this list only, never from input.
+// sealedColumn is one column whose values the keyring seals (spec 034). Its two queries
+// are written out in full, so no SQL is put together while the program runs.
 type sealedColumn struct {
 	table, column, id string
 	context           func(id string) (string, error)
+	// readPage reads one page of ids and values after the id $1, at most $2 rows.
+	readPage string
+	// reseal writes the value $2 of the id $1, while the old value is still $3.
+	reseal string
 }
 
 func fixedContext(c string) func(string) (string, error) {
@@ -41,10 +45,22 @@ var sealedColumns = []sealedColumn{
 			return "", err
 		}
 		return identity.TOTPContext(u), nil
-	}},
-	{table: "webhook_endpoints", column: "secret", id: "id", context: fixedContext(webhooks.SecretContext)},
-	{table: "webhook_endpoints", column: "old_secret", id: "id", context: fixedContext(webhooks.SecretContext)},
-	{table: "mail_queue", column: "sealed", id: "id", context: fixedContext(accountMailContext)},
+	},
+		readPage: `SELECT user_id::text, secret_sealed FROM totp_credentials
+			WHERE secret_sealed IS NOT NULL AND user_id::text > $1 ORDER BY user_id::text LIMIT $2`,
+		reseal: `UPDATE totp_credentials SET secret_sealed = $2 WHERE user_id::text = $1 AND secret_sealed = $3`},
+	{table: "webhook_endpoints", column: "secret", id: "id", context: fixedContext(webhooks.SecretContext),
+		readPage: `SELECT id::text, secret FROM webhook_endpoints
+			WHERE secret IS NOT NULL AND id::text > $1 ORDER BY id::text LIMIT $2`,
+		reseal: `UPDATE webhook_endpoints SET secret = $2 WHERE id::text = $1 AND secret = $3`},
+	{table: "webhook_endpoints", column: "old_secret", id: "id", context: fixedContext(webhooks.SecretContext),
+		readPage: `SELECT id::text, old_secret FROM webhook_endpoints
+			WHERE old_secret IS NOT NULL AND id::text > $1 ORDER BY id::text LIMIT $2`,
+		reseal: `UPDATE webhook_endpoints SET old_secret = $2 WHERE id::text = $1 AND old_secret = $3`},
+	{table: "mail_queue", column: "sealed", id: "id", context: fixedContext(accountMailContext),
+		readPage: `SELECT id::text, sealed FROM mail_queue
+			WHERE sealed IS NOT NULL AND id::text > $1 ORDER BY id::text LIMIT $2`,
+		reseal: `UPDATE mail_queue SET sealed = $2 WHERE id::text = $1 AND sealed = $3`},
 }
 
 // keyPageSize is how many rows a check or reseal reads at once, so memory stays flat.
@@ -108,12 +124,9 @@ func failureReason(err error) string {
 
 // eachSealed calls fn for every non-empty value of one column, one page at a time.
 func eachSealed(ctx context.Context, pool *pgxpool.Pool, c sealedColumn, fn func(id string, sealed []byte) error) error {
-	table, column, idCol := pgx.Identifier{c.table}.Sanitize(), pgx.Identifier{c.column}.Sanitize(), pgx.Identifier{c.id}.Sanitize()
-	query := fmt.Sprintf("SELECT %s::text, %s FROM %s WHERE %s IS NOT NULL AND %s::text > $1 ORDER BY %s::text LIMIT %d",
-		idCol, column, table, column, idCol, idCol, keyPageSize)
 	after := ""
 	for {
-		rows, err := pool.Query(ctx, query, after)
+		rows, err := pool.Query(ctx, c.readPage, after, keyPageSize)
 		if err != nil {
 			return fmt.Errorf("app: read %s.%s: %v", c.table, c.column, err)
 		}
@@ -277,10 +290,8 @@ func (r *resealer) run(ctx context.Context) (ResealReport, error) {
 }
 
 func (r *resealer) column(ctx context.Context, c sealedColumn) error {
-	table, column, idCol := pgx.Identifier{c.table}.Sanitize(), pgx.Identifier{c.column}.Sanitize(), pgx.Identifier{c.id}.Sanitize()
-	// The old value is part of the condition, so a value that changed meanwhile is left alone:
-	// its new value was sealed with the current key already.
-	update := fmt.Sprintf("UPDATE %s SET %s = $2 WHERE %s::text = $1 AND %s = $3", table, column, idCol, column)
+	// The old value is part of the condition of c.reseal, so a value that changed meanwhile is
+	// left alone: its new value was sealed with the current key already.
 	return eachSealed(ctx, r.pool, c, func(id string, sealed []byte) error {
 		if r.keyring.SealedWithCurrent(sealed) || r.stop() {
 			return nil
@@ -303,7 +314,7 @@ func (r *resealer) column(ctx context.Context, c sealedColumn) error {
 		if r.beforeUpdate != nil {
 			r.beforeUpdate(c, id)
 		}
-		if _, err := r.pool.Exec(ctx, update, id, fresh, sealed); err != nil {
+		if _, err := r.pool.Exec(ctx, c.reseal, id, fresh, sealed); err != nil {
 			return fmt.Errorf("app: seal %s.%s again: %v", c.table, c.column, err)
 		}
 		r.rep.Values++
@@ -392,9 +403,19 @@ func RetireOldKey(ctx context.Context, t *KeyTools, keyFile string) (KeyReport, 
 	return rep, RecordKeyEvent(ctx, t.Pool, "keys.retired", rep.CurrentKey, nil)
 }
 
-// saveCursor records where a file job stopped. The column name comes from code only.
+// cursorUpdates are the cursors the file jobs keep, each with its query written out in
+// full, so no SQL is put together while the program runs.
+var cursorUpdates = map[string]string{
+	"encrypt_cursor": "UPDATE storage_state SET encrypt_cursor = $1",
+	"reseal_cursor":  "UPDATE storage_state SET reseal_cursor = $1",
+}
+
+// saveCursor records where a file job stopped.
 func saveCursor(ctx context.Context, pool *pgxpool.Pool, column, value string) error {
-	query := fmt.Sprintf("UPDATE storage_state SET %s = $1", pgx.Identifier{column}.Sanitize())
+	query, ok := cursorUpdates[column]
+	if !ok {
+		return fmt.Errorf("app: no cursor is called %q", column)
+	}
 	if _, err := pool.Exec(ctx, query, value); err != nil {
 		return fmt.Errorf("app: save %s: %v", column, err)
 	}

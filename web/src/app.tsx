@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type Me } from './api';
 import { appearanceQuery, useAccent, useImportedFont } from './appearance';
+import { useCapabilities } from './capabilities';
 import { mayCreate } from './create-permission';
 import { keepSettingsTyping } from './kept-fields';
 import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './personal';
@@ -86,9 +87,10 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
   const canCreateSpace = me.global_permissions.includes('create_space');
   const can = target?.space.can;
   const blog = target?.space.features?.blog ?? true;
+  const capabilities = useCapabilities();
   const offered: Offered = {
     page: mayCreate(can, 'page'),
-    database: mayCreate(can, 'database'),
+    database: capabilities.databases && mayCreate(can, 'database'),
     post: blog && mayCreate(can, 'post'),
   };
   const main = mainCreation(offered, canCreateSpace);

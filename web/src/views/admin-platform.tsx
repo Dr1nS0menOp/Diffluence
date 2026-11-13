@@ -137,7 +137,7 @@ function AnalyticsForm({ current }: { current: Settings }) {
           checked={form.enabled}
           onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
         />
-        {t('analytics.enabled')}
+        {t('analytics.enabled')} <span className="muted">{t('experimental.label')}</span>
       </label>
       <p className="muted">{t('analytics.enabledHelp')}</p>
       <Field label={t('analytics.mode')} help={t(`analytics.mode_${form.mode}_help`)}>

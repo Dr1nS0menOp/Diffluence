@@ -14,6 +14,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/outbox"
@@ -153,9 +154,14 @@ func (s *Service) matchTrigger(ctx context.Context, trigger string, event uuid.U
 	return nil
 }
 
-// spaceAllowsRules reads the switch of the space. An instance rule follows the
-// switch of the space of its page.
+// spaceAllowsRules reads the switch of the installation, then that of the space. An
+// instance rule follows the switch of the space of its page. While automation is off as
+// an experimental part (spec 069), no rule runs, also one made before it was turned off.
 func (s *Service) spaceAllowsRules(ctx context.Context, rc runContext) (bool, error) {
+	on, err := s.Features.ExperimentalOn(ctx, s.Pool, features.ExperimentalAutomation)
+	if err != nil || !on {
+		return false, err
+	}
 	if rc.SpaceID == nil {
 		return true, nil
 	}

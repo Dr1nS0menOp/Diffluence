@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 )
 
@@ -32,9 +33,10 @@ func (s *Server) registerExchangeRoutes() {
 	r.HandleFunc("POST /api/v1/imports/{id}/run", me, s.handleImportRun)
 	r.HandleFunc("POST /api/v1/imports/{id}/undo", me, s.handleImportUndo)
 	r.HandleFunc("POST /api/v1/pages/{id}/import-word", Object("page.edit"), s.handleImportWord)
-	r.HandleFunc("POST /api/v1/spaces/{id}/bundles", Object("space.bundle"), s.handleBundleStart)
-	r.HandleFunc("POST /api/v1/admin/bundles", admin, s.handleBundleImport)
-	r.HandleFunc("GET /api/v1/admin/bundles/key", admin, s.handleBundleKey)
+	// Bundles between instances are an experimental part (spec 069).
+	r.HandleFunc("POST /api/v1/spaces/{id}/bundles", Object("space.bundle"), s.experimental(features.ExperimentalBundles, s.handleBundleStart))
+	r.HandleFunc("POST /api/v1/admin/bundles", admin, s.experimental(features.ExperimentalBundles, s.handleBundleImport))
+	r.HandleFunc("GET /api/v1/admin/bundles/key", admin, s.experimental(features.ExperimentalBundles, s.handleBundleKey))
 	r.HandleFunc("GET /api/v1/admin/export-policy", admin, s.handleExportPolicy)
 	r.HandleFunc("PUT /api/v1/admin/export-policy", admin, s.handleExportPolicySet)
 }

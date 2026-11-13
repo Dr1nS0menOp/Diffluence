@@ -25,6 +25,7 @@ const (
 	challengePasskeyRegister = "passkey_register"
 	challengePasskeyLogin    = "passkey_login"
 	challengePasskeyReauth   = "passkey_reauth"
+	challengePasskeyMFA      = "passkey_mfa"
 	passkeyTTL               = 5 * time.Minute
 )
 
@@ -233,6 +234,86 @@ func (s *Service) FinishPasskeyReauth(ctx context.Context, c Caller, sessionID u
 		return err
 	}
 	return s.confirmSession(ctx, c, sessionID, ConfirmedByPasskey)
+}
+
+// BeginMFAPasskey asks for a passkey of the account whose password was right, as the
+// second step of its login. challenge is the token of that first step, which stays.
+func (s *Service) BeginMFAPasskey(ctx context.Context, challenge string) (any, string, error) {
+	var userID *uuid.UUID
+	var expires time.Time
+	var attempts int
+	err := s.pool.QueryRow(ctx, `SELECT user_id, expires_at, attempts FROM auth_challenges
+		WHERE token_hash = $1 AND kind = $2`, hashToken(challenge), challengeMFA).Scan(&userID, &expires, &attempts)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", ErrInvalidCredentials
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if userID == nil || !s.now().Before(expires) || attempts >= maxMFAAttempts {
+		return nil, "", ErrInvalidCredentials
+	}
+	u, err := s.loadPasskeyUser(ctx, s.pool, *userID)
+	if err != nil {
+		return nil, "", err
+	}
+	options, session, err := s.webauthn.BeginLogin(u, requireLocalCheck())
+	if err != nil {
+		return nil, "", ErrInvalidCredentials
+	}
+	token, err := s.NewChallenge(ctx, s.pool, challengePasskeyMFA, userID, session, passkeyTTL)
+	return options, token, err
+}
+
+// CompleteMFAPasskey finishes a login with a passkey of the account of challenge. Only a
+// passkey step begun for that account counts.
+func (s *Service) CompleteMFAPasskey(ctx context.Context, challenge, token string, response []byte, meta RequestMeta) (string, Principal, error) {
+	return s.completeMFA(ctx, challenge, secondStep{failure: "bad_passkey",
+		check: func(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (string, error) {
+			return s.usePasskey(ctx, tx, userID, passkeyAnswer{token: token, response: response})
+		}}, meta)
+}
+
+// passkeyAnswer is what the browser sends back for a passkey step.
+type passkeyAnswer struct {
+	token    string
+	response []byte
+}
+
+// usePasskey checks a passkey assertion of userID inside tx. It returns
+// SecondFactorPasskey, or "" when the assertion does not hold.
+func (s *Service) usePasskey(ctx context.Context, tx pgx.Tx, userID uuid.UUID, a passkeyAnswer) (string, error) {
+	var session webauthn.SessionData
+	owner, err := s.TakeChallenge(ctx, tx, challengePasskeyMFA, a.token, &session)
+	if errors.Is(err, ErrInvalidCredentials) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if owner == nil || *owner != userID {
+		return "", nil
+	}
+	parsed, err := protocol.ParseCredentialRequestResponseBody(bytes.NewReader(a.response))
+	if err != nil {
+		return "", nil
+	}
+	u, err := s.loadPasskeyUser(ctx, tx, userID)
+	if err != nil {
+		return "", err
+	}
+	cred, err := s.webauthn.ValidateLogin(u, session, parsed)
+	if err != nil {
+		return "", nil
+	}
+	updated, err := json.Marshal(cred)
+	if err != nil {
+		return "", err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE webauthn_credentials SET credential = $2, last_used_at = now() WHERE credential_id = $1", cred.ID, updated); err != nil {
+		return "", err
+	}
+	return SecondFactorPasskey, nil
 }
 
 // BeginPasskeyLogin starts a login without a user name: the browser offers the

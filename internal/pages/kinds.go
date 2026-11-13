@@ -120,6 +120,11 @@ func (s *Service) checkKindChange(ctx context.Context, tx pgx.Tx, p Page, kind s
 	return nil
 }
 
+// DatabasesOn reports whether new databases may be made (spec 069).
+func (s *Service) DatabasesOn(ctx context.Context) (bool, error) {
+	return s.features.ExperimentalOn(ctx, s.pool, features.ExperimentalDatabases)
+}
+
 // Post is a blog post in a list.
 type Post struct {
 	ID          uuid.UUID `json:"id"`

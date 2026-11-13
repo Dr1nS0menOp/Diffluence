@@ -3,6 +3,15 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: experimental parts start off, a passkey after the password, and a smaller claim (spec 069, wave RV3a)
+- Automation rules, databases, bundles between instances and restore from the console are experimental for 1.0 and off on a new installation (ADR-043). An administrator turns each on under Administration, Organising, Experimental parts. While a part is off, its routes answer 404 `experimental_off`, no screen offers it, a rule stays and does not run, and a database stays and can be edited. Public sites and analytics keep their own switches, which already start off, and are marked experimental
+- The example space of a new installation leaves out its database while databases are off
+- An account whose second factor is a passkey is asked for it after its password; before, the password alone was enough for such an account. An account with an authenticator app and a passkey may use either. New routes `POST /api/v1/auth/login/passkey/begin` and `/finish`; the login answer names the factors in `mfa_methods`
+- A token's scope follows the route it calls, not words in the address: the pages of a label called "export" are read with the read scope
+- The few queries that named a table from a list now are written out in full; a test keeps every query from being put together with `fmt.Sprintf`
+- The README, the install guide and the known limits say what Diffluence is sized for: one node, a few hundred people, measured on your own hardware. `SECURITY.md` says alpha, as the README does. The risks page and the threat model are brought up to date. The built decisions ADR-005 to 007, 009, 011, 013 and 017 to 020 are marked accepted
+- `compose.dev.yaml` pins `postgres:16` by digest, as `compose.yaml` does
+- Upgrade impact: migration 0054 keeps on each experimental part the installation already used: a rule exists, a database exists, a bundle export or import is on record, or a restore was asked for in the console. Check Administration, Organising afterwards and turn on what you use that left no trace (`docs/operations/upgrade.md`). A script that logs in with a password for an account with a passkey now gets `mfa_required` and must finish with the passkey. A token with only the read scope can no longer be refused on a route that merely contains the word export
 ### Changed: rules for administration, editing sockets and logins (spec 066)
 - Open editors no longer wait in the order of work or count as requests in the metrics. They have caps of their own: 512 per node and 8 per login.
 - Only a system administrator acts on an account or group that holds system administration: its name, status, reset link, second factor, password stop, end date, anonymising, and who is in such a group. Only a system administrator starts a restore from the console

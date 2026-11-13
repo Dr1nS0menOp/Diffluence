@@ -74,6 +74,19 @@ The backup service and `scripts/backup.sh` note each complete backup in the audi
 
 Before a node migrates a database that holds data, it writes `system.upgrade_started` to the audit log: the highest migration before, the one it migrates to, its version, and when the last backup was noted. If an upgrade goes wrong in a way a rollback cannot fix, restore the backup that this marker names, as in [backup-restore.md](backup-restore.md), and start the version you had.
 
+## Experimental parts after an upgrade
+
+Since migration 0054 (ADR-043, spec 069), automation rules, databases, bundles between instances and restore from the console are experimental and off on a new installation. The upgrade keeps on what the installation already used, once, from the traces each part leaves:
+
+| Part | Kept on when |
+|---|---|
+| Automation rules | a rule exists, at the instance or in a space |
+| Databases | a database exists, also one in the trash |
+| Bundles between instances | a bundle export is still listed among the jobs, or the audit log holds a bundle import |
+| Restore from the console | a restore was ever asked for in the console |
+
+Afterwards, look under Administration, Organising, Experimental parts, and turn on what you use that left no trace: a bundle export whose job was already cleaned up, for example. Turning a part off deletes nothing: a rule stays and stops running, a database stays and can still be edited, only new ones wait. Public sites and analytics keep their own switches, unchanged by the upgrade.
+
 ## Rolling back
 
 Expand migrations leave the old structure in place, so the previous version runs on a database the new version has migrated. Roll back by starting the previous version.

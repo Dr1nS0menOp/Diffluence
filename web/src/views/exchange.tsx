@@ -17,6 +17,7 @@ import {
 } from '../api';
 import { Dialog, ErrorNote, Field, FilePicker, Loading, formatSize } from '../components/ui';
 import { offeredNames, useCapabilities } from '../capabilities';
+import { ExperimentalOff } from '../components/experimental-off';
 import { Link } from '../router';
 import { TableBox } from '../components/table-box';
 
@@ -643,9 +644,11 @@ export function ExportTab() {
     queryKey: ['export-policy'],
     queryFn: () => api.get<ExportPolicy>('/admin/export-policy'),
   });
+  const capabilities = useCapabilities();
   const key = useQuery({
     queryKey: ['bundle-key'],
     queryFn: () => api.get<{ fingerprint: string }>('/admin/bundles/key'),
+    enabled: capabilities.bundles,
   });
   const links = useQuery({
     queryKey: ['public-links'],
@@ -728,7 +731,7 @@ export function ExportTab() {
               checked={limits.public_sites_enabled}
               onChange={(e) => setLimits({ public_sites_enabled: e.target.checked })}
             />{' '}
-            {t('exchange.sitesOn')}
+            {t('exchange.sitesOn')} <span className="muted">{t('experimental.label')}</span>
           </label>
           <label className="check">
             <input
@@ -747,10 +750,18 @@ export function ExportTab() {
       </section>
       <section>
         <h2>{t('exchange.bundles')}</h2>
-        <p className="muted">{t('exchange.ownFingerprint', { fingerprint: key.data?.fingerprint ?? '' })}</p>
-        <FilePicker label={t('exchange.importBundle')} accept=".zip" onPick={(f) => upload.mutate(f)} />
-        <ErrorNote error={upload.error} />
-        {bundle && <ImportSteps id={bundle} />}
+        {capabilities.bundles ? (
+          <>
+            <p className="muted">
+              {t('exchange.ownFingerprint', { fingerprint: key.data?.fingerprint ?? '' })}
+            </p>
+            <FilePicker label={t('exchange.importBundle')} accept=".zip" onPick={(f) => upload.mutate(f)} />
+            <ErrorNote error={upload.error} />
+            {bundle && <ImportSteps id={bundle} />}
+          </>
+        ) : (
+          <ExperimentalOff />
+        )}
       </section>
       <section>
         <h2>{t('exchange.publicLinks')}</h2>
@@ -848,6 +859,7 @@ export function ExportSection({ space }: { space: Space }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [bundle, setBundle] = useState<string | null>(null);
+  const capabilities = useCapabilities();
   const start = useMutation({
     mutationFn: () => api.post<ExportRun>(`/spaces/${space.id}/bundles`),
     onSuccess: (run) => setBundle(run.id),
@@ -863,7 +875,7 @@ export function ExportSection({ space }: { space: Space }) {
             {t('exchange.exportButton')}
           </button>
         )}
-        {space.can?.['space.bundle'] && space.can?.['space.export'] && (
+        {capabilities.bundles && space.can?.['space.bundle'] && space.can?.['space.export'] && (
           <button type="button" onClick={() => start.mutate()}>
             {t('exchange.exportBundle')}
           </button>

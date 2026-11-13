@@ -46,7 +46,18 @@ func newEnvWith(t *testing.T, change func(*config.Config)) *env {
 // newEnvLogging is newEnvWith with a logger of the test's choosing.
 func newEnvLogging(t *testing.T, change func(*config.Config), log *slog.Logger) *env {
 	t.Helper()
-	tdb := testutil.Database(t)
+	return newEnvOn(t, testutil.Database(t), change, log)
+}
+
+// newInstalledEnv runs on a database exactly as a new installation starts, with every
+// experimental part off (spec 069).
+func newInstalledEnv(t *testing.T, change func(*config.Config)) *env {
+	t.Helper()
+	return newEnvOn(t, testutil.InstalledDatabase(t), change, slog.New(slog.DiscardHandler))
+}
+
+func newEnvOn(t *testing.T, tdb testutil.TestDB, change func(*config.Config), log *slog.Logger) *env {
+	t.Helper()
 	u, _ := url.Parse("http://localhost")
 	cfg := config.Config{
 		Role: config.RoleAll, HTTPAddr: "127.0.0.1:0", PublicURL: u, InstanceName: "Test",

@@ -24,6 +24,10 @@ func (s *Server) registerIdentityRoutes() {
 	r.HandleFunc("GET /api/v1/auth/providers", Public, s.handleProviders)
 	// Public: the second step of a login. Needs the token from a correct password; rate limited and audited.
 	r.HandleFunc("POST /api/v1/auth/login/totp", Public, s.handleLoginTOTP)
+	// Public: the second step with a passkey, for the account of a correct password only.
+	// Rate limited, verified by signature and audited.
+	r.HandleFunc("POST /api/v1/auth/login/passkey/begin", Public, s.handleLoginPasskeyBegin)
+	r.HandleFunc("POST /api/v1/auth/login/passkey/finish", Public, s.handleLoginPasskeyFinish)
 	// Public: starting and finishing a login cannot need a session. Checked by state, PKCE and nonce.
 	r.HandleFunc("GET /api/v1/auth/oidc/start", Public, s.handleOIDCStart)
 	r.HandleFunc("GET /api/v1/auth/oidc/callback", Public, s.handleOIDCCallback)
@@ -130,6 +134,59 @@ func (s *Server) handleLoginTOTP(w http.ResponseWriter, r *http.Request) {
 	token, p, err := s.deps.Identity.CompleteMFA(r.Context(), in.Token, in.Code, meta)
 	if errors.Is(err, identity.ErrInvalidCredentials) {
 		writeError(w, http.StatusUnauthorized, "invalid_code", "That code is not correct.")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	s.loginByIP.giveBack("ip:" + meta.IP)
+	s.setSessionCookie(w, token)
+	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User)})
+}
+
+func (s *Server) handleLoginPasskeyBegin(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Token string `json:"mfa_token"`
+	}
+	if decodeJSON(w, r, 4<<10, &in) != nil {
+		badBody(w)
+		return
+	}
+	if !s.loginByIP.allow("ip:" + metaFrom(r).IP) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
+		return
+	}
+	options, token, err := s.deps.Identity.BeginMFAPasskey(r.Context(), in.Token)
+	if errors.Is(err, identity.ErrInvalidCredentials) {
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "Log in with your password again.")
+		return
+	}
+	if err != nil {
+		s.internalError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"options": options, "token": token})
+}
+
+func (s *Server) handleLoginPasskeyFinish(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		MFAToken string          `json:"mfa_token"`
+		Token    string          `json:"token"`
+		Response json.RawMessage `json:"response"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	meta := metaFrom(r)
+	if !s.loginByIP.allow("ip:" + meta.IP) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
+		return
+	}
+	token, p, err := s.deps.Identity.CompleteMFAPasskey(r.Context(), in.MFAToken, in.Token, in.Response, meta)
+	if errors.Is(err, identity.ErrInvalidCredentials) {
+		writeError(w, http.StatusUnauthorized, "invalid_credentials", "This passkey could not be used.")
 		return
 	}
 	if err != nil {

@@ -40,9 +40,36 @@ const (
 // No session exists yet.
 type MFARequiredError struct {
 	Token string
+	// Methods are the second factors the account has, which can each finish the login.
+	Methods []string
 }
 
 func (e *MFARequiredError) Error() string { return "identity: second factor required" }
+
+// The second factors that finish a login after the password.
+const (
+	SecondFactorCode    = "code"
+	SecondFactorPasskey = "passkey"
+)
+
+// secondFactors lists the second factors of an account: an authenticator app, which also
+// lets a recovery code in, and a passkey. An account with none logs in with its password.
+func (s *Service) secondFactors(ctx context.Context, q db.Querier, userID uuid.UUID) ([]string, error) {
+	var code, passkey bool
+	if err := q.QueryRow(ctx, `SELECT
+			EXISTS (SELECT 1 FROM totp_credentials WHERE user_id = $1 AND confirmed_at IS NOT NULL),
+			EXISTS (SELECT 1 FROM webauthn_credentials WHERE user_id = $1)`, userID).Scan(&code, &passkey); err != nil {
+		return nil, err
+	}
+	methods := []string{}
+	if code {
+		methods = append(methods, SecondFactorCode)
+	}
+	if passkey {
+		methods = append(methods, SecondFactorPasskey)
+	}
+	return methods, nil
+}
 
 func randomToken() string {
 	b := make([]byte, 32)
@@ -326,13 +353,18 @@ func (s *Service) removeTOTP(ctx context.Context, tx pgx.Tx, c Caller, id uuid.U
 // useSecondFactor checks a TOTP or recovery code inside tx. It returns the method
 // that worked, or "" when the code is wrong.
 func (s *Service) useSecondFactor(ctx context.Context, tx pgx.Tx, userID uuid.UUID, code string) (string, error) {
+	// An account whose second factor is a passkey has no authenticator app; a recovery
+	// code still counts.
+	var step int64
 	secret, err := s.totpSecret(ctx, tx, userID)
-	if err != nil {
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+	case err != nil:
 		return "", err
-	}
-	step, err := s.matchTOTP(secret, code)
-	if err != nil {
-		return "", err
+	default:
+		if step, err = s.matchTOTP(secret, code); err != nil {
+			return "", err
+		}
 	}
 	if step != 0 {
 		// A code works once: the step must be newer than the last one used.
@@ -356,9 +388,25 @@ func (s *Service) useSecondFactor(ctx context.Context, tx pgx.Tx, userID uuid.UU
 	return "", nil
 }
 
-// CompleteMFA finishes a login with a second factor. The challenge survives a
-// few wrong codes, then it is gone and the password step must be repeated.
+// secondStep is how a login is finished after the password: check says, inside tx, which
+// second factor of the account worked, or "" when none did; failure names a refusal in
+// the audit log.
+type secondStep struct {
+	check   func(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (string, error)
+	failure string
+}
+
+// CompleteMFA finishes a login with a code. The challenge survives a few wrong codes,
+// then it is gone and the password step must be repeated.
 func (s *Service) CompleteMFA(ctx context.Context, challenge, code string, meta RequestMeta) (string, Principal, error) {
+	return s.completeMFA(ctx, challenge, secondStep{failure: "bad_code",
+		check: func(ctx context.Context, tx pgx.Tx, userID uuid.UUID) (string, error) {
+			return s.useSecondFactor(ctx, tx, userID, code)
+		}}, meta)
+}
+
+// completeMFA finishes the login of challenge once step finds a second factor that works.
+func (s *Service) completeMFA(ctx context.Context, challenge string, step secondStep, meta RequestMeta) (string, Principal, error) {
 	hash := hashToken(challenge)
 	var token string
 	var p Principal
@@ -379,7 +427,7 @@ func (s *Service) CompleteMFA(ctx context.Context, challenge, code string, meta 
 			_, _ = tx.Exec(ctx, "DELETE FROM auth_challenges WHERE token_hash = $1", hash)
 			return nil // deleted; reported as a failure below
 		}
-		method, err := s.useSecondFactor(ctx, tx, *userID, code)
+		method, err := step.check(ctx, tx, *userID)
 		if err != nil {
 			return err
 		}
@@ -394,7 +442,11 @@ func (s *Service) CompleteMFA(ctx context.Context, challenge, code string, meta 
 		if p, err = s.principalByID(ctx, tx, *userID); err != nil {
 			return err
 		}
-		token, p.SessionID, err = s.createSession(ctx, tx, sessionStart{UserID: *userID, Method: "password and code", Meta: meta})
+		how := "password and code"
+		if method == SecondFactorPasskey {
+			how = "password and passkey"
+		}
+		token, p.SessionID, err = s.createSession(ctx, tx, sessionStart{UserID: *userID, Method: how, Meta: meta})
 		if err != nil {
 			return err
 		}
@@ -419,7 +471,7 @@ func (s *Service) CompleteMFA(ctx context.Context, challenge, code string, meta 
 		if failedFor != nil {
 			objID = failedFor.String()
 		}
-		e := event(meta, Actor{Type: audit.ActorAnonymous}, "auth.login_mfa", "user", objID, audit.ResultFailure, map[string]any{"reason": "bad_code"})
+		e := event(meta, Actor{Type: audit.ActorAnonymous}, "auth.login_mfa", "user", objID, audit.ResultFailure, map[string]any{"reason": step.failure})
 		if err := audit.RecordStandalone(ctx, s.pool, e); err != nil {
 			return "", Principal{}, err
 		}

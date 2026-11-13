@@ -6,10 +6,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"time"
 
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/version"
@@ -106,7 +108,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	var mfa *identity.MFARequiredError
 	if errors.As(err, &mfa) {
 		s.loginByIP.giveBack("ip:" + meta.IP)
-		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": mfa.Token})
+		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": mfa.Token, "mfa_methods": mfa.Methods})
 		return
 	}
 	if err != nil {
@@ -196,13 +198,23 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 		}
 		down = found
 	}
+	experimental, err := s.deps.Features.Experimental(r.Context())
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	// A helper that is set up but did not answer its last check is not offered either,
-	// because the screen would offer what fails (ARC-071, ARC-072).
+	// because the screen would offer what fails (ARC-071, ARC-072). An experimental part
+	// that is off is not offered at all (spec 069).
 	writeJSON(w, http.StatusOK, map[string]any{
-		"pdf_export":     s.deps.Exchange.PDFAvailable() && !down["pdf"],
-		"office_preview": s.deps.Exchange.OfficeAvailable() && !down["office"],
-		"drawing":        s.deps.Config.DrawingOrigin() != "",
-		"collaboration":  s.deps.Config.CollabURL != "" && !down["collaboration"],
+		"pdf_export":      s.deps.Exchange.PDFAvailable() && !down["pdf"],
+		"office_preview":  s.deps.Exchange.OfficeAvailable() && !down["office"],
+		"drawing":         s.deps.Config.DrawingOrigin() != "",
+		"collaboration":   s.deps.Config.CollabURL != "" && !down["collaboration"],
+		"automation":      slices.Contains(experimental.On, features.ExperimentalAutomation),
+		"databases":       slices.Contains(experimental.On, features.ExperimentalDatabases),
+		"bundles":         slices.Contains(experimental.On, features.ExperimentalBundles),
+		"console_restore": slices.Contains(experimental.On, features.ExperimentalConsoleRestore),
 	})
 }
 

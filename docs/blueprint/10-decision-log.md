@@ -17,31 +17,31 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 *Accepted (2026-11-03).* Markdown alone cannot represent macros, mentions, merged table cells or co-editing state. Consequence: Markdown round-trips work for standard content. Rich elements export to Markdown as close as possible, with a note.
 
 **ADR-005: Modular monolith in one binary with roles**
-*Proposed.* One codebase and binary (`api`, `worker`, `all`) with strict internal modules. Consequence: easy to deploy from LXC to Kubernetes. Services can be split out later if measurements ever require it.
+*Accepted (built; status set 2026-11-13 by ADR-043).* One codebase and binary (`api`, `worker`, `all`) with strict internal modules. Consequence: easy to deploy from LXC to Kubernetes. Services can be split out later if measurements ever require it.
 
 **ADR-006: PostgreSQL as the only required database**
-*Proposed.* Proven, and fits the existing Patroni/HAProxy setup. Full-text search covers v1. Consequence: no separate search cluster to begin with. Search is behind an interface for later.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Proven, and fits the existing Patroni/HAProxy setup. Full-text search covers v1. Consequence: no separate search cluster to begin with. Search is behind an interface for later.
 
 **ADR-007: NATS JetStream as the message queue, with a transactional outbox**
-*Proposed.* Written in Go, Apache 2.0, can run **embedded** for small installs and as a cluster for HA, and has persistent streams. The outbox guarantees that events are not lost. Consequence: one extra component in HA setups, none in small setups.
+*Accepted (built; status set 2026-11-13 by ADR-043, which leaves NATS to the measurements of spec 068).* Written in Go, Apache 2.0, can run **embedded** for small installs and as a cluster for HA, and has persistent streams. The outbox guarantees that events are not lost. Consequence: one extra component in HA setups, none in small setups.
 
 **ADR-008: Single-tenant, ready for linking**
 *Accepted.* One organisation per installation. UUIDv7 IDs and `origin_instance_id` make linking and merging possible later. Consequence: no multi-tenant SaaS in the core design.
 
 **ADR-009: Allow-only permissions with inheriting view restrictions**
-*Proposed.* Three layers (global, space, page) and no explicit deny. View restrictions inherit, edit restrictions don't. One central evaluation function. Consequence: effective rights are easy to explain and test.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Three layers (global, space, page) and no explicit deny. View restrictions inherit, edit restrictions don't. One central evaluation function. Consequence: effective rights are easy to explain and test.
 
 **ADR-010: Public pages as a static site on a separate host**
 *Accepted (2026-11-03).* This meets "fully cut off from the rest" most strictly: there is no server code, no database and no path back. Consequence: public pages update when published, not live. Public search is client-side.
 
 **ADR-011: Envelope encryption (AES-256-GCM) with a pluggable KMS**
-*Proposed.* Attachments and secrets are encrypted at application level. Page text is protected by disk and backup encryption so search keeps working. Consequence: key management must be documented and backed up separately.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Attachments and secrets are encrypted at application level. Page text is protected by disk and backup encryption so search keeps working. Consequence: key management must be documented and backed up separately.
 
 **ADR-012: Zero-downtime upgrades through expand/contract and N/N+1 compatibility**
 *Accepted (requirement), method proposed.* Additive migrations, background data migrations via the queue, removal in a later release, and a CI test with mixed versions. Consequence: some changes take two releases to complete. That is the price of upgrades without downtime.
 
 **ADR-013: Tamper-evident audit log**
-*Proposed.* Append-only, hash chain, daily signed checkpoint, separate retention. Consequence: anonymising users uses pseudonymous ids instead of deleting audit rows.
+*Accepted (built; status set 2026-11-13 by ADR-043; ADR-041 supersedes the append inside the saving transaction).* Append-only, hash chain, daily signed checkpoint, separate retention. Consequence: anonymising users uses pseudonymous ids instead of deleting audit rows.
 
 **ADR-014: One universal retention period for deleted items**
 *Accepted.* Default 30 days, configurable. Per-space retention comes later. Consequence: a purge job also removes data from object storage and the search index.
@@ -53,16 +53,16 @@ Each decision is short: **context → decision → consequences**. Status is *Ac
 *Accepted (product owner, 2026-11-04).* Keep the total as low as possible, to avoid constant security advisories and abandoned code, but never hand-write an important or security-critical part when a widely used, maintained module does the job. Consequence: `docs/dependencies.md` lists every dependency with its reason. Not used from the blueprint's list: TanStack Router (it brought 9 packages and one outside our licence list; a small router replaces it), `bluemonday` and `sqlc`.
 
 **ADR-017: The permission rule lives in Go and in SQL, tested against each other**
-*Proposed.* Single decisions use a pure Go function, which also feeds the "why can or can't I?" view. Lists use SQL functions, so filtering happens in the database. Consequence: two expressions of one rule, which is exactly why the matrix compares both with a third, literal one. A change touches all three.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Single decisions use a pure Go function, which also feeds the "why can or can't I?" view. Lists use SQL functions, so filtering happens in the database. Consequence: two expressions of one rule, which is exactly why the matrix compares both with a third, literal one. A change touches all three.
 
 **ADR-018: Jobs and periodic tasks are coordinated through PostgreSQL**
-*Proposed.* Imports use a `jobs` table with `SKIP LOCKED`. Periodic tasks use a lease row, which also works through PgBouncer, unlike session advisory locks. Events still go through the outbox and NATS (ADR-007). Consequence: one moving part fewer. Revisit if job volume ever calls for it.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Imports use a `jobs` table with `SKIP LOCKED`. Periodic tasks use a lease row, which also works through PgBouncer, unlike session advisory locks. Events still go through the outbox and NATS (ADR-007). Consequence: one moving part fewer. Revisit if job volume ever calls for it.
 
 **ADR-019: Two database roles**
-*Proposed.* Migrations run as the owner of the tables. The application uses a role that owns nothing, with UPDATE and DELETE on `audit_events` revoked. Consequence: the blueprint's "the application's role cannot change audit rows" is enforced by PostgreSQL. Compose sets this up; a single-role setup still works for development.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Migrations run as the owner of the tables. The application uses a role that owns nothing, with UPDATE and DELETE on `audit_events` revoked. Consequence: the blueprint's "the application's role cannot change audit rows" is enforced by PostgreSQL. Compose sets this up; a single-role setup still works for development.
 
 **ADR-020: Accounts link across SCIM and OIDC on a shared stable id**
-*Proposed.* Found by testing against real Authentik: it does not mark e-mail addresses as verified, but its SCIM `externalId` equals the OIDC subject. Linking on that id needs no trust in an address users may change. Consequence: Entra ID needs `externalId` mapped to `objectId`. Local accounts with a password never link.
+*Accepted (built; status set 2026-11-13 by ADR-043).* Found by testing against real Authentik: it does not mark e-mail addresses as verified, but its SCIM `externalId` equals the OIDC subject. Linking on that id needs no trust in an address users may change. Consequence: Entra ID needs `externalId` mapped to `objectId`. Local accounts with a password never link.
 
 **ADR-021: One design standard, enforced by checks**
 *Accepted by the product owner, 2026-11-04.* After ten designs and two rounds of iteration, the product owner chose the Helder style and layout, the Rail editor, and a page tree with collapsible branches, in the system font with an optional imported font. `docs/design/README.md` is the standard. Design values live only in `web/src/design/tokens.css`; `web/scripts/check-design.mjs` and approved pictures in the browser tests enforce it. Consequence: a change that drifts from the design fails, and every new screen needs a picture. Pictures are tied to one browser image, so updating Playwright means new pictures. No new dependency: icons, logo, menus and dialogs are our own. The look is the product owner's to change, through a new ADR.
@@ -178,6 +178,16 @@ Status: decided by the product owner (2026-11-11), built in spec 054. Context: t
 - The first upgrade of an installation that holds data, never noted a backup and never upgraded without one, goes on once, with a warning and `system.upgrade_without_backup` in the audit log. From the next upgrade on, the rule of ADR-040 holds in full.
 - `diffluence migrate` asks for the backup too; `--without-backup` upgrades once without one and records it.
 Consequences: an installation that changes nothing has backups and upgrades without a stop; one that cannot back up sees why in the browser instead of a dead site. The age of 24 hours, the setting and its `off` stay as ADR-040 decided. Supersedes: the refusal without exception of ADR-040, for the first upgrade only.
+
+**ADR-043: A feature freeze for 1.0, a smaller claim, and how 1.0 is checked**
+Status: the five answers are the product owner's (2026-11-13); how they are built in spec 069 was decided on the product owner's behalf on 2026-11-13, and may be overruled. Context: the product grew fast for one maintainer, and an independent review asked what 1.0 should hold, what it may claim, and who checks it. Decision:
+- **Feature freeze for 1.0.** No new parts before 1.0. Optional parts are experimental and off by default on a new installation: automation rules, databases (and so sheets, which live only in a database), bundles between instances and restore from the console, each with one switch for the installation; public sites and analytics keep the switches they already had, which already start off. An upgrade keeps on what the installation already used (migration 0054). An off part answers its routes with 404 `experimental_off`, is not offered on any screen, and keeps what exists: a rule stays and stops running, a database stays and can be edited.
+- **NATS may go.** If PostgreSQL alone carries the events and holds at 5,000 people, NATS is dropped. Spec 068 and its waves EV1 to EV3 decide that by measurement; ADR-007 stands until then.
+- **The claim** is "one node, a few hundred people, measured on your own hardware", in the README, `install.md` and `limits.md`, until several nodes are proven.
+- **No outside review after every wave.** The written rules, the checks and the tests carry each wave.
+- **One outside reader at 1.0** for permissions, login and restore.
+- The status of the ADRs that are built but still said *Proposed* (005 to 007, 009, 011, 013, 017 to 020) is set to *Accepted*: the code carries them. Their decisions are unchanged.
+Consequences: a new installation offers less, and each optional part has to earn its place before it is on by default. An administrator who used a part keeps it without doing anything; one who used a part that left no trace turns it on once (`docs/operations/upgrade.md`). The scale figures of `limits.md` stay as measurements, not as a promise.
 
 ---
 

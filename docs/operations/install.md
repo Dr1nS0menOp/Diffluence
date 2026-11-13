@@ -2,6 +2,10 @@
 
 Written for: operators who know Docker or Linux. Tested with PostgreSQL 16.
 
+**Plan for one node and a few hundred people, measured on your own hardware.** Running several nodes is described below, but it is not proven yet. What was measured is in [the known limits](limits.md) and the stress tests of [10 November](../reports/2026-11-10-stress-test.md) and [12 November](../reports/2026-11-12-stress-test-2.md); repeat the load on your own machine before you count on more.
+
+**Experimental parts start off** (ADR-043): automation rules, databases, bundles between instances and restore from the console are turned on one by one under Administration, Organising; public sites and analytics have their own switches. An upgrade keeps on what the installation already used; see [upgrade.md](upgrade.md).
+
 **PostgreSQL needs the `pg_trgm` extension** (spec 047), which ships with PostgreSQL in its contrib modules and in the official `postgres` images. The role that migrates creates it, which needs the right to create objects in the database. A managed database must allow `pg_trgm`. Without it, a node refuses to migrate, says why, and changes nothing.
 
 ## Docker Compose (the reference installation)

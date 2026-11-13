@@ -10,6 +10,11 @@ export interface Capabilities {
   office_preview: boolean;
   drawing: boolean;
   collaboration: boolean;
+  /** The experimental parts (spec 069), off until an administrator turns them on. */
+  automation: boolean;
+  databases: boolean;
+  bundles: boolean;
+  console_restore: boolean;
 }
 
 /** Until the answer is there, nothing is offered: better a moment late than a broken button. */
@@ -18,6 +23,10 @@ export const NOTHING_ON: Capabilities = {
   office_preview: false,
   drawing: false,
   collaboration: false,
+  automation: false,
+  databases: false,
+  bundles: false,
+  console_restore: false,
 };
 
 const CAPABILITIES_STALE_MS = 60_000;

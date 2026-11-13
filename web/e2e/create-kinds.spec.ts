@@ -66,6 +66,37 @@ test('someone who makes pages but not databases is not offered a database', asyn
   await expect(menu.getByRole('menuitem', { name: 'New database' })).toHaveCount(0);
 });
 
+test('databases off in the console are offered nowhere, and on again they are back (spec 069)', async ({
+  page,
+}) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  const space = await newSpace(page, 'Experimental');
+  await page.goto('/admin/organising');
+  await expect(page.getByRole('heading', { name: 'Experimental parts' })).toBeVisible();
+  const databases = page.getByRole('checkbox', { name: 'Databases on' });
+  await expect(databases).toBeChecked();
+  // The box follows the server, so it changes once the answer is back.
+  await databases.click();
+  await expect(databases).not.toBeChecked();
+  await checkAccessibility(page);
+  try {
+    await page.goto(`/spaces/${space.key}`);
+    await page.getByRole('button', { name: 'More to create' }).click();
+    const menu = page.getByRole('menu');
+    await expect(menu.getByRole('menuitem', { name: 'New page' })).toBeVisible();
+    await expect(menu.getByRole('menuitem', { name: 'New database' })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+  } finally {
+    // The other suites test databases, so scripts/e2e turns every part on.
+    await page.goto('/admin/organising');
+    await page.getByRole('checkbox', { name: 'Databases on' }).click();
+  }
+  await expect(page.getByRole('checkbox', { name: 'Databases on' })).toBeChecked();
+  await page.goto(`/spaces/${space.key}`);
+  await page.getByRole('button', { name: 'More to create' }).click();
+  await expect(page.getByRole('menu').getByRole('menuitem', { name: 'New database' })).toBeVisible();
+});
+
 test('the role editor lists posts and databases beside pages', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
   await page.goto('/admin/permissions');

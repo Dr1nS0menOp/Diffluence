@@ -19,8 +19,14 @@ func TestCapabilitiesSayWhatIsOnAndNothingMore(t *testing.T) {
 			t.Fatalf("%s is not set up, so it must say false: %v", part, got)
 		}
 	}
-	if len(got) != 4 {
+	// The four helpers and the four experimental parts of spec 069, each only a yes or no.
+	if len(got) != 8 {
 		t.Fatalf("only whether a part is on, never where it runs: %v", got)
+	}
+	for part, on := range got {
+		if _, ok := on.(bool); !ok {
+			t.Fatalf("%s says more than on or off: %v", part, on)
+		}
 	}
 	e.app.Exchange().SetPDFHelper("http://helper.invalid")
 	defer e.app.Exchange().SetPDFHelper("")

@@ -10,6 +10,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/config"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/restore"
 )
@@ -26,7 +27,9 @@ func (s *Server) registerRunningRoutes() {
 	// brings back every account and grant of the backup, so it is for system
 	// administrators only (spec 066).
 	system := SessionOnly(Permission(identity.PermSystemAdministrator))
-	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(system), s.handleRestoreRequest)
+	// Restore from the console is an experimental part (spec 069). Cancelling stays open,
+	// so a restore asked for before the part was turned off can still be stopped.
+	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(system), s.experimental(features.ExperimentalConsoleRestore, s.handleRestoreRequest))
 	r.HandleFunc("DELETE /api/v1/admin/backups/restore", admin, s.handleRestoreCancel)
 	r.HandleFunc("GET /api/v1/admin/configuration", admin, s.handleConfiguration)
 	// Logging everyone out is an incident action; asking for the password again first

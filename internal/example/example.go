@@ -141,6 +141,19 @@ func (p plan) walk(visit func(page planPage, parent *planPage)) {
 	down(p.Pages, nil)
 }
 
+// withoutDatabases is the tree with every database left out, with what is below it.
+func withoutDatabases(list []planPage) []planPage {
+	out := []planPage{}
+	for _, page := range list {
+		if page.Database {
+			continue
+		}
+		page.Children = withoutDatabases(page.Children)
+		out = append(out, page)
+	}
+	return out
+}
+
 // assets lists every file the pages use.
 func (p plan) assets() []string {
 	names := append([]string{}, p.HomeFiles...)
@@ -238,6 +251,15 @@ func (s *Service) Create(ctx context.Context, c identity.Caller) (spaces.Space, 
 	p, err := loadPlan()
 	if err != nil {
 		return spaces.Space{}, err
+	}
+	// The example shows what this installation offers: without databases (spec 069),
+	// it leaves its database out.
+	databases, err := s.pages.DatabasesOn(ctx)
+	if err != nil {
+		return spaces.Space{}, err
+	}
+	if !databases {
+		p.Pages = withoutDatabases(p.Pages)
 	}
 	sp, err := s.spaces.Create(ctx, c, spaces.Input{Key: p.Key, Name: p.Name, Description: p.Description, Icon: p.Icon})
 	if err != nil {

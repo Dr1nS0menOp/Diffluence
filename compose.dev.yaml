@@ -7,7 +7,9 @@ name: diffluence-dev
 
 services:
   db:
-    image: postgres:16
+    # Pinned by digest, the same as compose.yaml: a tag that moves would recreate the
+    # test database in the middle of a run.
+    image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
     environment:
       POSTGRES_USER: diffluence
       POSTGRES_PASSWORD: diffluence

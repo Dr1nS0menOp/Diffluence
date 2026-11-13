@@ -323,6 +323,7 @@ func (s *Server) withAuthentication(next http.Handler) http.Handler {
 // maintenance mode off again.
 var openDuringMaintenance = []string{
 	"/api/v1/auth/login", "/api/v1/auth/login/totp", "/api/v1/auth/logout", "/api/v1/auth/reauth",
+	"/api/v1/auth/login/passkey/begin", "/api/v1/auth/login/passkey/finish",
 	"/api/v1/auth/reauth/passkey/begin", "/api/v1/auth/reauth/passkey/finish",
 	"/api/v1/auth/passkey/begin", "/api/v1/auth/passkey/finish", "/api/v1/admin/maintenance",
 }

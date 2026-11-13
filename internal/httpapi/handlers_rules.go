@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/automation"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/webhooks"
@@ -18,25 +19,30 @@ func (s *Server) registerRuleRoutes() {
 	admin := Permission(identity.PermAdministrator)
 	manage := Object(permissions.SpaceAutomation)
 
-	r.HandleFunc("GET /api/v1/spaces/{id}/rules", manage, s.handleSpaceRules)
-	r.HandleFunc("POST /api/v1/spaces/{id}/rules", manage, s.handleSpaceRuleCreate)
-	r.HandleFunc("GET /api/v1/rules/{id}", manage, s.handleRule)
-	r.HandleFunc("PUT /api/v1/rules/{id}", manage, s.handleRuleUpdate)
-	r.HandleFunc("DELETE /api/v1/rules/{id}", manage, s.handleRuleDelete)
-	r.HandleFunc("POST /api/v1/rules/{id}/test", manage, s.handleRuleTest)
-	r.HandleFunc("GET /api/v1/rules/{id}/runs", manage, s.handleRuleRuns)
-	r.HandleFunc("POST /api/v1/rules/{id}/hook", SessionOnly(manage), s.handleRuleHook)
+	// Automation is an experimental part (spec 069): while it is off, every route of it
+	// answers 404 experimental_off, except the list of a page, which is then empty.
+	on := func(next http.HandlerFunc) http.HandlerFunc {
+		return s.experimental(features.ExperimentalAutomation, next)
+	}
+	r.HandleFunc("GET /api/v1/spaces/{id}/rules", manage, on(s.handleSpaceRules))
+	r.HandleFunc("POST /api/v1/spaces/{id}/rules", manage, on(s.handleSpaceRuleCreate))
+	r.HandleFunc("GET /api/v1/rules/{id}", manage, on(s.handleRule))
+	r.HandleFunc("PUT /api/v1/rules/{id}", manage, on(s.handleRuleUpdate))
+	r.HandleFunc("DELETE /api/v1/rules/{id}", manage, on(s.handleRuleDelete))
+	r.HandleFunc("POST /api/v1/rules/{id}/test", manage, on(s.handleRuleTest))
+	r.HandleFunc("GET /api/v1/rules/{id}/runs", manage, on(s.handleRuleRuns))
+	r.HandleFunc("POST /api/v1/rules/{id}/hook", SessionOnly(manage), on(s.handleRuleHook))
 	// The module decides: page.view for a rule with a manual trigger, otherwise manage.
-	r.HandleFunc("POST /api/v1/rules/{id}/run", Object(permissions.ActionPageView), s.handleRuleRun)
+	r.HandleFunc("POST /api/v1/rules/{id}/run", Object(permissions.ActionPageView), on(s.handleRuleRun))
 	r.HandleFunc("GET /api/v1/pages/{id}/rules", Object(permissions.ActionPageView), s.handlePageRules)
-	r.HandleFunc("GET /api/v1/admin/rules", admin, s.handleInstanceRules)
-	r.HandleFunc("POST /api/v1/admin/rules", admin, s.handleInstanceRuleCreate)
-	r.HandleFunc("GET /api/v1/admin/automation", admin, s.handleAutomationLimit)
-	r.HandleFunc("PUT /api/v1/admin/automation", SessionOnly(admin), s.handleAutomationLimitSet)
+	r.HandleFunc("GET /api/v1/admin/rules", admin, on(s.handleInstanceRules))
+	r.HandleFunc("POST /api/v1/admin/rules", admin, on(s.handleInstanceRuleCreate))
+	r.HandleFunc("GET /api/v1/admin/automation", admin, on(s.handleAutomationLimit))
+	r.HandleFunc("PUT /api/v1/admin/automation", SessionOnly(admin), on(s.handleAutomationLimitSet))
 	// Public: an outside system has no session here. The 256-bit token in the address
 	// is the permission, it is stored hashed, an unknown token is a plain 404, and the
 	// rule still acts only as its account, within its limit of runs per hour.
-	r.HandleFunc("POST /hooks/{token}", Public, s.handleIncomingHook)
+	r.HandleFunc("POST /hooks/{token}", Public, on(s.handleIncomingHook))
 
 	r.HandleFunc("GET /api/v1/spaces/{id}/webhooks", manage, s.handleSpaceWebhooks)
 	r.HandleFunc("POST /api/v1/spaces/{id}/webhooks", manage, s.handleSpaceWebhookCreate)
@@ -204,12 +210,23 @@ func (s *Server) handlePageRules(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// Every page asks this, so while automation is off the answer is an empty list,
+	// which is the truth: no rule can run.
+	on, err := s.deps.Features.ExperimentalOn(r.Context(), s.deps.Pool, features.ExperimentalAutomation)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	names := []map[string]any{}
+	if !on {
+		writeJSON(w, http.StatusOK, map[string]any{"rules": names})
+		return
+	}
 	list, err := s.deps.Automation.Manual(r.Context(), s.caller(r), id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	names := make([]map[string]any, 0, len(list))
 	for _, rule := range list {
 		names = append(names, map[string]any{"id": rule.ID, "name": rule.Name})
 	}

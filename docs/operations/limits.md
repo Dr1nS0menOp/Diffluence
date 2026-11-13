@@ -4,6 +4,8 @@ What was tried to break Diffluence, where it gave way, how it fails, and what to
 
 This is a self-test by the people who built the app. It is **not** an independent penetration test. A limit that was not reached is written as "not reached at N", which never means safe.
 
+**What Diffluence claims:** one node, a few hundred people, measured on your own hardware (ADR-043). The figures for 5,000 people below are targets and measurements on test machines, not a promise; several nodes are not proven. The stress tests on a real server: [10 November](../reports/2026-11-10-stress-test.md) and [12 November](../reports/2026-11-12-stress-test-2.md).
+
 ## How it was measured
 
 - One node with `role=all`, in a read-only container without capabilities, and PostgreSQL 16 with its normal crash safety, on 6 November 2026.

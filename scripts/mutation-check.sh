@@ -304,7 +304,7 @@ mutate "unknown panels accepted" internal/document/attrs.go \
 mutate "a TOTP code can be replayed" internal/identity/factors.go \
   's.replace("WHERE user_id = $1 AND last_step < $2", "WHERE user_id = $1 AND last_step <= $2 + 100")' $app -run TestTOTP
 mutate "password alone opens a session with TOTP on" internal/identity/identity.go \
-  's.replace("mfa, err := s.hasTOTP(ctx, s.pool, u.ID)", "mfa, err := s.hasTOTP(ctx, s.pool, u.ID)\n\tmfa = false")' $app -run TestTOTP
+  's.replace("mfa := len(methods) > 0", "mfa := false")' $app -run TestTOTP
 mutate "OIDC takes over a local account by e-mail" internal/sso/sso.go \
   's.replace("if source != identity.SourceSCIM || hasPassword || !verified {", "if len(source) < 0 && hasPassword && verified {")' $app -run TestOIDCRefusals
 mutate "OIDC ignores the nonce" internal/sso/sso.go \
@@ -1037,7 +1037,7 @@ mutate "the old master key is retired while it is still needed" internal/app/key
 mutate "a check counts an older key as current" internal/app/keyrotation.go \
   's.replaceAll("if id != r.CurrentKey {", "if false && id != r.CurrentKey {")' $app -run TestTheOldKeyCannotBeRetiredBeforeEverythingIsSealedAgain
 mutate "resealing overwrites a value changed meanwhile" internal/app/keyrotation.go \
-  's.replace("WHERE %s::text = $1 AND %s = $3\", table, column, idCol, column)", "WHERE %s::text = $1 AND $3::bytea IS NOT NULL\", table, column, idCol)")' $app -run TestAValueChangedWhileItIsSealedAgainKeepsTheNewValue
+  's.replace("AND secret_sealed = $3`", "AND $3::bytea IS NOT NULL`").replace("AND secret = $3`", "AND $3::bytea IS NOT NULL`").replace("AND old_secret = $3`", "AND $3::bytea IS NOT NULL`").replace("AND sealed = $3`", "AND $3::bytea IS NOT NULL`")' $app -run TestAValueChangedWhileItIsSealedAgainKeepsTheNewValue
 mutate "a check passes a value that does not open" internal/app/keyrotation.go \
   's.replace("if _, err := k.Open(sealed, purpose); err != nil {", "if _, err := k.Open(sealed, purpose); err != nil && false {")' $app -run TestAWrongKeyIsNamedForEveryValueAndFileWithoutShowingThem
 mutate "a deep check reads only the end of a file" internal/app/keyrotation.go \
@@ -2029,6 +2029,47 @@ mutate "a shared public address warns of a proxy" internal/app/health.go \
   's.replace("(!a.IsPrivate() \x26\x26 !a.IsLoopback())", "!a.IsValid()")' $app -run TestLoginsThatAllComeFromOnePrivateAddressAreSeen
 mutate "one person alone warns of a proxy" internal/app/health.go \
   's.replace(" AND count(DISTINCT user_id) > 1", "")' $app -run TestLoginsThatAllComeFromOnePrivateAddressAreSeen
+# Spec 069: experimental parts start off, a passkey after the password, scopes by route.
+mutate "every experimental part counts as on" internal/features/experimental.go \
+  's.replace("return slices.Contains(v.On, part), nil", "return len(v.On) >= 0, nil")' $app -run TestANewInstallationRefusesEveryExperimentalPart
+mutate "an off part is served" internal/features/experimental.go \
+  's.replace("\tif !on {\n\t\treturn experimentalOff()", "\tif !on \x26\x26 false {\n\t\treturn experimentalOff()")' $app -run TestANewInstallationRefusesEveryExperimentalPart
+mutate "an unknown experimental part is stored" internal/features/experimental.go \
+  's.replace("if !slices.Contains(ExperimentalParts, part) {", "if false {")' $app -run TestOnlyAnExperimentalPartCanBeTurnedOn
+mutate "a part named twice is stored twice" internal/features/experimental.go \
+  's.replace("if !slices.Contains(on, part) {", "if true {")' $app -run TestAnAdministratorTurnsOnOneExperimentalPart
+mutate "a rule runs while automation is off" internal/automation/match.go \
+  's.replace("if err != nil || !on {\n\t\treturn false, err\n\t}\n\tif rc.SpaceID == nil {", "if err != nil || (!on \x26\x26 false) {\n\t\treturn false, err\n\t}\n\tif rc.SpaceID == nil {")' $app -run TestARuleStopsRunningWhenAutomationIsTurnedOff
+mutate "the rule routes are served while automation is off" internal/httpapi/handlers_rules.go \
+  's.replace("return s.experimental(features.ExperimentalAutomation, next)\n", "_ = features.ExperimentalAutomation\n\t\treturn next\n")' $app -run TestANewInstallationRefusesEveryExperimentalPart
+mutate "a bundle is made while bundles are off" internal/httpapi/handlers_exchange.go \
+  's.replace("s.experimental(features.ExperimentalBundles, s.handleBundleStart)", "s.handleBundleStart")' $app -run TestANewInstallationRefusesEveryExperimentalPart
+mutate "a restore is asked for while it is off" internal/httpapi/handlers_running.go \
+  's.replace("s.experimental(features.ExperimentalConsoleRestore, s.handleRestoreRequest)", "func() http.HandlerFunc { _ = features.ExperimentalConsoleRestore; return s.handleRestoreRequest }()")' $app -run TestANewInstallationRefusesEveryExperimentalPart
+mutate "a database is made while databases are off" internal/pages/pages.go \
+  's.replace("if in.Kind == KindDatabase {\n\t\t\tif err := s.features.RequireExperimental", "if false {\n\t\t\tif err := s.features.RequireExperimental")' $app -run 'TestANewInstallationRefusesEveryExperimentalPart|TestADatabaseOutlivesTheSwitch'
+mutate "the screens are offered databases while they are off" internal/httpapi/handlers.go \
+  's.replace("slices.Contains(experimental.On, features.ExperimentalDatabases)", "true")' $app -run TestANewInstallationStartsWithEveryExperimentalPartOff
+mutate "the example makes a database while databases are off" internal/example/example.go \
+  's.replace("if !databases {", "if !databases \x26\x26 false {")' $app -run TestTheExampleLeavesItsDatabaseOutWhileDatabasesAreOff
+mutate "the example leaves its database out while databases are on" internal/example/example.go \
+  's.replace("if !databases {", "if !databases || true {")' $app -run TestTheExampleShowsItsDatabaseWhileDatabasesAreOn
+mutate "an upgrade turns on a part that left no trace" internal/db/migrations/0054_experimental_parts.sql \
+  's.replace("(\x27automation\x27, EXISTS (SELECT 1 FROM automation_rules))", "(\x27automation\x27, true)")' $app -run 'TestANewInstallationStartsWithEveryExperimentalPartOff|TestAnUpgradeTurnsOnOnlyWhatWasUsed'
+mutate "an upgrade forgets a database" internal/db/migrations/0054_experimental_parts.sql \
+  's.replace("EXISTS (SELECT 1 FROM pages WHERE kind = \x27database\x27)", "false")' $app -run TestAnUpgradeKeepsEveryExperimentalPartInUse
+mutate "an upgrade overrides a choice already made" internal/db/migrations/0054_experimental_parts.sql \
+  's.replace("ON CONFLICT (key) DO NOTHING", "ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value")' $app -run TestAnUpgradeKeepsAChoiceAlreadyMade
+mutate "a password alone opens an account with a passkey" internal/identity/factors.go \
+  's.replace("if passkey {\n\t\tmethods = append(methods, SecondFactorPasskey)", "if false {\n\t\tmethods = append(methods, SecondFactorPasskey)")' $app -run TestAPasswordLoginAsksForThePasskeyOfAnAccountThatHasOnlyThat
+mutate "a code is not offered beside a passkey" internal/identity/factors.go \
+  's.replace("if code {\n\t\tmethods = append(methods, SecondFactorCode)", "if false {\n\t\tmethods = append(methods, SecondFactorCode)")' $app -run TestALoginOffersTheSecondFactorsTheAccountHas
+mutate "the scope follows words in the address" internal/httpapi/server.go \
+  's.replace("case slices.Contains(exportRoutes, r.Pattern):", "case strings.Contains(r.URL.Path, \"/export\"):")' $app -run TestTheScopeOfATokenFollowsTheRouteNotTheAddress
+mutate "a space export needs only the read scope" internal/httpapi/server.go \
+  's.replace("\t\"GET /api/v1/spaces/{id}/export.zip\",\n", "")' $app -run TestEveryExportRouteNeedsMoreThanTheReadScope
+mutate "an unrouted request needs no admin scope" internal/httpapi/server.go \
+  's.replace("case r.Pattern == \"\" || strings.HasPrefix(path,", "case strings.HasPrefix(path,")' ./internal/httpapi/ -run TestTheScopeOfARequestComesFromItsRoute
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

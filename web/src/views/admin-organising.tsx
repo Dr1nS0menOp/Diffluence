@@ -132,6 +132,63 @@ function FeatureTable({ start }: { start: InstanceFeatures }) {
   );
 }
 
+interface ExperimentalParts {
+  on: string[];
+  all: string[];
+}
+
+/** The experimental parts (spec 069): off on a new installation, on here one by one. */
+function ExperimentalTable({ start }: { start: ExperimentalParts }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const save = useMutation({
+    mutationFn: (on: string[]) => api.put('/admin/experimental', { on }),
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: ['admin-experimental'] });
+      await client.invalidateQueries({ queryKey: ['capabilities'] });
+    },
+  });
+  return (
+    <section>
+      <h2>{t('experimental.title')}</h2>
+      <p className="muted">{t('experimental.help')}</p>
+      <ErrorNote error={save.error} />
+      <TableBox>
+        <table>
+          <thead>
+            <tr>
+              <th>{t('common.name')}</th>
+              <th>{t('experimental.on')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {start.all.map((name) => {
+              const label = t(`experimental.part_${name}`);
+              return (
+                <tr key={name}>
+                  <td>{label}</td>
+                  <td>
+                    <input
+                      type="checkbox"
+                      aria-label={t('experimental.onNamed', { name: label })}
+                      checked={start.on.includes(name)}
+                      onChange={(e) =>
+                        save.mutate(
+                          e.target.checked ? [...start.on, name] : start.on.filter((x) => x !== name),
+                        )
+                      }
+                    />
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </TableBox>
+    </section>
+  );
+}
+
 function SaveSpaceAsTemplate() {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -192,12 +249,19 @@ export function OrganisingTab() {
     queryKey: ['admin-features'],
     queryFn: () => api.get<InstanceFeatures>('/admin/features'),
   });
-  if (settings.isPending || features.isPending) return <Loading />;
-  if (settings.error || features.error) return <ErrorNote error={settings.error ?? features.error} />;
+  const experimental = useQuery({
+    queryKey: ['admin-experimental'],
+    queryFn: () => api.get<ExperimentalParts>('/admin/experimental'),
+  });
+  if (settings.isPending || features.isPending || experimental.isPending) return <Loading />;
+  if (settings.error || features.error || experimental.error) {
+    return <ErrorNote error={settings.error ?? features.error ?? experimental.error} />;
+  }
   return (
     <>
       <OrganisingForm start={settings.data} />
       <FeatureTable start={features.data} />
+      <ExperimentalTable start={experimental.data} />
       <SaveSpaceAsTemplate />
     </>
   );

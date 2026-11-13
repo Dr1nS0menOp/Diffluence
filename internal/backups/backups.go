@@ -294,16 +294,21 @@ func (s *Service) ReportRestore(ctx context.Context, r RestoreReport) error {
 	})
 }
 
-// failureMail is one kind of failure the administrators are mailed about. The table comes
-// from this package, never from input.
+// failureMail is one kind of failure the administrators are mailed about. Its queries are
+// written out in full, so no SQL is put together while the program runs.
 type failureMail struct {
-	kind  string
-	table string
+	kind string
+	// waiting asks whether a failure waits to be mailed; markMailed marks every one mailed.
+	waiting, markMailed string
 }
 
 var failureMails = []failureMail{
-	{MailBackupFailed, "backup_runs"},
-	{MailRestoreCheckFailed, "backup_restore_checks"},
+	{kind: MailBackupFailed,
+		waiting:    `SELECT EXISTS (SELECT 1 FROM backup_runs WHERE NOT ok AND mailed_at IS NULL)`,
+		markMailed: `UPDATE backup_runs SET mailed_at = now() WHERE NOT ok AND mailed_at IS NULL`},
+	{kind: MailRestoreCheckFailed,
+		waiting:    `SELECT EXISTS (SELECT 1 FROM backup_restore_checks WHERE NOT ok AND mailed_at IS NULL)`,
+		markMailed: `UPDATE backup_restore_checks SET mailed_at = now() WHERE NOT ok AND mailed_at IS NULL`},
 }
 
 // MailFailures mails every active administrator about backups and restore checks that
@@ -323,9 +328,8 @@ func (s *Service) MailFailures(ctx context.Context) error {
 }
 
 func (s *Service) mailFailure(ctx context.Context, tx pgx.Tx, m failureMail) error {
-	table := pgx.Identifier{m.table}.Sanitize()
 	var waiting bool
-	if err := tx.QueryRow(ctx, fmt.Sprintf("SELECT EXISTS (SELECT 1 FROM %s WHERE NOT ok AND mailed_at IS NULL)", table)).Scan(&waiting); err != nil {
+	if err := tx.QueryRow(ctx, m.waiting).Scan(&waiting); err != nil {
 		return err
 	}
 	if !waiting {
@@ -361,7 +365,7 @@ func (s *Service) mailFailure(ctx context.Context, tx pgx.Tx, m failureMail) err
 			return err
 		}
 	}
-	_, err := tx.Exec(ctx, fmt.Sprintf("UPDATE %s SET mailed_at = now() WHERE NOT ok AND mailed_at IS NULL", table))
+	_, err := tx.Exec(ctx, m.markMailed)
 	return err
 }
 

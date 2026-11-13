@@ -311,10 +311,13 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		return "", Principal{}, ErrInvalidCredentials
 	}
 
-	mfa, err := s.hasTOTP(ctx, s.pool, u.ID)
+	// Any second factor of the account is asked for after the password, also when it is
+	// only a passkey.
+	methods, err := s.secondFactors(ctx, s.pool, u.ID)
 	if err != nil {
 		return "", Principal{}, err
 	}
+	mfa := len(methods) > 0
 	var token string
 	var p Principal
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -356,7 +359,7 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 		return "", Principal{}, err
 	}
 	if mfa {
-		return "", Principal{}, &MFARequiredError{Token: token}
+		return "", Principal{}, &MFARequiredError{Token: token, Methods: methods}
 	}
 	p.User = u
 	return token, p, nil

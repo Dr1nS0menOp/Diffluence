@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Diffluence is **pre-alpha**. No version is supported before 1.0. From 1.0 on:
+Diffluence is **alpha**. No version is supported before 1.0. From 1.0 on:
 
 - only the newest release line receives fixes;
 - a security fix ships as a patch of that line within days of its confirmation;

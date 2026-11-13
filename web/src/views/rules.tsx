@@ -3,6 +3,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Space } from '../api';
+import { useCapabilities } from '../capabilities';
+import { ExperimentalOff } from '../components/experimental-off';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, Loading, RelativeTime } from '../components/ui';
 import { Link, navigate } from '../router';
@@ -320,8 +322,14 @@ function ImportRule({ spaceId }: { spaceId: string | null }) {
   );
 }
 
-/** The rules of a space, or of the instance. */
+/** The rules of a space, or of the instance, while automation is on (spec 069). */
 export function RuleList({ spaceId }: { spaceId: string | null }) {
+  const capabilities = useCapabilities();
+  if (!capabilities.automation) return <ExperimentalOff />;
+  return <RuleTable spaceId={spaceId} />;
+}
+
+function RuleTable({ spaceId }: { spaceId: string | null }) {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['rules', spaceId],

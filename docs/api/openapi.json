@@ -576,6 +576,40 @@
         "x-access": "permission:administrator"
       }
     },
+    "/api/v1/admin/experimental": {
+      "get": {
+        "operationId": "get /api/v1/admin/experimental",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/experimental",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/export-policy": {
       "get": {
         "operationId": "get /api/v1/admin/export-policy",
@@ -3180,6 +3214,42 @@
     "/api/v1/auth/login": {
       "post": {
         "operationId": "post /api/v1/auth/login",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "x-access": "public"
+      }
+    },
+    "/api/v1/auth/login/passkey/begin": {
+      "post": {
+        "operationId": "post /api/v1/auth/login/passkey/begin",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "x-access": "public"
+      }
+    },
+    "/api/v1/auth/login/passkey/finish": {
+      "post": {
+        "operationId": "post /api/v1/auth/login/passkey/finish",
         "parameters": [],
         "responses": {
           "200": {
