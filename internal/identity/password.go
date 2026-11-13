@@ -3,6 +3,7 @@
 package identity
 
 import (
+	"context"
 	"crypto/rand"
 	"crypto/subtle"
 	"encoding/base64"
@@ -35,11 +36,16 @@ var DefaultParams = Params{Memory: 19 * 1024, Time: 2, Threads: 1, SaltLen: 16, 
 // machine, which no caller owns.
 var hashSlots = make(chan struct{}, max(runtime.NumCPU()/2, 1))
 
-// hashKey runs Argon2id when a slot is free.
-func hashKey(pw string, salt []byte, p Params, keyLen uint32) []byte {
-	hashSlots <- struct{}{}
+// hashKey runs Argon2id when a slot is free. It stops waiting when ctx ends, so a request
+// whose caller gave up does not hold a place in the queue.
+func hashKey(ctx context.Context, pw string, salt []byte, p Params, keyLen uint32) ([]byte, error) {
+	select {
+	case hashSlots <- struct{}{}:
+	case <-ctx.Done():
+		return nil, fmt.Errorf("identity: wait for a password hash: %w", ctx.Err())
+	}
 	defer func() { <-hashSlots }()
-	return argon2.IDKey([]byte(pw), salt, p.Time, p.Memory, p.Threads, keyLen)
+	return argon2.IDKey([]byte(pw), salt, p.Time, p.Memory, p.Threads, keyLen), nil
 }
 
 // Password length limits. The upper bound stops hashing from becoming a DoS vector.
@@ -69,14 +75,18 @@ func ValidatePassword(pw string) error {
 // HashPassword returns a PHC-formatted Argon2id hash.
 // The password is normalised to NFC first, so the same password typed on two systems,
 // composed or decomposed, gives the same hash (NIST SP 800-63B, SEC-107).
-func HashPassword(pw string, p Params) (string, error) {
+func HashPassword(ctx context.Context, pw string, p Params) (string, error) {
 	pw = norm.NFC.String(pw)
 	if len(pw) > MaxPasswordBytes {
 		return "", ErrPasswordTooLong
 	}
 	salt := make([]byte, p.SaltLen)
 	_, _ = rand.Read(salt) // crypto/rand.Read never fails on supported platforms
-	return encodeHash(p, salt, hashKey(pw, salt, p, p.KeyLen)), nil
+	key, err := hashKey(ctx, pw, salt, p, p.KeyLen)
+	if err != nil {
+		return "", err
+	}
+	return encodeHash(p, salt, key), nil
 }
 
 // encodeHash writes a hash in the PHC format.
@@ -87,7 +97,8 @@ func encodeHash(p Params, salt, key []byte) string {
 
 // VerifyPassword checks pw against an encoded hash in constant time.
 // needsRehash is true when the hash uses weaker parameters than current.
-func VerifyPassword(encoded, pw string, current Params) (ok, needsRehash bool, err error) {
+// An error that is not a malformed hash means ctx ended before a hash could run.
+func VerifyPassword(ctx context.Context, encoded, pw string, current Params) (ok, needsRehash bool, err error) {
 	p, salt, key, err := decodeHash(encoded)
 	if err != nil {
 		return false, false, err
@@ -96,12 +107,19 @@ func VerifyPassword(encoded, pw string, current Params) (ok, needsRehash bool, e
 		return false, false, nil
 	}
 	normal := norm.NFC.String(pw)
-	ok = subtle.ConstantTimeCompare(hashKey(normal, salt, p, uint32(len(key))), key) == 1
+	got, err := hashKey(ctx, normal, salt, p, uint32(len(key)))
+	if err != nil {
+		return false, false, err
+	}
+	ok = subtle.ConstantTimeCompare(got, key) == 1
 	// A hash from before normalising holds the bytes as typed. Only a password that is not
 	// already NFC costs a second hash, and a match is stored again in the new form.
 	asTyped := false
 	if !ok && normal != pw {
-		ok = subtle.ConstantTimeCompare(hashKey(pw, salt, p, uint32(len(key))), key) == 1
+		if got, err = hashKey(ctx, pw, salt, p, uint32(len(key))); err != nil {
+			return false, false, err
+		}
+		ok = subtle.ConstantTimeCompare(got, key) == 1
 		asTyped = ok
 	}
 	needsRehash = asTyped || p.Memory < current.Memory || p.Time < current.Time || p.Threads < current.Threads ||

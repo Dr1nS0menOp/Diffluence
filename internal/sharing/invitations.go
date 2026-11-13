@@ -119,9 +119,42 @@ func (s *Service) AskInvitation(ctx context.Context, c identity.Caller, pageID u
 // errMayNotInvite ends the transaction of a request from someone who may not invite.
 var errMayNotInvite = errors.New("sharing: may not invite people")
 
-// AskGuestInvitation files the same request from a space, for someone who manages it.
-// The answer hangs on the home page, because a notification hangs on a page.
-func (s *Service) AskGuestInvitation(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in InvitationAsk) (uuid.UUID, error) {
+// GuestInvitation is the answer to a request for a guest: the link when an administrator
+// invited at once, or else the request that waits for an administrator.
+type GuestInvitation struct {
+	Link    string
+	Request uuid.UUID
+}
+
+// InviteGuest lets someone into one space as a guest. Only someone who may invite guests to
+// the space asks, and only while an administrator allows guests. An administrator invites
+// at once; anyone else files a request that an administrator answers (ADR-033).
+func (s *Service) InviteGuest(ctx context.Context, c identity.Caller, spaceID uuid.UUID, email string) (GuestInvitation, error) {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceInviteGuests); err != nil {
+		return GuestInvitation{}, err
+	}
+	access := settings.DefaultAccess
+	if err := s.settings.ReadSection(ctx, settings.SectionAccess, &access); err != nil {
+		return GuestInvitation{}, err
+	}
+	if !access.GuestInvites {
+		return GuestInvitation{}, apperr.Conflict("guest_invites_off", "An administrator turned guest invitations off.")
+	}
+	administrator, err := s.identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
+	if err != nil {
+		return GuestInvitation{}, err
+	}
+	if administrator {
+		link, err := s.identity.Invite(ctx, c, identity.NewInvitation{Email: email, Type: identity.TypeGuest, SpaceID: &spaceID})
+		return GuestInvitation{Link: link}, err
+	}
+	request, err := s.askGuestInvitation(ctx, c, spaceID, InvitationAsk{Email: email})
+	return GuestInvitation{Request: request}, err
+}
+
+// askGuestInvitation files the request of InviteGuest. The answer hangs on the home page,
+// because a notification hangs on a page.
+func (s *Service) askGuestInvitation(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in InvitationAsk) (uuid.UUID, error) {
 	if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {
 		return uuid.Nil, err
 	}

@@ -471,7 +471,7 @@ mutate "the grace period never ends" internal/app/app.go \
 mutate "a name goes into the chain" internal/audit/audit.go \
   's.replace("if !slices.Contains(personalDetails, key) {", "if len(key) > 0 || !slices.Contains(personalDetails, key) {")' $app -run TestPersonalDataInTheAuditLog
 mutate "erasing leaves the personal part" internal/identity/lifecycle.go \
-  's.replace("if err := audit.ErasePersonal(ctx, tx, id.String()); err != nil {", "if err := error(nil); err != nil {")' $app -run TestPersonalDataInTheAuditLog
+  's.replace("erased, err := audit.ErasePersonal(ctx, tx, id.String())", "erased, err := int64(0), error(nil)")' $app -run TestPersonalDataInTheAuditLog
 mutate "a changed personal part is not noticed" internal/audit/audit.go \
   's.replace("if part != nil && personalDigest(salt, *part) != e.PersonalDigest {", "if part != nil && len(salt) < 0 {")' $app -run TestChangingAPersonalPart
 mutate "the queue reads the link of an account mail" internal/app/account_mail.go \
@@ -735,8 +735,8 @@ mutate "a member without the role asks for an invitation" internal/sharing/invit
   's.replace("if !mayInvite {\n\t\t\treturn errMayNotInvite", "if !mayInvite \x26\x26 len(in.Email) < 0 {\n\t\t\treturn errMayNotInvite")' $app -run TestInvitationMatrix
 mutate "a space manager without the role asks for a guest" internal/sharing/invitations.go \
   's.replace("if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil {\n\t\treturn uuid.Nil, err", "if err := s.requireGlobal(ctx, c, identity.PermInvitePeople); err != nil \x26\x26 len(in.Email) < 0 {\n\t\treturn uuid.Nil, err")' $app -run TestASpaceManagerOnlyAsksForAGuest
-mutate "a space manager invites a guest without approval" internal/httpapi/handlers_people.go \
-  's.replace("if !administrator {", "if !administrator \x26\x26 len(in.Email) < 0 {")' $app -run TestASpaceManagerOnlyAsksForAGuest
+mutate "a space manager invites a guest without approval" internal/sharing/invitations.go \
+  's.replace("\tif administrator {\n\t\tlink, err := s.identity.Invite(", "\tif administrator || len(email) >= 0 {\n\t\tlink, err := s.identity.Invite(")' $app -run TestASpaceManagerOnlyAsksForAGuest
 mutate "asking sends the invitation at once" internal/sharing/invitations.go \
   's.replace("return recordInvitation(ctx, tx, c, \"invitation.requested\", r)", "if _, err := s.identity.InviteWithin(ctx, tx, c, identity.NewInvitation{Email: address, Type: identity.TypeGuest, SpaceID: \x26r.spaceID}); err != nil {\n\t\treturn err\n\t}\n\treturn recordInvitation(ctx, tx, c, \"invitation.requested\", r)")' $app -run TestAskingForAnInvitationSendsNothing
 mutate "someone who is no administrator answers" internal/sharing/invitations.go \
@@ -848,7 +848,7 @@ mutate "a synced block offers everyone its source" internal/blocks/reuse.go \
 mutate "a filter by text finds a hidden page" internal/blocks/lists.go \
   's.replace("JOIN perm_visible_pages($1) v ON v.page_id = p.id\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t", "JOIN perm_visible_pages($1) v ON true\n\tJOIN spaces s ON s.id = p.space_id\n\tLEFT JOIN users u ON u.id = p.updated_by\n\tLEFT JOIN page_tree t")' $app -run TestFilterListFindsByTextPeopleAndDate
 mutate "wrong passwords lock the person out everywhere" internal/httpapi/handlers.go \
-  's.replace("accKey := allAddressesKey + \"|\" + meta.IP", "accKey := allAddressesKey")' $app -run TestWrongPasswordsFromOneAddressDoNotLockOutThePerson
+  's.replace("accKey := allAddressesKey + \"|\" + addressKey(meta.IP)", "accKey := allAddressesKey")' $app -run TestWrongPasswordsFromOneAddressDoNotLockOutThePerson
 mutate "guesses from many addresses have no limit" internal/httpapi/handlers.go \
   's.replace(" || !s.loginByAllIPs.allow(allAddressesKey)", "")' $app -run TestGuessesFromManyAddressesStillStopAtALimit
 mutate "any Markdown goes to the parser" internal/document/markdown.go \
@@ -986,7 +986,7 @@ mutate "the content screen ignores the last day of a change" internal/pages/cont
 mutate "the reach of a person counts pages of others" internal/identity/lifecycle.go \
   's.replace("FROM pages p WHERE COALESCE(p.owner_id, p.created_by) = $1 AND p.status", "FROM pages p WHERE p.status")' $app -run TestAnAdministratorSeesTheReachOfAPersonButNoTitles
 mutate "a good login gives back more than its own try" internal/httpapi/handlers.go \
-  's.replace("\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByAllIPs.giveBack(allAddressesKey)", "\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByIP.giveBack(\"ip:\" + meta.IP)\n\ts.loginByAllIPs.giveBack(allAddressesKey)")' $app -run TestOwnGoodLoginsDoNotBuyGuessesOnOtherAccounts
+  's.replace("\ts.loginByIP.giveBack(addressKey(meta.IP))\n\ts.loginByAllIPs.giveBack(allAddressesKey)", "\ts.loginByIP.giveBack(addressKey(meta.IP))\n\ts.loginByIP.giveBack(addressKey(meta.IP))\n\ts.loginByAllIPs.giveBack(allAddressesKey)")' $app -run TestOwnGoodLoginsDoNotBuyGuessesOnOtherAccounts
 mutate "a word asks for no other forms" internal/search/forms.go \
   's.replace("\tall := forms(strings.ToLower(word))", "\tall := []string{strings.ToLower(word)}")' $app -run TestSearchFindsWordFormsAndKeepsTheExactTitleFirst
 mutate "quotes ask for other forms too" internal/search/language.go \
@@ -996,7 +996,7 @@ mutate "the Files screen ignores the name" internal/attachments/versions.go \
 
 # Spec 031: the order of work, readiness, hashing and reuse of permission facts.
 mutate "a save waits behind reading" internal/httpapi/admission.go \
-  's.replace("\tif !isRead(r) {\n\t\treturn classSave\n\t}", "\tif r.Method == \"\" {\n\t\treturn classSave\n\t}")' ./internal/httpapi/ -run TestEachRequestHasTheRightClass
+  's.replace("\tif !isRead(r) {\n\t\tfor _, prefix := range signInPaths {", "\tif r.Method == \"\" {\n\t\tfor _, prefix := range signInPaths {")' ./internal/httpapi/ -run TestEachRequestHasTheRightClass
 mutate "reading takes the reserve of saving" internal/httpapi/admission.go \
   's.replace("read := max(poolSize-quarter, 1)", "read := max(poolSize, 1)")' ./internal/httpapi/ -run TestReadingLeavesAQuarterOfThePoolForSaving
 mutate "search does not count against reading" internal/httpapi/admission.go \
@@ -1012,7 +1012,7 @@ mutate "a write reuses old permission facts" internal/httpapi/admission.go \
 mutate "a full pool looks ready" internal/app/app.go \
   's.replace("if stat := a.pool.Stat(); stat.AcquiredConns() >= stat.MaxConns() {", "if stat := a.pool.Stat(); stat.AcquiredConns() > stat.MaxConns() {")' $app -run TestAFullPoolIsBusyNotAGoneDatabase
 mutate "hashes run without a limit" internal/identity/password.go \
-  's.replace("\thashSlots <- struct{}{}\n\tdefer func() { <-hashSlots }()\n", "")' ./internal/identity/ -run TestNoMoreHashesRunAtOnceThanTheLimit
+  's.replace("\tselect {\n\tcase hashSlots <- struct{}{}:", "\tselect {\n\tdefault:\n\tcase hashSlots <- struct{}{}:")' ./internal/identity/ -run TestNoMoreHashesRunAtOnceThanTheLimit
 mutate "a memo mixes up people" internal/permissions/memo.go \
   's.replace("\tu, ok := m.users[id]\n\treturn u, ok", "\tfor _, u := range m.users {\n\t\treturn u, true\n\t}\n\treturn UserFacts{}, false")' ./internal/permissions/ -run TestTheMemoKeepsEachPersonsOwnFactsAndLivesOneContext
 # Files at rest (SEC-725, spec 032).
@@ -1054,7 +1054,7 @@ mutate "a second key change starts while the first is unfinished" internal/keys/
 mutate "the PDF helper gets no password" internal/exchange/pdf.go \
   's.replace("\t\treq.SetBasicAuth(helperUser, s.pdfPassword)\n", "")' $app -run TestThePDFHelperGetsItsPasswordAndRefusesWithoutIt
 mutate "a password is hashed as typed, not as NFC" internal/identity/password.go \
-  's.replace("func HashPassword(pw string, p Params) (string, error) {\n\tpw = norm.NFC.String(pw)\n", "func HashPassword(pw string, p Params) (string, error) {\n")' ./internal/identity/ -run TestAPasswordIsTheSameComposedOrDecomposed
+  's.replace("func HashPassword(ctx context.Context, pw string, p Params) (string, error) {\n\tpw = norm.NFC.String(pw)\n", "func HashPassword(ctx context.Context, pw string, p Params) (string, error) {\n")' ./internal/identity/ -run TestAPasswordIsTheSameComposedOrDecomposed
 mutate "a password may hold the product name" internal/identity/lifecycle.go \
   's.replace(", local, productWord)", ", local)")' ./internal/identity/ -run TestANewPasswordCannotHoldTheNameOfTheProduct
 mutate "a title keeps the marks that reverse reading" internal/pages/pages.go \
@@ -1155,8 +1155,8 @@ mutate "a bundle needs space administration again" internal/exchange/bundle.go \
   's.replace("spaceID, permissions.SpaceBundle)", "spaceID, permissions.SpaceAdminister)")' $app -run TestEachSplitPermissionWorksWithoutAdministering
 mutate "a bundle no longer needs export" internal/exchange/bundle.go \
   's.replace("if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceExport); err != nil {\n\t\treturn ExportRun{}, err\n\t}\n\tallowed, err := s.mayUseFormat(ctx, c.UserID, FormatBundle)", "allowed, err := s.mayUseFormat(ctx, c.UserID, FormatBundle)")' $app -run TestABundleStillNeedsExport
-mutate "asking for guests needs only manage access again" internal/httpapi/handlers_people.go \
-  's.replace("id, permissions.SpaceInviteGuests); err != nil {", "id, permissions.SpaceManageAccess); err != nil {")' $app -run TestAskingForGuestsIsItsOwnPermission
+mutate "asking for guests needs only manage access again" internal/sharing/invitations.go \
+  's.replace("spaceID, permissions.SpaceInviteGuests); err != nil {", "spaceID, permissions.SpaceManageAccess); err != nil {")' $app -run TestAskingForGuestsIsItsOwnPermission
 mutate "administering no longer asks for guests" internal/permissions/evaluate.go \
   's.replace("holds(in, SpaceInviteGuests) || holds(in, SpaceAdminister)", "holds(in, SpaceInviteGuests)")' $perms -run TestMatrixEvaluate
 mutate "moving out needs only edit again" internal/pages/move.go \
@@ -1174,16 +1174,17 @@ mutate "the migration leaves existing roles as they were" internal/db/migrations
   's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "kept facts ignore the permission generation" internal/permissions/factcache.go \
   's.replace("\treturn gen == c.gen\n", "\treturn true\n").replace("\tif gen > c.gen {", "\tif false {")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "a revoked space grant does not count" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("ON space_grants\n    FOR EACH STATEMENT", "ON space_grants\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "leaving a group does not count" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("ON group_members\n    FOR EACH STATEMENT", "ON group_members\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "archiving a space does not count" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("UPDATE OF status ON spaces\n    FOR EACH STATEMENT", "UPDATE OF status ON spaces\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "disabling an account does not count" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("ON users\n    FOR EACH STATEMENT", "ON users\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "losing the product does not count" internal/db/migrations/0040_finer_permissions.sql \
-  's.replace("ON global_grants\n    FOR EACH STATEMENT", "ON global_grants\n    FOR EACH STATEMENT WHEN (false)")' $perms -run TestAChangeEndsKeptFactsAtOnce
+# Since migration 0057 the counting triggers are those of 0057, counted at commit (spec 071).
+mutate "a revoked space grant does not count" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON space_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON space_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "leaving a group does not count" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON group_members\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON group_members\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "archiving a space does not count" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON spaces\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON spaces\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "disabling an account does not count" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON users\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON users\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
+mutate "losing the product does not count" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON global_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON global_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
 mutate "an account past its end stays active while kept" internal/permissions/factcache.go \
   's.replace("\tu.Active = activeAt(e.status, e.expires, c.now())\n", "")' $perms -run TestAKeptAccountEndsAtItsEndDate
 mutate "kept facts never grow old" internal/permissions/factcache.go \
@@ -1231,7 +1232,7 @@ mutate "the setup stays open with an administrator" internal/setup/setup.go \
 mutate "the setup form is read before the code" internal/httpapi/handlers_setup.go \
   's.replace("\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil {", "\tif err := s.deps.Setup.Check(r.Context(), in.Code, from); err != nil && false {")' $app -run TestTheSetupScreenRefusesAnyoneWithoutTheCode
 mutate "one address may guess setup codes for ever" internal/httpapi/handlers_setup.go \
-  's.replace("\tif !s.setupTries.allow(\"ip:\" + meta.IP) {", "\tif !s.setupTries.allow(\"ip:\" + meta.IP) && false {")' $app -run TestOneAddressCannotKeepGuessingSetupCodes
+  's.replace("\tif !s.setupTries.allow(addressKey(meta.IP)) {", "\tif !s.setupTries.allow(addressKey(meta.IP)) \x26\x26 false {")' $app -run TestOneAddressCannotKeepGuessingSetupCodes
 mutate "turning off TOTP lets a session guess the password" internal/httpapi/handlers_identity.go \
   's.replace("\tif !s.loginByAcc.allow(\"pw:\" + PrincipalFrom(r.Context()).User.ID.String()) {", "\tif false {")' $app -run TestTurningOffTOTPCannotBeUsedToGuessThePassword
 mutate "a plain address on the network counts as safe" internal/config/config.go \
@@ -1243,7 +1244,7 @@ mutate "the app listens on every address" compose.yaml \
 mutate "a SCIM filter on an attribute nobody reads is ignored" internal/scim/scim.go \
   's.replace("if !slices.Contains(known, attr) {", "if !slices.Contains(known, attr) && false {")' ./internal/scim/ -run TestAFilterIsUnderstoodWholeOrRefused
 mutate "many addresses together flood one inbox" internal/httpapi/handlers_people.go \
-  's.replace("\tif s.mayMail(in.Email) {\n\t\tif err := s.deps.Identity.RequestReset(", "\tif true {\n\t\tif err := s.deps.Identity.RequestReset(")' $app -run TestResetMailToOnePersonStopsAtALimitFromAnyAddress
+  's.replace("\tif !s.mayMail(in.Email) {\n\t\ttime.Sleep(forgotAnswerTime)\n\t\tw.WriteHeader(http.StatusAccepted)\n\t\treturn\n\t}\n\tmeta := metaFrom(r)", "\tif false {\n\t\treturn\n\t}\n\tmeta := metaFrom(r)")' $app -run TestResetMailToOnePersonStopsAtALimitFromAnyAddress
 mutate "a new second factor goes unmentioned" internal/identity/factors.go \
   's.replace("return s.tellOfChange(ctx, tx, c.UserID)", "return nil")' $app -run TestAPersonIsToldOfEveryChangeToTheirSignIn
 mutate "a new password goes unmentioned" internal/identity/users.go \
@@ -1654,7 +1655,7 @@ mutate "a waiting event can be rewritten" internal/db/migrations/0047_audit_pend
 mutate "a list leaves out waiting events" internal/audit/audit.go \
   's.replace("listWaitingSQL, false, f.Limit, keep)", "listWaitingSQL, false, 0, keep)")' $audit -run TestReadersSeeWaitingEventsAtOnce
 mutate "an export leaves out waiting events" internal/audit/audit.go \
-  's.replace("exportWaitingSQL, false, maxRows-sealed, write)", "exportWaitingSQL, false, 0, write)")' $audit -run TestReadersSeeWaitingEventsAtOnce
+  's.replace("exportWaitingSQL, false, maxRows-n, write)", "exportWaitingSQL, false, 0, write)")' $audit -run TestReadersSeeWaitingEventsAtOnce
 mutate "a check does not count waiting events" internal/audit/audit.go \
   's.replace("\"SELECT count(*) FROM audit_pending\").Scan(&res.Unsealed)", "\"SELECT 0::bigint\").Scan(&res.Unsealed)")' $audit -run TestVerifyCountsWaitingEvents
 mutate "events waiting a minute do not warn" internal/health/health.go \
@@ -2115,6 +2116,50 @@ mutate "the server's checkpoint job fails once the backup service signs" interna
   's.replace("if errors.Is(err, audit.ErrKeyNotInForce) {", "if false {")' $app -run TestTheServerStopsSigningOnceTheBackupServiceDoes
 mutate "migrate in the server tries as the application role" cmd/diffluence/worker.go \
   's.replace("\tcase cfg.LeavesMigrations():\n\t\treturn \"\", errNoOwner\n", "")' ./cmd/diffluence/ -run TestAContainerWithoutTheOwnerSaysWhereToMigrate
+
+# Spec 071 (wave RV4).
+mutate "each IPv6 address counts apart" internal/httpapi/limiter.go \
+  's.replace("addr.Prefix(ipv6NetworkBits)", "addr.Prefix(128)")' ./internal/httpapi/ -run TestAnIPv6NetworkCountsAsOneAddress
+mutate "the limiter keeps windows that ended" internal/httpapi/limiter.go \
+  's.replace("\tl.forgetEnded(now)\n", "")' ./internal/httpapi/ -run TestTheLimiterForgetsExpiredWindowsAsItGoes
+mutate "an old window takes a new one with it" internal/httpapi/limiter.go \
+  's.replace("ok \x26\x26 c.start.Equal(w.start)", "ok \x26\x26 c != nil")' ./internal/httpapi/ -run TestAResetKeyKeepsItsNewWindow
+mutate "sign-ins take the room of saving" internal/httpapi/admission.go \
+  's.replace("return classSignIn", "return classSave")' ./internal/httpapi/ -run 'TestSignInsCannotFillTheRoomOfSaving|TestASignInGetsInWhileSavingIsFull|TestSignInRoutesHaveTheirOwnClass'
+mutate "a wait for a hash outlives its request" internal/identity/password.go \
+  's.replace("case <-ctx.Done():\n\t\treturn nil, fmt.Errorf(\"identity: wait for a password hash", "case <-make(chan struct{}):\n\t\treturn nil, fmt.Errorf(\"identity: wait for a password hash")' ./internal/identity/ -run TestAWaitForAHashEndsWithItsRequest
+mutate "a session that must set up a second factor reaches all of /me" internal/httpapi/server.go \
+  's.replace("p.NeedsSecondFactor \x26\x26 !slices.Contains(secondFactorRoutes, r.Pattern)", "p.NeedsSecondFactor \x26\x26 !strings.HasPrefix(r.URL.Path, \"/api/v1/me\") \x26\x26 !slices.Contains(secondFactorRoutes, r.Pattern)")' $app -run TestASessionThatMustSetUpASecondFactorReachesOnlyTheSetup
+mutate "the sharing module trusts its caller with a guest" internal/sharing/invitations.go \
+  's.replace("if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceInviteGuests); err != nil {\n\t\treturn GuestInvitation{}, err", "if false {\n\t\treturn GuestInvitation{}, nil")' $app -run 'TestTheSharingModuleRefusesAGuestToSomeoneWhoDoesNotManageTheSpace|TestAGuestInvitationCarriesOneSpace'
+mutate "single sign-on makes an account from an unverified address" internal/sso/sso.go \
+  's.replace("if !verified \x26\x26 !p.cfg.AllowUnverifiedEmail {", "if false \x26\x26 !verified \x26\x26 !p.cfg.AllowUnverifiedEmail {")' $app -run TestSingleSignOnMakesNoAccountFromAnAddressNobodyVerified
+mutate "an operator cannot accept unverified addresses" internal/sso/sso.go \
+  's.replace("if !verified \x26\x26 !p.cfg.AllowUnverifiedEmail {", "if !verified {")' $app -run TestAnOperatorMayAcceptUnverifiedAddresses
+mutate "single sign-on makes accounts by default" internal/config/config.go \
+  's.replace("l.boolean(\"OIDC_AUTO_CREATE\", false)", "l.boolean(\"OIDC_AUTO_CREATE\", true)")' ./internal/config/ -run TestSingleSignOnMakesNoAccountsByDefault
+mutate "forgot password waits for the work of a known address" internal/httpapi/handlers_people.go \
+  's.replace("\tgo func() {\n\t\tdefer func() { <-s.accountLinkWork }()", "\tfunc() {\n\t\tdefer func() { <-s.accountLinkWork }()")' $app -run TestForgotPasswordAndSignUpAnswerInTheSameTimeForAKnownAddress
+mutate "a personal part goes without a recorded erasure" internal/audit/audit.go \
+  's.replace("if res.ErasedParts > res.RecordedErasures {", "if false {")' ./internal/audit/ -run TestAPersonalPartRemovedWithoutARecordedErasureIsFound
+mutate "a check ignores the counts of erasures" internal/audit/audit.go \
+  's.replace("res.RecordedErasures += erasedCount(e.Details)\n", "")' ./internal/audit/ -run TestAnErasureRecordedWithItsCountKeepsTheCheckWhole
+mutate "anonymising records no count" internal/identity/lifecycle.go \
+  's.replace("audit.DetailErasedParts: erased}", "\"erased\": erased}")' $app -run TestPersonalDataInTheAuditLogCanBeErasedWhileTheChainHolds
+mutate "a permission change is counted at every statement" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("IF current_setting(\x27diffluence.permissions_counted\x27, true) = \x27yes\x27 THEN", "IF false THEN")' ./internal/permissions/ -run TestALongPermissionChangeDoesNotHoldUpOthers
+mutate "a group change holds the count until it commits" internal/db/migrations/0057_counted_at_commit.sql \
+  's.replace("ON group_members\n    DEFERRABLE INITIALLY DEFERRED", "ON group_members\n    DEFERRABLE INITIALLY IMMEDIATE")' ./internal/permissions/ -run TestALongPermissionChangeDoesNotHoldUpOthers
+mutate "an export cut at its limit says it is complete" internal/audit/audit.go \
+  's.replace("case n >= maxRows:\n\t\tend = CSVLimited", "case false:\n\t\tend = CSVLimited")' ./internal/audit/ -run TestAnExportCutAtItsLimitSaysSo
+mutate "the pages of an export overlap" internal/audit/audit.go \
+  's.replace("AND e.seq > $11", "AND e.seq >= $11")' ./internal/audit/ -run TestAnExportEndsWithTheCountOfItsEvents
+mutate "the console check of the audit log has the limit of a read" internal/httpapi/handlers.go \
+  's.replace("s.deps.CheckAudit(db.WithQueryLimit(r.Context(), auditWalkLimit))", "s.deps.CheckAudit(db.WithQueryLimit(r.Context(), queryLimit))")' ./internal/httpapi/ -run TestTheConsoleCheckOfTheAuditLogIsNotCutAtTheLimitOfARead
+mutate_collab "the editing service takes any bearer as the API" access.mjs \
+  's.replace("return timingSafeEqual(digest(authorization), digest(`Bearer ${token}`));", "return authorization.startsWith(\"Bearer \");")' access.test.mjs
+mutate_collab "an unset token lets the API in" access.mjs \
+  's.replace("if (!token || typeof authorization", "if (typeof authorization")' access.test.mjs
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

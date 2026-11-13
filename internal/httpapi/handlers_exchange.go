@@ -88,6 +88,8 @@ func (s *Server) handleExportFile(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer func() { _ = file.Close() }()
+	// A large export takes longer to send than the server's write timeout, as a file does.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(uploadDeadline))
 	w.Header().Set("Content-Type", "application/octet-stream")
 	w.Header().Set("Content-Disposition", attachmentHeader(run.Filename))
 	if _, err := io.Copy(w, file); err != nil {

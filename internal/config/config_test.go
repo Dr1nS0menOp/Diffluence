@@ -33,6 +33,26 @@ func TestDefaults(t *testing.T) {
 	}
 }
 
+// Single sign-on makes no account until an operator says so, and then only for an address
+// the provider verified, unless the operator says that too.
+func TestSingleSignOnMakesNoAccountsByDefault(t *testing.T) {
+	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c.OIDC.AutoCreate || c.OIDC.AllowUnverifiedEmail {
+		t.Fatalf("defaults: %+v", c.OIDC)
+	}
+	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x",
+		"DIFFLUENCE_OIDC_AUTO_CREATE": "true", "DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL": "true"}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !c.OIDC.AutoCreate || !c.OIDC.AllowUnverifiedEmail {
+		t.Fatalf("switched on: %+v", c.OIDC)
+	}
+}
+
 func TestFileVariant(t *testing.T) {
 	p := filepath.Join(t.TempDir(), "db")
 	if err := os.WriteFile(p, []byte("postgres://from-file\n"), 0o600); err != nil {

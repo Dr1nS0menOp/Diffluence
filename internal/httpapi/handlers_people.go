@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -18,7 +19,6 @@ import (
 	"github.com/diffluence/diffluence/internal/people"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/sharing"
 	"github.com/diffluence/diffluence/internal/watches"
 )
 
@@ -97,7 +97,7 @@ func (s *Server) mayMail(email string) bool {
 
 // limitAccountLinks stops anyone from trying links or addresses at speed.
 func (s *Server) limitAccountLinks(w http.ResponseWriter, r *http.Request) bool {
-	if s.loginByIP.allow("ip:" + metaFrom(r).IP) {
+	if s.loginByIP.allow(addressKey(metaFrom(r).IP)) {
 		return true
 	}
 	w.Header().Set("Retry-After", strconv.Itoa(int(loginWindow.Seconds())))
@@ -116,14 +116,15 @@ func (s *Server) handleForgot(w http.ResponseWriter, r *http.Request) {
 	if !s.limitAccountLinks(w, r) {
 		return
 	}
-	ready := time.Now().Add(forgotAnswerTime)
-	if s.mayMail(in.Email) {
-		if err := s.deps.Identity.RequestReset(r.Context(), in.Email, metaFrom(r)); err != nil {
-			s.deps.Log.Error("password reset failed", "error", err, "request_id", RequestIDFrom(r.Context()))
-		}
+	if !s.mayMail(in.Email) {
+		time.Sleep(forgotAnswerTime)
+		w.WriteHeader(http.StatusAccepted)
+		return
 	}
-	time.Sleep(time.Until(ready))
-	w.WriteHeader(http.StatusAccepted)
+	meta := metaFrom(r)
+	s.answerBesideTheWork(w, r, "password reset", func(ctx context.Context) error {
+		return s.deps.Identity.RequestReset(ctx, in.Email, meta)
+	})
 }
 
 func (s *Server) handleReset(w http.ResponseWriter, r *http.Request) {
@@ -214,12 +215,46 @@ func (s *Server) handleSignup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	ready := time.Now().Add(forgotAnswerTime)
-	if s.mayMail(in.Email) {
-		if err := s.deps.Identity.RequestSignup(r.Context(), in.Email, access.SignupDomains); err != nil {
-			s.deps.Log.Error("sign-up failed", "error", err, "request_id", RequestIDFrom(r.Context()))
-		}
+	if !s.mayMail(in.Email) {
+		time.Sleep(forgotAnswerTime)
+		w.WriteHeader(http.StatusAccepted)
+		return
 	}
+	s.answerBesideTheWork(w, r, "sign-up", func(ctx context.Context) error {
+		return s.deps.Identity.RequestSignup(ctx, in.Email, access.SignupDomains)
+	})
+}
+
+// accountLinkWorkers is how much forgot-password and sign-up work may run beside answers at
+// once on a node. Past it the answer is "busy", whatever the address.
+const accountLinkWorkers = 16
+
+// accountLinkWorkLimit is the longest that work may take after its answer went out.
+const accountLinkWorkLimit = 30 * time.Second
+
+// answerBesideTheWork answers 202 after forgotAnswerTime, while work runs on beside the
+// answer. Only work for an address with an account, or allowed to sign up, does much, so
+// the answer must not wait for it: its time would tell the address apart. The work keeps
+// going when the caller leaves, so a link is never lost to an impatient browser.
+func (s *Server) answerBesideTheWork(w http.ResponseWriter, r *http.Request, what string, work func(context.Context) error) {
+	select {
+	case s.accountLinkWork <- struct{}{}:
+	default:
+		w.Header().Set("Retry-After", "2")
+		writeError(w, http.StatusServiceUnavailable, "busy", busyMessage)
+		return
+	}
+	ready := time.Now().Add(forgotAnswerTime)
+	requestID := RequestIDFrom(r.Context())
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(r.Context()), accountLinkWorkLimit)
+	go func() {
+		defer func() { <-s.accountLinkWork }()
+		defer cancel()
+		// This goroutine is where the work ends, so its error is recorded here.
+		if err := work(ctx); err != nil {
+			s.deps.Log.Error(what+" failed", "error", err, "request_id", requestID)
+		}
+	}()
 	time.Sleep(time.Until(ready))
 	w.WriteHeader(http.StatusAccepted)
 }
@@ -672,41 +707,16 @@ func (s *Server) handleInviteGuest(w http.ResponseWriter, r *http.Request) {
 		badBody(w)
 		return
 	}
-	c := s.caller(r)
-	if err := s.deps.Permissions.RequireSpace(r.Context(), s.deps.Pool, c.UserID, id, permissions.SpaceInviteGuests); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	access := settings.DefaultAccess
-	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionAccess, &access); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	if !access.GuestInvites {
-		s.fail(w, r, apperr.Conflict("guest_invites_off", "An administrator turned guest invitations off."))
-		return
-	}
-	administrator, err := s.deps.Identity.HasGlobalPermission(r.Context(), c.UserID, identity.PermAdministrator)
+	invitation, err := s.deps.Sharing.InviteGuest(r.Context(), s.caller(r), id, in.Email)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	// Only an administrator lets someone in. Anyone else asks one (ADR-033).
-	if !administrator {
-		request, err := s.deps.Sharing.AskGuestInvitation(r.Context(), c, id, sharing.InvitationAsk{Email: in.Email})
-		if err != nil {
-			s.fail(w, r, err)
-			return
-		}
-		writeJSON(w, http.StatusAccepted, map[string]any{"id": request, "waiting": true})
+	if invitation.Link == "" {
+		writeJSON(w, http.StatusAccepted, map[string]any{"id": invitation.Request, "waiting": true})
 		return
 	}
-	link, err := s.deps.Identity.Invite(r.Context(), c, identity.NewInvitation{Email: in.Email, Type: identity.TypeGuest, SpaceID: &id})
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	writeJSON(w, http.StatusCreated, map[string]any{"link": link})
+	writeJSON(w, http.StatusCreated, map[string]any{"link": invitation.Link})
 }
 
 func (s *Server) handleSpaceCategories(w http.ResponseWriter, r *http.Request) {

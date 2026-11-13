@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { CLOSE_ACCESS_ENDED, createAccess, ticketFrom } from './access.mjs';
+import { CLOSE_ACCESS_ENDED, createAccess, isTheAPI, ticketFrom } from './access.mjs';
 
 const PAGE = '0196f0a0-0000-7000-8000-000000000001';
 
@@ -21,6 +21,16 @@ function connection(ticket) {
   const closed = [];
   return { entry: { ticket, close: (event) => closed.push(event) }, closed };
 }
+
+test('only the token of the API is the API, compared in constant time', () => {
+  const token = 'a-long-shared-token-of-the-api';
+  assert.equal(isTheAPI(`Bearer ${token}`, token), true);
+  assert.equal(isTheAPI(`Bearer ${token}x`, token), false);
+  assert.equal(isTheAPI(`Bearer ${token.slice(0, -1)}`, token), false);
+  assert.equal(isTheAPI(token, token), false);
+  assert.equal(isTheAPI(undefined, token), false);
+  assert.equal(isTheAPI('Bearer ', ''), false, 'an unset token lets nobody in');
+});
 
 test('the service reads the ticket and nothing else from the socket', () => {
   const headers = new Headers({ cookie: 'diffluence_session=secret', 'x-diffluence-collab-ticket': 'abc.def' });

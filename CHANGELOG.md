@@ -3,6 +3,16 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: limits of signing in, counted audit erasures and exports, and accounts from single sign-on (spec 071, wave RV4)
+- The limits per address count an IPv6 address by its /64 network. The limiter forgets ended windows as it goes. Signing in has its own share of the database pool beside saving, and a request that ends while waiting for a password hash stops waiting
+- An audit CSV ends with a line that says `#complete`, `#limit-reached` or `#incomplete` with the number of events. It is read in pages of 5,000, and a long export or export download is no longer cut off by the server's write timeout. The check of the audit log from the console may walk the chain for up to ten minutes
+- A change to who may do what is counted once per transaction, at its commit, so a long import or sync no longer makes other permission changes wait
+- A session that must set up a second factor reaches only the setup screen's routes and signing out; making a token there is refused
+- Anonymising someone records how many personal parts of audit events it erased. The check of the audit log counts the parts that are gone, and fails when more are gone than erasures recorded (`erased_parts`, `recorded_erasures`)
+- Forgot password and sign-up always answer after 400 ms, while their work goes on beside the answer
+- Single sign-on makes no account at a first login unless `DIFFLUENCE_OIDC_AUTO_CREATE=true`, and then only for an address the provider marks as verified. New setting `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL` accepts unverified addresses. The audit log names the reason `email_not_verified`
+- The editing service compares the API's token in constant time, and runs in `compose.yaml` with a read-only root and no capabilities
+- Upgrade impact: an installation whose people get their account at their first single sign-on sets `DIFFLUENCE_OIDC_AUTO_CREATE=true` before upgrading, and, with a provider that does not mark addresses as verified (Authentik by default, Entra ID), also `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` or marks them there. Migration 0057 changes the permission triggers and counts the audit parts erased before; finish upgrading every node before anonymising anyone. A script that reads the audit CSV skips its last line. Take the new `compose.yaml`. Migration 0056 only holds its number
 ### Changed: the backup service migrates, signs the audit checkpoints and confirms a restore (spec 070, wave RV3b)
 - In `compose.yaml` the server gets only the application's database role. The backup service alone holds the owner of the tables: every round, at most a minute apart, it runs the migrations of a new release, and the contract migrations once their grace period is over. Until it has, the server shows "Waiting before an upgrade" with the kind `migrations` and looks again every 5 seconds
 - The backup service signs the audit checkpoints every five minutes with a key derived from the backup key, and writes them to its own log. The change of key is a position in the audit chain, endorsed by the key derived from `master.key`, so older checkpoints keep verifying and `diffluence audit verify` needs nothing new. The database refuses a checkpoint of a key no longer in force

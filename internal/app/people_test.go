@@ -565,6 +565,56 @@ func TestAResetLinkWorksOnceAndRevealsNothing(t *testing.T) {
 	}
 }
 
+// slowMail takes its time over every mail, as a busy mail queue would.
+type slowMail struct {
+	fakeMail
+	delay time.Duration
+}
+
+func (s *slowMail) Send(ctx context.Context, q db.Querier, m identity.AccountMail) error {
+	time.Sleep(s.delay)
+	return s.fakeMail.Send(ctx, q, m)
+}
+
+// The time of the answer tells nothing about the address, also when the work for a known
+// address is slow: the answer does not wait for it.
+func TestForgotPasswordAndSignUpAnswerInTheSameTimeForAKnownAddress(t *testing.T) {
+	e := newEnv(t)
+	root := admin(e)
+	mail := &slowMail{delay: 1500 * time.Millisecond}
+	e.app.Identity().SetMailer(mail, "http://example.test")
+	e.user("anna@example.com", identity.PermUseProduct)
+	features := root.ok("GET", "/api/v1/admin/settings/features", nil)
+	features["self_signup"] = true
+	root.ok("PUT", "/api/v1/admin/settings/features", features)
+	access := root.ok("GET", "/api/v1/admin/settings/access", nil)
+	access["signup_domains"] = []string{"example.com"}
+	root.ok("PUT", "/api/v1/admin/settings/access", access)
+
+	timed := func(path, email string) time.Duration {
+		start := time.Now()
+		if status, out := publicPost(e, path, map[string]any{"email": email}); status != 202 {
+			t.Fatalf("%s %s: %d %s", path, email, status, out)
+		}
+		return time.Since(start)
+	}
+	for _, c := range []struct{ path, email string }{
+		{"/api/v1/auth/forgot", "anna@example.com"},
+		{"/api/v1/auth/signup", "new@example.com"},
+	} {
+		if took := timed(c.path, c.email); took > time.Second {
+			t.Errorf("%s waited %s for the work of a known address", c.path, took)
+		}
+	}
+	deadline := time.Now().Add(10 * time.Second)
+	for mail.count() < 2 && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if mail.count() != 2 {
+		t.Fatalf("the work stopped with the answer: %d mails", mail.count())
+	}
+}
+
 func TestAResetStillAsksForTheSecondFactor(t *testing.T) {
 	e := newEnv(t)
 	mail := withMail(e)
@@ -611,7 +661,7 @@ func TestANewPasswordMustBeLongAndNotLeaked(t *testing.T) {
 	}
 	// An older, shorter password keeps working until someone changes it.
 	short := "twelve chars"
-	hash, err := identity.HashPassword(short, identity.DefaultParams)
+	hash, err := identity.HashPassword(context.Background(), short, identity.DefaultParams)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -771,6 +821,35 @@ func TestARequiredSecondFactorLimitsTheSession(t *testing.T) {
 		t.Fatal("the app must know, to show the setup")
 	}
 	anna.want(200, "GET", "/api/v1/me/security", nil)
+}
+
+// A session that must set up a second factor reaches only what setting one up takes. A
+// token made there would carry none of that limit.
+func TestASessionThatMustSetUpASecondFactorReachesOnlyTheSetup(t *testing.T) {
+	e := newEnv(t)
+	root := admin(e)
+	access := root.ok("GET", "/api/v1/admin/settings/access", nil)
+	access["second_factor"] = "members"
+	root.ok("PUT", "/api/v1/admin/settings/access", access)
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+
+	refused := []struct{ method, path string }{
+		{"POST", "/api/v1/me/tokens"},
+		{"GET", "/api/v1/me/tokens"},
+		{"GET", "/api/v1/me/notifications"},
+		{"PUT", "/api/v1/me/preferences"},
+		{"POST", "/api/v1/me/export"},
+		{"GET", "/api/v1/me/spaces"},
+	}
+	for _, r := range refused {
+		out := anna.want(403, r.method, r.path, map[string]any{"name": "script", "scopes": []string{"read"}})
+		if !strings.Contains(out, "second_factor_required") {
+			t.Errorf("%s %s: %s", r.method, r.path, out)
+		}
+	}
+	anna.want(200, "GET", "/api/v1/me", nil)
+	anna.want(200, "GET", "/api/v1/me/security", nil)
+	anna.want(200, "GET", "/api/v1/me/passkeys", nil)
 }
 
 func TestLoginHistoryKeepsTheLastLogins(t *testing.T) {

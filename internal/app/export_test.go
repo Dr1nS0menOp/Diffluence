@@ -10,6 +10,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/sharing"
 )
 
 // AddMigrationForTest makes this binary know one more migration.
@@ -82,6 +83,9 @@ func (a *App) EventListenersForTest() map[string]func(context.Context, []byte) e
 	}
 	return out
 }
+
+// SharingForTest is the sharing module, for a test that calls it without the HTTP layer.
+func (a *App) SharingForTest() *sharing.Service { return a.sharing }
 
 // InMaintenanceForTest tells whether mail and jobs wait.
 func (a *App) InMaintenanceForTest(ctx context.Context) (bool, error) { return a.inMaintenance(ctx) }

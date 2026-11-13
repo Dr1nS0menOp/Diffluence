@@ -161,7 +161,8 @@ func NewService(pool *pgxpool.Pool, instanceID uuid.UUID, opts Options) *Service
 // time does not reveal which email addresses have accounts.
 func (s *Service) dummyHash() string {
 	s.dummyOnce.Do(func() {
-		s.dummy, _ = HashPassword("diffluence-timing-equaliser", s.params)
+		// Made once and kept for every later login, so no single request may cut it short.
+		s.dummy, _ = HashPassword(context.Background(), "diffluence-timing-equaliser", s.params)
 	})
 	return s.dummy
 }
@@ -229,7 +230,7 @@ func (s *Service) CreateLocalUserIn(ctx context.Context, tx pgx.Tx, in NewUser, 
 	if err := s.validateNewPassword(in.Password, in.Email, in.DisplayName); err != nil {
 		return User{}, err
 	}
-	hash, err := HashPassword(in.Password, s.params)
+	hash, err := HashPassword(ctx, in.Password, s.params)
 	if err != nil {
 		return User{}, err
 	}
@@ -289,7 +290,11 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 	}
 	// The hash runs for a locked account too, so a lock costs the same time as a wrong
 	// password and its answer is the same: the lock says nothing to a guesser.
-	ok, rehash, verr := VerifyPassword(hash, password, s.params)
+	ok, rehash, verr := VerifyPassword(ctx, hash, password, s.params)
+	// A request that ended while it waited for a hash is not a wrong password.
+	if verr != nil && ctx.Err() != nil {
+		return "", Principal{}, verr
+	}
 
 	reason := ""
 	switch {
@@ -335,7 +340,7 @@ func (s *Service) Login(ctx context.Context, email, password string, meta Reques
 			}
 		}
 		if rehash {
-			newHash, err := HashPassword(password, s.params)
+			newHash, err := HashPassword(ctx, password, s.params)
 			if err != nil {
 				return err
 			}

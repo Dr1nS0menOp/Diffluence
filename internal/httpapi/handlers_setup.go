@@ -72,7 +72,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	meta := metaFrom(r)
-	if !s.setupTries.allow("ip:" + meta.IP) {
+	if !s.setupTries.allow(addressKey(meta.IP)) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(setupWindow.Seconds())))
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many tries. Try again later.")
 		return
@@ -104,7 +104,7 @@ func (s *Server) handleSetup(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, identity.Explain(err))
 		return
 	}
-	s.setupTries.reset("ip:" + meta.IP)
+	s.setupTries.reset(addressKey(meta.IP))
 	caller := identity.SystemCaller("setup")
 	if err := s.deps.Settings.ApplyFirstSetup(r.Context(), caller, in.Organisation, in.Language, in.TimeZone); err != nil {
 		// The administrator exists; the name and defaults can be set under Look and Settings.

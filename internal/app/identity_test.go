@@ -38,7 +38,7 @@ import (
 // lets anyone choose a password for someone else.
 func (e *env) givePassword(userID, password string) {
 	e.t.Helper()
-	hash, err := identity.HashPassword(password, identity.DefaultParams)
+	hash, err := identity.HashPassword(context.Background(), password, identity.DefaultParams)
 	if err != nil {
 		e.t.Fatal(err)
 	}
@@ -575,6 +575,39 @@ func TestOIDCLogin(t *testing.T) {
 	}
 }
 
+// A new account takes its address from the provider, so the provider must say it verified
+// that address: else someone could take the address of a colleague who never logged in.
+func TestSingleSignOnMakesNoAccountFromAnAddressNobodyVerified(t *testing.T) {
+	p := newIDP(t)
+	e := newEnvWithOIDC(t, p)
+	for i, claims := range []map[string]any{
+		{"sub": "u-false", "email": "colleague@example.com", "email_verified": false},
+		{"sub": "u-missing", "email": "colleague@example.com"},
+		{"sub": "u-text", "email": "colleague@example.com", "email_verified": "true"},
+	} {
+		if to := e.oidcLogin(p, noRedirect(), claims); to == "/" {
+			t.Fatalf("case %d: an account was made from an unverified address", i)
+		}
+	}
+	if got := e.count("SELECT count(*) FROM users WHERE email = 'colleague@example.com'"); got != 0 {
+		t.Fatalf("%d accounts were made", got)
+	}
+	if to := e.oidcLogin(p, noRedirect(), map[string]any{"sub": "u-ok", "email": "colleague@example.com", "email_verified": true}); to != "/" {
+		t.Fatalf("a verified address ended at %q", to)
+	}
+}
+
+// An operator whose provider never states the claim may accept unverified addresses.
+func TestAnOperatorMayAcceptUnverifiedAddresses(t *testing.T) {
+	p := newIDP(t)
+	e := newEnvWith(t, func(c *config.Config) {
+		c.OIDC = config.OIDC{Issuer: p.srv.URL, ClientID: "client", ClientSecret: "secret", AutoCreate: true, AllowUnverifiedEmail: true}
+	})
+	if to := e.oidcLogin(p, noRedirect(), map[string]any{"sub": "u-1", "email": "someone@example.com"}); to != "/" {
+		t.Fatalf("ended at %q", to)
+	}
+}
+
 func TestOIDCRefusals(t *testing.T) {
 	p := newIDP(t)
 	e := newEnvWithOIDC(t, p)
@@ -630,7 +663,7 @@ func TestOIDCRefusals(t *testing.T) {
 	// A disabled account cannot use OIDC.
 	admin := e.user("admin@example.com", identity.AllGlobalPermissions...)
 	c = noRedirect()
-	if to := e.oidcLogin(p, c, map[string]any{"sub": "later", "email": "later@example.com", "name": "Later"}); to != "/" {
+	if to := e.oidcLogin(p, c, map[string]any{"sub": "later", "email": "later@example.com", "name": "Later", "email_verified": true}); to != "/" {
 		t.Fatalf("login ended at %q", to)
 	}
 	var id string

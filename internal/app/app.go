@@ -239,7 +239,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	if cfg.OIDC.Issuer != "" {
 		a.sso = sso.New(sso.Config{Issuer: cfg.OIDC.Issuer, ClientID: cfg.OIDC.ClientID, ClientSecret: cfg.OIDC.ClientSecret,
 			RedirectURL: cfg.PublicOrigin() + "/api/v1/auth/oidc/callback", DisplayName: cfg.OIDC.DisplayName,
-			AutoCreate: cfg.OIDC.AutoCreate, GroupsClaim: cfg.OIDC.GroupsClaim}, a.pool, a.identity)
+			AutoCreate: cfg.OIDC.AutoCreate, AllowUnverifiedEmail: cfg.OIDC.AllowUnverifiedEmail, GroupsClaim: cfg.OIDC.GroupsClaim}, a.pool, a.identity)
 	}
 
 	if cfg.Role.RunsAPI() {

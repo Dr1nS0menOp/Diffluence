@@ -129,6 +129,14 @@ func WithQueryLimit(ctx context.Context, limit time.Duration) context.Context {
 	return context.WithValue(ctx, queryLimitKey{}, &limitWatch{limit: limit})
 }
 
+// QueryLimitOf returns the limit WithQueryLimit set on ctx, or zero when there is none.
+func QueryLimitOf(ctx context.Context) time.Duration {
+	if watch, ok := ctx.Value(queryLimitKey{}).(*limitWatch); ok {
+		return watch.limit
+	}
+	return 0
+}
+
 // QueryRanOut reports whether a query under ctx stopped at its limit.
 func QueryRanOut(ctx context.Context) bool {
 	watch, ok := ctx.Value(queryLimitKey{}).(*limitWatch)
@@ -234,6 +242,8 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_signing_keys FROM " + ident,
 			// A personal part can be erased, and never changed.
 			"REVOKE UPDATE, TRUNCATE ON audit_personal FROM " + ident,
+			// The parts erased before erasures were counted are fixed at the upgrade.
+			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_erasure_baseline FROM " + ident,
 			// A waiting event is sealed and then removed, or its personal part is erased;
 			// the trigger of audit_pending allows nothing else (ADR-041).
 			"REVOKE TRUNCATE ON audit_pending FROM " + ident,

@@ -26,6 +26,11 @@ services:
     build: ./collab
     restart: unless-stopped
     networks: [helpers]
+    # The service writes nothing to disk: its state lives in memory and in the API.
+    read_only: true
+    tmpfs: [/tmp]
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
     environment:
       DIFFLUENCE_API_URL: http://diffluence:8080
       DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}

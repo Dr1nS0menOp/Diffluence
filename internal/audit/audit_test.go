@@ -182,7 +182,7 @@ func TestListFiltersAndCSVExport(t *testing.T) {
 		t.Fatalf("export n=%d err=%v", n, err)
 	}
 	rows, err := csv.NewReader(&buf).ReadAll()
-	if err != nil || len(rows) != 3 || rows[0][0] != "seq" {
+	if err != nil || len(rows) != 4 || rows[0][0] != "seq" || rows[3][0] != audit.CSVComplete {
 		t.Fatalf("csv: %v %v", rows, err)
 	}
 	// Details is JSON so it starts with '{'; check a cell that starts with '=' directly.

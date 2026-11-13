@@ -66,7 +66,7 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-149** · built · Write down how session lifetimes at the provider and here relate (ASVS 7.1.3). Belongs in `docs/operations/identity-providers.md`.
 - **SEC-150** · built · A step-up for accounts of a provider goes through a fresh login with `prompt=login`. The response must then be checked for `auth_time`, or a provider that ignores the prompt passes (ASVS 6.8.4). Spec 013 does not say so yet.
 - **SEC-151** · new · A group from the provider can hold *administrator*, so whoever controls the provider controls this instance. That can be intended. The console should show it plainly, and the audit log shows who joined. Low. Belongs in wave F.
-- **SEC-152** · built · `OIDC_AUTO_CREATE` is on by default, so everyone at the provider can get an account. The install guide should say so. Refuse an `http` issuer outside local testing. Low.
+- **SEC-152** · built · `OIDC_AUTO_CREATE` is off by default; an operator who turns it on gives everyone at the provider an account, and the guide says so. A new account needs an address the provider marks as verified, unless `OIDC_ALLOW_UNVERIFIED_EMAIL` is on (spec 071). Refuse an `http` issuer outside local testing. Low.
 - **SEC-153** · built · The cookie for the flow has no `__Secure-` prefix on https (ASVS 3.3.1). Low. Belongs in wave F. Built (spec 042): `TestTheLoginFlowCookieIsSecureByNameOnHTTPS`.
 ## 2.5 Provisioning with SCIM
 

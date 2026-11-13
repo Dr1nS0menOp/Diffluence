@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/settings"
@@ -94,8 +95,8 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	// An account alone is not the key: anyone could then lock a person out by guessing
 	// wrong on purpose (spec 025). The wide limit stops guesses from many addresses.
 	allAddressesKey := "acc:" + identityKey(in.Email)
-	accKey := allAddressesKey + "|" + meta.IP
-	if !s.loginByIP.allow("ip:"+meta.IP) || !s.loginByAcc.allow(accKey) || !s.loginByAllIPs.allow(allAddressesKey) {
+	accKey := allAddressesKey + "|" + addressKey(meta.IP)
+	if !s.loginByIP.allow(addressKey(meta.IP)) || !s.loginByAcc.allow(accKey) || !s.loginByAllIPs.allow(allAddressesKey) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(loginWindow.Seconds())))
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
@@ -107,7 +108,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 	var mfa *identity.MFARequiredError
 	if errors.As(err, &mfa) {
-		s.loginByIP.giveBack("ip:" + meta.IP)
+		s.loginByIP.giveBack(addressKey(meta.IP))
 		writeJSON(w, http.StatusOK, map[string]any{"mfa_required": true, "mfa_token": mfa.Token, "mfa_methods": mfa.Methods})
 		return
 	}
@@ -115,7 +116,7 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	s.loginByIP.giveBack("ip:" + meta.IP)
+	s.loginByIP.giveBack(addressKey(meta.IP))
 	s.loginByAllIPs.giveBack(allAddressesKey)
 	s.loginByAcc.reset(accKey)
 	s.setSessionCookie(w, token)
@@ -331,14 +332,24 @@ func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 	name := "diffluence-audit-" + time.Now().UTC().Format("20060102-150405") + ".csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
+	// A long log takes longer to send than the server's write timeout. Each query of the
+	// export reads one page, so the limit on one query of a read still holds.
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(uploadDeadline))
 	if _, err := audit.ExportCSV(r.Context(), s.deps.Pool, f, maxExportRows, w); err != nil {
-		// Headers are already sent; all we can do is log and stop.
+		// Headers are already sent: the file ends with a line that says it stopped.
 		s.deps.Log.Error("audit export interrupted", "error", err, "request_id", RequestIDFrom(r.Context()))
 	}
 }
 
+// auditWalkLimit is how long the check from the console may walk the chain in its one
+// query: long enough for millions of events, and still an end. The nightly check and
+// `diffluence audit verify` have no limit. Only auditors ask, and the class of search and
+// reports bounds how many walks run at once.
+const auditWalkLimit = 10 * time.Minute
+
 func (s *Server) handleAuditVerify(w http.ResponseWriter, r *http.Request) {
-	res, err := s.deps.CheckAudit(r.Context())
+	_ = http.NewResponseController(w).SetWriteDeadline(time.Now().Add(auditWalkLimit + time.Minute))
+	res, err := s.deps.CheckAudit(db.WithQueryLimit(r.Context(), auditWalkLimit))
 	if err != nil {
 		s.internalError(w, r, err)
 		return

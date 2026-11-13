@@ -4,7 +4,7 @@
 // about who may do what is an answer from the API, and it never writes a version.
 import { Server } from '@hocuspocus/server';
 import * as Y from 'yjs';
-import { createAccess, ticketFrom } from './access.mjs';
+import { createAccess, isTheAPI, ticketFrom } from './access.mjs';
 import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
 import { bindPresence } from './presence.mjs';
 
@@ -94,7 +94,7 @@ const server = new Server({
       response.writeHead(200).end('ok');
       throw null;
     }
-    if (request.url === '/recheck' && request.method === 'POST' && request.headers.authorization === `Bearer ${TOKEN}`) {
+    if (request.url === '/recheck' && request.method === 'POST' && isTheAPI(request.headers.authorization, TOKEN)) {
       recheck().catch((error) => console.error('recheck failed', error.message));
       response.writeHead(202).end();
       throw null;

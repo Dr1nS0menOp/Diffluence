@@ -266,7 +266,7 @@ func TestLoginSessionAndAuditTrail(t *testing.T) {
 
 	resp, body = e.do(c, "GET", "/api/v1/admin/audit-events/export", "")
 	if resp.StatusCode != 200 || !strings.HasPrefix(resp.Header.Get("Content-Type"), "text/csv") ||
-		!strings.HasPrefix(body, "seq,id,occurred_at") {
+		!strings.HasPrefix(body, "seq,id,occurred_at") || !strings.Contains(body, "\n"+audit.CSVComplete+",") {
 		t.Fatalf("export: %d %s", resp.StatusCode, body[:min(len(body), 200)])
 	}
 	resp, body = e.do(c, "GET", "/api/v1/admin/audit-events/verify", "")

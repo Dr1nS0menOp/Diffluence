@@ -126,7 +126,7 @@ func (s *Server) handleLoginTOTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	meta := metaFrom(r)
-	if !s.loginByIP.allow("ip:" + meta.IP) {
+	if !s.loginByIP.allow(addressKey(meta.IP)) {
 		w.Header().Set("Retry-After", strconv.Itoa(int(loginWindow.Seconds())))
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
@@ -140,7 +140,7 @@ func (s *Server) handleLoginTOTP(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	s.loginByIP.giveBack("ip:" + meta.IP)
+	s.loginByIP.giveBack(addressKey(meta.IP))
 	s.setSessionCookie(w, token)
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User)})
 }
@@ -153,7 +153,7 @@ func (s *Server) handleLoginPasskeyBegin(w http.ResponseWriter, r *http.Request)
 		badBody(w)
 		return
 	}
-	if !s.loginByIP.allow("ip:" + metaFrom(r).IP) {
+	if !s.loginByIP.allow(addressKey(metaFrom(r).IP)) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
 	}
@@ -180,7 +180,7 @@ func (s *Server) handleLoginPasskeyFinish(w http.ResponseWriter, r *http.Request
 		return
 	}
 	meta := metaFrom(r)
-	if !s.loginByIP.allow("ip:" + meta.IP) {
+	if !s.loginByIP.allow(addressKey(meta.IP)) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
 	}
@@ -193,7 +193,7 @@ func (s *Server) handleLoginPasskeyFinish(w http.ResponseWriter, r *http.Request
 		s.internalError(w, r, err)
 		return
 	}
-	s.loginByIP.giveBack("ip:" + meta.IP)
+	s.loginByIP.giveBack(addressKey(meta.IP))
 	s.setSessionCookie(w, token)
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User)})
 }
@@ -259,7 +259,7 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handlePasskeyLoginBegin(w http.ResponseWriter, r *http.Request) {
-	if !s.loginByIP.allow("ip:" + metaFrom(r).IP) {
+	if !s.loginByIP.allow(addressKey(metaFrom(r).IP)) {
 		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many login attempts. Try again later.")
 		return
 	}
@@ -292,7 +292,7 @@ func (s *Server) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request
 		s.internalError(w, r, err)
 		return
 	}
-	s.loginByIP.giveBack("ip:" + metaFrom(r).IP)
+	s.loginByIP.giveBack(addressKey(metaFrom(r).IP))
 	s.setSessionCookie(w, token)
 	writeJSON(w, http.StatusOK, map[string]any{"user": toUserJSON(p.User)})
 }

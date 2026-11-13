@@ -20,6 +20,7 @@ DIFFLUENCE_OIDC_CLIENT_ID=...
 DIFFLUENCE_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc_client_secret
 DIFFLUENCE_OIDC_DISPLAY_NAME=Authentik
 DIFFLUENCE_OIDC_GROUPS_CLAIM=groups        # optional
+DIFFLUENCE_OIDC_AUTO_CREATE=true           # optional: accounts at first login, see "Who gets an account"
 ```
 
 **SCIM.** In Diffluence: Administration, Provisioning, New token. In Authentik: create a SCIM provider with URL `https://wiki.example.com/scim/v2` and that token, using the default user and group mappings, then add it as a backchannel provider of the application. Users and groups arrive automatically.
@@ -62,6 +63,8 @@ A login through a provider opens a session here, and from then on the two run ap
 
 ## Who gets an account
 
-`DIFFLUENCE_OIDC_AUTO_CREATE` is on by default: **everyone the provider lets in gets an account here at their first login.** That suits a provider that only holds your own organisation. With a shared or public provider, turn it off and create accounts through SCIM or by invitation, or limit who may log in at the provider itself.
+`DIFFLUENCE_OIDC_AUTO_CREATE` is off by default: a login through the provider then opens only an account that already exists, made through SCIM or by invitation. Set it to `true` and **everyone the provider lets in gets an account here at their first login.** That suits a provider that only holds your own organisation. With a shared or public provider, leave it off, or limit who may log in at the provider itself.
+
+A new account takes its e-mail address from the provider, so it is made only when the provider says it verified that address (`email_verified: true` in the token). Otherwise the login is refused, and the audit log shows the reason `email_not_verified`: with a provider where people choose their own address, someone could otherwise take the address of a colleague who has not logged in yet. Authentik does not mark addresses as verified by default, and Entra ID does not send the claim. With such a provider, either mark the addresses verified there, or set `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only your organisation can set an address at the provider.
 
 A group from the provider can hold *administrator*. Whoever controls that group at the provider then controls this instance, so treat the provider's administrators as administrators here, and protect their accounts the same way.

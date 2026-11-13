@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -154,6 +156,26 @@ func TestASpaceManagerOnlyAsksForAGuest(t *testing.T) {
 	}
 	if len(f.sent) != 0 {
 		t.Fatalf("sent: %+v", f.sent)
+	}
+}
+
+// The sharing module decides who may ask for a guest, so a caller that skips the check of
+// the route still meets it.
+func TestTheSharingModuleRefusesAGuestToSomeoneWhoDoesNotManageTheSpace(t *testing.T) {
+	e := newEnv(t)
+	admin(e)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace, identity.PermInvitePeople)
+	viewer := e.user("viewer@example.com", identity.PermUseProduct, identity.PermInvitePeople)
+	space, _ := owner.space("ENG")
+	owner.grant(space, "user", viewer.id, permissions.TemplateViewer)
+
+	caller := identity.Caller{UserID: uuid.MustParse(viewer.id)}
+	_, err := e.app.SharingForTest().InviteGuest(context.Background(), caller, uuid.MustParse(space), outsider)
+	if err == nil {
+		t.Fatal("a viewer of the space asked for a guest")
+	}
+	if got := e.count("SELECT count(*) FROM invitation_requests WHERE space_id = $1", space); got != 0 {
+		t.Fatalf("%d requests were filed", got)
 	}
 }
 

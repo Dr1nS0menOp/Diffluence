@@ -37,7 +37,9 @@ type Config struct {
 	RedirectURL  string
 	DisplayName  string
 	AutoCreate   bool
-	GroupsClaim  string // empty = do not sync groups
+	// AllowUnverifiedEmail lets AutoCreate take an address without email_verified.
+	AllowUnverifiedEmail bool
+	GroupsClaim          string // empty = do not sync groups
 }
 
 // Login failures users can be told about.
@@ -46,6 +48,10 @@ var (
 	ErrAccountExists = errors.New("sso: a local account uses this e-mail address")
 	ErrFailed        = errors.New("sso: login failed")
 )
+
+// errUnverifiedEmail ends a first login whose address the provider did not verify. The
+// person is told what ErrNoAccount tells; the audit log names the reason.
+var errUnverifiedEmail = fmt.Errorf("%w: the provider did not verify the address", ErrNoAccount)
 
 // Provider runs logins against one identity provider.
 type Provider struct {
@@ -289,6 +295,8 @@ func (p *Provider) Callback(ctx context.Context, state, code, binding string, me
 		return err
 	})
 	switch {
+	case errors.Is(err, errUnverifiedEmail):
+		return fail("email_not_verified", ErrNoAccount)
 	case errors.Is(err, ErrNoAccount):
 		return fail("no_account", err)
 	case errors.Is(err, ErrAccountExists):
@@ -356,6 +364,12 @@ func (p *Provider) resolve(ctx context.Context, tx pgx.Tx, c claims, meta identi
 	case errors.Is(err, pgx.ErrNoRows):
 		if !p.cfg.AutoCreate {
 			return uuid.Nil, ErrNoAccount
+		}
+		// The new account takes the address, so the provider must vouch for it: else anyone
+		// could claim the address of a colleague who has not logged in yet.
+		verified := c.EmailVerified != nil && *c.EmailVerified
+		if !verified && !p.cfg.AllowUnverifiedEmail {
+			return uuid.Nil, errUnverifiedEmail
 		}
 		caller := identity.SystemCaller("oidc")
 		caller.Meta = meta

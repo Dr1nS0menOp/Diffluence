@@ -100,6 +100,14 @@ Since migration 0054 (ADR-043, spec 069), automation rules, databases, bundles b
 
 Afterwards, look under Administration, Organising, Experimental parts, and turn on what you use that left no trace: a bundle export whose job was already cleaned up, for example. Turning a part off deletes nothing: a rule stays and stops running, a database stays and can still be edited, only new ones wait. Public sites and analytics keep their own switches, unchanged by the upgrade.
 
+## Single sign-on after an upgrade
+
+Since spec 071, single sign-on makes no account at a first login unless `DIFFLUENCE_OIDC_AUTO_CREATE=true` is set, and then only for an address the provider marks as verified. An installation that relied on accounts being made at the first login sets `DIFFLUENCE_OIDC_AUTO_CREATE=true` before upgrading. When its provider does not mark addresses as verified (Authentik by default, Entra ID), it also marks them there, or sets `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only the organisation can set an address at the provider (`docs/operations/identity-providers.md`). People who already have an account log in as before.
+
+## Erased personal parts after an upgrade
+
+Since migration 0057, the check of the audit log counts the personal parts of events that are gone, and fails when more are gone than recorded erasures removed. Anonymising someone records how many parts it erased. The migration counts the parts erased before, so an installation that anonymised people earlier still checks whole. While nodes of the previous release still run, an anonymisation on such a node records no count; finish the upgrade of every node before anonymising anyone.
+
 ## Rolling back
 
 Expand migrations leave the old structure in place, so the previous version runs on a database the new version has migrated. Roll back by starting the previous version.

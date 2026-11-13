@@ -15,13 +15,20 @@ import (
 
 // workClass is what a request asks of the database. Under too much load the classes are
 // served in this order: saving first, then reading, then search and reports (ARC-233).
+// Signing in has a share of its own beside them, so a rush of sign-ins, each waiting for
+// its password hash, cannot take the room of saving.
 type workClass int
 
 const (
 	classSave workClass = iota
 	classRead
 	classHeavy
+	classSignIn
 )
+
+// signInPaths are the routes that sign in, set up or prove an account: anyone may call
+// them, and many check a password.
+var signInPaths = []string{"/api/v1/auth/", "/api/v1/setup"}
 
 // busyMessage is what a refused request says. Text being written stays in the browser,
 // so the person loses nothing by trying again.
@@ -39,6 +46,11 @@ var heavyPrefixes = []string{
 // classOf sorts a request into its class.
 func classOf(r *http.Request) workClass {
 	if !isRead(r) {
+		for _, prefix := range signInPaths {
+			if strings.HasPrefix(r.URL.Path, prefix) {
+				return classSignIn
+			}
+		}
 		return classSave
 	}
 	if strings.Contains(r.URL.Path, "/export") || strings.Contains(r.URL.Path, "/insights") || strings.Contains(r.URL.Path, "/analytics") {
@@ -97,18 +109,20 @@ func (g *gate) leave() { <-g.slots }
 
 // admission keeps the order of work for one node.
 type admission struct {
-	gates [3]*gate
+	gates [4]*gate
 }
 
 // newAdmission divides a pool of the given size. Saving may use it all; reading leaves a
 // quarter for saving; search and reports use a quarter, counted inside reading as well.
+// Signing in uses a quarter of its own: it holds a connection only around its hash.
 func newAdmission(poolSize int) *admission {
 	quarter := max(poolSize/4, 1)
 	read := max(poolSize-quarter, 1)
-	return &admission{gates: [3]*gate{
-		classSave:  newGate(max(poolSize, 1), 8*max(poolSize, 1), 15*time.Second, "5"),
-		classRead:  newGate(read, 4*max(poolSize, 1), 3*time.Second, "2"),
-		classHeavy: newGate(min(quarter, read), 2*quarter, time.Second, "2"),
+	return &admission{gates: [4]*gate{
+		classSave:   newGate(max(poolSize, 1), 8*max(poolSize, 1), 15*time.Second, "5"),
+		classRead:   newGate(read, 4*max(poolSize, 1), 3*time.Second, "2"),
+		classHeavy:  newGate(min(quarter, read), 2*quarter, time.Second, "2"),
+		classSignIn: newGate(quarter, 8*quarter, 5*time.Second, "2"),
 	}}
 }
 

@@ -230,7 +230,9 @@ func TestAWaitingEventCannotBeRemovedOrChanged(t *testing.T) {
 		t.Fatalf("erasing the personal part: %v", err)
 	}
 	seal(t, tdb)
-	if res := verify(t, tdb); !res.OK || res.Checked != 1 {
+	// The chain holds; the part counts as gone, and without a recorded erasure the check
+	// says so.
+	if res := verify(t, tdb); res.FirstBadSeq != 0 || res.Checked != 1 || res.ErasedParts != 1 || res.OK {
 		t.Fatalf("%+v", res)
 	}
 }
@@ -278,7 +280,7 @@ func TestReadersSeeWaitingEventsAtOnce(t *testing.T) {
 		t.Fatalf("export n=%d err=%v", n, err)
 	}
 	rows, err := csv.NewReader(&buf).ReadAll()
-	if err != nil || len(rows) != 3 || rows[1][0] == "" || rows[2][0] != "" || rows[2][5] != "page.updated" {
+	if err != nil || len(rows) != 4 || rows[1][0] == "" || rows[2][0] != "" || rows[2][5] != "page.updated" || rows[3][0] != audit.CSVComplete {
 		t.Fatalf("waiting last, without a seq: %v %v", rows, err)
 	}
 }
@@ -290,16 +292,14 @@ func TestErasingAPersonReachesAWaitingEvent(t *testing.T) {
 	if err := audit.RecordStandalone(ctx, tdb.Pool, sample("page.updated")); err != nil {
 		t.Fatal(err)
 	}
-	err := pgx.BeginFunc(ctx, tdb.Pool, func(tx pgx.Tx) error { return audit.ErasePersonal(ctx, tx, "u1") })
-	if err != nil {
-		t.Fatal(err)
+	if n := erase(t, tdb, "u1"); n != 1 {
+		t.Fatalf("erased %d parts", n)
 	}
-	seal(t, tdb)
 	var left int
 	if err := tdb.Pool.QueryRow(ctx, "SELECT count(*) FROM audit_personal").Scan(&left); err != nil || left != 0 {
 		t.Fatalf("personal parts left: %d, %v", left, err)
 	}
-	if res := verify(t, tdb); !res.OK || res.Checked != 1 {
+	if res := verify(t, tdb); !res.OK || res.Checked != 2 || res.ErasedParts != 1 {
 		t.Fatalf("%+v", res)
 	}
 }

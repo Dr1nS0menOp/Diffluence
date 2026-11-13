@@ -137,19 +137,29 @@ func (e *Event) restorePersonal(data *string) error {
 	return nil
 }
 
-// ErasePersonal removes the personal parts of the events by and about a person. The
-// chain holds, because it only knows their digest.
-func ErasePersonal(ctx context.Context, tx pgx.Tx, personID string) error {
+// DetailErasedParts is the detail of an event that erased personal parts, holding how many
+// it erased. A check of the chain adds them up, so a part that goes without such an event
+// is found.
+const DetailErasedParts = "personal_parts_erased"
+
+// ErasePersonal removes the personal parts of the events by and about a person, and says
+// how many it removed. The chain holds, because it only knows their digest. The caller
+// records the erasure in the same transaction, with the count under DetailErasedParts.
+func ErasePersonal(ctx context.Context, tx pgx.Tx, personID string) (int64, error) {
 	// An event that still waits for the sealer carries its personal part with it. This goes
 	// first: if the sealer is moving such a part right now, the update waits for it, and the
 	// delete below, a statement of its own, then sees the part in audit_personal.
-	if _, err := tx.Exec(ctx, `UPDATE audit_pending SET salt = NULL, data = NULL
-		WHERE (actor_id = $1 OR object_id = $1) AND salt IS NOT NULL`, personID); err != nil {
-		return err
+	waiting, err := tx.Exec(ctx, `UPDATE audit_pending SET salt = NULL, data = NULL
+		WHERE (actor_id = $1 OR object_id = $1) AND salt IS NOT NULL`, personID)
+	if err != nil {
+		return 0, err
 	}
-	_, err := tx.Exec(ctx, `DELETE FROM audit_personal p USING audit_events e
+	sealed, err := tx.Exec(ctx, `DELETE FROM audit_personal p USING audit_events e
 		WHERE e.seq = p.seq AND (e.actor_id = $1 OR e.object_id = $1)`, personID)
-	return err
+	if err != nil {
+		return 0, err
+	}
+	return waiting.RowsAffected() + sealed.RowsAffected(), nil
 }
 
 // Stored is an event as read back from the database. An event that still waits for the
@@ -311,7 +321,15 @@ type VerifyResult struct {
 	// Unsealed counts the events that still wait for the sealer, so are not in the chain
 	// that was checked yet (ADR-041).
 	Unsealed int64 `json:"unsealed"`
+	// ErasedParts counts the checked events whose personal part is gone.
+	ErasedParts int64 `json:"erased_parts"`
+	// RecordedErasures counts the parts that erasures in the chain say they removed, with
+	// those erased before erasures were counted. Fewer than ErasedParts fails the check.
+	RecordedErasures int64 `json:"recorded_erasures"`
 }
+
+// unrecordedErasure is the reason of a check that found more parts gone than recorded.
+const unrecordedErasure = "personal parts are gone that no recorded erasure removed"
 
 // Verify walks the chain and reports the first inconsistency. After pruning it starts
 // at the signed anchor that pruning left. It also counts the events that wait for the
@@ -377,9 +395,34 @@ func Verify(ctx context.Context, q db.Querier) (VerifyResult, error) {
 		if part != nil && personalDigest(salt, *part) != e.PersonalDigest {
 			return fail("a personal part does not match its digest (part changed)"), nil
 		}
+		if part == nil && e.PersonalDigest != "" {
+			res.ErasedParts++
+		}
+		res.RecordedErasures += erasedCount(e.Details)
 		prev = hash
 	}
-	return res, rows.Err()
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+	var before int64
+	err = q.QueryRow(ctx, "SELECT coalesce((SELECT parts FROM audit_erasure_baseline), 0)").Scan(&before)
+	if err != nil {
+		return res, err
+	}
+	res.RecordedErasures += before
+	if res.ErasedParts > res.RecordedErasures {
+		res.OK, res.Reason = false, unrecordedErasure
+	}
+	return res, nil
+}
+
+// erasedCount reads DetailErasedParts of an event. JSON gives every number as a float64.
+func erasedCount(details map[string]any) int64 {
+	n, ok := details[DetailErasedParts].(float64)
+	if !ok || n < 0 {
+		return 0
+	}
+	return int64(n)
 }
 
 // Filter selects events. Zero values mean "no filter".
@@ -396,7 +439,14 @@ type Filter struct {
 	ObjectID   string
 	// Censor removes what the reader may not see, on the screen and in an export.
 	Censor func(*Event)
+	// exportPage is how many sealed events one query of an export reads; zero means
+	// defaultExportPage. Tests make it small.
+	exportPage int
 }
+
+// defaultExportPage keeps each query of an export short: the limit on one query of a read
+// applies to each page, not to the whole export.
+const defaultExportPage = 5000
 
 func optTime(t time.Time) *time.Time {
 	if t.IsZero() {
@@ -419,7 +469,9 @@ const selectSQL = `SELECT e.seq, e.payload, p.data
 	  AND ($10 = '' OR e.object_id = $10)`
 
 const listSQL = selectSQL + " ORDER BY e.seq DESC LIMIT $6"
-const exportSQL = selectSQL + " ORDER BY e.seq LIMIT $6"
+
+// exportPageSQL reads the next page of an export, after the last seq it wrote ($11).
+const exportPageSQL = selectSQL + " AND e.seq > $11 ORDER BY e.seq LIMIT $6"
 
 // waitingSQL finds events that wait for the sealer, with the same filters. They are the
 // newest there are, so a list shows them first and an export writes them last. Paging
@@ -450,12 +502,14 @@ type scanned struct {
 // each runs one of the queries above with the filter's arguments and hands every row to
 // fn as it comes, so an export of a million rows is never held whole. The sealed queries
 // also give the seq. It returns how many rows it handed on.
-func (f Filter) each(ctx context.Context, q db.Querier, sql string, sealed bool, limit int, fn func(scanned) error) (int, error) {
+// A query that takes more parameters gets them as more.
+func (f Filter) each(ctx context.Context, q db.Querier, sql string, sealed bool, limit int, fn func(scanned) error, more ...any) (int, error) {
 	if limit <= 0 {
 		return 0, nil
 	}
-	rows, err := q.Query(ctx, sql, f.ActorID, f.Action, optTime(f.Since), optTime(f.Until), f.BeforeSeq, limit,
-		f.ObjectType, f.SpaceID, f.Result, f.ObjectID)
+	args := append([]any{f.ActorID, f.Action, optTime(f.Since), optTime(f.Until), f.BeforeSeq, limit,
+		f.ObjectType, f.SpaceID, f.Result, f.ObjectID}, more...)
+	rows, err := q.Query(ctx, sql, args...)
 	if err != nil {
 		return 0, err
 	}
@@ -523,14 +577,54 @@ func List(ctx context.Context, q db.Querier, f Filter) ([]Stored, error) {
 var CSVHeader = []string{"seq", "id", "occurred_at", "actor_type", "actor_id", "action", "object_type",
 	"object_id", "space_id", "result", "ip", "user_agent", "request_id", "details"}
 
-// ExportCSV writes matching events (oldest first, up to maxRows) as CSV. Events that still
-// wait for the sealer come last, with an empty seq.
+// The first cell of the last line of an export says how it ended; the second counts its
+// events. A file without such a line was cut off on the way.
+const (
+	// CSVComplete ends an export that holds every matching event.
+	CSVComplete = "#complete"
+	// CSVLimited ends an export that stopped at its row limit.
+	CSVLimited = "#limit-reached"
+	// CSVStopped ends an export that stopped on an error.
+	CSVStopped = "#incomplete"
+)
+
+// ExportCSV writes matching events (oldest first, up to maxRows) as CSV, and a last line
+// that says how the export ended. Sealed events are read a page at a time, so no single
+// query runs long. Events that still wait for the sealer come last, with an empty seq.
 func ExportCSV(ctx context.Context, q db.Querier, f Filter, maxRows int, w io.Writer) (int, error) {
 	cw := csv.NewWriter(w)
 	if err := cw.Write(CSVHeader); err != nil {
 		return 0, err
 	}
+	n, err := f.exportRows(ctx, q, maxRows, cw)
+	end := CSVComplete
+	switch {
+	case err != nil:
+		end = CSVStopped
+	case n >= maxRows:
+		end = CSVLimited
+	}
+	last := make([]string, len(CSVHeader))
+	last[0], last[1] = end, strconv.Itoa(n)
+	if werr := cw.Write(last); err == nil {
+		err = werr
+	}
+	cw.Flush()
+	if err != nil {
+		return n, err
+	}
+	return n, cw.Error()
+}
+
+// exportRows writes the events of an export and counts them.
+func (f Filter) exportRows(ctx context.Context, q db.Querier, maxRows int, cw *csv.Writer) (int, error) {
+	page := f.exportPage
+	if page <= 0 {
+		page = defaultExportPage
+	}
+	var after int64
 	write := func(row scanned) error {
+		after = row.seq
 		e, err := f.read(row.payload, row.part)
 		if err != nil {
 			return fmt.Errorf("audit: decode seq %d: %w", row.seq, err)
@@ -552,15 +646,18 @@ func ExportCSV(ctx context.Context, q db.Querier, f Filter, maxRows int, w io.Wr
 		}
 		return cw.Write(rec)
 	}
-	sealed, err := f.each(ctx, q, exportSQL, true, maxRows, write)
-	if err != nil {
-		return sealed, err
+	n := 0
+	for n < maxRows {
+		want := min(page, maxRows-n)
+		got, err := f.each(ctx, q, exportPageSQL, true, want, write, after)
+		n += got
+		if err != nil {
+			return n, err
+		}
+		if got < want {
+			break
+		}
 	}
-	waiting, err := f.each(ctx, q, exportWaitingSQL, false, maxRows-sealed, write)
-	n := sealed + waiting
-	if err != nil {
-		return n, err
-	}
-	cw.Flush()
-	return n, cw.Error()
+	waiting, err := f.each(ctx, q, exportWaitingSQL, false, maxRows-n, write)
+	return n + waiting, err
 }

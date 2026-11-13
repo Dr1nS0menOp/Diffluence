@@ -759,7 +759,8 @@ func (s *Service) Anonymise(ctx context.Context, c Caller, id uuid.UUID, reason 
 		if err := forgetLinksOf(ctx, tx, id); err != nil {
 			return err
 		}
-		if err := audit.ErasePersonal(ctx, tx, id.String()); err != nil {
+		erased, err := audit.ErasePersonal(ctx, tx, id.String())
+		if err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM auth_challenges WHERE user_id = $1 OR data->>'email' = $2", id, u.Email); err != nil {
@@ -768,7 +769,7 @@ func (s *Service) Anonymise(ctx context.Context, c Caller, id uuid.UUID, reason 
 		if err := s.keepsAnAdministrator(ctx, tx, c); err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "user.anonymised", "user", id.String(), map[string]any{"reason": reason})
+		return s.record(ctx, tx, c, "user.anonymised", "user", id.String(), map[string]any{"reason": reason, audit.DetailErasedParts: erased})
 	})
 }
 

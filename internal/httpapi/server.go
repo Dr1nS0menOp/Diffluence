@@ -151,6 +151,9 @@ type Server struct {
 	admission *admission
 	// sockets caps the open editing sockets of this node and of each login.
 	sockets *socketCap
+	// accountLinkWork holds a place for every forgot-password or sign-up request whose work
+	// runs on beside its answer.
+	accountLinkWork chan struct{}
 }
 
 // New builds the API.
@@ -173,6 +176,8 @@ func New(d Deps) (*Server, error) {
 		markdownBusy:  make(chan struct{}, markdownSlots),
 		admission:     newAdmission(poolSize(d)),
 		sockets:       newSocketCap(socketsPerNode, socketsPerLogin),
+
+		accountLinkWork: make(chan struct{}, accountLinkWorkers),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
@@ -237,8 +242,23 @@ func (s *Server) enforce(a Access, h http.Handler) http.Handler {
 	})
 }
 
-// secondFactorRoutes stay open to a person who still has to set up a second factor.
-var secondFactorRoutes = []string{"/api/v1/me", "/api/v1/auth/"}
+// secondFactorRoutes stay open to a person who still has to set up a second factor: what
+// the setup screen reads and sends, confirming who they are, and signing out. They are
+// named by route pattern, so a new route under /me is closed until it is listed here.
+var secondFactorRoutes = []string{
+	"GET /api/v1/me",
+	"GET /api/v1/me/security",
+	"POST /api/v1/me/password",
+	"POST /api/v1/me/totp/begin",
+	"POST /api/v1/me/totp/confirm",
+	"GET /api/v1/me/passkeys",
+	"POST /api/v1/me/passkeys/begin",
+	"POST /api/v1/me/passkeys/finish",
+	"POST /api/v1/auth/reauth",
+	"POST /api/v1/auth/reauth/passkey/begin",
+	"POST /api/v1/auth/reauth/passkey/finish",
+	"POST /api/v1/auth/logout",
+}
 
 // allowedByCredential checks what the kind of credential allows, before the rule
 // of the route. It answers the request when it refuses.
@@ -248,7 +268,7 @@ func (s *Server) allowedByCredential(w http.ResponseWriter, r *http.Request, a A
 		writeError(w, http.StatusForbidden, "session_only", "This needs a login in the browser, not a token.")
 	case p.ViaToken && !s.tokenMayGoOn(w, r, p):
 		return false
-	case p.NeedsSecondFactor && !slices.ContainsFunc(secondFactorRoutes, func(prefix string) bool { return strings.HasPrefix(r.URL.Path, prefix) }):
+	case p.NeedsSecondFactor && !slices.Contains(secondFactorRoutes, r.Pattern):
 		writeError(w, http.StatusForbidden, "second_factor_required", "Set up a second factor first.")
 	case a.sensitive && time.Since(p.ConfirmedAt) > identity.ReauthWindow:
 		writeError(w, http.StatusForbidden, "reauth_required", "Confirm who you are to do this.")

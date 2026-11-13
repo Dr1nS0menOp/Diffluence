@@ -399,7 +399,7 @@ func (s *Service) SetGlobalPermissions(ctx context.Context, c Caller, subjectTyp
 }
 
 func (s *Service) storePassword(ctx context.Context, tx pgx.Tx, userID uuid.UUID, password string) error {
-	hash, err := HashPassword(password, s.params)
+	hash, err := HashPassword(ctx, password, s.params)
 	if err != nil {
 		return err
 	}
@@ -441,7 +441,7 @@ func (s *Service) checkPassword(ctx context.Context, q db.Querier, userID uuid.U
 	if err != nil {
 		return err
 	}
-	ok, _, err := VerifyPassword(hash, password, s.params)
+	ok, _, err := VerifyPassword(ctx, hash, password, s.params)
 	if err != nil {
 		return err
 	}

@@ -62,6 +62,8 @@ services:
       DIFFLUENCE_OIDC_CLIENT_SECRET: diffluence-secret
       DIFFLUENCE_OIDC_DISPLAY_NAME: Authentik
       DIFFLUENCE_OIDC_GROUPS_CLAIM: groups
+      # The test logs in people the provider holds, so accounts are made at the first login.
+      DIFFLUENCE_OIDC_AUTO_CREATE: "true"
     depends_on:
       db:
         condition: service_healthy

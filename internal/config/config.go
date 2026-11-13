@@ -123,8 +123,12 @@ type OIDC struct {
 	ClientID     string
 	ClientSecret string
 	DisplayName  string
-	AutoCreate   bool
-	GroupsClaim  string
+	// AutoCreate makes an account at the first login of someone the provider lets in.
+	AutoCreate bool
+	// AllowUnverifiedEmail lets AutoCreate take an address the provider does not state as
+	// verified, for a provider that never sends email_verified.
+	AllowUnverifiedEmail bool
+	GroupsClaim          string
 }
 
 // SecureCookies reports whether cookies must carry the Secure flag.
@@ -250,8 +254,11 @@ func (l *loader) load() Config {
 			ClientID:     l.str("OIDC_CLIENT_ID", ""),
 			ClientSecret: l.str("OIDC_CLIENT_SECRET", ""),
 			DisplayName:  l.str("OIDC_DISPLAY_NAME", "Single sign-on"),
-			AutoCreate:   l.boolean("OIDC_AUTO_CREATE", true),
-			GroupsClaim:  l.str("OIDC_GROUPS_CLAIM", ""),
+			// Off by default: an operator opens the installation to everyone at the provider
+			// on purpose (docs/operations/identity-providers.md).
+			AutoCreate:           l.boolean("OIDC_AUTO_CREATE", false),
+			AllowUnverifiedEmail: l.boolean("OIDC_ALLOW_UNVERIFIED_EMAIL", false),
+			GroupsClaim:          l.str("OIDC_GROUPS_CLAIM", ""),
 		},
 		SMTP: SMTP{
 			Host:     l.str("SMTP_HOST", ""),

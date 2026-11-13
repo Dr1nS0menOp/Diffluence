@@ -73,7 +73,7 @@ In total 241 lines.
 1. **One binary, three roles,** from one small server to a cluster (chapter 1).
 2. **PostgreSQL is the truth.** Everything else can be rebuilt, or can wait.
 3. **A change, its audit and its event are one transaction.** Nothing is lost and nothing is invented.
-4. **Permissions are never cached.** A restriction works at once, on every node.
+4. **A restriction works at once, on every node.** A node keeps the facts of a permission check only while the count of permission changes in the database stays the same (ARC-231); every change raises that count when it commits, so no node acts on a fact older than the last change.
 5. **Nodes hold nothing.** Any node can die at any moment.
 6. **Requests stay fast.** Slow work goes to the worker, and a helper is never on the path of a request.
 7. **Helpers are optional, and a file is hostile,** also after a helper has touched it.
