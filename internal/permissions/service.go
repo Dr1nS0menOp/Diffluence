@@ -147,8 +147,14 @@ func (s *Service) LoadPage(ctx context.Context, q db.Querier, id uuid.UUID) (Spa
 	ctx = db.MustBeCurrent(ctx)
 	p := PageFacts{ID: id}
 	var spaceID uuid.UUID
-	err := q.QueryRow(ctx, "SELECT space_id, status, created_by, kind, archived_at IS NOT NULL FROM pages WHERE id = $1", id).
-		Scan(&spaceID, &p.Status, &p.CreatedBy, &p.Kind, &p.Archived)
+	// The control fact rides in the same query, so document control adds no round trip
+	// (DOC-1300).
+	err := q.QueryRow(ctx, `
+		SELECT p.space_id, p.status, p.created_by, p.kind, p.archived_at IS NOT NULL,
+		       EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id
+		                 AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'))
+		FROM pages p WHERE p.id = $1`, id).
+		Scan(&spaceID, &p.Status, &p.CreatedBy, &p.Kind, &p.Archived, &p.ControlHidden)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return SpaceFacts{}, p, apperr.NotFound()
 	}

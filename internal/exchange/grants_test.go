@@ -40,7 +40,8 @@ func TestABundleOfVersionTwoGainsOnlyTheLaterSplit(t *testing.T) {
 	if !slices.Contains(got, permissions.SpaceLabels) || !slices.Contains(got, permissions.SpaceLook) {
 		t.Fatalf("a version 2 bundle knew nothing of labels and the look: %v", got)
 	}
-	want := slices.Sorted(slices.Values([]string{permissions.PageEdit, permissions.PageMoveOut, permissions.DatabaseEdit}))
+	want := slices.Sorted(slices.Values([]string{permissions.PageEdit, permissions.PageMoveOut, permissions.DatabaseEdit,
+		permissions.PageWorkflow}))
 	if got := permissionsOfGrant(2, permissions.PageEdit); !slices.Equal(got, want) {
 		t.Fatalf("editing in a version 2 bundle moved pages out and edited databases too: %v", got)
 	}
@@ -77,8 +78,9 @@ func TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases(t *testi
 	if !slices.Equal(slices.Sorted(slices.Values(got)), slices.Sorted(slices.Values(want))) {
 		t.Fatalf("a version 3 bundle knew nothing of posts and databases apart from pages: %v", got)
 	}
-	if got := permissionsOfGrant(versionOfSpec040, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
-		t.Fatalf("a version 3 bundle holds the eight of spec 040 itself: %v", got)
+	if got := permissionsOfGrant(versionOfSpec040, permissions.SpaceAdminister); !slices.Equal(got,
+		[]string{permissions.SpaceAdminister, permissions.SpaceWorkflows}) {
+		t.Fatalf("a version 3 bundle holds the eight of spec 040 itself, and knew nothing of workflows: %v", got)
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
 		t.Fatalf("a current bundle holds posts and databases itself, so pages alone must stay alone: %v", got)
@@ -90,10 +92,28 @@ const versionOfSpec045 = 4
 
 func TestABundleOfVersionFourGivesWhoeverEditsPagesDatabasesToo(t *testing.T) {
 	got := permissionsOfGrant(versionOfSpec045, permissions.PageEdit)
-	if want := []string{permissions.DatabaseEdit, permissions.PageEdit}; !slices.Equal(got, want) {
+	if want := []string{permissions.DatabaseEdit, permissions.PageEdit, permissions.PageWorkflow}; !slices.Equal(got, want) {
 		t.Fatalf("a version 4 bundle knew nothing of editing databases apart from pages: %v", got)
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.PageEdit); !slices.Equal(got, []string{permissions.PageEdit}) {
 		t.Fatalf("a current bundle holds database.edit itself, so editing pages alone must stay alone: %v", got)
+	}
+}
+
+// versionOfSpec049 is the bundle version that first held database.edit, the last before the
+// workflow permissions of spec 064.
+const versionOfSpec049 = 5
+
+func TestABundleOfVersionFiveGivesEditorsAndAdministratorsTheWorkflowPermissions(t *testing.T) {
+	if got := permissionsOfGrant(versionOfSpec049, permissions.PageEdit); !slices.Equal(got,
+		[]string{permissions.PageEdit, permissions.PageWorkflow}) {
+		t.Fatalf("editing in a version 5 bundle set workflows as well, and must still: %v", got)
+	}
+	if got := permissionsOfGrant(versionOfSpec049, permissions.SpaceAdminister); !slices.Equal(got,
+		[]string{permissions.SpaceAdminister, permissions.SpaceWorkflows}) {
+		t.Fatalf("administering in a version 5 bundle ran the workflows as well, and must still: %v", got)
+	}
+	if got := permissionsOfGrant(bundleVersion, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
+		t.Fatalf("a current bundle holds space.workflows itself: %v", got)
 	}
 }

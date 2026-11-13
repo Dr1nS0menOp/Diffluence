@@ -135,7 +135,8 @@ func childPages(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) ([]
 func contributors(ctx context.Context, q db.Querier, pageID uuid.UUID) ([]Contributor, error) {
 	rows, err := q.Query(ctx, `SELECT v.author_id, COALESCE(u.display_name, ''), count(*)
 		FROM page_versions v LEFT JOIN users u ON u.id = v.author_id
-		WHERE v.page_id = $1 GROUP BY v.author_id, u.display_name
+		WHERE v.page_id = $1 AND v.number <= (SELECT current_version FROM pages WHERE id = $1) -- not who works on a version under review
+		GROUP BY v.author_id, u.display_name
 		ORDER BY count(*) DESC, lower(COALESCE(u.display_name, ''))`, pageID)
 	if err != nil {
 		return nil, err

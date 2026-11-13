@@ -25,6 +25,7 @@ import {
   StatusesSection,
 } from './space-organise';
 import { TableBox } from '../components/table-box';
+import { WorkflowsSection } from './space-workflows';
 
 const SPACE_SECTIONS = [
   'details',
@@ -37,6 +38,7 @@ const SPACE_SECTIONS = [
   'roles',
   'statuses',
   'labels',
+  'workflows',
   'placeholders',
   'rules',
   'import',
@@ -58,6 +60,7 @@ const SECTION_NEEDS: Record<string, string[]> = {
   sites: ['site.publish'],
   statuses: ['space.statuses'],
   labels: ['space.labels'],
+  workflows: ['space.workflows'],
   shortcuts: ['space.look'],
   people: ['space.administer', 'space.look'],
   export: ['space.administer', 'space.bundle'],
@@ -303,6 +306,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       items: [
         item('statuses', t('spaceSettings.statuses')),
         item('labels', t('organise.labels')),
+        item('workflows', t('control.settingsTitle')),
         item('placeholders', t('space.placeholders')),
         away('content', t('content.title'), `${base}/content`),
         away('templates', t('templates.title'), `${base}/templates`),
@@ -401,6 +405,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       {section === 'roles' && <SpaceRolesPanel space={space} />}
       {section === 'statuses' && <StatusesSection space={space} />}
       {section === 'labels' && <LabelsSection space={space} />}
+      {section === 'workflows' && <WorkflowsSection space={space} />}
       {section === 'placeholders' && <PlaceholdersSection space={space} />}
       {section === 'rules' && <RulesSection space={space} />}
       {section === 'import' && <ImportSection space={space} />}

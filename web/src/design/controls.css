@@ -234,6 +234,21 @@ fieldset.matrix label {
   background: var(--color-danger-tint);
 }
 
+/* The band of a controlled page (spec 064): a note of a few lines, and the steps on offer. */
+.control-band > p {
+  margin-block: var(--space-1);
+}
+
+.control-band .control-governed {
+  margin-block-start: var(--space-2);
+}
+
+.control-band .control-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
 .lozenge {
   display: inline-block;
   padding-inline: var(--space-1-5);

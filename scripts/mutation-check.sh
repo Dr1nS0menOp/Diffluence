@@ -257,7 +257,7 @@ mutate "font changes are not audited" internal/settings/font.go \
 mutate "a replaced font file stays on disk" internal/settings/font.go \
   's.replace("if found {", "if false && found {")' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont)$'
 mutate "publishing skips the check" internal/pages/versions.go \
-  's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif p.CurrentVersion != in.BaseVersion")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestArchivedPagesAreReadOnlyAndLeaveEveryList|TestEditRestrictionDoesNotInherit|TestEveryObjectRouteIsProtected|TestScheduledPublishingStopsWhenTheRightsAreGone)$'
+  's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\thead, err := headVersion(ctx, tx, p)", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\thead, err := headVersion(ctx, tx, p)")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestArchivedPagesAreReadOnlyAndLeaveEveryList|TestEditRestrictionDoesNotInherit|TestEveryObjectRouteIsProtected|TestScheduledPublishingStopsWhenTheRightsAreGone)$'
 mutate "search ignores permissions" internal/search/words.go \
   's.replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "")' $app -run TestAWrongRowOfTheSearchTableShowsNothing
 mutate "a hidden page counts in a search" internal/search/words.go \
@@ -285,7 +285,7 @@ mutate "a page returns while its parent is in the trash" internal/pages/tree.go 
 mutate "SVG shown inline" internal/attachments/attachments.go \
   's.replace(`"image/webp": true}`, `"image/webp": true, "text/xml; charset=utf-8": true, "text/plain": true, "text/xml": true}`)' $app -run '^(TestAttachmentsNeverTrustAFile|TestPageLookIsCheckedAndAudited)$'
 mutate "publish loses its audit event" internal/pages/pages.go \
-  's.replace("return p, record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent, \"kind\": in.kind})", "return p, nil")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
+  's.replace("if err := record(ctx, tx, c, \"page.created\", p, map[string]any{\"parent_id\": in.parent, \"kind\": in.kind}); err != nil {", "if err := error(nil); err != nil {")' ./internal/app/ -run TestAuditAndOutboxPerStateChange
 mutate "javascript links accepted" internal/document/document.go \
   's.replace("default:\n\t\treturn \"\", bad\n\t}\n\treturn href, nil", "default:\n\t}\n\treturn href, nil")' ./internal/document/
 mutate "a file may point anywhere" internal/document/attrs.go \
@@ -351,7 +351,7 @@ mutate "templates open as pages" internal/permissions/evaluate.go \
   's.replace("p.Kind != KindTemplate, true)", "true, true)")' $perms
 mutate "SQL: lists show archived pages" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE p.archived_at IS NULL\n$$;", "WHERE true\n$$;")' $perms
-mutate "SQL: templates show in lists" internal/db/migrations/0008_organising.sql \
+mutate "SQL: templates show in lists" internal/db/migrations/0051_document_control.sql \
   's.replace("AND p.kind <> \x27template\x27\n", "\n")' $perms
 mutate "a label reveals hidden pages" internal/pages/labels.go \
   's.replace("JOIN perm_listed_pages($1) v ON v.page_id = l.page_id", "JOIN (SELECT $1::uuid AS u) v ON true")' $app -run TestLabelsAreCleanedAndNeverRevealHiddenPages
@@ -361,12 +361,12 @@ mutate "a move skips hidden pages" internal/pages/move.go \
   's.replace("if hidden {\n", "if hidden && len(tree) < 0 {\n")' $app -run TestMoveBetweenSpacesIsRefusedWhenItWouldTouchTooMuch
 mutate "a restore drops a restriction" internal/pages/archive.go \
   's.replace("if len(parents) > 0 && !withParents {", "if len(parents) < 0 && !withParents {")' $app -run TestARestoreBelowAnArchivedPageCannotDropARestriction
-mutate "publishing ignores required approval" internal/pages/versions.go \
-  's.replace("if err := s.requireApproved(ctx, tx, p, title, doc); err != nil {", "if err := s.requireApproved(ctx, tx, p, title, doc); err != nil && len(title) < 0 {")' $app -run TestASpaceCanRequireApprovalOfTheExactText
+mutate "publishing ignores required approval" internal/pages/control.go \
+  's.replace("\treturn s.requireApproved(ctx, tx, p, title, doc)\n", "\treturn nil\n")' $app -run TestASpaceCanRequireApprovalOfTheExactText
 mutate "a scheduled publish ignores lost rights" internal/pages/schedule.go \
   's.replace("_, err = s.Publish(ctx, identity.Caller{UserID: due.user}, due.page,", "var author uuid.UUID\n\t\t_ = s.pool.QueryRow(ctx, \"SELECT created_by FROM pages WHERE id = $1\", due.page).Scan(&author)\n\t\t_, err = s.Publish(ctx, identity.Caller{UserID: author}, due.page,")' $app -run TestScheduledPublishingStopsWhenTheRightsAreGone
 mutate "handing over gives delete own" internal/permissions/service.go \
-  's.replace("SELECT space_id, status, created_by, kind,", "SELECT space_id, status, COALESCE(owner_id, created_by), kind,")' $app -run TestHandingOverAPageGivesNoRightToDeleteIt
+  's.replace("SELECT p.space_id, p.status, p.created_by, p.kind,", "SELECT p.space_id, p.status, COALESCE(p.owner_id, p.created_by), p.kind,")' $app -run TestHandingOverAPageGivesNoRightToDeleteIt
 mutate "a bulk job skips the check" internal/pages/content.go \
   's.replace("if err := s.applyContent(ctx, c, id, in.Action); err != nil {", "var author uuid.UUID\n\t\t_ = s.pool.QueryRow(ctx, \"SELECT created_by FROM pages WHERE id = $1\", id).Scan(&author)\n\t\t_ = c\n\t\tif err := s.applyContent(ctx, identity.Caller{UserID: author}, id, in.Action); err != nil {")' $app -run TestContentScreenFiltersAndReportsWhatWorked
 
@@ -1068,9 +1068,9 @@ mutate "an edit restriction does not stop a move out" internal/permissions/evalu
   's.replace("AttachmentAdd, ActionAttachmentDelete, PageMoveOut, DatabaseEdit:", "AttachmentAdd, ActionAttachmentDelete, DatabaseEdit:")' $perms -run TestMatrixEvaluate
 mutate "asking for guests stops in an archived space" internal/permissions/evaluate.go \
   's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
-# Migration 0044 holds the latest rbac_split_off, so the mutations of the split aim there.
-mutate "the migration gives editors no move out" internal/db/migrations/0044_database_edit_and_role_names.sql \
-  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"']", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'database.edit'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+# Migration 0051 holds the latest rbac_split_off, so the mutations of the split aim there.
+mutate "the migration gives editors no move out" internal/db/migrations/0051_document_control.sql \
+  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"'", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'database.edit'"'"'")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "kept facts ignore the permission generation" internal/permissions/factcache.go \
@@ -1093,11 +1093,11 @@ mutate "a request from before a change uses kept facts" internal/permissions/fac
   's.replace("\treturn gen == c.gen\n", "\treturn gen <= c.gen\n")' $perms -run TestKeptFactsEndWithTheirGenerationAndTheirAge
 mutate "a purged page leaves its reactions" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("CREATE TRIGGER pages_take_reactions AFTER DELETE ON pages\n    FOR EACH ROW", "CREATE TRIGGER pages_take_reactions AFTER DELETE ON pages\n    FOR EACH ROW WHEN (false)")' $app -run TestAPurgedPageLeavesNothingBehind
-mutate "a list shows a hidden page" internal/db/migrations/0040_finer_permissions.sql \
+mutate "a list shows a hidden page" internal/db/migrations/0051_document_control.sql \
   's.replace("      AND p.archived_at IS NULL\n      AND p.id NOT IN (SELECT h.page_id FROM perm_hidden_pages(u) h)", "      AND p.archived_at IS NULL")' $app -run TestNoListShowsAHiddenPageOrWhatHangsOnIt
 mutate "a move out of a restricted branch needs no right to restrict" internal/pages/move.go \
   's.replace("\tif len(lost) \x3e 0 {\n\t\tif err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {", "\tif len(lost) \x3c 0 {\n\t\tif err := s.perms.RequirePage(ctx, tx, c.UserID, p.ID, permissions.RestrictionManage, uuid.Nil); err != nil {")' $app -run TestNoPlaceChangeOpensAPage
-mutate "the faster list forgets the archive" internal/db/migrations/0040_finer_permissions.sql \
+mutate "the faster list forgets the archive" internal/db/migrations/0051_document_control.sql \
   's.replace("      AND p.archived_at IS NULL\n", "")' $perms -run TestMatrixSQLAgreesWithEvaluate
 mutate "the faster hidden pages miss a group" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("OR (r.subject_type = '"'"'group'"'"' AND r.subject_id IN\n                   (SELECT gm.group_id FROM group_members gm WHERE gm.user_id = u)))))", "OR false)))")' $perms -run TestMatrixSQLAgreesWithEvaluate
@@ -1210,7 +1210,7 @@ mutate "a copied item asks for nothing of its kind" internal/pages/tree.go \
   's.replace("\tif err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {\n\t\treturn Page{}, err\n\t}\n", "")' $app -run TestCopyingADatabaseAsksForDatabasesWhereTheCopyGoes
 mutate "a branch moves out without the kinds in it" internal/pages/move.go \
   's.replace("append([]string{permissions.SpaceView}, needed...)", "append([]string{permissions.SpaceView, permissions.PageCreate}, needed[:0]...)")' $app -run TestMovingADatabaseToAnotherSpaceAsksForDatabasesThere
-mutate "the migration gives page creators no posts" internal/db/migrations/0044_database_edit_and_role_names.sql \
+mutate "the migration gives page creators no posts" internal/db/migrations/0051_document_control.sql \
   's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"']", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves roles without posts and databases" internal/db/migrations/0041_posts_and_databases.sql \
   's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1325,8 +1325,8 @@ mutate "the built-in editor cannot edit databases" internal/permissions/manage.g
   's.replace("PostCreate, DatabaseCreate,\n\t\tDatabaseEdit},", "PostCreate, DatabaseCreate},")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "the editable list ignores the kind" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("AND CASE WHEN p.kind = '"'"'database'"'"'", "AND CASE WHEN false")' $perms -run TestDatabasesAndPagesAreEditedApart
-mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0044_database_edit_and_role_names.sql \
-  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"']", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0051_document_control.sql \
+  's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"', ", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', ")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration gives editors no database editing" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("\nSELECT rbac_split_roles_from(", "\nSELECT 1, (")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "the migration runs every earlier split again" internal/db/migrations/0044_database_edit_and_role_names.sql \
@@ -1375,7 +1375,7 @@ mutate "requests wait for a connection without a limit" internal/httpapi/server.
 mutate "a request on a full pool is not told busy" internal/httpapi/server.go \
   's.replace("case db.AcquireRanOut(r.Context()):", "case false:")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
 mutate "the feed shows an older version of a page" internal/feed/feed.go \
-  's.replace("AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)", "")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+  's.replace("AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent", "AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE false")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "the feed shows pages the reader may not see" internal/feed/feed.go \
   's.replace("AND ` + visible(\"v.page_id\") + `", "AND true")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "popular leaves out pages with only reactions" internal/feed/feed.go \
@@ -1786,6 +1786,48 @@ mutate "a node on a restored database leaves the settings lost" internal/app/upg
   's.replace("though it is recorded.\n\t\treturn db.ApplySessionSettings(ctx, owner)", "though it is recorded.\n\t\treturn nil")' $app -run TestANodeStartingOnARestoredDatabaseSetsTheSessionSettingsAgain
 mutate "migrate leaves the settings lost" cmd/diffluence/main.go \
   's.replace("if err := db.ApplySessionSettings(ctx, pool); err != nil {", "if err := error(nil); err != nil {")' ./cmd/diffluence/ -run TestMigrateSetsTheSessionSettingsAgainWithNothingToMigrate
+# Spec 064, wave DC1: readers see approved versions only, every change starts review again,
+# a publish supersedes the round, a space workflow wins, and no workflow lacks a way out.
+mutate "a never-approved page shows to readers" internal/permissions/evaluate.go \
+  's.replace("\tif p.ControlHidden {", "\tif false {")' $perms -run TestMatrixEvaluate
+mutate "an edit restriction does not stop an author seeing the head" internal/permissions/evaluate.go \
+  's.replace("return len(in.Page.EditSubjects) == 0 || in.User.matchesAny(in.Page.EditSubjects)", "return true")' $perms -run TestMatrixEvaluate
+mutate "the visible list shows hidden controlled pages" internal/db/migrations/0051_document_control.sql \
+  's.replace("      AND p.id NOT IN (SELECT c.page_id FROM perm_control_hidden_pages(u) c)\n", "")' $perms -run TestMatrixSQLAgreesWithEvaluate
+mutate "a withdrawn page shows to readers in SQL" internal/db/migrations/0051_document_control.sql \
+  's.replace("WHERE pc.approved_version IS NULL OR pc.state_kind = \x27obsolete\x27))", "WHERE pc.approved_version IS NULL))")' $perms -run TestMatrixSQLAgreesWithEvaluate
+mutate "a change to approved content reaches readers" internal/pages/pages.go \
+  's.replace("\tif controlled \x26\x26 ctl.approved() {\n\t\tworking := p", "\tif false {\n\t\tworking := p")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
+mutate "a change does not start review again" internal/pages/pages.go \
+  's.replace("return working, s.restartReview(ctx, tx, c, p, ctl, number, cause)", "return working, nil")' $app -run TestWhatRestartsReview
+mutate "an unchanged text still waits for review" internal/pages/control.go \
+  's.replace("\t\tif same {\n", "\t\tif same \x26\x26 false {\n")' $app -run TestWhatRestartsReview
+mutate "a publish leaves the round open" internal/pages/control.go \
+  's.replace("\tif err := endRound(ctx, tx, p.ID, roundStatusSuperseded, cause); err != nil {", "\tif err := error(nil); err != nil {")' $app -run TestAPublishSupersedesTheRoundAndItsAnswers
+mutate "an answer about a replaced text counts" internal/pages/control.go \
+  's.replace("\t\tif in.Version != ctl.headVersion {", "\t\tif false {")' $app -run TestAPublishSupersedesTheRoundAndItsAnswers
+mutate "a reader gets the head" internal/pages/control.go \
+  's.replace("\tif !d.Can[permissions.PageEdit] {", "\tif false {")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
+mutate "a reader reaches every version of a controlled page" internal/pages/control.go \
+  's.replace("return historyView{only: max(currentVersion, 1)}, nil", "return historyView{}, nil")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
+mutate "the feed shows a version waiting for review" internal/feed/feed.go \
+  's.replace("WHERE NOT v.silent AND ` + readable(\"v\") + `", "WHERE NOT v.silent")' $app -run TestTheFeedNeverShowsAVersionWaitingForReview
+mutate "a space workflow keeps the page workflows" internal/pages/assign.go \
+  's.replace("\"DELETE FROM page_workflows pw USING pages p WHERE p.id = pw.page_id AND p.space_id = $1\"", "\"SELECT $1::uuid\"")' $app -run TestTheSpaceWorkflowOverridesPageWorkflows
+mutate "a page gets its own workflow under a space workflow" internal/pages/assign.go \
+  's.replace("\t\tif spaceWorkflow {", "\t\tif false {")' $app -run TestTheSpaceWorkflowOverridesPageWorkflows
+mutate "a branch takes over page workflows unasked" internal/pages/assign.go \
+  's.replace("len(replaced) \x3e 0 \x26\x26 !in.ReplaceChildren \x26\x26 !in.Preview", "false")' $app -run TestABranchWorkflowFollowsMovesInAndOut
+mutate "a workflow may lack a way to approval" internal/workflow/workflow.go \
+  's.replace("\t\tif !leadsToApproval(s.ID, next, states) {", "\t\tif false {")' ./internal/workflow/ -run TestNoAcceptedWorkflowLacksAWayToApproval
+mutate "a state may be unreachable" internal/workflow/workflow.go \
+  's.replace("\t\tif !reached[s.ID] {", "\t\tif !reached[s.ID] \x26\x26 false {")' ./internal/workflow/ -run TestEachRuleOfAWorkflowIsChecked
+mutate "page.workflow is not split off page.edit in SQL" internal/db/migrations/0051_document_control.sql \
+  's.replace(", \x27database.edit\x27, \x27page.workflow\x27]", ", \x27database.edit\x27]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the migration gives administrators no workflows" internal/db/migrations/0051_document_control.sql \
+  's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.workflows\x27]);", "SELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
+mutate "a bundle from before spec 064 gives editors no workflows" internal/exchange/bundlein.go \
+  's.replace("permissions.PageWorkflow:      6,", "permissions.PageWorkflow:      1,")' ./internal/exchange/ -run TestABundleOfVersionFiveGivesEditorsAndAdministratorsTheWorkflowPermissions
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

@@ -159,10 +159,14 @@ func (s *Service) Publish(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		if err != nil {
 			return err
 		}
-		if p.CurrentVersion != in.BaseVersion && !in.Overwrite {
+		head, err := headVersion(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+		if head != in.BaseVersion && !in.Overwrite {
 			return apperr.Conflict("version_conflict", "Someone else published this page while you were editing.")
 		}
-		if err := s.requireApproved(ctx, tx, p, title, doc); err != nil {
+		if err := s.requireApprovedUnlessControlled(ctx, tx, p, title, doc); err != nil {
 			return err
 		}
 		if in.SetStage {
@@ -194,6 +198,23 @@ func currentDocument(ctx context.Context, tx pgx.Tx, p Page) (document.Node, err
 	return document.Parse(raw)
 }
 
+// headDocument is the title and text an author's change builds on: the head, which on a
+// controlled page can be newer than what readers see. Only routes that need edit use it.
+func headDocument(ctx context.Context, tx pgx.Tx, p Page) (string, document.Node, error) {
+	head, err := headVersion(ctx, tx, p)
+	if err != nil {
+		return "", document.Node{}, err
+	}
+	var raw []byte
+	var title string
+	err = tx.QueryRow(ctx, "SELECT title, document FROM page_versions WHERE page_id = $1 AND number = $2", p.ID, head).Scan(&title, &raw)
+	if err != nil {
+		return "", document.Node{}, err
+	}
+	doc, err := document.Parse(raw)
+	return title, doc, err
+}
+
 // Rename changes the title. It creates a version, so history shows who did it.
 func (s *Service) Rename(ctx context.Context, c identity.Caller, id uuid.UUID, title string) (Page, error) {
 	title, err := cleanTitle(title)
@@ -217,12 +238,15 @@ func (s *Service) Rename(ctx context.Context, c identity.Caller, id uuid.UUID, t
 			}
 			return record(ctx, tx, c, "page.renamed", out, nil)
 		}
-		doc, err := currentDocument(ctx, tx, p)
+		_, doc, err := headDocument(ctx, tx, p)
 		if err != nil {
 			return err
 		}
 		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID}); err != nil {
 			return err
+		}
+		if out.working {
+			return nil // the new title waits for review, and page.working_published records it
 		}
 		return record(ctx, tx, c, "page.renamed", out, map[string]any{"previous_title": p.Title})
 	})
@@ -252,8 +276,12 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return nil, err
 	}
+	history, err := s.historyOf(ctx, c, id)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, "SELECT "+versionColumns+` FROM page_versions v
-		LEFT JOIN users u ON u.id = v.author_id WHERE v.page_id = $1 ORDER BY v.number DESC LIMIT 1000`, id)
+		LEFT JOIN users u ON u.id = v.author_id WHERE v.page_id = $1 AND ($2 = 0 OR v.number = $2) AND ($3 = 0 OR v.number <= $3) ORDER BY v.number DESC LIMIT 1000`, id, history.only, history.upTo)
 	if err != nil {
 		return nil, err
 	}
@@ -265,7 +293,7 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
-	removed, err := s.pool.Query(ctx, "SELECT number, removed_at FROM removed_versions WHERE page_id = $1", id)
+	removed, err := s.pool.Query(ctx, "SELECT number, removed_at FROM removed_versions WHERE page_id = $1 AND $2 = 0 AND ($3 = 0 OR number <= $3)", id, history.only, history.upTo)
 	if err != nil {
 		return nil, err
 	}
@@ -285,9 +313,16 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	return out, nil
 }
 
-func (s *Service) version(ctx context.Context, id uuid.UUID, number int) (Version, error) {
+func (s *Service) version(ctx context.Context, c identity.Caller, id uuid.UUID, number int) (Version, error) {
 	var v Version
-	err := s.pool.QueryRow(ctx, "SELECT "+versionColumns+`, v.document FROM page_versions v
+	history, err := s.historyOf(ctx, c, id)
+	if err != nil {
+		return v, err
+	}
+	if !history.shows(number) {
+		return v, apperr.NotFound()
+	}
+	err = s.pool.QueryRow(ctx, "SELECT "+versionColumns+`, v.document FROM page_versions v
 		LEFT JOIN users u ON u.id = v.author_id WHERE v.page_id = $1 AND v.number = $2`, id, number).
 		Scan(&v.Number, &v.Title, &v.AuthorID, &v.AuthorName, &v.Summary, &v.RestoredFrom, &v.CreatedAt, &v.Imported, &v.Document)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -316,7 +351,11 @@ func (s *Service) RemoveVersion(ctx context.Context, c identity.Caller, id uuid.
 		if err != nil {
 			return err
 		}
-		if number == p.CurrentVersion {
+		head, err := headVersion(ctx, tx, p)
+		if err != nil {
+			return err
+		}
+		if number == p.CurrentVersion || number == head {
 			return apperr.Conflict("current_version", "The current version cannot be removed. Publish a new one first.")
 		}
 		var raw []byte
@@ -351,7 +390,7 @@ func (s *Service) GetVersion(ctx context.Context, c identity.Caller, id uuid.UUI
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return Version{}, err
 	}
-	v, err := s.version(ctx, id, number)
+	v, err := s.version(ctx, c, id, number)
 	if err != nil {
 		return v, err
 	}
@@ -371,11 +410,11 @@ func (s *Service) Compare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return Comparison{}, err
 	}
-	a, err := s.version(ctx, id, from)
+	a, err := s.version(ctx, c, id, from)
 	if err != nil {
 		return Comparison{}, err
 	}
-	b, err := s.version(ctx, id, to)
+	b, err := s.version(ctx, c, id, to)
 	if err != nil {
 		return Comparison{}, err
 	}
@@ -441,6 +480,9 @@ func (s *Service) RestoreVersion(ctx context.Context, c identity.Caller, id uuid
 		if out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID, RestoredFrom: &number}); err != nil {
 			return err
 		}
+		if out.working {
+			return nil // a restore is a change that waits for review (DOC-312)
+		}
 		return record(ctx, tx, c, "page.version_restored", out, map[string]any{"restored_from": number})
 	})
 	return out, err
@@ -462,15 +504,15 @@ func (s *Service) SetTaskDone(ctx context.Context, c identity.Caller, taskID uui
 		if err != nil {
 			return err
 		}
-		doc, err := currentDocument(ctx, tx, p)
+		title, doc, err := headDocument(ctx, tx, p)
 		if err != nil {
 			return err
 		}
 		if !document.SetTaskDone(&doc, taskID, done) {
 			return apperr.NotFound()
 		}
-		out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: p.Title, Doc: doc, Author: c.UserID, Silent: true})
-		if err != nil {
+		out, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: title, Doc: doc, Author: c.UserID, Silent: true})
+		if err != nil || out.working {
 			return err
 		}
 		action := "task.reopened"

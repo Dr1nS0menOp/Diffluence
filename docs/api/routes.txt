@@ -236,6 +236,7 @@ GET /api/v1/spaces/{id}/tree/branches                          object:space.view
 GET /api/v1/spaces/{id}/tree/find                              object:space.view
 GET /api/v1/spaces/{id}/watch                                  object:space.view
 GET /api/v1/spaces/{id}/webhooks                               object:space.automation
+GET /api/v1/spaces/{id}/workflows                              object:space.view
 GET /api/v1/start                                              authenticated
 GET /api/v1/system/capabilities                                permission:use_product
 GET /api/v1/system/info                                        permission:use_product
@@ -244,6 +245,8 @@ GET /api/v1/templates/{id}/export                              authenticated
 GET /api/v1/templates/{id}/files/{file}                        authenticated
 GET /api/v1/webhooks/{id}                                      object:space.automation
 GET /api/v1/webhooks/{id}/deliveries                           object:space.automation
+GET /api/v1/workflows/{id}                                     authenticated
+GET /api/v1/workflows/{id}/history                             authenticated
 GET /collab                                                    public
 GET /collab/documents/{id}                                     public
 GET /livez                                                     public
@@ -375,6 +378,7 @@ POST /api/v1/pages/{id}/publish                                object:page.edit
 POST /api/v1/pages/{id}/save-as-template                       object:space.templates
 POST /api/v1/pages/{id}/share                                  object:page.view
 POST /api/v1/pages/{id}/sort-children                          object:page.edit
+POST /api/v1/pages/{id}/transitions                            object:page.edit
 POST /api/v1/pages/{id}/unarchive                              object:page.archive
 POST /api/v1/pages/{id}/undo-delete                            authenticated
 POST /api/v1/pages/{id}/versions/{number}/restore              object:page.edit
@@ -408,11 +412,13 @@ POST /api/v1/spaces/{id}/templates/import                      object:space.temp
 POST /api/v1/spaces/{id}/trash/bulk                            object:space.administer
 POST /api/v1/spaces/{id}/unarchive                             object:space.administer
 POST /api/v1/spaces/{id}/webhooks                              object:space.automation
+POST /api/v1/spaces/{id}/workflows                             object:space.workflows
 POST /api/v1/tasks/{id}/done                                   object:page.edit
 POST /api/v1/templates/{id}/use                                authenticated
 POST /api/v1/trash/{id}/restore                                object:space.administer
 POST /api/v1/webhooks/{id}/deliveries/{delivery}/resend        object:space.automation
 POST /api/v1/webhooks/{id}/rotate                              session-only object:space.automation
+POST /api/v1/workflows/{id}/archive                            authenticated
 POST /collab/authorize                                         public
 POST /hooks/{token}                                            public
 POST /scim/v2/Groups                                           scim-token
@@ -462,6 +468,7 @@ PUT /api/v1/pages/{id}/stage                                   object:page.edit
 PUT /api/v1/pages/{id}/verification                            object:page.edit
 PUT /api/v1/pages/{id}/watch                                   object:page.view
 PUT /api/v1/pages/{id}/watchers/{user}                         object:page.watchers
+PUT /api/v1/pages/{id}/workflow                                object:page.workflow
 PUT /api/v1/rules/{id}                                         object:space.automation
 PUT /api/v1/sites/{id}/pages                                   object:site.publish
 PUT /api/v1/spaces/{id}/approvals                              object:space.approvals
@@ -480,8 +487,10 @@ PUT /api/v1/spaces/{id}/shortcuts                              object:space.look
 PUT /api/v1/spaces/{id}/statuses                               object:space.statuses
 PUT /api/v1/spaces/{id}/title-align                            object:space.look
 PUT /api/v1/spaces/{id}/watch                                  object:space.view
+PUT /api/v1/spaces/{id}/workflow                               object:space.workflows
 PUT /api/v1/templates/{id}/favourite                           authenticated
 PUT /api/v1/users/{id}/follow                                  authenticated
+PUT /api/v1/workflows/{id}                                     authenticated
 PUT /collab/documents/{id}                                     public
 PUT /scim/v2/Groups/{id}                                       scim-token
 PUT /scim/v2/Users/{id}                                        scim-token

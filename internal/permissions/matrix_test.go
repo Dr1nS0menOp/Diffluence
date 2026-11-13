@@ -87,7 +87,7 @@ var managerPerms = permissions.Templates[permissions.TemplateManager]
 // splitOffAdministerPerms is everything split off space administration, in specs 036 and 040.
 var splitOffAdministerPerms = []string{permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates,
 	permissions.SpaceAudit, permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals,
-	permissions.SpaceBundle, permissions.SpaceLook, permissions.PageWatchers}
+	permissions.SpaceBundle, permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows}
 
 var grantCases = []grantCase{
 	{name: "none", subject: "none"},
@@ -180,22 +180,38 @@ type pageState struct {
 	kind         string
 	// noPage asks at space level, with no page at all (PRM-166).
 	noPage bool
+	// control puts the page under document control (spec 064): "" not controlled, "never"
+	// never approved, "approved" with an approved version, "withdrawn" in an obsolete state.
+	control string
 }
 
+// Control states of a page, as pageState.control names them.
+const (
+	controlNever     = "never"
+	controlApproved  = "approved"
+	controlWithdrawn = "withdrawn"
+)
+
 var pageStates = []pageState{
-	{"published", "published", false, false, "page", false},
-	{"others-draft", "draft", false, false, "page", false},
-	{"own-draft", "draft", true, false, "page", false},
-	{"trashed", "trashed", false, false, "page", false},
-	{"archived", "published", false, true, "page", false},
-	{"own-archived", "published", true, true, "page", false},
-	{"post", "published", false, false, "post", false},
-	{"template", "published", false, false, "template", false},
-	{"own-template", "published", true, false, "template", false},
-	{"folder", "published", false, false, "folder", false},
-	{"link", "published", false, false, "link", false},
-	{"database", "published", false, false, "database", false},
+	{"published", "published", false, false, "page", false, ""},
+	{"others-draft", "draft", false, false, "page", false, ""},
+	{"own-draft", "draft", true, false, "page", false, ""},
+	{"trashed", "trashed", false, false, "page", false, ""},
+	{"archived", "published", false, true, "page", false, ""},
+	{"own-archived", "published", true, true, "page", false, ""},
+	{"post", "published", false, false, "post", false, ""},
+	{"template", "published", false, false, "template", false, ""},
+	{"own-template", "published", true, false, "template", false, ""},
+	{"folder", "published", false, false, "folder", false, ""},
+	{"link", "published", false, false, "link", false, ""},
+	{"database", "published", false, false, "database", false, ""},
 	{name: "no-page", noPage: true},
+	// Spec 064: what readers see of a controlled page.
+	{"controlled-never-approved", "published", false, false, "page", false, controlNever},
+	{"controlled-approved", "published", false, false, "page", false, controlApproved},
+	{"controlled-withdrawn", "published", false, false, "page", false, controlWithdrawn},
+	{"controlled-database-never-approved", "published", false, false, "database", false, controlNever},
+	{"controlled-archived-never-approved", "published", false, true, "page", false, controlNever},
 }
 
 var spaceStates = []string{"active", "archived", "trashed"}
@@ -209,6 +225,7 @@ var actions = []string{
 	permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
 	permissions.SpaceLook, permissions.PageWatchers, permissions.PageMoveOut, permissions.SpaceInviteGuests,
 	permissions.PostCreate, permissions.DatabaseCreate, permissions.DatabaseEdit,
+	permissions.SpaceWorkflows, permissions.PageWorkflow,
 }
 
 // isDeleteAction says whether the creator of the object decides, through "delete own".
@@ -272,6 +289,18 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		if !matches(r.viewRoot) || !matches(r.viewMid) || !matches(r.viewLeaf) {
 			return false
 		}
+		// A controlled page that was never approved, or was withdrawn, exists only for its
+		// authors: the edit permission of its kind and the edit restriction on it. Whether it
+		// is archived does not matter (spec 064, DOC-300 to DOC-322).
+		if ps.control == controlNever || ps.control == controlWithdrawn {
+			edit := permissions.PageEdit
+			if ps.kind == "database" {
+				edit = permissions.DatabaseEdit
+			}
+			if !has(edit) || !matches(r.editLeaf) {
+				return false
+			}
+		}
 	}
 	// Archived spaces are read-only. What only looks after the space keeps working.
 	switch action {
@@ -279,7 +308,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		permissions.SpaceManageAccess, permissions.SpaceInviteGuests, permissions.AnalyticsView,
 		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
-		permissions.SpaceLook, permissions.PageWatchers:
+		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows:
 	default:
 		if spaceStatus == "archived" {
 			return false
@@ -292,7 +321,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage, permissions.AnalyticsView,
 		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
-		permissions.SpaceLook, permissions.PageWatchers:
+		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows:
 	default:
 		if ps.archived {
 			return false
@@ -335,7 +364,8 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 	// parent never counts.
 	switch action {
 	case permissions.PageEdit, permissions.PageArchive, permissions.ActionPageDelete,
-		permissions.AttachmentAdd, permissions.ActionAttachmentDelete, permissions.PageMoveOut, permissions.DatabaseEdit:
+		permissions.AttachmentAdd, permissions.ActionAttachmentDelete, permissions.PageMoveOut, permissions.DatabaseEdit,
+		permissions.PageWorkflow:
 		if !ps.noPage && !matches(r.editLeaf) {
 			return false
 		}
@@ -457,7 +487,8 @@ func evaluateOnePerson(t *testing.T, u userCase, id matrixIDs, subjects func(str
 				var page *permissions.PageFacts
 				if !ps.noPage {
 					page = &permissions.PageFacts{ID: id.leaf, Status: ps.status, CreatedBy: creator, Kind: ps.kind,
-						Archived: ps.archived, ViewChain: chain, EditSubjects: subjects(r.editLeaf)}
+						Archived: ps.archived, ViewChain: chain, EditSubjects: subjects(r.editLeaf),
+						ControlHidden: ps.control == controlNever || ps.control == controlWithdrawn}
 				}
 				for _, ss := range spaceStates {
 					space := permissions.SpaceFacts{ID: id.leaf, Status: ss, Grants: grants}
@@ -537,6 +568,12 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 	exec(`INSERT INTO users (id, origin_instance_id, type, status, email, display_name)
 		VALUES ($1, $2, 'member', 'active', 'other@example.com', 'o'), ($3, $2, 'member', 'disabled', 'disabled@example.com', 'd')`,
 		other, inst, disabled)
+	// One workflow serves every controlled page: the rule reads the state of a page, not
+	// its workflow.
+	workflowSpace, workflow := ids.New(), ids.New()
+	exec(`INSERT INTO spaces (id, origin_instance_id, key, name, status, created_by) VALUES ($1, $2, $3, 'w', 'active', $4)`,
+		workflowSpace, inst, workflowSpace.String(), other)
+	exec(`INSERT INTO workflows (id, space_id, name, created_by) VALUES ($1, $2, 'w', $3)`, workflow, workflowSpace, other)
 
 	type realUser struct {
 		id uuid.UUID
@@ -596,6 +633,12 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 		if parent != nil {
 			queue(`INSERT INTO page_tree (ancestor_id, descendant_id, depth)
 				SELECT ancestor_id, $2, depth + 1 FROM page_tree WHERE descendant_id = $1`, *parent, id)
+		}
+		if ps.control != "" {
+			kind := map[string]string{controlNever: "draft", controlApproved: "approved", controlWithdrawn: "obsolete"}[ps.control]
+			queue(`INSERT INTO page_control (page_id, workflow_id, workflow_version, state_id, state_kind, approved_version, governed_by)
+				VALUES ($1, $2, 1, $3, $3, CASE WHEN $4::boolean THEN NULL ELSE 1 END, 'page')`,
+				id, workflow, kind, ps.control == controlNever)
 		}
 		return id
 	}

@@ -303,6 +303,7 @@ func (s *Service) Choices(ctx context.Context, c identity.Caller, id uuid.UUID) 
 	rows, err := s.pool.Query(ctx, `SELECT p.id, p.parent_id, p.title,
 			EXISTS (SELECT 1 FROM public_site_pages k WHERE k.site_id = $2 AND k.page_id = p.id),
 			EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id AND r.kind = 'view' WHERE t.descendant_id = p.id)
+			OR EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'))
 		FROM pages p JOIN perm_visible_pages($3) vis ON vis.page_id = p.id
 		WHERE p.space_id = $1 AND p.status = 'published' AND p.archived_at IS NULL AND p.kind = ANY($4)
 		ORDER BY (SELECT count(*) FROM page_tree a WHERE a.descendant_id = p.id), p.position, p.id`,

@@ -29,13 +29,14 @@ const (
 // Templates maps a template to its permissions.
 var Templates = map[string][]string{
 	TemplateViewer: {SpaceView, SpaceExport, CommentAdd, CommentDeleteOwn},
-	TemplateEditor: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn,
+	TemplateEditor: {SpaceView, SpaceExport, PageCreate, PageEdit, PageWorkflow, PageArchive, PageDeleteOwn,
 		CommentAdd, CommentDeleteOwn, AttachmentAdd, AttachmentDeleteOwn, PageMoveOut, PostCreate, DatabaseCreate,
 		DatabaseEdit},
 	// Manager runs the people and the content of a space, but not the space itself.
 	TemplateManager: {SpaceView, SpaceExport, PageCreate, PageEdit, PageArchive, PageDeleteOwn, PageDeleteAny,
 		CommentAdd, CommentDeleteOwn, CommentDeleteAny, AttachmentAdd, AttachmentDeleteOwn, AttachmentDeleteAny,
-		RestrictionManage, SpaceManageAccess, PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit},
+		RestrictionManage, SpaceManageAccess, PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit,
+		PageWorkflow},
 	TemplateSpaceAdmin: AllSpacePermissions,
 }
 

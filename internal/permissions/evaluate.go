@@ -78,6 +78,12 @@ const (
 	// and everything page.edit allows on any other item (ADR-040, spec 049). On a database,
 	// asking for page.edit asks for this.
 	DatabaseEdit = "database.edit"
+
+	// SpaceWorkflows makes, changes and archives the workflows of a space and sets the space
+	// workflow (spec 064).
+	SpaceWorkflows = "space.workflows"
+	// PageWorkflow sets a workflow of the space on a page or a branch, and removes it.
+	PageWorkflow = "page.workflow"
 )
 
 // Kinds of item that have a create permission of their own (ADR-038). The pages package
@@ -109,6 +115,7 @@ var AllSpacePermissions = []string{
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
 	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
 	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit,
+	SpaceWorkflows, PageWorkflow,
 }
 
 // SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
@@ -130,6 +137,8 @@ var SplitFrom = map[string]string{
 	PostCreate:        PageCreate,
 	DatabaseCreate:    PageCreate,
 	DatabaseEdit:      PageEdit,
+	SpaceWorkflows:    SpaceAdminister,
+	PageWorkflow:      PageEdit,
 }
 
 // splitOffAdminister reports whether a permission was split off space administration, so
@@ -204,6 +213,9 @@ type PageFacts struct {
 	ViewChain []RestrictionLevel
 	// EditSubjects is the edit restriction on the page itself (empty = none).
 	EditSubjects []Subject
+	// ControlHidden marks a controlled page that was never approved or was withdrawn: only
+	// its authors may see it (spec 064, DOC-300 to DOC-322).
+	ControlHidden bool
 }
 
 // Input is one question: may this user do this?
@@ -243,6 +255,8 @@ type Decision struct {
 // isEdit reports whether an edit restriction on the page applies to action.
 func isEdit(action string) bool {
 	switch action {
+	case PageWorkflow:
+		return true
 	case PageEdit, PageArchive, ActionPageDelete, AttachmentAdd, ActionAttachmentDelete, PageMoveOut, DatabaseEdit:
 		return true
 	}
@@ -374,7 +388,21 @@ func Evaluate(in Input) Decision {
 	if isEdit(in.Action) && len(p.EditSubjects) > 0 {
 		check(LayerRestriction, "edit:"+p.ID.String(), in.User.matchesAny(p.EditSubjects), false)
 	}
+	if p.ControlHidden {
+		check(LayerPage, "control_author", mayAuthor(in), true)
+	}
 	return d
+}
+
+// mayAuthor says whether the person is an author of the page: they hold the edit permission
+// of its kind and no edit restriction keeps them out. Archiving does not count, so the
+// authors of an archived, never-approved page still see it. perm_control_hidden_pages is
+// the same rule in SQL.
+func mayAuthor(in Input) bool {
+	if !holds(in, spaceEditPermission(in.Page)) {
+		return false
+	}
+	return len(in.Page.EditSubjects) == 0 || in.User.matchesAny(in.Page.EditSubjects)
 }
 
 // Global permissions that decide who may see a person.

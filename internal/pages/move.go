@@ -199,6 +199,9 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := reposition(ctx, tx, moved, in); err != nil {
 		return Page{}, err
 	}
+	if err := s.settleBranch(ctx, tx, c, p.ID, settleMoved); err != nil {
+		return Page{}, err
+	}
 	out, err := load(ctx, tx, p.ID)
 	if err != nil {
 		return Page{}, err

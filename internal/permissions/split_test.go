@@ -22,10 +22,16 @@ func TestAListFromBeforeASplitGetsWhatWasSplitOff(t *testing.T) {
 	if !slices.Contains(got, SpaceLabels) || slices.Contains(got, SpaceAudit) {
 		t.Fatalf("a list from between the splits: %v", got)
 	}
+	// Written before spec 064: administering and editing bring the workflow permissions.
+	got = WithSplitOff([]string{SpaceView, SpaceAdminister, PageEdit, SitePublish, SpaceLabels, PageMoveOut, DatabaseEdit})
+	if !slices.Contains(got, SpaceWorkflows) || !slices.Contains(got, PageWorkflow) {
+		t.Fatalf("a list from before spec 064: %v", got)
+	}
 }
 
 func TestAListThatKnowsTheSplitStaysAsItIs(t *testing.T) {
-	in := []string{SpaceView, SpaceAdminister, SitePublish, SpaceLabels}
+	// It names a permission of every split off administer: 036, 040 and 064.
+	in := []string{SpaceView, SpaceAdminister, SitePublish, SpaceLabels, SpaceWorkflows}
 	if got := WithSplitOff(in); !slices.Equal(got, slices.Sorted(slices.Values(in))) {
 		t.Fatalf("a list naming finer permissions changed: %v", got)
 	}

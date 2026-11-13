@@ -82,6 +82,12 @@ func (s *Service) Move(ctx context.Context, c identity.Caller, id uuid.UUID, in 
 		if err := reposition(ctx, tx, p, in); err != nil {
 			return err
 		}
+		if !sameParent {
+			// Into a branch it joins in the start state, out of one it is ordinary again (DOC-410).
+			if err := s.settleBranch(ctx, tx, c, id, settleMoved); err != nil {
+				return err
+			}
+		}
 		out, err = load(ctx, tx, id)
 		if err != nil {
 			return err

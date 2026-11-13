@@ -149,6 +149,31 @@ What changed, besides the feed itself:
 - **No read holds the database for long.** Each query of a read stops after 15 seconds and the person is told the server is busy, as when no connection is free. Writes are not limited, so a change is never cut off halfway.
 
 Budgets on that data, checked by `TestTheFeedIsFastOnRealData` when it runs against the dump: recent 150 ms, for you 500 ms, popular 250 ms. **The stress test has not been repeated on the server with these changes.**
+
+### Document control on the real data set (spec 064, wave DC1)
+
+Measured on 13 November 2026 on the same dump, with a tenth of the pages put under control (5,962 pages: 80% approved, 15% never approved, 5% withdrawn, so 1,142 hidden from readers), in the development container while another build ran beside it. "Before" is the dump as restored, at migration 0049.
+
+| Query | Before | After |
+|---|---|---|
+| The pages a person may see, member | 26 ms | 39 ms |
+| The pages a person may see, watcher of every page | 24 ms | 31 ms |
+| The pages a person may edit, member and watcher | 46 and 65 ms | 56 and 92 ms |
+| The facts of one page for the rule | 0.03 ms | 0.06 ms |
+| Feed, recent, member and watcher | 37 and 38 ms | 37 and 36 ms |
+| Feed, for you, member | 50 ms | 50 ms |
+| Feed, for you, watcher of every page | 226 ms | 390 ms |
+
+The two feed rows compare the former queries with the new ones, run in turn at the same moment by `TestTheFeedKeepsItsHashOnRealData`; the first rows are single runs of `EXPLAIN ANALYZE`. The new cost of "for you" for the watcher is the current version of each of 60,384 watched pages, which bounds the walk so that no version under review shows; it stays inside its budget of 500 ms.
+
+Through the whole application, the median of seven requests (`TestDocumentControlOnRealData`):
+
+| Request | Ordinary page | Controlled page |
+|---|---|---|
+| Open a page, as a reader | 6.4 ms | 8.0 ms |
+| Open a page, as an author who sees the working version | 6.7 ms | 7.5 ms |
+
+The tree of the largest space took 17 ms, search on a common word 28 ms, and the recent feed 28 ms. An approval that makes a working version current, with search, links and tasks, took 12.1 ms as the median of seven, 15.8 ms at most. Spec 064 allows a controlled read 5 ms more than an ordinary one, and a step 20 ms. The visible set is still built once per query as a hash, and the hidden pages are looked up by key: as a join, PostgreSQL first read all 60,385 pages for it.
 ### What traces cost (spec 060)
 
 Measured on 12 November 2026 in the development container (16 CPUs) with `go test ./internal/tracing -bench . -benchmem`, spans going to an exporter that drops them, so the cost of sending to a collector is not in it.

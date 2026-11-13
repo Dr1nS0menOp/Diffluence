@@ -30,10 +30,10 @@ Document control is only as strong as its weakest path. Each line here is a situ
 
 ## 13.4 Several nodes and concurrency
 
-- **DOC-1230** · new · Two people answering the last two answers of a round at the same moment on two nodes produce exactly one transition: the round row is locked (`SELECT … FOR UPDATE`) while answering. *Proof:* a concurrency test with two goroutines and two connections.
-- **DOC-1231** · new · A publish and a final approval at the same moment: whichever commits first wins, and the other sees the new state (the approval of a superseded text is refused, DOC-330). *Proof:* a concurrency test.
+- **DOC-1230** · built · Two people answering the last two answers of a round at the same moment on two nodes produce exactly one transition: the round row is locked (`SELECT … FOR UPDATE`) while answering. *Proof:* a concurrency test with two goroutines and two connections.
+- **DOC-1231** · built · A publish and a final approval at the same moment: whichever commits first wins, and the other sees the new state (the approval of a superseded text is refused, DOC-330). *Proof:* a concurrency test.
 - **DOC-1232** · new · The due-date job (DOC-230) claims due rounds with `FOR UPDATE SKIP LOCKED`, so on several workers each reminder and escalation happens once. *Proof:* a test with two workers.
-- **DOC-1233** · new · The visibility row (`page_control`, DOC-1300) is updated in the same transaction as the transition, so no node can serve a reader a version that is not approved, even for a moment. *Proof:* a test that reads from another connection during a transition.
+- **DOC-1233** · built · The visibility row (`page_control`, DOC-1300) is updated in the same transaction as the transition, so no node can serve a reader a version that is not approved, even for a moment. *Proof:* a test that reads from another connection during a transition.
 
 ## 13.5 Time
 
@@ -43,7 +43,7 @@ Document control is only as strong as its weakest path. Each line here is a situ
 
 ## 13.6 Failures
 
-- **DOC-1250** · new · A failure while taking a transition (database error, a node dying) leaves the page in its previous state, with no partial answer, signature or visibility change, because it is one transaction. *Proof:* fault-injection tests.
+- **DOC-1250** · built · A failure while taking a transition (database error, a node dying) leaves the page in its previous state, with no partial answer, signature or visibility change, because it is one transaction. *Proof:* fault-injection tests.
 - **DOC-1251** · new · A failure while assigning a workflow to a large space as background work leaves each page either fully assigned or untouched, and the job resumes where it stopped. *Proof:* a test that kills the job halfway and resumes.
 - **DOC-1252** · new · A notification that fails to send is retried by the existing outbox and never blocks a transition. *Proof:* a test with a failing mail sender.
 - **DOC-1253** · new · Search indexing of a newly approved version runs after the transition; until it is done, readers find the previous approved version, never the working one. *Proof:* a test that delays indexing.

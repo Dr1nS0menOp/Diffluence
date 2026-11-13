@@ -80,6 +80,10 @@ type Page struct {
 	LinkTarget     string     `json:"link_target"`
 	CommentsClosed bool       `json:"comments_closed"`
 	Look
+
+	// working says this is the head of a controlled page as its authors see it, which
+	// readers do not see yet (spec 064). What follows a change must not tell watchers.
+	working bool
 }
 
 // Crumb is one step of the breadcrumb trail.
@@ -109,6 +113,8 @@ type Detail struct {
 	SeenVersion int        `json:"seen_version"`
 	Scheduled   *Scheduled `json:"scheduled"`
 	Approval    *Approval  `json:"approval"`
+	// Control is the workflow of a controlled page, nil for an ordinary page (spec 064).
+	Control *ControlInfo `json:"control"`
 
 	Features map[string]bool `json:"features"`
 }
@@ -153,11 +159,16 @@ const pageColumns = `id, space_id, parent_id, position, title, status, current_v
 	archived_at, archived_by, published_at, link_target`
 
 func scanPage(r pgx.Row) (Page, error) {
+	return scanPageAnd(r)
+}
+
+// scanPageAnd reads a page and the columns a query adds after pageColumns.
+func scanPageAnd(r pgx.Row, more ...any) (Page, error) {
 	var p Page
-	err := r.Scan(&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
+	err := r.Scan(append([]any{&p.ID, &p.SpaceID, &p.ParentID, &p.Position, &p.Title, &p.Status, &p.CurrentVersion,
 		&p.CreatedBy, &p.UpdatedBy, &p.CreatedAt, &p.UpdatedAt, &p.CommentsClosed,
 		&p.Emoji, &p.FullWidth, &p.TitleAlign, &p.HideChildren, &p.HeaderAttachmentID, &p.HeaderPosition, &p.Language,
-		&p.Kind, &p.OwnerID, &p.StageText, &p.StageColor, &p.ReviewOn, &p.ArchivedAt, &p.ArchivedBy, &p.PublishedAt, &p.LinkTarget)
+		&p.Kind, &p.OwnerID, &p.StageText, &p.StageColor, &p.ReviewOn, &p.ArchivedAt, &p.ArchivedBy, &p.PublishedAt, &p.LinkTarget}, more...)...)
 	return p, err
 }
 
@@ -247,7 +258,10 @@ func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, in n
 		return p, err
 	}
 	// The kind says which create permission made it: a post and a database have their own.
-	return p, record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": in.parent, "kind": in.kind})
+	if err := record(ctx, tx, c, "page.created", p, map[string]any{"parent_id": in.parent, "kind": in.kind}); err != nil {
+		return p, err
+	}
+	return p, s.settleNew(ctx, tx, c, id)
 }
 
 // NewPage is the input for Create.
@@ -401,7 +415,10 @@ func syncMentions(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc document
 	return isNew(current), isNew(currentGroups), err
 }
 
-// appendVersion writes the next version and updates the page and search index.
+// appendVersion writes the next version and updates the page and search index. On a
+// controlled page that readers see approved, the version waits for review instead: the
+// page row, search and links keep the approved version (spec 064, DOC-310). The Page
+// returned is then what its authors see, marked working.
 func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, in newVersion) (Page, error) {
 	title, doc, author := in.Title, in.Doc, in.Author
 	if err := checkDocumentKind(p.Kind, doc); err != nil {
@@ -414,8 +431,14 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err != nil {
 		return p, err
 	}
-	first := p.CurrentVersion == 0
-	number := p.CurrentVersion + 1
+	ctl, controlled, err := lockControl(ctx, tx, p.ID)
+	if err != nil {
+		return p, err
+	}
+	number, err := nextVersionNumber(ctx, tx, p)
+	if err != nil {
+		return p, err
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO page_versions (id, origin_instance_id, page_id, number, title, document, schema_version, author_id, summary, restored_from, silent)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
 		ids.New(), s.instanceID, p.ID, number, title, raw, document.SchemaVersion, author, in.Summary, in.RestoredFrom, in.Silent); err != nil {
@@ -424,13 +447,48 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err := attachments.RecordUse(ctx, tx, p.ID, number, doc); err != nil {
 		return p, err
 	}
+	cause := causeChanged
+	if in.RestoredFrom != nil {
+		cause = causeRestored
+	}
+	if controlled && ctl.approved() {
+		working := p
+		working.Title, working.CurrentVersion, working.working = title, number, true
+		if err := recordAudit(ctx, tx, c, "page.working_published", "page", p.ID, p.SpaceID,
+			map[string]any{"version": number, "silent": in.Silent, "restored_from": in.RestoredFrom}); err != nil {
+			return p, err
+		}
+		return working, s.restartReview(ctx, tx, c, p, ctl, number, cause)
+	}
+	p, err = s.makeCurrent(ctx, tx, c, p, current{number: number, title: title, doc: doc, author: author, version: in})
+	if err != nil || !controlled {
+		return p, err
+	}
+	return p, s.restartReview(ctx, tx, c, p, ctl, number, cause)
+}
+
+// current is a version that becomes the one readers see.
+type current struct {
+	number int
+	title  string
+	doc    document.Node
+	author uuid.UUID
+	// version says how it was written; an approval passes the zero value.
+	version newVersion
+}
+
+// makeCurrent makes a written version the current one: the page row, search, links,
+// blocks, mentions and tasks follow it, and watchers hear of it.
+func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, in current) (Page, error) {
+	number, title, doc, author := in.number, in.title, in.doc, in.author
+	first := p.CurrentVersion == 0
 	if p.PublishedAt == nil {
 		if _, err := tx.Exec(ctx, `UPDATE pages p SET review_on = (now() + make_interval(months => s.review_months))::date
 			FROM spaces s WHERE p.id = $1 AND s.id = p.space_id AND p.review_on IS NULL AND s.review_months > 0`, p.ID); err != nil {
 			return p, err
 		}
 	}
-	p, err = scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now(),
+	p, err := scanPage(tx.QueryRow(ctx, `UPDATE pages SET current_version = $2, title = $3, status = 'published', updated_by = $4, updated_at = now(),
 			published_at = COALESCE(published_at, now())
 		WHERE id = $1 RETURNING `+pageColumns, p.ID, number, title, author))
 	if err != nil {
@@ -464,13 +522,13 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 		return p, err
 	}
 	details := map[string]any{"version": number}
-	if in.RestoredFrom != nil {
-		details["restored_from"] = *in.RestoredFrom
+	if in.version.RestoredFrom != nil {
+		details["restored_from"] = *in.version.RestoredFrom
 	}
-	if in.Silent {
+	if in.version.Silent {
 		details["silent"] = true
 	}
-	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.Silent, "first": first, "version": number,
+	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.version.Silent, "first": first, "version": number,
 		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned})
 }
 
@@ -479,7 +537,12 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
 		return Detail{}, err
 	}
-	p, err := load(ctx, s.pool, id)
+	// Whether the page is controlled rides along, so an ordinary page costs no extra query.
+	var controlled bool
+	p, err := scanPageAnd(s.pool.QueryRow(ctx, "SELECT "+pageColumns+", EXISTS (SELECT 1 FROM page_control WHERE page_id = pages.id) FROM pages WHERE id = $1", id), &controlled)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return Detail{}, apperr.NotFound()
+	}
 	if err != nil {
 		return Detail{}, err
 	}
@@ -487,8 +550,16 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if d.Features, err = s.features.ForSpace(ctx, s.pool, p.SpaceID); err != nil {
 		return d, err
 	}
-	if p.CurrentVersion > 0 {
-		err = s.pool.QueryRow(ctx, "SELECT document, schema_version FROM page_versions WHERE page_id = $1 AND number = $2", id, p.CurrentVersion).
+	if d.Can, err = s.capabilities(ctx, c, p); err != nil {
+		return d, err
+	}
+	if controlled {
+		if err := s.fillControl(ctx, &d); err != nil {
+			return d, err
+		}
+	}
+	if d.CurrentVersion > 0 {
+		err = s.pool.QueryRow(ctx, "SELECT document, schema_version FROM page_versions WHERE page_id = $1 AND number = $2", id, d.CurrentVersion).
 			Scan(&d.Document, &d.SchemaVersion)
 		if err != nil {
 			return d, err
@@ -532,9 +603,6 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if d.CreatedByName, d.UpdatedByName, err = s.authorNames(ctx, p); err != nil {
 		return d, err
 	}
-	if d.Can, err = s.capabilities(ctx, c, p); err != nil {
-		return d, err
-	}
 	if err := s.fillOrganising(ctx, c, &d); err != nil {
 		return d, err
 	}
@@ -548,7 +616,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 			d.HeaderAttachmentID = nil
 		}
 	}
-	s.touchRecent(ctx, c.UserID, p)
+	s.touchRecent(ctx, c.UserID, d.Page)
 	return d, nil
 }
 

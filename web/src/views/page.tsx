@@ -48,6 +48,7 @@ import {
 } from '../components/icons';
 import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
 import { LabelBar } from '../components/page-labels';
+import { ControlBand } from '../components/control-band';
 import {
   ApprovalBanner,
   ApprovalsDialog,
@@ -734,6 +735,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <ErrorNote error={favourite.error} />
         <PageNotes page={page} />
         <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
+        <ControlBand page={page} />
         {page.status === 'draft' && (
           <p role="status" className="note">
             {t('page.unpublished')}

@@ -770,6 +770,10 @@
     "space_statuses_help": "Choose the statuses pages can have, and how often pages are reviewed.",
     "space_approvals": "Approval rule",
     "space_approvals_help": "Choose whether pages need approval, and who always answers.",
+    "space_workflows": "Workflows",
+    "space_workflows_help": "Make and change the workflows of the space, and choose one for the whole space.",
+    "page_workflow": "Set a workflow on a page",
+    "page_workflow_help": "Put a page, or a page and the pages below it, under a workflow of the space, and take it off.",
     "space_bundle": "Bundle the space",
     "space_bundle_help": "Make one file with all of the space, to move it to another instance. It also needs Export.",
     "space_look": "Look and shortcuts",
@@ -3417,5 +3421,25 @@
     "subject_user": "Person",
     "subject_group": "Group",
     "permission": "Permission"
+  },
+  "control": {
+    "neverApproved": "Never approved: readers do not see this page yet.",
+    "approvedVersion": "Version {{number}} is approved.",
+    "approvedBy": "Approved by {{name}}",
+    "working": "You see version {{number}}, which is not approved yet. Readers see the approved version.",
+    "withdrawn": "Withdrawn: readers no longer see this page.",
+    "governedSpace": "The whole space follows the workflow {{workflow}}.",
+    "governedBranch": "The workflow {{workflow}} is set on the branch of {{page}}.",
+    "governedPage": "The workflow {{workflow}} is set on this page.",
+    "comment": "Comment",
+    "commentNeeded": "Comment, needed for this step",
+    "settingsTitle": "Workflows",
+    "settingsIntro": "A workflow says how a page gets approved. Readers see only approved versions of the pages it governs.",
+    "none": "This space has no workflows yet.",
+    "spaceWorkflow": "Workflow of the whole space",
+    "columnName": "Name",
+    "columnVersion": "Version",
+    "columnPages": "Pages",
+    "columnStates": "States"
   }
 }

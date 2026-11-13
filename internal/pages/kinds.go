@@ -74,6 +74,10 @@ func (s *Service) SetKind(ctx context.Context, c identity.Caller, id uuid.UUID, 
 				return err
 			}
 		}
+		// A folder holds nothing to approve, and a space workflow can govern some kinds only.
+		if err := s.settleBranch(ctx, tx, c, id, settleKind); err != nil {
+			return err
+		}
 		return record(ctx, tx, c, "page.kind_changed", out, map[string]any{"from": p.Kind, "to": kind})
 	})
 	return out, err

@@ -6913,6 +6913,33 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/transitions": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/transitions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.edit"
+      }
+    },
     "/api/v1/pages/{id}/unarchive": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/unarchive",
@@ -7392,6 +7419,33 @@
           "pages"
         ],
         "x-access": "object:page.watchers"
+      }
+    },
+    "/api/v1/pages/{id}/workflow": {
+      "put": {
+        "operationId": "put /api/v1/pages/{id}/workflow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.workflow"
       }
     },
     "/api/v1/people": {
@@ -10449,6 +10503,85 @@
         "x-access": "object:space.automation"
       }
     },
+    "/api/v1/spaces/{id}/workflow": {
+      "put": {
+        "operationId": "put /api/v1/spaces/{id}/workflow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
+      }
+    },
+    "/api/v1/spaces/{id}/workflows": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/workflows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      },
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/workflows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
+      }
+    },
     "/api/v1/start": {
       "get": {
         "operationId": "get /api/v1/start",
@@ -11018,6 +11151,112 @@
           "webhooks"
         ],
         "x-access": "session-only object:space.automation"
+      }
+    },
+    "/api/v1/workflows/{id}": {
+      "get": {
+        "operationId": "get /api/v1/workflows/{id}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "workflows"
+        ],
+        "x-access": "authenticated"
+      },
+      "put": {
+        "operationId": "put /api/v1/workflows/{id}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "workflows"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/workflows/{id}/archive": {
+      "post": {
+        "operationId": "post /api/v1/workflows/{id}/archive",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "workflows"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/workflows/{id}/history": {
+      "get": {
+        "operationId": "get /api/v1/workflows/{id}/history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "workflows"
+        ],
+        "x-access": "authenticated"
       }
     },
     "/collab": {

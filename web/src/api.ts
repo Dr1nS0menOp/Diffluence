@@ -504,6 +504,60 @@ export interface PageDetail extends PageSummary {
   seen_version: number;
   scheduled: { at: string; silent: boolean } | null;
   approval: ApprovalMark | null;
+  control: ControlInfo | null;
+}
+
+/** What a state means to Diffluence, whatever a space calls it (spec 064). */
+export type WorkflowStateKind = 'draft' | 'in_review' | 'approved' | 'rejected' | 'obsolete';
+
+export interface WorkflowTransition {
+  id: string;
+  name: string;
+  description: string;
+  from: string;
+  to: string;
+  requires_comment: boolean;
+}
+
+export interface WorkflowState {
+  id: string;
+  name: string;
+  description: string;
+  kind: WorkflowStateKind;
+  start: boolean;
+  timed: boolean;
+}
+
+export interface Workflow {
+  id: string;
+  space_id: string;
+  name: string;
+  description: string;
+  version: number;
+  definition: { states: WorkflowState[]; transitions: WorkflowTransition[] };
+  archived: boolean;
+  pages: number;
+  space_workflow: boolean;
+}
+
+/** The workflow of a controlled page, as the band near its title shows it. */
+export interface ControlInfo {
+  workflow_id: string;
+  workflow_name: string;
+  workflow_version: number;
+  state_id: string;
+  state_name: string;
+  state_kind: WorkflowStateKind;
+  approved_version: number | null;
+  approved_at: string | null;
+  approved_by: string;
+  head_version: number;
+  shows_working: boolean;
+  governed_by: 'space' | 'page' | 'branch';
+  governed_from: string | null;
+  governed_from_title: string;
+  set_by: string;
+  transitions: WorkflowTransition[];
 }
 
 export interface Draft {

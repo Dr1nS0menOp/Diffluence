@@ -24,17 +24,20 @@ var publicKinds = []string{pages.KindPage, pages.KindPost}
 
 // eventsThatCanHide are all that can take a page's right to be public away (GAP-015).
 var eventsThatCanHide = []string{"restriction.added", "permission.restriction.added", "page.moved", "page.archived", "page.trashed",
-	"page.purged", "page.version_removed", "space.archived", "space.trashed", "space.purged"}
+	"page.purged", "page.version_removed", "space.archived", "space.trashed", "space.purged", "page.withdrawn", "page.controlled"}
 
 // mayBePublic is the one rule for what the world may see (PRM-096, PRM-098): chosen
 // pages of this space that are published, not archived, in a space that is in use,
-// with no view restriction on them or above them. It answers with those that pass.
-// No person's rights come into it.
+// with no view restriction on them or above them, and not a controlled page that was
+// never approved or was withdrawn (spec 064, DOC-301, DOC-322). It answers with those
+// that pass. No person's rights come into it.
 func (s *Service) mayBePublic(ctx context.Context, q db.Querier, spaceID uuid.UUID, list []uuid.UUID) (map[uuid.UUID]bool, error) {
 	rows, err := q.Query(ctx, `SELECT p.id FROM pages p JOIN spaces sp ON sp.id = p.space_id
 		WHERE p.id = ANY($1) AND p.space_id = $2 AND p.status = 'published' AND p.archived_at IS NULL AND sp.status = 'active' AND p.kind = ANY($3)
 		AND NOT EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id AND r.kind = 'view'
-			WHERE t.descendant_id = p.id)`, list, spaceID, publicKinds)
+			WHERE t.descendant_id = p.id)
+		AND NOT EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id
+			AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'))`, list, spaceID, publicKinds)
 	if err != nil {
 		return nil, err
 	}

@@ -461,7 +461,8 @@ func historyHere(ctx context.Context, r reader) (Answer, error) {
 	}
 	rows, err := r.s.pool.Query(ctx, `SELECT v.number, v.summary, v.created_at, COALESCE(u.display_name, '')
 		FROM page_versions v LEFT JOIN users u ON u.id = v.author_id
-		WHERE v.page_id = $1 ORDER BY v.number DESC LIMIT $2`, id, r.max(5))
+		WHERE v.page_id = $1 AND v.number <= (SELECT current_version FROM pages WHERE id = $1)
+		ORDER BY v.number DESC LIMIT $2`, id, r.max(5)) // a version waiting for review is not history yet (spec 064)
 	out, err := scanRows(rows, err, func(row pgx.CollectableRow, v *Row) error {
 		var at time.Time
 		err := row.Scan(&v.Count, &v.Title, &at, &v.By)

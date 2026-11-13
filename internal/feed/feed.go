@@ -75,6 +75,13 @@ func visible(column string) string {
 	return `(CASE WHEN ` + column + ` IN (SELECT page_id FROM perm_visible_pages($1)) THEN true END)`
 }
 
+// readable keeps a version that readers may see: none above the current one, which on a
+// controlled page waits for review (spec 064). As a subquery per version it keeps the
+// newest-first walk.
+func readable(version string) string {
+	return version + `.number <= (SELECT cv.current_version FROM pages cv WHERE cv.id = ` + version + `.page_id)`
+}
+
 // One row per page: its newest version that was not silent. A silent version reached
 // nobody, so it does not show here either. The versions are read newest first, and each
 // is asked whether it is the newest of its page and whether its page is visible, so a
@@ -83,8 +90,9 @@ var changesSQL = `WITH changes AS (
 		SELECT v.page_id, v.author_id, v.created_at AS at,
 			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
 		FROM page_versions v
-		WHERE NOT v.silent
-		  AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)
+		WHERE NOT v.silent AND ` + readable("v") + `
+		  AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent
+			AND ` + readable("n") + `)
 		  AND ` + visible("v.page_id") + `
 	)` + changesTail
 
@@ -92,7 +100,9 @@ var changesSQL = `WITH changes AS (
 // of spaces they watch, and pages of people they follow. Walking every version newest
 // first and dropping almost all of them took over two minutes on 115,000 versions
 // (spec 061), so those pages are gathered first, and each gives its newest version that
-// was not silent. The filter of changesTail still decides, so the rule is the same.
+// was not silent. The filter of changesTail still decides, so the rule is the same. The
+// current version of each candidate bounds its walk, so a version under review never shows
+// (spec 064); asked per version instead, it cost the watcher of every page 200 ms more.
 var forYouSQL = `WITH candidates AS (
 		SELECT w.target_id AS page_id FROM watches w WHERE w.user_id = $1 AND w.target_type = 'page'
 		UNION
@@ -109,9 +119,10 @@ var forYouSQL = `WITH candidates AS (
 		SELECT v.page_id, v.author_id, v.created_at AS at,
 			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
 		FROM candidates k
+		JOIN pages cp ON cp.id = k.page_id
 		CROSS JOIN LATERAL (
 			SELECT n.page_id, n.author_id, n.created_at, n.number FROM page_versions n
-			WHERE n.page_id = k.page_id AND NOT n.silent
+			WHERE n.page_id = k.page_id AND NOT n.silent AND n.number <= cp.current_version
 			ORDER BY n.number DESC LIMIT 1) v
 		WHERE ` + visible("v.page_id") + `
 	)` + changesTail
