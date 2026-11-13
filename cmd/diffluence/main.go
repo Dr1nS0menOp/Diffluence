@@ -366,8 +366,15 @@ func migrateDatabase(ctx context.Context, cfg config.Config, migs []db.Migration
 	}
 	defer pool.Close()
 	rep, err := db.Migrate(ctx, pool, migs, opts)
-	if err != nil || cfg.MigrateDatabaseURL == "" {
+	if err != nil {
 		return rep, err
+	}
+	// A database restored into a fresh one lost what 0050 set, though it is recorded.
+	if err := db.ApplySessionSettings(ctx, pool); err != nil {
+		return rep, err
+	}
+	if cfg.MigrateDatabaseURL == "" {
+		return rep, nil
 	}
 	role, err := db.RoleOf(cfg.DatabaseURL)
 	if err != nil {

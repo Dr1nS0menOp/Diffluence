@@ -3,6 +3,10 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Fixed: the database settings after a restore, and two builds of one release (spec 065)
+- A backup does not carry the defaults of the database itself, so a restore into a fresh database lost `plan_cache_mode` and `jit` while the migrations said they were set. Every run of migrations now sets them again: the node that starts after a restore, `diffluence migrate`, and the restore from the console. The restore drill checks both in a plain session
+- The dry run of a release built the same release twice and found them different on CI: the first build was kept inside the checkout, and Go records an untracked folder in the binary. It is kept outside now, the checkout must be clean before the second build, and a difference fails the job again
+- Upgrade impact: none. A node writes the two defaults at every start, which changes nothing when they are already there
 ### Added: ready for a NATS cluster and for PgBouncer (spec 063)
 - `DIFFLUENCE_NATS_REPLICAS` sets how many NATS nodes keep a copy of each event: 1 (the default, and the only value for the embedded server), 3 or 5 for a cluster. Any other value is refused at start. A node raises the copies of an existing event stream to this setting, and never lowers them by itself
 - The database now holds `plan_cache_mode = force_custom_plan` and `jit = off` as its own defaults, so every session has them, also through PgBouncer in transaction mode, which drops what a client sends at connect. The pool still sends both, for a direct connection

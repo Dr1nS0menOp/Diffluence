@@ -104,6 +104,8 @@ bash scripts/restore.sh /backups/diffluence-20261104T182225Z /root/diffluence-ba
 
 The script checks the checksums, checks the key before it changes anything, restores the database and files, starts Diffluence, verifies the audit chain, and runs `diffluence key check` to prove that every stored file and secret opens with the restored `master.key`. Log in afterwards and open a few pages.
 
+The dump does not carry the defaults of the database itself, the settings `plan_cache_mode` and `jit` that make every session plan its queries well (specs 061 and 063). A restore into a fresh database would lose them, so every run of migrations sets them again: the node that starts after the restore, `diffluence migrate`, and the restore from the console. Nothing needs doing by hand. To check, `SHOW plan_cache_mode` gives `force_custom_plan` and `SHOW jit` gives `off` in a plain `psql` session. On a managed database whose owner is not Diffluence's owner role, the settings cannot be stored in the database; the node still sends both when it connects, and only a connection through PgBouncer goes without them.
+
 ### Over the live installation, from the console
 
 To put a running installation back to an earlier backup, an administrator uses Administration, System, Backups (spec 059). The page says what is lost, asks for the installation's name typed out, and asks for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day.

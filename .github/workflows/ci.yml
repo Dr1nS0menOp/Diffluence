@@ -270,28 +270,38 @@ jobs:
           distribution: goreleaser
           version: v2.20.1
           args: release --snapshot --clean --skip=sign,sbom
+      # Outside the checkout: Go stamps the binary with vcs.modified=true when any untracked
+      # file sits in the tree, so a copy kept inside made the second build differ (spec 065).
       - name: keep the first run
-        run: mv dist dist-first
+        run: mv dist "$RUNNER_TEMP/dist-first"
+      - name: the checkout is clean, as a release builds from it
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain | while IFS= read -r line; do echo "::error title=not clean::$line"; done
+            exit 1
+          fi
       - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
         with:
           distribution: goreleaser
           version: v2.20.1
           args: release --snapshot --clean --skip=sign,sbom
-      # A difference becomes an annotation naming the file, readable without the log.
-      # Report-only for now: on CI the packaged binaries differ between two runs while the
-      # archives' listings match, which reproducible.sh does not show on a development machine.
-      # The cause is being found; until then a difference must not hide every other result.
+      # A difference becomes an annotation naming the file and, for a binary, the build
+      # settings Go recorded in it, so the cause can be read from the run itself.
       - name: the two runs are the same, byte for byte
-        continue-on-error: true
         run: |
-          if diff dist-first/checksums.txt dist/checksums.txt >checksums.diff; then exit 0; fi
+          first="$RUNNER_TEMP/dist-first"
+          if diff "$first/checksums.txt" dist/checksums.txt >checksums.diff; then exit 0; fi
           grep -E '^[<>]' checksums.diff | while IFS= read -r line; do
             echo "::error title=not reproducible::$line"
-          done
+          done || true
           for f in $(grep -E '^<' checksums.diff | awk '{print $3}'); do
             case "$f" in
-              *.tar.gz) diff <(tar -tvzf "dist-first/$f") <(tar -tvzf "dist/$f") | head -5 |
-                while IFS= read -r line; do echo "::error title=$f::$line"; done || true ;;
+              *.tar.gz)
+                mkdir -p "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
+                tar -xzf "$first/$f" -C "$RUNNER_TEMP/a" diffluence && tar -xzf "dist/$f" -C "$RUNNER_TEMP/b" diffluence &&
+                  diff <(go version -m "$RUNNER_TEMP/a/diffluence") <(go version -m "$RUNNER_TEMP/b/diffluence") | head -8 |
+                  while IFS= read -r line; do echo "::error title=$f::$line"; done || true
+                rm -rf "$RUNNER_TEMP/a" "$RUNNER_TEMP/b" ;;
             esac
           done
           exit 1

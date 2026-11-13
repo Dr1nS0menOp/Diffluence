@@ -312,8 +312,10 @@ func mailSender(cfg config.Config) mail.Sender {
 // migrate applies migrations, as the owner of the tables when one is configured.
 func (a *App) migrate(ctx context.Context, opts db.Options) error {
 	return a.asOwner(ctx, func(owner *pgxpool.Pool) error {
-		_, err := db.Migrate(ctx, owner, a.migrations, opts)
-		return err
+		if _, err := db.Migrate(ctx, owner, a.migrations, opts); err != nil {
+			return err
+		}
+		return db.ApplySessionSettings(ctx, owner)
 	})
 }
 

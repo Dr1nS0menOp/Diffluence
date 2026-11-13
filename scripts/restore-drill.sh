@@ -142,6 +142,15 @@ api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
 api "$url/api/v1/search?q=survive" | grep -q '"title":"Important"'
 after=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc 'SELECT count(*) FROM audit_events')
 [ "$after" -ge "$before" ]
+# The dump does not carry the defaults of the database, so the node that started on the
+# restored one set them again: a plain session, which sends nothing at connect, has both (spec 065).
+for want in 'plan_cache_mode force_custom_plan' 'jit off'; do
+  got=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SHOW ${want%% *}")
+  if [ "$got" != "${want#* }" ]; then
+    echo "after the restore ${want%% *} is '$got', not ${want#* }"
+    exit 1
+  fi
+done
 
 # The keys came back halfway through their change: everything opens, and the change can finish.
 docker compose exec -T diffluence diffluence key check --deep >/dev/null

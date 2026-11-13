@@ -1778,6 +1778,14 @@ mutate "the database does not hold jit" internal/db/migrations/0050_session_sett
   's.replace("SET jit = off", "SET application_name = off")' ./internal/db/ -run TestANewSessionPlansWithItsValuesWithoutAskingForIt
 mutate "a role that does not own the database stops the migration" internal/db/migrations/0050_session_settings.sql \
   's.replace("EXCEPTION WHEN insufficient_privilege THEN", "EXCEPTION WHEN division_by_zero THEN")' ./internal/db/ -run TestTheSessionSettingsAskNothingTheOwnerMayNotDo
+
+# Spec 065: a database restored into a fresh one gets the defaults of 0050 again.
+mutate "applying the session settings again does nothing" internal/db/session_settings.go \
+  's.replace("_, err := q.Exec(ctx, SessionSettingsSQL)", "_, err := q.Exec(ctx, \"SELECT 1\")")' ./internal/db/ -run TestTheSessionSettingsComeBackOnADatabaseThatLostThem
+mutate "a node on a restored database leaves the settings lost" internal/app/upgrade.go \
+  's.replace("though it is recorded.\n\t\treturn db.ApplySessionSettings(ctx, owner)", "though it is recorded.\n\t\treturn nil")' $app -run TestANodeStartingOnARestoredDatabaseSetsTheSessionSettingsAgain
+mutate "migrate leaves the settings lost" cmd/diffluence/main.go \
+  's.replace("if err := db.ApplySessionSettings(ctx, pool); err != nil {", "if err := error(nil); err != nil {")' ./cmd/diffluence/ -run TestMigrateSetsTheSessionSettingsAgainWithNothingToMigrate
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

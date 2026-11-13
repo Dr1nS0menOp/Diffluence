@@ -104,8 +104,11 @@ func (a *App) prepareSchema(ctx context.Context) error {
 		if err := a.checkBeforeUpgrade(ctx, owner); err != nil {
 			return err
 		}
-		_, err := db.Migrate(ctx, owner, a.migrations, db.Options{Log: a.log})
-		return err
+		if _, err := db.Migrate(ctx, owner, a.migrations, db.Options{Log: a.log}); err != nil {
+			return err
+		}
+		// A database restored into a fresh one lost what 0050 set, though it is recorded.
+		return db.ApplySessionSettings(ctx, owner)
 	})
 }
 
