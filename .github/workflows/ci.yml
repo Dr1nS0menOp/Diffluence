@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Every gate here must pass before a pull request can be merged.
-# Renovate pins the actions below to commit SHAs (see renovate.json).
+# Every action is pinned by commit SHA, with its version in a comment; Renovate keeps the
+# pins current (see renovate.json).
 name: ci
 
 on:
@@ -23,7 +24,7 @@ jobs:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
       - run: sh scripts/check-dco.sh "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}"
@@ -32,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
           POSTGRES_USER: diffluence
           POSTGRES_PASSWORD: diffluence
@@ -44,8 +45,8 @@ jobs:
     env:
       DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: format
@@ -64,11 +65,11 @@ jobs:
   web:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: install
@@ -80,6 +81,9 @@ jobs:
       - name: known vulnerabilities in shipped packages
         run: npm audit --omit=dev --audit-level=high
         working-directory: web
+      - name: known vulnerabilities in the packages of the service for editing together
+        run: npm audit --omit=dev --audit-level=high
+        working-directory: collab
       - name: licences
         run: make licenses
 
@@ -87,7 +91,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [go, web]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: start the development containers
         run: bash scripts/dev up
       - name: install frontend packages
@@ -102,7 +106,7 @@ jobs:
     needs: go
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
           POSTGRES_USER: diffluence
           POSTGRES_PASSWORD: diffluence
@@ -114,10 +118,10 @@ jobs:
     env:
       DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: actions/setup-go@v6
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
       - name: release N and N+1 side by side on one database
@@ -132,7 +136,7 @@ jobs:
     needs: go
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
           POSTGRES_USER: diffluence
           POSTGRES_PASSWORD: diffluence
@@ -142,15 +146,32 @@ jobs:
           --health-cmd "pg_isready -U diffluence"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build image
         run: docker build -t diffluence:ci .
       - name: build the image of the backup service (spec 054)
         run: docker build --target backup -t diffluence-backup:ci .
-      - name: scan image
+      - name: build the image of the service for editing together
+        run: docker build -t diffluence-collab:ci collab
+      # Every image the reference installation runs is scanned, not only the app (spec 067).
+      - name: scan the app image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
           image-ref: diffluence:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: scan the backup image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: diffluence-backup:ci
+          severity: HIGH,CRITICAL
+          exit-code: "1"
+          ignore-unfixed: true
+      - name: scan the image of the service for editing together
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: diffluence-collab:ci
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
@@ -181,7 +202,7 @@ jobs:
     container:
       image: semgrep/semgrep:1.183.0@sha256:2e45517a85e13a9cca14a2a00df6bb48affd66b8ebfae1b0991cd57578362fb0
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: scan
         run: >-
           semgrep scan --metrics=off --error
@@ -206,8 +227,8 @@ jobs:
             build-mode: none
             pack: javascript
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         if: matrix.language == 'go'
         with:
           go-version-file: go.mod
@@ -317,7 +338,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
           POSTGRES_USER: diffluence
           POSTGRES_PASSWORD: diffluence
@@ -329,11 +350,11 @@ jobs:
     env:
       DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-go@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.mod
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 22
       - name: fuzz the parsers

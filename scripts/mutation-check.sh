@@ -1828,6 +1828,44 @@ mutate "the migration gives administrators no workflows" internal/db/migrations/
   's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.workflows\x27]);", "SELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "a bundle from before spec 064 gives editors no workflows" internal/exchange/bundlein.go \
   's.replace("permissions.PageWorkflow:      6,", "permissions.PageWorkflow:      1,")' ./internal/exchange/ -run TestABundleOfVersionFiveGivesEditorsAndAdministratorsTheWorkflowPermissions
+# Spec 067: every route that takes an id is walked as a stranger, and the service for
+# editing together holds a ticket in place of the cookie.
+mutate "anyone reads an export by its id" internal/exchange/export.go \
+  's.replace("FROM export_runs WHERE id = $1 AND created_by = $2`", "FROM export_runs WHERE id = $1 AND $2::uuid IS NOT NULL`")' $app -run TestEveryRouteThatTakesAnIDIsProtected
+mutate "anyone deletes a saved block by its id" internal/savedblocks/savedblocks.go \
+  's.replace("DELETE FROM saved_blocks WHERE id = $1 AND owner_id = $2", "DELETE FROM saved_blocks WHERE id = $1 AND $2::uuid IS NOT NULL")' $app -run TestEveryRouteThatTakesAnIDIsProtected
+mutate "the proxy passes the cookie on" internal/httpapi/handlers_collab.go \
+  's.replace("\t\tr.Header.Del(\"Cookie\")\n", "")' $app -run TestTheServiceGetsATicketAndNeverTheCookie
+mutate "the proxy passes the browser's Authorization on" internal/httpapi/handlers_collab.go \
+  's.replace("\t\tr.Header.Del(\"Authorization\")\n", "")' $app -run TestTheServiceGetsATicketAndNeverTheCookie
+mutate "the proxy lets in a socket it refused a ticket" internal/httpapi/handlers_collab.go \
+  's.replace("ticket, err := s.deps.Collab.Ticket(r.Context(), *p, pageID)\n\t\tif err != nil {", "ticket, err := s.deps.Collab.Ticket(r.Context(), *p, pageID)\n\t\tif err != nil \x26\x26 false {")' $app -run TestOnlySomeoneWhoMayEditCanConnect
+mutate "a token opens the socket" internal/collab/collab.go \
+  's.replace("if p.ViaToken || p.SessionID == uuid.Nil || p.NeedsSecondFactor {", "if p.NeedsSecondFactor {")' $app -run TestATokenDoesNotOpenASocket
+mutate "a ticket opens another page" internal/collab/collab.go \
+  's.replace("(err == nil \x26\x26 t.PageID != pageID)", "(err == nil \x26\x26 false)")' $app -run TestATicketOpensOnlyItsOwnPage
+mutate "a ticket outlives its session" internal/collab/collab.go \
+  's.replace("p, err := s.identity.PeekSessionByID(ctx, t.SessionID)", "p, err := identity.Principal{User: identity.User{ID: t.UserID}}, error(nil)")' $app -run '^(TestATicketEndsWithItsSession|TestAnOpenEditorDoesNotKeepTheSessionAlive)$'
+mutate "a ticket outlives the right to edit" internal/collab/collab.go \
+  's.replace("\tperson, err := s.Authorize(ctx, p, pageID)\n\tif err != nil || !person.Allowed {\n\t\treturn Person{}, err\n\t}\n\tt.Expires", "\tperson := Person{Allowed: true, UserID: p.User.ID}\n\tt.Expires")' $app -run TestATicketEndsWhenTheRightToEditEnds
+mutate "an open editor keeps the session alive" internal/identity/identity.go \
+  's.replace("\tp, _, err := s.sessionWhere(ctx, sessionByID, id)\n", "\tp, _, err := s.sessionWhere(ctx, sessionByID, id)\n\t_, _ = s.pool.Exec(ctx, \"UPDATE sessions SET last_seen_at = now() WHERE id = $1\", id)\n")' $app -run TestAnOpenEditorDoesNotKeepTheSessionAlive
+mutate "a ticket's signature is not checked" internal/collab/ticket.go \
+  's.replace("if !hmac.Equal(got, want) {", "if len(got) \x3c 0 \x26\x26 !hmac.Equal(got, want) {")' ./internal/collab/ -run '^(TestATicketWithAnotherPersonInItIsRefused|TestATicketFromAnotherKeyIsRefused)$'
+mutate "an expired ticket is taken" internal/collab/ticket.go \
+  's.replace("if err != nil || !now.Before(t.Expires) {", "if err != nil {")' ./internal/collab/ -run TestATicketPastItsExpiryIsRefused
+mutate_collab "the service asks without a ticket" access.mjs \
+  's.replace("if (!ticket) return null;", "")' access.test.mjs
+mutate_collab "the service takes a yes without a new ticket" access.mjs \
+  's.replace("return answer.allowed \x26\x26 answer.ticket ? answer : null;", "return answer.allowed ? answer : null;")' access.test.mjs
+mutate_collab "a recheck keeps the old ticket" access.mjs \
+  's.replace("entry.ticket = answer.ticket;", "")' access.test.mjs
+mutate_collab "a refused recheck leaves the connection open" access.mjs \
+  's.replace("entry.close(CLOSE_ACCESS_ENDED);", "")' access.test.mjs
+mutate_collab "a failed API at the recheck keeps the connection" access.mjs \
+  's.replace(".catch(() =\x3e null)", ".catch(() =\x3e ({ ticket: entry.ticket }))")' access.test.mjs
+mutate_collab "the service reads the cookie" access.mjs \
+  's.replace("return requestHeaders.get(TICKET_HEADER) ?? \x27\x27;", "return requestHeaders.get(TICKET_HEADER) ?? requestHeaders.get(\x27cookie\x27) ?? \x27\x27;")' access.test.mjs
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

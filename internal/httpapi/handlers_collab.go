@@ -12,7 +12,6 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/collab"
-	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -29,9 +28,9 @@ func (s *Server) registerCollabRoutes() {
 	r.HandleFunc("POST /collab/authorize", Public, s.collabOnly(s.handleCollabAuthorize))
 	r.HandleFunc("GET /collab/documents/{id}", Public, s.collabOnly(s.handleCollabLoad))
 	r.HandleFunc("PUT /collab/documents/{id}", Public, s.collabOnly(s.handleCollabStore))
-	// Public: a browser's WebSocket to the service. The service asks /collab/authorize
-	// with the cookie of the connection before it lets anyone in, and this route only
-	// passes on what comes from our own origin.
+	// Public: a browser's WebSocket to the service. The proxy checks the session and the
+	// right to edit itself, passes on only what comes from our own origin, and hands the
+	// service a ticket in place of the cookie (spec 067).
 	r.Handle("GET /collab", Public, s.collabProxy())
 }
 
@@ -73,40 +72,18 @@ func (s *Server) handleVersionAuthors(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"authors": authors})
 }
 
-// sessionFromHeader reads our session out of the cookies of a connection. An answer
-// without a valid session is a plain no.
-func (s *Server) sessionFromHeader(r *http.Request, header string) (identity.Principal, error) {
-	cookies, err := http.ParseCookie(header)
-	if err != nil {
-		return identity.Principal{}, identity.ErrNoSession
-	}
-	for _, c := range cookies {
-		if c.Name == s.cookieName {
-			return s.deps.Identity.AuthenticateSession(r.Context(), c.Value)
-		}
-	}
-	return identity.Principal{}, identity.ErrNoSession
-}
-
+// handleCollabAuthorize answers the service about the ticket of a connection. The service
+// never holds a session: it has the ticket the API gave the socket (spec 067).
 func (s *Server) handleCollabAuthorize(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		PageID uuid.UUID `json:"page_id"`
-		Cookie string    `json:"cookie"`
+		Ticket string    `json:"ticket"`
 	}
 	if decodeJSON(w, r, maxSmallBody, &in) != nil {
 		badBody(w)
 		return
 	}
-	p, err := s.sessionFromHeader(r, in.Cookie)
-	if errors.Is(err, identity.ErrNoSession) {
-		writeJSON(w, http.StatusOK, collab.Person{})
-		return
-	}
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	person, err := s.deps.Collab.Authorize(r.Context(), p, in.PageID)
+	person, err := s.deps.Collab.Recheck(r.Context(), in.Ticket, in.PageID)
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -158,6 +135,8 @@ func (s *Server) handleCollabStore(w http.ResponseWriter, r *http.Request) {
 
 // collabProxy passes the WebSocket of a browser on to the service (ARC-118). A page
 // on another site could open this socket with our cookie, so the origin must be ours.
+// The API decides who may connect: the service gets a ticket for one person and one
+// page, and never the cookies of the browser (spec 067).
 func (s *Server) collabProxy() http.Handler {
 	missing := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "Not found.")
@@ -177,8 +156,29 @@ func (s *Server) collabProxy() http.Handler {
 			writeError(w, http.StatusForbidden, "cross_origin_blocked", "Cross-origin requests are not allowed.")
 			return
 		}
+		p := PrincipalFrom(r.Context())
+		if p == nil {
+			writeError(w, http.StatusUnauthorized, "unauthenticated", "Please log in.")
+			return
+		}
+		pageID, err := uuid.Parse(r.URL.Query().Get("page"))
+		if err != nil {
+			writeError(w, http.StatusNotFound, "not_found", "Not found.")
+			return
+		}
+		ticket, err := s.deps.Collab.Ticket(r.Context(), *p, pageID)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		// What proves the person to us stays here. A header of the same name from the
+		// browser is replaced, never passed on.
+		r.Header.Del("Cookie")
+		r.Header.Del("Authorization")
+		r.Header.Set(collab.TicketHeader, ticket)
 		// The service listens on its root, as it serves nothing else on this socket.
 		r.URL.Path = "/"
+		r.URL.RawQuery = ""
 		proxy.ServeHTTP(w, r)
 	})
 }

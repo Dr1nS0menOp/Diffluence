@@ -227,7 +227,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		Comments: a.comments, Watches: a.watches, Templates: a.templates, Notify: a.notify, Jobs: a.jobs, Features: a.features,
 		Outward: a.outward, Origin: cfg.PublicOrigin()})
 	a.webhooks = webhooks.NewService(a.pool, a.perms, a.identity, a.outward, a.keyring, a.notify)
-	a.collab = collab.NewService(a.pool, a.perms, a.identity, collab.Options{URL: cfg.CollabURL, Token: cfg.CollabToken})
+	a.collab = collab.NewService(a.pool, a.perms, a.identity, collab.Options{URL: cfg.CollabURL, Token: cfg.CollabToken, Keyring: a.keyring})
 	a.exchange = exchange.NewService(a.pool, a.perms, a.pages, a.attach, a.store, a.jobs, a.settings,
 		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, PDFPassword: cfg.PDFPassword, CollaboraURL: cfg.CollaboraURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
 	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,

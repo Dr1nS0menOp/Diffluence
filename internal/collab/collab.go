@@ -22,6 +22,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/keys"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
@@ -33,6 +34,8 @@ const recheckTimeout = 5 * time.Second
 type Options struct {
 	URL   string
 	Token string
+	// Keyring signs the tickets that let a browser into the service.
+	Keyring *keys.Keyring
 }
 
 // Service answers the collab service.
@@ -60,11 +63,62 @@ func (s *Service) TrustsToken(token string) bool {
 	return s.Installed() && subtle.ConstantTimeCompare([]byte(token), []byte(s.options.Token)) == 1
 }
 
-// Person is who the service may let in.
+// Person is who the service may let in. Ticket is the one to ask with next time.
 type Person struct {
 	Allowed bool      `json:"allowed"`
 	UserID  uuid.UUID `json:"user_id"`
 	Name    string    `json:"name"`
+	Ticket  string    `json:"ticket,omitempty"`
+}
+
+// Ticket lets a session onto the socket of one page, for a short while. Only a session of
+// a person who may edit the page gets one; a token or a session still waiting for its
+// second factor does not (spec 067).
+func (s *Service) Ticket(ctx context.Context, p identity.Principal, pageID uuid.UUID) (string, error) {
+	if p.ViaToken || p.SessionID == uuid.Nil || p.NeedsSecondFactor {
+		return "", apperr.NotFound()
+	}
+	person, err := s.Authorize(ctx, p, pageID)
+	if err != nil {
+		return "", err
+	}
+	if !person.Allowed {
+		return "", apperr.NotFound()
+	}
+	return sealTicket(s.options.Keyring, ticket{SessionID: p.SessionID, UserID: p.User.ID, PageID: pageID,
+		Expires: time.Now().Add(ticketLifetime)})
+}
+
+// Recheck decides again for the holder of a ticket, and renews the ticket on a yes. It
+// reads the session without counting as activity, so an open editor does not keep a
+// session alive. Every doubt is a no.
+func (s *Service) Recheck(ctx context.Context, raw string, pageID uuid.UUID) (Person, error) {
+	t, err := openTicket(s.options.Keyring, raw, time.Now())
+	if errors.Is(err, errBadTicket) || (err == nil && t.PageID != pageID) {
+		return Person{}, nil
+	}
+	if err != nil {
+		return Person{}, err
+	}
+	p, err := s.identity.PeekSessionByID(ctx, t.SessionID)
+	if errors.Is(err, identity.ErrNoSession) {
+		return Person{}, nil
+	}
+	if err != nil {
+		return Person{}, err
+	}
+	if p.User.ID != t.UserID || p.NeedsSecondFactor {
+		return Person{}, nil
+	}
+	person, err := s.Authorize(ctx, p, pageID)
+	if err != nil || !person.Allowed {
+		return Person{}, err
+	}
+	t.Expires = time.Now().Add(ticketLifetime)
+	if person.Ticket, err = sealTicket(s.options.Keyring, t); err != nil {
+		return Person{}, err
+	}
+	return person, nil
 }
 
 // Authorize decides about a session and a page. Edit is needed: a person with view

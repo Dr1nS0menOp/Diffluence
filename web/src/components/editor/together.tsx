@@ -31,9 +31,10 @@ export interface Together {
 
 export type LinkState = 'connecting' | 'online' | 'offline' | 'ended';
 
-function socketAddress(): string {
+/** The socket of one page. The API checks the right to edit it before the socket opens. */
+function socketAddress(pageId: string): string {
   const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  return `${scheme}://${window.location.host}/collab`;
+  return `${scheme}://${window.location.host}/collab?page=${encodeURIComponent(pageId)}`;
 }
 
 /** Connects to the service for as long as the editor is open, and keeps typing in the browser. */
@@ -48,10 +49,11 @@ export function useTogether(pageId: string, info: CollabInfo | null) {
     const doc = new Y.Doc();
     const kept = new IndexeddbPersistence(sharedDocumentName(userId, pageId), doc);
     const provider = new HocuspocusProvider({
-      url: socketAddress(),
+      url: socketAddress(pageId),
       name: pageId,
       document: doc,
-      // The session cookie proves who this is. The protocol still wants a token.
+      // The session cookie proves to the API who this is, and the API gives the service a
+      // ticket in its place. The protocol still wants a token.
       token: 'session',
       onSynced: () => setReady(true),
       onStatus: ({ status }) => {

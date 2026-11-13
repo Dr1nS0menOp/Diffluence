@@ -464,12 +464,24 @@ func (s *Service) session(ctx context.Context, token string) (Principal, time.Ti
 	if token == "" || len(token) > 128 {
 		return Principal{}, time.Time{}, ErrNoSession
 	}
+	return s.sessionWhere(ctx, sessionByTokenHash, hashToken(token))
+}
+
+// The two ways a session is found. Each is a fixed condition on one parameter.
+const (
+	sessionByTokenHash = "s.token_hash = $1"
+	sessionByID        = "s.id = $1"
+)
+
+// sessionWhere resolves the session that matches condition, one of the constants above,
+// and removes it when it has ended.
+func (s *Service) sessionWhere(ctx context.Context, condition string, arg any) (Principal, time.Time, error) {
 	var p Principal
 	var lastSeen, created, expires time.Time
 	var confirmed, accountEnds *time.Time
 	err := s.pool.QueryRow(ctx, `SELECT s.id, s.last_seen_at, s.created_at, s.expires_at, s.reauth_at, s.needs_second_factor,
 			u.id, u.type, u.status, u.email, u.display_name, u.created_at, u.expires_at
-		FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.token_hash = $1`, hashToken(token)).
+		FROM sessions s JOIN users u ON u.id = s.user_id WHERE `+condition, arg).
 		Scan(&p.SessionID, &lastSeen, &created, &expires, &confirmed, &p.NeedsSecondFactor,
 			&p.User.ID, &p.User.Type, &p.User.Status, &p.User.Email, &p.User.DisplayName, &p.User.CreatedAt, &accountEnds)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -519,6 +531,17 @@ func (s *Service) AuthenticateSession(ctx context.Context, token string) (Princi
 // open tab must not keep a session alive for ever (spec 013, D8).
 func (s *Service) PeekSession(ctx context.Context, token string) (Principal, error) {
 	p, _, err := s.session(ctx, token)
+	return p, err
+}
+
+// PeekSessionByID is PeekSession for a session named by its id, for a holder that never
+// saw the token: the service for editing together asks about a session this way, and an
+// open editor must not keep it alive (spec 067).
+func (s *Service) PeekSessionByID(ctx context.Context, id uuid.UUID) (Principal, error) {
+	if id == uuid.Nil {
+		return Principal{}, ErrNoSession
+	}
+	p, _, err := s.sessionWhere(ctx, sessionByID, id)
 	return p, err
 }
 

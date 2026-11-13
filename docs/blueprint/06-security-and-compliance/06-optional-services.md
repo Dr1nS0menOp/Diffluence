@@ -54,7 +54,7 @@ Gotenberg's Chromium route had a high-rated SSRF bug, CVE-2026-42595, because it
 
 The product owner said yes to this in ADR-026, with Hocuspocus and Yjs. The study in spec 015 lists what comes with it.
 
-- **SEC-540** · built · The browser gets a short-lived token from the API for one page. The service asks the API on each connection, and the session cookie never goes to the service (ASVS 4.4.3, 4.4.4).
+- **SEC-540** · built · The browser gets a short-lived token from the API for one page. The service asks the API on each connection, and the session cookie never goes to the service (ASVS 4.4.3, 4.4.4). Built (spec 067): the API checks the session and the right to edit at the socket, takes the cookie off, and gives the service a signed ticket for one person and one page that lasts two minutes. The service asks with that ticket and gets a new one at every check; the check does not count as activity, so an open editor does not keep a session alive.
 - **SEC-541** · built · Connections use `wss`, and the `Origin` header is checked against the public address (ASVS 4.4.1, 4.4.2).
 - **SEC-542** · built · **High.** Hocuspocus checks rights when a connection starts. It does not check again by itself. It offers `onTokenSync` and read-only connections, but something must start them. A person whose access ends would otherwise go on reading and writing. On a change of grants or restrictions, the app must tell the service to drop or re-check connections for those pages, within seconds (ASVS 8.3.2).
 - **SEC-543** · built · A person without edit rights gets a read-only connection, and the service refuses their changes.

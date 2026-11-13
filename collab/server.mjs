@@ -4,6 +4,7 @@
 // about who may do what is an answer from the API, and it never writes a version.
 import { Server } from '@hocuspocus/server';
 import * as Y from 'yjs';
+import { createAccess, ticketFrom } from './access.mjs';
 import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
 import { bindPresence } from './presence.mjs';
 
@@ -13,7 +14,6 @@ const PORT = Number(process.env.DIFFLUENCE_COLLAB_PORT ?? 1234);
 const RECHECK_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 2_000;
 const SAVE_MAX_DEBOUNCE_MS = 10_000;
-const CLOSE_ACCESS_ENDED = { code: 4403, reason: 'access-ended' };
 const CLOSE_REFUSED_STATE = { code: 4422, reason: 'document-refused' };
 
 if (!TOKEN) {
@@ -28,38 +28,9 @@ function callAPI(path, init = {}) {
   });
 }
 
-/** Asks the API whether a session may edit a page. Anything but a clear yes is a no. */
-async function authorize(pageId, cookie) {
-  const res = await callAPI('/authorize', { method: 'POST', body: JSON.stringify({ page_id: pageId, cookie }) });
-  if (!res.ok) return null;
-  const answer = await res.json();
-  return answer.allowed ? answer : null;
-}
-
-// Who is connected, by document, so rights can be asked for again (SEC-542).
-const connections = new Map();
-
-function remember(documentName, entry) {
-  if (!connections.has(documentName)) connections.set(documentName, new Set());
-  connections.get(documentName).add(entry);
-}
-
-function forget(documentName, entry) {
-  connections.get(documentName)?.delete(entry);
-  if (connections.get(documentName)?.size === 0) connections.delete(documentName);
-}
-
-/** Asks again for everyone. A failed answer counts as no: a right must be proven. */
-async function recheck() {
-  for (const [documentName, entries] of connections) {
-    for (const entry of [...entries]) {
-      const answer = await authorize(documentName, entry.cookie).catch(() => null);
-      if (answer) continue;
-      entry.close(CLOSE_ACCESS_ENDED);
-      forget(documentName, entry);
-    }
-  }
-}
+const { authorize, remember, forget, recheck } = createAccess((body) =>
+  callAPI('/authorize', { method: 'POST', body: JSON.stringify(body) }),
+);
 
 const authors = new Map();
 
@@ -72,16 +43,15 @@ const server = new Server({
   maxDebounce: SAVE_MAX_DEBOUNCE_MS,
 
   async onAuthenticate({ documentName, requestHeaders, connectionConfig }) {
-    const cookie = requestHeaders.get('cookie') ?? '';
-    const answer = await authorize(documentName, cookie);
+    const answer = await authorize(documentName, ticketFrom(requestHeaders));
     if (!answer) throw new Error('not allowed');
     connectionConfig.readOnly = false;
-    return { user: { id: answer.user_id, name: answer.name }, cookie };
+    return { user: { id: answer.user_id, name: answer.name }, ticket: answer.ticket };
   },
 
   async connected({ documentName, context, connection }) {
     const entry = {
-      cookie: context.cookie,
+      ticket: context.ticket,
       close: (event) => {
         // A closing document says nothing to the browser, so it hears it in words first.
         connection.sendStateless(event.reason);

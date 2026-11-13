@@ -46,24 +46,55 @@ function sharedJSON(doc: Y.Doc): unknown {
   return doc.getXmlFragment('default').toJSON();
 }
 
+/** A WebSocket outside the browser that carries the session of `page`, as a browser's would. */
+async function sessionSocket(page: Page) {
+  const cookies = await page.context().cookies();
+  const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  const origin = 'http://localhost:8080';
+  // Node's WebSocket takes extra headers, which a browser would add by itself.
+  return class SessionSocket extends WebSocket {
+    constructor(url: string | URL, protocols?: string | string[]) {
+      super(url, { protocols, headers: { cookie, origin } } as unknown as string[]);
+    }
+  };
+}
+
+/** Opens a socket for one page and asks to join the document of another (spec 067). */
+async function joinThroughAnotherPage(page: Page, socketPage: string, documentName: string) {
+  let refused = false;
+  let synced = false;
+  const socket = new HocuspocusProviderWebsocket({
+    url: `ws://localhost:8080/collab?page=${socketPage}`,
+    WebSocketPolyfill: await sessionSocket(page),
+  });
+  const provider = new HocuspocusProvider({
+    websocketProvider: socket,
+    name: documentName,
+    document: new Y.Doc(),
+    token: 'session',
+    onAuthenticationFailed: () => {
+      refused = true;
+    },
+    onSynced: () => {
+      synced = true;
+    },
+  });
+  provider.attach();
+  await expect.poll(() => refused || synced, SYNC).toBe(true);
+  provider.destroy();
+  socket.destroy();
+  return { refused, synced };
+}
+
 /**
  * A client outside the browser that holds a real session of `page` and speaks the protocol of the
  * service directly, so nothing in the editor stops what it sends (SEC-546).
  */
 async function hostileClient(page: Page, pageId: string) {
-  const cookies = await page.context().cookies();
-  const cookie = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
-  const origin = 'http://localhost:8080';
-  // Node's WebSocket takes extra headers, which a browser would add by itself.
-  class SessionSocket extends WebSocket {
-    constructor(url: string | URL, protocols?: string | string[]) {
-      super(url, { protocols, headers: { cookie, origin } } as unknown as string[]);
-    }
-  }
   const doc = new Y.Doc();
   const socket = new HocuspocusProviderWebsocket({
-    url: 'ws://localhost:8080/collab',
-    WebSocketPolyfill: SessionSocket,
+    url: `ws://localhost:8080/collab?page=${pageId}`,
+    WebSocketPolyfill: await sessionSocket(page),
   });
   const provider = new HocuspocusProvider({
     websocketProvider: socket,
@@ -152,6 +183,12 @@ test.describe('editing together', () => {
     await grant(page, spaceId, { type: 'user', id: colleagueId }, ['space.view']);
     await expect(colleague.getByText('You can no longer edit this page.')).toBeVisible({ timeout: 20_000 });
     await colleague.context().close();
+  });
+
+  test('a socket opened for one page cannot join the document of another', async ({ page }) => {
+    const other = await publishedPage(page, spaceId, 'Elsewhere', 'Other text.');
+    expect(await joinThroughAnotherPage(page, target, other)).toEqual({ refused: true, synced: false });
+    expect(await joinThroughAnotherPage(page, other, other)).toEqual({ refused: false, synced: true });
   });
 
   test('a published version names everyone who took part', async ({ browser, page }) => {

@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: pinned and scanned builds, and a ticket for editing together (spec 067)
+- The service for editing together now gets a signed ticket for one person and one page from the API, which checks the session and the right to edit when the socket opens. The browser's cookies stay with the API. The service asks again with the ticket every minute and gets a new one each time; these checks do not count as activity, so a session still ends at its idle limit while an editor is open
+- Every GitHub action is pinned by commit, and the base images `postgres:16` and `node:22-slim` by digest. CI builds and scans the app, backup and editing-together images with Trivy, and runs `npm audit` for the editing-together service. A release signs and attests all three images
+- The image of the editing-together service ships without npm and corepack, which it never runs. The backup image takes Debian's security updates when it is built, and leaves out `gosu`, which it never runs
+- A test walks every route that takes an id as someone with no access, from one table that says whose object each route reaches
+- Upgrade impact: deploy the API and the editing-together service of this release together; an older service is refused by the new API and the other way round, so open editors reconnect once. `compose.yaml` pins `postgres:16` by digest; update it with the release
 ### Fixed: the database settings after a restore, and two builds of one release (spec 065)
 - A backup does not carry the defaults of the database itself, so a restore into a fresh database lost `plan_cache_mode` and `jit` while the migrations said they were set. Every run of migrations now sets them again: the node that starts after a restore, `diffluence migrate`, and the restore from the console. The restore drill checks both in a plain session
 - The dry run of a release built the same release twice and found them different on CI: the first build was kept inside the checkout, and Go records an untracked folder in the binary. It is kept outside now, the checkout must be clean before the second build, and a difference fails the job again
