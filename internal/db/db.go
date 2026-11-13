@@ -179,6 +179,10 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 			// owner, write them, so no code path can grant past a role (spec 036).
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON space_grants FROM " + ident,
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON global_grants FROM " + ident,
+			// The console asks for a restore and every node says what it does (spec 059);
+			// the worker, as the owner, moves a restore along.
+			"GRANT USAGE ON SCHEMA ops TO " + ident,
+			"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ops TO " + ident,
 		} {
 			if _, err := tx.Exec(ctx, stmt); err != nil {
 				return fmt.Errorf("db: grant to application role: %w", err)

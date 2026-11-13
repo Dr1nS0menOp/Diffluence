@@ -1644,6 +1644,47 @@ mutate "a failure mails people who are not administrators" internal/backups/back
   's.replace("AND u.anonymised_at IS NULL AND perm_has_global(u.id, \x27administrator\x27)", "AND u.anonymised_at IS NULL")' $app -run TestAFailedBackupMailsTheAdministratorsAtMostTwiceADay
 mutate "no address logs everyone out" internal/httpapi/handlers_running.go \
   's.replace("if (strings.TrimSpace(in.Email) == \"\") == !in.All {", "if false {")' $app -run TestAnAdministratorLogsPeopleOutFromTheConsole
+# Spec 059: a restore over the live installation from the console.
+mutate "a restore takes any name typed" internal/restore/restore.go \
+  's.replace("if strings.TrimSpace(a.Confirm) != a.Installation {", "if false {")' $app -run TestOneRestoreAtATimeAndOneADay
+mutate "a restore takes a backup that never completed" internal/restore/restore.go \
+  's.replace("if !complete {", "if false {")' $app -run TestOnlyAnAdministratorRestoresACompleteBackup
+mutate "a restore runs beside a backup asked for" internal/restore/restore.go \
+  's.replace("if backingUp {", "if false {")' $app -run TestOneRestoreAtATimeAndOneADay
+mutate "two restores a day" internal/restore/restore.go \
+  's.replace("if today >= PerDay {", "if today > PerDay {")' $app -run TestOneRestoreAtATimeAndOneADay
+mutate "a failed restore lets the nodes serve" internal/restore/restore.go \
+  's.replace("StateRestoring, StateChecking, StateFailed))", "StateRestoring, StateChecking, StateChecking))")' $app -run TestARestoreThatFailsHalfwayKeepsTheNodesWaitingUntilTheWayBack
+mutate "the nodes wait for a worker that died" internal/restore/restore.go \
+  's.replace("(state IN ($1, $2) AND updated_at > now() - make_interval(secs => $3))", "(state IN ($1, $2) AND $3::float8 > 0)")' $app -run TestARestoreThatStoodStillLongBeforeAnyChangeIsNotWaitedFor
+mutate "a restore that changed something ends as refused" internal/restore/restore.go \
+  's.replace("state = CASE WHEN changed THEN $3 ELSE $4 END,", "state = $4,")' $app -run TestARestoreThatFailsHalfwayKeepsTheNodesWaitingUntilTheWayBack
+mutate "restoring is not marked as a change" internal/restore/restore.go \
+  's.replace("changed = changed OR $2 = $4", "changed = changed OR $2 = $3")' $app -run TestARestoreThatFailsHalfwayKeepsTheNodesWaitingUntilTheWayBack
+mutate "a backup of a newer release is restored" internal/restore/run.go \
+  's.replace("if newest > r.NewestKnown {", "if newest > r.NewestKnown+1 {")' $app -run TestABackupOfANewerReleaseIsRefused
+mutate "the worker restores under a serving node" internal/restore/run.go \
+  's.replace("if err := WaitForNodes(ctx, r.Pool, r.StopWithin, r.Poll); err != nil {", "if err := error(nil); err != nil {")' $app -run TestANodeThatKeepsServingStopsTheRestore
+mutate "a password alone confirms a restore" internal/identity/tokens.go \
+  's.replace("if method != nil && *method == ConfirmedByPasskey && at != nil && s.now().Sub(*at) <= ReauthWindow {", "if true {")' $app -run TestARestoreAsksForASecondFactor
+mutate "a wrong code confirms a restore" internal/identity/tokens.go \
+  's.replace("\t\t\tif method == \"\" {\n\t\t\t\treturn secondFactorRequired(", "\t\t\tif false {\n\t\t\t\treturn secondFactorRequired(")' $app -run TestARestoreAsksForASecondFactor
+mutate "a typing error costs the code" internal/httpapi/handlers_running.go \
+  's.replace("if strings.TrimSpace(in.Confirm) != installation {", "if false {")' $app -run TestARestoreAsksForTheNameOfTheInstallation
+mutate "a node starts to serve during a restore" internal/app/app.go \
+  's.replace("if a.restoreBegan(ctx) {", "if false {")' $app -run TestServeRefusesToServeDuringARestore
+mutate "a serving node ignores a restore" internal/app/restoring.go \
+  's.replace("\t\t\tclose(started)\n", "\t\t\t_ = started\n")' $app -run TestAServingNodeStopsWhenARestoreBegins
+mutate "a waiting node never serves again" internal/app/restoring.go \
+  's.replace("\t\tif now == nil {\n", "\t\tif now == nil {\n\t\t\tcontinue\n\t\t}\n\t\tif false {\n")' $app -run TestANodeWaitsOnThePageWhileARestoreRunsAndGoesOnAfter
+mutate "a restore makes the schema ops again" cmd/diffluence/restore.go \
+  's.replace("slices.Contains(fields, \"ops\") || makesPublic", "(false \x26\x26 slices.Contains(fields, \"ops\")) || makesPublic")' ./cmd/diffluence/ -run TestARestoreLeavesTheSchemaOpsAlone
+mutate "the last migration in a dump counts, not the newest" cmd/diffluence/restore.go \
+  's.replace("newest = max(newest, v)", "newest = v")' ./cmd/diffluence/ -run TestTheNewestMigrationIsReadFromTheDump
+mutate "the files step empties any folder" cmd/diffluence/restore.go \
+  's.replace("if keyErr != nil \x26\x26 markErr != nil {", "if keyErr != nil \x26\x26 markErr != nil \x26\x26 false {")' ./cmd/diffluence/ -run TestTheFilesStepEmptiesOnlyADataFolder
+mutate "a backup name may hold a backslash" cmd/diffluence/restore.go \
+  's.replace("strings.ContainsAny(name, `/\\`)", "false")' ./cmd/diffluence/ -run TestABackupNameStaysInTheBackupFolder
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

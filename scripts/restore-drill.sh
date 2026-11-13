@@ -23,7 +23,7 @@ cleanup() {
     [ -d "$work/$p" ] && (cd "$work/$p" && COMPOSE_PROJECT_NAME=dfldrill$p docker compose down -v --rmi local >/dev/null 2>&1 || true)
   done
   # The backup service writes as root.
-  docker run --rm -v "$work:/w" busybox rm -rf /w/backups /w/first/backups >/dev/null 2>&1 || true
+  docker run --rm -v "$work:/w" busybox rm -rf /w/backups /w/first/backups /w/second/backups >/dev/null 2>&1 || true
   rm -rf "$work"
   docker rmi -f "$DIFFLUENCE_IMAGE" "$DIFFLUENCE_BACKUP_IMAGE" >/dev/null 2>&1 || true
 }
@@ -165,4 +165,95 @@ if bash scripts/restore-check.sh "$work/no-backups-here" "$service_key" >/dev/nu
   echo "the restore check passed without a backup"
   exit 1
 fi
-echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a key change finished after the restore, a backup noted while the node was down, and the backup service"
+echo "6. a restore over the live installation, as the console asks for it (spec 059)"
+mkdir -p backup-key backups
+cp "$service_key" backup-key/backup.key
+docker compose run --rm backup once | tail -1
+target=$(find backups -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | tail -n 1)
+target=$(basename "$target")
+rm -f "$jar"
+api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
+later=$(api -d "{\"space_id\":\"$space\",\"title\":\"Made after the backup\"}" "$url/api/v1/pages" | first_id)
+restores() { docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SELECT $1 FROM ops.restores ORDER BY requested_at DESC LIMIT 1"; }
+if docker compose run --rm diffluence backup restore-request --name "$target" --confirm 'Not this one' >/dev/null 2>&1; then
+  echo "a restore was asked for with the wrong name"
+  exit 1
+fi
+# A backup that is not whole is refused before any node stops.
+broken=diffluence-20200101T000000Z
+docker run --rm -v "$PWD/backups:/b" busybox sh -c "cp -r /b/$target /b/$broken && echo tampered >>/b/$broken/files.tar.gz.gpg"
+docker compose run --rm diffluence backup report --name "$broken" --reason manual --started 2020-01-01T00:00:00Z --size 1 >/dev/null
+docker compose run --rm diffluence backup restore-request --name "$broken" --confirm Diffluence >/dev/null
+docker compose up -d backup >/dev/null 2>&1
+for _ in $(seq 1 60); do
+  case "$(restores state)" in refused | failed | done) break ;; esac
+  sleep 2
+done
+if [ "$(restores state)" != refused ] || [ "$(restores changed)" != f ]; then
+  echo "a restore of a broken backup was not refused before it changed anything: $(restores state) $(restores step)"
+  exit 1
+fi
+curl -sf "$url/readyz" >/dev/null || { echo "the nodes stopped for a broken backup"; exit 1; }
+# One restore a day: the drill moves the refused one back a day to ask again.
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc "UPDATE ops.restores SET requested_at = now() - interval '2 days'"
+docker compose run --rm diffluence backup restore-request --name "$target" --confirm Diffluence >/dev/null
+saw_waiting=
+for _ in $(seq 1 150); do
+  state=$(restores state)
+  case "$state" in done | failed | refused) break ;; esac
+  if curl -s "$url/readyz" | grep -q '"restoring"'; then saw_waiting=1; fi
+  sleep 2
+done
+if [ "$state" != done ]; then
+  echo "the restore from the console did not finish: $state, $(restores step)"
+  docker compose logs --tail 30 backup
+  exit 1
+fi
+[ -n "$saw_waiting" ] || { echo "no node showed the waiting page during the restore"; exit 1; }
+for _ in $(seq 1 30); do curl -sf "$url/readyz" >/dev/null && break; sleep 2; done
+curl -sf "$url/readyz" >/dev/null || { echo "the nodes did not serve again after the restore"; exit 1; }
+rm -f "$jar"
+api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
+api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
+if curl -sf -b "$jar" "$url/api/v1/pages/$later" >/dev/null; then
+  echo "a page made after the backup survived the restore"
+  exit 1
+fi
+[ "$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "SELECT count(*) FROM audit_events WHERE action = 'backup.restored'")" = 1 ]
+safety=$(restores safety_name)
+[ -d "backups/$safety" ] || { echo "the safety backup $safety is missing"; exit 1; }
+docker compose exec -T diffluence diffluence audit verify >/dev/null
+
+echo "7. a restore that stops halfway keeps every node waiting, and the way back"
+# Checksums that match a file cut short: the check passes, the restore stops in the files.
+cut=diffluence-20200102T000000Z
+docker run --rm -v "$PWD/backups:/b" busybox sh -c "cp -r /b/$target /b/$cut && cd /b/$cut &&
+  head -c 100 files.tar.gz.gpg >short && mv short files.tar.gz.gpg && sha256sum *.gpg >SHA256SUMS"
+docker compose run --rm diffluence backup report --name "$cut" --reason manual --started 2020-01-02T00:00:00Z --size 1 >/dev/null
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc "UPDATE ops.restores SET requested_at = now() - interval '2 days'"
+docker compose run --rm diffluence backup restore-request --name "$cut" --confirm Diffluence >/dev/null
+for _ in $(seq 1 150); do
+  state=$(restores state)
+  case "$state" in done | failed | refused) break ;; esac
+  sleep 2
+done
+if [ "$state" != failed ] || [ "$(restores changed)" != t ]; then
+  echo "a restore that broke halfway did not stay failed: $state, $(restores step)"
+  exit 1
+fi
+sleep 6
+curl -s "$url/" | grep -q 'way-back' || { echo "the waiting page does not name the way back"; exit 1; }
+if curl -sf "$url/readyz" >/dev/null; then
+  echo "a node serves while a restore stopped halfway"
+  exit 1
+fi
+docker compose run --rm backup way-back | tail -1
+[ "$(restores state)" = done ] || { echo "the way back did not finish: $(restores state) $(restores step)"; exit 1; }
+for _ in $(seq 1 30); do curl -sf "$url/readyz" >/dev/null && break; sleep 2; done
+curl -sf "$url/readyz" >/dev/null || { echo "the nodes did not serve again after the way back"; exit 1; }
+rm -f "$jar"
+api -d '{"email":"admin@example.com","password":"correct horse battery staple"}' "$url/api/v1/auth/login" >/dev/null
+api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
+docker compose exec -T diffluence diffluence audit verify >/dev/null
+docker compose stop backup >/dev/null 2>&1
+echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a key change finished after the restore, a backup noted while the node was down, the backup service, a restore from the console with its safety backup, and the way back from a restore that stopped halfway"

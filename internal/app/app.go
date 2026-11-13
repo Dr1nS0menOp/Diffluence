@@ -37,6 +37,7 @@ import (
 	"github.com/diffluence/diffluence/internal/feed"
 	"github.com/diffluence/diffluence/internal/httpapi"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/keys"
@@ -415,9 +416,20 @@ func (a *App) Run(ctx context.Context) error {
 
 // Serve is Run on an existing listener (tests use port 0).
 func (a *App) Serve(ctx context.Context, ln net.Listener) error {
+	// A node that starts while a restore runs must not serve a single request (spec 059).
+	if a.restoreBegan(ctx) {
+		_ = ln.Close()
+		return ErrRestoring
+	}
+	if a.nodeID == [16]byte{} {
+		a.nodeID = ids.New()
+	}
 	var wg sync.WaitGroup
 	workCtx, stopWork := context.WithCancel(context.Background())
 	defer stopWork()
+	restoreStarted := make(chan struct{})
+	wg.Add(1)
+	go func() { defer wg.Done(); a.watchRestore(workCtx, restoreStarted) }()
 
 	if a.cfg.Role.RunsWorker() {
 		relay := &outbox.Relay{Pool: a.pool, Publisher: a.queue, Log: a.log, Refused: func(ctx context.Context, data []byte, cause error) error {
@@ -472,11 +484,16 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 		if !errors.Is(err, http.ErrServerClosed) {
 			runErr = err
 		}
+	case <-restoreStarted:
+		runErr = ErrRestoring
 	}
 
 	a.draining.Store(true)
 	a.log.Info("shutting down", "delay", a.cfg.ShutdownDelay)
-	time.Sleep(a.cfg.ShutdownDelay)
+	if !errors.Is(runErr, ErrRestoring) {
+		// A restore waits for every node; requests in flight still finish below.
+		time.Sleep(a.cfg.ShutdownDelay)
+	}
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(shutdownCtx); err != nil && runErr == nil {

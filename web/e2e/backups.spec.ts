@@ -23,6 +23,30 @@ test('Backups says when no backup service checked in, and back up now waits for 
   await expect(page.getByLabel('Backups to keep')).toHaveValue('7');
 });
 
+// A restore over the installation says what is lost, asks for the installation's name typed
+// out, and a second factor on top of the password (spec 059). The test admin has none, so
+// it is refused and nothing is asked of the backup service.
+test('Restoring over the installation asks for its name and a second factor', async ({ page }) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  await page.goto('/admin/backups');
+  await expect(page.getByRole('heading', { name: 'Restore over this installation' })).toBeVisible();
+  await expect(page.getByText(/Everything since is lost/)).toBeVisible();
+  await expect(page.getByText(/a backup of the installation as it is now/)).toBeVisible();
+  const restore = page.getByRole('button', { name: 'Restore over this installation' });
+  await expect(restore).toBeDisabled();
+  await page.getByLabel(/^Type .* to confirm$/).fill('Not the name');
+  await expect(restore).toBeDisabled();
+  const label = await page.getByText(/^Type .* to confirm$/).textContent();
+  const name = (label ?? '').replace(/^Type /, '').replace(/ to confirm$/, '');
+  await page.getByLabel(/^Type .* to confirm$/).fill(name);
+  await expect(restore).toBeEnabled();
+  await checkAccessibility(page);
+  await restore.click();
+  await expect(page.getByRole('alert')).toContainText('a passkey');
+  // The test before may leave a backup waiting; only a restore must not be asked for.
+  await expect(page.getByText(/The restore of .* waits for the backup service/)).toHaveCount(0);
+});
+
 // The configuration shows where each setting came from and never a secret value.
 test('Configuration lists each setting with its source', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);

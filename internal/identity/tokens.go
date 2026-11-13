@@ -213,15 +213,59 @@ func (s *Service) Reauthenticate(ctx context.Context, c Caller, sessionID uuid.U
 	if err := s.checkPassword(ctx, s.pool, c.UserID, password); err != nil {
 		return err
 	}
-	return s.confirmSession(ctx, c, sessionID)
+	return s.confirmSession(ctx, c, sessionID, ConfirmedByPassword)
 }
 
-// confirmSession notes that the person just proved who they are.
-func (s *Service) confirmSession(ctx context.Context, c Caller, sessionID uuid.UUID) error {
+// How a person last proved who they are in a session.
+const (
+	ConfirmedByPassword = "password"
+	ConfirmedByPasskey  = "passkey"
+)
+
+// confirmSession notes that the person just proved who they are, and how.
+func (s *Service) confirmSession(ctx context.Context, c Caller, sessionID uuid.UUID, method string) error {
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, "UPDATE sessions SET reauth_at = $2 WHERE id = $1", sessionID, s.now()); err != nil {
+		if _, err := tx.Exec(ctx, "UPDATE sessions SET reauth_at = $2, reauth_method = $3 WHERE id = $1", sessionID, s.now(), method); err != nil {
 			return err
 		}
-		return s.record(ctx, tx, c, "auth.reauthenticated", "session", sessionID.String(), nil)
+		return s.record(ctx, tx, c, "auth.reauthenticated", "session", sessionID.String(), map[string]any{"method": method})
 	})
+}
+
+// ConfirmSecondFactor asks for more than a password, for the most dangerous actions such as
+// a restore over the live installation (spec 059): a code from the authenticator app or a
+// recovery code given now, or a passkey confirmed in this session within ReauthWindow.
+func (s *Service) ConfirmSecondFactor(ctx context.Context, c Caller, sessionID uuid.UUID, code string) error {
+	if code != "" {
+		return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+			on, err := s.hasTOTP(ctx, tx, c.UserID)
+			if err != nil {
+				return err
+			}
+			if !on {
+				return secondFactorRequired("Set up an authenticator app or a passkey first.")
+			}
+			method, err := s.useSecondFactor(ctx, tx, c.UserID, code)
+			if err != nil {
+				return err
+			}
+			if method == "" {
+				return secondFactorRequired("The code is wrong or was used already.")
+			}
+			return s.record(ctx, tx, c, "auth.second_factor_confirmed", "session", sessionID.String(), map[string]any{"method": method})
+		})
+	}
+	var method *string
+	var at *time.Time
+	if err := s.pool.QueryRow(ctx, "SELECT reauth_method, reauth_at FROM sessions WHERE id = $1", sessionID).Scan(&method, &at); err != nil {
+		return err
+	}
+	if method != nil && *method == ConfirmedByPasskey && at != nil && s.now().Sub(*at) <= ReauthWindow {
+		return nil
+	}
+	return secondFactorRequired("Confirm with a code from your authenticator app, a recovery code or a passkey.")
+}
+
+func secondFactorRequired(message string) *apperr.Error {
+	return &apperr.Error{Kind: apperr.KindForbidden, Code: "second_factor_required", Message: message}
 }

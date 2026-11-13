@@ -31,7 +31,9 @@ encrypt_to() {
 
 # The database first: a file that appears after the dump is harmless, but a page
 # pointing at a file that is not in the backup is not.
-docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc | encrypt_to database.dump.gpg
+# The schema ops steers a restore from the console and is never restored, so a backup
+# holds its tables without their rows (spec 059).
+docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc --exclude-table-data='ops.*' | encrypt_to database.dump.gpg
 
 # Stored files and the encryption key, read through a throw-away container.
 volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq diffluence)")

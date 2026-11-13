@@ -3,6 +3,7 @@
 DELETE /api/v1/admin/analytics/data                            session-only permission:administrator
 DELETE /api/v1/admin/appearance/font                           session-only permission:administrator
 DELETE /api/v1/admin/appearance/logo                           session-only permission:administrator
+DELETE /api/v1/admin/backups/restore                           session-only permission:administrator
 DELETE /api/v1/admin/categories/{id}                           session-only permission:administrator
 DELETE /api/v1/admin/groups/{id}                               session-only permission:administrator
 DELETE /api/v1/admin/groups/{id}/members/{user}                session-only permission:administrator
@@ -274,6 +275,7 @@ POST /api/v1/access-requests/{id}/allow                        object:restrictio
 POST /api/v1/access-requests/{id}/refuse                       object:restriction.manage
 POST /api/v1/admin/appearance/reset                            session-only permission:administrator
 POST /api/v1/admin/backups/request                             session-only permission:administrator
+POST /api/v1/admin/backups/restore                             sensitive permission:administrator
 POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator

@@ -20,6 +20,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/diffluence/diffluence/internal/app"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/config"
@@ -27,6 +29,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/diffluence/diffluence/internal/restore"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/version"
 )
@@ -47,6 +50,11 @@ Commands:
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   backup next|report|restore-checked
                             what the backup worker asks and tells the console; see diffluence backup
+  backup restore-request --name BACKUP --confirm INSTALLATION
+                            restore a backup over this installation: the backup worker stops
+                            every node, makes a safety backup, restores and checks (spec 059)
+  backup restore-prepare|restore-run|restore-abort|restore-way-back
+                            the steps of a restore, which the backup worker runs
   key <step>                replace master.key without downtime; see diffluence key
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
@@ -108,6 +116,16 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			err = cmdBackupReport(ctx, args[2:], stdout)
 		case len(args) >= 2 && args[1] == "restore-checked":
 			err = cmdBackupRestoreChecked(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-request":
+			err = cmdBackupRestoreRequest(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-prepare":
+			err = cmdBackupRestorePrepare(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-run":
+			err = cmdBackupRestoreRun(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-abort":
+			err = cmdBackupRestoreAbort(ctx, args[2:], stdout)
+		case len(args) >= 2 && args[1] == "restore-way-back":
+			err = cmdBackupRestoreWayBack(ctx, args[2:], stdout)
 		default:
 			fmt.Fprint(stderr, usage)
 			return 2
@@ -195,7 +213,14 @@ func cmdServe(ctx context.Context) error {
 	signal.Notify(hup, syscall.SIGHUP)
 	defer signal.Stop(hup)
 	for {
+		// A restore from the console keeps every node off the database until it is done
+		// (spec 059), also a node that starts while it runs.
+		if err := app.WaitWhileRestoring(ctx, cfg.DatabaseURL, cfg.HTTPAddr, log); err != nil {
+			return stoppedCleanly(err)
+		}
+		stopBeat := sayStarting(ctx, cfg.DatabaseURL)
 		a, err := app.New(ctx, cfg, log)
+		stopBeat()
 		var refused *app.UpgradeRefused
 		if errors.As(err, &refused) {
 			if err := waitBeforeUpgrade(ctx, cfg.HTTPAddr, refused, hup, log); err != nil {
@@ -206,9 +231,45 @@ func cmdServe(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		defer a.Close()
-		return a.Run(ctx)
+		err = a.Run(ctx)
+		a.Close()
+		if errors.Is(err, app.ErrRestoring) {
+			continue
+		}
+		return err
 	}
+}
+
+// sayStarting tells the restore worker every few seconds that a node is starting, so it
+// never restores under a node that migrates or opens its modules (spec 059). It returns
+// the function that stops it.
+func sayStarting(ctx context.Context, databaseURL string) func() {
+	beatCtx, cancel := context.WithCancel(ctx)
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		pool, err := db.Open(beatCtx, databaseURL)
+		if err != nil {
+			return
+		}
+		defer pool.Close()
+		node := uuid.New()
+		tick := time.NewTicker(5 * time.Second)
+		defer tick.Stop()
+		for {
+			_ = restore.Seen(beatCtx, pool, node, restore.ModeStarting)
+			select {
+			case <-beatCtx.Done():
+				// The node's own row takes over once it serves; this one ends now.
+				leave, stop := context.WithTimeout(context.WithoutCancel(beatCtx), 2*time.Second)
+				_, _ = pool.Exec(leave, "DELETE FROM ops.nodes WHERE node_id = $1", node)
+				stop()
+				return
+			case <-tick.C:
+			}
+		}
+	}()
+	return func() { cancel(); <-done }
 }
 
 // waitBeforeUpgrade serves the waiting page until a minute passes or SIGHUP arrives.

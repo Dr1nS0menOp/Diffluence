@@ -35,6 +35,8 @@ ENV
 fi
 . /tmp/e2e-env
 echo 'correct horse battery staple' | /tmp/diffluence user create-admin --email admin@example.com --name Admin >/dev/null
+# One complete backup, as a backup service reports it, so the console offers a restore (spec 059).
+/tmp/diffluence backup report --name diffluence-20261101T120000Z --reason manual --started 2026-11-01T12:00:00Z --size 2048 >/dev/null
 nohup /tmp/diffluence serve >/tmp/e2e.log 2>&1 &
 echo $! >/tmp/e2e.pid
 if [ -n "$E2E_COLLAB" ]; then

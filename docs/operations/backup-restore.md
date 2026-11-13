@@ -104,6 +104,26 @@ bash scripts/restore.sh /backups/diffluence-20261104T182225Z /root/diffluence-ba
 
 The script checks the checksums, checks the key before it changes anything, restores the database and files, starts Diffluence, verifies the audit chain, and runs `diffluence key check` to prove that every stored file and secret opens with the restored `master.key`. Log in afterwards and open a few pages.
 
+### Over the live installation, from the console
+
+To put a running installation back to an earlier backup, an administrator uses Administration, System, Backups (spec 059). The page says what is lost, asks for the installation's name typed out, and asks for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day.
+
+The backup service does the work:
+1. It checks the backup while people still work: the checksums, that the key opens it, and that this release knows its database. A backup that fails here changes nothing.
+2. It stops every node. Each shows a waiting page, and `/readyz` answers `restoring`.
+3. It makes a safety backup of the installation as it is now.
+4. It restores the database in one transaction, then the files and keys.
+5. It brings the database up to this release, writes the restore into the restored audit log, and checks the audit chain and the keys.
+6. The nodes serve again within seconds.
+
+If it stops halfway, every node keeps waiting and the page says so. Go back to the safety backup with:
+
+```sh
+docker compose run --rm backup way-back
+```
+
+Without the console, an operator on the machine asks for the same restore with `docker compose run --rm diffluence backup restore-request --name diffluence-20261104T182225Z --confirm "<installation name>"`. The backup service picks it up within a minute. The schema `ops` steers a restore and is never restored itself; backups hold its tables without rows.
+
 ## master.key
 
 `master.key` protects every stored file and every secret Diffluence keeps. **Without it, no file can be read, and nobody can log in with an authenticator app.** The backup keeps it, encrypted, in `master.key.gpg`. Keep a second copy of the backup key apart from the backups, as above.

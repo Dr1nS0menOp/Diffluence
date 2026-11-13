@@ -10,6 +10,9 @@ import { TableBox } from '../components/table-box';
 /** How often the backup page reads the worker's state again: a request is taken within a minute. */
 const BACKUPS_POLL_MS = 15_000;
 
+/** Restores the safety backup after a restore that stopped halfway (spec 059). A command, not text. */
+const WAY_BACK_COMMAND = 'docker compose run --rm backup way-back';
+
 interface BackupRun {
   name: string;
   reason: 'schedule' | 'request' | 'manual';
@@ -43,6 +46,31 @@ interface BackupOverview {
     message: string;
   } | null;
   requests_per_hour: number;
+  restore: Restore | null;
+  installation_name: string;
+  restores_per_day: number;
+}
+
+interface Restore {
+  id: string;
+  backup_name: string;
+  requested_by_name: string;
+  requested_at: string;
+  state:
+    | 'requested'
+    | 'preparing'
+    | 'stopping'
+    | 'backing_up'
+    | 'restoring'
+    | 'checking'
+    | 'done'
+    | 'refused'
+    | 'failed';
+  step: string;
+  safety_name: string;
+  changed: boolean;
+  updated_at: string;
+  finished_at: string | null;
 }
 
 /** A whole number of 1 or more from a field, or 0 for "as the installation was started". */
@@ -229,30 +257,138 @@ function RestoreCheck({ data }: { data: BackupOverview }) {
   );
 }
 
-/** Restoring over the live installation stays a command: it replaces everything, and the
- * server cannot stop itself to do it (spec 058, D7). The page spells the command out. */
-function RestoreCommand({ runs }: { runs: BackupRun[] }) {
+/** Where the latest restore stands: waiting for the worker, running, done, or stopped. */
+function RestoreState({ r }: { r: Restore }) {
   const { t } = useTranslation();
-  const good = runs.filter((r) => r.ok);
+  const dates = useDates();
+  const qc = useQueryClient();
+  const cancel = useMutation({
+    mutationFn: () => api.del('/admin/backups/restore'),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+  });
+  if (r.state === 'requested') {
+    return (
+      <>
+        <p role="status">
+          {t('running.restoreAsked', { name: r.backup_name, when: dates.moment(r.requested_at) })}
+        </p>
+        <p>
+          <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+            {t('running.restoreCancel')}
+          </button>
+        </p>
+        <ErrorNote error={cancel.error} />
+      </>
+    );
+  }
+  if (r.state === 'done') {
+    return (
+      <p role="status" className="muted">
+        {t('running.restoreDone', {
+          name: r.backup_name,
+          when: dates.moment(r.finished_at ?? r.updated_at),
+          safety: r.safety_name,
+        })}
+      </p>
+    );
+  }
+  if (r.state === 'refused') {
+    return (
+      <p role="status" className="note">
+        {t('running.restoreRefused', { name: r.backup_name, step: r.step })}
+      </p>
+    );
+  }
+  if (r.state === 'failed') {
+    return (
+      <div role="alert" className="note note-error">
+        <p>{t('running.restoreBroke', { name: r.backup_name, step: r.step })}</p>
+        <pre>
+          <code>{WAY_BACK_COMMAND}</code>
+        </pre>
+      </div>
+    );
+  }
+  return <p role="status">{t('running.restoreRunning', { name: r.backup_name, step: r.step })}</p>;
+}
+
+/** A restore over the live installation (spec 059): the worker stops every node, makes a
+ * safety backup, restores and checks. It asks for the installation's name typed out and a
+ * second factor; a passkey confirmed just before counts too. */
+function RestoreOver({ data }: { data: BackupOverview }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const qc = useQueryClient();
+  const good = data.runs.filter((r) => r.ok);
   const [name, setName] = useState('');
-  const chosen = name || good[0]?.name || '';
-  if (good.length === 0) return null;
+  const [confirm, setConfirm] = useState('');
+  const [code, setCode] = useState('');
+  const chosen = good.find((r) => r.name === name) ?? good[0];
+  const ask = useMutation({
+    mutationFn: () =>
+      api.post('/admin/backups/restore', { name: chosen?.name ?? '', confirm, code: code.trim() }),
+    onSuccess: () => {
+      setConfirm('');
+      setCode('');
+      return qc.invalidateQueries({ queryKey: ['backups'] });
+    },
+  });
+  const open = data.restore !== null && data.restore.finished_at === null;
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    ask.mutate();
+  };
   return (
     <>
       <h2>{t('running.restoreHowTitle')}</h2>
-      <p>{t('running.restoreHow')}</p>
-      <Field label={t('running.restoreWhich')}>
-        <select value={chosen} onChange={(e) => setName(e.target.value)}>
-          {good.map((r) => (
-            <option key={r.name} value={r.name}>
-              {r.name}
-            </option>
-          ))}
-        </select>
-      </Field>
-      <pre>
-        <code>{`bash scripts/restore.sh ./backups/${chosen} ./backup-key/backup.key`}</code>
-      </pre>
+      {data.restore && <RestoreState r={data.restore} />}
+      {!open && chosen && (
+        <form onSubmit={submit} className="settings-form">
+          <Field label={t('running.restoreWhich')}>
+            <select value={chosen.name} onChange={(e) => setName(e.target.value)}>
+              {good.map((r) => (
+                <option key={r.name} value={r.name}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <p className="note">
+            {t('running.restoreLoss', { name: chosen.name, when: dates.moment(chosen.started_at) })}
+          </p>
+          <p>{t('running.restoreSafety')}</p>
+          <Field label={t('running.restoreConfirmLabel', { name: data.installation_name })}>
+            <input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
+          </Field>
+          <Field label={t('running.restoreCode')} help={t('running.restoreCodeHelp')}>
+            <input
+              value={code}
+              onChange={(e) => setCode(e.target.value)}
+              autoComplete="one-time-code"
+              inputMode="text"
+            />
+          </Field>
+          <ErrorNote error={ask.error} />
+          <div>
+            <button
+              type="submit"
+              className="danger"
+              disabled={ask.isPending || confirm.trim() !== data.installation_name}
+            >
+              {t('running.restoreButton')}
+            </button>{' '}
+            <small className="muted">{t('running.restoreLimit', { count: data.restores_per_day })}</small>
+          </div>
+        </form>
+      )}
+      {chosen && (
+        <>
+          <p>{t('running.restoreByCommand')}</p>
+          <pre>
+            <code>{`docker compose run --rm diffluence backup restore-request --name ${chosen.name} --confirm '${data.installation_name}'`}</code>
+          </pre>
+        </>
+      )}
     </>
   );
 }
@@ -275,7 +411,7 @@ export function BackupsTab() {
       <h2>{t('running.list')}</h2>
       <BackupList runs={q.data.runs} />
       <RestoreCheck data={q.data} />
-      <RestoreCommand runs={q.data.runs} />
+      <RestoreOver data={q.data} />
     </>
   );
 }

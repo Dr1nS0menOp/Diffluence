@@ -8,8 +8,10 @@ import (
 	"strings"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/restore"
 )
 
 // registerRunningRoutes are the parts of the console that run the installation (spec 058):
@@ -19,6 +21,10 @@ func (s *Server) registerRunningRoutes() {
 	admin := SessionOnly(Permission(identity.PermAdministrator))
 	r.HandleFunc("GET /api/v1/admin/backups", admin, s.handleBackups)
 	r.HandleFunc("POST /api/v1/admin/backups/request", admin, s.handleBackupRequest)
+	// A restore over the live installation is the most dangerous action there is: it asks
+	// for a fresh login and, on top of it, a second factor or a passkey (spec 059).
+	r.HandleFunc("POST /api/v1/admin/backups/restore", Sensitive(admin), s.handleRestoreRequest)
+	r.HandleFunc("DELETE /api/v1/admin/backups/restore", admin, s.handleRestoreCancel)
 	r.HandleFunc("GET /api/v1/admin/configuration", admin, s.handleConfiguration)
 	// Logging everyone out is an incident action; asking for the password again first
 	// keeps a stolen session from using it as a weapon.
@@ -31,7 +37,57 @@ func (s *Server) handleBackups(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, overview)
+	latest, err := restore.Latest(r.Context(), s.deps.Pool)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, struct {
+		backups.Overview
+		Restore          *restore.Restore `json:"restore"`
+		InstallationName string           `json:"installation_name"`
+		RestoresPerDay   int              `json:"restores_per_day"`
+	}{overview, latest, s.deps.Config.InstanceName, restore.PerDay})
+}
+
+// handleRestoreRequest asks the backup worker to restore a backup over the installation.
+// The name is checked before the second factor, so a typing error costs no code.
+func (s *Server) handleRestoreRequest(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Name    string `json:"name"`
+		Confirm string `json:"confirm"`
+		Code    string `json:"code"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	installation := s.deps.Config.InstanceName
+	if strings.TrimSpace(in.Confirm) != installation {
+		s.fail(w, r, apperr.Invalid("Type the name of this installation, "+installation+", to confirm."))
+		return
+	}
+	p := PrincipalFrom(r.Context())
+	c := s.caller(r)
+	if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	rs, err := restore.Request(r.Context(), s.deps.Pool, restore.Ask{BackupName: in.Name, Confirm: in.Confirm,
+		Installation: installation, Caller: c, CallerName: p.User.DisplayName})
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, rs)
+}
+
+func (s *Server) handleRestoreCancel(w http.ResponseWriter, r *http.Request) {
+	if err := restore.Cancel(r.Context(), s.deps.Pool, s.caller(r)); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleBackupRequest(w http.ResponseWriter, r *http.Request) {

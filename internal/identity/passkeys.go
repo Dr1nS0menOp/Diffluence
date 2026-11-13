@@ -232,7 +232,7 @@ func (s *Service) FinishPasskeyReauth(ctx context.Context, c Caller, sessionID u
 	if _, err := s.pool.Exec(ctx, "UPDATE webauthn_credentials SET credential = $2, last_used_at = now() WHERE credential_id = $1", cred.ID, updated); err != nil {
 		return err
 	}
-	return s.confirmSession(ctx, c, sessionID)
+	return s.confirmSession(ctx, c, sessionID, ConfirmedByPasskey)
 }
 
 // BeginPasskeyLogin starts a login without a user name: the browser offers the

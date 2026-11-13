@@ -4,6 +4,9 @@
 # inside Compose on an interval, so an installation has backups without anyone remembering.
 #   diffluence-backup loop   back up every DIFFLUENCE_BACKUP_INTERVAL (the default)
 #   diffluence-backup once   make one backup and exit with its result
+#   diffluence-backup way-back
+#                            after a restore from the console stopped halfway, restore the
+#                            safety backup it made first (spec 059)
 # It reads the database as the owner, the data volume and ./secrets read-only, and the key
 # from /key/backup.key. Backups go to /backups, encrypted with gpg as backup.sh does, so
 # scripts/restore.sh restores them.
@@ -82,7 +85,10 @@ backup_once() {
   # The database first: a file that appears after the dump is harmless, but a page that
   # points at a file the backup lacks is not.
   step="dumping the database"
-  pg_dump --dbname="$(cat /run/secrets/migrate_database_url)" -Fc | encrypt_to "$work/database.dump.gpg" || return 1
+  # The schema ops steers a restore and is never restored, so a backup holds its tables
+  # without their rows (spec 059).
+  pg_dump --dbname="$(cat /run/secrets/migrate_database_url)" -Fc --exclude-table-data='ops.*' |
+    encrypt_to "$work/database.dump.gpg" || return 1
   step="packing the stored files"
   tar -C /data -czf - --exclude=./master.key --exclude=./master.key.next --exclude=./master.key.previous \
     --exclude=./nats . | encrypt_to "$work/files.tar.gz.gpg" || return 1
@@ -107,7 +113,8 @@ backup_once() {
     return 1
   fi
   log "backup written to $dir and noted"
-  prune
+  # A restore keeps every backup until it is done: the one it restores may be the oldest.
+  [ "${restoring:-}" = 1 ] || prune
 }
 
 # key_fingerprint is the start of a SHA-256 of the key, which shows the console that a key
@@ -145,6 +152,31 @@ attempt() {
   fi
 }
 
+# restore carries out a restore the console asked for (spec 059): diffluence checks the
+# backup and stops every node, this script makes the safety backup, and diffluence restores
+# and checks. Each step writes down where it is, so the console and the waiting page say it.
+restore() {
+  local id=$1 chosen=$2
+  log "restoring $chosen over the installation, as the console asked"
+  if ! diffluence backup restore-prepare --request "$id" --dir "$target" --key "$key"; then
+    log "the restore of $chosen did not begin; nothing was changed"
+    return 1
+  fi
+  restoring=1
+  if ! attempt request; then
+    restoring=
+    diffluence backup restore-abort --request "$id" --step "$step" --dir "$target" --key "$key" ||
+      log "could not tell the console that the restore ended"
+    return 1
+  fi
+  restoring=
+  if ! diffluence backup restore-run --request "$id" --safety "$name" --dir "$target" --key "$key"; then
+    log "the restore stopped; every node waits. The way back: docker compose run --rm backup way-back"
+    return 1
+  fi
+  log "restored $chosen; the safety backup is $name"
+}
+
 # prune keeps the newest DIFFLUENCE_BACKUP_KEEP backups.
 prune() {
   local old
@@ -167,6 +199,9 @@ case "${1:-loop}" in
   once)
     attempt manual
     ;;
+  way-back)
+    diffluence backup restore-way-back --dir "$target" --key "$key"
+    ;;
   loop)
     if ! every=$(seconds_of "$interval"); then
       log "DIFFLUENCE_BACKUP_INTERVAL must look like 4h, 30m or 1d, not $interval"
@@ -185,6 +220,10 @@ case "${1:-loop}" in
         --key-fingerprint "$(key_fingerprint)" 2>/dev/null); then
         read -r what value keep_now <<<"$answer"
         case "$what" in
+          restore)
+            # value is the restore, keep_now the backup it restores.
+            restore "$value" "$keep_now" || true
+            ;;
           now)
             keep=$keep_now
             # This loop records a failed backup and tries again on schedule: the console
@@ -208,7 +247,7 @@ case "${1:-loop}" in
     done
     ;;
   *)
-    echo "usage: diffluence-backup [loop|once]" >&2
+    echo "usage: diffluence-backup [loop|once|way-back]" >&2
     exit 2
     ;;
 esac

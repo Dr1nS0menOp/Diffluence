@@ -380,6 +380,40 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/backups/restore": {
+      "delete": {
+        "operationId": "delete /api/v1/admin/backups/restore",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "post": {
+        "operationId": "post /api/v1/admin/backups/restore",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "sensitive permission:administrator"
+      }
+    },
     "/api/v1/admin/bundles": {
       "post": {
         "operationId": "post /api/v1/admin/bundles",

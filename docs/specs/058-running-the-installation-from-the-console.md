@@ -93,7 +93,7 @@ Load budget (ARC-238): `backup next` is one upsert, one settings read and two in
 
 ### 3.2 Restoring over the live installation from the console
 
-Decided by the product owner on 2026-11-11: a full restore over the live installation must be possible from the admin screen. It is too large to build safely beside the rest of this wave, so it is its own step, planned here.
+Decided by the product owner on 2026-11-11: a full restore over the live installation must be possible from the admin screen. It is too large to build safely beside the rest of this wave, so it is its own step, planned here. Built in wave RS; spec 059 is the detailed plan and records where the build went further.
 
 **Who and how.** Only an instance administrator. The route is sensitive and asks for a fresh second factor or passkey, not only the password. The administrator types the installation's name to confirm. Before the button, the page says in plain words what is lost: everything since that backup, for everyone, including pages, files, comments and accounts made since then.
 

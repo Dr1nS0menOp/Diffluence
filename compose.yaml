@@ -105,9 +105,14 @@ services:
       # How many backups to keep: 42 is a week at one every 4 hours.
       DIFFLUENCE_BACKUP_KEEP: ${DIFFLUENCE_BACKUP_KEEP:-42}
       DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
+      # A restore from the console runs as the owner of the tables and writes the data
+      # folder: the backup service is the worker that carries it out (spec 059).
+      DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+      DIFFLUENCE_DATA_DIR: /data
+      DIFFLUENCE_INSTANCE_NAME: ${DIFFLUENCE_INSTANCE_NAME:-}
     secrets: [database_url, migrate_database_url]
     volumes:
-      - data:/data:ro
+      - data:/data
       - ./secrets:/secrets:ro
       - ${DIFFLUENCE_BACKUP_DIR:-./backups}:/backups
       - ${DIFFLUENCE_BACKUP_KEY_DIR:-./backup-key}:/key:ro

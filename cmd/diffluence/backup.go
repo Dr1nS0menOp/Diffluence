@@ -10,9 +10,12 @@ import (
 	"io"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/restore"
 	"github.com/diffluence/diffluence/internal/settings"
 )
 
@@ -22,20 +25,27 @@ import (
 
 // openBackups connects with the application's role and returns the backups module.
 func openBackups(ctx context.Context) (*backups.Service, func(), error) {
+	svc, _, done, err := openBackupsPool(ctx)
+	return svc, done, err
+}
+
+// openBackupsPool is openBackups with its connection, for the restore queries.
+func openBackupsPool(ctx context.Context) (*backups.Service, *pgxpool.Pool, func(), error) {
 	cfg, err := config.FromEnvironment()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	pool, err := db.Open(ctx, cfg.DatabaseURL)
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
 	// The worker never mails: only a server node holds the key that seals mail.
-	return backups.NewService(pool, settings.NewService(pool, nil), nil, ""), pool.Close, nil
+	return backups.NewService(pool, settings.NewService(pool, nil), nil, ""), pool, pool.Close, nil
 }
 
 // cmdBackupNext prints what the worker should do now, as one line it can read in a shell:
 //
+//	restore <id> <backup>   restore <backup> over the installation (spec 059)
 //	now <reason> <keep>     make a backup now, then keep the newest <keep>
 //	wait <seconds> <keep>   ask again after <seconds>
 func cmdBackupNext(ctx context.Context, args []string, stdout io.Writer) error {
@@ -46,11 +56,21 @@ func cmdBackupNext(ctx context.Context, args []string, stdout io.Writer) error {
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
-	svc, done, err := openBackups(ctx)
+	svc, pool, done, err := openBackupsPool(ctx)
 	if err != nil {
 		return err
 	}
 	defer done()
+	// A restore goes before any backup: the console asked for it, and it makes its own
+	// safety backup.
+	rs, err := restore.Claim(ctx, pool)
+	if err != nil {
+		return err
+	}
+	if rs != nil {
+		fmt.Fprintf(stdout, "restore %s %s\n", rs.ID, rs.BackupName)
+		return nil
+	}
 	d, err := svc.Next(ctx, backups.Defaults{Interval: *interval, Keep: *keep, KeyFingerprint: *key})
 	if err != nil {
 		return err
