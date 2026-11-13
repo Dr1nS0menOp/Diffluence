@@ -98,7 +98,7 @@ In this order, each with its own study:
 
 ## Enterprise document features
 
-The product owner counts these as basic enterprise features (2026-11-06). Each is a clean-room build, as `02-clean-room-and-licensing.md` describes: the products below are named only to say which behaviour is meant. We read their public pages for behaviour, write our own spec, and copy no text, workflow, icon or layout. Each starts with its own study. They are built before 1.0 (ADR-038). The sources are in `03-functional/sources.md`.
+The product owner counts these as basic enterprise features (2026-11-06). Each is a clean-room build, as `02-clean-room-and-licensing.md` describes: the products below are named only to say which behaviour is meant. We read their public pages for behaviour, write our own spec, and copy no text, workflow, icon or layout. Each starts with its own study. They are built before 1.0 (ADR-038). Document control is studied in [09-enterprise/01-document-control.md](09-enterprise/01-document-control.md) and planned in spec 064. The sources are in `03-functional/sources.md`.
 
 | Feature | What people get | What exists already |
 |---|---|---|
