@@ -124,6 +124,32 @@ A save no longer takes the audit lock: it writes its event to `audit_pending`, a
 
 The database of the development container runs with `fsync` and `synchronous_commit` off, so no commit waits for the disk there. That is the step the lock was held across, so on a real disk the old way is slower still and these numbers understate the gain. **The stress test has not been repeated on the server with this change.** Until it is, the 3.7 seconds above is the last measured state for all 5,000 at once.
 
+### Measured on the real data set (spec 061)
+
+The second stress test (12 November 2026) found the generated data of spec 050 misleading: on the seeded data of the server the feed did not answer within a minute. Every hot read is now also measured on a dump of that data (5,001 people, 384 spaces, 60,385 pages, 115,022 versions, 1.7 GB), restored into PostgreSQL 16 with `scripts/stress/real-data.sh`, with nothing else running. "Member" is an ordinary member in the most groups; "watcher" is the person who watches the most pages, here every page, and who sees everything.
+
+| Query | Before | After |
+|---|---|---|
+| Feed, recent, member of 201 spaces | 233 ms; over 2 minutes once pgx used a generic plan | 43 ms |
+| Feed, recent, watcher | 79 ms | 35 ms |
+| Feed, for you, member | over 2 minutes | 73 ms |
+| Feed, for you, watcher of 60,384 pages | over 2 minutes | 233 ms |
+| Feed, popular, 32,000 comments in the week | about 320 ms | 187 ms (member), 107 ms (watcher) |
+| The page tree of the largest space (3,978 pages) | 36 ms | not changed |
+| The storage still free in a space | 3 ms | not changed |
+| The count on the bell | 0.2 ms | not changed |
+| The spaces a person may see | 6.6 ms | not changed |
+
+The feed is the median of five runs through `feed.Service`; the other rows are single runs of `EXPLAIN ANALYZE`. The last four were 38 to 260 ms in the stress test only because the feed held the database's cores: alone they are fast.
+
+What changed, besides the feed itself:
+
+- **Every query is planned with its values** (`plan_cache_mode = force_custom_plan` on the pool). pgx prepares statements, and after five runs PostgreSQL may keep a generic plan, which cannot see that an optional filter is empty. Planning costs about a millisecond a query.
+- **No JIT** (`jit = off` on the pool). PostgreSQL compiled any plan whose estimate looked large, which cost half a second or more each time, on queries that take milliseconds.
+- **No read holds the database for long.** Each query of a read stops after 15 seconds and the person is told the server is busy, as when no connection is free. Writes are not limited, so a change is never cut off halfway.
+
+Budgets on that data, checked by `TestTheFeedIsFastOnRealData` when it runs against the dump: recent 150 ms, for you 500 ms, popular 250 ms. **The stress test has not been repeated on the server with these changes.**
+
 ## What stops everything
 
 | What | Result | What to do |

@@ -110,12 +110,26 @@ func TestTheFeedGivesWhatTheFormerQueryGave(t *testing.T) {
 	reader.ok("POST", "/api/v1/pages", map[string]any{"space_id": eng, "title": "Draft only"})
 	owner.page(ops, nil, "Elsewhere", "x")
 	reader.ok("PUT", "/api/v1/pages/"+top+"/watch", nil)
+	// Every way into "for you" (spec 061): a followed person, a watched space and a
+	// watched branch, besides the watched page above.
+	if _, err := e.app.Pool().Exec(context.Background(),
+		"INSERT INTO follows (user_id, followed_id) VALUES ($1, $2)", reader.id, owner.id); err != nil {
+		t.Fatal(err)
+	}
+	owner.ok("PUT", "/api/v1/spaces/"+eng+"/watch", nil)
+	// Someone who reaches pages only through a watched branch, and may see them.
+	brancher := e.user("brancher@example.com", identity.PermUseProduct)
+	owner.grant(eng, "user", brancher.id, permissions.TemplateViewer)
+	if _, err := e.app.Pool().Exec(context.Background(),
+		"INSERT INTO watches (user_id, target_type, target_id) VALUES ($1, 'branch', $2)", brancher.id, top); err != nil {
+		t.Fatal(err)
+	}
 	reader.ok("PUT", "/api/v1/pages/"+top+"/reactions/"+url.PathEscape("👍"), nil)
 	owner.ok("PUT", "/api/v1/pages/"+busy+"/reactions/"+url.PathEscape("👍"), nil)
 	owner.comment(busy, "nice")
 	owner.comment(secret, "only for me")
 
-	for _, u := range []*user{owner, reader, outsider} {
+	for _, u := range []*user{owner, reader, outsider, brancher} {
 		for _, tab := range []string{"recent", "for_you", "popular"} {
 			reference, args := referenceFeed, []any{u.id, tab == "for_you"}
 			if tab == "popular" {

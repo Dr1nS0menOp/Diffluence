@@ -196,6 +196,7 @@ func New(d Deps) (*Server, error) {
 		withLogAndRecover(d.Log),
 		s.admission.middleware,
 		withAcquireLimit,
+		withQueryLimit,
 		withSecurityHeaders(d.Config.SecureCookies()),
 		cop.Handler,
 		s.withAuthentication,
@@ -348,12 +349,18 @@ func (s *Server) internalError(w http.ResponseWriter, r *http.Request, err error
 }
 
 // answerBusyPool answers "busy" when the request found no database connection in
-// time, and reports whether it did. The person can try again, as with admission.
+// time or one of its queries ran past its limit, and reports whether it did. The person
+// can try again, as with admission.
 func (s *Server) answerBusyPool(w http.ResponseWriter, r *http.Request) bool {
-	if !db.AcquireRanOut(r.Context()) {
+	switch {
+	case db.AcquireRanOut(r.Context()):
+		s.deps.Log.Warn("request found no database connection in time", "request_id", RequestIDFrom(r.Context()))
+	case db.QueryRanOut(r.Context()):
+		s.deps.Log.Warn("a query of a read ran past its limit", "request_id", RequestIDFrom(r.Context()),
+			"route", r.Pattern)
+	default:
 		return false
 	}
-	s.deps.Log.Warn("request found no database connection in time", "request_id", RequestIDFrom(r.Context()))
 	w.Header().Set("Retry-After", busyRetrySeconds)
 	writeError(w, http.StatusServiceUnavailable, "busy", busyMessage)
 	return true

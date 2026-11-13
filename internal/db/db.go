@@ -38,6 +38,15 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		return nil, errors.New("db: invalid DATABASE_URL")
 	}
 	cfg.ConnConfig.RuntimeParams["application_name"] = "diffluence"
+	// pgx prepares each statement once, and after five runs PostgreSQL may switch to a
+	// generic plan that cannot see which optional filters are empty. On real data such
+	// plans of the feed took over two minutes against 233 ms (spec 061), so every query
+	// is planned with its values. Planning costs about a millisecond a query.
+	cfg.ConnConfig.RuntimeParams["plan_cache_mode"] = "force_custom_plan"
+	// JIT compiles a plan whose estimate looks expensive, which costs half a second or
+	// more each time; the feed's "for you" took 700 ms with it and 47 ms without on real
+	// data (spec 061). The queries of a request are short, so it never pays here.
+	cfg.ConnConfig.RuntimeParams["jit"] = "off"
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.HealthCheckPeriod = 30 * time.Second
@@ -71,10 +80,49 @@ func (q *queryCounter) TraceQueryStart(ctx context.Context, _ *pgx.Conn, _ pgx.T
 	if FreshnessOf(ctx) == MayLag {
 		q.lag.Add(1)
 	}
-	return ctx
+	// pgx runs the query under the context returned here, so a request's limit on one
+	// query applies here; a deadline makes pgx cancel the statement on the server.
+	watch, ok := ctx.Value(queryLimitKey{}).(*limitWatch)
+	if !ok {
+		return ctx
+	}
+	bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errQueryLimit)
+	return context.WithValue(bounded, queryCancelKey{}, cancel)
 }
 
-func (*queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEndData) {}
+// TraceQueryEnd notes a query that ran out, and frees the timer of the query.
+func (*queryCounter) TraceQueryEnd(ctx context.Context, _ *pgx.Conn, data pgx.TraceQueryEndData) {
+	cancel, ok := ctx.Value(queryCancelKey{}).(context.CancelFunc)
+	if !ok {
+		return
+	}
+	if data.Err != nil && errors.Is(context.Cause(ctx), errQueryLimit) {
+		if watch, ok := ctx.Value(queryLimitKey{}).(*limitWatch); ok {
+			watch.ranOut.Store(true)
+		}
+	}
+	cancel()
+}
+
+// errQueryLimit is the cause of a query of a request that took too long.
+var errQueryLimit = errors.New("db: query took too long")
+
+type queryLimitKey struct{}
+
+type queryCancelKey struct{}
+
+// WithQueryLimit makes every query under ctx stop after limit. Reads of requests get one,
+// so no single read can hold a connection and a core of the database for minutes;
+// background work has no limit, because a long export or check is expected there.
+func WithQueryLimit(ctx context.Context, limit time.Duration) context.Context {
+	return context.WithValue(ctx, queryLimitKey{}, &limitWatch{limit: limit})
+}
+
+// QueryRanOut reports whether a query under ctx stopped at its limit.
+func QueryRanOut(ctx context.Context) bool {
+	watch, ok := ctx.Value(queryLimitKey{}).(*limitWatch)
+	return ok && watch.ranOut.Load()
+}
 
 // The pool calls the two methods below around every wait for a connection, and uses
 // the context TraceAcquireStart returns for that wait. That is where a request's limit
@@ -82,7 +130,7 @@ func (*queryCounter) TraceQueryEnd(context.Context, *pgx.Conn, pgx.TraceQueryEnd
 
 // TraceAcquireStart bounds the wait when the context carries a limit.
 func (*queryCounter) TraceAcquireStart(ctx context.Context, _ *pgxpool.Pool, _ pgxpool.TraceAcquireStartData) context.Context {
-	watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch)
+	watch, ok := ctx.Value(acquireLimitKey{}).(*limitWatch)
 	if !ok {
 		return ctx
 	}
@@ -97,7 +145,7 @@ func (*queryCounter) TraceAcquireEnd(ctx context.Context, _ *pgxpool.Pool, data 
 		return
 	}
 	if data.Err != nil && errors.Is(context.Cause(ctx), errAcquireLimit) {
-		if watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch); ok {
+		if watch, ok := ctx.Value(acquireLimitKey{}).(*limitWatch); ok {
 			watch.ranOut.Store(true)
 		}
 	}
@@ -111,8 +159,8 @@ type acquireLimitKey struct{}
 
 type acquireCancelKey struct{}
 
-// acquireWatch is the limit of one request, and whether a wait ran into it.
-type acquireWatch struct {
+// limitWatch is one limit of a request, and whether something ran into it.
+type limitWatch struct {
 	limit  time.Duration
 	ranOut atomic.Bool
 }
@@ -121,12 +169,12 @@ type acquireWatch struct {
 // Requests get one, so a full pool answers "busy" instead of hanging; background work
 // keeps waiting, because it has nobody to answer.
 func WithAcquireLimit(ctx context.Context, limit time.Duration) context.Context {
-	return context.WithValue(ctx, acquireLimitKey{}, &acquireWatch{limit: limit})
+	return context.WithValue(ctx, acquireLimitKey{}, &limitWatch{limit: limit})
 }
 
 // AcquireRanOut reports whether a wait for a connection under ctx gave up at its limit.
 func AcquireRanOut(ctx context.Context) bool {
-	watch, ok := ctx.Value(acquireLimitKey{}).(*acquireWatch)
+	watch, ok := ctx.Value(acquireLimitKey{}).(*limitWatch)
 	return ok && watch.ranOut.Load()
 }
 

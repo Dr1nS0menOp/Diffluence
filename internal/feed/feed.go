@@ -65,19 +65,60 @@ type Service struct {
 // NewService creates the service.
 func NewService(pool *pgxpool.Pool) *Service { return &Service{pool: pool} }
 
+// visible asks whether the page of a row may be seen. As a plain IN or EXISTS, PostgreSQL
+// inlines the rule and works out the person's spaces again for every candidate, 6 ms each,
+// or builds the whole set first and gives up reading the newest versions first: 230 to
+// 360 ms for twenty items on real data (spec 061). Inside an expression the set is built
+// once, as a hash, about 30 ms, and the newest-first walk stays. perm_visible_pages stays
+// the rule.
+func visible(column string) string {
+	return `(CASE WHEN ` + column + ` IN (SELECT page_id FROM perm_visible_pages($1)) THEN true END)`
+}
+
 // One row per page: its newest version that was not silent. A silent version reached
 // nobody, so it does not show here either. The versions are read newest first, and each
 // is asked whether it is the newest of its page and whether its page is visible, so a
-// page of twenty items reads about twenty versions instead of every visible page
-// (spec 050). perm_visible_pages stays the rule.
-const changesSQL = `WITH changes AS (
+// page of twenty items reads about twenty versions (spec 050).
+var changesSQL = `WITH changes AS (
 		SELECT v.page_id, v.author_id, v.created_at AS at,
 			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
 		FROM page_versions v
 		WHERE NOT v.silent
 		  AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)
-		  AND EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)
-	)
+		  AND ` + visible("v.page_id") + `
+	)` + changesTail
+
+// "For you" holds only pages a person watches, pages below a branch they watch, pages
+// of spaces they watch, and pages of people they follow. Walking every version newest
+// first and dropping almost all of them took over two minutes on 115,000 versions
+// (spec 061), so those pages are gathered first, and each gives its newest version that
+// was not silent. The filter of changesTail still decides, so the rule is the same.
+var forYouSQL = `WITH candidates AS (
+		SELECT w.target_id AS page_id FROM watches w WHERE w.user_id = $1 AND w.target_type = 'page'
+		UNION
+		SELECT p.id FROM watches w JOIN pages p ON p.space_id = w.target_id
+		WHERE w.user_id = $1 AND w.target_type = 'space'
+		UNION
+		SELECT t.descendant_id FROM watches w JOIN page_tree t ON t.ancestor_id = w.target_id
+		WHERE w.user_id = $1 AND w.target_type = 'branch'
+		UNION
+		SELECT v.page_id FROM follows f JOIN page_versions v ON v.author_id = f.followed_id
+		WHERE f.user_id = $1
+	),
+	changes AS (
+		SELECT v.page_id, v.author_id, v.created_at AS at,
+			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
+		FROM candidates k
+		CROSS JOIN LATERAL (
+			SELECT n.page_id, n.author_id, n.created_at, n.number FROM page_versions n
+			WHERE n.page_id = k.page_id AND NOT n.silent
+			ORDER BY n.number DESC LIMIT 1) v
+		WHERE ` + visible("v.page_id") + `
+	)` + changesTail
+
+// changesTail turns changes into items, and applies the space, the cursor and, for
+// "for you", who made the change and why the person sees it.
+const changesTail = `
 	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), c.kind, c.at,
 		(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = c.page_id),
 		(SELECT count(*) FROM comments m WHERE m.page_id = c.page_id AND m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only)
@@ -100,32 +141,38 @@ const changesSQL = `WITH changes AS (
 // Popular pages count what happened to them in the last days, among comments that
 // the person may see. Only a page with a reaction or comment in those days can score, so
 // those pages are the candidates, and only they are asked whether they are visible
-// (spec 050).
-const popularSQL = `WITH active AS (
-		SELECT r.target_id AS page_id FROM reactions r
-		WHERE r.target_type = 'page' AND r.created_at > now() - make_interval(days => $4)
-		UNION
-		SELECT m.page_id FROM comments m
-		WHERE m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only AND m.created_at > now() - make_interval(days => $4)
+// (spec 050). The reactions and comments of those days are counted in one pass: counted
+// page by page, 20,000 active pages took about 300 ms on real data (spec 061).
+var popularSQL = `WITH counted AS (
+		SELECT page_id, sum(reactions)::bigint AS reactions, sum(comments)::bigint AS comments FROM (
+			SELECT r.target_id AS page_id, 1 AS reactions, 0 AS comments FROM reactions r
+			WHERE r.target_type = 'page' AND r.created_at > now() - make_interval(days => $4)
+			UNION ALL
+			SELECT m.page_id, 0, 1 FROM comments m
+			WHERE m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only AND m.created_at > now() - make_interval(days => $4)
+		) recent
+		GROUP BY page_id
 	),
 	scores AS (
-		SELECT v.page_id,
-			(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = v.page_id
-				AND r.created_at > now() - make_interval(days => $4)) AS reactions,
-			(SELECT count(*) FROM comments m WHERE m.page_id = v.page_id AND m.trash_item_id IS NULL AND NOT m.purged
-				AND NOT m.editors_only AND m.created_at > now() - make_interval(days => $4)) AS comments
-		FROM active v
-		WHERE EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)
+		SELECT v.page_id, v.reactions, v.comments
+		FROM counted v
+		WHERE ` + visible("v.page_id") + `
+	),
+	-- The top pages first; the excerpt and the name are read for those alone.
+	top AS (
+		SELECT c.page_id, c.reactions, c.comments, p.title, p.emoji, p.updated_at, p.updated_by, s.key, s.name
+		FROM scores c
+		JOIN pages p ON p.id = c.page_id AND p.status = 'published'
+		JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
+		WHERE c.reactions + c.comments > 0 AND ($2::uuid IS NULL OR p.space_id = $2)
+		ORDER BY c.reactions + c.comments DESC, p.updated_at DESC, c.page_id LIMIT $3
 	)
-	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), 'popular', p.updated_at,
-		c.reactions, c.comments
-	FROM scores c
-	JOIN pages p ON p.id = c.page_id AND p.status = 'published'
-	JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
-	LEFT JOIN search_documents d ON d.page_id = c.page_id
-	LEFT JOIN users u ON u.id = p.updated_by
-	WHERE c.reactions + c.comments > 0 AND ($2::uuid IS NULL OR p.space_id = $2)
-	ORDER BY c.reactions + c.comments DESC, p.updated_at DESC, c.page_id LIMIT $3`
+	SELECT t.page_id, t.title, t.emoji, t.key, t.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), 'popular', t.updated_at,
+		t.reactions, t.comments
+	FROM top t
+	LEFT JOIN search_documents d ON d.page_id = t.page_id
+	LEFT JOIN users u ON u.id = t.updated_by
+	ORDER BY t.reactions + t.comments DESC, t.updated_at DESC, t.page_id`
 
 func scan(r pgx.CollectableRow) (Item, error) {
 	var v Item
@@ -159,10 +206,13 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 	}
 	var rows pgx.Rows
 	var err error
-	if q.Tab == TabPopular {
+	switch q.Tab {
+	case TabPopular:
 		rows, err = s.pool.Query(ctx, popularSQL, c.UserID, space, limit, popularDays, excerptChars)
-	} else {
-		rows, err = s.pool.Query(ctx, changesSQL, c.UserID, space, before, limit, excerptChars, q.Tab == TabForYou, beforeID)
+	case TabForYou:
+		rows, err = s.pool.Query(ctx, forYouSQL, c.UserID, space, before, limit, excerptChars, true, beforeID)
+	default:
+		rows, err = s.pool.Query(ctx, changesSQL, c.UserID, space, before, limit, excerptChars, false, beforeID)
 	}
 	if err != nil {
 		return nil, err

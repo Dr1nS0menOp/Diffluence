@@ -161,6 +161,22 @@ func withAcquireLimit(next http.Handler) http.Handler {
 	})
 }
 
+// queryLimit is the longest one query of a read may run. A read normally needs
+// milliseconds; one that runs this long holds a connection and a core of the database
+// that everyone else needs, and is better told "busy" (spec 061). Writes keep running,
+// so a change is never cut off halfway by this limit.
+const queryLimit = 15 * time.Second
+
+// withQueryLimit bounds every query of a read.
+func withQueryLimit(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isRead(r) {
+			r = r.WithContext(db.WithQueryLimit(r.Context(), queryLimit))
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 // withPermissionMemo lets a read load the facts of a person and a space once (ARC-197).
 // A write gets none: a grant it makes must count for the checks after it.
 func withPermissionMemo(next http.Handler) http.Handler {

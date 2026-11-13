@@ -1369,19 +1369,19 @@ mutate "a new space reads the instance through a second connection" internal/fea
 mutate "a wait for a connection has no limit" internal/db/db.go \
   's.replace("bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errAcquireLimit)", "bounded, cancel := context.WithTimeoutCause(ctx, watch.limit*100000, errAcquireLimit)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
 mutate "a wait that ran out is not noted" internal/db/db.go \
-  's.replace("watch.ranOut.Store(true)", "watch.ranOut.Store(false)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
+  's.replace("acquireLimitKey{}).(*limitWatch); ok {\n\t\t\twatch.ranOut.Store(true)", "acquireLimitKey{}).(*limitWatch); ok {\n\t\t\twatch.ranOut.Store(false)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
 mutate "requests wait for a connection without a limit" internal/httpapi/server.go \
   's.replace("\t\twithAcquireLimit,\n", "")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
 mutate "a request on a full pool is not told busy" internal/httpapi/server.go \
-  's.replace("if !db.AcquireRanOut(r.Context()) {", "if !db.AcquireRanOut(r.Context()) || true {")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
+  's.replace("case db.AcquireRanOut(r.Context()):", "case false:")' $app -run TestARequestOnAFullPoolIsToldBusyInTime
 mutate "the feed shows an older version of a page" internal/feed/feed.go \
   's.replace("AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent)", "")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "the feed shows pages the reader may not see" internal/feed/feed.go \
-  's.replace("AND EXISTS (SELECT 1 FROM perm_visible_pages($1) vp WHERE vp.page_id = v.page_id)", "")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+  's.replace("AND ` + visible(\"v.page_id\") + `", "AND true")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "popular leaves out pages with only reactions" internal/feed/feed.go \
   's.replace("WHERE r.target_type = \x27page\x27 AND r.created_at", "WHERE r.target_type = \x27none\x27 AND r.created_at")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "popular shows pages the reader may not see" internal/feed/feed.go \
-  's.replace("WHERE EXISTS (SELECT 1 FROM perm_visible_pages($1) vp", "WHERE true OR EXISTS (SELECT 1 FROM perm_visible_pages($1) vp")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+  's.replace("FROM counted v\n\t\tWHERE ` + visible(\"v.page_id\") + `", "FROM counted v\n\t\tWHERE true")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 mutate "the bell counts rows about hidden pages" internal/notify/list.go \
   's.replace("SELECT v.page_id FROM perm_visible_pages($1) v\n", "SELECT v.id AS page_id FROM pages v\n")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "an IP address is taken as the public address" internal/config/config.go \
@@ -1685,6 +1685,30 @@ mutate "the files step empties any folder" cmd/diffluence/restore.go \
   's.replace("if keyErr != nil \x26\x26 markErr != nil {", "if keyErr != nil \x26\x26 markErr != nil \x26\x26 false {")' ./cmd/diffluence/ -run TestTheFilesStepEmptiesOnlyADataFolder
 mutate "a backup name may hold a backslash" cmd/diffluence/restore.go \
   's.replace("strings.ContainsAny(name, `/\\`)", "false")' ./cmd/diffluence/ -run TestABackupNameStaysInTheBackupFolder
+
+# Spec 061: reads fast on real data, and no read can hold the database for long.
+mutate "a query of a request has no limit" internal/db/db.go \
+  's.replace("bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errQueryLimit)", "bounded, cancel := context.WithTimeoutCause(ctx, watch.limit*1000, errQueryLimit)")' ./internal/db/ -run TestAQueryOfARequestStopsAtItsLimit
+mutate "a query that ran out is not noticed" internal/db/db.go \
+  's.replace("errors.Is(context.Cause(ctx), errQueryLimit)", "false")' ./internal/db/ -run TestAQueryOfARequestStopsAtItsLimit
+mutate "a query that failed on its own counts as running out" internal/db/db.go \
+  's.replace("data.Err != nil \x26\x26 errors.Is(context.Cause(ctx), errQueryLimit)", "data.Err != nil")' ./internal/db/ -run TestAQueryThatFailsForAnotherReasonDoesNotCountAsRunningOut
+mutate "the pool reuses generic plans" internal/db/db.go \
+  's.replace("cfg.ConnConfig.RuntimeParams[\"plan_cache_mode\"] = \"force_custom_plan\"", "")' ./internal/db/ -run TestThePoolPlansEveryQueryWithItsValues
+mutate "the pool compiles plans" internal/db/db.go \
+  's.replace("cfg.ConnConfig.RuntimeParams[\"jit\"] = \"off\"", "")' ./internal/db/ -run TestThePoolCompilesNoPlans
+mutate "for you leaves out watched spaces" internal/feed/feed.go \
+  's.replace("WHERE w.user_id = $1 AND w.target_type = \x27space\x27", "WHERE w.user_id = $1 AND w.target_type = \x27none\x27")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "for you leaves out watched branches" internal/feed/feed.go \
+  's.replace("WHERE w.user_id = $1 AND w.target_type = \x27branch\x27", "WHERE w.user_id = $1 AND w.target_type = \x27none\x27")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "for you leaves out followed people" internal/feed/feed.go \
+  's.replace("WHERE f.user_id = $1\n", "WHERE false\n")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "for you shows an older version" internal/feed/feed.go \
+  's.replace("ORDER BY n.number DESC LIMIT 1) v", "ORDER BY n.number LIMIT 1) v")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "the feed shows what one may not see" internal/feed/feed.go \
+  's.replace("THEN true END)", "THEN true ELSE true END)")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
+mutate "popular counts no comments" internal/feed/feed.go \
+  's.replace("SELECT m.page_id, 0, 1 FROM comments m", "SELECT m.page_id, 0, 0 FROM comments m")' $app -run TestTheFeedGivesWhatTheFormerQueryGave
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"
