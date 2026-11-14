@@ -130,8 +130,8 @@ Each line is explained in the chapter named after it, in [`08-roadmap/`](08-road
 
 | Line | Priority | What | Chapter |
 |---|---|---|---|
-| RMP-001 | High | Beta criteria written before the beta | 1 |
-| RMP-002 | High | The 1.0 promises written as a page: what is frozen, how it may change, support, upgrades | 1 |
+| RMP-001 | High | Beta criteria written before the beta. Written in [`docs/beta-criteria.md`](../beta-criteria.md) (2026-11-14) | 1 |
+| RMP-002 | High | The 1.0 promises written as a page: what is frozen, how it may change, support, upgrades. Written in [`docs/promises.md`](../promises.md) (2026-11-14) | 1 |
 | RMP-003 | Medium | The order before 1.0: safe to run, enterprise document features, server lines, beta | 1 |
 | RMP-004 | Medium | Every wave leaves the product maintainable if work pauses | 1 |
 | RMP-005 | Low | Each phase after 1.0 starts with a study and a list of what it will not do | 1 |

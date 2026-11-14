@@ -40,6 +40,8 @@ For a real installation, read [the install guide](docs/operations/install.md).
 | [Upgrade](docs/operations/upgrade.md) | One command, no downtime |
 | [Backup and restore](docs/operations/backup-restore.md) | With a drill that proves it works |
 | [Identity providers](docs/operations/identity-providers.md) | Authentik, Entra ID, others |
+| [Beta criteria](docs/beta-criteria.md) | What must hold before a release is called beta, and what holds today |
+| [Promises for 1.0](docs/promises.md) | What is frozen, how it may change, upgrades, security fixes and support |
 | [Development](docs/development.md) | Everything runs in containers |
 | [Threat model](docs/security/threat-model.md) | What we defend against, and how we know |
 | [Routes](docs/api/routes.txt) | Every API route and its access rule |
