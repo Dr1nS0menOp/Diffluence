@@ -63,16 +63,42 @@ func NewGate(mac func(purpose string, message []byte) []byte) Gate { return Gate
 
 func (g Gate) holdsKey() bool { return g.mac != nil }
 
+// HoldsKey says whether the gate can make and check codes at all.
+func (g Gate) HoldsKey() bool { return g.holdsKey() }
+
 func gateMessage(id uuid.UUID, name string) []byte {
 	return append(id[:], []byte(name)...)
 }
 
 // Code is the confirmation code of a restore of backup, as the log shows it: 12345-67890.
 func (g Gate) Code(id uuid.UUID, backup string) string {
-	sum := g.mac("restore confirmation code", gateMessage(id, backup))
+	return g.CodeOf("restore confirmation code", gateMessage(id, backup))
+}
+
+// CodeOf is a confirmation code for message, kept apart from every other use by purpose, as
+// the log shows it: 12345-67890. Another step of the backup service confirms its own changes
+// with it (spec 076).
+func (g Gate) CodeOf(purpose string, message []byte) string {
+	sum := g.mac(purpose, message)
 	n := binary.BigEndian.Uint64(sum[:8]) % 10_000_000_000
 	digits := fmt.Sprintf("%0*d", CodeDigits, n)
 	return digits[:CodeDigits/2] + "-" + digits[CodeDigits/2:]
+}
+
+// Matches compares, in constant time, a code a person typed with the code of message. A gate
+// without a key matches nothing.
+func (g Gate) Matches(purpose string, message []byte, entered string) bool {
+	if !g.holdsKey() {
+		return false
+	}
+	return hmac.Equal([]byte(normaliseCode(entered)), []byte(normaliseCode(g.CodeOf(purpose, message))))
+}
+
+// CleanCode drops the spaces and dashes a reader adds to a code, and says whether what is
+// left is a code at all.
+func CleanCode(s string) (string, bool) {
+	code := normaliseCode(s)
+	return code, isCode(code)
 }
 
 // seal marks what the backup service confirmed: a restore of a backup, or the safety backup

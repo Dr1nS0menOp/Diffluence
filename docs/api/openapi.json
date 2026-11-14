@@ -395,7 +395,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "session-only permission:administrator"
+        "x-access": "session-only permission:system_administrator"
       },
       "post": {
         "operationId": "post /api/v1/admin/backups/restore",
@@ -417,6 +417,24 @@
     "/api/v1/admin/backups/restore/code": {
       "post": {
         "operationId": "post /api/v1/admin/backups/restore/code",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:system_administrator"
+      }
+    },
+    "/api/v1/admin/backups/schedule/code": {
+      "post": {
+        "operationId": "post /api/v1/admin/backups/schedule/code",
         "parameters": [],
         "responses": {
           "200": {
@@ -1848,6 +1866,24 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/settings/retention/lowering": {
+      "delete": {
+        "operationId": "delete /api/v1/admin/settings/retention/lowering",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/settings/{section}": {
       "get": {
         "operationId": "get /api/v1/admin/settings/{section}",
@@ -1898,6 +1934,33 @@
           "admin"
         ],
         "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/settings/{section}/confirmed": {
+      "put": {
+        "operationId": "put /api/v1/admin/settings/{section}/confirmed",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "section",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "sensitive permission:system_administrator"
       }
     },
     "/api/v1/admin/space-templates": {

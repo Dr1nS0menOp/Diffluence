@@ -93,7 +93,11 @@ func TestTheWorkerFollowsTheConsole(t *testing.T) {
 		t.Fatalf("after a backup the worker waits at most a minute before asking again: %+v %v", d, err)
 	}
 
-	root.ok("PUT", "/api/v1/admin/settings/backups", map[string]any{"interval_hours": 12, "keep": 7})
+	// Fewer backups, less often, is a confirmed change (spec 076); a worker that holds to
+	// nothing between rounds follows it.
+	_, recovery := root.enrolTOTP()
+	root.ok("PUT", "/api/v1/admin/settings/backups/confirmed",
+		map[string]any{"settings": map[string]any{"interval_hours": 12, "keep": 7}, "code": recovery[0]})
 	d, err = svc.Next(ctx, workerDefaults)
 	if err != nil || d.Keep != 7 {
 		t.Fatalf("the console's keep wins: %+v %v", d, err)

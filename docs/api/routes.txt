@@ -3,7 +3,7 @@
 DELETE /api/v1/admin/analytics/data                            session-only permission:administrator
 DELETE /api/v1/admin/appearance/font                           session-only permission:administrator
 DELETE /api/v1/admin/appearance/logo                           session-only permission:administrator
-DELETE /api/v1/admin/backups/restore                           session-only permission:administrator
+DELETE /api/v1/admin/backups/restore                           session-only permission:system_administrator
 DELETE /api/v1/admin/categories/{id}                           session-only permission:administrator
 DELETE /api/v1/admin/groups/{id}                               session-only permission:administrator
 DELETE /api/v1/admin/groups/{id}/members/{user}                session-only permission:administrator
@@ -12,6 +12,7 @@ DELETE /api/v1/admin/pages/{id}/versions/{number}              permission:admini
 DELETE /api/v1/admin/permission-sets/{id}                      session-only permission:administrator
 DELETE /api/v1/admin/roles/{id}                                session-only permission:administrator
 DELETE /api/v1/admin/scim-tokens/{id}                          session-only permission:administrator
+DELETE /api/v1/admin/settings/retention/lowering               session-only permission:administrator
 DELETE /api/v1/approvals/{id}/people/{user}                    authenticated
 DELETE /api/v1/attachments/{id}                                object:attachment.delete
 DELETE /api/v1/attachments/{id}/labels/{label}                 object:attachment.add
@@ -287,6 +288,7 @@ POST /api/v1/admin/appearance/reset                            session-only perm
 POST /api/v1/admin/backups/request                             session-only permission:administrator
 POST /api/v1/admin/backups/restore                             sensitive permission:system_administrator
 POST /api/v1/admin/backups/restore/code                        session-only permission:system_administrator
+POST /api/v1/admin/backups/schedule/code                       session-only permission:system_administrator
 POST /api/v1/admin/bundles                                     permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator
@@ -465,6 +467,7 @@ PUT /api/v1/admin/role-assignments                             session-only perm
 PUT /api/v1/admin/roles/{id}                                   session-only permission:administrator
 PUT /api/v1/admin/settings                                     session-only permission:administrator
 PUT /api/v1/admin/settings/{section}                           session-only permission:administrator
+PUT /api/v1/admin/settings/{section}/confirmed                 sensitive permission:system_administrator
 PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator

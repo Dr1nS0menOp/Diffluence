@@ -22,6 +22,9 @@ umask 077
 
 target=/backups
 key=/key/backup.key
+# What this service holds to: how many backups it keeps at least, and how long it waits at
+# most. It sits in the backup folder, which the server never reaches (spec 076).
+held=$target/.diffluence-held.json
 interval=${DIFFLUENCE_BACKUP_INTERVAL:-4h}
 keep=${DIFFLUENCE_BACKUP_KEEP:-42}
 export GNUPGHOME=/tmp/gnupg
@@ -217,10 +220,23 @@ restore() {
   log "restored $chosen; the safety backup is $name"
 }
 
-# prune keeps the newest DIFFLUENCE_BACKUP_KEEP backups.
+# prune keeps the newest $keep backups, and never fewer than this service holds to: fewer
+# take effect only once the code from this log was entered in the console (spec 076). When
+# that cannot be read, nothing is removed.
 prune() {
-  local old
-  find "$target" -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | head -n -"$keep" |
+  local old floor kept=$keep
+  if ! floor=$(diffluence backup held --held "$held"); then
+    log "no old backup was removed: what this service holds to could not be read from $held"
+    return 0
+  fi
+  case "$floor" in
+    '' | *[!0-9]*)
+      log "no old backup was removed: $held gave no number"
+      return 0
+      ;;
+  esac
+  [ "$kept" -ge "$floor" ] || kept=$floor
+  find "$target" -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | head -n -"$kept" |
     while IFS= read -r old; do
       rm -rf -- "$old" && log "removed the old backup $old"
     done
@@ -259,9 +275,14 @@ case "${1:-loop}" in
       # The console decides when (its schedule, or "back up now") and how many to keep.
       # A release from before spec 058 has no answer; then the folder decides, as before.
       if answer=$(diffluence backup next --default-interval "${every}s" --default-keep "$keep" \
-        --key-fingerprint "$(key_fingerprint)" --key "$key" 2>/dev/null); then
+        --key-fingerprint "$(key_fingerprint)" --key "$key" --held "$held" 2>/dev/null); then
         read -r what value keep_now minutes <<<"$answer"
         case "$what" in
+          say)
+            # The code that confirms keeping fewer backups or backing up less often, typed
+            # into the console by someone who can read this log (spec 076).
+            log "${answer#say }"
+            ;;
           restore)
             # value is the restore, keep_now the backup it restores.
             restore "$value" "$keep_now" || true

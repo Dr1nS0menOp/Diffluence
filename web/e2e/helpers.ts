@@ -78,6 +78,26 @@ export async function createUser(browser: Browser, email: string, type = 'member
   return user.id;
 }
 
+/**
+ * A system administrator who just logged in and has recovery codes, for a change that lets more
+ * through than before, such as putting a test's setting back (spec 076).
+ */
+export async function confirmingAdministrator(
+  browser: Browser,
+): Promise<{ api: APIRequestContext; codes: string[]; close: () => Promise<void> }> {
+  const email = `${unique('keeper')}@example.com`;
+  await createUser(browser, email, 'member', ['use_product', 'administrator', 'system_administrator']);
+  const context = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:8080' });
+  const res = await context.request.post('/api/v1/auth/login', { data: { email, password: PASSWORD } });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  const setup = await context.request.post('/api/v1/me/totp/begin', { data: { password: PASSWORD } });
+  const { secret } = (await setup.json()) as { secret: string };
+  const confirm = await context.request.post('/api/v1/me/totp/confirm', { data: { code: totpCode(secret) } });
+  expect(confirm.ok(), await confirm.text()).toBeTruthy();
+  const { recovery_codes: codes } = (await confirm.json()) as { recovery_codes: string[] };
+  return { api: context.request, codes, close: () => context.close() };
+}
+
 /** A user with a real name, for screens where the name shows. */
 export async function createNamedUser(browser: Browser, email: string, displayName: string) {
   const { api, close } = await adminRequest(browser);

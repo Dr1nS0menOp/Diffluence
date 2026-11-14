@@ -1532,7 +1532,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       {tab === 'users' && <UsersTab />}
       {tab === 'invitations' && <InvitationsTab />}
       {tab === 'permissions' && <PermissionsTab />}
-      {tab === 'rules' && <RulesTab />}
+      {tab === 'rules' && <RulesTab me={me} />}
       {tab === 'look' && <LookTab />}
       {tab === 'care' && <CareTab me={me} />}
       {tab === 'groups' && <GroupsTab />}

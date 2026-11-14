@@ -8,6 +8,7 @@ import { ExperimentalOff } from '../components/experimental-off';
 import { ConfirmButton, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
+import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
 
 /** How often the backup page reads the worker's state again: a request is taken within a minute. */
 const BACKUPS_POLL_MS = 15_000;
@@ -40,7 +41,20 @@ interface BackupOverview {
     default_keep: number;
     key_present: boolean;
     key_fingerprint: string;
+    /** What the backup service holds to; 0 until it said (spec 076). */
+    held_keep: number;
+    held_interval_hours: number;
   } | null;
+  /** An ask for fewer backups or fewer rounds that waits for the code from the log. */
+  confirmation: {
+    asked_at: string;
+    keep: number;
+    interval_hours: number;
+    code_shown: boolean;
+    code_entered: boolean;
+    wrong_codes: number;
+  } | null;
+  confirmation_tries: number;
   request: { requested_at: string; claimed_at: string | null } | null;
   runs: BackupRun[];
   restore_check: {
@@ -90,24 +104,42 @@ function wholeOrDefault(text: string): number {
   return Number.isFinite(n) && n > 0 ? n : 0;
 }
 
-function BackupSchedule({ data }: { data: BackupOverview }) {
+/** Whether the backup service holds to more backups, or more rounds, than the schedule asks:
+ * fewer take effect only with the code from its log (spec 076). */
+function holdsMore(data: BackupOverview): boolean {
+  const w = data.worker;
+  if (!w || w.held_keep === 0) return false;
+  const keep = data.settings.keep || w.default_keep;
+  const hours = data.settings.interval_hours || w.default_interval_hours;
+  return w.held_keep > keep || w.held_interval_hours < hours;
+}
+
+function BackupSchedule({ data, isSystem }: { data: BackupOverview; isSystem: boolean }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [hours, setHours] = useState(
     data.settings.interval_hours ? String(data.settings.interval_hours) : '',
   );
   const [keep, setKeep] = useState(data.settings.keep ? String(data.settings.keep) : '');
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
   useEffect(() => {
     setHours(data.settings.interval_hours ? String(data.settings.interval_hours) : '');
     setKeep(data.settings.keep ? String(data.settings.keep) : '');
   }, [data.settings.interval_hours, data.settings.keep]);
   const save = useMutation({
-    mutationFn: () =>
-      api.put('/admin/settings/backups', {
-        interval_hours: wholeOrDefault(hours),
-        keep: wholeOrDefault(keep),
-      }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['backups'] }),
+    mutationFn: () => {
+      const schedule = { interval_hours: wholeOrDefault(hours), keep: wholeOrDefault(keep) };
+      return confirm
+        ? api.put('/admin/settings/backups/confirmed', { settings: schedule, code: confirm.code.trim() })
+        : api.put('/admin/settings/backups', schedule);
+    },
+    onSuccess: () => {
+      setConfirm(null);
+      return qc.invalidateQueries({ queryKey: ['backups'] });
+    },
+    onError: (error) => {
+      if (isSystem && needsConfirmation(error)) setConfirm((c) => c ?? { code: '', reason: '' });
+    },
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -117,6 +149,11 @@ function BackupSchedule({ data }: { data: BackupOverview }) {
   return (
     <form onSubmit={submit} className="settings-form">
       <h2>{t('running.schedule')}</h2>
+      {w && holdsMore(data) && (
+        <p role="status" className="note">
+          {t('running.heldMore', { keep: w.held_keep, hours: w.held_interval_hours })}
+        </p>
+      )}
       <Field
         label={t('running.intervalHours')}
         help={
@@ -134,12 +171,43 @@ function BackupSchedule({ data }: { data: BackupOverview }) {
         <input inputMode="numeric" value={keep} onChange={(e) => setKeep(e.target.value)} />
       </Field>
       <ErrorNote error={save.error} />
+      {confirm && <ConfirmFields value={confirm} onChange={setConfirm} note={t('running.fewerNote')} />}
       <div>
         <button type="submit" className="primary" disabled={save.isPending}>
-          {t('common.save')}
+          {confirm ? t('rules.confirmButton') : t('common.save')}
         </button>
       </div>
     </form>
+  );
+}
+
+/** Where an ask for fewer backups stands: waiting for the code in the log, or for its check. */
+function FewerBackups({ data, isSystem }: { data: BackupOverview; isSystem: boolean }) {
+  const { t } = useTranslation();
+  const c = data.confirmation;
+  if (!c) return null;
+  if (!c.code_shown) {
+    return (
+      <p role="status" className="note">
+        {t('running.fewerAsked')}
+      </p>
+    );
+  }
+  if (!isSystem) {
+    return (
+      <p role="status" className="note">
+        {t('running.fewerSystemOnly')}
+      </p>
+    );
+  }
+  return (
+    <LogCode
+      path="/admin/backups/schedule/code"
+      entered={c.code_entered}
+      wrongCodes={c.wrong_codes}
+      tries={data.confirmation_tries}
+      button={t('running.fewerCodeButton')}
+    />
   );
 }
 
@@ -269,19 +337,32 @@ function RestoreCheck({ data }: { data: BackupOverview }) {
 }
 
 /** The code the backup service wrote to its log, typed in by someone who can read that log
- * (spec 070). Only a system administrator, who could ask for the restore, enters it. */
-function RestoreCode({ r, tries }: { r: Restore; tries: number }) {
+ * (specs 070 and 076). Only a system administrator, who could ask for what it confirms,
+ * enters it. */
+function LogCode({
+  path,
+  entered,
+  wrongCodes,
+  tries,
+  button,
+}: {
+  path: string;
+  entered: boolean;
+  wrongCodes: number;
+  tries: number;
+  button: string;
+}) {
   const { t } = useTranslation();
   const qc = useQueryClient();
   const [code, setCode] = useState('');
   const enter = useMutation({
-    mutationFn: () => api.post('/admin/backups/restore/code', { code }),
+    mutationFn: () => api.post(path, { code }),
     onSuccess: () => {
       setCode('');
       return qc.invalidateQueries({ queryKey: ['backups'] });
     },
   });
-  if (r.code_entered) {
+  if (entered) {
     return <p role="status">{t('running.restoreCodeWaits')}</p>;
   }
   const submit = (e: FormEvent) => {
@@ -290,9 +371,9 @@ function RestoreCode({ r, tries }: { r: Restore; tries: number }) {
   };
   return (
     <form onSubmit={submit} className="settings-form">
-      {r.wrong_codes > 0 && (
+      {wrongCodes > 0 && (
         <p role="alert" className="note">
-          {t('running.restoreCodeWrong', { count: Math.max(tries - r.wrong_codes, 0) })}
+          {t('running.restoreCodeWrong', { count: Math.max(tries - wrongCodes, 0) })}
         </p>
       )}
       <p>{t('running.restoreCodeShown')}</p>
@@ -310,15 +391,26 @@ function RestoreCode({ r, tries }: { r: Restore; tries: number }) {
       <ErrorNote error={enter.error} />
       <div>
         <button type="submit" disabled={enter.isPending || code.trim() === ''}>
-          {t('running.restoreCodeButton')}
+          {button}
         </button>
       </div>
     </form>
   );
 }
 
-/** Where the latest restore stands: waiting for the worker, running, done, or stopped. */
-function RestoreState({ r, tries, canConfirm }: { r: Restore; tries: number; canConfirm: boolean }) {
+/** Where the latest restore stands: waiting for the worker, running, done, or stopped. Only a
+ * system administrator confirms or takes back a restore (spec 076). */
+function RestoreState({
+  r,
+  tries,
+  canConfirm,
+  canCancel,
+}: {
+  r: Restore;
+  tries: number;
+  canConfirm: boolean;
+  canCancel: boolean;
+}) {
   const { t } = useTranslation();
   const dates = useDates();
   const qc = useQueryClient();
@@ -332,12 +424,22 @@ function RestoreState({ r, tries, canConfirm }: { r: Restore; tries: number; can
         <p role="status">
           {t('running.restoreAsked', { name: r.backup_name, when: dates.moment(r.requested_at) })}
         </p>
-        {canConfirm && r.code_shown && <RestoreCode r={r} tries={tries} />}
-        <p>
-          <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
-            {t('running.restoreCancel')}
-          </button>
-        </p>
+        {canConfirm && r.code_shown && (
+          <LogCode
+            path="/admin/backups/restore/code"
+            entered={r.code_entered}
+            wrongCodes={r.wrong_codes}
+            tries={tries}
+            button={t('running.restoreCodeButton')}
+          />
+        )}
+        {canCancel && (
+          <p>
+            <button type="button" onClick={() => cancel.mutate()} disabled={cancel.isPending}>
+              {t('running.restoreCancel')}
+            </button>
+          </p>
+        )}
         <ErrorNote error={cancel.error} />
       </>
     );
@@ -402,7 +504,7 @@ function RestoreOver({ data }: { data: BackupOverview }) {
   return (
     <>
       <h2>{t('running.restoreHowTitle')}</h2>
-      {data.restore && <RestoreState r={data.restore} tries={data.restore_code_tries} canConfirm />}
+      {data.restore && <RestoreState r={data.restore} tries={data.restore_code_tries} canConfirm canCancel />}
       {!open && chosen && (
         <form onSubmit={submit} className="settings-form">
           <Field label={t('running.restoreWhich')}>
@@ -464,24 +566,31 @@ export function BackupsTab({ me }: { me: Me }) {
   });
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
+  const isSystem = me.global_permissions.includes('system_administrator');
   return (
     <>
       <p>{t('running.backupsIntro')}</p>
       <WorkerState data={q.data} />
       <BackUpNow data={q.data} />
-      <BackupSchedule data={q.data} />
+      <BackupSchedule data={q.data} isSystem={isSystem} />
+      <FewerBackups data={q.data} isSystem={isSystem} />
       <h2>{t('running.list')}</h2>
       <BackupList runs={q.data.runs} />
       <RestoreCheck data={q.data} />
       {/* A restore brings back every account and grant of the backup (spec 066). Restore
           from the console is an experimental part (spec 069). */}
-      {me.global_permissions.includes('system_administrator') && capabilities.console_restore ? (
+      {isSystem && capabilities.console_restore ? (
         <RestoreOver data={q.data} />
       ) : (
         <>
           <h2>{t('running.restoreHowTitle')}</h2>
           {q.data.restore && (
-            <RestoreState r={q.data.restore} tries={q.data.restore_code_tries} canConfirm={false} />
+            <RestoreState
+              r={q.data.restore}
+              tries={q.data.restore_code_tries}
+              canConfirm={false}
+              canCancel={isSystem}
+            />
           )}
           {capabilities.console_restore ? (
             <p className="muted">{t('running.restoreSystemOnly')}</p>

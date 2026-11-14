@@ -16,11 +16,21 @@ test('Backups says when no backup service checked in, and back up now waits for 
   await expect(page.getByText(/A backup was asked for .* and waits for the backup service\./)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Back up now' })).toHaveCount(0);
 
-  // An empty field means the default the installation was started with.
+  // An empty field means the default the installation was started with. Without a backup
+  // service that said its default, 7 may be fewer, so it asks a system administrator for a
+  // second factor; the test admin has none, so nothing is stored (spec 076).
   await page.getByLabel('Backups to keep').fill('7');
   await page.getByRole('button', { name: 'Save' }).click();
+  const schedule = page.locator('form').filter({ has: page.getByRole('heading', { name: 'Schedule' }) });
+  await expect(
+    schedule.getByText(/Keeping fewer backups or backing up less often needs/).first(),
+  ).toBeVisible();
+  await expect(schedule.getByLabel('Code from your authenticator app, or a recovery code')).toBeVisible();
+  await checkAccessibility(page);
+  await schedule.getByRole('button', { name: 'Confirm and save' }).click();
+  await expect(schedule.getByRole('alert').filter({ hasText: 'a passkey' })).toBeVisible();
   await page.reload();
-  await expect(page.getByLabel('Backups to keep')).toHaveValue('7');
+  await expect(page.getByLabel('Backups to keep')).toHaveValue('');
 });
 
 // A restore over the installation says what is lost, asks for the installation's name typed

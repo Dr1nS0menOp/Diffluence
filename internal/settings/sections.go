@@ -107,11 +107,24 @@ type Access struct {
 type Retention struct {
 	AuditDays     int    `json:"audit_days"`
 	LongerBecause string `json:"longer_because"`
+	// Lowering is a shorter time a system administrator confirmed, which holds only from its
+	// time on (spec 076). Only the server sets it: what a form sends back is ignored.
+	Lowering *RetentionLowering `json:"lowering,omitempty"`
+}
+
+// RetentionLowering is a shorter retention that waits for its time.
+type RetentionLowering struct {
+	AuditDays     int       `json:"audit_days"`
+	LongerBecause string    `json:"longer_because"`
+	Because       string    `json:"because"`
+	From          time.Time `json:"from"`
 }
 
 // Backups is how often the backup worker makes a backup and how many it keeps (spec 058).
 // Zero means the default the worker was started with, such as DIFFLUENCE_BACKUP_INTERVAL,
-// so an installation that never opens this section behaves as before.
+// so an installation that never opens this section behaves as before. The backups module
+// stores it, because whether a change keeps fewer backups depends on what its worker holds
+// (spec 076).
 type Backups struct {
 	IntervalHours int `json:"interval_hours"`
 	Keep          int `json:"keep"`
@@ -123,6 +136,12 @@ const (
 	maxBackupIntervalHours = 168
 	maxBackupKeep          = 1000
 )
+
+// guard leaves the backup section to the backups module, which alone can tell what a change
+// does to the backups kept.
+func (b Backups) guard(Change, section) (section, error) {
+	return nil, errors.New("settings: the backups module stores the backup section")
+}
 
 func (b Backups) validate() error {
 	if b.IntervalHours < 0 || b.IntervalHours > maxBackupIntervalHours {
@@ -320,12 +339,17 @@ func (s *Service) Section(ctx context.Context, name string) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return v, s.Read(ctx, name, v)
+	// Under the section's own key, where SetSection stores it: the form then starts from what
+	// holds, so saving it unchanged never reads as a change back to the defaults.
+	if err := s.ReadSection(ctx, name, v); err != nil {
+		return nil, err
+	}
+	return settle(v, time.Now()), nil
 }
 
-// SetSection stores a section from JSON. Unknown fields are refused, as they are
-// everywhere else in the API. Only an administrator gets here (route rule).
-func (s *Service) SetSection(ctx context.Context, c identity.Caller, name string, body io.Reader) (any, error) {
+// DecodeSection reads a section from JSON and checks its limits. Unknown fields are
+// refused, as they are everywhere else in the API.
+func DecodeSection(name string, body io.Reader) (any, error) {
 	v, err := sectionValue(name)
 	if err != nil {
 		return nil, err
@@ -338,26 +362,71 @@ func (s *Service) SetSection(ctx context.Context, c identity.Caller, name string
 	if err := v.validate(); err != nil {
 		return nil, err
 	}
-	raw, err := json.Marshal(v)
+	return v, nil
+}
+
+// SetSection stores a section from JSON. Only an administrator gets here (route rule). A
+// change that lets more through than the section in force allows is refused: it needs
+// SetSectionConfirmed (spec 076).
+func (s *Service) SetSection(ctx context.Context, c identity.Caller, name string, body io.Reader) (any, error) {
+	return s.setSection(ctx, c, name, body, Change{At: time.Now()})
+}
+
+// SetSectionConfirmed stores a section from JSON for a system administrator who logged in
+// again and gave a second factor just now; the route and its handler check both. It may
+// let more through than before, as the section allows: a shorter audit retention needs a
+// reason and holds only after RetentionLoweringDelay (spec 076).
+func (s *Service) SetSectionConfirmed(ctx context.Context, c identity.Caller, name string, body io.Reader, reason string) (any, error) {
+	return s.setSection(ctx, c, name, body, Change{Confirmed: true, Reason: reason, At: time.Now()})
+}
+
+func (s *Service) setSection(ctx context.Context, c identity.Caller, name string, body io.Reader, change Change) (any, error) {
+	decoded, err := DecodeSection(name, body)
 	if err != nil {
 		return nil, err
 	}
+	v := decoded.(section)
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		stored, err := keepNewerFields(ctx, tx, sectionKeyPrefix+name, raw, v)
-		if err != nil {
+		if g, ok := v.(guarded); ok {
+			stored, err := lockedSection(ctx, tx, name, change.At)
+			if err != nil {
+				return err
+			}
+			if v, err = g.guard(change, stored); err != nil {
+				return err
+			}
+		}
+		if err := StoreSection(ctx, tx, name, v); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
-			ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, sectionKeyPrefix+name, stored); err != nil {
+		details := map[string]any{"section": name}
+		if change.Confirmed {
+			details["confirmed"] = true
+		}
+		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", name, "", details)); err != nil {
 			return err
 		}
-		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", name, "", map[string]any{"section": name})); err != nil {
-			return err
-		}
-		_, err = outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
+		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
 		return err
 	})
 	return v, err
+}
+
+// StoreSection writes a section inside the caller's transaction, keeping the fields of a
+// newer release. A module that owns the rules of a section, such as backups, stores it
+// through this; the caller checks it, audits the change and decides who may make it.
+func StoreSection(ctx context.Context, tx pgx.Tx, name string, v any) error {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+	stored, err := keepNewerFields(ctx, tx, sectionKeyPrefix+name, raw, v)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, `INSERT INTO settings (key, value) VALUES ($1, $2)
+		ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = now()`, sectionKeyPrefix+name, stored)
+	return err
 }
 
 // keepNewerFields adds to raw the fields of the stored section that this release does not
@@ -493,7 +562,8 @@ func AuditDays(ctx context.Context, q db.Querier) (int, error) {
 	if err := json.Unmarshal(stored, &retention); err != nil {
 		return 0, fmt.Errorf("settings: retention: %w", err)
 	}
-	return retention.AuditDays, nil
+	// A shorter time holds only from its own time on (spec 076).
+	return retention.settled(time.Now()).AuditDays, nil
 }
 
 // Maintenance is the state of maintenance mode.

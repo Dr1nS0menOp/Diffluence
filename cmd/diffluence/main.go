@@ -60,6 +60,7 @@ Commands:
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   backup next|report|restore-checked
                             what the backup worker asks and tells the console; see diffluence backup
+  backup held [--held FILE] how many backups the backup worker holds to, from its own file
   backup restore-request --name BACKUP --confirm INSTALLATION
                             restore a backup over this installation: the backup worker stops
                             every node, makes a safety backup, restores and checks (spec 059)
@@ -127,6 +128,8 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			err = cmdBackupNote(ctx, stdout)
 		case len(args) >= 2 && args[1] == "next":
 			err = traced(ctx, "backup next", func(ctx context.Context) error { return cmdBackupNext(ctx, args[2:], stdout, stderr) })
+		case len(args) >= 2 && args[1] == "held":
+			err = cmdBackupHeld(args[2:], stdout)
 		case len(args) >= 2 && args[1] == "report":
 			err = traced(ctx, "backup report", func(ctx context.Context) error { return cmdBackupReport(ctx, args[2:], stdout) })
 		case len(args) >= 2 && args[1] == "restore-checked":

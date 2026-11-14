@@ -589,7 +589,7 @@ func TestForgotPasswordAndSignUpAnswerInTheSameTimeForAKnownAddress(t *testing.T
 	root.ok("PUT", "/api/v1/admin/settings/features", features)
 	access := root.ok("GET", "/api/v1/admin/settings/access", nil)
 	access["signup_domains"] = []string{"example.com"}
-	root.ok("PUT", "/api/v1/admin/settings/access", access)
+	confirmedChange(e, "access", access)
 
 	timed := func(path, email string) time.Duration {
 		start := time.Now()
@@ -786,7 +786,7 @@ func TestSignUpIsOffByDefaultAndOnlyForListedDomains(t *testing.T) {
 	root.ok("PUT", "/api/v1/admin/settings/features", features)
 	access := root.ok("GET", "/api/v1/admin/settings/access", nil)
 	access["signup_domains"] = []string{"example.com"}
-	root.ok("PUT", "/api/v1/admin/settings/access", access)
+	confirmedChange(e, "access", access)
 
 	if status, _ := publicPost(e, "/api/v1/auth/signup", map[string]any{"email": "a@other.example.org"}); status != 202 || mail.count() != 0 {
 		t.Fatalf("another domain: %d, mails %d", status, mail.count())

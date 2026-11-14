@@ -317,7 +317,8 @@ func TestAnOperatorCanChooseAnotherRuleForASecondFactor(t *testing.T) {
 	e.sql("UPDATE instance SET created_at = now() - interval '15 days'")
 	access := root.ok("GET", "/api/v1/admin/settings/access", nil)
 	access["second_factor"] = "none"
-	root.ok("PUT", "/api/v1/admin/settings/access", access)
+	// A weaker rule is a confirmed change (spec 076).
+	confirmedChange(e, "access", access)
 	c := e.client()
 	if got := e.login(c, root.email, adminPassword); got != 200 {
 		t.Fatalf("login: %d", got)
@@ -392,7 +393,8 @@ func TestTheAuditLogStaysAYearByDefault(t *testing.T) {
 	root.want(400, "PUT", "/api/v1/admin/settings/retention", map[string]any{"audit_days": 800})
 	root.want(400, "PUT", "/api/v1/admin/settings/retention", map[string]any{"audit_days": 0})
 	root.ok("PUT", "/api/v1/admin/settings/retention", map[string]any{"audit_days": 800, "longer_because": "A contract asks for it"})
-	root.ok("PUT", "/api/v1/admin/settings/retention", map[string]any{"audit_days": 90})
+	// A shorter time is a confirmed change (spec 076).
+	root.want(403, "PUT", "/api/v1/admin/settings/retention", map[string]any{"audit_days": 90})
 }
 
 func TestAnErrorFromTheRendererOfAccountMailReachesNobody(t *testing.T) {

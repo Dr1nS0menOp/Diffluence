@@ -319,13 +319,16 @@ func (s *Server) withAuthentication(next http.Handler) http.Handler {
 	})
 }
 
-// openDuringMaintenance lists what still works: logging in and out, and switching
-// maintenance mode off again.
+// openDuringMaintenance lists what still works: logging in and out, switching maintenance
+// mode off again, and entering the code that confirms a restore asked for before, which an
+// operator may well do with maintenance on. Its route lets only a system administrator in
+// (spec 076).
 var openDuringMaintenance = []string{
 	"/api/v1/auth/login", "/api/v1/auth/login/totp", "/api/v1/auth/logout", "/api/v1/auth/reauth",
 	"/api/v1/auth/login/passkey/begin", "/api/v1/auth/login/passkey/finish",
 	"/api/v1/auth/reauth/passkey/begin", "/api/v1/auth/reauth/passkey/finish",
 	"/api/v1/auth/passkey/begin", "/api/v1/auth/passkey/finish", "/api/v1/admin/maintenance",
+	"/api/v1/admin/backups/restore/code",
 }
 
 // withMaintenance refuses every write during maintenance mode. It is a check here

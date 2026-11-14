@@ -3,6 +3,7 @@
 package httpapi
 
 import (
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -34,7 +35,11 @@ func (s *Server) registerRunningRoutes() {
 	// code is the proof, and the request before it already asked for a fresh login. Like
 	// cancelling, it stays open with the part off, for a request asked for before.
 	r.HandleFunc("POST /api/v1/admin/backups/restore/code", system, s.handleRestoreCode)
-	r.HandleFunc("DELETE /api/v1/admin/backups/restore", admin, s.handleRestoreCancel)
+	// Taking a restore back is for whoever may ask for one (spec 076).
+	r.HandleFunc("DELETE /api/v1/admin/backups/restore", system, s.handleRestoreCancel)
+	// Keeping fewer backups goes on only with the code the backup service wrote to its own
+	// log; the change before it already asked for a fresh login and a second factor (spec 076).
+	r.HandleFunc("POST /api/v1/admin/backups/schedule/code", system, s.handleScheduleCode)
 	r.HandleFunc("GET /api/v1/admin/configuration", admin, s.handleConfiguration)
 	// Logging everyone out is an incident action; asking for the password again first
 	// keeps a stolen session from using it as a weapon.
@@ -109,6 +114,28 @@ func (s *Server) handleRestoreCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := restore.EnterCode(r.Context(), s.deps.Pool, s.caller(r), in.Code); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleScheduleCode passes the code from the backup service's log on to it, for keeping
+// fewer backups or backing up less often.
+func (s *Server) handleScheduleCode(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Code string `json:"code"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil {
+		badBody(w)
+		return
+	}
+	code, ok := restore.CleanCode(in.Code)
+	if !ok {
+		s.fail(w, r, apperr.Invalid(fmt.Sprintf("A confirmation code has %d digits, such as 12345-67890.", restore.CodeDigits)))
+		return
+	}
+	if err := s.deps.Backups.EnterScheduleCode(r.Context(), s.caller(r), code); err != nil {
 		s.fail(w, r, err)
 		return
 	}

@@ -2345,6 +2345,79 @@ mutate "ending a pair closes while the part is off" internal/httpapi/handlers_pu
   's.replace("Object(permissions.SpaceAdminister), s.handlePublishingEnd)", "Object(permissions.SpaceAdminister), on(s.handlePublishingEnd))")' $app -run '^TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair$'
 mutate "a block reference is left out of the list a release rewrites" internal/document/references.go \
   's.replace("\tTypePageCard: \"page_id\",\n", "")' $docpkg -run 'TestEveryAttributeThatHoldsAnIDIsListed$'
+# Spec 076: a change that lets more through is a system administrator's, confirmed.
+mutate "an administrator keeps fewer backups" internal/backups/schedule.go \
+  's.replace("if !change.Confirmed \x26\x26 keepsFewer(next, stored, w) {", "if false {")' $app -run 'TestKeepingFewerBackupsNeedsASystemAdministrator|TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor'
+mutate "a change before any worker checked in counts as more" internal/backups/schedule.go \
+  's.replace("return fewerKept || lessOften", "return (fewerKept || lessOften) \x26\x26 false")' $app -run TestKeepingFewerBackupsNeedsASystemAdministrator
+mutate "a confirmed change of fewer backups is not asked of the worker" internal/backups/schedule.go \
+  's.replace("if !change.Confirmed || !belowHeld(next, w) {", "if true {")' $app -run TestTheRightWorkerCodeKeepsFewerBackups
+mutate "the console takes a code for fewer backups the worker never showed" internal/backups/schedule.go \
+  's.replace(" AND code_shown_at IS NOT NULL AND confirmation IS NULL", " AND confirmation IS NULL")' $app -run TestKeepingFewerBackupsNeedsTheWorkerCode
+mutate "an entered code for fewer backups reaches the audit log" internal/backups/schedule.go \
+  's.replace("c.Event(ActionScheduleCodeEntered, \"backup\", id.String(), \"\", nil)", "c.Event(ActionScheduleCodeEntered, \"backup\", id.String()+code, \"\", nil)")' $app -run TestTheRightWorkerCodeKeepsFewerBackups
+mutate "the worker keeps fewer backups at once" internal/backups/held.go \
+  's.replace("\tif keep >= h.Keep {\n", "\tif keep >= 0 {\n")' $app -run TestTheWorkerKeepsItsBackupsWhateverTheDatabaseSays
+mutate "the worker backs up less often at once" internal/backups/held.go \
+  's.replace("seconds <= h.IntervalSeconds {", "seconds >= 0 {")' $app -run TestTheWorkerKeepsItsBackupsWhateverTheDatabaseSays
+mutate "a fresh worker keeps fewer than its defaults" internal/backups/held.go \
+  's.replace("h.Keep = max(keep, d.Keep)", "h.Keep = keep")' ./internal/backups/ -run TestAWorkerThatHoldsNothingYetKeepsTheMore
+mutate "a damaged file of the worker is a fresh start" internal/backups/held.go \
+  's.replace("return Held{}, fmt.Errorf(\"backups: %s is damaged: %v\", path, err)", "return Held{path: path}, nil")' ./internal/backups/ -run TestADamagedHeldFileIsNeverAFreshStart
+mutate "a wrong code lowers what the worker holds to" internal/backups/held.go \
+  's.replace("codes.Matches(scheduleCodePurpose, ch.message(), *req.confirmation):", "(codes.Matches(scheduleCodePurpose, ch.message(), *req.confirmation) || true):")' $app -run TestKeepingFewerBackupsNeedsTheWorkerCode
+mutate "wrong codes for fewer backups are tried without end" internal/backups/held.go \
+  's.replace("if ch.Wrong >= ConfirmationTries {", "if ch.Wrong >= ConfirmationTries*1000 {")' $app -run TestKeepingFewerBackupsNeedsTheWorkerCode
+mutate "a code for fewer backups waits for ever" internal/backups/held.go \
+  's.replace("case time.Since(ch.ShownAt) > ConfirmationLifetime:", "case false:")' $app -run TestACodeForFewerBackupsEndsAfterHalfAnHour
+mutate "every code for fewer backups has the same random part" internal/backups/held.go \
+  's.replace("out := append([]byte{}, c.Nonce...)", "out := []byte{}")' ./internal/backups/ -run TestTheCodeOfAChallengeCoversTheAskAndTheValues
+mutate "a code for fewer backups leaves the ask out" internal/backups/held.go \
+  's.replace("\tout = append(out, c.Request[:]...)\n", "")' ./internal/backups/ -run TestTheCodeOfAChallengeCoversTheAskAndTheValues
+mutate "the worker answers an ask for other values than the section" internal/backups/held.go \
+  's.replace("if req == nil || req.keep != b.Keep || req.intervalHours != b.IntervalHours {", "if req == nil {")' $app -run TestTheWorkerKeepsItsBackupsWhateverTheDatabaseSays
+mutate "a worker without its key shows a code" internal/backups/held.go \
+  's.replace("\tif !codes.HoldsKey() {\n", "\tif false {\n")' $app -run TestAWorkerWithoutItsKeyKeepsItsBackups
+mutate "the console never learns what the worker holds to" internal/backups/held.go \
+  's.replace("SET held_keep = $1, held_interval = $2 WHERE id = 1", "SET held_keep = $1, held_interval = $2 WHERE id = 0")' $app -run TestTheRightWorkerCodeKeepsFewerBackups
+mutate "an administrator weakens the rule for logging in" internal/settings/guard.go \
+  's.replace("if a.looserThan(*stored.(*Access)) \x26\x26 !c.Confirmed {", "if false {")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "a weaker second factor counts as stricter" internal/settings/guard.go \
+  's.replace("if slices.Index(secondFactorStrength, a.SecondFactor) < slices.Index(secondFactorStrength, stored.SecondFactor) {", "if false {")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "a longer idle time counts as stricter" internal/settings/guard.go \
+  's.replace("if stored.IdleMinutes != 0 \x26\x26 (a.IdleMinutes == 0 || a.IdleMinutes > stored.IdleMinutes) {", "if false {")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "guests again count as stricter" internal/settings/guard.go \
+  's.replace("if a.GuestInvites \x26\x26 !stored.GuestInvites {", "if false {")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "a new domain for signing up counts as stricter" internal/settings/guard.go \
+  's.replace("\t\tif !slices.ContainsFunc(stored.SignupDomains,", "\t\tif false \x26\x26 !slices.ContainsFunc(stored.SignupDomains,")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "an administrator shortens the audit retention" internal/settings/guard.go \
+  's.replace("\tif !c.Confirmed {\n\t\treturn nil, ConfirmationRequired(\"Keeping audit rows", "\tif false {\n\t\treturn nil, ConfirmationRequired(\"Keeping audit rows")' $app -run TestAShorterAuditRetentionNeedsAConfirmedChangeAndAReason
+mutate "a shorter retention needs no reason" internal/settings/guard.go \
+  's.replace("if reason == \"\" ||", "if false ||")' $app -run TestAShorterAuditRetentionNeedsAConfirmedChangeAndAReason
+mutate "a shorter retention holds at once" internal/settings/guard.go \
+  's.replace("From: c.At.Add(RetentionLoweringDelay)}", "From: c.At}")' $app -run TestAShorterAuditRetentionNeedsAConfirmedChangeAndAReason
+mutate "a form sets a shorter retention itself" internal/settings/guard.go \
+  's.replace("\t\tr.Lowering = inForce.Lowering\n", "")' $app -run TestAShorterAuditRetentionNeedsAConfirmedChangeAndAReason
+mutate "the prune command takes a shorter retention before its time" internal/settings/guard.go \
+  's.replace("if r.Lowering == nil || at.Before(r.Lowering.From) {", "if r.Lowering == nil {")' $app -run TestAShorterAuditRetentionNeedsAConfirmedChangeAndAReason
+mutate "the console forms start from the defaults" internal/settings/sections.go \
+  's.replace("\tif err := s.ReadSection(ctx, name, v); err != nil {\n\t\treturn nil, err\n\t}\n\treturn settle(", "\tif err := s.Read(ctx, name, v); err != nil {\n\t\treturn nil, err\n\t}\n\treturn settle(")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
+mutate "a confirmed change takes no second factor" internal/httpapi/handlers_console.go \
+  's.replace("if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {", "if err := error(nil); err != nil {")' $app -run 'TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
+mutate "a confirmed change needs no system administrator" internal/httpapi/handlers_console.go \
+  's.replace("Sensitive(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed", "Sensitive(admin),\n\t\ts.handleSectionSetConfirmed")' $app -run 'TestKeepingFewerBackupsNeedsASystemAdministrator|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
+mutate "a confirmed change needs no fresh login" internal/httpapi/handlers_console.go \
+  's.replace("Sensitive(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed", "SessionOnly(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed")' $app -run 'TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
+mutate "codes for a confirmed change are tried without end" internal/httpapi/handlers_console.go \
+  's.replace("strings.TrimSpace(in.Code) != \"\" \x26\x26 !s.loginByAcc.allow(", "false \x26\x26 !s.loginByAcc.allow(")' $app -run TestWrongCodesForAConfirmedChangeAreLimited
+mutate "the backup section is stored past its module" internal/httpapi/handlers_console.go \
+  's.replace("if section := r.PathValue(\"section\"); section == settings.SectionBackups {", "if section := r.PathValue(\"section\"); section == \"\" {")' $app -run TestKeepingFewerBackupsNeedsASystemAdministrator
+mutate "an administrator takes back a restore" internal/httpapi/handlers_running.go \
+  's.replace("\"DELETE /api/v1/admin/backups/restore\", system,", "\"DELETE /api/v1/admin/backups/restore\", admin,")' $app -run TestOnlyASystemAdministratorTakesBackARestore
+mutate "an administrator enters the code for fewer backups" internal/httpapi/handlers_running.go \
+  's.replace("\"POST /api/v1/admin/backups/schedule/code\", system,", "\"POST /api/v1/admin/backups/schedule/code\", admin,")' $app -run TestKeepingFewerBackupsNeedsTheWorkerCode
+mutate "a restore cannot be confirmed during maintenance" internal/httpapi/middleware.go \
+  's.replace("\t\"/api/v1/admin/backups/restore/code\",\n", "")' $app -run TestTheRestoreCodeIsTakenDuringMaintenance
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

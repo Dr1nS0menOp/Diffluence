@@ -25,7 +25,7 @@ chmod 600 /root/diffluence-backup.key
 
 **Without this key a backup cannot be restored.** Keep a second copy in a password safe or on paper. Whoever has both the key and a backup can read everything, including TOTP seeds, so never store them together. The backup service and the script refuse a key inside the backup folder, and refuse to run without one.
 
-The backup service also derives two more keys from it (spec 070): the key that signs the audit checkpoints, and the key of the codes that confirm a restore. The server never reads this file. Replacing the backup key replaces the checkpoint key too; the backup service records the change in the audit chain on its next round, and older checkpoints keep verifying.
+The backup service also derives two more keys from it (spec 070): the key that signs the audit checkpoints, and the key of the codes that confirm a restore or fewer backups (spec 076). The server never reads this file. Replacing the backup key replaces the checkpoint key too; the backup service records the change in the audit chain on its next round, and older checkpoints keep verifying.
 
 ## Docker Compose: the backup service
 
@@ -44,6 +44,14 @@ docker compose logs backup              # what it did, and why it did not
 ```
 
 **In the console** (Administration, System, Backups; spec 058): the schedule and the number kept set there win over these two variables, which stay the default. "Back up now" asks the service for a backup, which it starts within a minute (at most 4 an hour). The page lists every backup with its size, whether it was complete or which step failed, and whether a test restore of it passed; it shows when the service last checked in and whether it holds a key (only a fingerprint, never the key). A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service talks to the console through the database, with the access it already has, so the same page works when the worker is a Kubernetes CronJob or a systemd timer that runs `diffluence backup next` and `diffluence backup report`.
+
+**Keeping fewer backups, or backing up less often** (spec 076), is a system administrator's change, with a fresh login and a second factor. The service then writes a code to its log, valid 30 minutes, which a system administrator enters on the same page:
+
+```
+To keep the newest 7 backups and back up every 168 hours, enter this confirmation code in the console: 12345-67890 (valid 30 minutes)
+```
+
+Until the right code is entered, the service keeps what it kept, and the page says so; three wrong codes, or none within 30 minutes, end the ask. More backups, or more often, take effect at once. The service keeps what it holds to in `./backups/.diffluence-held.json`, a small file the server never reaches; it never removes more old backups than that file says, also for `docker compose run --rm backup once`. Leave the file in place. A new or emptied backup folder starts from the larger of the console's number and `DIFFLUENCE_BACKUP_KEEP`.
 
 The service is also the only process that holds the owner of the tables (spec 070). Every round, at most a minute apart, it runs the migrations of a new release, then the contract migrations once their grace period is over, and signs the head of the audit chain every five minutes. It writes those checkpoints to its own log as witness lines.
 

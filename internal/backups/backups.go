@@ -94,6 +94,10 @@ type Defaults struct {
 	Interval       time.Duration
 	Keep           int
 	KeyFingerprint string // empty: no key
+	// Held is what the worker holds to between rounds (spec 076). With it, the console's
+	// choice keeps more backups or backs up more often at once, and fewer or less often only
+	// after ConfirmFewer confirmed it. A caller that keeps nothing between rounds leaves it nil.
+	Held *Held
 }
 
 // Decision is what the worker should do now.
@@ -126,6 +130,11 @@ func (s *Service) Next(ctx context.Context, d Defaults) (Decision, error) {
 		interval, keep, err := s.effective(ctx, tx, d)
 		if err != nil {
 			return err
+		}
+		if d.Held != nil {
+			if keep, interval, err = s.hold(ctx, tx, d, keep, interval); err != nil {
+				return err
+			}
 		}
 		out.Keep = keep
 		var id uuid.UUID
@@ -171,14 +180,21 @@ func (s *Service) effective(ctx context.Context, q db.Querier, d Defaults) (time
 	if err := s.settings.ReadSectionIn(ctx, q, settings.SectionBackups, &b); err != nil {
 		return 0, 0, err
 	}
-	interval, keep := d.Interval, d.Keep
+	interval, keep := resolve(b, d.Interval, d.Keep)
+	return interval, keep, nil
+}
+
+// resolve is the interval and the number kept of a backup section, with zero standing for
+// the worker's default.
+func resolve(b settings.Backups, defaultInterval time.Duration, defaultKeep int) (time.Duration, int) {
+	interval, keep := defaultInterval, defaultKeep
 	if b.IntervalHours > 0 {
 		interval = time.Duration(b.IntervalHours) * time.Hour
 	}
 	if b.Keep > 0 {
 		keep = b.Keep
 	}
-	return interval, keep, nil
+	return interval, keep
 }
 
 // Report is what the worker says about one backup it tried.
@@ -418,6 +434,10 @@ type Worker struct {
 	DefaultKeep          int       `json:"default_keep"`
 	KeyPresent           bool      `json:"key_present"`
 	KeyFingerprint       string    `json:"key_fingerprint"`
+	// HeldKeep and HeldIntervalHours are what the worker holds to (spec 076); zero until a
+	// worker of this release reported them.
+	HeldKeep          int     `json:"held_keep"`
+	HeldIntervalHours float64 `json:"held_interval_hours"`
 }
 
 // Request is the "back up now" that waits, if any.
@@ -439,10 +459,15 @@ type RestoreCheck struct {
 type Overview struct {
 	Settings settings.Backups `json:"settings"`
 	// Worker is nil until a worker has ever asked what to do.
-	Worker       *Worker       `json:"worker"`
-	Request      *Request      `json:"request"`
-	Runs         []Run         `json:"runs"`
-	RestoreCheck *RestoreCheck `json:"restore_check"`
+	Worker *Worker `json:"worker"`
+	// Confirmation is the ask for fewer backups or fewer rounds that waits for the code from
+	// the worker's log, or nil (spec 076).
+	Confirmation *ScheduleRequest `json:"confirmation"`
+	// ConfirmationTries is how many wrong codes end such an ask.
+	ConfirmationTries int           `json:"confirmation_tries"`
+	Request           *Request      `json:"request"`
+	Runs              []Run         `json:"runs"`
+	RestoreCheck      *RestoreCheck `json:"restore_check"`
 	// RequestsPerHour is the limit on "back up now", for the page to say.
 	RequestsPerHour int `json:"requests_per_hour"`
 }
@@ -450,17 +475,19 @@ type Overview struct {
 // Overview reads the backup page: four small queries on tables that stay small. The
 // route requires administrator.
 func (s *Service) Overview(ctx context.Context) (Overview, error) {
-	out := Overview{Runs: []Run{}, RequestsPerHour: RequestsPerHour}
+	out := Overview{Runs: []Run{}, RequestsPerHour: RequestsPerHour, ConfirmationTries: ConfirmationTries}
 	if err := s.settings.ReadSection(ctx, settings.SectionBackups, &out.Settings); err != nil {
 		return out, err
 	}
 	var w Worker
-	var interval int
-	err := s.pool.QueryRow(ctx, `SELECT seen_at, default_interval, default_keep, key_fingerprint FROM backup_worker WHERE id = 1`).
-		Scan(&w.SeenAt, &interval, &w.DefaultKeep, &w.KeyFingerprint)
+	var interval, heldKeep, heldInterval int
+	err := s.pool.QueryRow(ctx, `SELECT seen_at, default_interval, default_keep, key_fingerprint,
+			COALESCE(held_keep, 0), COALESCE(held_interval, 0) FROM backup_worker WHERE id = 1`).
+		Scan(&w.SeenAt, &interval, &w.DefaultKeep, &w.KeyFingerprint, &heldKeep, &heldInterval)
 	switch {
 	case err == nil:
 		w.DefaultIntervalHours = float64(interval) / 3600
+		w.HeldKeep, w.HeldIntervalHours = heldKeep, float64(heldInterval)/3600
 		w.KeyPresent = w.KeyFingerprint != ""
 		w.Absent = time.Since(w.SeenAt) > WorkerAbsentAfter
 		out.Worker = &w
@@ -473,6 +500,9 @@ func (s *Service) Overview(ctx context.Context) (Overview, error) {
 	case err == nil:
 		out.Request = &req
 	case !errors.Is(err, pgx.ErrNoRows):
+		return out, err
+	}
+	if out.Confirmation, err = openScheduleRequest(ctx, s.pool); err != nil {
 		return out, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT r.name, r.reason, r.started_at, r.finished_at, r.ok, r.size_bytes, r.message,

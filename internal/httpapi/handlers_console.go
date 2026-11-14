@@ -4,7 +4,10 @@ package httpapi
 
 import (
 	"bytes"
+	"encoding/json"
 	"net/http"
+	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -52,6 +55,13 @@ func (s *Server) registerConsoleRoutes() {
 	r.HandleFunc("DELETE /api/v1/admin/categories/{id}", SessionOnly(admin), s.handleCategoryDelete)
 	r.HandleFunc("GET /api/v1/admin/settings/{section}", SessionOnly(admin), s.handleSectionGet)
 	r.HandleFunc("PUT /api/v1/admin/settings/{section}", SessionOnly(admin), s.handleSectionSet)
+	// A change that lets more through than before, such as a weaker rule for logging in, a
+	// shorter audit retention or fewer backups kept, is a system administrator's, with a fresh
+	// login and, in the handler, a second factor (spec 076).
+	r.HandleFunc("PUT /api/v1/admin/settings/{section}/confirmed", Sensitive(Permission(identity.PermSystemAdministrator)),
+		s.handleSectionSetConfirmed)
+	// Taking back a shorter audit retention keeps more, so any administrator may.
+	r.HandleFunc("DELETE /api/v1/admin/settings/retention/lowering", SessionOnly(admin), s.handleRetentionLoweringCancel)
 	r.HandleFunc("PUT /api/v1/admin/appearance/logo", SessionOnly(admin), s.handleLogoSet)
 	r.HandleFunc("DELETE /api/v1/admin/appearance/logo", SessionOnly(admin), s.handleLogoRemove)
 	r.HandleFunc("POST /api/v1/admin/appearance/reset", SessionOnly(admin), s.handleLookReset)
@@ -458,12 +468,72 @@ func (s *Server) handleSectionSet(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	v, err := s.deps.Settings.SetSection(r.Context(), s.caller(r), r.PathValue("section"), bytes.NewReader(body))
+	var v any
+	// The backups module stores its own section: only it knows what its worker holds to.
+	if section := r.PathValue("section"); section == settings.SectionBackups {
+		v, err = s.deps.Backups.SetSchedule(r.Context(), s.caller(r), bytes.NewReader(body))
+	} else {
+		v, err = s.deps.Settings.SetSection(r.Context(), s.caller(r), section, bytes.NewReader(body))
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
 	writeJSON(w, http.StatusOK, v)
+}
+
+// confirmedSections are the sections where a change can let more through than before.
+var confirmedSections = []string{settings.SectionAccess, settings.SectionRetention, settings.SectionBackups}
+
+// handleSectionSetConfirmed stores a section for a system administrator who logged in again
+// (route rule) and gives a second factor now: a code, a recovery code, or a passkey confirmed
+// just before. The section is checked first, so a wrong address costs no code.
+func (s *Server) handleSectionSetConfirmed(w http.ResponseWriter, r *http.Request) {
+	section := r.PathValue("section")
+	if !slices.Contains(confirmedSections, section) {
+		s.fail(w, r, apperr.NotFound())
+		return
+	}
+	var in struct {
+		Settings json.RawMessage `json:"settings"`
+		Code     string          `json:"code"`
+		Reason   string          `json:"reason"`
+	}
+	if decodeJSON(w, r, maxSmallBody, &in) != nil || len(in.Settings) == 0 {
+		badBody(w)
+		return
+	}
+	p := PrincipalFrom(r.Context())
+	c := s.caller(r)
+	// The same limit per account as for a restore: a stolen session must not keep guessing.
+	if strings.TrimSpace(in.Code) != "" && !s.loginByAcc.allow("2fa:"+p.User.ID.String()) {
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Try again later.")
+		return
+	}
+	if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	var v any
+	var err error
+	if section == settings.SectionBackups {
+		v, err = s.deps.Backups.SetScheduleConfirmed(r.Context(), c, bytes.NewReader(in.Settings))
+	} else {
+		v, err = s.deps.Settings.SetSectionConfirmed(r.Context(), c, section, bytes.NewReader(in.Settings), in.Reason)
+	}
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, v)
+}
+
+func (s *Server) handleRetentionLoweringCancel(w http.ResponseWriter, r *http.Request) {
+	if err := s.deps.Settings.CancelRetentionLowering(r.Context(), s.caller(r)); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func (s *Server) handleLogo(w http.ResponseWriter, r *http.Request) {

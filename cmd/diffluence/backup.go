@@ -43,11 +43,17 @@ func openBackupsPool(ctx context.Context) (*backups.Service, *pgxpool.Pool, func
 	return backups.NewService(pool, settings.NewService(pool, nil), nil, ""), pool, pool.Close, nil
 }
 
+// defaultHeldFile is where the backup service of compose.yaml keeps what it holds to: in its
+// own backup folder, which the server never reaches (spec 076).
+const defaultHeldFile = "/backups/.diffluence-held.json"
+
 // cmdBackupNext prints what the worker should do now, as one line it can read in a shell:
 //
 //	restore <id> <backup>          restore <backup> over the installation (spec 059)
 //	code <backup> <code> <minutes> write the code that confirms the restore of <backup> to the
 //	                               log; it lasts <minutes> (spec 070)
+//	say <sentence>                 write the sentence to the log: the code that confirms
+//	                               keeping fewer backups or backing up less often (spec 076)
 //	now <reason> <keep>            make a backup now, then keep the newest <keep>
 //	wait <seconds> <keep>          ask again after <seconds>
 func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer) error {
@@ -56,6 +62,7 @@ func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer)
 	keep := fs.Int("default-keep", 42, "how many backups to keep when the console did not choose")
 	key := fs.String("key-fingerprint", "", "the first 16 hexadecimal characters of a SHA-256 of the backup key; empty when there is no key")
 	keyPath := fs.String("key", defaultBackupKey, "the backup key, which makes and checks the code that confirms a restore")
+	heldPath := fs.String("held", defaultHeldFile, "the file where the worker keeps how many backups it holds to")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -64,9 +71,10 @@ func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return err
 	}
 	defer done()
+	gate := workerGate(*keyPath, stderr)
 	// A restore goes before any backup: the console asked for it, and it makes its own
 	// safety backup. It goes on only with the code this service wrote to its log.
-	c, err := restore.Claim(ctx, pool, workerGate(*keyPath, stderr))
+	c, err := restore.Claim(ctx, pool, gate)
 	if err != nil {
 		return err
 	}
@@ -78,7 +86,22 @@ func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer)
 		fmt.Fprintf(stdout, "code %s %s %d\n", c.Show.BackupName, c.Code, int(restore.CodeLifetime.Minutes()))
 		return nil
 	}
-	d, err := svc.Next(ctx, backups.Defaults{Interval: *interval, Keep: *keep, KeyFingerprint: *key})
+	// A file that cannot be read stops this answer, and with it the console's schedule; the
+	// shell then backs up on its own interval and removes nothing (spec 076).
+	held, err := backups.LoadHeld(*heldPath)
+	if err != nil {
+		return err
+	}
+	defaults := backups.Defaults{Interval: *interval, Keep: *keep, KeyFingerprint: *key, Held: &held}
+	line, err := svc.ConfirmFewer(ctx, gate, defaults)
+	if err != nil {
+		return err
+	}
+	if line != "" {
+		fmt.Fprintf(stdout, "say %s\n", line)
+		return nil
+	}
+	d, err := svc.Next(ctx, defaults)
 	if err != nil {
 		return err
 	}
@@ -87,6 +110,23 @@ func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer)
 		return nil
 	}
 	fmt.Fprintf(stdout, "wait %d %d\n", int(d.Wait.Seconds()), d.Keep)
+	return nil
+}
+
+// cmdBackupHeld prints how many backups the worker holds to, 0 when it holds nothing yet, so
+// the shell never removes more old backups than that, whatever keep it was given (spec 076).
+// It reads only the file: it works while the database cannot be reached.
+func cmdBackupHeld(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("backup held", flag.ContinueOnError)
+	heldPath := fs.String("held", defaultHeldFile, "the file where the worker keeps how many backups it holds to")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	keep, err := backups.HeldKeep(*heldPath)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, keep)
 	return nil
 }
 

@@ -4,6 +4,7 @@ import type { Browser, Page } from '@playwright/test';
 import {
   ADMIN,
   checkAccessibility,
+  confirmingAdministrator,
   createUser,
   expect,
   grant,
@@ -43,21 +44,31 @@ async function browserAs(browser: Browser, email: string, password = PASSWORD): 
   return page;
 }
 
-/** A setting of the whole instance, put back afterwards. Tests here run one at a time. */
+/**
+ * A setting of the whole instance, put back afterwards. Tests here run one at a time. Putting a
+ * stricter rule back is a confirmed change (spec 076), so a system administrator with a second
+ * factor does it.
+ */
 async function withSection<T extends object>(
   page: Page,
+  browser: Browser,
   section: string,
   change: Partial<T>,
   run: () => Promise<void>,
 ) {
   const path = `/api/v1/admin/settings/${section}`;
+  const keeper = await confirmingAdministrator(browser);
   const before = (await (await page.request.get(path)).json()) as T;
   const set = await page.request.put(path, { data: { ...before, ...change } });
   expect(set.ok(), await set.text()).toBeTruthy();
   try {
     await run();
   } finally {
-    await page.request.put(path, { data: before });
+    const back = await keeper.api.put(`${path}/confirmed`, {
+      data: { settings: before, code: keeper.codes[0], reason: '' },
+    });
+    expect(back.ok(), await back.text()).toBeTruthy();
+    await keeper.close();
   }
 }
 
@@ -195,7 +206,7 @@ test('a required second factor leaves only the account open', async ({ page, bro
   await login(page, ADMIN.email, ADMIN.password);
   const email = `${unique('factor')}@example.com`;
   await createUser(browser, email);
-  await withSection(page, 'access', { second_factor: 'members' }, async () => {
+  await withSection(page, browser, 'access', { second_factor: 'members' }, async () => {
     const as = await (await browser.newContext(BASE)).newPage();
     await as.goto('/login');
     await as.getByLabel('Email').fill(email);
@@ -209,9 +220,46 @@ test('a required second factor leaves only the account open', async ({ page, bro
   });
 });
 
-test('a warning comes before an idle session ends, and staying keeps it open', async ({ page }) => {
+test('a shorter audit retention asks for a second factor and a reason, and waits', async ({
+  page,
+  browser,
+}) => {
   await login(page, ADMIN.email, ADMIN.password);
-  await withSection(page, 'access', { idle_minutes: 5 }, async () => {
+  await page.goto('/admin/rules');
+  const retention = page.getByRole('heading', { name: 'Retention' }).locator('..');
+  await retention.getByLabel('Keep audit rows for this many days').fill('90');
+  await retention.getByRole('button', { name: 'Save' }).click();
+  await expect(retention.getByLabel('Why a shorter time')).toBeVisible();
+  await expect(retention.getByLabel('Code from your authenticator app, or a recovery code')).toBeVisible();
+  await checkAccessibility(page);
+  await retention.getByLabel('Why a shorter time').fill('The contract ended');
+  await retention.getByRole('button', { name: 'Confirm and save' }).click();
+  await expect(retention.getByRole('alert').filter({ hasText: 'a passkey' })).toBeVisible();
+
+  // A system administrator with a second factor sets it; it waits, and any administrator can
+  // take it back.
+  const keeper = await confirmingAdministrator(browser);
+  const set = await keeper.api.put('/api/v1/admin/settings/retention/confirmed', {
+    data: {
+      settings: { audit_days: 90, longer_because: '' },
+      code: keeper.codes[0],
+      reason: 'The contract ended',
+    },
+  });
+  expect(set.ok(), await set.text()).toBeTruthy();
+  await keeper.close();
+  await page.reload();
+  const waiting = page.getByRole('status').filter({ hasText: 'audit rows are kept for 90 days' });
+  await expect(waiting).toContainText('The contract ended');
+  await expect(retention.getByLabel('Keep audit rows for this many days')).toHaveValue('365');
+  await checkAccessibility(page);
+  await waiting.getByRole('button', { name: 'Keep the longer time' }).click();
+  await expect(waiting).toHaveCount(0);
+});
+
+test('a warning comes before an idle session ends, and staying keeps it open', async ({ page, browser }) => {
+  await login(page, ADMIN.email, ADMIN.password);
+  await withSection(page, browser, 'access', { idle_minutes: 5 }, async () => {
     await page.clock.install();
     await page.goto('/people');
     await expect(page.getByRole('heading', { name: 'People' })).toBeVisible();

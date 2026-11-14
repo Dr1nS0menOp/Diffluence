@@ -4,8 +4,10 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Category } from '../api';
+import { api, type Category, type Me } from '../api';
+import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
 import { ErrorNote, Field, Loading } from '../components/ui';
+import { useDates } from '../dates';
 import { permissionLabel } from '../permission-words';
 import { RolesTab } from './roles';
 import { TableBox } from '../components/table-box';
@@ -43,16 +45,27 @@ interface Access {
 interface Retention {
   audit_days: number;
   longer_because: string;
+  /** A shorter time a system administrator confirmed, which holds from its time on (spec 076). */
+  lowering?: { audit_days: number; because: string; from: string } | null;
 }
 
-/** Loads a section, and hands the form to the screen once it is there. */
+/** Loads a section, and hands the form to the screen once it is there. A change that lets more
+ * through than before asks a system administrator for a second factor, and goes to the route
+ * that checks it (spec 076). */
 export function SectionForm<T extends object>({
   section,
   title,
+  canConfirm = false,
+  confirmNote = '',
+  withReason = false,
   children,
 }: {
   section: string;
   title: string;
+  /** Whether this person is a system administrator, who may confirm such a change. */
+  canConfirm?: boolean;
+  confirmNote?: string;
+  withReason?: boolean;
   children: (form: T, set: (change: Partial<T>) => void) => ReactNode;
 }) {
   const { t } = useTranslation();
@@ -60,12 +73,24 @@ export function SectionForm<T extends object>({
   const key = ['section', section];
   const q = useQuery({ queryKey: key, queryFn: () => api.get<T>(`/admin/settings/${section}`) });
   const [changes, setChanges] = useState<Partial<T>>({});
+  const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const save = useMutation({
-    mutationFn: (form: T) => api.put<T>(`/admin/settings/${section}`, form),
+    mutationFn: (form: T) =>
+      confirm
+        ? api.put<T>(`/admin/settings/${section}/confirmed`, {
+            settings: form,
+            code: confirm.code.trim(),
+            reason: confirm.reason,
+          })
+        : api.put<T>(`/admin/settings/${section}`, form),
     onSuccess: async () => {
       setChanges({});
+      setConfirm(null);
       await client.invalidateQueries({ queryKey: key });
       await client.invalidateQueries({ queryKey: ['appearance'] });
+    },
+    onError: (error) => {
+      if (canConfirm && needsConfirmation(error)) setConfirm((c) => c ?? { code: '', reason: '' });
     },
   });
   if (q.error) return <ErrorNote error={q.error} />;
@@ -87,8 +112,11 @@ export function SectionForm<T extends object>({
           </p>
         )}
         {children(form, (change) => setChanges({ ...changes, ...change }))}
+        {confirm && (
+          <ConfirmFields value={confirm} onChange={setConfirm} note={confirmNote} withReason={withReason} />
+        )}
         <button type="submit" className="primary" disabled={save.isPending}>
-          {t('common.save')}
+          {confirm ? t('rules.confirmButton') : t('common.save')}
         </button>
       </form>
     </section>
@@ -172,10 +200,15 @@ function FeaturesForm() {
   );
 }
 
-function AccessForm() {
+function AccessForm({ canConfirm }: { canConfirm: boolean }) {
   const { t } = useTranslation();
   return (
-    <SectionForm<Access> section="access" title={t('rules.access')}>
+    <SectionForm<Access>
+      section="access"
+      title={t('rules.access')}
+      canConfirm={canConfirm}
+      confirmNote={t('rules.confirmAccess')}
+    >
       {(form, set) => (
         <>
           <Field label={t('rules.secondFactor')} help={t('rules.secondFactorHelp')}>
@@ -213,12 +246,45 @@ function AccessForm() {
   );
 }
 
-function RetentionForm() {
+/** A shorter audit retention that waits for its time, and the way to take it back. */
+function RetentionLowering({ lowering }: { lowering: NonNullable<Retention['lowering']> }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const client = useQueryClient();
+  const takeBack = useMutation({
+    mutationFn: () => api.del('/admin/settings/retention/lowering'),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['section', 'retention'] }),
+  });
+  return (
+    <div className="note" role="status">
+      <p>
+        {t('rules.retentionLowering', {
+          days: lowering.audit_days,
+          when: dates.moment(lowering.from),
+          because: lowering.because,
+        })}
+      </p>
+      <ErrorNote error={takeBack.error} />
+      <button type="button" onClick={() => takeBack.mutate()} disabled={takeBack.isPending}>
+        {t('rules.retentionLoweringCancel')}
+      </button>
+    </div>
+  );
+}
+
+function RetentionForm({ canConfirm }: { canConfirm: boolean }) {
   const { t } = useTranslation();
   return (
-    <SectionForm<Retention> section="retention" title={t('rules.retention')}>
+    <SectionForm<Retention>
+      section="retention"
+      title={t('rules.retention')}
+      canConfirm={canConfirm}
+      confirmNote={t('rules.confirmRetention')}
+      withReason
+    >
       {(form, set) => (
         <>
+          {form.lowering && <RetentionLowering lowering={form.lowering} />}
           <Field label={t('rules.auditDays')} help={t('rules.auditDaysHelp')}>
             <input
               type="number"
@@ -236,13 +302,14 @@ function RetentionForm() {
   );
 }
 
-export function RulesTab() {
+export function RulesTab({ me }: { me: Me }) {
+  const canConfirm = me.global_permissions.includes('system_administrator');
   return (
     <>
       <GeneralForm />
       <FeaturesForm />
-      <AccessForm />
-      <RetentionForm />
+      <AccessForm canConfirm={canConfirm} />
+      <RetentionForm canConfirm={canConfirm} />
     </>
   );
 }
