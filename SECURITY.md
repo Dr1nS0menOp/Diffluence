@@ -5,8 +5,10 @@
 Diffluence is **alpha**. No version is supported before 1.0. From 1.0 on:
 
 - only the newest release line receives fixes;
-- a security fix ships as a patch of that line within days of its confirmation;
+- a security fix ships as a patch of that line, within the times below, and is never back-ported to an older line;
 - an installation up to six months old upgrades to the newest release in one step.
+
+[The 1.0 promises](docs/promises.md) say this in full.
 
 Releases are signed with Sigstore and carry SLSA provenance and an SBOM; `docs/operations/install.md` says how to check them.
 
@@ -22,7 +24,10 @@ These are aims, not promises. Diffluence comes without guarantee, and security u
 
 - Acknowledgement within 3 working days
 - A first assessment within 7 days
-- Critical issues fixed in a release within 7 days of confirmation
+- Critical issues fixed in a patch release within 7 days of confirmation
+- High issues fixed in a patch release within 30 days of confirmation
+- Lower severities fixed in the next regular release
+- When a fix cannot be ready in time, an advisory with a workaround first
 - Credit in the advisory, unless you prefer not to be named
 - A CVE assigned through GitHub where appropriate
 

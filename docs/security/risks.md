@@ -2,7 +2,7 @@
 
 Read this before you put real information in Diffluence. The first part is for everyone. After that come a part for people who run it and a part for people who write and read in it.
 
-Last updated: 13 November 2026. Diffluence is **alpha** software, sized for one node and a few hundred people, measured on your own hardware.
+Last updated: 14 November 2026. Diffluence is **alpha** software, sized for one node and a few hundred people, measured on your own hardware.
 
 ## The short version
 
@@ -63,6 +63,8 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 | Databases and sheets | Structured data in pages, with filters and sums that are newer and less tested than ordinary pages |
 | Bundles between instances | A space leaves this installation as a signed file, and a bundle from elsewhere brings its pages in |
 | Restore from the console | A system administrator can replace every page, account and grant with a backup from the browser, after a fresh login and a second factor or passkey |
+| Draft and published spaces | Two spaces are paired, and pages reach the readers of the published space through a release, a second way of writing into a space beside editing |
+| Guided templates | One use of a template makes a set of pages from fields and conditions, under rights per template that narrow those of the space |
 
 **Measures added since the first version of this page:** a restore from the console is for system administrators only, and asks for a fresh login and a second factor or passkey; an account with a passkey is asked for it after its password; acting on an account or group that holds system administration needs that role; the reference installation makes a backup every 4 hours and refuses an upgrade without a recent one; the audit log is sealed into its chain within a second and checked against a witness outside the database; the editing service receives a short ticket instead of a person's session; and a token's scope follows the route it calls.
 

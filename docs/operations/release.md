@@ -9,7 +9,7 @@ Before 1.0 there are no releases with support: every build on main is upgraded t
 From 1.0 (OPS-098, also in `SECURITY.md`):
 
 - **Only the newest release line is supported.** A fix is never back-ported to an older line: the upgrade is the fix. That is what keeps a project without staff honest about what it can look after.
-- **A security fix ships as a patch of the newest line within days** of its confirmation.
+- **A security fix ships as a patch of the newest line**, as aims after its confirmation: a Critical issue within 7 days, a High one within 30 days, the rest in the next regular release ([promises.md](../promises.md), section 4).
 - **An installation up to six months old upgrades to the newest release in one step** (spec 048 D3). Older ones go through the release of six months before.
 
 ## What a release is made of

@@ -6,7 +6,7 @@
 >
 > **What it is sized for:** one node, a few hundred people, measured on your own hardware. Several nodes are not proven yet. What was measured, and where it gave way, is in [the known limits](docs/operations/limits.md) and the stress tests of [10 November](docs/reports/2026-11-10-stress-test.md) and [12 November](docs/reports/2026-11-12-stress-test-2.md).
 >
-> **Experimental parts** are off on a new installation, and an administrator turns each on under Administration, Organising: automation rules, databases, bundles between instances and restore from the console. Public sites and analytics are experimental too, with their own switches, which also start off ([ADR-043](docs/blueprint/10-decision-log.md)).
+> **Experimental parts** are off on a new installation, and an administrator turns each on under Administration, Organising: automation rules, databases, bundles between instances, restore from the console, draft and published spaces, and guided templates. Public sites and analytics are experimental too, with their own switches, which also start off ([ADR-043](docs/blueprint/10-decision-log.md)).
 
 Diffluence is a team wiki with spaces, pages and enterprise-grade permissions, licensed under Apache 2.0. The plan and every design decision live in [`docs/blueprint/`](docs/blueprint/00-README.md).
 

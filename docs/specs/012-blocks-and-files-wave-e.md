@@ -1,6 +1,6 @@
 # 012: Wave E, blocks that show things, and files
 
-Status: planned in detail, not built yet
+Status: built in wave E, see `docs/handoff/2026-11-06-wave-e.md`; what each requirement still misses is in the status lines of `docs/blueprint/03-functional/05-dynamic-blocks.md` and `06-files.md`
 Phase: wave E of `docs/blueprint/03-functional-requirements.md`. The product owner asked on 2026-11-05 to build the whole of blueprint 03, one commit per wave. This wave comes after waves C (working together) and D (organising), and uses what they add. Each dependency is named per block below.
 
 ## Problem

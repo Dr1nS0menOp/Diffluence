@@ -100,6 +100,8 @@ Since migration 0054 (ADR-043, spec 069), automation rules, databases, bundles b
 
 Afterwards, look under Administration, Organising, Experimental parts, and turn on what you use that left no trace: a bundle export whose job was already cleaned up, for example. Turning a part off deletes nothing: a rule stays and stops running, a database stays and can still be edited, only new ones wait. Public sites and analytics keep their own switches, unchanged by the upgrade.
 
+Two experimental parts came later and leave no trace before they exist, so they are off after the upgrade that brings them: draft and published spaces (`publishing`, spec 073) and guided templates (`guided_templates`, spec 074). Guided templates cannot be turned on while a node of the previous release still runs: finish the upgrade of every node first.
+
 ## Single sign-on after an upgrade
 
 Since spec 071, single sign-on makes no account at a first login unless `DIFFLUENCE_OIDC_AUTO_CREATE=true` is set, and then only for an address the provider marks as verified. An installation that relied on accounts being made at the first login sets `DIFFLUENCE_OIDC_AUTO_CREATE=true` before upgrading. When its provider does not mark addresses as verified (Authentik by default, Entra ID), it also marks them there, or sets `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only the organisation can set an address at the provider (`docs/operations/identity-providers.md`). People who already have an account log in as before.
