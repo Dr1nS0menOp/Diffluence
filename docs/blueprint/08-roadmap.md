@@ -108,6 +108,8 @@ The product owner counts these as basic enterprise features (2026-11-06). Each i
 
 The public pages of Templating.app describe a Jira app, for issues and projects. Here it means the same behaviour for pages.
 
+Guided templates are studied in [09-enterprise/templates/01-guided-templates.md](09-enterprise/templates/01-guided-templates.md) and planned in spec 074, as an experimental part that starts off (ADR-043).
+
 ## Kinds of item
 
 Create offers four kinds of item, made the same way, each with its own job (ADR-028):
