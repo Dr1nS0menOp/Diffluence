@@ -81,6 +81,8 @@ test('a reviewer answers in the panel, and readers never see the review comments
   page,
   browser,
 }) => {
+  // Two new accounts and three logins: on a hosted runner this ran past the usual minute.
+  test.slow();
   const space = await newSpace(page, 'Reviewed');
   const id = await publishedPage(
     page,
@@ -161,6 +163,7 @@ test('a reviewer answers in the panel, and readers never see the review comments
   await expect(dialog).toHaveCount(0);
   await expect(approve).toBeFocused();
   await other.keyboard.press('Enter');
+  await expect(dialog.getByLabel('Comment')).toBeFocused();
   await other.keyboard.type('Clear and complete.');
   await dialog.getByRole('button', { name: 'Approve' }).click();
   await context.close();
