@@ -1,0 +1,42 @@
+# 09.P13: The screens
+
+How to read this chapter: see [01-draft-and-published-spaces.md](01-draft-and-published-spaces.md).
+
+The screens follow the design standard of Diffluence (`docs/design/README.md`): the Stil look of ADR-034, the five frames, the components listed there, every word through the translation files, every screen with an approved picture in light, dark, narrow and right-to-left, and WCAG 2.2 at level AA. No layout, icon or wording of another product is used (`02-clean-room-and-licensing.md`). This feature adds **no new frame** and as few new components as it can: one screen, one settings section, a band, and marks in existing places.
+
+## 13.1 Where things live
+
+- **PUB-1200** · new · **Space settings, group Content, section "Published space"** (in the Settings frame, one section at its own address): in an unpaired space, the explanation of what a pair is and the button "Link a published space", which opens a `Dialog` with the two choices of PUB-211 and the preview of PUB-210; in a draft space, the pair's settings (PUB-240), the health line (PUB-241), the list of pages in other spaces that link here (PUB-522), and "End the link" as a `danger` action behind a `ConfirmDialog` that repeats the action on its button. In a published space, the section shows which space it is published from, only to those who may view that space, and to others "This space is changed only by releases." *Proof:* e2e pictures of the three states.
+- **PUB-1201** · new · **The release screen**, in the Space frame of the draft space, reached from the sidebar's part This space as **Release** (shown only to those with `space.release`) and from the section above. *Proof:* an e2e picture.
+- **PUB-1202** · new · **Administration, Organising, Experimental parts** gains one checkbox, "Draft and published spaces", as spec 069 made for the other parts. *Proof:* the existing picture, updated.
+
+## 13.2 The release screen
+
+- **PUB-1210** · new · The screen has the space's name as its title and `Tabs` with arrow keys: **To release** (the default), **Left out**, **Removed in the draft**, **History**. Above the list sits a `.tiles` summary with counts: not released yet, changed since release, waiting for approval, cannot be released, removed in the draft. *Proof:* an e2e picture with very little and with a lot of content, as the standard asks.
+- **PUB-1211** · new · **To release** is a `SortTable` with a real checkbox per row, inside a `TableBox`: the page (`PageMark` with its path in muted text), the status as a `.lozenge` with words, what changed in words ("Text, files"), the last release as `RelativeTime`, and a `ghost` action Compare (PUB-432). Selected rows have the accent tint and the checkbox, never colour alone. *Why:* WCAG 1.3.1 and 1.4.1. *Proof:* an accessibility check.
+- **PUB-1212** · new · The one `primary` button is **Release…**: with rows selected, "Release 12 pages…"; with none, "Release everything that changed…". A quiet button offers "Release a branch…", which asks for the page with the existing page chooser. Leave out, Include and Take off are in a `Menu` on the selection, because they are used less. *Why:* one main action per view (design standard, Components). *Proof:* an e2e test.
+- **PUB-1213** · new · **The preview** opens in a `Dialog`: the counts first as a sentence ("12 pages will change for readers, 3 are new, 1 will be taken off"), then each list in a collapsible section, the files' total against the room, the warnings (links that stay text, pages placed higher, restricted pages left out), a field **Note for readers** (PUB-633), the choice **Tell watchers** (on by default), and the button **Release 12 pages**. Escape closes it without releasing; focus returns to the button that opened it. *Why:* WCAG 2.1.2 and 2.4.3; a confirmation repeats the action on its button (design standard, Words). *Proof:* keyboard e2e tests.
+- **PUB-1214** · new · A running run shows its **progress** as text in a `role="status"` line ("Released 250 of 1,200 pages"), updated per batch, and a Cancel button; the rest of the screen stays usable. *Why:* WCAG 4.1.3. *Proof:* an accessibility test.
+- **PUB-1215** · new · **History** lists runs newest first (PUB-910), each opening its report. *Proof:* an e2e picture.
+- **PUB-1216** · new · States per the standard: **Loading**; **Failed** with an `ErrorNote`; **Empty**: "Everything is released. Pages you change will show here." in muted text; **No permission**: the screen does not exist for the person ("does not exist, or you cannot see it"); **Busy**: buttons disabled while an action runs. *Proof:* e2e tests of each.
+- **PUB-1220** · new · The default order of **To release** is **oldest change first**, so the backlog is worked from the end that has waited longest. *Why:* research on flagged revisions points to the review backlog as the cost that wears a team down (02). *Proof:* a test of the order.
+
+## 13.3 On a draft page
+
+- **PUB-1221** · new · Writers and release managers see, under the byline, a `.note` with the release status in words: "Released as version 4 on 3 November · changed since: text, title" with the links **Compare** and **Open the published page** (when they may view it). A page in step shows only a muted line "Released"; a page never released shows "Not released yet". Readers of the draft space without `page.edit` or `space.release` see nothing of it. *Why:* notes on a page use `.note` under the byline (design standard, What organises a page). *Proof:* e2e pictures of each status.
+- **PUB-1222** · new · **Release this page…**, **Leave out of releases** and **Take off the published space** are in the page's **More** menu, for those with `space.release`. *Why:* rarely used actions live in More, never as a row of buttons. *Proof:* an e2e test.
+- **PUB-1223** · new · The page's history marks released versions (PUB-911) with a word, not only an icon. *Proof:* a picture.
+- **PUB-1224** · new · The tree of a draft space gains one choice in its filter: **Changed since release**, listing those pages flat, like the other flat views. The tree has no per-row release marks. *Why:* marks on every row would clutter the tree (ADR-034 took away its guide lines for the same reason). *Proof:* an e2e test.
+- **PUB-1225** · new · A controlled page's band (DOC-901) and the release note are one band: control first, then release. *Why:* two bands under a title would push the text down. *Proof:* a picture of a controlled page in a draft space.
+
+## 13.4 On a published page
+
+- **PUB-1230** · new · Readers see an ordinary page: the byline shows **Released** with the date as `RelativeTime` and the version number; for a twin of a controlled page, "Approved on" (PUB-730). No Edit button, no file drop, no label adding, because those controls are absent without permission. People who may view the draft page also see a quiet link **Open the draft** in the byline. *Proof:* pictures as a reader and as a writer.
+- **PUB-1231** · new · Editors who would otherwise edit (they hold `page.edit` in the published space) see under the byline one `.note`: "This page is changed by releases from the draft space" with the draft space's name when they may view it, and otherwise "This page is changed only by releases." *Why:* someone used to editing must understand why Edit is missing. *Proof:* pictures of both.
+- **PUB-1232** · new · Draft page comments counted for authors (PUB-223) show on the draft page as "4 comments from readers" linking to the twin's comments. *Proof:* a picture.
+
+## 13.5 Words, keyboard, language, small screens
+
+- **PUB-1240** · new · All words go through `en.json` and pass `npm run strings`. The words are plain: Release, Released, Not released yet, Changed since release, Left out, Take off, Removed in the draft, Note for readers. No word of another product's interface is used. *Proof:* the strings check.
+- **PUB-1241** · new · Every action has a keyboard path; the release screen is reachable from the sidebar by keyboard, its table follows the `SortTable` keys, the menus follow arrow keys and Escape. No new shortcut is added. *Proof:* a keyboard e2e test of a whole release.
+- **PUB-1242** · new · Layout uses logical properties only, so it works right to left; the release screen and the dialog work at 360 px wide, with the table scrolling inside its `TableBox` and the page never scrolling sideways. *Proof:* e2e pictures, narrow and RTL.
