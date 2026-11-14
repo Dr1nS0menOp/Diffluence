@@ -318,6 +318,20 @@ func (s *Service) EndSessions(ctx context.Context, actor Actor, email string, me
 	return ended, err
 }
 
+// SessionCount is how many sessions are open, of how many people.
+type SessionCount struct {
+	Sessions int64 `json:"sessions"`
+	People   int64 `json:"people"`
+}
+
+// CountSessions counts the open sessions, so the console can say what logging everyone out
+// ends before anyone confirms it (spec 075, CSL-541). The route requires administrator.
+func (s *Service) CountSessions(ctx context.Context) (SessionCount, error) {
+	var c SessionCount
+	err := s.pool.QueryRow(ctx, "SELECT count(*), count(DISTINCT user_id) FROM sessions").Scan(&c.Sessions, &c.People)
+	return c, err
+}
+
 // ResetMFA removes someone's authenticator, for a lost phone, and ends their sessions:
 // an attacker with a session must not outlive the reset of the account (SEC-126). The
 // route requires administrator.

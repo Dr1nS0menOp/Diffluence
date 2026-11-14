@@ -44,9 +44,10 @@ Commands:
                             without a recent backup and records that in the audit log
   user create-admin         create a local administrator (password on stdin)
   setup-code                print a new one-time code for the setup screen of a new install
-  audit verify [--witness FILE]
+  audit verify [--witness FILE [--report]]
                             verify the audit log hash chain, and compare it with the
-                            checkpoints in an application log (FILE, or - for stdin)
+                            checkpoints in an application log (FILE, or - for stdin);
+                            --report records the result for the console's audit area
   audit prune               remove audit rows past their retention, as the owner of the tables
   events check              check that the event log lost nothing: no gap in its positions, no
                             cursor past an event it did not hand over, nothing waiting long
@@ -239,11 +240,17 @@ func cmdServe(ctx context.Context) error {
 		return err
 	}
 	defer stopTracing()
-	log := app.NewLogger(cfg.LogLevel)
+	level := new(slog.LevelVar)
+	level.Set(cfg.LogLevel)
+	log := app.NewLogger(level)
 	// Settings used only later are tried now, in the background, so a wrong one shows
 	// before the mail, login or publish that needs it (OPS-101). A warning never stops a start.
+	// The Configuration page shows the last try (spec 075, CSL-608).
+	probes := &config.ProbeRecord{}
 	go func() {
-		for _, w := range config.Probe(ctx, cfg) {
+		warnings := config.Probe(ctx, cfg)
+		probes.Keep(time.Now(), warnings)
+		for _, w := range warnings {
 			log.Warn("a setting does not work yet", "setting", "DIFFLUENCE_"+w.Setting, "reason", w.Message)
 		}
 	}()
@@ -270,6 +277,8 @@ func cmdServe(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		a.ControlLogLevel(level)
+		a.UseProbes(probes)
 		err = a.Run(ctx)
 		a.Close()
 		if errors.Is(err, app.ErrRestoring) {
@@ -652,8 +661,12 @@ func cmdBackupNote(ctx context.Context, stdout io.Writer) error {
 func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout io.Writer) error {
 	fs := flag.NewFlagSet("audit verify", flag.ContinueOnError)
 	witnessPath := fs.String("witness", "", "an application log holding audit checkpoints, or - for standard input")
+	report := fs.Bool("report", false, "record the result of the comparison with the witness, for the console")
 	if err := fs.Parse(args); err != nil {
 		return err
+	}
+	if *report && *witnessPath == "" {
+		return errors.New("--report records the comparison with a witness log: give it with --witness FILE")
 	}
 	var witness []audit.Checkpoint
 	if *witnessPath != "" {
@@ -706,6 +719,12 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 		Action: "audit.verified", ObjectType: "audit_log", Result: result, Details: details}); err != nil {
 		return err
 	}
+	if *report {
+		if err := audit.RecordWitnessCheck(ctx, pool, witnessReport(res, compared)); err != nil {
+			return err
+		}
+		fmt.Fprintln(stdout, "witness result reported to the console")
+	}
 	if !res.OK {
 		return fmt.Errorf("audit chain BROKEN at seq %d: %s (checked %d events)", res.FirstBadSeq, res.Reason, res.Checked)
 	}
@@ -718,6 +737,16 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 			compared.Compared, compared.Pruned)
 	}
 	return nil
+}
+
+// witnessReport is what the console is told of a check: a chain that is broken in itself
+// fails the comparison too, at the position the chain breaks.
+func witnessReport(chain audit.VerifyResult, compared audit.WitnessResult) audit.WitnessCheck {
+	if !chain.OK {
+		return audit.WitnessCheck{FirstBadSeq: chain.FirstBadSeq, Reason: "the chain itself does not hold: " + chain.Reason}
+	}
+	return audit.WitnessCheck{OK: compared.OK, Compared: compared.Compared, Pruned: compared.Pruned,
+		FirstBadSeq: compared.FirstBadSeq, Reason: compared.Reason}
 }
 
 // readWitness reads the checkpoints from an application log. A log without any is an

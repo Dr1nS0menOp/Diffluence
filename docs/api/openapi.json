@@ -310,6 +310,24 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/audit-overview": {
+      "get": {
+        "operationId": "get /api/v1/admin/audit-overview",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/automation": {
       "get": {
         "operationId": "get /api/v1/admin/automation",
@@ -580,6 +598,24 @@
             }
           }
         ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/events": {
+      "get": {
+        "operationId": "get /api/v1/admin/events",
+        "parameters": [],
         "responses": {
           "200": {
             "description": "Done. Most routes answer with JSON."
@@ -1181,6 +1217,74 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/log-level": {
+      "delete": {
+        "operationId": "delete /api/v1/admin/log-level",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "get": {
+        "operationId": "get /api/v1/admin/log-level",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/log-level",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/log-level/confirmed": {
+      "put": {
+        "operationId": "put /api/v1/admin/log-level/confirmed",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "sensitive permission:system_administrator"
+      }
+    },
     "/api/v1/admin/mail": {
       "get": {
         "operationId": "get /api/v1/admin/mail",
@@ -1233,6 +1337,51 @@
           "admin"
         ],
         "x-access": "sensitive permission:system_administrator"
+      }
+    },
+    "/api/v1/admin/monitoring": {
+      "get": {
+        "operationId": "get /api/v1/admin/monitoring",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/monitoring/{kind}": {
+      "get": {
+        "operationId": "get /api/v1/admin/monitoring/{kind}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/organising": {
@@ -1814,6 +1963,24 @@
         "x-access": "sensitive permission:administrator"
       }
     },
+    "/api/v1/admin/sessions/count": {
+      "get": {
+        "operationId": "get /api/v1/admin/sessions/count",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/sessions/end": {
       "post": {
         "operationId": "post /api/v1/admin/sessions/end",
@@ -2205,6 +2372,24 @@
     "/api/v1/admin/trash/spaces": {
       "get": {
         "operationId": "get /api/v1/admin/trash/spaces",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
+    "/api/v1/admin/upgrades": {
+      "get": {
+        "operationId": "get /api/v1/admin/upgrades",
         "parameters": [],
         "responses": {
           "200": {

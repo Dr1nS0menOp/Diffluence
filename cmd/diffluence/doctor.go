@@ -12,9 +12,11 @@ import (
 	"time"
 
 	"github.com/diffluence/diffluence/internal/app"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/health"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/version"
 )
@@ -61,7 +63,8 @@ func cmdDoctor(ctx context.Context, stdout io.Writer) error {
 		return errDoctorFound
 	}
 	facts, err := app.ReadHealthFacts(ctx, app.HealthSource{Pool: pool, Store: disk, Migrations: migs,
-		MailConfigured: cfg.SMTP.Host != "", OIDCConfigured: cfg.OIDC.Issuer != "", ContractGrace: cfg.ContractGrace}, time.Now())
+		MailConfigured: cfg.SMTP.Host != "", OIDCConfigured: cfg.OIDC.Issuer != "", ContractGrace: cfg.ContractGrace,
+		Backups: backups.NewService(pool, settings.NewService(pool, nil), nil, "")}, time.Now())
 	if err != nil {
 		fmt.Fprintln(stdout, "health: PROBLEM: the health facts cannot be read; is the database migrated?")
 		return errDoctorFound

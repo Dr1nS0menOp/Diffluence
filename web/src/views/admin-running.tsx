@@ -5,7 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Me } from '../api';
 import { useCapabilities } from '../capabilities';
 import { ExperimentalOff } from '../components/experimental-off';
-import { ConfirmButton, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { ConfirmDialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
 import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
@@ -603,11 +603,116 @@ export function BackupsTab({ me }: { me: Me }) {
   );
 }
 
-interface Configuration {
-  settings: { name: string; value: string; source: string }[];
-  problems: string[];
+interface ConfigurationRow {
+  name: string;
+  value: string;
+  source: string;
+  /** The value or its source differs from what the server started with (CSL-601). */
+  changes_at_restart: boolean;
+  running: { value: string; source: string } | null;
 }
 
+interface Configuration {
+  settings: ConfigurationRow[];
+  problems: string[];
+  tracing: { name: string; value: string; source: string }[];
+  probe: { done: boolean; at: string | null; warnings: { setting: string; message: string }[] };
+}
+
+/** Why a setting the server reads at its start is shown and not changed (CSL-607). */
+const WHY_NOT_HERE: Record<string, string> = {
+  DATABASE_URL: 'start',
+  MIGRATE_DATABASE_URL: 'start',
+  LISTEN_DATABASE_URL: 'start',
+  PUBLIC_URL: 'start',
+  HTTP_ADDR: 'start',
+  ROLE: 'start',
+  DATA_DIR: 'start',
+  MASTER_KEY_FILE: 'start',
+  TRUSTED_PROXIES: 'start',
+  SMTP_PASSWORD: 'secret',
+  OIDC_CLIENT_SECRET: 'secret',
+  COLLAB_TOKEN: 'secret',
+  METRICS_TOKEN: 'secret',
+  PDF_PASSWORD: 'secret',
+  OUTWARD_ALLOW_PRIVATE: 'outward',
+  PUBLISH_DIR: 'publish',
+  UPGRADE_BACKUP_MAX_AGE: 'backup',
+  CONTRACT_GRACE: 'grace',
+  OIDC_AUTO_CREATE: 'oidc',
+  OIDC_ALLOW_UNVERIFIED_EMAIL: 'oidc',
+  LOG_LEVEL: 'logLevel',
+};
+
+function ConfigurationValue({ row }: { row: ConfigurationRow }) {
+  const { t } = useTranslation();
+  if (!row.changes_at_restart) return <>{row.value}</>;
+  return (
+    <>
+      {row.value} <span className="lozenge">{t('installation.changesAtRestart')}</span>
+      {row.running && (
+        <>
+          <br />
+          <small className="muted">
+            {t('installation.runningNow', { value: row.running.value, source: row.running.source })}
+          </small>
+        </>
+      )}
+    </>
+  );
+}
+
+function ConfigurationProbe({ probe }: { probe: Configuration['probe'] }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  if (!probe.done || !probe.at) return <p className="muted">{t('installation.probeNone')}</p>;
+  if (probe.warnings.length === 0) {
+    return <p>{t('installation.probeOk', { when: dates.moment(probe.at) })}</p>;
+  }
+  return (
+    <div className="note">
+      <p>{t('installation.probeWarned', { when: dates.moment(probe.at) })}</p>
+      <ul>
+        {probe.warnings.map((w) => (
+          <li key={w.setting}>
+            <code>{`DIFFLUENCE_${w.setting}`}</code>: {w.message}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function TracingVariables({ rows }: { rows: Configuration['tracing'] }) {
+  const { t } = useTranslation();
+  if (rows.length === 0) return <p className="muted">{t('installation.tracingNone')}</p>;
+  return (
+    <TableBox>
+      <table>
+        <thead>
+          <tr>
+            <th>{t('running.colSetting')}</th>
+            <th>{t('running.colValue')}</th>
+            <th>{t('running.colSource')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((s) => (
+            <tr key={s.name}>
+              <th scope="row">
+                <code>{s.name}</code>
+              </th>
+              <td>{s.value}</td>
+              <td>{s.source}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </TableBox>
+  );
+}
+
+/** Configuration (CSL-600 to CSL-612): what the server started with, read-only, with its source. */
 export function ConfigurationTab() {
   const { t } = useTranslation();
   const q = useQuery({
@@ -636,6 +741,7 @@ export function ConfigurationTab() {
               <th>{t('running.colSetting')}</th>
               <th>{t('running.colValue')}</th>
               <th>{t('running.colSource')}</th>
+              <th>{t('installation.colWhy')}</th>
             </tr>
           </thead>
           <tbody>
@@ -644,13 +750,57 @@ export function ConfigurationTab() {
                 <th scope="row">
                   <code>{s.name}</code>
                 </th>
-                <td>{s.value}</td>
+                <td>
+                  <ConfigurationValue row={s} />
+                </td>
                 <td>{s.source}</td>
+                <td>{WHY_NOT_HERE[s.name] ? t(`installation.why_${WHY_NOT_HERE[s.name]}`) : ''}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </TableBox>
+      <p className="muted">{t('installation.fromOutside')}</p>
+      <p className="muted">{t('installation.configCommand')}</p>
+      <h2>{t('installation.tracingTitle')}</h2>
+      <p>{t('installation.tracingIntro')}</p>
+      <TracingVariables rows={q.data.tracing} />
+      <h2>{t('installation.probeTitle')}</h2>
+      <ConfigurationProbe probe={q.data.probe} />
+    </>
+  );
+}
+
+/** Logging everyone out says first how many sessions of how many people end (CSL-541). */
+function EndEveryone({ onConfirm }: { onConfirm: () => void }) {
+  const { t } = useTranslation();
+  const [asking, setAsking] = useState(false);
+  const count = useQuery({
+    queryKey: ['session-count'],
+    queryFn: () => api.get<{ sessions: number; people: number }>('/admin/sessions/count'),
+    enabled: asking,
+    staleTime: 0,
+  });
+  return (
+    <>
+      <button type="button" className="danger" onClick={() => setAsking(true)}>
+        {t('running.endAll')}
+      </button>
+      {asking && (
+        <ConfirmDialog
+          title={t('running.endAll')}
+          message={
+            count.data
+              ? t('installation.endAllCount', { sessions: count.data.sessions, people: count.data.people })
+              : count.error
+                ? t('running.endAllConfirm')
+                : t('installation.countLoading')
+          }
+          confirmLabel={t('running.endAll')}
+          onConfirm={onConfirm}
+          onClose={() => setAsking(false)}
+        />
+      )}
     </>
   );
 }
@@ -683,12 +833,8 @@ export function SessionsTab() {
       </form>
       <h2>{t('running.everyoneTitle')}</h2>
       <p>{t('running.endAllWarn')}</p>
-      <ConfirmButton
-        label={t('running.endAll')}
-        message={t('running.endAllConfirm')}
-        tone="danger"
-        onConfirm={() => end.mutate({ all: true })}
-      />
+      <EndEveryone onConfirm={() => end.mutate({ all: true })} />
+      <p className="muted">{t('installation.incident')}</p>
       <ErrorNote error={end.error} />
       {ended !== null && <p role="status">{t('running.ended', { count: ended })}</p>}
     </>

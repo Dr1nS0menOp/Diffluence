@@ -28,6 +28,9 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 
 ## Metrics
 
+Administration, System health offers the rules and the dashboard of the running release as downloads under **Monitoring files**, from a copy built into the binary that a test keeps equal to `deploy/monitoring/`. The page says whether `/metrics` is on, never the token. Below it, **Log level** shows the level each node runs at; an administrator can raise it for 1, 4 or 24 hours, for every node or one, and it returns by itself (a quieter level needs a system administrator and a second factor). Debug never writes a password, a token or the words of a page, and the witness line of the audit log is written at every level.
+
+
 `/metrics` answers a scraper that sends the token set in `DIFFLUENCE_METRICS_TOKEN`. Names change only with a note in the changelog.
 
 | Metric | What |

@@ -144,6 +144,86 @@ func TestABackupOfTwentySixHoursIsStillFine(t *testing.T) {
 	expect(t, f, "backup", OK, "backup_ok")
 }
 
+// The disk thresholds are settings now (spec 075, CSL-581): the rules follow them, and a
+// zero value means the defaults.
+func TestTheDiskRulesFollowTheThresholdsAnAdministratorSet(t *testing.T) {
+	f := healthy()
+	f.Thresholds = Thresholds{DiskWarnPercent: 20, DiskRefusePercent: 5}
+	f.DiskFree, f.DiskTotal, f.Growth30d = 199, 1000, 0
+	expect(t, f, "disk", Warn, "disk_low")
+	f.DiskFree = 200
+	expect(t, f, "disk", OK, "disk_ok")
+	f.DiskFree = 49
+	c := expect(t, f, "disk", Problem, "disk_full")
+	if c.Values["refuse"] != 5 {
+		t.Fatalf("the sentence names the refuse level in force: %+v", c.Values)
+	}
+	f.DiskFree = 50
+	expect(t, f, "disk", Warn, "disk_low")
+	if !RefusesAt(49, 1000, 5) || RefusesAt(50, 1000, 5) {
+		t.Fatal("files are refused below the refuse level, and taken at it")
+	}
+	if RefusesAt(0, 0, 10) {
+		t.Fatal("an unknown size must not refuse at any level")
+	}
+	if RefusesAt(19, 1000, 0) != RefusesLargeWrites(19, 1000) {
+		t.Fatal("no level set is the default level")
+	}
+}
+
+// A backup every 4 hours that stopped warns after 6 hours, not 26 (CSL-582).
+func TestTheBackupLineFollowsTheSchedule(t *testing.T) {
+	f := healthy()
+	f.BackupInterval = 4 * time.Hour
+	f.LastBackup = now.Add(-6 * time.Hour)
+	expect(t, f, "backup", OK, "backup_ok")
+	f.LastBackup = now.Add(-6*time.Hour - time.Second)
+	expect(t, f, "backup", Warn, "backup_old")
+	f.BackupInterval = 168 * time.Hour
+	f.LastBackup = now.Add(-170 * time.Hour)
+	expect(t, f, "backup", OK, "backup_ok")
+	f.LastBackup = now.Add(-170*time.Hour - time.Second)
+	expect(t, f, "backup", Warn, "backup_old")
+}
+
+// Without a schedule the line keeps the 26 hours of a daily backup that runs a little late.
+func TestTheBackupLineWithoutAScheduleWaitsTwentySixHours(t *testing.T) {
+	f := healthy()
+	f.LastBackup = now.Add(-26 * time.Hour)
+	expect(t, f, "backup", OK, "backup_ok")
+	f.LastBackup = now.Add(-26*time.Hour - time.Second)
+	expect(t, f, "backup", Warn, "backup_old")
+}
+
+// The witness is compared outside and its result reported (CSL-532, CSL-533): a failed
+// comparison needs a person; once one was reported, eight days without one warns; an
+// installation that never set it up sees nothing.
+func TestAFailedWitnessComparisonIsAProblem(t *testing.T) {
+	f := healthy()
+	f.WitnessReported, f.WitnessAt, f.WitnessOK = true, now.Add(-time.Hour), false
+	expect(t, f, "audit", Problem, "witness_failed")
+	f.AuditWaiting, f.OldestAuditWaiting = 1, now.Add(-AuditSealProblemAfter-time.Second)
+	expect(t, f, "audit", Problem, "audit_stuck")
+}
+
+func TestAWitnessReportOlderThanEightDaysWarns(t *testing.T) {
+	f := healthy()
+	f.WitnessReported, f.WitnessOK = true, true
+	f.WitnessAt = now.Add(-WitnessWarnAfter)
+	expect(t, f, "audit", OK, "audit_ok")
+	f.WitnessAt = now.Add(-WitnessWarnAfter - time.Second)
+	c := expect(t, f, "audit", Warn, "witness_old")
+	if c.Values["days"] != 8 {
+		t.Fatalf("values %+v", c.Values)
+	}
+}
+
+func TestAnInstallationThatNeverReportedAWitnessIsNotWarned(t *testing.T) {
+	f := healthy()
+	f.WitnessAt, f.WitnessOK = time.Time{}, false
+	expect(t, f, "audit", OK, "audit_ok")
+}
+
 // A contract migration waits for its grace period on purpose (spec 048 D1); only a day on
 // top of that is news.
 func TestAContractMigrationWarnsADayAfterItsGrace(t *testing.T) {

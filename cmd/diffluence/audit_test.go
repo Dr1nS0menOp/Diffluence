@@ -102,6 +102,88 @@ func TestAuditVerifyComparesTheChainWithTheWitnessLog(t *testing.T) {
 	}
 }
 
+// --report records what the comparison found, so the console can show it (spec 075,
+// CSL-532): a match, and a mismatch with the position, written also when the command fails.
+func TestAuditVerifyReportsTheWitnessComparison(t *testing.T) {
+	url := commandEnv(t)
+	ctx := context.Background()
+	var out, errOut bytes.Buffer
+	if code := run([]string{"user", "create-admin", "--email", "first@example.com", "--name", "First"},
+		strings.NewReader("correct horse battery staple\n"), &out, &errOut); code != 0 {
+		t.Fatalf("create-admin: %d %s", code, errOut.String())
+	}
+	pool, err := db.Open(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer pool.Close()
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := keys.LoadOrCreate(cfg.KeyFile(), true); err != nil {
+		t.Fatal(err)
+	}
+	key, err := signingKey(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := audit.SealWaiting(ctx, pool); err != nil {
+		t.Fatal(err)
+	}
+	cp, signed, err := audit.SignCheckpoint(ctx, pool, key)
+	if err != nil || !signed {
+		t.Fatalf("signed %v: %v", signed, err)
+	}
+	var witness bytes.Buffer
+	slog.New(slog.NewJSONHandler(&witness, nil)).Info(audit.WitnessMessage, cp.WitnessAttrs()...)
+	line := witness.String()
+
+	errOut.Reset()
+	if code := run([]string{"audit", "verify", "--report"}, strings.NewReader(""), &out, &errOut); code == 0 ||
+		!strings.Contains(errOut.String(), "--witness") {
+		t.Fatalf("a report without a witness: %d %q", code, errOut.String())
+	}
+	if got, _ := audit.LatestWitnessCheck(ctx, pool); got != nil {
+		t.Fatalf("a refused command reported: %+v", got)
+	}
+	out.Reset()
+	if code := run([]string{"audit", "verify", "--witness", "-", "--report"}, strings.NewReader(line), &out, &errOut); code != 0 {
+		t.Fatalf("a whole chain: %d %s", code, errOut.String())
+	}
+	got, err := audit.LatestWitnessCheck(ctx, pool)
+	if err != nil || got == nil || !got.OK || got.Compared != 1 {
+		t.Fatalf("the report of a match: %+v %v", got, err)
+	}
+	if !strings.Contains(out.String(), "reported") {
+		t.Fatalf("the command says it reported: %q", out.String())
+	}
+
+	// The owner removes the tail with its checkpoint; the witness still holds it.
+	for _, q := range []string{
+		"ALTER TABLE audit_events DISABLE TRIGGER audit_events_no_update_delete",
+		"DELETE FROM audit_checkpoints",
+		"DELETE FROM audit_personal WHERE seq >= $1",
+		"DELETE FROM audit_events WHERE seq >= $1",
+		"ALTER TABLE audit_events ENABLE TRIGGER audit_events_no_update_delete",
+	} {
+		args := []any{}
+		if strings.Contains(q, "$1") {
+			args = append(args, cp.Seq)
+		}
+		if _, err := pool.Exec(ctx, q, args...); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if code := run([]string{"audit", "verify", "--witness", "-", "--report"}, strings.NewReader(line), &out, &errOut); code == 0 {
+		t.Fatal("a removed tail passed the witness")
+	}
+	got, err = audit.LatestWitnessCheck(ctx, pool)
+	if err != nil || got == nil || got.OK || got.FirstBadSeq != cp.Seq || got.Reason == "" {
+		t.Fatalf("the report of a mismatch: %+v %v", got, err)
+	}
+}
+
 // A log without checkpoints is the wrong file, or a collector that kept nothing.
 func TestAuditVerifyRefusesAWitnessLogWithoutCheckpoints(t *testing.T) {
 	commandEnv(t)

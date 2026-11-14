@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -483,7 +482,7 @@ func (s *Server) handleSectionSet(w http.ResponseWriter, r *http.Request) {
 }
 
 // confirmedSections are the sections where a change can let more through than before.
-var confirmedSections = []string{settings.SectionAccess, settings.SectionRetention, settings.SectionBackups}
+var confirmedSections = []string{settings.SectionAccess, settings.SectionRetention, settings.SectionBackups, settings.SectionHealth}
 
 // handleSectionSetConfirmed stores a section for a system administrator who logged in again
 // (route rule) and gives a second factor now: a code, a recovery code, or a passkey confirmed
@@ -503,17 +502,10 @@ func (s *Server) handleSectionSetConfirmed(w http.ResponseWriter, r *http.Reques
 		badBody(w)
 		return
 	}
-	p := PrincipalFrom(r.Context())
+	if !s.confirmSecondFactor(w, r, in.Code) {
+		return
+	}
 	c := s.caller(r)
-	// The same limit per account as for a restore: a stolen session must not keep guessing.
-	if strings.TrimSpace(in.Code) != "" && !s.loginByAcc.allow("2fa:"+p.User.ID.String()) {
-		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many attempts. Try again later.")
-		return
-	}
-	if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {
-		s.fail(w, r, err)
-		return
-	}
 	var v any
 	var err error
 	if section == settings.SectionBackups {

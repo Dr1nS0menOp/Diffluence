@@ -39,6 +39,10 @@ export const SETTINGS_INDEX: SettingEntry[] = [
   { label: 'admin.holders', tab: 'permissions' },
   { label: 'admin.invitations', tab: 'invitations' },
   { label: 'admin.serviceAccounts', tab: 'users' },
+  { label: 'installation.diskWarn', tab: 'settings' },
+  { label: 'installation.diskRefuse', tab: 'settings' },
+  { label: 'installation.logLevel', tab: 'system' },
+  { label: 'installation.monitoringFiles', tab: 'system' },
 ];
 
 const MAX_FOUND = 8;

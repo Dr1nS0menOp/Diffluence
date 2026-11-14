@@ -44,6 +44,7 @@ var tableOwners = map[string]string{
 	"audit_signing_keys":     "internal/audit",
 	"audit_erasure_baseline": "internal/audit",
 	"audit_entries":          "internal/audit",
+	"audit_witness_checks":   "internal/audit",
 	"outbox_events":          "internal/outbox",
 	"event_failures":         "internal/failures",
 	"event_head":             "internal/events",

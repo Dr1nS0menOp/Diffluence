@@ -76,6 +76,7 @@ func newHiddenWorld(t *testing.T) hiddenWorld {
 // unwalked are the list routes the walk cannot fill in, each with the reason.
 var unwalked = map[string]string{
 	"GET /api/v1/admin/settings/{section}":    "administrators only, and holds settings, not content",
+	"GET /api/v1/admin/monitoring/{kind}":     "administrators only, and sends a file of the release, not content",
 	"GET /api/v1/templates/{id}/files/{file}": "a file of a template, which follows the rule of its template (TestTemplateFilesFollowTheRuleOfTheTemplate)",
 }
 

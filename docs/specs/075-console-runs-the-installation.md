@@ -1,6 +1,6 @@
 # Spec 075: The console runs the installation
 
-Status: study and plan, 2026-11-14. Nothing is built yet.
+Status: study and plan, 2026-11-14. Wave CS1 is built (2026-11-14); waves CS2 to CS6 wait for 1.0.
 
 Study: [blueprint 11](../blueprint/11-console/01-console-runs-the-installation.md), chapters 02 to 12, lines CSL-001 to CSL-1220. Basis: the roadmap item "Running the installation from the admin screen" (`08-roadmap.md`, "Wanted, later"), specs 058, 059, 068, 069 and 070, ADR-040 to ADR-044. The study sorts 132 commands, settings, fixed values and scripts: 25 change in the console (13 built, 12 new), 69 are shown only, and 38 stay commands, each with its reason (chapter 03).
 
@@ -36,6 +36,8 @@ Not experimental: everything of CS1, the worker in Go and its tasks page (CS2), 
 - **Docs.** `backup-restore.md`, `upgrade.md`, `install.md`, `monitoring.md` and the threat model follow each wave.
 
 ## CS1: show what exists, and two small settings
+
+Status: built on 2026-11-14. What was built, and what differs from the plan below, is in the decisions D26 to D37 and in the report `docs/reports/2026-11-14-wave-cs1.md`.
 
 **Scope:**
 - the configuration page shows "changes at the next restart" (CSL-601), the OpenTelemetry variables (CSL-604), the reasons of class S (CSL-607) and the last configuration warnings (CSL-608);
@@ -189,7 +191,7 @@ Chapter 12 in full. In short: no start, stop or upgrade of containers or package
 
 ## Decisions
 
-Each decided on the product owner's behalf on 2026-11-14; each may be overruled. The lines are explained in blueprint 11.1, section 1.3.
+Each decided on the product owner's behalf on 2026-11-14; each may be overruled. D1 to D25 are explained in blueprint 11.1, section 1.3; D26 to D37 were decided while building wave CS1, decided on the product owner's behalf on 2026-11-14, may be overruled.
 
 | | Line | Decision |
 |---|---|---|
@@ -218,7 +220,18 @@ Each decided on the product owner's behalf on 2026-11-14; each may be overruled.
 | D23 | CSL-582 | The backup line warns at the interval plus two hours, never sooner than 26 hours without a schedule |
 | D24 | CSL-596 | Cancelling a task before it runs: tier 1 for tasks of tier 1 and 2, tier 2 for a task of tier 3 |
 | D25 | CSL-946 | A waiting task of a person who is disabled is cancelled |
-
+| D26 | CSL-472 | A log level quieter than the one the answering node started with hides warnings, so it goes through the confirmed path of spec 076 (system administrator, fresh login, second factor); a louder or equal level stays tier 1 |
+| D27 | CSL-581 | Lower disk thresholds (warning later, refusing files later) let the disk fill further, so they go through the confirmed path of spec 076; higher ones stay tier 1. The section `health` joins the sections of the confirmed route |
+| D28 | CSL-800 | Upgrades sits after Backups and Events after Audit; the other sections keep their places until Worker (CS2) and Encryption key (CS5) arrive, so the sidebar changes once |
+| D29 | CSL-562 | Until the worker reports its platform (CS2), the upgrade page shows the commands of Docker Compose, Helm and the packages, each labelled |
+| D30 | CSL-604 | `OTEL_RESOURCE_ATTRIBUTES` is free text and shows only as set, like headers and keys; an endpoint shows without its user, password, query and fragment |
+| D31 | CSL-607 | The reason of each class S setting is a sentence in the table; links to `install.md` per row wait, because an installation does not serve the documentation |
+| D32 | CSL-570 | The log level for a while reaches every Diffluence node of every role; the backup service follows when the worker runs in Go (CS2) |
+| D33 | CSL-601 | "Changes at the next restart" compares the values as the page shows them: a secret whose value changed but whose source did not is not marked, because the server keeps no secret for the page |
+| D34 | CSL-532 | Witness reports are kept, not pruned: a daily report is about 365 small rows a year. The application role may add and read them, never change or remove one |
+| D35 | CSL-702 | The log level and the thresholds are read together every five seconds in one statement by key, beside maintenance mode, not inside its read, which is per request and cached |
+| D36 | CSL-608 | The last try of the outside settings is kept by the process from its start and shown; the page never tries again |
+| D37 | CSL-582 | The backup line takes the console's schedule, or the backup service's default when the console left it empty |
 ## Open for the product owner
 
 1. **After 1.0, or partly before?** The freeze says after (D19). CS2 is not a new part for users, but it rewrites the worker every installation runs; building it before 1.0 would test it longer, at the cost of change during the freeze.

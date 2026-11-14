@@ -1878,3 +1878,113 @@ test.describe('draft and published spaces', () => {
     await checkAccessibility(page);
   });
 });
+
+// The console that runs the installation (spec 075, wave CS1): upgrades, events, signatures,
+// the log level for a while, the configuration and the count before logging everyone out.
+test.describe('the console that runs the installation', () => {
+  async function installationPage(browser: Browser, colorScheme: 'light' | 'dark' = 'light') {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme });
+    const page = await context.newPage();
+    await login(page, ADMIN.email, ADMIN.password);
+    return page;
+  }
+
+  /** A picture of one part of a screen, where the rest changes with what ran before. */
+  async function pictureOf(where: Locator, name: string) {
+    await useFixedFont(where.page());
+    await where.page().evaluate(() => document.fonts.ready);
+    await expect(where).toHaveScreenshot(`${name}.png`);
+  }
+
+  /** The release, its build date and the PostgreSQL version differ between builds. */
+  const releaseFacts = (page: Page) => [page.locator('.tiles dd'), page.getByText(/PostgreSQL/)];
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`UpgradesTab: the upgrade page, ${colorScheme}`, async ({ browser }) => {
+      const page = await installationPage(browser, colorScheme);
+      await page.goto('/admin/upgrades');
+      await expect(page.getByText('No cleanup migration waits.')).toBeVisible();
+      await fixText(page.locator('main time'), 'just now');
+      await picture(page, `installation-upgrades-${colorScheme}`, releaseFacts(page));
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+  }
+
+  test('UpgradesTab: the upgrade page on a phone, right to left', async ({ browser }) => {
+    const page = await installationPage(browser);
+    await page.setViewportSize(NARROW_SCREEN);
+    await page.goto('/admin/upgrades');
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await expect(page.getByRole('heading', { name: 'Nodes' })).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    // On a phone the sections come first; the picture is of the page below them.
+    await page.getByRole('heading', { name: 'Nodes' }).scrollIntoViewIfNeeded();
+    await picture(page, 'installation-upgrades-phone-rtl', releaseFacts(page));
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.context().close();
+  });
+
+  test('EventsTab: where the events go', async ({ browser }) => {
+    const page = await installationPage(browser);
+    await page.goto('/admin/events');
+    await expect(page.getByText(/Events go through/)).toBeVisible();
+    await fixText(
+      page.getByRole('status').filter({ hasText: 'Events go through' }),
+      'Events go through NATS, since just now. NATS is in use.',
+    );
+    await picture(page, 'installation-events');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`AuditSignatures: the keys and the witness, ${colorScheme}`, async ({ browser }) => {
+      const page = await installationPage(browser, colorScheme);
+      await page.goto('/admin/audit');
+      const section = page.getByRole('region', { name: 'Signatures' });
+      await expect(section.getByRole('heading', { name: 'Keys that sign' })).toBeVisible();
+      await fixText(
+        section.locator('p').first(),
+        'The newest checkpoint covers position 100, signed just now.',
+      );
+      await fixText(section.locator('code'), '0123456789abcdef');
+      await fixText(section.locator('td:nth-child(2)'), '1');
+      await pictureOf(section, `installation-signatures-${colorScheme}`);
+      await page.context().close();
+    });
+  }
+
+  test('LogLevelLine: the log level for a while', async ({ browser }) => {
+    const page = await installationPage(browser);
+    await page.goto('/admin/system');
+    await page.getByRole('button', { name: 'Change', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: 'Log level for a while' });
+    await dialog.getByLabel('Level').selectOption('error');
+    await expect(dialog.getByText('A quieter level than the one the node was started with')).toBeVisible();
+    await pictureOf(dialog, 'installation-log-level');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('ConfigurationTab: what the server started with', async ({ browser }) => {
+    const page = await installationPage(browser);
+    await page.goto('/admin/configuration');
+    await expect(page.getByRole('heading', { name: 'Traces' })).toBeVisible();
+    await picture(page, 'installation-configuration', [page.getByText(/^Tried /)]);
+    await page.context().close();
+  });
+
+  test('SessionsTab: the count before logging everyone out', async ({ browser }) => {
+    const page = await installationPage(browser);
+    await page.goto('/admin/sessions');
+    await page.getByRole('button', { name: 'Log everyone out' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Log everyone out' });
+    const message = dialog.getByText(/This ends \d+ sessions of \d+ people/);
+    await expect(message).toBeVisible();
+    await fixText(message, 'This ends 12 sessions of 5 people, yours included. Everyone must log in again.');
+    await pictureOf(dialog, 'installation-end-everyone');
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await page.context().close();
+  });
+});

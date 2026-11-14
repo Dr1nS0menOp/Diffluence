@@ -303,6 +303,8 @@ func sectionValue(name string) (section, error) {
 		return &Look{}, nil
 	case SectionBackups:
 		return &Backups{}, nil
+	case SectionHealth:
+		return &Health{}, nil
 	}
 	return nil, apperr.NotFound()
 }

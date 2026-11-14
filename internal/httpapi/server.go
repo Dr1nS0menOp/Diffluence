@@ -121,6 +121,8 @@ type Deps struct {
 	// ReadyNotes are what /readyz adds while this node is ready but not at its best, such
 	// as a nearly full disk. Nil means none.
 	ReadyNotes func(ctx context.Context) []string
+	// Installation is what the console's areas of the running installation read (spec 075).
+	Installation Installation
 
 	InstanceID uuid.UUID
 	Log        *slog.Logger

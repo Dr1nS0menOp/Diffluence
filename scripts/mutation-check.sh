@@ -1597,11 +1597,11 @@ mutate "an IP address is taken as the public address" internal/config/config.go 
 # that refuses files on a nearly full disk, the cleaner, and doctor.
 health=./internal/health/
 mutate "files are refused at exactly 2% free" internal/health/health.go \
-  's.replace("percentFree(free, total) < DiskRefusePercent", "percentFree(free, total) <= DiskRefusePercent")' $health -run TestADiskAtTwoPercentWarnsButStillTakesFiles
+  's.replace("percentFree(free, total) < uint64(level)", "percentFree(free, total) <= uint64(level)")' $health -run TestADiskAtTwoPercentWarnsButStillTakesFiles
 mutate "an unknown disk size refuses files" internal/health/health.go \
   's.replace("return total > 0 && percentFree", "return total >= 0 \x26\x26 percentFree")' $health -run TestADiskOfUnknownSizeNeverWarnsAndNeverRefuses
 mutate "a disk at 10% free warns" internal/health/health.go \
-  's.replace("case percent < DiskWarnPercent:", "case percent <= DiskWarnPercent:")' $health -run TestADiskAtTenPercentIsFine
+  's.replace("case percent < uint64(f.Thresholds.warnPercent()):", "case percent <= uint64(f.Thresholds.warnPercent()):")' $health -run TestADiskAtTenPercentIsFine
 mutate "growth equal to the free room warns" internal/health/health.go \
   's.replace("uint64(f.Growth30d) > f.DiskFree:", "uint64(f.Growth30d) >= f.DiskFree:")' $health -run TestADiskThatAMonthOfGrowthWouldFillWarns
 mutate "growth that is not known warns" internal/health/health.go \
@@ -1609,7 +1609,7 @@ mutate "growth that is not known warns" internal/health/health.go \
 mutate "no backup noted is fine" internal/health/health.go \
   's.replace("if f.LastBackup.IsZero() {\n\t\treturn check(\"backup\", Warn", "if false {\n\t\treturn check(\"backup\", Warn")' $health -run TestNoBackupNotedWarns
 mutate "a backup of exactly 26 hours warns" internal/health/health.go \
-  's.replace("if age > BackupWarnAfter {", "if age >= BackupWarnAfter {")' $health -run TestABackupOfTwentySixHoursIsStillFine
+  's.replace("if age > backupWarnAfter(f.BackupInterval) {", "if age >= backupWarnAfter(f.BackupInterval) {")' $health -run TestABackupOfTwentySixHoursIsStillFine
 mutate "a contract migration of exactly a day warns" internal/health/health.go \
   's.replace("f.Now.Sub(f.LastMigrationAt) > f.ContractGrace+ContractWaitWarnAfter", "f.Now.Sub(f.LastMigrationAt) >= f.ContractGrace+ContractWaitWarnAfter")' $health -run TestAContractMigrationWaitingMoreThanADayWarns
 mutate "an event stuck in the outbox is only a warning" internal/health/health.go \
@@ -1625,7 +1625,7 @@ mutate "a release of exactly 60 days warns" internal/health/health.go \
 mutate "the guard lets every file through" internal/storage/guard.go \
   's.replace("\tif g.Refusing(ctx) {\n\t\treturn Object{}, errNoRoom", "\tif false {\n\t\treturn Object{}, errNoRoom")' ./internal/storage/ -run TestAStoreBelowTwoPercentRefusesFilesWithNoRoom
 mutate "the guard reads the disk on every file" internal/storage/guard.go \
-  's.replace("g.now().Sub(g.readAt) < roomFreshFor", "g.now().Sub(g.readAt) < 0")' ./internal/storage/ -run TestTheRoomIsReadAtMostEveryThirtySeconds
+  's.replace("g.now().Sub(g.readAt) >= roomFreshFor", "g.now().Sub(g.readAt) >= 0")' ./internal/storage/ -run TestTheRoomIsReadAtMostEveryThirtySeconds
 mutate "a refused file is a bad request" internal/httpapi/handlers_content.go \
   's.replace("\tcase apperr.KindNoRoom:\n\t\tstatus = http.StatusInsufficientStorage\n", "")' $app -run TestANearlyFullDiskRefusesFilesButTextStillSaves
 mutate "a nearly full disk leaves no note on readyz" internal/app/health.go \
@@ -1634,6 +1634,56 @@ mutate "readyz drops its notes" internal/httpapi/server.go \
   's.replace("len(list) > 0 {", "len(list) > 99 {")' $app -run TestANearlyFullDiskRefusesFilesButTextStillSaves
 mutate "the health page takes any event for a backup" internal/app/health.go \
   's.replace("FROM audit_events WHERE action = $1 ORDER BY seq DESC LIMIT 1", "FROM audit_events WHERE action <> $1 ORDER BY seq DESC LIMIT 1")' $app -run TestTheHealthPageShowsTheBackupAndTheDisk
+
+# Spec 075, wave CS1: the console shows what runs the installation, and sets the log level for a
+# while and the disk thresholds. Each bound, each guard, the witness report and the debug log.
+settings=./internal/settings/
+mutate "the refuse threshold at the warn level is accepted" internal/settings/runtime.go \
+  's.replace("if warn, refuse := h.Levels(); refuse >= warn {", "if warn, refuse := h.Levels(); refuse > warn {")' $settings -run TestTheDiskThresholdsKeepToTheirBounds
+mutate "a warn threshold below 5% is accepted" internal/settings/runtime.go \
+  's.replace("h.DiskWarnPercent < minDiskWarnPercent ||", "h.DiskWarnPercent < minDiskWarnPercent-1 ||")' $settings -run TestTheDiskThresholdsKeepToTheirBounds
+mutate "a warn threshold above 50% is accepted" internal/settings/runtime.go \
+  's.replace("h.DiskWarnPercent > maxDiskWarnPercent)", "h.DiskWarnPercent > maxDiskWarnPercent+1)")' $settings -run TestTheDiskThresholdsKeepToTheirBounds
+mutate "a refuse threshold above 10% is accepted" internal/settings/runtime.go \
+  's.replace("h.DiskRefusePercent > maxDiskRefusePercent)", "h.DiskRefusePercent > maxDiskRefusePercent+1)")' $settings -run TestTheDiskThresholdsKeepToTheirBounds
+mutate "lower disk thresholds are an ordinary change" internal/settings/runtime.go \
+  's.replace("if (warn < storedWarn || refuse < storedRefuse) \x26\x26 !c.Confirmed {", "if (warn < storedWarn-100 || refuse < storedRefuse) \x26\x26 !c.Confirmed {")' $settings -run TestLowerDiskThresholdsNeedAConfirmedChange
+mutate "a quieter log level is an ordinary change" internal/settings/runtime.go \
+  's.replace("if levelOf(o.Level) > configured \x26\x26 !c.Confirmed {", "if false \x26\x26 !c.Confirmed {")' $settings -run TestAQuieterLogLevelNeedsAConfirmedChange
+mutate "a log level holds for any number of hours" internal/settings/runtime.go \
+  's.replace("if !slices.Contains(LogHours, r.Hours) {", "if r.Hours < 1 {")' $settings -run TestALogOverrideKeepsToItsLevelsAndHours
+mutate "the log level never ends" internal/settings/runtime.go \
+  's.replace("if o == nil || !now.Before(o.Until) ||", "if o == nil ||")' $settings -run TestALogOverrideEndsByItsTimeAndHoldsOnlyForItsNodes
+mutate "a log level for one node holds on every node" internal/settings/runtime.go \
+  's.replace("(o.Node != \"\" \x26\x26 o.Node != node)", "false")' $settings -run TestALogOverrideEndsByItsTimeAndHoldsOnlyForItsNodes
+mutate "the store refuses at the default level only" internal/storage/guard.go \
+  's.replace("health.RefusesAt(g.free, g.total, g.refuseLevel())", "health.RefusesAt(g.free, g.total, 0)")' $app -run TestTheDiskThresholdsAreBoundedAndFollowed
+mutate "the backup line ignores the schedule" internal/health/health.go \
+  's.replace("return interval + BackupLateBy", "return BackupWarnAfter")' $health -run TestTheBackupLineFollowsTheSchedule
+mutate "a failed witness report is fine" internal/health/health.go \
+  's.replace("case f.WitnessReported \x26\x26 !f.WitnessOK:", "case false:")' $health -run TestAFailedWitnessComparisonIsAProblem
+mutate "a witness report of exactly eight days warns" internal/health/health.go \
+  's.replace("f.Now.Sub(f.WitnessAt) > WitnessWarnAfter:", "f.Now.Sub(f.WitnessAt) >= WitnessWarnAfter:")' $health -run TestAWitnessReportOlderThanEightDaysWarns
+mutate "the witness report says OK on a mismatch" cmd/diffluence/main.go \
+  's.replace("return audit.WitnessCheck{OK: compared.OK,", "return audit.WitnessCheck{OK: true,")' ./cmd/diffluence/ -run TestAuditVerifyReportsTheWitnessComparison
+mutate "the audit area hides an unendorsed key" internal/audit/console.go \
+  's.replace("k.Endorsed = len(public) == ed25519.PublicKeySize \x26\x26 ed25519.Verify(", "k.Endorsed = len(public) == ed25519.PublicKeySize || ed25519.Verify(")' ./internal/audit/ -run TestTheAuditOverviewNamesTheCheckpointAndTheKeys
+mutate "a tracing header is shown" internal/config/console.go \
+  's.replace("\t\treturn endpointShown(value)\n\t}\n\treturn \"(set)\"", "\t\treturn endpointShown(value)\n\t}\n\treturn value")' ./internal/config/ -run TestTheTracingVariablesShowWithoutCredentials
+mutate "a tracing endpoint keeps its user and query" internal/config/console.go \
+  's.replace("return (\x26url.URL{Scheme: u.Scheme, Host: u.Host, Path: u.Path}).String()", "return u.String()")' ./internal/config/ -run TestTheTracingVariablesShowWithoutCredentials
+mutate "a value changed after the start is not marked" internal/config/console.go \
+  's.replace("if !found || was != s {", "if !found {")' ./internal/config/ -run TestASettingChangedAfterTheStartIsMarked
+mutate "a quieter log level needs no system administrator" internal/httpapi/handlers_installation.go \
+  's.replace("\"PUT /api/v1/admin/log-level/confirmed\", Sensitive(Permission(identity.PermSystemAdministrator))", "\"PUT /api/v1/admin/log-level/confirmed\", Sensitive(Permission(identity.PermAdministrator))")' $app -run TestAnAdministratorCannotMakeTheInstallationQuieterOrFuller
+mutate "a quieter log level needs no second factor" internal/httpapi/handlers_installation.go \
+  's.replace("\tif !s.confirmSecondFactor(w, r, in.Code) {\n\t\treturn\n\t}\n\to, err :=", "\to, err :=")' $app -run TestASystemAdministratorConfirmsAQuieterLevelWithASecondFactor
+mutate "a token reaches the areas of the installation" internal/httpapi/handlers_installation.go \
+  's.replace("\tadmin := SessionOnly(Permission(identity.PermAdministrator))\n\tr.HandleFunc(\"GET /api/v1/admin/upgrades\"", "\tadmin := Permission(identity.PermAdministrator)\n\tr.HandleFunc(\"GET /api/v1/admin/upgrades\"")' $app -run TestATokenReachesNoAreaOfTheInstallation
+mutate "lower disk thresholds need no confirmed change" internal/httpapi/handlers_console.go \
+  's.replace(", settings.SectionBackups, settings.SectionHealth}", ", settings.SectionBackups}")' $app -run TestASystemAdministratorConfirmsAQuieterLevelWithASecondFactor
+mutate "the debug log writes the query of a request" internal/httpapi/middleware.go \
+  's.replace("\"path\", loggedPath(r.URL.Path),", "\"path\", r.URL.RequestURI(),")' $app -run TestDebugLogsNoSecretOrTitleAndErrorKeepsTheWitness
 mutate "the growth is measured from the newest sample" internal/app/health.go \
   's.replace("WHERE taken_at <= now() - make_interval(secs => $2)", "WHERE taken_at >= now() - make_interval(secs => $2)")' $app -run TestTheDatabaseGrowthComesFromTheHourlySamples
 mutate "the cleaner keeps finished jobs" internal/app/health.go \
@@ -2438,13 +2488,13 @@ mutate "the prune command takes a shorter retention before its time" internal/se
 mutate "the console forms start from the defaults" internal/settings/sections.go \
   's.replace("\tif err := s.ReadSection(ctx, name, v); err != nil {\n\t\treturn nil, err\n\t}\n\treturn settle(", "\tif err := s.Read(ctx, name, v); err != nil {\n\t\treturn nil, err\n\t}\n\treturn settle(")' $app -run TestAWeakerRuleForLoggingInNeedsAConfirmedChange
 mutate "a confirmed change takes no second factor" internal/httpapi/handlers_console.go \
-  's.replace("if err := s.deps.Identity.ConfirmSecondFactor(r.Context(), c, p.SessionID, strings.TrimSpace(in.Code)); err != nil {", "if err := error(nil); err != nil {")' $app -run 'TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
+  's.replace("\tif !s.confirmSecondFactor(w, r, in.Code) {\n\t\treturn\n\t}\n\tc := s.caller(r)", "\tc := s.caller(r)")' $app -run 'TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
 mutate "a confirmed change needs no system administrator" internal/httpapi/handlers_console.go \
   's.replace("Sensitive(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed", "Sensitive(admin),\n\t\ts.handleSectionSetConfirmed")' $app -run 'TestKeepingFewerBackupsNeedsASystemAdministrator|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
 mutate "a confirmed change needs no fresh login" internal/httpapi/handlers_console.go \
   's.replace("Sensitive(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed", "SessionOnly(Permission(identity.PermSystemAdministrator)),\n\t\ts.handleSectionSetConfirmed")' $app -run 'TestKeepingFewerBackupsNeedsAFreshLoginAndASecondFactor|TestAWeakerRuleForLoggingInNeedsAConfirmedChange'
-mutate "codes for a confirmed change are tried without end" internal/httpapi/handlers_console.go \
-  's.replace("strings.TrimSpace(in.Code) != \"\" \x26\x26 !s.loginByAcc.allow(", "false \x26\x26 !s.loginByAcc.allow(")' $app -run TestWrongCodesForAConfirmedChangeAreLimited
+mutate "codes for a confirmed change are tried without end" internal/httpapi/handlers_installation.go \
+  's.replace("if code != \"\" \x26\x26 !s.loginByAcc.allow(", "if false \x26\x26 !s.loginByAcc.allow(")' $app -run TestWrongCodesForAConfirmedChangeAreLimited
 mutate "the backup section is stored past its module" internal/httpapi/handlers_console.go \
   's.replace("if section := r.PathValue(\"section\"); section == settings.SectionBackups {", "if section := r.PathValue(\"section\"); section == \"\" {")' $app -run TestKeepingFewerBackupsNeedsASystemAdministrator
 mutate "an administrator takes back a restore" internal/httpapi/handlers_running.go \

@@ -26,13 +26,20 @@ const (
 // The thresholds (spec 048 D8 to D10, spec 051 D2).
 const (
 	// DiskWarnPercent is how much of the data folder may be left before administrators are
-	// warned.
+	// warned, until an administrator sets another level (spec 075, CSL-581).
 	DiskWarnPercent = 10
 	// DiskRefusePercent is below which uploads, imports and exports are refused, so the
-	// room left goes to text.
+	// room left goes to text, until an administrator sets another level.
 	DiskRefusePercent = 2
-	// BackupWarnAfter tolerates a daily backup that runs a little late.
+	// BackupWarnAfter tolerates a daily backup that runs a little late. It holds while no
+	// schedule is known.
 	BackupWarnAfter = 26 * time.Hour
+	// BackupLateBy is how late a backup may be on its schedule before the line warns
+	// (spec 075, CSL-582).
+	BackupLateBy = 2 * time.Hour
+	// WitnessWarnAfter is how long the audit line waits for the next witness report, once
+	// one was ever reported (spec 075, CSL-533).
+	WitnessWarnAfter = 8 * 24 * time.Hour
 	// ContractWaitWarnAfter is how long a contract migration may wait for every node, on top
 	// of the grace it waits on purpose.
 	ContractWaitWarnAfter = 24 * time.Hour
@@ -111,6 +118,41 @@ type Facts struct {
 	// BuildDate is the date of the commit this release was built from; zero = unknown.
 	BuildDate time.Time
 	Version   string
+	// Thresholds are the disk levels an administrator set; zero values are the defaults.
+	Thresholds Thresholds
+	// BackupInterval is how often a backup is made, from the schedule or the worker's
+	// default; zero = not known.
+	BackupInterval time.Duration
+	// WitnessReported says whether a witness comparison was ever reported (audit verify
+	// --witness --report); WitnessAt and WitnessOK are of the newest report.
+	WitnessReported bool
+	WitnessAt       time.Time
+	WitnessOK       bool
+}
+
+// Thresholds are the levels of free disk space the checks and the store use. A zero value
+// stands for its default.
+type Thresholds struct {
+	// DiskWarnPercent is the free share below which administrators are warned.
+	DiskWarnPercent int
+	// DiskRefusePercent is the free share below which new files are refused.
+	DiskRefusePercent int
+}
+
+// warnPercent is the warn level in force.
+func (t Thresholds) warnPercent() int {
+	if t.DiskWarnPercent > 0 {
+		return t.DiskWarnPercent
+	}
+	return DiskWarnPercent
+}
+
+// refusePercent is the refuse level in force.
+func (t Thresholds) refusePercent() int {
+	if t.DiskRefusePercent > 0 {
+		return t.DiskRefusePercent
+	}
+	return DiskRefusePercent
 }
 
 // Check is the result of one rule.
@@ -138,27 +180,45 @@ func Evaluate(f Facts) []Check {
 // auditSealing says whether the worker keeps the audit chain up to date. Events that wait
 // only a moment are normal, so the line then reads the same as when none wait.
 func auditSealing(f Facts) Check {
-	if f.AuditWaiting == 0 || f.OldestAuditWaiting.IsZero() {
-		return check("audit", OK, "audit_ok", nil)
+	var lag time.Duration
+	values := map[string]any{}
+	if f.AuditWaiting > 0 && !f.OldestAuditWaiting.IsZero() {
+		lag = f.Now.Sub(f.OldestAuditWaiting)
+		values = map[string]any{"count": f.AuditWaiting, "seconds": int(lag.Seconds())}
 	}
-	lag := f.Now.Sub(f.OldestAuditWaiting)
-	values := map[string]any{"count": f.AuditWaiting, "seconds": int(lag.Seconds())}
+	// A comparison with the witness that failed outweighs events that merely wait: it can
+	// mean the chain was changed (ADR-039).
 	switch {
 	case lag > AuditSealProblemAfter:
 		return check("audit", Problem, "audit_stuck", values)
+	case f.WitnessReported && !f.WitnessOK:
+		return check("audit", Problem, "witness_failed", witnessValues(f))
 	case lag > AuditSealWarnAfter:
 		return check("audit", Warn, "audit_lagging", values)
+	case f.WitnessReported && f.Now.Sub(f.WitnessAt) > WitnessWarnAfter:
+		return check("audit", Warn, "witness_old", witnessValues(f))
 	}
 	return check("audit", OK, "audit_ok", values)
+}
+
+func witnessValues(f Facts) map[string]any {
+	return map[string]any{"at": f.WitnessAt.UTC().Format(time.RFC3339), "days": int(f.Now.Sub(f.WitnessAt).Hours() / 24)}
 }
 
 // percentFree is the free part of a disk in whole percent, rounded down.
 func percentFree(free, total uint64) uint64 { return free * 100 / total }
 
-// RefusesLargeWrites says whether the store should refuse files. An unknown size never
-// refuses: a store that cannot tell must not stop people.
+// RefusesLargeWrites says whether the store should refuse files at the default level. An
+// unknown size never refuses: a store that cannot tell must not stop people.
 func RefusesLargeWrites(free, total uint64) bool {
-	return total > 0 && percentFree(free, total) < DiskRefusePercent
+	return RefusesAt(free, total, 0)
+}
+
+// RefusesAt says whether the store should refuse files at refusePercent free; zero is the
+// default level. An unknown size never refuses.
+func RefusesAt(free, total uint64, refusePercent int) bool {
+	level := Thresholds{DiskRefusePercent: refusePercent}.refusePercent()
+	return total > 0 && percentFree(free, total) < uint64(level) // #nosec G115 -- a level is a small positive percentage.
 }
 
 func disk(f Facts) Check {
@@ -166,11 +226,12 @@ func disk(f Facts) Check {
 		return check("disk", OK, "disk_unknown", nil)
 	}
 	percent := percentFree(f.DiskFree, f.DiskTotal)
-	values := map[string]any{"free": f.DiskFree, "total": f.DiskTotal, "percent": percent}
+	values := map[string]any{"free": f.DiskFree, "total": f.DiskTotal, "percent": percent,
+		"refuse": f.Thresholds.refusePercent()}
 	switch {
-	case RefusesLargeWrites(f.DiskFree, f.DiskTotal):
+	case RefusesAt(f.DiskFree, f.DiskTotal, f.Thresholds.DiskRefusePercent):
 		return check("disk", Problem, "disk_full", values)
-	case percent < DiskWarnPercent:
+	case percent < uint64(f.Thresholds.warnPercent()): // #nosec G115 -- a level is a small positive percentage.
 		return check("disk", Warn, "disk_low", values)
 	case f.GrowthKnown && f.Growth30d > 0 && uint64(f.Growth30d) > f.DiskFree:
 		return check("disk", Warn, "disk_fills", values)
@@ -202,10 +263,19 @@ func backup(f Facts) Check {
 	case f.RestoreCheckFailed:
 		return check("backup", Warn, "restore_check_failed", values)
 	}
-	if age > BackupWarnAfter {
+	if age > backupWarnAfter(f.BackupInterval) {
 		return check("backup", Warn, "backup_old", values)
 	}
 	return check("backup", OK, "backup_ok", values)
+}
+
+// backupWarnAfter is how old the newest backup may be: its interval and BackupLateBy, or
+// BackupWarnAfter while no schedule is known.
+func backupWarnAfter(interval time.Duration) time.Duration {
+	if interval <= 0 {
+		return BackupWarnAfter
+	}
+	return interval + BackupLateBy
 }
 
 func migrations(f Facts) Check {
@@ -291,7 +361,7 @@ func Count(checks []Check) (problems, warnings int) {
 var Sentences = map[string]string{
 	"disk_unknown":      "This store cannot tell how much room it has.",
 	"disk_ok":           "{percent}% of the disk is free.",
-	"disk_low":          "Only {percent}% of the disk is free. Make room or add space before files are refused at 2%.",
+	"disk_low":          "Only {percent}% of the disk is free. Make room or add space before files are refused at {refuse}%.",
 	"disk_full":         "Only {percent}% of the disk is free, so uploads, imports and exports are refused. Text still saves. Make room now.",
 	"disk_fills":        "{percent}% of the disk is free, but at the growth of the last 30 days it fills within a month. Plan more space.",
 	"database_unknown":  "The size of the database is measured once an hour; it has not been measured yet.",
@@ -310,6 +380,8 @@ var Sentences = map[string]string{
 	"audit_ok":          "Audit events are sealed in the chain within seconds.",
 	"audit_lagging":     "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
 	"audit_stuck":       "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",
+	"witness_failed":    "The last comparison of the audit chain with the witness in the log store did not match. Run diffluence audit verify --witness and follow the incident steps.",
+	"witness_old":       "The audit chain was last compared with the witness {days} days ago. Check the timer that runs diffluence audit verify --witness --report.",
 	"mail_off":          "No mail server is set, so nobody gets mail. Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM.",
 	"mail_ok":           "Mail is set up.",
 	"mail_failed":       "{count} mail(s) failed in the last day. Check the mail server.",

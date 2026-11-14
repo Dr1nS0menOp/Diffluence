@@ -16,6 +16,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/tracing"
 	"github.com/diffluence/diffluence/internal/version"
 )
@@ -63,8 +64,11 @@ func (a *App) RegisterNode(ctx context.Context) error {
 	if a.nodeID == [16]byte{} {
 		a.nodeID = ids.New()
 	}
-	_, err := a.pool.Exec(ctx, `INSERT INTO nodes (id, role, version, max_migration) VALUES ($1, $2, $3, $4)
-		ON CONFLICT (id) DO UPDATE SET last_seen_at = now()`, a.nodeID, string(a.cfg.Role), version.Version, a.maxMigration())
+	// The level this node runs at goes in the update it already makes, so the console shows
+	// where a log level for a while took (spec 075, CSL-572 and CSL-701).
+	_, err := a.pool.Exec(ctx, `INSERT INTO nodes (id, role, version, max_migration, log_level) VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (id) DO UPDATE SET last_seen_at = now(), log_level = EXCLUDED.log_level`,
+		a.nodeID, string(a.cfg.Role), version.Version, a.maxMigration(), settings.LevelName(a.runningLevel()))
 	return err
 }
 
@@ -251,26 +255,34 @@ type NodeStatus struct {
 	StartedAt    time.Time `json:"started_at"`
 	LastSeenAt   time.Time `json:"last_seen_at"`
 	Live         bool      `json:"live"`
+	// LogLevel is the level the node runs at; empty for a node of a release before spec 075.
+	LogLevel string `json:"log_level"`
 }
 
-// SystemStatus is what the admin console shows under system health.
-func (a *App) SystemStatus(ctx context.Context) (any, error) {
-	rows, err := a.pool.Query(ctx, `SELECT id::text, role, version, max_migration, started_at, last_seen_at,
-			last_seen_at > now() - make_interval(secs => $1)
+// listNodes reads the node registry, oldest start first.
+func listNodes(ctx context.Context, q db.Querier) ([]NodeStatus, error) {
+	rows, err := q.Query(ctx, `SELECT id::text, role, version, max_migration, started_at, last_seen_at,
+			last_seen_at > now() - make_interval(secs => $1), log_level
 		FROM nodes ORDER BY started_at`, nodeLiveWindow.Seconds())
 	if err != nil {
 		return nil, err
 	}
 	nodes, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (NodeStatus, error) {
 		var n NodeStatus
-		err := r.Scan(&n.ID, &n.Role, &n.Version, &n.MaxMigration, &n.StartedAt, &n.LastSeenAt, &n.Live)
+		err := r.Scan(&n.ID, &n.Role, &n.Version, &n.MaxMigration, &n.StartedAt, &n.LastSeenAt, &n.Live, &n.LogLevel)
 		return n, err
 	})
-	if err != nil {
-		return nil, err
-	}
 	if nodes == nil {
 		nodes = []NodeStatus{}
+	}
+	return nodes, err
+}
+
+// SystemStatus is what the admin console shows under system health.
+func (a *App) SystemStatus(ctx context.Context) (any, error) {
+	nodes, err := listNodes(ctx, a.pool)
+	if err != nil {
+		return nil, err
 	}
 	var unpublished, failedJobs, queuedJobs, storageQueue, trashItems int
 	var applied int

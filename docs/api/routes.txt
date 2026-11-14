@@ -8,6 +8,7 @@ DELETE /api/v1/admin/categories/{id}                           session-only perm
 DELETE /api/v1/admin/groups/{id}                               session-only permission:administrator
 DELETE /api/v1/admin/groups/{id}/members/{user}                session-only permission:administrator
 DELETE /api/v1/admin/invitations/{id}                          session-only permission:administrator
+DELETE /api/v1/admin/log-level                                 session-only permission:administrator
 DELETE /api/v1/admin/pages/{id}/versions/{number}              permission:administrator
 DELETE /api/v1/admin/permission-sets/{id}                      session-only permission:administrator
 DELETE /api/v1/admin/roles/{id}                                session-only permission:administrator
@@ -56,11 +57,13 @@ GET /api/v1/admin/attention                                    session-only perm
 GET /api/v1/admin/audit-events                                 session-only permission:administrator
 GET /api/v1/admin/audit-events/export                          session-only permission:administrator
 GET /api/v1/admin/audit-events/verify                          session-only permission:administrator
+GET /api/v1/admin/audit-overview                               session-only permission:administrator
 GET /api/v1/admin/automation                                   permission:administrator
 GET /api/v1/admin/backups                                      session-only permission:administrator
 GET /api/v1/admin/bundles/key                                  permission:administrator
 GET /api/v1/admin/configuration                                session-only permission:administrator
 GET /api/v1/admin/event-failures                               session-only permission:administrator
+GET /api/v1/admin/events                                       session-only permission:administrator
 GET /api/v1/admin/experimental                                 permission:administrator
 GET /api/v1/admin/export-policy                                permission:administrator
 GET /api/v1/admin/features                                     permission:administrator
@@ -73,7 +76,10 @@ GET /api/v1/admin/insights                                     permission:admini
 GET /api/v1/admin/insights/search                              permission:administrator
 GET /api/v1/admin/invitations                                  session-only permission:administrator
 GET /api/v1/admin/jobs                                         session-only permission:administrator
+GET /api/v1/admin/log-level                                    session-only permission:administrator
 GET /api/v1/admin/mail                                         permission:administrator
+GET /api/v1/admin/monitoring                                   session-only permission:administrator
+GET /api/v1/admin/monitoring/{kind}                            session-only permission:administrator
 GET /api/v1/admin/organising                                   permission:administrator
 GET /api/v1/admin/outgoing-hosts                               permission:administrator
 GET /api/v1/admin/pages/{id}                                   session-only permission:administrator
@@ -84,6 +90,7 @@ GET /api/v1/admin/role-assignments                             session-only perm
 GET /api/v1/admin/roles/{id}/holders                           permission:administrator
 GET /api/v1/admin/rules                                        permission:administrator
 GET /api/v1/admin/scim-tokens                                  session-only permission:administrator
+GET /api/v1/admin/sessions/count                               session-only permission:administrator
 GET /api/v1/admin/settings                                     session-only permission:administrator
 GET /api/v1/admin/settings/{section}                           session-only permission:administrator
 GET /api/v1/admin/spaces                                       session-only permission:administrator
@@ -92,6 +99,7 @@ GET /api/v1/admin/summary                                      session-only perm
 GET /api/v1/admin/system                                       session-only permission:administrator
 GET /api/v1/admin/templates                                    permission:administrator
 GET /api/v1/admin/trash/spaces                                 session-only permission:administrator
+GET /api/v1/admin/upgrades                                     session-only permission:administrator
 GET /api/v1/admin/users                                        session-only permission:administrator
 GET /api/v1/admin/users/{id}                                   session-only permission:administrator
 GET /api/v1/admin/users/{id}/reach                             session-only permission:administrator
@@ -467,6 +475,8 @@ PUT /api/v1/admin/features                                     permission:admini
 PUT /api/v1/admin/groups/{id}/members/{user}                   session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/owners                           session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/permissions                      session-only permission:administrator
+PUT /api/v1/admin/log-level                                    session-only permission:administrator
+PUT /api/v1/admin/log-level/confirmed                          sensitive permission:system_administrator
 PUT /api/v1/admin/maintenance                                  sensitive permission:system_administrator
 PUT /api/v1/admin/organising                                   permission:administrator
 PUT /api/v1/admin/outgoing-hosts                               session-only permission:administrator

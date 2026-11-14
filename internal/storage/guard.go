@@ -29,16 +29,29 @@ type Guarded struct {
 	inner Store
 	now   func() time.Time
 
-	mu      sync.Mutex
-	room    Spacer // nil = the store does not know its room
-	readAt  time.Time
-	refuses bool
+	mu     sync.Mutex
+	room   Spacer // nil = the store does not know its room
+	readAt time.Time
+	// free and total are the last reading; readOK says whether it succeeded.
+	free, total uint64
+	readOK      bool
+	// refuseLevel gives the percentage of free room below which files are refused; zero is
+	// the default of the health rules (spec 075, CSL-581).
+	refuseLevel func() int
 }
 
 // NewGuarded wraps a store. A store that does not know its room is never refused.
 func NewGuarded(inner Store) *Guarded {
 	room, _ := inner.(Spacer)
-	return &Guarded{inner: inner, now: time.Now, room: room}
+	return &Guarded{inner: inner, now: time.Now, room: room, refuseLevel: func() int { return 0 }}
+}
+
+// FollowRefuseLevel reads the refuse level from level from now on, at every check, so a new
+// level holds at once on the reading already taken.
+func (g *Guarded) FollowRefuseLevel(level func() int) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	g.refuseLevel = level
 }
 
 // UseRoomOf reads the room from s from now on, and forgets the last reading. Tests use it
@@ -58,13 +71,12 @@ func (g *Guarded) Refusing(ctx context.Context) bool {
 	if g.room == nil {
 		return false
 	}
-	if !g.readAt.IsZero() && g.now().Sub(g.readAt) < roomFreshFor {
-		return g.refuses
+	if g.readAt.IsZero() || g.now().Sub(g.readAt) >= roomFreshFor {
+		var err error
+		g.free, g.total, err = g.room.Space(ctx)
+		g.readAt, g.readOK = g.now(), err == nil
 	}
-	free, total, err := g.room.Space(ctx)
-	g.readAt = g.now()
-	g.refuses = err == nil && health.RefusesLargeWrites(free, total)
-	return g.refuses
+	return g.readOK && health.RefusesAt(g.free, g.total, g.refuseLevel())
 }
 
 // Put stores r, unless the disk is nearly full.

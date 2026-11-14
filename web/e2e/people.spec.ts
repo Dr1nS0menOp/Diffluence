@@ -694,10 +694,12 @@ test('a page out of reach shows in the audit log by id, with a censored title', 
 
   await login(page, ADMIN.email, ADMIN.password);
   await page.goto(`/admin/audit?object_id=${hidden}`);
-  await expect(page.getByRole('table')).toContainText('(Censored title)');
-  await expect(page.getByRole('table')).not.toContainText('Initech');
+  // The audit page also lists the keys that sign (spec 075); the events are the table with actions.
+  const events = page.getByRole('table').filter({ has: page.getByRole('columnheader', { name: 'Action' }) });
+  await expect(events).toContainText('(Censored title)');
+  await expect(events).not.toContainText('Initech');
   await checkAccessibility(page);
-  await page.getByRole('table').getByRole('button').first().click();
+  await events.getByRole('button').first().click();
   const dialog = page.getByRole('dialog');
   await expect(dialog.getByRole('definition').first()).toHaveText('(Censored title)');
   await expect(dialog).toContainText('Hidden from the console');

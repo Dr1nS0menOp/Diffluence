@@ -9,9 +9,12 @@ import (
 	"sync"
 	"time"
 
+	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/events"
 	"github.com/diffluence/diffluence/internal/health"
+	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/version"
 )
@@ -43,6 +46,8 @@ type HealthSource struct {
 	OIDCConfigured bool
 	// ContractGrace is the configured wait before contract migrations run.
 	ContractGrace time.Duration
+	// Backups gives the backup schedule the backup line follows; nil leaves it unknown.
+	Backups *backups.Service
 }
 
 // healthFactsSQL reads every count the checks need in one statement. Each part is cheap:
@@ -130,7 +135,28 @@ func ReadHealthFacts(ctx context.Context, src HealthSource, now time.Time) (heal
 		return f, fmt.Errorf("app: read the migration state: %w", err)
 	}
 	f.PendingContract = st.PendingContract
-	return f, nil
+	return f, readConsoleFacts(ctx, src, &f)
+}
+
+// readConsoleFacts adds what the console sets or reports since spec 075: the disk thresholds,
+// the backup schedule and the newest witness report.
+func readConsoleFacts(ctx context.Context, src HealthSource, f *health.Facts) error {
+	rt, err := settings.ReadRuntime(ctx, src.Pool)
+	if err != nil {
+		return err
+	}
+	f.Thresholds = rt.Health.Thresholds()
+	if src.Backups != nil {
+		if f.BackupInterval, err = src.Backups.Interval(ctx, src.Pool); err != nil {
+			return fmt.Errorf("app: read the backup schedule: %w", err)
+		}
+	}
+	w, err := audit.LatestWitnessCheck(ctx, src.Pool)
+	if err != nil || w == nil {
+		return err
+	}
+	f.WitnessReported, f.WitnessAt, f.WitnessOK = true, w.CheckedAt, w.OK
+	return nil
 }
 
 // healthCache keeps the last facts of this node for healthFreshFor.
@@ -149,7 +175,7 @@ func (a *App) HealthFacts(ctx context.Context) (health.Facts, error) {
 		return a.healthCache.facts, nil
 	}
 	facts, err := ReadHealthFacts(ctx, HealthSource{Pool: a.pool, Store: a.store, Migrations: a.migrations,
-		MailConfigured: a.mail.Configured(), OIDCConfigured: a.sso != nil, ContractGrace: a.cfg.ContractGrace}, now)
+		MailConfigured: a.mail.Configured(), OIDCConfigured: a.sso != nil, ContractGrace: a.cfg.ContractGrace, Backups: a.backups}, now)
 	if err != nil {
 		return facts, err
 	}

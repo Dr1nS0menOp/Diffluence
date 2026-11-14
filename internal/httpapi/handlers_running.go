@@ -5,12 +5,10 @@ package httpapi
 import (
 	"fmt"
 	"net/http"
-	"os"
 	"strings"
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/config"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/restore"
@@ -44,6 +42,7 @@ func (s *Server) registerRunningRoutes() {
 	// Logging everyone out is an incident action; asking for the password again first
 	// keeps a stolen session from using it as a weapon.
 	r.HandleFunc("POST /api/v1/admin/sessions/end", Sensitive(admin), s.handleEndSessions)
+	s.registerInstallationRoutes()
 }
 
 func (s *Server) handleBackups(w http.ResponseWriter, r *http.Request) {
@@ -156,28 +155,6 @@ func (s *Server) handleBackupRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusAccepted)
-}
-
-// handleConfiguration shows the settings the server started with and where each came
-// from, as diffluence config check prints them: secrets as (set), database addresses
-// without their password. It reads the environment and the file again, so it shows what
-// a restart would take; problems are listed by key and line, never with a value.
-func (s *Server) handleConfiguration(w http.ResponseWriter, _ *http.Request) {
-	_, list, err := config.Inspect(os.LookupEnv)
-	problems := []string{}
-	if err != nil {
-		problems = strings.Split(err.Error(), "\n")
-	}
-	type setting struct {
-		Name   string `json:"name"`
-		Value  string `json:"value"`
-		Source string `json:"source"`
-	}
-	out := make([]setting, 0, len(list))
-	for _, item := range list {
-		out = append(out, setting{Name: item.Name, Value: item.Value, Source: item.Source})
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"settings": out, "problems": problems})
 }
 
 func (s *Server) handleEndSessions(w http.ResponseWriter, r *http.Request) {

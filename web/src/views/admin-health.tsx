@@ -92,7 +92,8 @@ export function HealthBand() {
   if (!disk || !DISK_TROUBLE.includes(disk.code)) return null;
   return (
     <p role="status" className={disk.state === 'problem' ? 'note note-error' : 'note'}>
-      {t('health.band')} <Link href="/admin/system">{t('health.bandLook')}</Link>
+      {t('health.band', { refuse: disk.values.refuse })}{' '}
+      <Link href="/admin/system">{t('health.bandLook')}</Link>
     </p>
   );
 }

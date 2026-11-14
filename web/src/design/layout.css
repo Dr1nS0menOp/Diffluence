@@ -1520,6 +1520,12 @@ span.twist {
   max-inline-size: 100%;
 }
 
+/* A command to copy wraps rather than widen the area on a narrow screen. */
+.settings-area pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
 .settings-area > h1 {
   margin-block-end: var(--space-2);
 }

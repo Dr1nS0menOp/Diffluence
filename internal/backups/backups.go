@@ -184,6 +184,24 @@ func (s *Service) effective(ctx context.Context, q db.Querier, d Defaults) (time
 	return interval, keep, nil
 }
 
+// Interval is how often a backup is made: the console's schedule, or the worker's default
+// where the console left it at zero. Zero when neither is known yet, before any worker asked.
+// The health line of the backup follows it (spec 075, CSL-582).
+func (s *Service) Interval(ctx context.Context, q db.Querier) (time.Duration, error) {
+	var b settings.Backups
+	if err := s.settings.ReadSectionIn(ctx, q, settings.SectionBackups, &b); err != nil {
+		return 0, err
+	}
+	if b.IntervalHours > 0 {
+		return time.Duration(b.IntervalHours) * time.Hour, nil
+	}
+	w, err := readWorker(ctx, q)
+	if err != nil || w == nil {
+		return 0, err
+	}
+	return w.interval, nil
+}
+
 // resolve is the interval and the number kept of a backup section, with zero standing for
 // the worker's default.
 func resolve(b settings.Backups, defaultInterval time.Duration, defaultKeep int) (time.Duration, int) {

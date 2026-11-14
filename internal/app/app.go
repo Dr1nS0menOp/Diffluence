@@ -72,8 +72,9 @@ import (
 )
 
 // NewLogger returns the JSON logger used everywhere. While tracing is on, a line written with
-// a context carries the ids of its trace and span (spec 060 D9).
-func NewLogger(level slog.Level) *slog.Logger {
+// a context carries the ids of its trace and span (spec 060 D9). A server passes a
+// slog.LevelVar, so a log level for a while can change it (spec 075, CSL-571).
+func NewLogger(level slog.Leveler) *slog.Logger {
 	return slog.New(tracing.LogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 }
 
@@ -130,11 +131,20 @@ type App struct {
 	draining   atomic.Bool
 	// healthCache keeps the facts of the health checks for 30 seconds (spec 051).
 	healthCache healthCache
+	// runtime is the log level for a while and the disk thresholds, reread every few seconds.
+	runtime runtimeState
+	// startedWith is the configuration as this process read it at its start, so the console
+	// can mark what changes at the next restart (spec 075, CSL-601).
+	startedWith []config.Setting
 }
 
 // New connects to the database and queue and builds the modules.
 func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error) {
 	a := &App{cfg: cfg, log: log, witness: slog.New(alwaysEnabled{log.Handler()})}
+	a.runtime.running.Store(int64(cfg.LogLevel))
+	// The list is what this process read now; its problems already stopped a start, or
+	// show on the Configuration page, which reads them again.
+	_, a.startedWith, _ = config.Inspect(os.LookupEnv)
 	var err error
 	if a.migrations, err = db.Migrations(); err != nil {
 		return nil, err
@@ -185,6 +195,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.encrypted = storage.NewEncrypted(disk, a.keyring, a.everyFileEncrypted)
 	// New files are refused when the disk is nearly full, so the room left goes to text.
 	a.guard = storage.NewGuarded(a.encrypted)
+	a.guard.FollowRefuseLevel(func() int { return a.thresholds().DiskRefusePercent })
 	a.store = a.guard
 	a.perms = permissions.NewService(a.pool)
 	a.settings = settings.NewService(a.pool, a.store)
@@ -255,6 +266,8 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,
 			SystemStatus: a.SystemStatus, HelpersDown: a.HelpersDown, CheckAudit: a.CheckAudit, Gauges: a.Gauges, Failures: a.failures,
 			HealthChecks: a.HealthChecks, ReadyNotes: a.ReadyNotes, Backups: a.backups,
+			Installation: httpapi.Installation{Upgrades: a.UpgradeStatus, Events: a.EventsStatus, Audit: a.AuditOverview,
+				LogLevel: a.LogLevelState, StartedWith: a.startedWith, LastProbe: a.lastProbe},
 			Setup: a.setup, InstanceID: a.instanceID, Log: log, Ready: a.Ready})
 		if err != nil {
 			a.Close()
@@ -464,8 +477,9 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 		}
 	}
 
-	wg.Add(1)
+	wg.Add(2)
 	go func() { defer wg.Done(); a.heartbeat(workCtx) }()
+	go func() { defer wg.Done(); a.runRuntime(workCtx) }()
 
 	srv := &http.Server{
 		Handler:           a.Handler(),

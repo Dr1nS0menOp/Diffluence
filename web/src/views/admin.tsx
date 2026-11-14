@@ -42,6 +42,14 @@ import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } f
 import { SettingsSearch, SummaryTab } from './admin-summary';
 import { HealthBand, HealthChecks } from './admin-health';
 import { BackupsTab, ConfigurationTab, SessionsTab } from './admin-running';
+import {
+  AuditSignatures,
+  DiskThresholds,
+  EventsTab,
+  LogLevelLine,
+  MonitoringFiles,
+  UpgradesTab,
+} from './admin-installation';
 import { SettingsFrame } from '../components/settings-frame';
 import { ControlTab } from './admin-control';
 import { TableBox } from '../components/table-box';
@@ -66,6 +74,8 @@ const TABS = [
   'scim',
   'system',
   'backups',
+  'upgrades',
+  'events',
   'configuration',
   'sessions',
   'insights',
@@ -86,11 +96,13 @@ const ADMIN_GROUPS: { id: string; tabs: (typeof TABS)[number][] }[] = [
     tabs: [
       'system',
       'backups',
+      'upgrades',
       'configuration',
       'care',
       'settings',
       'mail',
       'audit',
+      'events',
       'insights',
       'analytics',
     ],
@@ -1066,6 +1078,7 @@ function AuditTab() {
             : t('admin.verifyBad', { seq: verify.data.first_bad_seq, reason: verify.data.reason })}
         </p>
       )}
+      <AuditSignatures />
       <TableBox>
         <table>
           <thead>
@@ -1139,7 +1152,7 @@ function ExampleSpaceSection() {
   );
 }
 
-function SettingsTab() {
+function SettingsTab({ me }: { me: Me }) {
   const { t } = useTranslation();
   const q = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Settings>('/admin/settings') });
   const system = useQuery({
@@ -1199,6 +1212,7 @@ function SettingsTab() {
           {t('common.save')}
         </button>
       </form>
+      <DiskThresholds isSystem={me.global_permissions.includes('system_administrator')} />
       <AppearanceSection />
       <ExampleSpaceSection />
       <h2>{t('admin.authTitle')}</h2>
@@ -1436,7 +1450,7 @@ interface System {
   trash_items: number;
 }
 
-function SystemTab() {
+function SystemTab({ me }: { me: Me }) {
   const { t } = useTranslation();
   const dates = useDates();
   const q = useQuery({
@@ -1500,6 +1514,8 @@ function SystemTab() {
           </tbody>
         </table>
       </TableBox>
+      <MonitoringFiles />
+      <LogLevelLine me={me} />
     </>
   );
 }
@@ -1542,11 +1558,13 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       {tab === 'control' && <ControlTab />}
       {tab === 'export' && <ExportTab />}
       {tab === 'audit' && <AuditTab />}
-      {tab === 'settings' && <SettingsTab />}
+      {tab === 'settings' && <SettingsTab me={me} />}
       {tab === 'mail' && <MailTab />}
       {tab === 'scim' && <ScimTab />}
-      {tab === 'system' && <SystemTab />}
+      {tab === 'system' && <SystemTab me={me} />}
       {tab === 'backups' && <BackupsTab me={me} />}
+      {tab === 'upgrades' && <UpgradesTab />}
+      {tab === 'events' && <EventsTab />}
       {tab === 'configuration' && <ConfigurationTab />}
       {tab === 'sessions' && <SessionsTab />}
       {tab === 'insights' && <InsightsTab />}
