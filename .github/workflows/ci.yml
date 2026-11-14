@@ -58,7 +58,15 @@ jobs:
       - name: vulnerabilities
         run: make vuln
       - name: tests (race detector, integration against PostgreSQL)
-        run: make test-race
+        # A job log needs a login to read, while annotations are public, so the lines that
+        # name a failing test also go out as annotations.
+        run: |
+          set +e
+          make test-race 2>&1 | tee "$RUNNER_TEMP/test-race.log"
+          status=${PIPESTATUS[0]}
+          grep -E -e '--- FAIL|^FAIL|^panic:|WARNING: DATA RACE|_test\.go:[0-9]+:' "$RUNNER_TEMP/test-race.log" \
+            | head -n 40 | sed 's/%/%25/g; s/^/::error::/'
+          exit "$status"
       - name: build
         run: make build
 
