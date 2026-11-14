@@ -16,7 +16,7 @@ import { Column, Columns, Decision, Expand, Panel, Spotlight, UnknownBlock } fro
 import { CodeBlock } from './code';
 import { Dynamic } from './dynamic/dynamic';
 import { Anchor, ChartNode, Excerpt, Media, PageFacts } from './dynamic/nodes';
-import { DateMark, Instruction, Status, TemplateField } from './inline';
+import { DateMark, Instruction, Status, TemplateField, TemplateValue } from './inline';
 import { BlockFormat, Highlight, Subscript, Superscript, TextColor } from './marks';
 import { Mention } from './people';
 import { PageCard, PageLink, PlaceholderLink } from './page-links';
@@ -126,6 +126,7 @@ export function documentExtensions({
     DateMark,
     Mention,
     TemplateField,
+    TemplateValue,
     Instruction,
     TextColor,
     Highlight,

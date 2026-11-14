@@ -11,9 +11,12 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, FilePicker, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
+import { useCapabilities } from '../capabilities';
+import { TemplatePages } from './template-pages';
 
 function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged: () => void }) {
   const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
   const update = useMutation({
     mutationFn: (x: TemplateSummary & { hidden: boolean; promoted: boolean }) =>
       api.patch(`/templates/${x.id}`, {
@@ -51,6 +54,7 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
                 <td>
                   <Link href={`/templates/${x.id}/edit`}>{x.name}</Link>
                   {x.hidden && <span className="muted"> {t('templates.hidden')}</span>}
+                  {x.guided && !guidedOn && <span className="muted"> ({t('templates.needsGuided')})</span>}
                 </td>
                 <td>{x.category}</td>
                 <td className="row">
@@ -158,6 +162,7 @@ export function TemplatesView({ spaceKey }: { spaceKey: string }) {
 
 function TemplateForm({ template }: { template: TemplateSummary }) {
   const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
   const client = useQueryClient();
   const [form, setForm] = useState({
     name: template.name,
@@ -229,6 +234,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         onSave={() => save.mutate()}
         header={null}
       />
+      {guidedOn && <TemplatePages templateId={template.id} />}
     </>
   );
 }

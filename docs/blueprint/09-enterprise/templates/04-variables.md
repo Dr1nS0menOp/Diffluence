@@ -7,7 +7,7 @@ A **variable** is a named value that a template uses in more than one place. Dif
 ## 4.1 Kinds of variable
 
 - **TPL-200** · built · **Answers.** Each field of the form is a variable with the field's name. Fields with the same name share one answer (ORG-050). *Proof:* existing tests of `FillFields`.
-- **TPL-201** · new · **Built-in values**, the same in every entry of a set:
+- **TPL-201** · built · **Built-in values**, the same in every entry of a set:
 
   | Value | What it holds |
   |---|---|
@@ -22,18 +22,18 @@ A **variable** is a named value that a template uses in more than one place. Dif
   - `creator` as a mention does not notify the creator.
 
   *Proof:* a table test for each value; a test that `date` comes from the database.
-- **TPL-202** · new · **Links to entries** (TPL-110) are variables whose value is the page made from an entry. *Proof:* see TPL-110.
+- **TPL-202** · built · **Links to entries** (TPL-110) are variables whose value is the page made from an entry. *Proof:* see TPL-110.
 - **TPL-203** · new · There are **no computed variables**: no arithmetic, no joining of text, no "start date plus two weeks" written as a formula. *Why:* a formula is a small language, and this feature has none (TPL-1405). The one common need, a date relative to another, is met by the date field's default (TPL-304), which offers fixed choices. *Proof:* nothing to test; listed in chapter 14 (TPL-1201).
 
 ## 4.2 Where variables can be used
 
-- **TPL-210** · new · Variables can be used in:
+- **TPL-210** · partly · Variables can be used in:
   - the **title pattern** of every entry, written as `{name}`;
   - the **text** of every entry, as a block inserted from `/`;
   - the **labels** of an entry, through a label rule (TPL-423).
 
   They cannot be used in restrictions (TPL-131), in file names, or in the template's own name. *Why:* each place listed is one where people asked for the value in the situations of chapter 02; the others would widen what a form answer can do. *Proof:* tests for each place.
-- **TPL-211** · new · In the text, an answer is placed by today's `templateField` block, which shows a dashed box while editing (design standard). A built-in value or a link to an entry is placed by a new inline block, `templateValue`, with a source (`date`, `space`, `creator`, `set`, `template` or `entry:<key>`). *Why:* a field is something the form asks; a value is something the template knows. Keeping them apart keeps the form honest about what it asks. *Edge cases:* `Normalize` lets `templateValue` through only in templates, like `templateField` and `instruction` (spec 011). A page draft or a published page that contains one is refused, so a leftover can never reach a reader. *Proof:* a test that a page cannot be published with a `templateValue`, and a mutation that lets one through must be caught.
+- **TPL-211** · built · In the text, an answer is placed by today's `templateField` block, which shows a dashed box while editing (design standard). A built-in value or a link to an entry is placed by a new inline block, `templateValue`, with a source (`date`, `space`, `creator`, `set`, `template` or `entry:<key>`). *Why:* a field is something the form asks; a value is something the template knows. Keeping them apart keeps the form honest about what it asks. *Edge cases:* `Normalize` lets `templateValue` through only in templates, like `templateField` and `instruction` (spec 011). A page draft or a published page that contains one is refused, so a leftover can never reach a reader. *Proof:* a test that a page cannot be published with a `templateValue`, and a mutation that lets one through must be caught.
 - **TPL-212** · new · The value placed depends on the field's kind (chapter 05):
 
   | Kind | What lands in the page |
@@ -52,13 +52,13 @@ A **variable** is a named value that a template uses in more than one place. Dif
 
 ## 4.3 Scope
 
-- **TPL-220** · new · The scope of a variable is **one use of one template**. The same name means the same value in every entry of the set, and nothing outside it. *Why:* sharing across the set is the reason sets exist (TPL-012). Sharing beyond a set would need a store of values with its own rights and lifetime. *Proof:* a test that a name used in three entries has one value in all three.
-- **TPL-221** · new · Variables are defined **per template**. There is no shared library of variables across templates or for the instance (decided, TPL-1419). *Why:* a library would need its own rights, versions and approval, and the situations of chapter 02 do not need one. Templating.app's documentation mentions no shared library either; other tracker apps offer one in a paid edition. *Proof:* listed in chapter 14 (TPL-1206).
-- **TPL-222** · new · A variable's value is **fixed when the set is made**. A page does not change when the person mentioned leaves, or when the space is renamed. *Why:* a page is a record of what was true when it was written. Live values are what dynamic blocks are for (BLK). *Proof:* a test that renaming the space later does not change a page made with `{space}`.
+- **TPL-220** · built · The scope of a variable is **one use of one template**. The same name means the same value in every entry of the set, and nothing outside it. *Why:* sharing across the set is the reason sets exist (TPL-012). Sharing beyond a set would need a store of values with its own rights and lifetime. *Proof:* a test that a name used in three entries has one value in all three.
+- **TPL-221** · built · Variables are defined **per template**. There is no shared library of variables across templates or for the instance (decided, TPL-1419). *Why:* a library would need its own rights, versions and approval, and the situations of chapter 02 do not need one. Templating.app's documentation mentions no shared library either; other tracker apps offer one in a paid edition. *Proof:* listed in chapter 14 (TPL-1206).
+- **TPL-222** · built · A variable's value is **fixed when the set is made**. A page does not change when the person mentioned leaves, or when the space is renamed. *Why:* a page is a record of what was true when it was written. Live values are what dynamic blocks are for (BLK). *Proof:* a test that renaming the space later does not change a page made with `{space}`.
 
 ## 4.4 Names
 
-- **TPL-230** · new · A field's **name** is what the form shows as its label and what the title pattern uses. It must be unique in the template, ignoring case, and at most 100 bytes, as today. The editor refuses two fields that differ only in case. *Edge cases:*
+- **TPL-230** · partly · A field's **name** is what the form shows as its label and what the title pattern uses. It must be unique in the template, ignoring case, and at most 100 bytes, as today. The editor refuses two fields that differ only in case. *Edge cases:*
   - renaming a field in the template's editor renames every use in every entry, every title pattern and every condition, as one change and one new version. A rename never leaves a condition pointing at nothing;
   - the names `date`, `space`, `creator`, `set` and `template` are reserved for built-in values. A template from before this feature that has a field with one of those names keeps working: its field wins in its own title pattern, as `ExpandTitle` does today, and the editor asks for a new name at the next save.
 

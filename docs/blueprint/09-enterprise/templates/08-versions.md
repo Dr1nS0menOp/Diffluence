@@ -6,7 +6,7 @@ Today each save of a template's text is a version of its hidden page, but the re
 
 ## 8.1 What a version is
 
-- **TPL-600** · new · A **template version** is a numbered, unchangeable snapshot, called a **manifest**, of everything that decides what the template makes:
+- **TPL-600** · built · A **template version** is a numbered, unchangeable snapshot, called a **manifest**, of everything that decides what the template makes:
   - the entries and their order;
   - for each entry, its hidden page and **the page version number** of its text;
   - the title patterns, labels, label rules, restrictions and workflows;
@@ -22,7 +22,7 @@ Today each save of a template's text is a version of its hidden page, but the re
   - a test that every part listed above changes the version;
   - a test that the name does not;
   - a test that an old manifest still gives the old text.
-- **TPL-601** · new · A version is never changed or deleted while the template exists. Deleting a template deletes its versions, its hidden pages and its approvals, as today, and the pages made from it keep their origin record with "template deleted" (TPL-612). *Proof:* a test.
+- **TPL-601** · built · A version is never changed or deleted while the template exists. Deleting a template deletes its versions, its hidden pages and its approvals, as today, and the pages made from it keep their origin record with "template deleted" (TPL-612). *Proof:* a test.
 - **TPL-602** · new · The **history** of a template lists each version with:
   - its number, author, time and state (draft, waiting, approved, sent back, superseded);
   - who decided and why.
@@ -35,7 +35,7 @@ Today each save of a template's text is a version of its hidden page, but the re
 
 ## 8.2 Using a version
 
-- **TPL-603** · new · Opening the form **binds** it to the version it shows: the approved version, or the owner's draft when the owner tries it. Submitting makes pages from that version, even if a newer one was approved in between. *Edge cases:*
+- **TPL-603** · partly · Opening the form **binds** it to the version it shows: the approved version, or the owner's draft when the owner tries it. Submitting makes pages from that version, even if a newer one was approved in between. *Edge cases:*
   - a version that is withdrawn (TPL-524), or a template the person is no longer allowed to use (TPL-503), refuses the submit with a message and a way to start again;
   - a form left open for more than 24 hours asks the person to start again, because the dry run (TPL-341) may no longer be what would happen.
 
@@ -44,7 +44,7 @@ Today each save of a template's text is a version of its hidden page, but the re
 
 ## 8.3 Pages made from an older version
 
-- **TPL-610** · new · Every page made from a template records its **origin** in `page_template_origin`:
+- **TPL-610** · built · Every page made from a template records its **origin** in `page_template_origin`:
   - the set;
   - the template;
   - the template version;

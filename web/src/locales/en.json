@@ -2858,7 +2858,28 @@
     "kind_text": "Several lines",
     "kind_choice": "A choice",
     "fieldOptions": "Choices",
-    "fieldOptionsHelp": "One choice per line."
+    "fieldOptionsHelp": "One choice per line.",
+    "valueEntry": "A page of this set",
+    "value": {
+      "date": "Today's date",
+      "space": "Name of the space",
+      "creator": "Who makes the pages",
+      "set": "First page of the set",
+      "template": "Name of the template"
+    },
+    "pages": "Pages this template makes",
+    "pagesHelp": "Using the template makes all of these pages at once, or none of them.",
+    "firstPage": "First page",
+    "addPage": "Add a page",
+    "pageName": "Name of the page",
+    "below": "Below",
+    "removePage": "Remove",
+    "editText": "Write its text",
+    "writing": "Writing the text of {{name}}",
+    "publishAtOnce": "Publish the pages as they are made",
+    "publishAtOnceHelp": "Otherwise each page starts as an unpublished draft of whoever uses the template.",
+    "needsGuided": "needs guided templates",
+    "setQueued": "The pages are being made in the background. You can close this window; the list of your jobs shows when they are ready."
   },
   "spaceSettings": {
     "groupGeneral": "General",
@@ -3273,7 +3294,8 @@
     "part_databases": "Databases",
     "part_bundles": "Bundles between instances",
     "part_console_restore": "Restore from the console",
-    "part_publishing": "Draft and published spaces"
+    "part_publishing": "Draft and published spaces",
+    "part_guided_templates": "Guided templates: sets of pages from one template"
   },
   "exchange": {
     "export": "Export",

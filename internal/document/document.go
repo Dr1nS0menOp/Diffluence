@@ -77,6 +77,7 @@ const (
 	TypeDate           = "date"
 	TypeTemplateField  = "templateField"
 	TypeInstruction    = "instruction"
+	TypeTemplateValue  = "templateValue"
 	TypeMention        = "mention"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
@@ -101,7 +102,7 @@ const (
 
 var (
 	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard, TypeSpotlight, TypeUnknownBlock}
-	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink, TypeInlineImage}
+	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeTemplateValue, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink, TypeInlineImage}
 )
 
 // children says which node types may appear inside each node type.
@@ -132,6 +133,7 @@ var children = map[string][]string{
 	TypeDate:            {},
 	TypeTemplateField:   {},
 	TypeInstruction:     {},
+	TypeTemplateValue:   {},
 	TypeMention:         {},
 	TypeDynamic:         {},
 	TypePageFacts:       {TypeTable},

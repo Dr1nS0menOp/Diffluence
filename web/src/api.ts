@@ -429,9 +429,43 @@ export interface TemplateSummary {
   starter: boolean;
   favourite: boolean;
   version: number;
+  /** Uses a part of guided templates, offered only while that part is on (spec 074). */
+  guided: boolean;
+  /** The template version a form opened on this answer is bound to (TPL-603). */
+  template_version: number;
   fields?: TemplateField[];
   document?: Json;
 }
+
+/** Who a page made from an entry of a template is restricted to (spec 074, TPL-130). */
+export interface EntryRestrictions {
+  view: { type: 'user' | 'group'; id: string }[];
+  edit: { type: 'user' | 'group'; id: string }[];
+}
+
+/** One page a guided template makes (spec 074, TPL-100). */
+export interface TemplateEntry {
+  key: string;
+  name: string;
+  kind: 'page' | 'folder';
+  parent: string;
+  title_pattern: string;
+  labels: string[];
+  restrictions: EntryRestrictions;
+  workflow_id: string | null;
+  document?: Json;
+}
+
+/** The pages a template makes, as its newest version says. */
+export interface TemplateEntries {
+  version: number;
+  publish: boolean;
+  default_parent: string | null;
+  entries: TemplateEntry[];
+}
+
+/** What making pages from a template answers: the set, or the job that makes a large one. */
+export type SetOutcome = { kind: 'made'; page: Page; set_id: string } | { kind: 'queued'; job_id: string };
 
 export interface ContentRow {
   id: string;

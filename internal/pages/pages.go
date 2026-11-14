@@ -228,6 +228,8 @@ func recordEvent(ctx context.Context, tx pgx.Tx, c identity.Caller, action strin
 
 // newPage is a row to add.
 type newPage struct {
+	// id is made beforehand when links must point to the page before it exists (TPL-111).
+	id      uuid.UUID
 	spaceID uuid.UUID
 	parent  *uuid.UUID
 	title   string
@@ -239,7 +241,10 @@ type newPage struct {
 // insert adds a page row and its closure rows, at the end of its siblings. Kinds
 // outside the tree take no position, or they would leave gaps between pages.
 func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, in newPage) (Page, error) {
-	id := ids.New()
+	id := in.id
+	if id == uuid.Nil {
+		id = ids.New()
+	}
 	if in.kind == "" {
 		in.kind = KindPage
 	}

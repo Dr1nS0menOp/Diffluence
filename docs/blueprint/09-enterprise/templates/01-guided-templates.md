@@ -91,7 +91,7 @@ What is missing is everything in chapters 03 to 13:
 
 ## 1.2 Experimental, and off by default
 
-- **TPL-050** · new · Guided templates are an **experimental part** under ADR-043, named `guided_templates` in the `experimental` setting of spec 069. The part is off on a new installation and off after an upgrade. An administrator turns it on in Administration, Organising, "Experimental parts" (decided, TPL-1401).
+- **TPL-050** · built · Guided templates are an **experimental part** under ADR-043, named `guided_templates` in the `experimental` setting of spec 069. The part is off on a new installation and off after an upgrade. An administrator turns it on in Administration, Organising, "Experimental parts" (decided, TPL-1401).
 
   *Why:*
   - ADR-043 freezes new parts before 1.0, and makes optional parts experimental and off by default.

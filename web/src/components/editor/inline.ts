@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // Small items that sit in a line of text: status marks and dates.
 import { mergeAttributes, Node as DocumentNode, nodeInputRule } from '@tiptap/core';
+import i18n from '../../i18n';
 
 /** Today in the reader's own calendar, as stored: a date has no time zone. */
 export function today(now = new Date()): string {
@@ -91,6 +92,47 @@ export const TemplateField = DocumentNode.create({
   },
   renderText({ node }) {
     return node.attrs.name as string;
+  },
+});
+
+/** Words for what a template value stands for, while the template is being written. */
+export function templateValueLabel(source: string): string {
+  if (source.startsWith('entry:')) return i18n.t('templates.valueEntry');
+  const known = ['date', 'space', 'creator', 'set', 'template'];
+  return known.includes(source) ? i18n.t(`templates.value.${source}`) : source;
+}
+
+/**
+ * Something a template knows without asking: the date, the space, the creator, the set or
+ * a page of the set (spec 074, TPL-211). Making a page fills it in; it never reaches a
+ * reader, so it has the look of a field.
+ */
+export const TemplateValue = DocumentNode.create({
+  name: 'templateValue',
+  group: 'inline',
+  inline: true,
+  atom: true,
+  addAttributes() {
+    return {
+      source: {
+        default: 'date',
+        parseHTML: (el: HTMLElement) => el.getAttribute('data-value'),
+        renderHTML: (attrs: Record<string, string>) => ({ 'data-value': attrs.source }),
+      },
+    };
+  },
+  parseHTML() {
+    return [{ tag: 'span[data-value]' }];
+  },
+  renderHTML({ HTMLAttributes, node }) {
+    return [
+      'span',
+      mergeAttributes(HTMLAttributes, { class: 'template-field' }),
+      templateValueLabel(node.attrs.source as string),
+    ];
+  },
+  renderText({ node }) {
+    return templateValueLabel(node.attrs.source as string);
   },
 });
 

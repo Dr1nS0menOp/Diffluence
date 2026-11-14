@@ -108,6 +108,7 @@ var tableOwners = map[string]string{
 	"attachment_labels":   "internal/attachments",
 	"attachment_refs":     "internal/attachments",
 	"attachment_events":   "internal/attachments",
+	"pending_file_copies": "internal/attachments",
 	"storage_deletions":   "internal/storage",
 
 	// working together.
@@ -127,13 +128,17 @@ var tableOwners = map[string]string{
 	"saved_blocks":         "internal/savedblocks",
 
 	// templates, search, trash.
-	"templates":           "internal/templates",
-	"template_favourites": "internal/templates",
-	"template_uses":       "internal/templates",
-	"space_templates":     "internal/templates",
-	"search_documents":    "internal/search",
-	"search_pages":        "internal/search",
-	"trash_items":         "internal/trash",
+	"templates":            "internal/templates",
+	"template_favourites":  "internal/templates",
+	"template_uses":        "internal/templates",
+	"space_templates":      "internal/templates",
+	"template_versions":    "internal/templates",
+	"template_entry_pages": "internal/templates",
+	"template_sets":        "internal/templates",
+	"page_template_origin": "internal/templates",
+	"search_documents":     "internal/search",
+	"search_pages":         "internal/search",
+	"trash_items":          "internal/trash",
 
 	// exchange and public sites.
 	"export_runs":        "internal/exchange",
@@ -222,7 +227,7 @@ var crossings = map[crossing]int{
 	{"internal/attachments", "drafts"}:            1,
 	{"internal/attachments", "pages"}:             6,
 	{"internal/attachments", "spaces"}:            4,
-	{"internal/attachments", "storage_deletions"}: 5,
+	{"internal/attachments", "storage_deletions"}: 6,
 	{"internal/attachments", "users"}:             5,
 
 	// automation: a rule matches pages, labels, groups and grants, and its runs name people.

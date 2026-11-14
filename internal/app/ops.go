@@ -48,6 +48,16 @@ func (a *App) maxMigration() int {
 	return 0
 }
 
+// olderReleaseRuns says whether a live node knows fewer migrations than this one: a
+// previous release still running beside it during an upgrade (spec 074, TPL-1103).
+func (a *App) olderReleaseRuns(ctx context.Context) (bool, error) {
+	var older bool
+	err := a.pool.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM nodes
+		WHERE last_seen_at > now() - make_interval(secs => $1) AND max_migration < $2)`,
+		nodeLiveWindow.Seconds(), a.maxMigration()).Scan(&older)
+	return older, err
+}
+
 // RegisterNode records this process in the node registry.
 func (a *App) RegisterNode(ctx context.Context) error {
 	if a.nodeID == [16]byte{} {

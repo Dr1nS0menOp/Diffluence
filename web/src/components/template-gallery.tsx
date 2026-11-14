@@ -3,7 +3,14 @@
 import { useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Page, type Space, type TemplateField, type TemplateSummary } from '../api';
+import {
+  api,
+  type Page,
+  type SetOutcome,
+  type Space,
+  type TemplateField,
+  type TemplateSummary,
+} from '../api';
 import { navigate } from '../router';
 import { DocumentView } from './editor/editor';
 import { Dialog, ErrorNote, Field, Loading } from './ui';
@@ -68,21 +75,40 @@ export function stepsOf(template: TemplateSummary): { title: string; fields: Tem
 export const templateFileAddress = (templateId: string) => (fileId: string) =>
   `/api/v1/templates/${templateId}/files/${fileId}`;
 
-/** Makes the page. An empty page that was waiting for a template makes way for it. */
+/**
+ * Makes the page, or the set of pages of a guided template. An empty page that was waiting
+ * for a template makes way for it in the same step on the server (spec 074, TPL-122). A
+ * guided template is bound to the version the form showed and to a key made when the form
+ * opened, so a second press makes no second set (TPL-123, TPL-603).
+ */
 async function startPage(
   template: TemplateSummary,
   space: Space,
   parent: string | null,
   answers: Record<string, string>,
+  requestKey: string,
   replaces?: string,
-) {
-  const made = await api.post<{ page: Page }>(`/templates/${template.id}/use`, {
-    space_id: space.id,
-    parent_id: parent,
-    answers,
-  });
-  if (replaces) await api.del(`/pages/${replaces}`);
+): Promise<SetOutcome> {
+  const body = { space_id: space.id, parent_id: parent, answers, replaces: replaces ?? null };
+  const made = template.guided
+    ? await api.post<{ page?: Page; set_id?: string; job_id?: string }>(`/templates/${template.id}/sets`, {
+        ...body,
+        version: template.template_version,
+        request_key: requestKey,
+      })
+    : await api.post<{ page?: Page; set_id?: string; job_id?: string }>(
+        `/templates/${template.id}/use`,
+        body,
+      );
+  if (made.job_id) return { kind: 'queued', job_id: made.job_id };
+  if (!made.page) throw new Error('no page');
   navigate(`/pages/${made.page.id}/edit`);
+  return { kind: 'made', page: made.page, set_id: made.set_id ?? '' };
+}
+
+/** A key for one opening of a form. */
+function newRequestKey(): string {
+  return crypto.randomUUID();
 }
 
 function TemplateForm({
@@ -103,13 +129,30 @@ function TemplateForm({
   const { t } = useTranslation();
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [step, setStep] = useState(0);
+  const [requestKey] = useState(newRequestKey);
   const steps = stepsOf(template);
   const current = steps[step];
   const last = step === steps.length - 1;
   const use = useMutation({
-    mutationFn: () => startPage(template, space, parent, answers, replaces),
-    onSuccess: onClose,
+    mutationFn: () => startPage(template, space, parent, answers, requestKey, replaces),
+    onSuccess: (outcome) => {
+      if (outcome.kind === 'made') onClose();
+    },
   });
+  if (use.data?.kind === 'queued') {
+    return (
+      <>
+        <p role="status" className="note">
+          {t('templates.setQueued')}
+        </p>
+        <div className="dialog-actions">
+          <button type="button" className="primary" onClick={onClose}>
+            {t('common.close')}
+          </button>
+        </div>
+      </>
+    );
+  }
   return (
     <form
       onSubmit={(e: FormEvent) => {
@@ -179,6 +222,7 @@ export function TemplateGallery({
   const [filter, setFilter] = useState('');
   const [marked, setMarked] = useState(0);
   const [chosen, setChosen] = useState<TemplateSummary | null>(null);
+  const [queued, setQueued] = useState(false);
   const list = useQuery({
     queryKey: ['gallery', space.id],
     queryFn: () => api.get<{ templates: TemplateSummary[] }>(`/spaces/${space.id}/templates`),
@@ -201,8 +245,9 @@ export function TemplateGallery({
         setChosen(full);
         return;
       }
-      await startPage(full, space, parent, {}, replaces);
-      onClose();
+      const outcome = await startPage(full, space, parent, {}, newRequestKey(), replaces);
+      if (outcome.kind === 'made') onClose();
+      else setQueued(true);
     },
   });
   const keys = (e: KeyboardEvent) => {
@@ -233,6 +278,11 @@ export function TemplateGallery({
   return (
     <Dialog title={t('organise.gallery')} onClose={onClose} wide>
       <ErrorNote error={list.error ?? start.error} />
+      {queued && (
+        <p role="status" className="note">
+          {t('templates.setQueued')}
+        </p>
+      )}
       <div className="gallery">
         <div>
           <input

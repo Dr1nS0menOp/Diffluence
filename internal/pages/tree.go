@@ -6,6 +6,7 @@ import (
 	"context"
 	"slices"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -373,43 +374,50 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 		if err := lockTree(ctx, tx, p.SpaceID); err != nil {
 			return err
 		}
-		var isHome bool
-		if err := tx.QueryRow(ctx, "SELECT home_page_id IS NOT DISTINCT FROM $2 FROM spaces WHERE id = $1", p.SpaceID, id).Scan(&isHome); err != nil {
-			return err
-		}
-		if isHome {
-			return apperr.Conflict("home_page", "The home page of a space cannot be deleted.")
-		}
-		rows, err := tx.Query(ctx, `SELECT p.id FROM pages p JOIN page_tree t ON t.descendant_id = p.id
-			WHERE t.ancestor_id = $1 AND p.status <> 'trashed'`, id)
-		if err != nil {
-			return err
-		}
-		tree, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
-		if err != nil {
-			return err
-		}
-		for _, page := range tree {
-			d, err := s.perms.CheckPage(ctx, tx, c.UserID, page, permissions.ActionPageDelete, uuid.Nil)
-			if err != nil {
-				return err
-			}
-			if !d.Allowed {
-				return apperr.Conflict("contains_protected_pages",
-					"This page has pages below it that you cannot delete. Move them away or ask a space admin.")
-			}
-		}
-		item, err := trash.Add(ctx, tx, trash.Item{SpaceID: p.SpaceID, ObjectType: trash.TypePage, ObjectID: id,
-			Title: p.Title, DeletedBy: c.UserID}, retention)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `UPDATE pages SET pre_trash_status = status, status = 'trashed', trash_item_id = $2, updated_at = now()
-			WHERE id = ANY($1)`, tree, item); err != nil {
-			return err
-		}
-		return record(ctx, tx, c, "page.trashed", p, map[string]any{"pages": len(tree)})
+		return s.trashTree(ctx, tx, c, p, retention)
 	})
+}
+
+// trashTree sends a page and everything below it to the trash, inside tx. The caller has
+// checked page.delete on the page and holds the tree lock of its space.
+func (s *Service) trashTree(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, retention time.Duration) error {
+	id := p.ID
+	var isHome bool
+	if err := tx.QueryRow(ctx, "SELECT home_page_id IS NOT DISTINCT FROM $2 FROM spaces WHERE id = $1", p.SpaceID, id).Scan(&isHome); err != nil {
+		return err
+	}
+	if isHome {
+		return apperr.Conflict("home_page", "The home page of a space cannot be deleted.")
+	}
+	rows, err := tx.Query(ctx, `SELECT p.id FROM pages p JOIN page_tree t ON t.descendant_id = p.id
+		WHERE t.ancestor_id = $1 AND p.status <> 'trashed'`, id)
+	if err != nil {
+		return err
+	}
+	tree, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	if err != nil {
+		return err
+	}
+	for _, page := range tree {
+		d, err := s.perms.CheckPage(ctx, tx, c.UserID, page, permissions.ActionPageDelete, uuid.Nil)
+		if err != nil {
+			return err
+		}
+		if !d.Allowed {
+			return apperr.Conflict("contains_protected_pages",
+				"This page has pages below it that you cannot delete. Move them away or ask a space admin.")
+		}
+	}
+	item, err := trash.Add(ctx, tx, trash.Item{SpaceID: p.SpaceID, ObjectType: trash.TypePage, ObjectID: id,
+		Title: p.Title, DeletedBy: c.UserID}, retention)
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE pages SET pre_trash_status = status, status = 'trashed', trash_item_id = $2, updated_at = now()
+		WHERE id = ANY($1)`, tree, item); err != nil {
+		return err
+	}
+	return record(ctx, tx, c, "page.trashed", p, map[string]any{"pages": len(tree)})
 }
 
 // Restore implements trash.Handler.

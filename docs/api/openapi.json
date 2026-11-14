@@ -11361,6 +11361,159 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/entries": {
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/entries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      },
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/entries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/entries/{key}": {
+      "delete": {
+        "operationId": "delete /api/v1/templates/{id}/entries/{key}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      },
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/entries/{key}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      },
+      "patch": {
+        "operationId": "patch /api/v1/templates/{id}/entries/{key}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/export": {
       "get": {
         "operationId": "get /api/v1/templates/{id}/export",
@@ -11475,9 +11628,117 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/publishing": {
+      "put": {
+        "operationId": "put /api/v1/templates/{id}/publishing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/sets": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/sets",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/sets/check": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/sets/check",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/use": {
       "post": {
         "operationId": "post /api/v1/templates/{id}/use",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/versions": {
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/versions",
         "parameters": [
           {
             "in": "path",

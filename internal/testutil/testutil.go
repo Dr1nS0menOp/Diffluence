@@ -29,7 +29,7 @@ type TestDB struct {
 // AllExperimentalOn is the stored value that turns every experimental part on (spec 069).
 // It is written out here because the features package, which owns the names, sits above
 // this one; a test in features keeps the two equal.
-const AllExperimentalOn = `{"on": ["automation", "bundles", "console_restore", "databases", "publishing"]}`
+const AllExperimentalOn = `{"on": ["automation", "bundles", "console_restore", "databases", "guided_templates", "publishing"]}`
 
 // Database creates a migrated database with every experimental part on, and drops it
 // after the test. The suites test each part itself, so they start with it on; the

@@ -4,16 +4,16 @@ How to read this chapter: see [01-guided-templates.md](01-guided-templates.md).
 
 Teams already use templates: their own, the ten starters, space templates, and the automation action that makes a page from a template. This feature must not break any of them, must not change what a person sees in the gallery without an administrator's choice, and must run beside the previous release on the same database during an upgrade. The upgrade machinery applies as always: expand and contract migrations, the one-day grace of wave O2, and the backup rule of ADR-040 and ADR-042.
 
-- **TPL-1100** · new · The migrations are **expand only**. They add:
+- **TPL-1100** · built · The migrations are **expand only**. They add:
   - `template_versions`, `template_rights`, `template_spaces`, `template_reviews`, `template_sets`, `page_template_origin` and the pending copies of TPL-821;
   - nullable or defaulted columns on `templates` (`owner_id`, `state` defaulting to approved, `approved_version`);
   - the permission `template.propose` (TPL-061);
   - the space and instance setting of TPL-511.
 
   Nothing is renamed or dropped. *Why:* the upgrade promise of blueprint 07: the previous release keeps working on the new schema. *Proof:* the upgrade test across the release; today's template tests run unchanged after the migration.
-- **TPL-1101** · new · Every template that exists is **Approved**, owned by its creator (`created_by`), with **version 1** made from its current row and the current version of its hidden page (TPL-620). The starters are approved and keep their keys. *Why:* what people can use today, they can use tomorrow. *Proof:* a test that the gallery of every space lists the same templates, in the same order, before and after.
+- **TPL-1101** · built · Every template that exists is **Approved**, owned by its creator (`created_by`), with **version 1** made from its current row and the current version of its hidden page (TPL-620). The starters are approved and keep their keys. *Why:* what people can use today, they can use tomorrow. *Proof:* a test that the gallery of every space lists the same templates, in the same order, before and after.
 - **TPL-1102** · new · `template.propose` goes to every role that holds `page.create`, so no one loses anything (decided, TPL-1410), with the migration proof of wave PM. *Proof:* the adoption test, which shows that no decision changes except the new permission.
-- **TPL-1103** · new · The **previous release**, running beside the new one during the grace period, knows nothing of manifests, sets, new field kinds or conditions. If it met a guided template, it would drop what it does not know: unknown field kinds fall back to one-line fields (`fieldKinds`), and unknown blocks are lost on save. Two rules keep it from meeting one:
+- **TPL-1103** · built · The **previous release**, running beside the new one during the grace period, knows nothing of manifests, sets, new field kinds or conditions. If it met a guided template, it would drop what it does not know: unknown field kinds fall back to one-line fields (`fieldKinds`), and unknown blocks are lost on save. Two rules keep it from meeting one:
   - the experimental part starts **off** after the upgrade (TPL-050);
   - turning it on is **refused while the grace period** of the upgrade that brought this feature is running, with a message that says when it can be turned on.
 

@@ -78,6 +78,9 @@ test('databases off in the console are offered nowhere, and on again they are ba
   // The box follows the server, so it changes once the answer is back.
   await databases.click();
   await expect(databases).not.toBeChecked();
+  // The click scrolls the page, and a row can then sit under the sticky top bar, where axe
+  // measures its box against the search field. Measure the screen as it rests.
+  await page.evaluate(() => window.scrollTo(0, 0));
   await checkAccessibility(page);
   try {
     await page.goto(`/spaces/${space.key}`);

@@ -14,7 +14,6 @@ import (
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -66,77 +65,6 @@ func (s *Service) UsableParent(ctx context.Context, c identity.Caller, parent *u
 		return nil
 	}
 	return parent
-}
-
-// TemplateStart is a page to begin from a template.
-type TemplateStart struct {
-	SpaceID      uuid.UUID
-	ParentID     *uuid.UUID
-	Title        string
-	TemplatePage uuid.UUID
-	Document     document.Node
-	Labels       []string
-}
-
-// StartFromTemplate makes an unpublished page with a draft. It answers with the
-// labels a fixed list of the space left out.
-func (s *Service) StartFromTemplate(ctx context.Context, c identity.Caller, in TemplateStart) (Page, []string, error) {
-	title := in.Title
-	if title != "" {
-		clean, err := cleanTitle(title)
-		if err != nil {
-			return Page{}, nil, err
-		}
-		title = clean
-	}
-	var out Page
-	skipped := []string{}
-	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		if err := s.perms.RequireSpace(ctx, tx, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {
-			return err
-		}
-		if err := lockTree(ctx, tx, in.SpaceID); err != nil {
-			return err
-		}
-		if in.ParentID != nil {
-			if err := s.checkParent(ctx, tx, c, placement{spaceID: in.SpaceID, parent: *in.ParentID, kind: KindPage}); err != nil {
-				return err
-			}
-		}
-		var err error
-		if out, err = s.insert(ctx, tx, c, newPage{spaceID: in.SpaceID, parent: in.ParentID, title: title, author: c.UserID}); err != nil {
-			return err
-		}
-		mapping, err := s.attachments.CopyAll(ctx, tx, c, in.TemplatePage, out.ID, in.SpaceID)
-		if err != nil {
-			return err
-		}
-		doc := in.Document
-		document.RemapAttachments(&doc, mapping)
-		raw, err := document.Marshal(doc)
-		if err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, `INSERT INTO drafts (page_id, user_id, title, document, schema_version, base_version)
-			VALUES ($1, $2, $3, $4, $5, 0)`, out.ID, c.UserID, title, raw, document.SchemaVersion); err != nil {
-			return err
-		}
-		for _, label := range in.Labels {
-			refused, err := labels.Refused(ctx, tx, in.SpaceID, label)
-			if err != nil {
-				return err
-			}
-			if refused {
-				skipped = append(skipped, label)
-				continue
-			}
-			if err := addLabel(ctx, tx, c, out, label); err != nil {
-				return err
-			}
-		}
-		return nil
-	})
-	return out, skipped, err
 }
 
 // RequireRoomForFiles refuses at once when the files of a page would not fit in a space,

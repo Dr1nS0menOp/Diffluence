@@ -197,7 +197,25 @@ async function addComment(page: Page, pageId: string, data: object) {
 async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
   await page.evaluate(() => document.fonts.ready);
+  await placeSpaceStrip(page);
   await expect(page).toHaveScreenshot(`${name}.png`, { mask });
+}
+
+/**
+ * Scrolls the space strip again as the app does, now that the fixed font has changed the width
+ * of its chips. The app scrolled it with the font it had at load, so without this the strip
+ * stood wherever that earlier font had put it, and a picture changed from run to run.
+ */
+async function placeSpaceStrip(page: Page) {
+  await page.evaluate(() => {
+    const list = document.querySelector<HTMLElement>('.space-strip ul');
+    const chip = list?.querySelector('[aria-current]');
+    if (!list || !chip) return;
+    list.scrollLeft = 0;
+    const box = list.getBoundingClientRect();
+    const place = chip.getBoundingClientRect();
+    if (place.right > box.right) list.scrollLeft += place.right - box.right;
+  });
 }
 
 /** Gives every match the same text, so a time cannot change the width of what holds it. */
@@ -1135,6 +1153,26 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.locator('.template-field')).toBeVisible();
     await expect(page.locator('.instruction')).toBeVisible();
     await picture(page, 'template');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('TemplatePages: the pages a guided template makes', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const entries = `/api/v1/templates/${templateId}/entries`;
+    const add = async (name: string, parent: string) => {
+      const made = await page.request.post(entries, { data: { name, parent, kind: 'page' } });
+      expect(made.status(), await made.text()).toBe(201);
+      return ((await made.json()) as { key: string }).key;
+    };
+    const equipment = await add('Equipment', 'root');
+    await add('Laptop and badge', equipment);
+    await add('First week', 'root');
+    await page.goto(`/templates/${templateId}/edit`);
+    const pages = page.getByRole('region', { name: 'Pages this template makes' });
+    await expect(pages.getByRole('cell', { name: 'Laptop and badge' })).toBeVisible();
+    await pages.scrollIntoViewIfNeeded();
+    await picture(page, 'template-pages');
     await checkAccessibility(page);
     await page.context().close();
   });

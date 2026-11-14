@@ -51,6 +51,8 @@ type Instance struct {
 type Service struct {
 	pool     *pgxpool.Pool
 	settings *settings.Service
+	// olderReleaseRuns says whether a node of a previous release is still alive.
+	olderReleaseRuns func(context.Context) (bool, error)
 }
 
 // NewService creates the service.

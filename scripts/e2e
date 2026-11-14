@@ -37,7 +37,7 @@ fi
 echo 'correct horse battery staple' | /tmp/diffluence user create-admin --email admin@example.com --name Admin >/dev/null
 # Every experimental part on (spec 069), so each suite tests the part itself; turning
 # them on and off is tested in organising.spec.ts.
-psql -q -h db -U diffluence -d diffluence_e2e -c "INSERT INTO settings (key, value) VALUES ('experimental', '{\"on\": [\"automation\", \"bundles\", \"console_restore\", \"databases\", \"publishing\"]}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
+psql -q -h db -U diffluence -d diffluence_e2e -c "INSERT INTO settings (key, value) VALUES ('experimental', '{\"on\": [\"automation\", \"bundles\", \"console_restore\", \"databases\", \"guided_templates\", \"publishing\"]}') ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value"
 # One complete backup, as a backup service reports it, so the console offers a restore (spec 059).
 /tmp/diffluence backup report --name diffluence-20261101T120000Z --reason manual --started 2026-11-01T12:00:00Z --size 2048 >/dev/null
 nohup /tmp/diffluence serve >/tmp/e2e.log 2>&1 &

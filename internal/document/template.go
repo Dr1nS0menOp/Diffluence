@@ -108,6 +108,9 @@ func ForPublish(n Node) (Node, error) {
 	if len(Fields(n)) > 0 {
 		return n, apperr.Invalid("Fill in or remove the template fields before publishing.")
 	}
+	if HasTemplateValues(n) {
+		return n, apperr.Invalid("A value of a template cannot be published. Remove it first.")
+	}
 	return stripInstructions(n), nil
 }
 

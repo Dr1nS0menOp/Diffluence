@@ -63,6 +63,7 @@ export const KNOWN_NODE_TYPES = [
   'status',
   'date',
   'templateField',
+  'templateValue',
   'instruction',
   'mention',
   'table',

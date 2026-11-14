@@ -212,6 +212,36 @@
   margin-inline-end: var(--space-1);
 }
 
+/* The pages a guided template makes (spec 074): indenting shows what sits below what, as in the tree. */
+.template-pages {
+  margin-block: var(--space-3);
+  padding-inline: var(--space-6);
+}
+
+.template-pages [data-depth='1'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 1);
+}
+
+.template-pages [data-depth='2'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 2);
+}
+
+.template-pages [data-depth='3'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 3);
+}
+
+.template-pages [data-depth='4'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 4);
+}
+
+.template-pages [data-depth='5'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 5);
+}
+
+.template-pages [data-depth='6'] {
+  padding-inline-start: calc(var(--space-3) + var(--tree-indent) * 6);
+}
+
 .template-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

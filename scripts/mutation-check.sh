@@ -381,9 +381,44 @@ mutate "a purge takes hidden pages along" internal/trash/trash.go \
 mutate "a copy can lose a restriction from above" internal/pages/tree.go \
   's.replace("lost, _, err := inheritedChange(ctx, tx, p, in.ParentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif len(lost) > 0 {", "lost, _, err := inheritedChange(ctx, tx, p, in.ParentID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif len(lost) < 0 {")' $app -run TestACopyCannotQuietlyLoseAnInheritedRestriction
 mutate "any file comes through a template" internal/attachments/attachments.go \
-  's.replace("if a.PageID != pageID {", "if a.PageID != pageID && len(a.Filename) < 0 {")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+  's.replace("if !slices.Contains(pageIDs, a.PageID) {", "if !slices.Contains(pageIDs, a.PageID) && len(a.Filename) < 0 {")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
 mutate "template files ignore who may read the template" internal/templates/templates.go \
-  's.replace("if err := s.mayRead(ctx, s.pool, c, t); err != nil {\n\t\treturn attachments.Attachment{}, nil, err\n\t}\n\treturn s.files.OpenOfPage", "return s.files.OpenOfPage")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+  's.replace("if err := s.mayRead(ctx, s.pool, c, t); err != nil {\n\t\treturn attachments.Attachment{}, nil, err\n\t}\n\tpageIDs, err", "pageIDs, err")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+# Guided templates (spec 074, wave GT1): a set is whole or not made at all.
+mutate "a set is committed page by page instead of once" internal/templates/sets.go \
+  's.replace("made, skipped, err := s.pages.AddSetPage(ctx, tx, c, pages.SetPage{", "made, skipped, err := func() (pages.Page, []string, error) { var made pages.Page; var skipped []string; err := pgx.BeginFunc(ctx, s.pool, func(own pgx.Tx) error { var err error; made, skipped, err = s.pages.AddSetPage(ctx, own, c, pages.SetPage{").replace("Before: func(name string) error { return step(ctx, hooks, name, i) }})", "Before: func(name string) error { return step(ctx, hooks, name, i) }}); return err }); return made, skipped, err }()")' $app -run TestAFailureAtAnyStepOfASetLeavesNoTrace
+mutate "an entry the creator may not make is let through instead of refusing the set" internal/templates/sets.go \
+  's.replace("if len(missingRights) > 0 {", "if len(missingRights) < 0 {")' $app -run 'TestASetIsRefusedWholeWhenTheCreatorLacksARightOnPartOfIt|TestAWorkflowEntryNeedsTheRightToChooseOne'
+mutate "a restricted entry is made without its restriction" internal/templates/sets.go \
+  's.replace("if !e.Restrictions.any() {\n\t\treturn nil\n\t}\n\tif err := before()", "if true {\n\t\treturn nil\n\t}\n\tif err := before()")' $app -run 'TestASetIsRefusedWholeWhenTheCreatorLacksARightOnPartOfIt|TestAFailureAtAnyStepOfASetLeavesNoTrace'
+mutate "a value of a template reaches a reader" internal/document/template.go \
+  's.replace("if HasTemplateValues(n) {", "if HasTemplateValues(n) && len(n.Type) < 0 {")' ./internal/document/
+mutate "a link of a set points to the wrong page" internal/templates/sets.go \
+  's.replace("id, ok := pageOf[key]", "_, ok := pageOf[key]\n\t\tid := pageOf[RootKey]")' $app -run TestLinksBetweenEntriesResolveInOnePass
+mutate "a request sent twice makes two sets" internal/templates/sets.go \
+  's.replace("if p.key != \"\" {", "if p.key == \"never\" {")' $app -run TestADoubleSubmitMakesOneSet
+mutate "a guided template is offered while its part is off" internal/templates/templates.go \
+  's.replace("AND (NOT t.guided OR $3)", "AND (t.guided OR NOT t.guided OR $3)")' $app -run TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff
+mutate "a guided template is used while its part is off" internal/templates/sets.go \
+  's.replace("if !p.version.Manifest.usesGuidedParts(p.texts) && !p.t.Guided {", "if true {")' $app -run TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff
+mutate "a set is made in another space than its template's" internal/templates/sets.go \
+  's.replace("if t.Hidden || (t.SpaceID != nil && *t.SpaceID != in.SpaceID) {", "if t.Hidden {")' $app -run TestMissingPlacesRefuseTheSetAndKeepNothing
+mutate "a template takes a 101st page" internal/templates/manifest.go \
+  's.replace("if len(m.Entries) > maxEntries {", "if len(m.Entries) > maxEntries+1 {")' ./internal/templates/
+mutate "a template goes a 7th level deep" internal/templates/manifest.go \
+  's.replace("if level > maxLevels {", "if level > maxLevels+1 {")' ./internal/templates/
+mutate "a template asks a 41st question" internal/templates/manifest.go \
+  's.replace("if len(names) > maxSetFields {", "if len(names) > maxSetFields+1 {")' ./internal/templates/
+mutate "a link to an entry that is not there is kept" internal/templates/manifest.go \
+  's.replace("if _, _, found := m.entry(key); !found {", "if _, _, found := m.entry(key); found && !found {")' ./internal/templates/
+mutate "a background set keeps its answers after it ends" internal/templates/setjob.go \
+  's.replace("if ctx.Err() == nil {", "if ctx.Err() != nil {")' $app -run TestABackgroundSetKilledHalfwayLeavesNothingAndCompletesOnRetry
+mutate "a second background set of one person runs at once" internal/templates/setjob.go \
+  's.replace("if !mine {", "if !mine && mine {")' $app -run TestBackgroundSetsTakeTurnsPerPersonAndPerSpace
+mutate "the empty page of someone else makes way for a set" internal/templates/sets.go \
+  's.replace("if err := s.pages.TrashEmptyPage(ctx, tx, c, *p.replaces); err != nil {", "if err := s.pages.TrashEmptyPage(ctx, tx, c, *p.replaces); err != nil && err == nil {")' $app -run TestTheEmptyPageMakesWayInTheSameTransaction
+mutate "a plain template changed by the previous release keeps its old version" internal/templates/versions.go \
+  's.replace("m.Entries = slices.Clone(m.Entries)", "m.Entries = m.Entries[:len(m.Entries):len(m.Entries)]")' $app -run TestAPlainTemplateSavedByTheOlderReleaseGetsItsNextVersionOnFirstUse
 mutate "the link filter tells hidden from gone" internal/pages/content.go \
   's.replace("AND k.target_id NOT IN (SELECT g.page_id FROM perm_visible_pages($1) g)))", "AND k.target_id NOT IN (SELECT g.id FROM pages g WHERE g.status <> \x27trashed\x27 AND $1::uuid IS NOT NULL)))")' $app -run TestABrokenLinkFilterTreatsHiddenPagesAsGone
 mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \

@@ -84,6 +84,15 @@ var idRoutes = map[string]idRoute{
 	"POST /api/v1/pages/bulk-move":                    {owner: "moves only pages the caller may move, and reports the rest as not found", open: true},
 	"POST /api/v1/pages/link-facts":                   {owner: "answers only about pages the caller may view", open: true},
 	"POST /api/v1/pages/reachable":                    {owner: "answers only about pages the caller may view", open: true},
+	"GET /api/v1/templates/{id}/entries":              {owner: "a manager of the template's space"},
+	"POST /api/v1/templates/{id}/entries":             {owner: "a manager of the template's space"},
+	"GET /api/v1/templates/{id}/entries/{key}":        {owner: "a manager of the template's space"},
+	"PATCH /api/v1/templates/{id}/entries/{key}":      {owner: "a manager of the template's space"},
+	"DELETE /api/v1/templates/{id}/entries/{key}":     {owner: "a manager of the template's space"},
+	"PUT /api/v1/templates/{id}/publishing":           {owner: "a manager of the template's space"},
+	"GET /api/v1/templates/{id}/versions":             {owner: "a manager of the template's space"},
+	"POST /api/v1/templates/{id}/sets":                {owner: "whoever may create pages in the space"},
+	"POST /api/v1/templates/{id}/sets/check":          {owner: "whoever may create pages in the space"},
 }
 
 // bodyIDRoutes take the ids of the objects they reach in their body, not in the path.

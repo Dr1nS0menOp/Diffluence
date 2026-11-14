@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"slices"
 	"strings"
 	"time"
 	"unicode"
@@ -531,14 +532,16 @@ func (s *Service) Open(ctx context.Context, c identity.Caller, id uuid.UUID, dow
 	return a, f, nil
 }
 
-// OpenOfPage reads a file that must belong to this page. It is for a module with a
-// rule of its own, such as templates, whose pages the access rule refuses on purpose.
-func (s *Service) OpenOfPage(ctx context.Context, pageID, id uuid.UUID) (Attachment, io.ReadSeekCloser, error) {
+// OpenOfPages opens a file that belongs to one of several pages, such as the hidden pages
+// of a template and its entries (spec 074). It is for a module with a rule of its own,
+// such as templates, whose pages the access rule refuses on purpose. A file of any other
+// page is not found.
+func (s *Service) OpenOfPages(ctx context.Context, pageIDs []uuid.UUID, id uuid.UUID) (Attachment, io.ReadSeekCloser, error) {
 	a, err := get(ctx, s.pool, id)
 	if err != nil {
 		return a, nil, err
 	}
-	if a.PageID != pageID {
+	if !slices.Contains(pageIDs, a.PageID) {
 		return a, nil, apperr.NotFound()
 	}
 	f, err := s.OpenUnchecked(ctx, a)
@@ -689,9 +692,18 @@ func (s *Service) CopyAll(ctx context.Context, tx pgx.Tx, c identity.Caller, fro
 			return nil, err
 		}
 		key := "attachments/" + ids.New().String()
+		// The stored copy outlives a rollback of tx, so it is remembered first, on its own,
+		// and forgotten by tx when tx commits (TPL-821).
+		if _, err := s.pool.Exec(ctx, "INSERT INTO pending_file_copies (object_key) VALUES ($1)", key); err != nil {
+			_ = f.Close()
+			return nil, err
+		}
 		obj, err := s.store.Put(ctx, key, f, limit)
 		_ = f.Close()
 		if err != nil {
+			return nil, err
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM pending_file_copies WHERE object_key = $1", key); err != nil {
 			return nil, err
 		}
 		id := ids.New()
@@ -711,6 +723,31 @@ func (s *Service) CopyAll(ctx context.Context, tx pgx.Tx, c identity.Caller, fro
 		}
 	}
 	return mapping, nil
+}
+
+// pendingCopyAge is how long a stored copy may wait for the transaction that refers to it.
+// A set's transaction stops after 60 seconds (TPL-826), so an hour leaves wide room.
+const pendingCopyAge = time.Hour
+
+// CollectPendingCopies hands the stored copies whose transaction rolled back to the
+// storage deletions (TPL-821). A copy that a committed file version refers to is kept.
+func (s *Service) CollectPendingCopies(ctx context.Context) error {
+	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `DELETE FROM pending_file_copies
+			WHERE queued_at < now() - make_interval(secs => $1) RETURNING object_key`, pendingCopyAge.Seconds())
+		if err != nil {
+			return err
+		}
+		keys, err := pgx.CollectRows(rows, pgx.RowTo[string])
+		if err != nil || len(keys) == 0 {
+			return err
+		}
+		_, err = tx.Exec(ctx, `INSERT INTO storage_deletions (object_key)
+			SELECT k FROM unnest($1::text[]) AS k
+			WHERE NOT EXISTS (SELECT 1 FROM attachment_versions v WHERE v.object_key = k)
+			ON CONFLICT DO NOTHING`, keys)
+		return err
+	})
 }
 
 // DrainDeletions removes stored files queued by purges. Runs in the worker.

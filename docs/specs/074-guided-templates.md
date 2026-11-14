@@ -105,6 +105,8 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 
 **Not in it:** new field kinds, conditions, rights per template, approval, the editor's new sections (GT1 ships the API and builds sets from the existing editor with a minimal Pages list).
 
+**Status (2026-11-14):** built, with migration `0060_guided_templates`. Report: [2026-11-14-wave-gt1.md](../reports/2026-11-14-wave-gt1.md). Left for later, each with its reason in the decision table below: the bell for a background set (TPL-1433, with TPL-720 in GT4); the check step in the form, whose dry run GT1 ships as `POST /templates/{id}/sets/check` (GT2); restrictions and workflows of an entry are set through the API only, as the minimal Pages list does not show them; the measurements on the real-data dump (TPL-1422), because no dump was at hand.
+
 ## GT2: fields, the form and the check step
 
 **Scope:**
@@ -309,6 +311,29 @@ Decided on the product owner's behalf on 2026-11-14, may be overruled.
 | TPL-1422 | What data do budgets use? | The real-data dump, sets of 10 and 100 pages | Measured, never claimed |
 | TPL-1423 | Where do administrators approve? | Administration, Content, Templates | One place per scope |
 | TPL-1424 | Where are templates of all spaces offered? | Every space or chosen spaces, as chips | The design standard's rule for instance-wide things |
+
+### Decided while building GT1
+
+Decided on the product owner's behalf on 2026-11-14, may be overruled.
+
+| # | Question | Decision | Reason |
+|---|---|---|---|
+| TPL-1425 | Open question 1: one rule for the freeze of all three enterprise features? | No change now: document control keeps no switch; guided templates stay experimental | Document control was built before ADR-043 and is already part of the 1.0 claim; a switch added now would change a shipped part |
+| TPL-1426 | Open question 2: may people without `space.templates` write and propose templates? | Yes, as TPL-061 plans, in GT4 | Approval only means something when others can write; nothing of it is built before GT4 |
+| TPL-1427 | Open question 3: when is `StartSpace` (TPL-008) fixed? | On its own, in the wave after GT1, with its own test; not inside GT1 | The spec keeps space templates out of these waves (TPL-1203); GT1 already changes the one path of making pages, and two such changes in one wave are harder to review. TPL-006 is fixed in GT1 by TPL-122 |
+| TPL-1428 | What does "the grace period of the upgrade" mean for turning the part on (TPL-1103)? | While any node seen in the last minute knows fewer migrations than this one | That is exactly when an older release can meet a guided template; a fixed day would be too long on one node and too short with a stuck node |
+| TPL-1429 | What is the first entry's name, and its title when nothing is filled in? | It has no name; an empty title stays empty, as a one-page template always did | A one-page template must make what it made before (TPL-1101); a draft may wait for its title (PAG-003) |
+| TPL-1430 | A question nobody answered, in a title pattern | Counts as empty, so the entry's name stands in (TPL-140) | `{Field}` left in a title reads as a mistake |
+| TPL-1431 | Where are the fields of a version? | In the texts the manifest pins, not copied into the manifest | One place for them; GT2 adds what a field needs beyond the text (kinds, defaults, validation) to the manifest |
+| TPL-1432 | Removing an entry | Takes it out of the next version; its hidden page stays while the template exists | Older versions point to its text (TPL-601) |
+| TPL-1433 | How is a ready or failed background set made known? | The job's status, which the form shows; the bell comes with the notifications of GT4 (TPL-720) | Notifications of sets are planned once, with their rules about who is told |
+| TPL-1434 | Answers of a background set whose worker stopped | Kept with the job until it is retried or purged; every other ending removes them | A retry must make the same set (TPL-121); a stop is not an end |
+| TPL-1435 | A background set over its limit (TPL-827) | Goes back to the queue and rests one second there, letting other jobs pass | No worker spins on it, and nothing behind it waits |
+| TPL-1436 | A parent with an edit restriction (TPL-810) | Does not refuse a set: under the access rule, making a page below one is not an edit | The rule of the product holds everywhere; a view restriction does refuse, and is tested |
+| TPL-1437 | A link of another scheme in a template | Refused on save, as every document is (`Normalize`) | The same rule as pages; nothing is quietly dropped |
+| TPL-1438 | Who is on the restriction of a page made from a restricted entry | The template's people and groups, and its creator, as when a restriction is set by hand (ACC-065) | Nobody makes a page they cannot open |
+| TPL-1439 | Which empty page makes way for a set (TPL-122) | Only an unpublished page of one's own with no title, no text and no pages below it | A page with any content is someone's work |
+| TPL-1440 | An entry's workflow in a space that has a space workflow | Needs no right: the space workflow wins (DOC-420) | The entry's choice is not used, so nothing is chosen |
 
 ## What these waves do not cover
 

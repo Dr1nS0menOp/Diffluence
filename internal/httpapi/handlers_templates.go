@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/templates"
 )
@@ -30,6 +31,20 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("DELETE /api/v1/templates/{id}", me, s.handleTemplateDelete)
 	r.HandleFunc("POST /api/v1/templates/{id}/use", me, s.handleTemplateUse)
 	r.HandleFunc("GET /api/v1/templates/{id}/export", me, s.handleTemplateExport)
+	// Guided templates are an experimental part (spec 074, TPL-050): while it is off, every
+	// route of it answers 404 experimental_off. The module decides per template who may.
+	guided := func(next http.HandlerFunc) http.HandlerFunc {
+		return s.experimental(features.ExperimentalGuidedTemplates, next)
+	}
+	r.HandleFunc("GET /api/v1/templates/{id}/entries", me, guided(s.handleTemplateEntries))
+	r.HandleFunc("POST /api/v1/templates/{id}/entries", me, guided(s.handleTemplateEntryAdd))
+	r.HandleFunc("GET /api/v1/templates/{id}/entries/{key}", me, guided(s.handleTemplateEntry))
+	r.HandleFunc("PATCH /api/v1/templates/{id}/entries/{key}", me, guided(s.handleTemplateEntryUpdate))
+	r.HandleFunc("DELETE /api/v1/templates/{id}/entries/{key}", me, guided(s.handleTemplateEntryRemove))
+	r.HandleFunc("PUT /api/v1/templates/{id}/publishing", me, guided(s.handleTemplatePublishing))
+	r.HandleFunc("GET /api/v1/templates/{id}/versions", me, guided(s.handleTemplateVersions))
+	r.HandleFunc("POST /api/v1/templates/{id}/sets", me, guided(s.handleTemplateSet))
+	r.HandleFunc("POST /api/v1/templates/{id}/sets/check", me, guided(s.handleTemplateSetCheck))
 	r.HandleFunc("GET /api/v1/templates/{id}/files/{file}", me, s.handleTemplateFile)
 	r.HandleFunc("PUT /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOn)
 	r.HandleFunc("DELETE /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOff)
@@ -231,12 +246,25 @@ func (s *Server) handleTemplateUse(w http.ResponseWriter, r *http.Request) {
 	if !body(w, r, &in) {
 		return
 	}
-	p, skipped, err := s.deps.Templates.Use(r.Context(), s.caller(r), id, in)
+	made, err := s.deps.Templates.Use(r.Context(), s.caller(r), id, in)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]any{"page": p, "labels_left_out": skipped})
+	writeSet(w, made)
+}
+
+// writeSet answers with a set that was made, 201, or one made before by the same request,
+// 200, or with the job that makes a large one, 202 (spec 074).
+func writeSet(w http.ResponseWriter, made templates.SetResult) {
+	switch {
+	case made.JobID != nil:
+		writeJSON(w, http.StatusAccepted, map[string]any{"job_id": made.JobID})
+	case made.Again:
+		writeJSON(w, http.StatusOK, made)
+	default:
+		writeJSON(w, http.StatusCreated, made)
+	}
 }
 
 func (s *Server) handleTemplateExport(w http.ResponseWriter, r *http.Request) {

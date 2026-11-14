@@ -455,6 +455,56 @@ func (s *Service) SetRestrictions(ctx context.Context, c identity.Caller, pageID
 	})
 }
 
+// MissingSubjects lists the people and groups of a restriction that no longer exist.
+func (s *Service) MissingSubjects(ctx context.Context, q db.Querier, subjects []Subject) ([]Subject, error) {
+	missing := []Subject{}
+	for _, sub := range subjects {
+		err := s.subjectExists(ctx, q, sub)
+		if _, gone := apperr.As(err); gone {
+			missing = append(missing, sub)
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+	}
+	return missing, nil
+}
+
+// RestrictNewPage puts a restriction on a page that tx is making, so the page never exists
+// without it (spec 074, TPL-130). The caller has checked restriction.manage in the space
+// and that every subject exists. Whoever makes the page stays on the list.
+func (s *Service) RestrictNewPage(ctx context.Context, tx pgx.Tx, c identity.Caller, pageID uuid.UUID, kind string, subjects []Subject) error {
+	if kind != "view" && kind != "edit" {
+		return apperr.Invalid("A restriction is view or edit.")
+	}
+	if len(subjects) == 0 {
+		return nil
+	}
+	for _, sub := range subjects {
+		if (sub.Type != SubjectUser && sub.Type != SubjectGroup) || sub.ID == uuid.Nil {
+			return apperr.Invalid("Only users and groups can be listed on a restriction.")
+		}
+	}
+	subjects, err := s.withCaller(ctx, tx, c, subjects)
+	if err != nil {
+		return err
+	}
+	types, ids := make([]string, len(subjects)), make([]uuid.UUID, len(subjects))
+	for i, sub := range subjects {
+		types[i], ids[i] = sub.Type, sub.ID
+	}
+	if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
+		SELECT $1, $2, t, i FROM unnest($3::text[], $4::uuid[]) AS s (t, i) ON CONFLICT DO NOTHING`, pageID, kind, types, ids); err != nil {
+		return err
+	}
+	spaceID, err := spaceOfPage(ctx, tx, pageID)
+	if err != nil {
+		return err
+	}
+	return recordChange(ctx, tx, c, "restriction.added", "page", pageID.String(), spaceID, map[string]any{"kind": kind, "subjects": len(subjects)})
+}
+
 // withCaller adds the person who sets a restriction, unless a group already covers
 // them, so nobody locks themselves out by forgetting their own name (ACC-065).
 func (s *Service) withCaller(ctx context.Context, q db.Querier, c identity.Caller, subjects []Subject) ([]Subject, error) {

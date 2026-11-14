@@ -160,6 +160,63 @@ test('writing a template with a field and instruction text', async ({ page }) =>
   await expect(page.locator('.prose')).not.toContainText('Say why');
 });
 
+test('a template that makes a set: the Pages list, then one action makes every page (spec 074)', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Template sets');
+  await page.goto(`/spaces/${space.key}/templates`);
+  const name = unique('Onboarding');
+  await page.getByLabel('New template name').fill(name);
+  await page.getByRole('button', { name: 'New template' }).click();
+  const pages = page.getByRole('region', { name: 'Pages this template makes' });
+  await expect(pages.getByRole('cell', { name: 'First page' })).toBeVisible();
+  await pages.getByLabel('Name of the page').fill('Equipment');
+  await pages.getByRole('button', { name: 'Add a page' }).click();
+  await expect(pages.getByRole('cell', { name: 'Equipment' })).toBeVisible();
+  await pages.getByLabel('Name of the page').fill('Laptop');
+  await pages.getByLabel('Below').selectOption({ label: 'Equipment' });
+  await pages.getByRole('button', { name: 'Add a page' }).click();
+  await expect(
+    pages.getByRole('row', { name: /Laptop/ }).getByRole('cell', { name: 'Equipment' }),
+  ).toBeVisible();
+  await checkAccessibility(page);
+
+  // Writing the text of one page of the set uses the same editor.
+  await pages
+    .getByRole('row', { name: /^Laptop/ })
+    .getByRole('button', { name: 'Write its text' })
+    .click();
+  const writing = page.getByRole('region', { name: 'Writing the text of Laptop' });
+  // Two editors are open here, so wait for this one rather than for the only one.
+  await writing.locator('.prose.editing').click();
+  await expect(writing.locator('.prose.editing')).toBeFocused();
+  await page.keyboard.type('Pick it up on day one.');
+  await writing.getByRole('button', { name: 'Save' }).click();
+  await expect(writing).toHaveCount(0);
+
+  await page.goto(`/spaces/${space.key}/overview`);
+  await page.getByRole('button', { name: 'More to create' }).click();
+  await page.getByRole('menuitem', { name: 'From a template' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Start from a template' });
+  await dialog.getByRole('combobox', { name: 'Find a template' }).fill(name);
+  await dialog.getByRole('button', { name: 'Use this template' }).click();
+  await expect(page.getByLabel('Title')).toBeVisible();
+  const root = new URL(page.url()).pathname.split('/')[2];
+
+  // All three pages exist at once, as drafts of their maker, below each other.
+  const tree = (await (await page.request.get(`/api/v1/spaces/${space.id}/tree`)).json()) as {
+    pages?: { id: string; title: string; parent_id: string | null }[];
+  };
+  const made = (tree.pages ?? []).filter((p) => ['Equipment', 'Laptop'].includes(p.title));
+  expect(made.map((p) => p.title).sort()).toEqual(['Equipment', 'Laptop']);
+  expect(made.find((p) => p.title === 'Equipment')?.parent_id).toBe(root);
+  const laptop = made.find((p) => p.title === 'Laptop');
+  const draft = (await (await page.request.get(`/api/v1/pages/${laptop?.id}/draft`)).json()) as {
+    document: unknown;
+  };
+  expect(JSON.stringify(draft.document)).toContain('Pick it up on day one.');
+});
+
 test('a blog post stays out of the tree, and a silent publish still makes a version', async ({ page }) => {
   const space = await newSpace(page, 'News');
   await page.goto(`/spaces/${space.key}/overview`);

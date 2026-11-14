@@ -42,6 +42,8 @@ const template = (extra: Partial<TemplateSummary>): TemplateSummary => ({
   starter: false,
   favourite: false,
   version: 1,
+  guided: false,
+  template_version: 1,
   ...extra,
 });
 

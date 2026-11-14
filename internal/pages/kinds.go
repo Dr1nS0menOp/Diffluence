@@ -36,6 +36,11 @@ func checkDocumentKind(kind string, doc document.Node) error {
 	if kind != KindDatabase && document.HasSheet(doc) {
 		return apperr.Invalid("Only a database holds a sheet.")
 	}
+	// A value of a template is filled in when a page is made; a leftover must never reach
+	// a draft or a reader (spec 074, TPL-211).
+	if kind != KindTemplate && document.HasTemplateValues(doc) {
+		return apperr.Invalid("A value of a template cannot be part of a page. Remove it first.")
+	}
 	return nil
 }
 

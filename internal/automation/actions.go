@@ -123,7 +123,7 @@ func (s *Service) fromTemplate(ctx context.Context, r *run, a Action, values map
 	if space == nil {
 		return apperr.Invalid("Choose the space of the new page.")
 	}
-	_, _, err := s.Templates.Use(ctx, r.caller, *a.TargetID, templates.UseInput{SpaceID: *space, ParentID: a.ParentID, Title: expand(a.Title, values)})
+	_, err := s.Templates.Use(ctx, r.caller, *a.TargetID, templates.UseInput{SpaceID: *space, ParentID: a.ParentID, Title: expand(a.Title, values)})
 	return err
 }
 

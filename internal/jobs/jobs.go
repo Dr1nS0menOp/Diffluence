@@ -34,6 +34,11 @@ const (
 	StatusFailed  = "failed"
 )
 
+// ErrNotYet is what a handler returns when its job must wait for its turn, such as a limit
+// on how many of a kind run at once. The job goes back to the queue, and rests there for a
+// second before it is taken again, so it neither spins nor holds up the jobs behind it.
+var ErrNotYet = errors.New("jobs: not yet")
+
 // Job is one unit of queued work.
 type Job struct {
 	ID         uuid.UUID       `json:"id"`
@@ -168,6 +173,13 @@ func (s *Service) Cancel(ctx context.Context, c identity.Caller, id uuid.UUID) e
 // uses it: a job may change what an operator is backing up (spec 013, F11).
 func (s *Service) HoldWhile(check func(context.Context) (bool, error)) { s.held = check }
 
+// ForgetPayload empties what a job was given, for a job that carried personal data only
+// until it ended (spec 074, TPL-1409). Its kind and result stay.
+func (s *Service) ForgetPayload(ctx context.Context, id uuid.UUID) error {
+	_, err := s.pool.Exec(ctx, "UPDATE jobs SET payload = '{}' WHERE id = $1", id)
+	return err
+}
+
 // RunOnce claims and runs one queued job. It reports whether there was one.
 func (s *Service) RunOnce(ctx context.Context) (bool, error) { return s.runNext(ctx, nil) }
 
@@ -187,7 +199,9 @@ func (s *Service) runNext(ctx context.Context, skippedKinds []string) (bool, err
 		// Only kinds this node has a handler for: during an upgrade a newer node may queue a
 		// kind this release does not know, which must wait for a node that does (OPS-070).
 		err := tx.QueryRow(ctx, `SELECT id, kind, status, payload, created_by, created_at FROM jobs
-			WHERE status = 'queued' AND kind = ANY($2) AND NOT kind = ANY($1) ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
+			WHERE status = 'queued' AND kind = ANY($2) AND NOT kind = ANY($1)
+			  AND (started_at IS NULL OR started_at < now() - interval '1 second')
+			ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED`,
 			append([]string{}, skippedKinds...), s.kinds()).
 			Scan(&j.ID, &j.Kind, &j.Status, &j.Payload, &j.CreatedBy, &j.CreatedAt)
 		if err != nil {
@@ -206,6 +220,13 @@ func (s *Service) runNext(ctx context.Context, skippedKinds []string) (bool, err
 	spanCtx, end := tracing.Span(ctx, "job", j.Kind)
 	result, runErr := s.run(spanCtx, j)
 	end(runErr)
+	if errors.Is(runErr, ErrNotYet) {
+		requeue, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+		defer cancel()
+		// started_at stays: it marks when the job last tried, which the claim reads.
+		_, err := s.pool.Exec(requeue, "UPDATE jobs SET status = 'queued' WHERE id = $1", j.ID)
+		return true, err
+	}
 	status := StatusDone
 	if runErr != nil {
 		status = StatusFailed

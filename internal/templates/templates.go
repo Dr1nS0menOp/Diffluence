@@ -26,8 +26,10 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
@@ -67,8 +69,15 @@ type Template struct {
 	UsedAt        *time.Time       `json:"used_at"`
 	Version       int              `json:"version"`
 	Fields        []document.Field `json:"fields,omitempty"`
-	Document      json.RawMessage  `json:"document,omitempty"`
-	pageID        uuid.UUID
+	// Guided says the template uses a part of guided templates (spec 074, TPL-050).
+	Guided bool `json:"guided"`
+	// TemplateVersion is the version a form made from this answer is bound to (TPL-603).
+	TemplateVersion int             `json:"template_version"`
+	Document        json.RawMessage `json:"document,omitempty"`
+	pageID          uuid.UUID
+	ownerID         uuid.UUID
+	// today is the database's date when the row was read, for what a set fills in (TPL-857).
+	today string
 }
 
 // Input is what a person fills in for a template.
@@ -134,16 +143,35 @@ type Service struct {
 	spaces   *spaces.Service
 	identity *identity.Service
 	files    *attachments.Service
+	features *features.Service
+	jobs     *jobs.Service
 	seeded   atomic.Bool
+	hooks    atomic.Pointer[SetHooks]
+}
+
+// Deps are the modules templates work through.
+type Deps struct {
+	Pool     *pgxpool.Pool
+	Perms    *permissions.Service
+	Pages    *pages.Service
+	Spaces   *spaces.Service
+	Identity *identity.Service
+	Files    *attachments.Service
+	Features *features.Service
+	Jobs     *jobs.Service
 }
 
 // NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, sp *spaces.Service, id *identity.Service, files *attachments.Service) *Service {
-	return &Service{pool: pool, perms: perms, pages: pg, spaces: sp, identity: id, files: files}
+func NewService(d Deps) *Service {
+	s := &Service{pool: d.Pool, perms: d.Perms, pages: d.Pages, spaces: d.Spaces, identity: d.Identity, files: d.Files,
+		features: d.Features, jobs: d.Jobs}
+	d.Jobs.Register(jobSet, s.runSetJob)
+	return s
 }
 
 const columns = `t.id, t.page_id, t.space_id, t.name, t.description, t.category, t.labels, t.title_pattern, t.steps,
-	t.default_parent, t.hidden, t.promoted, t.starter_key IS NOT NULL, f.user_id IS NOT NULL, u.used_at, p.current_version`
+	t.default_parent, t.hidden, t.promoted, t.starter_key IS NOT NULL, f.user_id IS NOT NULL, u.used_at, p.current_version,
+	t.guided, COALESCE(t.approved_version, 0), COALESCE(t.owner_id, t.created_by), to_char(now(), 'YYYY-MM-DD')`
 
 const joins = `FROM templates t
 	JOIN pages p ON p.id = t.page_id
@@ -153,7 +181,8 @@ const joins = `FROM templates t
 func scan(r pgx.Row) (Template, error) {
 	var t Template
 	err := r.Scan(&t.ID, &t.pageID, &t.SpaceID, &t.Name, &t.Description, &t.Category, &t.Labels, &t.TitlePattern, &t.Steps,
-		&t.DefaultParent, &t.Hidden, &t.Promoted, &t.Starter, &t.Favourite, &t.UsedAt, &t.Version)
+		&t.DefaultParent, &t.Hidden, &t.Promoted, &t.Starter, &t.Favourite, &t.UsedAt, &t.Version,
+		&t.Guided, &t.TemplateVersion, &t.ownerID, &t.today)
 	return t, err
 }
 
@@ -209,7 +238,21 @@ func (s *Service) File(ctx context.Context, c identity.Caller, id, fileID uuid.U
 	if err := s.mayRead(ctx, s.pool, c, t); err != nil {
 		return attachments.Attachment{}, nil, err
 	}
-	return s.files.OpenOfPage(ctx, t.pageID, fileID)
+	pageIDs, err := s.entryPages(ctx, t)
+	if err != nil {
+		return attachments.Attachment{}, nil, err
+	}
+	return s.files.OpenOfPages(ctx, pageIDs, fileID)
+}
+
+// entryPages lists the hidden pages of a template: its own and those of its entries.
+func (s *Service) entryPages(ctx context.Context, t Template) ([]uuid.UUID, error) {
+	rows, err := s.pool.Query(ctx, `SELECT page_id FROM template_entry_pages WHERE template_id = $1`, t.ID)
+	if err != nil {
+		return nil, err
+	}
+	more, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	return append([]uuid.UUID{t.pageID}, more...), err
 }
 
 // Gallery lists what a person can start a page from in a space: favourites and
@@ -221,8 +264,14 @@ func (s *Service) Gallery(ctx context.Context, c identity.Caller, spaceID uuid.U
 	if err := s.seed(ctx); err != nil {
 		return nil, err
 	}
+	// A template that uses guided templates is not offered while that part is off (TPL-050).
+	guidedOn, err := s.features.ExperimentalOn(ctx, s.pool, features.ExperimentalGuidedTemplates)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+` WHERE NOT t.hidden AND (t.space_id = $2 OR t.space_id IS NULL)
-		ORDER BY f.user_id IS NOT NULL DESC, u.used_at DESC NULLS LAST, t.promoted DESC, lower(t.name), t.id`, c.UserID, spaceID)
+		AND (NOT t.guided OR $3)
+		ORDER BY f.user_id IS NOT NULL DESC, u.used_at DESC NULLS LAST, t.promoted DESC, lower(t.name), t.id`, c.UserID, spaceID, guidedOn)
 	return collect(rows, err)
 }
 
@@ -258,11 +307,16 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Tem
 }
 
 func auditTemplate(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, t Template) error {
+	return auditTemplateDetails(ctx, tx, c, action, t, map[string]any{})
+}
+
+func auditTemplateDetails(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, t Template, details map[string]any) error {
 	spaceID := ""
 	if t.SpaceID != nil {
 		spaceID = t.SpaceID.String()
 	}
-	if _, err := audit.Record(ctx, tx, c.Event(action, "template", t.ID.String(), spaceID, map[string]any{"name": t.Name})); err != nil {
+	details["name"] = t.Name
+	if _, err := audit.Record(ctx, tx, c.Event(action, "template", t.ID.String(), spaceID, details)); err != nil {
 		return err
 	}
 	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"template_id": t.ID})
@@ -293,13 +347,17 @@ func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spac
 	}
 	id := ids.New()
 	if _, err := tx.Exec(ctx, `INSERT INTO templates (id, page_id, space_id, name, description, category, labels, title_pattern,
-			steps, default_parent, hidden, promoted, starter_key, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+			steps, default_parent, hidden, promoted, starter_key, created_by, owner_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)`,
 		id, p.ID, spaceID, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent,
 		in.Hidden, in.Promoted, starter, c.UserID); err != nil {
 		return Template{}, err
 	}
-	return Template{ID: id, SpaceID: spaceID, Name: in.Name, pageID: p.ID}, nil
+	t := Template{ID: id, SpaceID: spaceID, Name: in.Name, TitlePattern: in.TitlePattern, Labels: in.Labels, Steps: in.Steps,
+		DefaultParent: in.DefaultParent, pageID: p.ID, ownerID: c.UserID}
+	// Version 1, as every template that existed before versions got one (TPL-620).
+	_, err = s.saveVersion(ctx, tx, c, t, rowManifest(t, p.CurrentVersion))
+	return t, err
 }
 
 // Create makes a template, of a space or of all spaces.
@@ -335,11 +393,15 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		return Template{}, err
 	}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		t, err := load(ctx, tx, c.UserID, id)
+		t, err := lockTemplate(ctx, tx, c.UserID, id)
 		if err != nil {
 			return err
 		}
 		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+			return err
+		}
+		before, err := s.currentVersion(ctx, tx, c, t)
+		if err != nil {
 			return err
 		}
 		if len(in.Document) > 0 {
@@ -360,7 +422,20 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 			id, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent, in.Hidden, in.Promoted); err != nil {
 			return err
 		}
-		return auditTemplate(ctx, tx, c, "template.updated", t)
+		if err := auditTemplate(ctx, tx, c, "template.updated", t); err != nil {
+			return err
+		}
+		// Whatever this changed of what the template makes is its next version (TPL-600).
+		changed, err := load(ctx, tx, c.UserID, id)
+		if err != nil {
+			return err
+		}
+		heads, err := s.pages.TemplateHeads(ctx, tx, []uuid.UUID{t.pageID})
+		if err != nil {
+			return err
+		}
+		_, err = s.saveVersion(ctx, tx, c, changed, withRow(before.Manifest, changed, heads[t.pageID]))
+		return err
 	})
 	if err != nil {
 		return Template{}, err
@@ -376,6 +451,18 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 			return err
 		}
 		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+			return err
+		}
+		// The hidden pages of the entries go with it; the pages made from it stay (TPL-601).
+		rows, err := tx.Query(ctx, `SELECT page_id FROM template_entry_pages WHERE template_id = $1`, id)
+		if err != nil {
+			return err
+		}
+		entryPages, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+		if err != nil {
+			return err
+		}
+		if err := s.pages.DeleteTemplatePages(ctx, tx, entryPages); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "DELETE FROM pages WHERE id = $1", t.pageID); err != nil {
@@ -422,52 +509,17 @@ type UseInput struct {
 	ParentID *uuid.UUID        `json:"parent_id"`
 	Title    string            `json:"title"`
 	Answers  map[string]string `json:"answers"`
+	// Replaces is the empty page that was waiting for the template (TPL-122).
+	Replaces *uuid.UUID `json:"replaces"`
 }
 
-// Use starts a page from a template. The answers are plain text, and the page is
-// an unpublished page with a draft: later changes to the template change nothing.
-func (s *Service) Use(ctx context.Context, c identity.Caller, id uuid.UUID, in UseInput) (pages.Page, []string, error) {
-	t, err := load(ctx, s.pool, c.UserID, id)
-	if err != nil {
-		return pages.Page{}, nil, err
-	}
-	if t.Hidden || (t.SpaceID != nil && *t.SpaceID != in.SpaceID) {
-		return pages.Page{}, nil, apperr.NotFound()
-	}
-	sp, err := s.spaces.Get(ctx, c, in.SpaceID)
-	if err != nil {
-		return pages.Page{}, nil, err
-	}
-	doc, err := s.pages.TemplateDocument(ctx, s.pool, t.pageID)
-	if err != nil {
-		return pages.Page{}, nil, err
-	}
-	for _, f := range document.Fields(doc) {
-		if f.Required && strings.TrimSpace(in.Answers[f.Name]) == "" {
-			return pages.Page{}, nil, apperr.Invalid("Fill in " + f.Name + ".")
-		}
-	}
-	if doc, err = document.FillFields(doc, in.Answers); err != nil {
-		return pages.Page{}, nil, err
-	}
-	title := strings.TrimSpace(in.Title)
-	if title == "" {
-		title = ExpandTitle(t.TitlePattern, sp.Name, in.Answers, time.Now())
-	}
-	parent := in.ParentID
-	if parent == nil {
-		parent = s.pages.UsableParent(ctx, c, t.DefaultParent, in.SpaceID)
-	}
-	p, skipped, err := s.pages.StartFromTemplate(ctx, c, pages.TemplateStart{SpaceID: in.SpaceID, ParentID: parent, Title: title,
-		TemplatePage: t.pageID, Document: doc, Labels: t.Labels})
-	if err != nil {
-		return p, nil, err
-	}
-	if _, err := s.pool.Exec(ctx, `INSERT INTO template_uses (user_id, template_id) VALUES ($1, $2)
-		ON CONFLICT (user_id, template_id) DO UPDATE SET used_at = now()`, c.UserID, id); err != nil {
-		return p, skipped, err
-	}
-	return p, skipped, nil
+// Use starts pages from a template: one page, or the set a guided template makes, with
+// the answers as plain text. The pages are unpublished pages with a draft unless the
+// template publishes at once, and later changes to the template change nothing. It is
+// the one-page case of MakeSet, so there is one way to make pages from a template.
+func (s *Service) Use(ctx context.Context, c identity.Caller, id uuid.UUID, in UseInput) (SetResult, error) {
+	return s.MakeSet(ctx, c, id, SetInput{SpaceID: in.SpaceID, ParentID: in.ParentID, Title: in.Title, Answers: in.Answers,
+		Replaces: in.Replaces})
 }
 
 // FromPage saves a page as a template of its space. Its files are copied.

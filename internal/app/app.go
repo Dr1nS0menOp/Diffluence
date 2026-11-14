@@ -192,12 +192,14 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.people = people.NewService(a.pool, a.perms, a.store, a.identity)
 	a.console = console.NewService(a.pool, a.store)
 	a.features = features.NewService(a.pool, a.settings)
+	a.features.HoldWhileOlderReleaseRuns(a.olderReleaseRuns)
 	a.jobs = jobs.NewService(a.pool, log)
 	a.jobs.HoldWhile(a.inMaintenance)
 	a.attach = attachments.NewService(a.pool, a.perms, a.store, a.settings, a.instanceID)
 	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.features, a.jobs, a.instanceID)
 	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.features, a.store, a.instanceID)
-	a.templates = templates.NewService(a.pool, a.perms, a.pages, a.spaces, a.identity, a.attach)
+	a.templates = templates.NewService(templates.Deps{Pool: a.pool, Perms: a.perms, Pages: a.pages, Spaces: a.spaces,
+		Identity: a.identity, Files: a.attach, Features: a.features, Jobs: a.jobs})
 	a.trash = trash.NewService(a.pool, a.perms, a.identity, log)
 	a.trash.Register(trash.TypePage, a.pages)
 	a.trash.Register(trash.TypeAttachment, a.attach)
@@ -583,6 +585,9 @@ func (a *App) Trash() *trash.Service { return a.trash }
 // Pages exposes pages (used by tests).
 func (a *App) Pages() *pages.Service { return a.pages }
 
+// Templates exposes templates (used by tests).
+func (a *App) Templates() *templates.Service { return a.templates }
+
 // Exchange exposes import and export (used by tests).
 func (a *App) Exchange() *exchange.Service { return a.exchange }
 
@@ -645,6 +650,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 			_, err := a.attach.DrainDeletions(ctx)
 			return err
 		}},
+		{Name: "collect-pending-copies", Every: 10 * time.Minute, Run: a.attach.CollectPendingCopies},
 		{Name: "encrypt-stored-files", Every: 10 * time.Minute, Run: a.encryptStoredFiles},
 		{Name: "fail-stale-jobs", Every: 10 * time.Minute, Run: a.jobs.FailStale},
 		{Name: "purge-identity", Every: 10 * time.Minute, Run: a.identity.PurgeExpired},

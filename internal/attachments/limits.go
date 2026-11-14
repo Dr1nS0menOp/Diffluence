@@ -94,6 +94,26 @@ func RefuseCopyThatDoesNotFit(ctx context.Context, q db.Querier, from, spaceID u
 	return nil
 }
 
+// RefuseCopiesThatDoNotFit refuses at once when the files of several pages, copied
+// together, would not fit in a space: a set from a template is checked whole before
+// anything is made (spec 074, TPL-103). Each copy checks again as it runs.
+func RefuseCopiesThatDoNotFit(ctx context.Context, q db.Querier, from []uuid.UUID, spaceID uuid.UUID) error {
+	var size int64
+	if err := q.QueryRow(ctx, `SELECT COALESCE(sum(v.size), 0)::bigint FROM attachments a
+		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
+		WHERE a.page_id = ANY($1) AND a.status = 'active'`, from).Scan(&size); err != nil {
+		return err
+	}
+	ok, err := fits(ctx, q, spaceID, size)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return errSpaceFull()
+	}
+	return nil
+}
+
 // FitsMove says, without locking, whether the files of moved pages would fit in a space.
 func FitsMove(ctx context.Context, q db.Querier, pageIDs []uuid.UUID, spaceID uuid.UUID) (bool, error) {
 	var size int64
