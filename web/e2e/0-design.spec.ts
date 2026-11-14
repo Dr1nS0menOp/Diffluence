@@ -1820,13 +1820,13 @@ test.describe('draft and published spaces', () => {
     await page.goto(`/pages/${draftPage}`);
     await expect(page.getByText('Changed since release: text')).toBeVisible();
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-draft-page');
+    await picture(page, 'publishing-draft-page', [page.getByTestId('last-updated')]);
     await checkAccessibility(page);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Release this page…' }).click();
     const dialog = page.getByRole('dialog', { name: 'Release this page' });
     await expect(dialog.getByText('Readers get version 2 of the draft. Changed: text.')).toBeVisible();
-    await picture(page, 'publishing-release');
+    await picture(page, 'publishing-release', [page.getByTestId('last-updated')]);
     await checkAccessibility(page);
     await page.keyboard.press('Escape');
   });
@@ -1836,7 +1836,7 @@ test.describe('draft and published spaces', () => {
     await page.goto(`/pages/${twin}`);
     await expect(page.getByText('Open the draft')).toBeVisible();
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-twin');
+    await picture(page, 'publishing-twin', [page.getByTestId('last-updated')]);
     await checkAccessibility(page);
   });
 });

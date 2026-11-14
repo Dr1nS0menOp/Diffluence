@@ -53,7 +53,8 @@ export function SpaceStrip({ current }: { current: Space }) {
     // Only the strip moves: scrollIntoView would take the sidebar along.
     if (chip.left < box.left) list.current.scrollLeft -= box.left - chip.left;
     else if (chip.right > box.right) list.current.scrollLeft += chip.right - box.right;
-  }, [place]);
+    // The list arrives in two answers; the current space can move when the second one lands.
+  }, [place, spaces.length]);
 
   useEffect(() => {
     const box = list.current;
