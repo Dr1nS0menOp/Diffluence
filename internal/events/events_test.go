@@ -16,10 +16,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/diffluence/diffluence/internal/failures"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // recorder keeps what each consumer was handed, in order, and fails the events it is told to.
@@ -303,7 +306,7 @@ func TestOnlyOneSequencerRunsAtATime(t *testing.T) {
 		if n != 1 {
 			t.Fatalf("moved %d events once the lock was free", n)
 		}
-	case <-time.After(10 * time.Second):
+	case <-time.After(30 * time.Second):
 		t.Fatal("the second sequencer never ran")
 	}
 }
@@ -420,21 +423,23 @@ func TestAFailedEventDoesNotHoldItsLane(t *testing.T) {
 		return nil
 	}
 	sequenceAll(t, pool)
+	before := dbNow(t, pool)
 	drain(t, r, lanes)
+	after := dbNow(t, pool)
 
 	if got := rec.of("webhooks"); !slices.Equal(got, []uuid.UUID{bad, good}) {
 		t.Fatalf("handed %v", got)
 	}
 	var tries int
-	var wait float64
+	var next time.Time
 	var lastError string
-	err := pool.QueryRow(ctx, `SELECT tries, extract(epoch FROM next_at - now())::float8, last_error
-		FROM event_retries WHERE consumer = 'webhooks' AND event_id = $1`, bad).Scan(&tries, &wait, &lastError)
+	err := pool.QueryRow(ctx, `SELECT tries, next_at, last_error
+		FROM event_retries WHERE consumer = 'webhooks' AND event_id = $1`, bad).Scan(&tries, &next, &lastError)
 	if err != nil {
 		t.Fatalf("the failed event waits nowhere: %v", err)
 	}
-	if tries != 1 || wait < 8 || wait > 12 || lastError != "the endpoint is down" {
-		t.Fatalf("tries %d, next in %vs, error %q", tries, wait, lastError)
+	if tries != 1 || !waitsFor(next, retryWaits[0], before, after) || lastError != "the endpoint is down" {
+		t.Fatalf("tries %d, next at %v, error %q", tries, next, lastError)
 	}
 	var cursor int64
 	if err := pool.QueryRow(ctx, "SELECT pos FROM event_cursors WHERE consumer = 'webhooks' AND lane = (SELECT lane FROM event_log WHERE id = $1)", good).
@@ -442,6 +447,22 @@ func TestAFailedEventDoesNotHoldItsLane(t *testing.T) {
 		t.Fatalf("cursor %d, err %v", cursor, err)
 	}
 	mustPass(t, pool)
+}
+
+// dbNow is the database's clock, which sets every wait.
+func dbNow(t *testing.T, pool *pgxpool.Pool) time.Time {
+	t.Helper()
+	var now time.Time
+	if err := pool.QueryRow(context.Background(), "SELECT now()").Scan(&now); err != nil {
+		t.Fatal(err)
+	}
+	return now
+}
+
+// waitsFor says whether next is wait after a moment between before and after, read from the
+// database around the step that set it. Bounds taken this way hold on a machine of any pace.
+func waitsFor(next time.Time, wait time.Duration, before, after time.Time) bool {
+	return !next.Before(before.Add(wait)) && !next.After(after.Add(wait))
 }
 
 // makeRetriesDue moves every waiting retry to now.
@@ -468,19 +489,19 @@ func TestARetryEndsInFailures(t *testing.T) {
 	// Each retry waits longer: 10 s, then 1, 5, 15 and 60 minutes, as NATS waited.
 	for i, wait := range retryWaits[1:] {
 		makeRetriesDue(t, pool)
+		before := dbNow(t, pool)
 		if n, err := r.retryStep(ctx, consumer); err != nil || n != 1 {
 			t.Fatalf("retry %d: ran %d, err %v", i+1, n, err)
 		}
+		after := dbNow(t, pool)
 		var tries int
-		var seconds float64
-		err := pool.QueryRow(ctx, `SELECT tries, extract(epoch FROM next_at - now())::float8
-			FROM event_retries WHERE consumer = 'automation'`).Scan(&tries, &seconds)
+		var next time.Time
+		err := pool.QueryRow(ctx, `SELECT tries, next_at FROM event_retries WHERE consumer = 'automation'`).Scan(&tries, &next)
 		if err != nil {
 			t.Fatalf("retry %d: %v", i+1, err)
 		}
-		left := time.Duration(seconds * float64(time.Second))
-		if tries != i+2 || left < wait-5*time.Second || left > wait+5*time.Second {
-			t.Fatalf("retry %d: tries %d, next in %v, want %v", i+1, tries, left, wait)
+		if tries != i+2 || !waitsFor(next, wait, before, after) {
+			t.Fatalf("retry %d: tries %d, next at %v, want %v after a moment between %v and %v", i+1, tries, next, wait, before, after)
 		}
 		if failed := countFailures(t, pool); failed != 0 {
 			t.Fatalf("gave up after retry %d", i+1)
@@ -626,7 +647,8 @@ func TestALiveLeaseIsNotTaken(t *testing.T) {
 	b := newRunner(pool, newRecorder().consumer("webhooks"))
 	lanesA, lanesB := start(t, a), start(t, b)
 	drain(t, a, lanesA)
-	if _, err := pool.Exec(ctx, "UPDATE event_cursors SET lease_until = now() + interval '2 seconds'"); err != nil {
+	// Live for far longer than the steps below take on a slow machine.
+	if _, err := pool.Exec(ctx, "UPDATE event_cursors SET lease_until = now() + interval '1 minute'"); err != nil {
 		t.Fatal(err)
 	}
 	drain(t, b, lanesB)
@@ -745,13 +767,7 @@ func TestPollingDeliversWithoutNotify(t *testing.T) {
 	go func() { defer close(done); r.Run(ctx) }()
 	id := enqueue(t, pool, map[string]any{"page_id": "p"})
 	sequenceAll(t, pool)
-	began := time.Now()
-	for len(rec.of("notifications")) == 0 {
-		if time.Since(began) > 5*time.Second {
-			t.Fatal("no event arrived without a notification")
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
+	waitUntil(t, "an event arrives without a notification", func() bool { return len(rec.of("notifications")) > 0 })
 	if got := rec.of("notifications"); !slices.Equal(got, []uuid.UUID{id}) {
 		t.Fatalf("handed %v", got)
 	}
@@ -774,19 +790,22 @@ func TestANotificationWakesTheConsumers(t *testing.T) {
 	listening := r.Wake.Subscribe()
 	go Listen(ctx, tdb.URL, r.Wake, slog.New(slog.DiscardHandler))
 	<-listening
+	// The cursors exist before the event, or a slow start of Run would put them past it.
+	if err := r.EnsureCursors(ctx); err != nil {
+		t.Fatal(err)
+	}
 	done := make(chan struct{})
 	go func() { defer close(done); r.Run(ctx) }()
-	// Run polls once at its start; let that pass before the event exists.
-	time.Sleep(200 * time.Millisecond)
+	// Run passes every lane once at its start, taking its lease; let that pass first, so only
+	// a wake-up can hand the event over within the hour of the poll.
+	waitUntil(t, "every lane passes once", func() bool {
+		var held int
+		err := pool.QueryRow(ctx, "SELECT count(*) FROM event_cursors WHERE lease_owner = $1", r.Node).Scan(&held)
+		return err == nil && held == Lanes
+	})
 	enqueue(t, pool, map[string]any{"page_id": "p"})
 	sequenceAll(t, pool)
-	began := time.Now()
-	for len(rec.of("notifications")) == 0 {
-		if time.Since(began) > 5*time.Second {
-			t.Fatal("the notification woke nothing")
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
+	waitUntil(t, "the notification wakes a consumer", func() bool { return len(rec.of("notifications")) > 0 })
 	cancel()
 	<-done
 }
@@ -812,7 +831,7 @@ func TestASaveDoesNotNotify(t *testing.T) {
 		t.Fatalf("a save notified: %+v", n)
 	}
 	sequenceAll(t, tdb.Pool)
-	wait, cancel := context.WithTimeout(ctx, 5*time.Second)
+	wait, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 	n, err = conn.WaitForNotification(wait)
 	if err != nil {
@@ -914,6 +933,53 @@ func TestABacklogAfterDowntimeIsDelivered(t *testing.T) {
 		}
 	}
 	mustPass(t, pool)
+}
+
+// The trace of the request that saved an event reaches its consumer, through the sequencer,
+// on the first run and on a retry (spec 068, 4.1).
+func TestATraceGoesFromTheSaveToTheConsumer(t *testing.T) {
+	pool := testutil.Database(t).Pool
+	ctx := context.Background()
+	stop, err := tracing.Start(ctx, tracing.Options{Enabled: true, Sample: 1, Exporter: tracetest.NewInMemoryExporter()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = stop(ctx) })
+	usePostgres(t, pool)
+	var mu sync.Mutex
+	var traces []trace.TraceID
+	consumer := Consumer{Name: "webhooks", Handle: func(ctx context.Context, _ []byte) error {
+		mu.Lock()
+		defer mu.Unlock()
+		traces = append(traces, trace.SpanContextFromContext(ctx).TraceID())
+		if len(traces) == 1 {
+			return errors.New("down once")
+		}
+		return nil
+	}}
+	r := newRunner(pool, consumer)
+	lanes := start(t, r)
+	saveCtx, end := tracing.Span(ctx, "request", "")
+	want := trace.SpanContextFromContext(saveCtx).TraceID()
+	err = pgx.BeginFunc(saveCtx, pool, func(tx pgx.Tx) error {
+		_, err := outbox.Enqueue(saveCtx, tx, "page.published", map[string]any{"page_id": "p"})
+		return err
+	})
+	end(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sequenceAll(t, pool)
+	drain(t, r, lanes)
+	makeRetriesDue(t, pool)
+	if n, err := r.retryStep(ctx, consumer); err != nil || n != 1 {
+		t.Fatalf("retried %d, err %v", n, err)
+	}
+	mu.Lock()
+	defer mu.Unlock()
+	if len(traces) != 2 || traces[0] != want || traces[1] != want {
+		t.Fatalf("handled in traces %v, want twice %v", traces, want)
+	}
 }
 
 // A new consumer starts at the head, and a second start keeps the cursors where they are.

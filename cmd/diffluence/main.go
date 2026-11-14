@@ -51,6 +51,12 @@ Commands:
   events check              check that the event log lost nothing: no gap in its positions, no
                             cursor past an event it did not hand over, nothing waiting long
                             while a worker runs (spec 068); exits 1 at the first breach
+  events switch postgres|nats
+                            send the events through PostgreSQL, or back through NATS, from the
+                            next relay batch on; postgres waits until no node of an older
+                            release runs (spec 068)
+  events status             show the transport, whether NATS is drained, and whether the
+                            release without NATS may be installed
   backup note               record that a complete backup was just made (scripts/backup.sh runs it)
   backup next|report|restore-checked
                             what the backup worker asks and tells the console; see diffluence backup
@@ -142,11 +148,17 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 	case "events":
-		if len(args) < 2 || args[1] != "check" {
+		switch {
+		case len(args) == 2 && args[1] == "check":
+			err = cmdEventsCheck(ctx, stdout)
+		case len(args) == 2 && args[1] == "status":
+			err = cmdEventsStatus(ctx, stdout)
+		case len(args) == 3 && args[1] == "switch" && (args[2] == string(events.TransportPostgres) || args[2] == string(events.TransportNATS)):
+			err = cmdEventsSwitch(ctx, events.Transport(args[2]), stdout)
+		default:
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
-		err = cmdEventsCheck(ctx, stdout)
 	case "setup-code":
 		err = cmdSetupCode(ctx, stdout)
 	case "worker":
@@ -527,8 +539,7 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 	return nil
 }
 
-// cmdBackupNote tells the checks before the next upgrade that a backup exists. It does not
-// check the backup: scripts/backup.sh runs it only after every part was written.
+// cmdEventsCheck runs the ledger rules of the event log (spec 068, 2.10).
 func cmdEventsCheck(ctx context.Context, stdout io.Writer) error {
 	cfg, err := config.FromEnvironment()
 	if err != nil {
@@ -550,6 +561,74 @@ func cmdEventsCheck(ctx context.Context, stdout io.Writer) error {
 	return nil
 }
 
+// cmdEventsSwitch sends the events through PostgreSQL or back through NATS (spec 068, 2.11).
+func cmdEventsSwitch(ctx context.Context, to events.Transport, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	changed, err := app.SwitchEvents(ctx, pool, to)
+	if err != nil {
+		return err
+	}
+	switch {
+	case changed:
+		fmt.Fprintf(stdout, "switched to %s: the next relay batch takes that way, and the workers start or keep the consumers within seconds\n", to)
+	case to == events.TransportPostgres:
+		fmt.Fprintln(stdout, "already on postgres: the drain of NATS starts anew")
+	default:
+		fmt.Fprintln(stdout, "already on nats")
+	}
+	return nil
+}
+
+// cmdEventsStatus shows where the switch stands and whether the release without NATS may be
+// installed.
+func cmdEventsStatus(ctx context.Context, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	s, err := events.ReadState(ctx, pool)
+	if err != nil {
+		return err
+	}
+	problem, err := events.NATSRemovalProblem(ctx, pool)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "transport: %s, since %s\n", s.Transport, s.ChangedAt.UTC().Format(time.RFC3339))
+	switch {
+	case s.Transport == events.TransportNATS:
+		fmt.Fprintln(stdout, "NATS: in use")
+	case s.DrainedAt.IsZero():
+		fmt.Fprintln(stdout, "NATS: not drained yet; a worker notes it within a minute of NATS being empty")
+	default:
+		fmt.Fprintf(stdout, "NATS: drained at %s\n", s.DrainedAt.UTC().Format(time.RFC3339))
+	}
+	for _, n := range s.OlderNodes {
+		fmt.Fprintf(stdout, "node of an older release: %s (role %s, migration %d)\n", n.Version, n.Role, n.MaxMigration)
+	}
+	if problem != "" {
+		fmt.Fprintf(stdout, "release without NATS: not yet: %s\n", problem)
+		return nil
+	}
+	fmt.Fprintln(stdout, "release without NATS: may be installed")
+	return nil
+}
+
+// cmdBackupNote tells the checks before the next upgrade that a backup exists. It does not
+// check the backup: scripts/backup.sh runs it only after every part was written.
 func cmdBackupNote(ctx context.Context, stdout io.Writer) error {
 	cfg, err := config.FromEnvironment()
 	if err != nil {

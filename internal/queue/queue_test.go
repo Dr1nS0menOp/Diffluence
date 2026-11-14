@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -88,6 +89,60 @@ func TestAnEventThatRecoversIsNotHandedOver(t *testing.T) {
 		t.Fatal(err)
 	}
 	waitFor(t, done)
+}
+
+// An event waiting for its retry is still in NATS: the drain after the switch to PostgreSQL
+// must wait for it (spec 068, 2.11). One that was handled is not.
+func TestAnEventWaitingForItsRetryCountsAsWaiting(t *testing.T) {
+	q := embedded(t)
+	q.retryWaits = []time.Duration{time.Hour}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	failed, handled := make(chan struct{}), make(chan struct{})
+	var failOnce, handleOnce sync.Once
+	listeners := []Listener{
+		{Durable: "slow", Handle: func(context.Context, []byte) error {
+			failOnce.Do(func() { close(failed) })
+			return errors.New("down")
+		}},
+		{Durable: "fast", Handle: func(context.Context, []byte) error {
+			handleOnce.Do(func() { close(handled) })
+			return nil
+		}},
+	}
+	for _, l := range listeners {
+		l.GiveUp = func(context.Context, string, []byte, error) error { return nil }
+		go func() { _ = q.Consume(ctx, l) }()
+	}
+	if _, err := q.Waiting(ctx, []string{"never-made"}); err == nil {
+		t.Fatal("a consumer that does not exist has nothing waiting")
+	}
+	if err := q.Publish(ctx, "diffluence.events.test", []byte("x"), "four"); err != nil {
+		t.Fatal(err)
+	}
+	waitFor(t, failed)
+	waitFor(t, handled)
+	if n, err := q.Waiting(ctx, []string{"slow"}); err != nil || n != 1 {
+		t.Fatalf("waiting %d, err %v", n, err)
+	}
+	// The acknowledgement reaches the server a moment after the handler returns.
+	deadline := time.Now().Add(30 * time.Second)
+	for {
+		n, err := q.Waiting(ctx, []string{"fast"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if n == 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatalf("a handled event still waits: %d", n)
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	if n, err := q.Waiting(ctx, []string{"slow", "fast"}); err != nil || n != 1 {
+		t.Fatalf("waiting in both %d, err %v", n, err)
+	}
 }
 
 func TestAFailureThatCannotBeStoredIsTriedAgain(t *testing.T) {

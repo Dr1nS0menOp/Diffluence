@@ -284,9 +284,12 @@ var crossings = map[crossing]int{
 	{"internal/console", "user_profiles"}:       1,
 	{"internal/console", "users"}:               5,
 
-	// events: the event path beside NATS reads the outbox it relays and the live nodes.
-	{"internal/events", "nodes"}:         1,
-	{"internal/events", "outbox_events"}: 4,
+	// events: the event path beside NATS reads the outbox it relays and the live nodes. The
+	// switch reads which releases the live nodes run (internal/app imports events, so its
+	// registry has no API events could call), and the check of the release without NATS looks
+	// for an event published to NATS after the drain (spec 068, wave EV2).
+	{"internal/events", "nodes"}:         3,
+	{"internal/events", "outbox_events"}: 5,
 
 	// exchange: an export reads a whole space, and an import restores one in a single
 	// transaction (spec 032).

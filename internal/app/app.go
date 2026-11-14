@@ -626,6 +626,7 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "forget-presence", Every: time.Minute, Run: a.presence.Forget},
 		{Name: "trim-recent-pages", Every: time.Hour, Run: a.pages.TrimRecent},
 		{Name: "replay-events", Every: time.Minute, Run: a.ReplayEvents},
+		{Name: "note-nats-drained", Every: time.Minute, Run: a.noteNATSDrained},
 		{Name: "purge-event-failures", Every: 24 * time.Hour, Run: a.failures.Purge},
 		{Name: "run-schedules", Every: time.Minute, Run: a.automation.RunSchedules},
 		{Name: "purge-rule-runs", Every: 24 * time.Hour, Run: a.automation.PurgeRuns},

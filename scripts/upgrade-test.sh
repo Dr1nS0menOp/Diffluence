@@ -159,6 +159,32 @@ by_new=$(write_on 8092 new)
 read_on 8091 "$by_new" new
 sleep 3
 
+# Spec 068: an operator switches the events from NATS to PostgreSQL. A release from before the
+# switch holds it up while it runs, so it comes once that release stops.
+events_cmd() { DIFFLUENCE_DATA_DIR="$work/new" "$new" events "$@"; }
+switch_events() {
+  local out
+  if out=$(events_cmd switch postgres 2>&1); then
+    echo "$out"
+    return 0
+  fi
+  case $out in
+    *"from before the switch"*) echo "release N is older than the switch, which waits: $out"; return 1 ;;
+  esac
+  echo "the switch failed: $out" >&2
+  exit 1
+}
+echo "3b. an operator switches the events to PostgreSQL while both run"
+switched_beside_old=
+if switch_events; then
+  switched_beside_old=1
+  # Events of both releases now go through the log.
+  by_new_switched=$(write_on 8092 new-switched)
+  by_old_switched=$(write_on 8091 old-switched)
+  read_on 8091 "$by_new_switched" new-switched
+  read_on 8092 "$by_old_switched" old-switched
+fi
+
 echo "4. the load balancer drops the old node, which then stops gracefully"
 echo 8092 >"$work/ports"
 sleep 1
@@ -182,6 +208,37 @@ if [ "$failed" -gt 0 ]; then
 fi
 [ "$on_old" -gt 0 ] && [ "$on_new" -gt 0 ]
 
+if [ -z "$switched_beside_old" ]; then
+  echo "4a. release N stopped: the switch goes through now"
+  switch_events || { echo "the switch still waits after release N stopped" >&2; exit 1; }
+  by_new_switched=$(write_on 8092 new-switched)
+fi
+
+# Every event of the log reached every consumer, and the NATS consumers of the new release
+# finished what they held: then the worker notes the drain, within a minute.
+echo "4b. every event of the log reaches every consumer, and NATS drains"
+settled() {
+  psql "$url" -tAc "SELECT (SELECT transport = 'postgres' AND nats_drained_at IS NOT NULL FROM event_transport)
+    AND (SELECT count(*) FROM event_log) > 0
+    AND (SELECT count(DISTINCT consumer) FROM event_cursors) = 4
+    AND NOT EXISTS (SELECT 1 FROM event_cursors c JOIN event_log l ON l.lane = c.lane AND l.pos > c.pos)
+    AND NOT EXISTS (SELECT 1 FROM event_retries)"
+}
+for _ in $(seq 1 300); do
+  [ "$(settled)" = t ] && break
+  sleep 0.5
+done
+if [ "$(settled)" != t ]; then
+  echo "the events did not settle after the switch:"
+  events_cmd status || true
+  psql "$url" -c "SELECT consumer, lane, pos FROM event_cursors ORDER BY 1, 2" -c "SELECT pos, lane, type FROM event_log ORDER BY pos"
+  tail -5 "$work/new.log"
+  exit 1
+fi
+echo "events in the log: $(psql "$url" -tAc 'SELECT count(*) FROM event_log')"
+events_cmd check
+events_cmd status
+
 echo "5. rolling back: the old version starts again on the migrated database"
 # The new node stops first, as in a rollback; the old one keeps its own queue folder.
 for p in "${pids[@]}"; do kill -TERM "$p" 2>/dev/null || true; done
@@ -199,9 +256,11 @@ if [ "$status" != 200 ]; then
 fi
 read_on 8091 "$by_old" old
 read_on 8091 "$by_new" new
+read_on 8091 "$by_new_switched" new-switched
 
 # The events and jobs both releases left behind went through: none failed, none set aside,
-# and the outbox empties (OPS-070).
+# and the outbox empties (OPS-070). After the switch, a release that knows it sequences what
+# waits; one from before it publishes to NATS, as before.
 for _ in $(seq 1 60); do
   [ "$(psql "$url" -tAc 'SELECT count(*) FROM outbox_events WHERE published_at IS NULL')" = 0 ] && break
   sleep 0.5
@@ -219,6 +278,7 @@ kill -TERM "${pids[-1]}"
 wait "${pids[-1]}" || true
 pids=()
 
-echo "6. the audit chain written by both versions is intact"
+echo "6. the audit chain written by both versions is intact, and so is the event log"
 DIFFLUENCE_DATA_DIR="$work/new" "$new" audit verify
+events_cmd check
 echo "upgrade test passed"

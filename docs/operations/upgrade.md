@@ -108,6 +108,27 @@ Since spec 071, single sign-on makes no account at a first login unless `DIFFLUE
 
 Since migration 0057, the check of the audit log counts the personal parts of events that are gone, and fails when more are gone than recorded erasures removed. Anonymising someone records how many parts it erased. The migration counts the parts erased before, so an installation that anonymised people earlier still checks whole. While nodes of the previous release still run, an anonymisation on such a node records no count; finish the upgrade of every node before anonymising anyone.
 
+## Events from NATS to PostgreSQL
+
+Since migration 0059 (spec 068, wave EV2) the events can go through PostgreSQL instead of NATS. The upgrade does not switch by itself: events keep going through NATS until an operator says otherwise. The release that removes NATS will refuse to upgrade until the switch is made and NATS is drained, and say so.
+
+To switch, once every node runs this release or the one before it (migration 0053 or later):
+
+```
+docker compose exec diffluence diffluence events switch postgres
+docker compose exec diffluence diffluence events status
+```
+
+The switch waits while a node of an older release has been seen in the last five minutes, and names it. From the next relay batch on, every new event goes to the event log; the workers start its consumers within five seconds. Their NATS consumers keep running and finish what NATS still holds, including retries that wait up to an hour. A worker notes within a minute of NATS being empty that it is drained; `events status` then says `NATS: drained at` with the time, and `release without NATS: may be installed`.
+
+To undo the switch, at any time and without waiting for nodes:
+
+```
+docker compose exec diffluence diffluence events switch nats
+```
+
+New events go through NATS again. What the event log already holds is still handed to every consumer, by every worker of this release, until nothing is left. The drain is forgotten; switching to postgres again starts a new one. If a node of an older release published to NATS after the drain, `events status` says so; stop that node, run `diffluence events switch postgres` again and wait for the drain.
+
 ## Rolling back
 
 Expand migrations leave the old structure in place, so the previous version runs on a database the new version has migrated. Roll back by starting the previous version.
@@ -134,7 +155,7 @@ A jump over several releases is allowed: the binary runs every migration in orde
 
 ## Proof
 
-`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request.
+`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request. It switches the events to PostgreSQL while both run (or once the old one stops, when it is from before the switch), and fails unless every event of the log reaches every consumer, NATS is noted as drained, and `diffluence events check` passes before and after the rollback.
 
 It also writes across versions: the old version publishes a page, saves a draft, comments and uploads a file; the new one reads all of it, writes its own, and the old one reads that while both run. Then it stops the new one and starts the old one again on the migrated database, as a rollback, which reads everything both wrote. At the end no job may have failed, no event may be set aside and the outbox must be empty, and the audit chain both wrote must hold.
 

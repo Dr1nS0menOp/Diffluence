@@ -956,6 +956,74 @@ mutate "the listen address ignores its setting" internal/config/config.go \
   's.replace("if c.ListenDatabaseURL != \"\" {", "if false {")' ./internal/config -run '^TestTheListenAddressFallsBackToTheDatabase$'
 mutate "the listen address shows its password" internal/config/report.go \
   's.replace("\"LISTEN_DATABASE_URL\": true, \"SMTP_PASSWORD\"", "\"SMTP_PASSWORD\"")' ./internal/config -run '^TestTheListenAddressIsShownWithoutItsPassword$'
+# Spec 068, wave EV2: the switch, the drain of NATS, the check of the release without NATS and
+# the trace column. Every condition has a mutation.
+mutate "the switch takes no events lock" internal/events/switch.go \
+  's.replace("\"SELECT pg_advisory_xact_lock($1)\", lockKey", "\"SELECT $1::bigint\", lockKey")' $ev -run '^TestEachEventGoesOneWayAcrossTheSwitch$'
+mutate "the switch goes ahead beside an older node" internal/events/switch.go \
+  's.replace("if len(behind) > 0 {", "if false {")' $ev -run '^TestTheSwitchWaitsForEveryNode$'
+mutate "a node of release A, part 1, holds the switch up" internal/events/switch.go \
+  's.replace("WHERE max_migration < $1 AND last_seen_at > now() - make_interval(secs => $2)\n\tORDER BY", "WHERE max_migration <= $1 AND last_seen_at > now() - make_interval(secs => $2)\n\tORDER BY")' $ev -run '^TestTheSwitchWaitsForEveryNode$'
+mutate "a node gone for long holds the switch up" internal/events/switch.go \
+  's.replace("WHERE max_migration < $1 AND last_seen_at > now() - make_interval(secs => $2)\n\tORDER BY", "WHERE max_migration < $1 AND $2 > 0\n\tORDER BY")' $ev -run '^TestTheSwitchWaitsForEveryNode$'
+mutate "the switch leaves the cursors to the first worker" internal/events/switch.go \
+  's.replace("createCursors(ctx, tx, consumers)", "createCursors(ctx, tx, nil)")' $ev -run '^TestTheCursorsStartAtTheHeadOfTheSwitch$'
+mutate "a switch keeps the drain of before" internal/events/switch.go \
+  's.replace("nats_drained_at = NULL FROM", "nats_drained_at = nats_drained_at FROM")' $ev -run '^(TestSwitchingAgainStartsANewDrain|TestDrainedIsSetOnlyWhenNothingWaits)$'
+mutate "a switch to the transport in use counts as a change" internal/events/switch.go \
+  's.replace("RETURNING o.transport <> n.transport", "RETURNING true")' $ev -run '^TestSwitchingAgainStartsANewDrain$'
+mutate "an older node that comes back leaves the drain" internal/events/switch.go \
+  's.replace("WHERE nats_drained_at IS NOT NULL AND `+anOlderNodeSQL", "WHERE false AND `+anOlderNodeSQL")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "NATS is asked while it carries the events or an older node runs" internal/events/switch.go \
+  's.replace("case s.Transport != TransportPostgres || len(s.OlderNodes) > 0:\n\t\treturn false, nil", "case false:\n\t\treturn false, nil")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "a drain once noted is asked again" internal/events/switch.go \
+  's.replace("case !s.DrainedAt.IsZero():\n\t\treturn true, nil", "case false:\n\t\treturn true, nil")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "the drain is noted while NATS holds events" internal/events/switch.go \
+  's.replace("if n > 0 {", "if n > 1000 {")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "the drain is noted on an answer from before a switch" internal/events/switch.go \
+  's.replace("WHERE changed_at = $3 AND NOT", "WHERE $3::timestamptz IS NOT NULL AND NOT")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "the drain is noted beside an older node that just started" internal/events/switch.go \
+  's.replace("WHERE changed_at = $3 AND NOT `+anOlderNodeSQL", "WHERE changed_at = $3 AND $1 > 0 AND $2 > 0`")' $ev -run '^TestDrainedIsSetOnlyWhenNothingWaits$'
+mutate "the consumers stop at once after a switch back" internal/events/switch.go \
+  's.replace("WHERE l.lane = c.lane AND l.pos > c.pos", "WHERE l.lane = c.lane AND l.pos > c.pos + 1000")' $ev -run '^TestSwitchingBackToNATSLosesNothing$'
+mutate "the consumers run on for ever after a switch back" internal/events/switch.go \
+  's.replace("WHERE l.lane = c.lane AND l.pos > c.pos", "WHERE l.pos > c.pos")' $ev -run '^TestSwitchingBackToNATSLosesNothing$'
+mutate "the consumers stop while a retry waits" internal/events/switch.go \
+  's.replace("\n\t\tOR EXISTS (SELECT 1 FROM event_retries)", "")' $ev -run '^TestARetryKeepsTheConsumersRunningUnderNATS$'
+mutate "the consumers wait for the first event after the switch" internal/events/switch.go \
+  's.replace("(SELECT transport = \x27postgres\x27 FROM event_transport)", "false")' $ev -run '^TestSwitchingBackToNATSLosesNothing$'
+mutate "the release without NATS takes a database before the switch" internal/events/switch.go \
+  's.replace("if err != nil || !canSwitch {", "if err != nil || !canSwitch && false {")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "the release without NATS takes a database still on NATS" internal/events/switch.go \
+  's.replace("case s.Transport != TransportPostgres:\n\t\treturn \"the events", "case false:\n\t\treturn \"the events")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "the release without NATS takes one beside an older node" internal/events/switch.go \
+  's.replace("case len(s.OlderNodes) > 0:\n\t\treturn (&NodesBehindError", "case false:\n\t\treturn (&NodesBehindError")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "the release without NATS takes one not yet drained" internal/events/switch.go \
+  's.replace("case s.DrainedAt.IsZero():\n\t\treturn \"NATS may", "case false:\n\t\treturn \"NATS may")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "the release without NATS misses a late publish" internal/events/switch.go \
+  's.replace("WHERE published_at >= $1)", "WHERE published_at >= $1 AND false)")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "the release without NATS counts a publish before the drain as late" internal/events/switch.go \
+  's.replace("WHERE published_at >= $1)", "WHERE published_at >= $1 - interval \x271 day\x27)")' $ev -run '^TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained$'
+mutate "a save forgets its trace" internal/outbox/outbox.go \
+  's.replace("trace = &tp", "_ = tp")' $ev -run '^TestATraceGoesFromTheSaveToTheConsumer$'
+mutate "the sequencer drops the trace" internal/events/sequencer.go \
+  's.replace("o.created_at, o.trace", "o.created_at, NULL")' $ev -run '^TestATraceGoesFromTheSaveToTheConsumer$'
+mutate "a consumer works outside the trace" internal/events/events.go \
+  's.replace("tracing.ConsumeStored(ctx, e.msg.Type, c.Name, e.trace)", "tracing.ConsumeStored(ctx, e.msg.Type, c.Name, \"\")")' $ev -run '^TestATraceGoesFromTheSaveToTheConsumer$'
+mutate "a retry works outside the trace" internal/events/retries.go \
+  's.replace("l.created_at, coalesce(l.trace, \x27\x27), t.tries", "l.created_at, \x27\x27, t.tries")' $ev -run '^TestATraceGoesFromTheSaveToTheConsumer$'
+mutate "a stored trace names no parent" internal/tracing/queue.go \
+  's.replace("ctx = propagator.Extract(ctx, propagation.MapCarrier{traceparentKey: traceparent})", "")' ./internal/tracing -run '^TestAStoredEventCarriesItsTraceToItsConsumer$'
+mutate "a trace is stored while tracing is off" internal/tracing/queue.go \
+  's.replace("func Traceparent(ctx context.Context) string {\n\tif !On() {", "func Traceparent(ctx context.Context) string {\n\tif false {")' ./internal/tracing -run '^TestAStoredTraceIsEmptyWhenOff$'
+mutate "a retry waiting in NATS does not count" internal/queue/queue.go \
+  's.replace("int(info.NumPending) + info.NumAckPending", "int(info.NumPending)")' ./internal/queue -run '^TestAnEventWaitingForItsRetryCountsAsWaiting$'
+mutate "only the last consumer of NATS counts" internal/queue/queue.go \
+  's.replace("total += int(info.NumPending)", "total = int(info.NumPending)")' ./internal/queue -run '^TestAnEventWaitingForItsRetryCountsAsWaiting$'
+mutate "a worker never starts the consumers of the log after a switch" internal/app/events.go \
+  's.replace("case needed:", "case needed && false:")' $app -run '^TestARunningWorkerFollowsTheSwitchAndNotesTheDrain$'
+mutate "a worker never notes the drain" internal/app/events.go \
+  's.replace("return a.queue.Waiting(ctx, durables)", "return len(durables), nil")' $app -run '^TestARunningWorkerFollowsTheSwitchAndNotesTheDrain$'
 mutate "a helper gets the network of the database" compose.yaml \
   's.replace("    networks: [helpers]\n", "")' $app -run TestHelpersHaveNoWayOut
 mutate "a private saved block reaches everyone" internal/savedblocks/savedblocks.go \

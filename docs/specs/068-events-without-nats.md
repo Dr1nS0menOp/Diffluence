@@ -1,7 +1,8 @@
 # Spec 068: events without NATS
 
-Status: study and plan, 2026-11-13. Wave EV1 is built (section 6): the PostgreSQL path stands
-beside NATS and stays off, since the transport stays `nats` until EV2. Blueprint lines: ADR-007,
+Status: study and plan, 2026-11-13. Waves EV1 (section 6) and EV2 (section 7) are built: the
+PostgreSQL path stands beside NATS, and an operator switches to it with
+`diffluence events switch postgres`; nothing switches by itself. Blueprint lines: ADR-007,
 ADR-018, OPS-012, OPS-083; spec 062 (F1, F3, T6) and spec 063 (F1).
 
 Written for: the people who build and run Diffluence, and the product owner, who decides.
@@ -644,6 +645,111 @@ and its answer is the open question above. **G2 to G4** need the stress server a
 EV2. **G5** is met for this wave: every one of the 48 mutations it added is caught, 45 on
 `internal/events` and its callers and three on the worker's wiring.
 
+## 7. Wave EV2 as built
+
+### 7.1 The switch, on an operator's command
+
+Section 2.11 had a worker switch by itself once every node ran release A. This release switches
+only when an operator runs `diffluence events switch postgres` (D24): the measurements on the
+stress server (G2, G3) come after this wave, and 5.1 keeps release A on `nats` until they pass.
+
+| Step | What happens |
+|---|---|
+| `events switch postgres` | One transaction under the events lock: refuse, naming them, while a node with a newest migration below 0053 was seen in the last five minutes (D25); create the cursors of the four consumers at the head (D26); set `postgres`, move `changed_at`, clear `nats_drained_at`. Every relay batch before it went to NATS, every one after it goes to the log |
+| The workers | Each looks every 5 s whether the consumers of the log are needed (D32): while the transport is `postgres`, or while a cursor is behind an event of its lane or a retry waits. The NATS consumers keep running, so what NATS held at the switch, and anything an older node publishes later, is still handled |
+| The drain | A periodic task, `note-nats-drained`, every minute: once the transport is `postgres`, no older node runs, and the four durables have nothing pending and nothing waiting for an ack (a retry that waits counts), it sets `nats_drained_at` (D28) |
+| `events switch nats` | The undo, at any time (D27): under the lock, back to `nats`, drain cleared. Events in the log are still handed over by every worker of this release until none is left |
+| `events switch postgres` again | Starts a new drain (D29): the way out after an older node published to NATS once it was drained |
+| `events status` | Transport, drain, older nodes, and the answer of the check of release B |
+
+Migration 0059 adds `outbox_events.trace` and `event_transport.nats_drained_at`; it may run twice
+(D33). Numbers 0055 to 0057 are waves RV3b and RV4's; 0058 holds the number of wave DC2.
+
+### 7.2 The check of release B
+
+`events.NATSRemovalProblem` is the check release B runs before it migrates (D30). It reads the
+database as any earlier release leaves it, and refuses, naming what to do, when:
+
+| The database | The problem names |
+|---|---|
+| has no `event_transport`, or no `nats_drained_at` | upgrade to the release that switches first |
+| is on `nats` | `diffluence events switch postgres` |
+| has a node of a release from before 0053 seen in five minutes | that node |
+| is on `postgres`, not drained | wait until `events status` says drained |
+| has an outbox row published at or after the drain | stop the older node, switch again, wait |
+
+It is tested against a fixture of each state. `diffluence events status` uses it now; EV3 puts it
+into the checks before an upgrade, with the kind `events`.
+
+### 7.3 The trace
+
+`outbox.Enqueue` stores the W3C `traceparent` of the request when tracing is on (D31); the
+sequencer copies it into `event_log.trace`; a consumer of the log, also on a retry, works in a span
+`queue consume <consumer>` with `messaging.system` `postgresql`, inside that trace. Off, nothing is
+stored and nothing runs. The NATS path is unchanged.
+
+### 7.4 Tests
+
+Written first and seen failing against stubs, in `internal/events/switch_test.go`:
+`TestEachEventGoesOneWayAcrossTheSwitch` (three relays, writers, and the switch arriving while one
+relay holds a batch; nothing reaches NATS after the switch commits, every event goes one way, the
+consumers started later get every event of the log), `TestTheSwitchWaitsForEveryNode`,
+`TestDrainedIsSetOnlyWhenNothingWaits`, `TestTheCursorsStartAtTheHeadOfTheSwitch`,
+`TestSwitchingBackToNATSLosesNothing`, `TestARetryKeepsTheConsumersRunningUnderNATS`,
+`TestSwitchingAgainStartsANewDrain`, `TestTheSwitchRefusesAnUnknownTransport` and
+`TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained` (eight fixtures).
+`TestAnOldRelayAfterTheSwitchLosesNothing` (a relay of release N, holding a row while the
+sequencer reaches it, then both side by side under writers) passed at once: EV1's sequencer
+already waits for a row an older relay holds. It guards that, and the existing mutation of the
+`published_at` filter breaks it. Elsewhere: `TestATraceGoesFromTheSaveToTheConsumer`, two tests in
+`internal/tracing`, `TestAnEventWaitingForItsRetryCountsAsWaiting` in `internal/queue`,
+`TestEventsSwitchAndStatus` in `cmd/diffluence`, and in `internal/app`
+`TestARunningWorkerFollowsTheSwitchAndNotesTheDrain`, a running node that hears of a mention
+through NATS, is switched, hears of the next through the log, and notes the drain.
+
+The CI `upgrade` job (G4) now switches while release N and this one run side by side (or once N
+stops, if N is from before 0053), writes through both, and fails unless every event of the log
+reaches all four consumers, NATS is noted drained, and `diffluence events check` passes, before
+and after the rollback. It proves delivery by cursors and the drain, not by the webhook witness of
+L4.
+
+### 7.5 Timing in the tests of EV1
+
+GitHub's `make test-race` failed once after EV1 landed and has not since. The tests of EV1 held
+these waits that assume a fast machine, now changed to wait on a condition or to bounds read from
+the database clock (D34):
+
+| Test | Was | Now |
+|---|---|---|
+| `TestANotificationWakesTheConsumers` | 200 ms sleep "for the first poll"; `Run` created the cursors itself, so a `Run` slower than 200 ms put them at the head past the event, and with an hour's poll it never arrived | cursors made first; waits until every lane holds its lease; 30 s for the event |
+| `TestAFailedEventDoesNotHoldItsLane` | retry due in 8 to 12 s from a later `now()` | due 10 s after a moment between two reads of the database clock around the step |
+| `TestARetryEndsInFailures` | each wait within ±5 s of a later `now()` | the same bounds as above |
+| `TestALiveLeaseIsNotTaken` | a lease live for 2 s | live for a minute |
+| `TestPollingDeliversWithoutNotify`, `TestASaveDoesNotNotify`, `TestOnlyOneSequencerRunsAtATime` | 5 to 10 s for a one-second poll or a lock | 30 s |
+
+The first is the likely cause. 80 runs of its old body under the race detector, `GOMAXPROCS=2`
+and 24 busy processes did not fail, so it is not proven.
+
+### 7.6 Measured again on the real data set
+
+`TestEventsOnRealData` on 13 November 2026, on the same dump and container as 6.4, now through
+`diffluence events switch` and with the trace column. The machine's load rose from 4 to 24 during
+the run, as other builds started, so the later stages are pessimistic.
+
+| Stage | Lag p50 / p95, notifications | Lag p95, the other three | Queue database time |
+|---|---|---|---|
+| 5/s | 147 / 268 ms | 251 ms | 3.4 ms a second |
+| 20/s, four times the model | 157 / 269 ms | 254 ms | 7.5 ms a second |
+| 85/s, the peak | 184 / 275 ms | 253 ms | 11.6 ms a second |
+| 170/s | 224 / 342 ms | 249 ms | 46 ms a second |
+| 340/s | 470 ms / 6.0 s | 15 ms | 156 ms a second |
+| 20/s without LISTEN (B4) | 719 ms / 1.21 s | 1.13 s | 4.4 ms a second |
+
+A backlog of 10,000 events went through all four consumers in 43 s (231 a second; 31 s in 6.4, on
+a quieter machine). B2: 5.6 s per `page.published` to 1,000 watchers, 180 notifications a second.
+G1's mark holds as in 6.4: lag p95 269 ms at four times the model against 1 s; the switch and the
+trace changed nothing measurable.
+
 ## Decisions
 
 Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
@@ -673,3 +779,14 @@ Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
 | D21 | Wave EV1: L3 counts a worker only after it has run a minute |
 | D22 | Wave EV1: System health warns in its "work" line when an event waits over a minute (both transports) or a consumer lags over five minutes; a gauge may carry one label, here the consumer |
 | D23 | Wave EV1: migration 0052 is a placeholder on this branch for the number wave RV1 holds; it goes when RV1 merges |
+| D24 | Wave EV2: the switch is an operator's command, `diffluence events switch postgres`, not automatic on upgrade, because G2 and G3 are measured after this wave. A later release may switch by itself once they pass |
+| D25 | Wave EV2: release A starts at migration 0053, since EV1's relays already take the events lock and its workers start the consumers of the log on `postgres`; the switch waits only for nodes below 0053 seen in the last five minutes |
+| D26 | Wave EV2: the switch creates the cursors of the four consumers at the head in its own transaction; a cursor made at a worker's first look (D16) would skip events sequenced in between |
+| D27 | Wave EV2: the undo is `diffluence events switch nats`, at any time, without waiting for nodes; a worker runs the consumers of the log while the transport is `postgres`, a cursor is behind an event of its lane, or a retry waits |
+| D28 | Wave EV2: NATS is drained when the four durables have no pending and no unacknowledged message (a waiting retry is unacknowledged), no older node runs, and no switch came while NATS was asked (`changed_at` moves on every switch); a missing durable is an error, not empty. A periodic task notes it each minute, and an older node that shows up undoes it |
+| D29 | Wave EV2: a switch to `postgres` while on `postgres` starts a new drain; release B refuses when an outbox row was published at or after the drain |
+| D30 | Wave EV2: the check of release B is `events.NATSRemovalProblem`, used by `diffluence events status` now and by the upgrade check in EV3 |
+| D31 | Wave EV2: the trace column holds the W3C `traceparent` only, stored when tracing is on; the NATS path is unchanged |
+| D32 | Wave EV2: a worker checks every 5 s, not every minute, whether to run the consumers of the log; one row read |
+| D33 | Wave EV2: migration 0059 holds the two columns and may run twice; 0058 is a placeholder for wave DC2 until it lands |
+| D34 | Wave EV2: tests wait on conditions with 30 s or 60 s deadlines, and check waits against the database clock read around the step, never against a fixed margin |

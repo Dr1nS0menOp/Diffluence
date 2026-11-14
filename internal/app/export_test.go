@@ -87,5 +87,8 @@ func (a *App) EventListenersForTest() map[string]func(context.Context, []byte) e
 // SharingForTest is the sharing module, for a test that calls it without the HTTP layer.
 func (a *App) SharingForTest() *sharing.Service { return a.sharing }
 
+// NoteNATSDrainedForTest runs the task that notes the drain of NATS after the switch.
+func (a *App) NoteNATSDrainedForTest(ctx context.Context) error { return a.noteNATSDrained(ctx) }
+
 // InMaintenanceForTest tells whether mail and jobs wait.
 func (a *App) InMaintenanceForTest(ctx context.Context) (bool, error) { return a.inMaintenance(ctx) }

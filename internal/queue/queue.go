@@ -214,6 +214,25 @@ func (q *Queue) Consume(ctx context.Context, l Listener) error {
 	return nil
 }
 
+// Waiting counts the events the durable consumers named have not finished: not yet
+// delivered, or delivered and not yet acknowledged, which includes an event waiting for its
+// retry. A consumer that does not exist is an error, since nobody would handle its events.
+func (q *Queue) Waiting(ctx context.Context, durables []string) (int, error) {
+	total := 0
+	for _, durable := range durables {
+		c, err := q.js.Consumer(ctx, StreamEvents, durable)
+		if err != nil {
+			return 0, fmt.Errorf("queue: find consumer %s: %w", durable, err)
+		}
+		info, err := c.Info(ctx)
+		if err != nil {
+			return 0, fmt.Errorf("queue: read consumer %s: %w", durable, err)
+		}
+		total += int(info.NumPending) + info.NumAckPending
+	}
+	return total, nil
+}
+
 // JetStream exposes the JetStream API for consumers.
 func (q *Queue) JetStream() jetstream.JetStream { return q.js }
 

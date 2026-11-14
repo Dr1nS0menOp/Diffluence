@@ -40,14 +40,14 @@ func (r *Runner) retryStep(ctx context.Context, c Consumer) (int, error) {
 		UPDATE event_retries t SET next_at = now() + make_interval(secs => $3)
 		FROM due JOIN event_log l ON l.pos = due.pos
 		WHERE t.consumer = due.consumer AND t.pos = due.pos
-		RETURNING l.pos, l.id, l.type, l.payload, l.created_at, t.tries`, c.Name, retryBatch, retryClaim.Seconds())
+		RETURNING l.pos, l.id, l.type, l.payload, l.created_at, coalesce(l.trace, ''), t.tries`, c.Name, retryBatch, retryClaim.Seconds())
 	if err != nil {
 		return 0, fmt.Errorf("events: claim the retries of %s: %w", c.Name, err)
 	}
 	due, err := pgx.CollectRows(rows, func(row pgx.CollectableRow) (retry, error) {
 		var t retry
 		var payload []byte
-		err := row.Scan(&t.pos, &t.msg.ID, &t.msg.Type, &payload, &t.msg.CreatedAt, &t.tries)
+		err := row.Scan(&t.pos, &t.msg.ID, &t.msg.Type, &payload, &t.msg.CreatedAt, &t.trace, &t.tries)
 		t.msg.Payload = payload
 		return t, err
 	})
@@ -64,7 +64,7 @@ func (r *Runner) retryStep(ctx context.Context, c Consumer) (int, error) {
 
 // runRetry runs one retry and records what became of it.
 func (r *Runner) runRetry(ctx context.Context, c Consumer, t retry) error {
-	cause := handle(ctx, c.Handle, t.event)
+	cause := handle(ctx, c, t.event)
 	switch {
 	case cause == nil:
 		_, err := r.Pool.Exec(ctx, "DELETE FROM event_retries WHERE consumer = $1 AND pos = $2", c.Name, t.pos)

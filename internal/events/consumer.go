@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/failures"
 )
 
@@ -76,12 +77,23 @@ func (r *Runner) lanes() []*lane {
 // the events that come after it, as the switch of spec 068 (2.11) needs. A cursor that
 // exists stays where it is.
 func (r *Runner) EnsureCursors(ctx context.Context) error {
-	for _, c := range r.Consumers {
-		_, err := r.Pool.Exec(ctx, `INSERT INTO event_cursors (consumer, lane, pos)
+	names := make([]string, len(r.Consumers))
+	for i, c := range r.Consumers {
+		names[i] = c.Name
+	}
+	return createCursors(ctx, r.Pool, names)
+}
+
+// createCursors gives each consumer a cursor per lane at the head; a cursor that exists
+// stays where it is. The switch calls it under the events lock, so the head is the one at the
+// switch.
+func createCursors(ctx context.Context, q db.Querier, consumers []string) error {
+	for _, name := range consumers {
+		_, err := q.Exec(ctx, `INSERT INTO event_cursors (consumer, lane, pos)
 			SELECT $1, lane, (SELECT pos FROM event_head) FROM generate_series(0, $2 - 1) AS lane
-			ON CONFLICT (consumer, lane) DO NOTHING`, c.Name, Lanes)
+			ON CONFLICT (consumer, lane) DO NOTHING`, name, Lanes)
 		if err != nil {
-			return fmt.Errorf("events: create the cursors of %s: %w", c.Name, err)
+			return fmt.Errorf("events: create the cursors of %s: %w", name, err)
 		}
 	}
 	return nil
@@ -113,7 +125,7 @@ func (r *Runner) step(ctx context.Context, l *lane) (int, error) {
 			return 0, err
 		}
 	}
-	rows, err := r.Pool.Query(ctx, `SELECT pos, id, type, payload, created_at FROM event_log
+	rows, err := r.Pool.Query(ctx, `SELECT `+eventColumns+` FROM event_log
 		WHERE lane = $1 AND pos > $2 ORDER BY pos LIMIT $3`, l.number, l.pos, readBatch)
 	if err != nil {
 		return 0, fmt.Errorf("events: read lane %d: %w", l.number, err)
@@ -138,7 +150,7 @@ func (r *Runner) step(ctx context.Context, l *lane) (int, error) {
 				return 0, errLeaseLost
 			}
 		}
-		if cause := handle(ctx, l.consumer.Handle, e); cause != nil {
+		if cause := handle(ctx, l.consumer, e); cause != nil {
 			if ctx.Err() != nil {
 				// A stopping worker did not finish the batch; the next holder runs it.
 				return 0, ctx.Err()

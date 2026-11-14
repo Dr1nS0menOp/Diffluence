@@ -21,6 +21,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // Lanes is how many lanes each consumer has (D5). The migration fixes it in a CHECK, and
@@ -66,6 +67,8 @@ type Consumer struct {
 type event struct {
 	pos int64
 	msg outbox.Message
+	// trace is the traceparent of the request that saved the event; empty without one.
+	trace string
 }
 
 // body is the event as a handler takes it.
@@ -77,11 +80,14 @@ func (e event) body() ([]byte, error) {
 	return data, nil
 }
 
-// scanEvent reads pos, id, type, payload and created_at.
+// eventColumns are the columns scanEvent reads, in its order.
+const eventColumns = "pos, id, type, payload, created_at, coalesce(trace, '')"
+
+// scanEvent reads eventColumns.
 func scanEvent(row pgx.CollectableRow) (event, error) {
 	var e event
 	var payload []byte
-	err := row.Scan(&e.pos, &e.msg.ID, &e.msg.Type, &payload, &e.msg.CreatedAt)
+	err := row.Scan(&e.pos, &e.msg.ID, &e.msg.Type, &payload, &e.msg.CreatedAt, &e.trace)
 	e.msg.Payload = payload
 	return e, err
 }
@@ -89,15 +95,19 @@ func scanEvent(row pgx.CollectableRow) (event, error) {
 // handlerWait is how long a handler gets for one event, as NATS gave it (consumeWait).
 const handlerWait = time.Minute
 
-// handle runs one handler on one event within its time.
-func handle(ctx context.Context, h Handler, e event) error {
+// handle runs one consumer on one event within its time, inside the trace of the request
+// that saved the event.
+func handle(ctx context.Context, c Consumer, e event) error {
 	data, err := e.body()
 	if err != nil {
 		return err
 	}
 	ctx, cancel := context.WithTimeout(ctx, handlerWait)
 	defer cancel()
-	return h(ctx, data)
+	ctx, end := tracing.ConsumeStored(ctx, e.msg.Type, c.Name, e.trace)
+	err = c.Handle(ctx, data)
+	end(err)
+	return err
 }
 
 // errLeaseLost says another worker took the lane while this one ran a batch. The batch then

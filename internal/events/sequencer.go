@@ -68,8 +68,8 @@ func (s Sequencer) Sequence(ctx context.Context, tx pgx.Tx) (int, error) {
 	if err := tx.QueryRow(ctx, "UPDATE event_head SET pos = pos + $1 RETURNING pos", n).Scan(&head); err != nil {
 		return 0, fmt.Errorf("events: move the head: %w", err)
 	}
-	tag, err := tx.Exec(ctx, `INSERT INTO event_log (pos, lane, id, type, payload, created_at)
-		SELECT $2::bigint + w.ord, `+laneSQL+`, o.id, o.type, o.payload, o.created_at
+	tag, err := tx.Exec(ctx, `INSERT INTO event_log (pos, lane, id, type, payload, created_at, trace)
+		SELECT $2::bigint + w.ord, `+laneSQL+`, o.id, o.type, o.payload, o.created_at, o.trace
 		FROM unnest($1::uuid[]) WITH ORDINALITY AS w(id, ord) JOIN outbox_events o ON o.id = w.id`,
 		waiting, head-int64(n))
 	if err != nil {

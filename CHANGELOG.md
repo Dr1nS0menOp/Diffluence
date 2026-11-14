@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: the switch of events from NATS to PostgreSQL, on an operator's command (spec 068, wave EV2)
+- `diffluence events switch postgres` sends every new event through the event log in PostgreSQL from the next relay batch on, and creates the cursors of the four listeners at that point, so none is skipped. It waits while a node of a release from before migration 0053 runs, and names it. `diffluence events switch nats` undoes it: new events go through NATS again, and what the log holds is still handed over
+- The NATS listeners keep running after the switch. Once they hold nothing, not even a retry, a worker notes that NATS is drained. `diffluence events status` shows the transport, the drain, older nodes, and whether the release without NATS may be installed; that check is the one the next release will run before it upgrades
+- An event keeps the trace of the request that saved it, so with tracing on, the listeners' work shows under that request
+- A worker looks every 5 seconds, not every minute, whether it must run the listeners of the event log
+- Upgrade impact: nothing changes by itself: events keep going through NATS. Migration 0059 adds a column for the trace to the outbox and one for the drain; it may run twice. Migration 0058 only holds its number. Before the release that removes NATS, run `diffluence events switch postgres` once every node runs this release, and wait until `diffluence events status` says NATS is drained ([upgrade.md](docs/operations/upgrade.md))
 ### Changed: the module boundary is checked, and smaller fixes (spec 072, wave RV5)
 - A test gives every table one owning module and lists, with a reason, each place a module still reads another module's table; a new one fails the checks. Five reads moved behind small functions of their owner (`settings.Load`, `pages.Title`, `spaces.HomePage`, `backups.ReadinessToRestore`, `restore.Leave`), from 564 mentions to 557
 - The service for editing together runs one check of its connections at a time; changes of rights that arrive meanwhile share one more check after it, instead of one check each

@@ -190,7 +190,7 @@ Measured on 13 November 2026 on the same dump in a PostgreSQL 16 of its own with
 | 340 | 7.7 s for notifications, 64 ms for the others | 163 ms a second |
 | 20, without LISTEN | 1.19 s | 5.2 ms a second |
 
-The sequencer costs about 0.2 ms of database time per event at four times the model and the cursors as much; at the peak both fall below 0.1 ms. The notifications consumer is the first to fall behind, between 170 and 340 events a second. A backlog of 10,000 events went through all four consumers in 31 seconds. A `page.published` in a space with 1,000 watchers takes the notifications consumer 5 seconds, about 200 notifications a second per lane, as it does through NATS today. **Not measured on the server**: the stress series with events (B3), a transaction held open for 15 minutes, and a restart of PostgreSQL under load (B5).
+The sequencer costs about 0.2 ms of database time per event at four times the model and the cursors as much; at the peak both fall below 0.1 ms. The notifications consumer is the first to fall behind, between 170 and 340 events a second. A backlog of 10,000 events went through all four consumers in 31 seconds. A `page.published` in a space with 1,000 watchers takes the notifications consumer 5 seconds, about 200 notifications a second per lane, as it does through NATS today. Run again with the switch of wave EV2 (spec 068, 7.6) on a busier machine: p95 269 ms at 20 events a second, 7.5 ms of queue database time a second, the backlog in 43 seconds. **Not measured on the server**: the stress series with events (B3), a transaction held open for 15 minutes, and a restart of PostgreSQL under load (B5).
 
 ### What traces cost (spec 060)
 

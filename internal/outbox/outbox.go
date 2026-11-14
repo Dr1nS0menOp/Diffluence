@@ -20,6 +20,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/diffluence/diffluence/internal/tracing"
 )
 
 // SubjectPrefix is prepended to the event type to form the NATS subject.
@@ -52,7 +53,13 @@ func Enqueue(ctx context.Context, tx pgx.Tx, eventType string, payload any) (uui
 		return uuid.Nil, fmt.Errorf("outbox: encode payload: %w", err)
 	}
 	id := ids.New()
-	if _, err := tx.Exec(ctx, "INSERT INTO outbox_events (id, type, payload) VALUES ($1, $2, $3)", id, eventType, body); err != nil {
+	// The trace of the request goes with the event, so its consumers work inside it (spec 068).
+	var trace *string
+	if tp := tracing.Traceparent(ctx); tp != "" {
+		trace = &tp
+	}
+	if _, err := tx.Exec(ctx, "INSERT INTO outbox_events (id, type, payload, trace) VALUES ($1, $2, $3, $4)",
+		id, eventType, body, trace); err != nil {
 		return uuid.Nil, fmt.Errorf("outbox: insert: %w", err)
 	}
 	return id, nil

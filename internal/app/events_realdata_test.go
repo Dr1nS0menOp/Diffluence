@@ -163,10 +163,12 @@ func TestEventsOnRealData(t *testing.T) {
 	}
 	t.Cleanup(a.Close)
 	pool := a.Pool()
-	for _, sql := range []string{"UPDATE event_transport SET transport = 'postgres'", "DELETE FROM outbox_events"} {
-		if _, err := pool.Exec(ctx, sql); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := pool.Exec(ctx, "DELETE FROM outbox_events"); err != nil {
+		t.Fatal(err)
+	}
+	// As an operator switches (spec 068, 2.11).
+	if _, err := app.SwitchEvents(ctx, pool, events.TransportPostgres); err != nil {
+		t.Fatal(err)
 	}
 	picks := pickRealEvents(t, pool)
 

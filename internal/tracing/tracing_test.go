@@ -298,6 +298,61 @@ func TestAnEventCarriesItsTraceThroughTheQueue(t *testing.T) {
 	}
 }
 
+// Spec 068: an event stored in PostgreSQL keeps the trace of the request that saved it, and
+// its consumer works inside that trace.
+func TestAStoredEventCarriesItsTraceToItsConsumer(t *testing.T) {
+	exporter := record(t, 1)
+	saved, end := Span(context.Background(), "request", "")
+	stored := Traceparent(saved)
+	end(nil)
+	if !strings.HasPrefix(stored, "00-") {
+		t.Fatalf("stored %q, want a W3C traceparent", stored)
+	}
+	_, done := ConsumeStored(context.Background(), "page.published", "webhooks", stored)
+	done(errors.New("the listener failed"))
+	spans := exporter.GetSpans()
+	if len(spans) != 2 {
+		t.Fatalf("%d spans", len(spans))
+	}
+	request, consume := spans[0], spans[1]
+	if consume.Name != "queue consume webhooks" || consume.SpanKind != trace.SpanKindConsumer {
+		t.Fatalf("name %q kind %v", consume.Name, consume.SpanKind)
+	}
+	if consume.SpanContext.TraceID() != request.SpanContext.TraceID() || consume.Parent.SpanID() != request.SpanContext.SpanID() {
+		t.Error("the consumer is not in the trace of the request that saved the event")
+	}
+	if got := attrs(consume); got["messaging.system"] != "postgresql" || got["messaging.destination.name"] != "page.published" {
+		t.Errorf("attributes %v", got)
+	}
+	if consume.Status.Code != codes.Error || consume.Status.Description != "error" {
+		t.Errorf("status %v", consume.Status)
+	}
+}
+
+// Off, an event stores no trace and its consumer starts nothing; an event saved outside a
+// trace, or stored by a release without the column, starts a trace of its own.
+func TestAStoredTraceIsEmptyWhenOff(t *testing.T) {
+	ctx := context.Background()
+	// Even a context that carries a trace from elsewhere stores none while tracing is off.
+	elsewhere := trace.ContextWithSpanContext(ctx, trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID: trace.TraceID{1}, SpanID: trace.SpanID{1}, TraceFlags: trace.FlagsSampled}))
+	if got := Traceparent(elsewhere); got != "" {
+		t.Fatalf("off, stored %q", got)
+	}
+	if got, _ := ConsumeStored(ctx, "page.published", "webhooks", ""); got != ctx {
+		t.Fatal("off, the consumer changed the context")
+	}
+	exporter := record(t, 1)
+	if got := Traceparent(ctx); got != "" {
+		t.Fatalf("outside a span, stored %q", got)
+	}
+	_, done := ConsumeStored(ctx, "page.published", "webhooks", "")
+	done(nil)
+	if span := only(t, exporter); span.Parent.IsValid() {
+		t.Errorf("an event without a trace got a parent: %v", span.Parent)
+	}
+}
+
 // D9: a log line written inside a span names the span.
 func TestALogLineNamesItsSpan(t *testing.T) {
 	record(t, 1)
