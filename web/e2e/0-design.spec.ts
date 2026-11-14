@@ -198,7 +198,10 @@ async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
   await page.evaluate(() => document.fonts.ready);
   await placeSpaceStrip(page);
-  await expect(page).toHaveScreenshot(`${name}.png`, { mask });
+  // Which spaces the strip holds depends on every test before this one, so only the
+  // picture of the strip itself shows its chips.
+  const strip = name === 'space-strip' ? [] : [page.locator('.space-strip ul')];
+  await expect(page).toHaveScreenshot(`${name}.png`, { mask: [...mask, ...strip] });
 }
 
 /**

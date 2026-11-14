@@ -103,6 +103,8 @@ test('databases off in the console are offered nowhere, and on again they are ba
 test('the role editor lists posts and databases beside pages', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
   await page.goto('/admin/permissions');
+  // Until the space roles are in, the first "New role" can be the one for instance roles.
+  await expect(page.getByRole('heading', { name: 'Roles for a space' })).toBeVisible();
   await page.getByRole('button', { name: 'New role' }).first().click();
   const editor = page.getByRole('dialog');
   await expect(editor.getByRole('checkbox', { name: /^Create blog posts\b/ })).toBeVisible();
