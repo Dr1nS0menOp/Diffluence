@@ -38,19 +38,33 @@ func markControlled(t *testing.T, e *env) {
 		SELECT gen_random_uuid(), s.id, 'Review', s.created_by FROM spaces s`)
 	e.sql(`INSERT INTO workflow_versions (workflow_id, version, definition, saved_by)
 		SELECT w.id, 1, $1::jsonb, w.created_by FROM workflows w`, realDataFlow)
+	// An approved page was approved by a person when it was last changed, so the feed has
+	// approvals to show beside the versions (spec 064, DOC-570).
 	e.sql(`INSERT INTO page_control (page_id, workflow_id, workflow_version, state_id, state_kind, approved_version,
-			approved_state_id, approved_at, head_version, governed_by, governed_from)
+			approved_state_id, approved_at, approved_by, head_version, governed_by, governed_from)
 		SELECT p.id, w.id, 1,
 			CASE WHEN h < 80 THEN 'approved' WHEN h < 95 THEN 'draft' ELSE 'withdrawn' END,
 			CASE WHEN h < 80 THEN 'approved' WHEN h < 95 THEN 'draft' ELSE 'obsolete' END,
 			CASE WHEN h < 80 OR h >= 95 THEN p.current_version END,
 			CASE WHEN h < 80 OR h >= 95 THEN 'approved' END,
-			CASE WHEN h < 80 OR h >= 95 THEN now() END,
+			CASE WHEN h < 80 OR h >= 95 THEN p.updated_at END,
+			CASE WHEN h < 80 THEN p.updated_by END,
 			p.current_version, 'page', p.id
 		FROM (SELECT p.*, abs(hashtext(p.id::text)) % 100 AS h, abs(hashtext(p.id::text || 'c')) % 10 AS pick FROM pages p) p
 		JOIN workflows w ON w.space_id = p.space_id
 		WHERE p.pick = 0 AND p.kind IN ('page', 'post', 'database') AND p.status = 'published'`)
+	// Each version of a controlled page pins its files, as migration 0063 does for pages
+	// controlled before it.
+	e.sql(`INSERT INTO attachment_pins (page_id, page_version, attachment_ids, versions, filenames)
+		SELECT pc.page_id, p.current_version, COALESCE(array_agg(a.id ORDER BY a.id) FILTER (WHERE a.id IS NOT NULL), '{}'),
+			COALESCE(array_agg(a.current_version ORDER BY a.id) FILTER (WHERE a.id IS NOT NULL), '{}'),
+			COALESCE(array_agg(a.filename ORDER BY a.id) FILTER (WHERE a.id IS NOT NULL), '{}')
+		FROM page_control pc JOIN pages p ON p.id = pc.page_id
+		LEFT JOIN attachment_refs r ON r.page_id = pc.page_id AND r.version = p.current_version
+		LEFT JOIN attachments a ON a.id = r.attachment_id AND a.page_id = pc.page_id AND a.status = 'active'
+		GROUP BY pc.page_id, p.current_version ON CONFLICT DO NOTHING`)
 	e.sql("ANALYZE page_control")
+	e.sql("ANALYZE attachment_pins")
 }
 
 const realDataFlow = `{"states": [
@@ -123,6 +137,9 @@ func TestDocumentControlOnRealData(t *testing.T) {
 	t.Logf("tree of the largest space %v", medianOf(reader, "GET", "/api/v1/spaces/"+space+"/tree/branches", nil).Round(time.Millisecond))
 	t.Logf("search on a common word %v", medianOf(reader, "GET", "/api/v1/search?q=plan", nil).Round(time.Millisecond))
 	t.Logf("feed, recent %v", medianOf(reader, "GET", "/api/v1/feed?tab=recent", nil).Round(time.Millisecond))
+	// Wave DC3: the doors around a page that ask more of a controlled one.
+	t.Logf("files of the largest space %v", medianOf(reader, "GET", "/api/v1/spaces/"+space+"/files", nil).Round(time.Millisecond))
+	t.Logf("quick search, files included %v", medianOf(reader, "GET", "/api/v1/search/quick?q=plan", nil).Round(time.Millisecond))
 
 	// A step: publish a change on approved pages, send it for review, and time the approval,
 	// which makes the change current, search and links included.
@@ -158,4 +175,9 @@ func TestDocumentControlOnRealData(t *testing.T) {
 	if median > transitionBudget {
 		t.Errorf("an approval takes %v, budget %v", median, transitionBudget)
 	}
+	// With working versions waiting, search asks their second entry (DOC-520, DOC-1302).
+	t.Logf("%d working entries; search on a common word as an author %v, as a reader %v",
+		e.count("SELECT count(*) FROM search_working"),
+		medianOf(author, "GET", "/api/v1/search?q=plan", nil).Round(time.Millisecond),
+		medianOf(reader, "GET", "/api/v1/search?q=plan", nil).Round(time.Millisecond))
 }

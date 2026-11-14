@@ -416,7 +416,7 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, list []pages.E
 			report.Failed = append(report.Failed, p.Title)
 			continue
 		}
-		list, err := s.attachments.ListForPage(ctx, p.ID)
+		list, err := s.attachments.List(ctx, c, p.ID)
 		if err != nil {
 			report.Failed = append(report.Failed, p.Title)
 			continue

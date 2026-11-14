@@ -72,10 +72,13 @@ type Template struct {
 	// Guided says the template uses a part of guided templates (spec 074, TPL-050).
 	Guided bool `json:"guided"`
 	// TemplateVersion is the version a form made from this answer is bound to (TPL-603).
-	TemplateVersion int             `json:"template_version"`
-	Document        json.RawMessage `json:"document,omitempty"`
-	pageID          uuid.UUID
-	ownerID         uuid.UUID
+	TemplateVersion int `json:"template_version"`
+	// WorkflowID is the workflow the first page made from a template of a space enters,
+	// without the part of guided templates (spec 064, DOC-560).
+	WorkflowID *uuid.UUID      `json:"workflow_id"`
+	Document   json.RawMessage `json:"document,omitempty"`
+	pageID     uuid.UUID
+	ownerID    uuid.UUID
 	// today is the database's date when the row was read, for what a set fills in (TPL-857).
 	today string
 }
@@ -92,6 +95,7 @@ type Input struct {
 	Hidden        bool            `json:"hidden"`
 	Promoted      bool            `json:"promoted"`
 	Document      json.RawMessage `json:"document"`
+	WorkflowID    *uuid.UUID      `json:"workflow_id"`
 }
 
 func (in *Input) validate() error {
@@ -171,7 +175,7 @@ func NewService(d Deps) *Service {
 
 const columns = `t.id, t.page_id, t.space_id, t.name, t.description, t.category, t.labels, t.title_pattern, t.steps,
 	t.default_parent, t.hidden, t.promoted, t.starter_key IS NOT NULL, f.user_id IS NOT NULL, u.used_at, p.current_version,
-	t.guided, COALESCE(t.approved_version, 0), COALESCE(t.owner_id, t.created_by), to_char(now(), 'YYYY-MM-DD')`
+	t.guided, COALESCE(t.approved_version, 0), COALESCE(t.owner_id, t.created_by), to_char(now(), 'YYYY-MM-DD'), t.workflow_id`
 
 const joins = `FROM templates t
 	JOIN pages p ON p.id = t.page_id
@@ -182,7 +186,7 @@ func scan(r pgx.Row) (Template, error) {
 	var t Template
 	err := r.Scan(&t.ID, &t.pageID, &t.SpaceID, &t.Name, &t.Description, &t.Category, &t.Labels, &t.TitlePattern, &t.Steps,
 		&t.DefaultParent, &t.Hidden, &t.Promoted, &t.Starter, &t.Favourite, &t.UsedAt, &t.Version,
-		&t.Guided, &t.TemplateVersion, &t.ownerID, &t.today)
+		&t.Guided, &t.TemplateVersion, &t.ownerID, &t.today, &t.WorkflowID)
 	return t, err
 }
 
@@ -346,11 +350,14 @@ func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spac
 		return Template{}, err
 	}
 	id := ids.New()
+	if err := s.checkWorkflow(ctx, tx, spaceID, in.WorkflowID); err != nil {
+		return Template{}, err
+	}
 	if _, err := tx.Exec(ctx, `INSERT INTO templates (id, page_id, space_id, name, description, category, labels, title_pattern,
-			steps, default_parent, hidden, promoted, starter_key, created_by, owner_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14)`,
+			steps, default_parent, hidden, promoted, starter_key, created_by, owner_id, workflow_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15)`,
 		id, p.ID, spaceID, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent,
-		in.Hidden, in.Promoted, starter, c.UserID); err != nil {
+		in.Hidden, in.Promoted, starter, c.UserID, in.WorkflowID); err != nil {
 		return Template{}, err
 	}
 	t := Template{ID: id, SpaceID: spaceID, Name: in.Name, TitlePattern: in.TitlePattern, Labels: in.Labels, Steps: in.Steps,
@@ -417,9 +424,12 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		if err != nil {
 			return err
 		}
+		if err := s.checkWorkflow(ctx, tx, t.SpaceID, in.WorkflowID); err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, `UPDATE templates SET name = $2, description = $3, category = $4, labels = $5, title_pattern = $6,
-				steps = $7, default_parent = $8, hidden = $9, promoted = $10, updated_at = now() WHERE id = $1`,
-			id, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent, in.Hidden, in.Promoted); err != nil {
+				steps = $7, default_parent = $8, hidden = $9, promoted = $10, workflow_id = $11, updated_at = now() WHERE id = $1`,
+			id, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent, in.Hidden, in.Promoted, in.WorkflowID); err != nil {
 			return err
 		}
 		if err := auditTemplate(ctx, tx, c, "template.updated", t); err != nil {
@@ -575,4 +585,16 @@ func (s *Service) Export(ctx context.Context, c identity.Caller, id uuid.UUID) (
 func (s *Service) Import(ctx context.Context, c identity.Caller, spaceID *uuid.UUID, b Bundle) (Template, error) {
 	return s.Create(ctx, c, spaceID, Input{Name: b.Name, Description: b.Description, Category: b.Category, Labels: b.Labels,
 		TitlePattern: b.TitlePattern, Steps: b.Steps, Document: b.Document})
+}
+
+// checkWorkflow allows a template to name a workflow only of its own space: workflows belong
+// to a space, so a template of all spaces names none (spec 064, DOC-560).
+func (s *Service) checkWorkflow(ctx context.Context, tx pgx.Tx, spaceID, workflowID *uuid.UUID) error {
+	if workflowID == nil {
+		return nil
+	}
+	if spaceID == nil {
+		return apperr.Invalid("A template of all spaces cannot name a workflow: workflows belong to a space.")
+	}
+	return s.pages.WorkflowOfSpace(ctx, tx, *workflowID, *spaceID)
 }

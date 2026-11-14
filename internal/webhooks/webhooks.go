@@ -54,7 +54,22 @@ var waits = []time.Duration{time.Minute, 10 * time.Minute, 2 * time.Hour, 22 * t
 // Events lists what an endpoint can ask for.
 var Events = []string{"page.created", "page.published", "page.renamed", "page.moved", "page.archived", "page.trashed", "page.restored",
 	"page.labelled", "page.stage_changed", "page.owner_changed", "comment.created", "attachment.uploaded", "attachment.trashed",
-	"space.created", "space.archived", "page.released", "release.finished"}
+	"space.created", "space.archived", "page.released", "release.finished", eventVersionApproved, eventWorkingChanged}
+
+// The events of document control (spec 064, DOC-552): a new version that readers see now, and
+// a change of a working version, which only an endpoint whose owner may edit the page hears of.
+const (
+	eventVersionApproved = "page.version_approved"
+	eventWorkingChanged  = "page.working_changed"
+)
+
+// heardWith is the permission the owner of an endpoint needs to hear of an event about a page.
+func heardWith(eventType string) string {
+	if eventType == eventWorkingChanged {
+		return permissions.PageEdit
+	}
+	return permissions.ActionPageView
+}
 
 // Service keeps endpoints and delivers.
 type Service struct {
@@ -349,7 +364,7 @@ func (s *Service) body(ctx context.Context, t target, d delivery) ([]byte, bool,
 		data["space_id"] = d.space
 	}
 	if d.page != nil {
-		allowed, err := s.perms.CheckPage(ctx, s.pool, t.OwnerID, *d.page, permissions.ActionPageView, uuid.Nil)
+		allowed, err := s.perms.CheckPage(ctx, s.pool, t.OwnerID, *d.page, heardWith(d.eventType), uuid.Nil)
 		if err != nil {
 			return nil, false, err
 		}

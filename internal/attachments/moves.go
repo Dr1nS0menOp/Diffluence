@@ -48,6 +48,9 @@ func (s *Service) Move(ctx context.Context, c identity.Caller, id, target uuid.U
 		if target == a.PageID {
 			return errSamePage()
 		}
+		if err := requireNotPinned(ctx, tx, a, 0); err != nil {
+			return err
+		}
 		taken, err := nameTaken(ctx, tx, target, a.Filename)
 		if err != nil {
 			return err

@@ -51,23 +51,45 @@ type Version struct {
 	Current    bool      `json:"current"`
 }
 
+// viewable finds a file for someone who may view its page, as they get it: a reader of a
+// controlled page gets the version the approved version pinned, and nothing of a file it
+// does not show (DOC-510, DOC-512).
 func (s *Service) viewable(ctx context.Context, c identity.Caller, id uuid.UUID) (Attachment, error) {
-	a, err := get(ctx, s.pool, id)
-	if err != nil {
-		return a, err
-	}
-	return a, s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil)
+	a, _, err := s.viewablePinned(ctx, c, id)
+	return a, err
 }
 
-// Versions lists every version of a file, newest first.
+// viewablePinned is viewable, and says whether the person gets a pinned version.
+func (s *Service) viewablePinned(ctx context.Context, c identity.Caller, id uuid.UUID) (Attachment, bool, error) {
+	a, err := get(ctx, s.pool, id)
+	if err != nil {
+		return a, false, err
+	}
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {
+		return a, false, err
+	}
+	p, err := s.pinsFor(ctx, s.pool, c, a.PageID)
+	if err != nil {
+		return a, false, err
+	}
+	a, err = atPin(ctx, s.pool, a, p)
+	return a, p != nil, err
+}
+
+// Versions lists every version of a file, newest first. A reader of a controlled page sees
+// only the version readers have.
 func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID) ([]Version, error) {
-	a, err := s.viewable(ctx, c, id)
+	a, pinnedVersion, err := s.viewablePinned(ctx, c, id)
 	if err != nil {
 		return nil, err
 	}
+	only := 0
+	if pinnedVersion {
+		only = a.Version
+	}
 	rows, err := s.pool.Query(ctx, `SELECT v.number, v.size, COALESCE(u.display_name, ''), v.created_at
 		FROM attachment_versions v LEFT JOIN users u ON u.id = v.uploaded_by
-		WHERE v.attachment_id = $1 ORDER BY v.number DESC`, id)
+		WHERE v.attachment_id = $1 AND ($2 = 0 OR v.number = $2) ORDER BY v.number DESC`, id, only)
 	if err != nil {
 		return nil, err
 	}
@@ -114,7 +136,10 @@ func (s *Service) MakeCurrent(ctx context.Context, c identity.Caller, id uuid.UU
 		if err := addEvent(ctx, tx, c, a.PageID, id, a.Filename, eventVersion); err != nil {
 			return err
 		}
-		return record(ctx, tx, c, "attachment.version_restored", a, map[string]any{"from": number, "version": next})
+		if err := record(ctx, tx, c, "attachment.version_restored", a, map[string]any{"from": number, "version": next}); err != nil {
+			return err
+		}
+		return s.fileChanged(ctx, tx, c, a.PageID, id)
 	})
 }
 
@@ -131,6 +156,9 @@ func (s *Service) DeleteVersion(ctx context.Context, c identity.Caller, id uuid.
 		}
 		if number == a.Version {
 			return apperr.Conflict("current_version", "The current version cannot be removed.")
+		}
+		if err := requireNotPinned(ctx, tx, a, number); err != nil {
+			return err
 		}
 		var key string
 		err = tx.QueryRow(ctx, "DELETE FROM attachment_versions WHERE attachment_id = $1 AND number = $2 RETURNING object_key", id, number).Scan(&key)
@@ -196,6 +224,11 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		}
 		if err := record(ctx, tx, c, "attachment.updated", a, map[string]any{"new_name": name}); err != nil {
 			return err
+		}
+		if name != a.Filename {
+			if err := s.fileChanged(ctx, tx, c, a.PageID, id); err != nil {
+				return err
+			}
 		}
 		out, err = get(ctx, tx, id)
 		return err
@@ -289,7 +322,23 @@ func (s *Service) Lookup(ctx context.Context, c identity.Caller, list []uuid.UUI
 	}
 	// Files mostly share a page, so each page is asked once.
 	may := map[uuid.UUID]bool{}
+	pins := map[uuid.UUID]*pinned{}
+	kept := []Facts{}
 	for i := range out {
+		p, asked := pins[pages[i]]
+		if !asked {
+			if p, err = s.pinsFor(ctx, s.pool, c, pages[i]); err != nil {
+				return nil, err
+			}
+			pins[pages[i]] = p
+		}
+		f, shown, err := factsAtPin(ctx, s.pool, out[i], pages[i], p)
+		if err != nil {
+			return nil, err
+		}
+		if !shown {
+			continue
+		}
 		allowed, asked := may[pages[i]]
 		if !asked {
 			d, err := s.perms.CheckPage(ctx, s.pool, c.UserID, pages[i], permissions.AttachmentAdd, uuid.Nil)
@@ -299,12 +348,28 @@ func (s *Service) Lookup(ctx context.Context, c identity.Caller, list []uuid.UUI
 			allowed = d.Allowed
 			may[pages[i]] = allowed
 		}
-		out[i].MayAddVersion = allowed
+		f.MayAddVersion = allowed
+		kept = append(kept, f)
 	}
-	if out == nil {
-		out = []Facts{}
+	return kept, nil
+}
+
+// factsAtPin gives the facts of a tile as a reader of a controlled page gets them, and
+// whether they get the file at all.
+func factsAtPin(ctx context.Context, q db.Querier, f Facts, pageID uuid.UUID, p *pinned) (Facts, bool, error) {
+	if p == nil {
+		return f, true, nil
 	}
-	return out, nil
+	a, err := atPin(ctx, q, Attachment{ID: f.ID, PageID: pageID}, p)
+	if apperr.IsNotFound(err) {
+		return f, false, nil
+	}
+	if err != nil {
+		return f, false, err
+	}
+	f.Filename, f.Size, f.ContentType = a.Filename, a.Size, a.ContentType
+	f.Inline, f.Media, f.Office = IsInline(f.ContentType), IsMedia(f.ContentType), IsOffice(f.Filename)
+	return f, true, nil
 }
 
 // SpaceFile is one row of the Files screen.
@@ -346,7 +411,8 @@ const (
 	JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
 	JOIN perm_visible_pages($1) vp ON vp.page_id = a.page_id
 	JOIN pages p ON p.id = a.page_id`
-	activeInSpace   = ` WHERE a.space_id = $2 AND a.status = 'active'`
+	// A file a reader may not have of a controlled page stays out of every list (DOC-512).
+	activeInSpace   = ` WHERE a.space_id = $2 AND a.status = 'active' AND a.id NOT IN (SELECT x.attachment_id FROM perm_unpinned_files($1) x)`
 	visibleFilesSQL = visibleFrom + ` LEFT JOIN users u ON u.id = a.created_by` + activeInSpace
 )
 

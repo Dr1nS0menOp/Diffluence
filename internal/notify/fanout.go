@@ -12,8 +12,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
+	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/tasks"
 	"github.com/diffluence/diffluence/internal/watches"
 )
@@ -53,6 +55,11 @@ type payload struct {
 	ReleaseRunID *uuid.UUID `json:"release_run_id"`
 	RunID        uuid.UUID  `json:"run_id"`
 	DraftSpaceID uuid.UUID  `json:"draft_space_id"`
+	// Approval says page.published made a version current because a workflow approved it;
+	// page.version_approved tells watchers and held mentions instead (spec 064).
+	Approval bool `json:"approval"`
+	// Previous is the version approved before a new approval, or 0 for the first.
+	Previous int `json:"previous"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
@@ -74,6 +81,8 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"page.review_ended":     s.onReviewEnded,
 		"page.reviewer_removed": s.onReviewerRemoved,
 		"release.finished":      s.onReleaseFinished,
+		"page.working_changed":  s.onWorkingChanged,
+		"page.version_approved": s.onVersionApproved,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -184,6 +193,9 @@ func (s *Service) onPublished(ctx context.Context, event uuid.UUID, p payload) e
 	if err := s.tell(ctx, p.Assigned, base, TypeTaskAssigned, ReasonAssigned); err != nil {
 		return err
 	}
+	if p.Approval {
+		return nil // the approval tells the mentioned and the watchers itself (DOC-603, DOC-606)
+	}
 	if err := s.tellMentions(ctx, base, p); err != nil {
 		return err
 	}
@@ -196,6 +208,82 @@ func (s *Service) onPublished(ctx context.Context, event uuid.UUID, p payload) e
 	}
 	base.Data = map[string]any{"version": p.Version}
 	return s.tell(ctx, watchers, base, TypePageChanged, ReasonWatching)
+}
+
+// onWorkingChanged follows a version of a controlled page that waits for review. Everything
+// about it reaches only people who may edit the page, checked now and again when it is shown
+// or mailed: the people it newly mentions, and the watchers. Readers hear of the approval
+// instead (DOC-603, DOC-606).
+func (s *Service) onWorkingChanged(ctx context.Context, event uuid.UUID, p payload) error {
+	if !p.Silent {
+		if err := s.autoWatch(ctx, p.ActorID, p.PageID, func(v Settings) bool { return v.AutoWatchEdit }); err != nil {
+			return err
+		}
+	}
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsEdit: true}
+	if err := s.tellMentions(ctx, base, p); err != nil {
+		return err
+	}
+	if p.Silent {
+		return nil
+	}
+	watchers, err := watches.Who(ctx, s.pool, p.PageID, p.SpaceID)
+	if err != nil {
+		return err
+	}
+	base.Data = map[string]any{"version": p.Version, "working": true}
+	return s.tell(ctx, watchers, base, TypePageChanged, ReasonWatching)
+}
+
+// onVersionApproved tells of a new version that readers see: the people it mentions who
+// could not hear of the working version, then the watchers, then those who asked for every
+// approval in the space (DOC-603, DOC-606, DOC-607). A mail shows the change since the
+// version approved before, never a version nobody approved (DOC-604).
+func (s *Service) onVersionApproved(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event}
+	held, err := s.heldMentions(ctx, p)
+	if err != nil {
+		return err
+	}
+	if err := s.tell(ctx, held, base, TypeMention, ReasonMentioned); err != nil {
+		return err
+	}
+	base.Data = map[string]any{"version": p.Version, "previous": p.Previous}
+	watchers, err := watches.Who(ctx, s.pool, p.PageID, p.SpaceID)
+	if err != nil {
+		return err
+	}
+	if err := s.tell(ctx, watchers, base, TypeVersionApproved, ReasonWatching); err != nil {
+		return err
+	}
+	subscribed, err := approvalSubscribers(ctx, s.pool, p.SpaceID)
+	if err != nil {
+		return err
+	}
+	return s.tell(ctx, subscribed, base, TypeVersionApproved, ReasonApprovals)
+}
+
+// heldMentions are the people an approved version newly mentions who may not edit the page:
+// whoever may edit heard of the mention when the working version was published.
+func (s *Service) heldMentions(ctx context.Context, p payload) ([]uuid.UUID, error) {
+	members, err := s.groupMembers(ctx, p.MentionedGroups)
+	if err != nil {
+		return nil, err
+	}
+	out := []uuid.UUID{}
+	for _, person := range append(append([]uuid.UUID{}, p.Mentions...), members...) {
+		d, err := s.perms.CheckPage(ctx, s.pool, person, p.PageID, permissions.PageEdit, uuid.Nil)
+		if apperr.IsNotFound(err) {
+			continue // a person who is gone hears nothing
+		}
+		if err != nil {
+			return nil, err
+		}
+		if !d.Allowed && !slices.Contains(out, person) {
+			out = append(out, person)
+		}
+	}
+	return out, nil
 }
 
 func (s *Service) onComment(ctx context.Context, event uuid.UUID, p payload) error {

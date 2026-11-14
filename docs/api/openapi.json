@@ -9281,6 +9281,83 @@
         "x-access": "object:space.approvals"
       }
     },
+    "/api/v1/spaces/{id}/approvals-digest": {
+      "delete": {
+        "operationId": "delete /api/v1/spaces/{id}/approvals-digest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      },
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/approvals-digest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      },
+      "put": {
+        "operationId": "put /api/v1/spaces/{id}/approvals-digest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      }
+    },
     "/api/v1/spaces/{id}/archive": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/archive",

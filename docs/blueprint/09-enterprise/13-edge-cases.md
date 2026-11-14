@@ -46,4 +46,4 @@ Document control is only as strong as its weakest path. Each line here is a situ
 - **DOC-1250** · built · A failure while taking a transition (database error, a node dying) leaves the page in its previous state, with no partial answer, signature or visibility change, because it is one transaction. *Proof:* fault-injection tests.
 - **DOC-1251** · new · A failure while assigning a workflow to a large space as background work leaves each page either fully assigned or untouched, and the job resumes where it stopped. *Proof:* a test that kills the job halfway and resumes.
 - **DOC-1252** · new · A notification that fails to send is retried by the existing outbox and never blocks a transition. *Proof:* a test with a failing mail sender.
-- **DOC-1253** · new · Search indexing of a newly approved version runs after the transition; until it is done, readers find the previous approved version, never the working one. *Proof:* a test that delays indexing.
+- **DOC-1253** · built · Search indexing of a newly approved version runs after the transition; until it is done, readers find the previous approved version, never the working one. *Proof:* a test that delays indexing.

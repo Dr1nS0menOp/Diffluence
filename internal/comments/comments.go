@@ -110,6 +110,9 @@ type Service struct {
 // It is defined here, where it is used, because pages already imports comments.
 type PageGate interface {
 	CommentsClosed(ctx context.Context, q db.Querier, pageID uuid.UUID) (bool, error)
+	// WorkingDiffers says a controlled page has a working version readers do not see yet
+	// (spec 064, DOC-500).
+	WorkingDiffers(ctx context.Context, q db.Querier, pageID uuid.UUID) (bool, error)
 }
 
 // NewService creates the service.
@@ -187,6 +190,32 @@ func (s *Service) visible(ctx context.Context, q db.Querier, c identity.Caller, 
 		return apperr.NotFound()
 	}
 	return nil
+}
+
+// aboutWorking says a new comment belongs to the working version of a controlled page: its
+// writer sees that version, and it differs from what readers see. Such a comment is kept for
+// those who may edit, as a thread made while editing is, until a version that holds what it
+// points at is approved (spec 064, DOC-500).
+//
+// A reviewer who may not edit reads the working version too, but would not see a thread kept
+// for editors, so their remarks go in the review, which readers never see (DOC-251, DOC-501).
+func (s *Service) aboutWorking(ctx context.Context, q db.Querier, c identity.Caller, pageID uuid.UUID) (bool, error) {
+	differs, err := s.pages.WorkingDiffers(ctx, q, pageID)
+	if err != nil || !differs {
+		return false, err
+	}
+	working, err := s.perms.ReadsWorking(ctx, q, c.UserID, pageID)
+	if err != nil || !working {
+		return false, err
+	}
+	editor, err := s.perms.CheckPage(ctx, q, c.UserID, pageID, permissions.PageEdit, uuid.Nil)
+	if err != nil {
+		return false, err
+	}
+	if !editor.Allowed {
+		return false, apperr.Conflict("comment_in_review", "This version is not approved yet. Put your remark in the review.")
+	}
+	return true, nil
 }
 
 // NewComment is what a person posts.
@@ -344,6 +373,11 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, pageID uuid.UUI
 		}
 		if editorsOnly && in.ParentID == nil {
 			if err := s.perms.RequirePage(ctx, tx, c.UserID, pageID, permissions.PageEdit, uuid.Nil); err != nil {
+				return err
+			}
+		}
+		if !editorsOnly {
+			if editorsOnly, err = s.aboutWorking(ctx, tx, c, pageID); err != nil {
 				return err
 			}
 		}
@@ -640,6 +674,12 @@ func ReleaseEditorsOnly(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc do
 			opened = append(opened, t.id)
 		}
 	}
-	_, err = tx.Exec(ctx, "UPDATE comments SET editors_only = false WHERE id = ANY($1) OR parent_id = ANY($1)", opened)
+	if _, err := tx.Exec(ctx, "UPDATE comments SET editors_only = false WHERE id = ANY($1) OR parent_id = ANY($1)", opened); err != nil {
+		return err
+	}
+	// A reply about a working version, in a thread readers see, reaches them with the version
+	// it was about (spec 064, DOC-500).
+	_, err = tx.Exec(ctx, `UPDATE comments SET editors_only = false WHERE page_id = $1 AND editors_only
+		AND parent_id IN (SELECT r.id FROM comments r WHERE r.page_id = $1 AND r.parent_id IS NULL AND NOT r.editors_only)`, pageID)
 	return err
 }

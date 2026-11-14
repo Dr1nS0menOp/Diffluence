@@ -150,6 +150,7 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if err := s.requireGuidedPart(ctx, p); err != nil {
 		return nil, err
 	}
+	p.version.Manifest = withTemplateWorkflow(p.version.Manifest, t.WorkflowID)
 	if err := s.checkRights(ctx, c, p.version.Manifest, in.SpaceID); err != nil {
 		return nil, err
 	}
@@ -191,6 +192,21 @@ func (s *Service) versionFor(ctx context.Context, c identity.Caller, t Template,
 		return err
 	})
 	return v, err
+}
+
+// withTemplateWorkflow gives the first page of a set the workflow its template names, when
+// the entry names none (spec 064, DOC-560). It comes after the check of the guided part, as
+// it needs no part of guided templates, and before the check of rights, which then asks for
+// the right to choose workflows like a workflow an entry names (TPL-152).
+func withTemplateWorkflow(m Manifest, workflowID *uuid.UUID) Manifest {
+	root := slices.IndexFunc(m.Entries, func(e Entry) bool { return e.Key == RootKey })
+	if workflowID == nil || root < 0 || m.Entries[root].WorkflowID != nil || m.Entries[root].Kind == EntryFolder {
+		return m
+	}
+	entries := slices.Clone(m.Entries)
+	entries[root].WorkflowID = workflowID
+	m.Entries = entries
+	return m
 }
 
 // requireGuidedPart hides a template that uses this feature while its part is off, which

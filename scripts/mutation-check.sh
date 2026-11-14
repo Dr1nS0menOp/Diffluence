@@ -246,8 +246,8 @@ mutate "SQL: guests count as all members" internal/db/migrations/0010_people.sql
   's.replace(`(g.subject_type = '"'"'all_members'"'"' AND x.type = '"'"'member'"'"')`, `(g.subject_type = '"'"'all_members'"'"')`)' $perms
 mutate "reading a page skips the check" internal/pages/pages.go \
   's.replace("\tviewErr := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil)\n", "\tviewErr := error(nil)\n")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestANamedApproverCanReadAnUnpublishedPage|TestAPageTheAccountCannotSeeStopsTheRun|TestARestoreBelowAnArchivedPageCannotDropARestriction|TestAdministratorsHaveNoContentAccessUntilRecovery|TestAllowingAccessNamesEveryLevelAndNeedsThemAll|TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent|TestAskingForAccessReachesSomeoneWhoMayGrantIt|TestDeleteRestoreAndPurge|TestDeletingAPageTakesArchivedPagesBelowItAlong|TestDeletingAParentAloneIsRefusedSoNothingFallsOpen|TestEveryObjectRouteIsProtected|TestGroups|TestMoveToAnotherSpaceTakesTheBranchAlong|TestRestrictionsAcrossTreeSearchFavouritesAndExport|TestSeveralWordFilesWaitUnderARestrictedPage|TestSharingOnlyNotifies|TestSpaceKeepsAnAdministratorAndGuestsAreNotMembers|TestStarterTemplatesAreThereAndCanBeHidden|TestUnpublishedPageIsPrivate)$'
-mutate "downloads skip the check" internal/attachments/attachments.go \
-  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app -run '^(TestAFileAnswersNotModifiedButStillChecksAccess|TestAFileMovesAcrossSpacesAndFollowsTheRulesOfItsNewPage|TestAnOfficeFileOpensAsPDFThroughTheHelper|TestAttachmentsNeverTrustAFile|TestEveryObjectRouteIsProtected|TestTemplateFilesFollowTheRuleOfTheTemplate)$'
+mutate "downloads skip the check" internal/attachments/versions.go \
+  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, false, err\n\t}\n\tp, err := s.pinsFor", "p, err := s.pinsFor")' $app -run '^(TestAFileAnswersNotModifiedButStillChecksAccess|TestAFileMovesAcrossSpacesAndFollowsTheRulesOfItsNewPage|TestAnOfficeFileOpensAsPDFThroughTheHelper|TestAttachmentsNeverTrustAFile|TestEveryObjectRouteIsProtected|TestTemplateFilesFollowTheRuleOfTheTemplate)$'
 mutate "any member can import a font" internal/httpapi/handlers_appearance.go \
   's.replace("admin := SessionOnly(Permission(identity.PermAdministrator))", "admin := SessionOnly(Permission(identity.PermUseProduct))")' $app -run '^(TestAdministratorImportsReplacesAndRemovesAFont|TestRouteTableIsDocumented|TestTheAPIDescriptionMatchesTheRoutes)$'
 mutate "any file passes as a font" internal/settings/font.go \
@@ -591,7 +591,7 @@ mutate "added text in a mail is not escaped" internal/document/changes.go \
   's.replace("html.EscapeString(text) + `</`", "text + `</`")' ./internal/document/
 
 mutate "a mail shows changes without the setting" internal/notify/render.go \
-  's.replace("if !allowed || i.Type != TypePageChanged || i.firstVersion <= 1 {", "if i.Type != TypePageChanged || i.firstVersion <= 1 {")' $app -run TestAMailShowsNoChanges
+  's.replace("if !allowed || (i.Type != TypePageChanged \x26\x26 i.Type != TypeVersionApproved) || from \x3c 1 {", "if (i.Type != TypePageChanged \x26\x26 i.Type != TypeVersionApproved) || from \x3c 1 {")' $app -run TestAMailShowsNoChanges
 mutate "a mail of changes reads through access" internal/notify/list.go \
   's.replace("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
 
@@ -819,8 +819,8 @@ mutate "a fragment may hold markup" internal/document/links.go \
   's.replace("len(fragment) <= maxFragmentBytes \x26\x26 fragmentPattern.MatchString(fragment)", "fragment != \"\"")' ./internal/document/
 mutate "a table may stay inside a table" internal/document/document.go \
   's.replace("\tliftNestedTables(\x26n, false)\n", "")' ./internal/document/
-mutate "one version of a file skips the check" internal/attachments/details.go \
-  's.replace("a, err := s.viewable(ctx, c, id)\n\tif err != nil {\n\t\treturn a, nil, err\n\t}\n\tvar key string", "a, err := get(ctx, s.pool, id)\n\tif err != nil {\n\t\treturn a, nil, err\n\t}\n\tvar key string")' $app -run TestOneVersionOfAFileHasItsOwnAddressThatGivesNoAccess
+mutate "one version of a file skips the check" internal/attachments/versions.go \
+  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, false, err\n\t}\n\tp, err := s.pinsFor", "p, err := s.pinsFor")' $app -run TestOneVersionOfAFileHasItsOwnAddressThatGivesNoAccess
 mutate "a reader changes the labels of a file" internal/attachments/details.go \
   's.replace("return a, s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.AttachmentAdd, uuid.Nil)", "return a, nil")' $app -run TestFileLabelsFollowTheRulesOfLabels
 mutate "a file label gets around the fixed list" internal/attachments/details.go \
@@ -1320,7 +1320,7 @@ mutate "a write may read from a copy that lags" internal/httpapi/admission.go \
 mutate "a helper that does not answer is still offered" internal/httpapi/handlers.go \
   's.replace("s.deps.Exchange.PDFAvailable() && !down[\"pdf\"]", "s.deps.Exchange.PDFAvailable()")' $app -run TestAHelperThatDoesNotAnswerIsShownAndNoLongerOffered
 mutate "a viewer is offered to save a changed PDF" internal/attachments/versions.go \
-  's.replace("out[i].MayAddVersion = allowed", "out[i].MayAddVersion = true")' $app -run TestOnlySomeoneWhoMayAddFilesIsOfferedToSaveAChangedPDF
+  's.replace("f.MayAddVersion = allowed", "f.MayAddVersion = allowed || true")' $app -run TestOnlySomeoneWhoMayAddFilesIsOfferedToSaveAChangedPDF
 mutate_web "any window may pose as a frame" src/components/frame-messages.ts \
   's.replace("!!frame && event.source === frame && event.origin === origin", "!!frame && event.origin === origin")' src/components/frame-messages.test.ts
 mutate_web "the viewer may give back something that is not a PDF" src/components/craft-frame.tsx \
@@ -2074,7 +2074,7 @@ mutate "a withdrawn page shows to readers in SQL" internal/db/migrations/0051_do
 mutate "a change to approved content reaches readers" internal/pages/pages.go \
   's.replace("\tif controlled \x26\x26 ctl.approved() {\n\t\tworking := p", "\tif false {\n\t\tworking := p")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
 mutate "a change does not start review again" internal/pages/pages.go \
-  's.replace("return working, s.restartReview(ctx, tx, c, p, ctl, number, cause)", "return working, nil")' $app -run TestWhatRestartsReview
+  's.replace("\t\twaits, err := s.restartReview(ctx, tx, c, p, ctl, number, cause)\n", "\t\twaits, err := false, error(nil)\n")' $app -run TestWhatRestartsReview
 mutate "an unchanged text still waits for review" internal/pages/control.go \
   's.replace("\t\tif same {\n", "\t\tif same \x26\x26 false {\n")' $app -run TestWhatRestartsReview
 mutate "a publish leaves the round open" internal/pages/control.go \
@@ -2137,6 +2137,53 @@ mutate "a workflow names a guest" internal/pages/workflow_templates.go \
   's.replace("\t\t\t\tif err == nil \x26\x26 typ == \"guest\" {", "\t\t\t\tif false {")' $app -run TestAddingAReviewer
 mutate "an author approves around the reviewers" internal/workflow/review.go \
   's.replace("\t\t\tif from.Review != nil \x26\x26 to.Kind == KindApproved {", "\t\t\tif false {")' ./internal/workflow/ -run TestEachRuleOfAReviewIsChecked
+# Spec 064, wave DC3: the content around the page. A reader held on the approved version gets
+# nothing of a working version through a comment, a file, search, an export, a site, a
+# webhook or a notification.
+mutate "a reader reads the working version" internal/permissions/service.go \
+  's.replace("\treturn reviewsPage(ctx, q, userID, pageID)\n}\n\n// reviewsPage", "\treturn true, nil\n}\n\n// reviewsPage")' $app -run '^(TestReadersDownloadThePinnedVersionOfAFile|TestCommentsOnTheWorkingVersionStayWithItsAuthors)$'
+mutate "a comment on the working version reaches readers" internal/comments/comments.go \
+  's.replace("\t\tif !editorsOnly {\n\t\t\tif editorsOnly, err = s.aboutWorking(ctx, tx, c, pageID); err != nil {", "\t\tif false {\n\t\t\tif editorsOnly, err = s.aboutWorking(ctx, tx, c, pageID); err != nil {")' $app -run TestCommentsOnTheWorkingVersionStayWithItsAuthors
+mutate "a reviewer comments on the working version for readers" internal/comments/comments.go \
+  's.replace("\tif !editor.Allowed {\n\t\treturn false, apperr.Conflict", "\tif !editor.Allowed \x26\x26 false {\n\t\treturn false, apperr.Conflict")' $app -run TestAReviewerWhoMayNotEditPutsRemarksInTheReview
+mutate "readers get the current version of a file" internal/attachments/pins.go \
+  's.replace("\tif err != nil || working {\n\t\treturn nil, err\n\t}\n\treturn p, nil", "\tif err != nil || working || true {\n\t\treturn nil, err\n\t}\n\treturn p, nil")' $app -run '^(TestReadersDownloadThePinnedVersionOfAFile|TestAFileOnlyTheWorkingVersionHoldsStaysWithItsAuthors)$'
+mutate "a new version of a shown file starts no review" internal/pages/around.go \
+  's.replace("\tif err != nil || !shown {\n\t\treturn err\n\t}", "\tif err != nil || !shown || true {\n\t\treturn err\n\t}")' $app -run TestReadersDownloadThePinnedVersionOfAFile
+mutate "a file the approved version shows is taken away" internal/attachments/pins.go \
+  's.replace("\t\treturn errPinned()\n", "\t\treturn nil\n")' $app -run TestAFileTheApprovedVersionShowsCannotBeTakenAway
+mutate "the Files screen lists a file waiting for review" internal/attachments/versions.go \
+  's.replace(" AND a.id NOT IN (SELECT x.attachment_id FROM perm_unpinned_files($1) x)`", "`")' $app -run TestAFileOnlyTheWorkingVersionHoldsStaysWithItsAuthors
+mutate "search lets a reader match the working entry" internal/search/words.go \
+  's.replace("FROM perm_editable_pages(@user) e WHERE e.page_id = ANY (ARRAY(\n\tSELECT x.page_id FROM search_working x", "FROM (SELECT y.page_id FROM search_working y WHERE @user::uuid IS NOT NULL) e WHERE e.page_id = ANY (ARRAY(\n\tSELECT x.page_id FROM search_working x")' $app -run TestAWordOnlyInTheWorkingVersionIsNeverFoundByAReader
+mutate "SQL: readers find a file by a name waiting for review" internal/db/migrations/0063_content_around_controlled_pages.sql \
+  's.replace("SELECT CASE WHEN reader_pinned_at(page) IS NOT NULL THEN", "SELECT CASE WHEN false THEN")' $app -run TestAWordOnlyInTheWorkingVersionIsNeverFoundByAReader
+mutate "an export gives a reader the working version" internal/pages/export.go \
+  's.replace("\t\tif working \x26\x26 f.head \x3e f.current {", "\t\tif f.head \x3e f.current {")' $app -run TestEveryExportHoldsTheVersionThePersonMaySee
+mutate "an export has no control block" internal/exchange/writers.go \
+  's.replace("\tif item.page.Control != nil {\n\t\tdoc.Content = append", "\tif false {\n\t\tdoc.Content = append")' $app -run TestEveryExportHoldsTheVersionThePersonMaySee
+mutate "an export gives a reader the old versions" internal/exchange/writers.go \
+  's.replace("\tif item.page.Control != nil \x26\x26 !item.page.Control.History {", "\tif false {")' $app -run TestEveryExportHoldsTheVersionThePersonMaySee
+mutate "an import shows readers the working version" internal/pages/imported.go \
+  's.replace("\t\tif v.Number == in.Current {", "\t\tif false {")' $app -run TestABundleKeepsTheRecordAndShowsReadersOnlyWhatWasApproved
+mutate "a site gets the working version of a file" internal/sites/build.go \
+  's.replace("s.attachments.ListForReaders(ctx, p.ID)", "s.attachments.ListForPage(ctx, p.ID)")' $app -run TestAPublicSiteNeverGetsAWorkingVersion
+mutate "a webhook of a reader hears of working changes" internal/webhooks/webhooks.go \
+  's.replace("\tif eventType == eventWorkingChanged {", "\tif false {")' $app -run TestWebhooksTellOfWorkingChangesOnlyToThoseWhoMayEdit
+mutate "a working change reaches a watcher who may only read" internal/notify/fanout.go \
+  's.replace("base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsEdit: true}\n\tif err := s.tellMentions", "base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event}\n\tif err := s.tellMentions")' $app -run '^(TestWatchersWhoAreReadersHearOnlyOfApprovedVersions|TestAMentionInAWorkingVersionWaitsForTheApproval)$'
+mutate "a mail shows a reader a version nobody approved" internal/notify/render.go \
+  's.replace("\tif err != nil || (reader \x26\x26 (i.Type != TypeVersionApproved || newest \x3e current)) {", "\tif err != nil || (reader \x26\x26 newest \x3e current \x26\x26 false) {")' $app -run TestEveryNotificationKindForAReaderHoldsNoWorkingText
+mutate "a notice for editors stays with someone who lost the right" internal/notify/list.go \
+  's.replace("\tWHERE n.user_id = $1 AND n.hidden_at IS NULL\n\t  AND (NOT n.needs_edit OR", "\tWHERE n.user_id = $1 AND n.hidden_at IS NULL\n\t  AND (true OR")' $app -run TestWatchersWhoAreReadersHearOnlyOfApprovedVersions
+mutate "a held mention is told twice" internal/notify/fanout.go \
+  's.replace("\t\tif !d.Allowed \x26\x26 !slices.Contains(out, person) {", "\t\tif (d.Allowed || !d.Allowed) \x26\x26 !slices.Contains(out, person) {")' $app -run TestAMentionInAWorkingVersionWaitsForTheApproval
+mutate "the feed hides an approval" internal/feed/feed.go \
+  's.replace("THEN \x27approved\x27 ELSE f.kind END", "THEN f.kind ELSE f.kind END")' $app -run TestTheFeedTellsReadersOfApprovalsAndNeverOfWorkingChanges
+mutate "a page from a template ignores its workflow" internal/templates/sets.go \
+  's.replace("\tif workflowID == nil || root \x3c 0 ||", "\tif true || workflowID == nil || root \x3c 0 ||")' $app -run TestAPageMadeFromATemplateEntersTheWorkflowItNames
+mutate "analytics count the approved version for an author" internal/pages/around.go \
+  's.replace("\tworking, err := perms.ReadsWorking(ctx, q, userID, pageID)\n\tif err != nil || !working {", "\tworking, err := perms.ReadsWorking(ctx, q, userID, pageID)\n\tif err != nil || !working || true {")' $app -run TestAnalyticsCountTheVersionThePersonRead
 # Spec 067: every route that takes an id is walked as a stranger, and the service for
 # editing together holds a ticket in place of the cookie.
 mutate "anyone reads an export by its id" internal/exchange/export.go \

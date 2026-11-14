@@ -11,8 +11,10 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/workflow"
 )
 
@@ -222,6 +224,14 @@ func (s *Service) landPage(ctx context.Context, tx pgx.Tx, c identity.Caller, id
 		id, g.workflowID, version, state.ID, state.Kind, next.approvedVersion, next.approvedStateID, next.headVersion, g.by, g.from); err != nil {
 		return "", err
 	}
+	// From now on readers keep the files of the version they see (DOC-510).
+	for _, number := range []int{current, next.headVersion} {
+		if number > 0 {
+			if err := attachments.Pin(ctx, tx, id, number); err != nil {
+				return "", err
+			}
+		}
+	}
 	var round *uuid.UUID
 	if state.Kind != workflow.KindApproved {
 		r, err := openRound(ctx, tx, id, next)
@@ -258,6 +268,11 @@ func (s *Service) removeControl(ctx context.Context, tx pgx.Tx, c identity.Calle
 		return err
 	}
 	if _, err := tx.Exec(ctx, "DELETE FROM page_control WHERE page_id = $1", id); err != nil {
+		return err
+	}
+	// Readers keep the approved version until the next publish, and so do they in search; the
+	// working entry has no reader left (DOC-141).
+	if err := search.DropWorking(ctx, tx, id); err != nil {
 		return err
 	}
 	p, err := load(ctx, tx, id)

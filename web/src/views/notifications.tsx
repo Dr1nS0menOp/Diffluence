@@ -28,6 +28,7 @@ const TYPES = [
   'reviewer_removed',
   'pages_released',
   'release_finished',
+  'version_approved',
   'rule',
 ];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];

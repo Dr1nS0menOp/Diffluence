@@ -438,7 +438,9 @@
     "type_pages_released": "{{name}} released pages you watch in {{page}}",
     "type_release_finished": "Your release from {{page}} has ended",
     "channel_pages_released": "Releases of pages you watch",
-    "channel_release_finished": "Your releases that ended"
+    "channel_release_finished": "Your releases that ended",
+    "type_version_approved": "A new version of {{page}} was approved",
+    "channel_version_approved": "A new version of a page you watch was approved"
   },
   "watching": {
     "title": "Watching",
@@ -451,6 +453,8 @@
     "stopBranch": "Stop watching this page and those below it",
     "watchSpace": "Watch this space",
     "stopSpace": "Stop watching this space",
+    "approvals": "Tell me about every approval in this space",
+    "stopApprovals": "Stop telling me about every approval",
     "started": "You now watch this.",
     "stopped": "You no longer watch this.",
     "kind_page": "Page",
@@ -662,6 +666,7 @@
     "kind_changed": "changed by {{name}}",
     "kind_released_one": "{{count}} page released by {{name}}",
     "kind_released_other": "{{count}} pages released by {{name}}",
+    "kind_approved": "new version approved by {{name}}",
     "empty_for_you": "Follow people and watch spaces to fill this list.",
     "empty_recent": "No page has changed yet.",
     "empty_popular": "Nothing stands out yet.",
@@ -2992,6 +2997,9 @@
     "labelsHelp": "Separate labels with commas.",
     "titlePattern": "Title pattern",
     "titlePatternHelp": "Use {date}, {space} and the names of fields.",
+    "workflow": "Workflow",
+    "workflowHelp": "A page made from this template follows this workflow, unless the space or a branch above it has one.",
+    "noWorkflow": "No workflow",
     "instructionText": "Help for the writer",
     "fieldKind": "Kind of answer",
     "kind_line": "One line",

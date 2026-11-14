@@ -15,11 +15,13 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/search"
 	"github.com/diffluence/diffluence/internal/workflow"
 )
 
@@ -145,7 +147,8 @@ func recordSystem(ctx context.Context, tx pgx.Tx, c identity.Caller, action stri
 	return recordAudit(ctx, tx, system, action, "page", p.ID, p.SpaceID, details)
 }
 
-// sameContent says whether two versions hold the same title and text.
+// sameContent says whether two versions hold the same title and text, and show the same
+// versions of the same files (DOC-511).
 func sameContent(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, a, b int) (bool, error) {
 	var same bool
 	err := tx.QueryRow(ctx, `SELECT x.title = y.title AND x.document = y.document FROM page_versions x, page_versions y
@@ -153,50 +156,53 @@ func sameContent(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, a, b int) (bo
 	if errors.Is(err, pgx.ErrNoRows) {
 		return false, nil
 	}
-	return same, err
+	if err != nil || !same {
+		return false, err
+	}
+	return attachments.SamePins(ctx, tx, pageID, a, b)
 }
 
 // restartReview follows a new version of a controlled page: every published change starts
 // review again, silent or restored ones too (DOC-310 to DOC-312). The round on the
 // version before ends as superseded, and its answers stay on record without counting for
 // the new one (DOC-330). A new version equal to the approved one returns the page to its
-// approved state without review (DOC-1410).
-func (s *Service) restartReview(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, ctl control, number int, cause string) error {
+// approved state without review (DOC-1410). It answers whether the version waits for review.
+func (s *Service) restartReview(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, ctl control, number int, cause string) (bool, error) {
 	if ctl.approved() {
 		same, err := sameContent(ctx, tx, p.ID, *ctl.approvedVersion, number)
 		if err != nil {
-			return err
+			return false, err
 		}
 		if same {
-			return s.returnToApproved(ctx, tx, c, p, ctl, number)
+			return false, s.returnToApproved(ctx, tx, c, p, ctl, number)
 		}
 	}
 	var current int
 	if err := tx.QueryRow(ctx, "SELECT current_version FROM workflows WHERE id = $1", ctl.workflowID).Scan(&current); err != nil {
-		return err
+		return false, err
 	}
 	def, err := definitionOf(ctx, tx, ctl.workflowID, current)
 	if err != nil {
-		return err
+		return false, err
 	}
 	start := def.StartState()
 	if err := endRound(ctx, tx, p.ID, roundStatusSuperseded, cause); err != nil {
-		return err
+		return false, err
 	}
 	from := ctl.stateID
 	ctl.workflowVersion, ctl.stateID, ctl.stateKind, ctl.headVersion = current, start.ID, start.Kind, number
 	if _, err := tx.Exec(ctx, `UPDATE page_control SET workflow_version = $2, state_id = $3, state_kind = $4, head_version = $5, updated_at = now()
 		WHERE page_id = $1`, p.ID, current, start.ID, start.Kind, number); err != nil {
-		return err
+		return false, err
 	}
 	round, err := openRound(ctx, tx, p.ID, ctl)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if err := systemAnswer(ctx, tx, p.ID, &round, from, start.ID, cause, number); err != nil {
-		return err
+		return false, err
 	}
-	return recordSystem(ctx, tx, c, "page.review_restarted", p, map[string]any{"version": number, "cause": cause, "state": start.ID})
+	return true, recordSystem(ctx, tx, c, "page.review_restarted", p, map[string]any{"version": number, "cause": cause, "state": start.ID})
 }
 
 // returnToApproved makes an unchanged version the approved one again: readers see the same
@@ -218,6 +224,9 @@ func (s *Service) returnToApproved(ctx context.Context, tx pgx.Tx, c identity.Ca
 		return err
 	}
 	if _, err := tx.Exec(ctx, "UPDATE pages SET current_version = $2 WHERE id = $1", p.ID, number); err != nil {
+		return err
+	}
+	if err := search.DropWorking(ctx, tx, p.ID); err != nil {
 		return err
 	}
 	if err := systemAnswer(ctx, tx, p.ID, nil, ctl.stateID, state.ID, causeEqualToApproved, number); err != nil {
@@ -393,10 +402,6 @@ func (s *Service) approve(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 		WHERE page_id = $1`, p.ID, ctl.headVersion, to.ID, c.UserID); err != nil {
 		return p, err
 	}
-	if ctl.headVersion == p.CurrentVersion {
-		// Never approved before: the page already holds this version, and appears to readers now.
-		return p, nil
-	}
 	var title string
 	var raw []byte
 	var authorID uuid.UUID
@@ -408,7 +413,14 @@ func (s *Service) approve(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 	if err != nil {
 		return p, err
 	}
-	return s.makeCurrent(ctx, tx, c, p, current{number: ctl.headVersion, title: title, doc: doc, author: authorID})
+	out := p
+	// A page never approved before already holds this version, and appears to readers now.
+	if ctl.headVersion != p.CurrentVersion {
+		if out, err = s.makeCurrent(ctx, tx, c, p, current{number: ctl.headVersion, title: title, doc: doc, author: authorID, approval: true}); err != nil {
+			return out, err
+		}
+	}
+	return out, announceApproval(ctx, tx, c, out, ctl, doc)
 }
 
 // ControlInfo is what the page band shows about the workflow of a page (DOC-302, DOC-303,

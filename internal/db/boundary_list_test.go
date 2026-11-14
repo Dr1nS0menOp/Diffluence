@@ -112,23 +112,25 @@ var tableOwners = map[string]string{
 	"attachment_refs":     "internal/attachments",
 	"attachment_events":   "internal/attachments",
 	"pending_file_copies": "internal/attachments",
+	"attachment_pins":     "internal/attachments",
 	"storage_deletions":   "internal/storage",
 
 	// working together.
-	"comments":             "internal/comments",
-	"comment_seen":         "internal/comments",
-	"reactions":            "internal/comments",
-	"watches":              "internal/watches",
-	"follows":              "internal/watches",
-	"page_tasks":           "internal/tasks",
-	"notifications":        "internal/notify",
-	"mail_queue":           "internal/mail",
-	"access_requests":      "internal/sharing",
-	"invitation_requests":  "internal/sharing",
-	"page_presence":        "internal/presence",
-	"page_version_authors": "internal/collab",
-	"collab_documents":     "internal/collab",
-	"saved_blocks":         "internal/savedblocks",
+	"comments":               "internal/comments",
+	"comment_seen":           "internal/comments",
+	"reactions":              "internal/comments",
+	"watches":                "internal/watches",
+	"follows":                "internal/watches",
+	"page_tasks":             "internal/tasks",
+	"notifications":          "internal/notify",
+	"approval_subscriptions": "internal/notify",
+	"mail_queue":             "internal/mail",
+	"access_requests":        "internal/sharing",
+	"invitation_requests":    "internal/sharing",
+	"page_presence":          "internal/presence",
+	"page_version_authors":   "internal/collab",
+	"collab_documents":       "internal/collab",
+	"saved_blocks":           "internal/savedblocks",
 
 	// templates, search, trash.
 	"templates":            "internal/templates",
@@ -141,6 +143,7 @@ var tableOwners = map[string]string{
 	"page_template_origin": "internal/templates",
 	"search_documents":     "internal/search",
 	"search_pages":         "internal/search",
+	"search_working":       "internal/search",
 	"trash_items":          "internal/trash",
 
 	// exchange and public sites.
@@ -341,6 +344,9 @@ var crossings = map[crossing]int{
 	{"internal/feed", "release_run_pages"}: 2,
 	{"internal/feed", "release_runs"}:      2,
 	{"internal/feed", "space_pairs"}:       1,
+	// A reader learns of a controlled page as approved: the feed asks it of the rows it shows,
+	// in the one query of a tab (spec 064, DOC-570).
+	{"internal/feed", "page_control"}: 1,
 
 	// identity: erasing a person removes their rows, and a deleted group its grants, in one
 	// transaction (spec 032); the list of a person's spaces shows names.

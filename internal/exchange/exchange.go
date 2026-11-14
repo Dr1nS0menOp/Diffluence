@@ -143,7 +143,7 @@ func (s *Service) PageMarkdown(ctx context.Context, c identity.Caller, pageID uu
 		if err != nil {
 			return "", nil, err
 		}
-		files, err := s.attachments.ListForPage(ctx, pageID)
+		files, err := s.attachments.List(ctx, c, pageID)
 		if err != nil {
 			return "", nil, err
 		}
@@ -221,7 +221,7 @@ func (s *Service) writeMarkdownTree(ctx context.Context, c identity.Caller, zw *
 		if err != nil {
 			return err
 		}
-		files, err := s.attachments.ListForPage(ctx, p.ID)
+		files, err := s.attachments.List(ctx, c, p.ID)
 		if err != nil {
 			return err
 		}

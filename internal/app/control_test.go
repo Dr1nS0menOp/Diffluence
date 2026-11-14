@@ -618,13 +618,22 @@ func TestTheFeedNeverShowsAVersionWaitingForReview(t *testing.T) {
 	w := newControlWorld(e, "DCN")
 	page := w.controlled("Feed page", "x")
 	w.approve(page)
-	before := e.scalar("SELECT max(created_at)::text FROM page_versions WHERE page_id = $1", page)
-	w.publishAs(w.author, page, "Feed page", "working", false)
-	for _, item := range w.reader.ok("GET", "/api/v1/feed?tab=recent", nil)["items"].([]any) {
-		row := item.(map[string]any)
-		if row["page_id"] == page && row["kind"] != "created" {
-			t.Fatalf("the feed shows the change under review: %v (approved at %s)", row, before)
+	item := func() map[string]any {
+		for _, it := range w.reader.ok("GET", "/api/v1/feed?tab=recent", nil)["items"].([]any) {
+			if row := it.(map[string]any); row["page_id"] == page {
+				return row
+			}
 		}
+		return nil
+	}
+	before := item()
+	w.publishAs(w.author, page, "Feed page", "working", false)
+	// Since wave DC3 a reader learns of the page by its approval (DOC-570), and nothing of the
+	// change: not its time, its text or its title.
+	row := item()
+	if before == nil || row == nil || row["kind"] != "approved" || row["at"] != before["at"] || row["title"] != "Feed page" ||
+		strings.Contains(fmt.Sprint(row["excerpt"]), "working") {
+		t.Fatalf("the feed shows the change under review: %v, before it %v", row, before)
 	}
 }
 

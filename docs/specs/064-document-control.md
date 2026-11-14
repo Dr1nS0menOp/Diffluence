@@ -161,6 +161,45 @@ Every wave follows these rules:
 - notifications using the visibility rule;
 - the site publishing only approved versions.
 
+**Built:** see `docs/reports/2026-11-14-wave-dc3.md`. Migration 0063 adds `attachment_pins`, `search_working`, `approval_subscriptions`, the column `needs_edit` of a notification, the workflow of a template and the source of an imported round, and the functions `reader_pins`, `reader_pinned_at`, `perm_unpinned_files` and `search_working_names`.
+
+**Load (DOC-1302, DOC-570):**
+- A reader's read of a file of a controlled page asks one more query for the pins, and one more for the rule when the page pins its files.
+- Search keeps a second entry only for drafts in progress. It asks the small table of working entries for the typed words, then the rule of editing for the few pages found; the shown rows ask it once more.
+- The lists of files ask `perm_unpinned_files`: the changed files of pinned pages first, then the rule of editing for their pages only.
+- The feed asks whether a person approved each page it shows, by key, for the rows of one page of the feed. Measured on the real-data dump: see the report.
+- A notification for editors asks the rule of editing for its own page when it is shown or mailed.
+
+**Decided on the product owner's behalf on 2026-11-14, may be overruled:**
+
+| # | Decision | Reason |
+|---|---|---|
+| DC3-1 | Every door around a page asks one question, `permissions.ReadsWorking`: authors (whoever may edit the page) and the reviewers of its open round read the working version; everyone else reads the version on the pages row | DOC-300: one rule in one place |
+| DC3-2 | A comment or reply written by someone who may edit, while a working version differs from the approved one, is kept for editors, as a thread made while editing is. It reaches readers when a version that holds what it points at is approved. A reader's comment belongs to the approved version, and everyone sees it | DOC-500, with what comments already had |
+| DC3-3 | A reviewer who may not edit cannot add a page comment while the working version differs: their remarks go in the review | A thread kept for editors would be hidden from them, and an open one would reach readers (DOC-251) |
+| DC3-4 | Editing a comment keeps the version it belongs to | A comment belongs to the version it was made on |
+| DC3-5 | Each version of a controlled page pins the files it shows, with their version and name. Readers get the pins of the version they read. A file the page holds but that version does not show is not a reader's | DOC-510, DOC-512 |
+| DC3-6 | A new version, an older version made current again, or a new name of a file the working version shows writes a new version of the page with the same text, which starts review again. A file that no version shows changes nothing | DOC-511: reviewers approve the files they saw |
+| DC3-7 | A file the approved version shows, or its pinned version, cannot be deleted, moved or removed until a version without it is approved | Simpler than keeping a file in the trash for readers (the edge of DOC-510), and nothing to purge around |
+| DC3-8 | The Files screen, its filters and quick file search leave out, for a reader, a file of a controlled page whose version or name waits for review; the page's own list shows the approved one | Only pinned versions, without a second set of names to search (DOC-512) |
+| DC3-9 | The second entry of search holds the working title, text and file names, only while they differ from the approved version. An author matches both entries and sees the working title and excerpt. A reviewer keeps the ordinary rule | DOC-520, DOC-1302, DC2-11 |
+| DC3-10 | The newly approved version is indexed inside the transaction of the approval | DOC-1253: until it commits, readers find the version approved before |
+| DC3-11 | Every export format puts a control line above a controlled page: its state, version, approval date and approver, or "Not approved" for a working version. A PDF that holds a working version says "Not approved" in the header of every page. Signatures join in DC4 | DOC-531 |
+| DC3-12 | Old versions of a controlled page in an export follow the history rule: none for a reader | DOC-320, DOC-321 |
+| DC3-13 | A bundle (version 8) carries the record: workflows, where each page stands, rounds with answers, reviewers and review comments, and the files as readers see them. An import copies the workflows into the new space as page workflows and keeps the version readers saw. A page that waited for review lands in the start state, and the rounds are a record marked with their installation that never counts | DOC-532; how imported approvals and signatures count further is DOC-1212, in DC5 |
+| DC3-14 | A token takes steps, answers a review and reads its record with the checks of the screens. Refusing a signature through a token is proved in DC4, which brings signing | DOC-551, DOC-733 |
+| DC3-15 | Two webhook events: `page.version_approved` reaches owners who may view the page, `page.working_changed` only owners who may edit it, checked at delivery | DOC-552 |
+| DC3-16 | Watchers who may edit hear of working changes. Every watcher hears of a new approved version, a new kind "version approved", in the digest by default. Its mail shows the change between the two approved versions | DOC-603, DOC-604 |
+| DC3-17 | A notice about a working version, or about a thread for editors, is shown and mailed only while its person may still edit the page | The edge of DOC-603 |
+| DC3-18 | A mail is built through the rule whatever a row says: a reader of a controlled page gets no change but one between approved versions, and no excerpt of a thread for editors | DOC-604 |
+| DC3-19 | A mention in a working version reaches at once those who may edit; the others hear when it is approved, once | DOC-606 |
+| DC3-20 | A digest groups the approvals of one page in one line, with the newest version | DOC-605 |
+| DC3-21 | The approvals digest is a choice per person and space, in the menu of the space, and goes through the channels and settings of every notification | DOC-607, DOC-609 |
+| DC3-22 | A template of a space may name an active workflow of that space, without the part of guided templates. The first page made from it enters it as a page workflow in its start state, through the set path of guided templates, unless its entry names one, or a space or branch workflow governs it. The person using the template needs the right to choose workflows, as for a workflow an entry names (TPL-152). A template of all spaces names none | DOC-560 on the model of spec 074; workflows belong to a space |
+| DC3-23 | The feed shows a reader a controlled page that a person approved as "approved", under the time its approved version was written; the approval does not move it up. A page that came under control already approved shows as before | DOC-570 within its budget: placing approvals by their time read every version on the real data (DC3 report) |
+| DC3-24 | Analytics record the version a person read | DOC-571 |
+| DC3-25 | A draft that waits at the upgrade gets its second search entry at its next publish | A migration runs no Go code |
+
 ## DC4: electronic signatures
 
 **Scope:**

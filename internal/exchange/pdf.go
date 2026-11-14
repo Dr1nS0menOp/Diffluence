@@ -217,7 +217,12 @@ func (w *exportWriter) pdfForm(page string, design PDFDesign, images map[string]
 	if err := addFile(indexFile, []byte(page)); err != nil {
 		return nil, "", err
 	}
-	if header := marginText(design.Header, w.title); header != "" {
+	headerText := design.Header
+	if w.holdsWorking() {
+		// A version nobody approved says so on every page of the file (DOC-531).
+		headerText = strings.TrimSpace(notApproved + "   " + headerText)
+	}
+	if header := marginText(headerText, w.title); header != "" {
 		if err := addFile("header.html", []byte(header)); err != nil {
 			return nil, "", err
 		}

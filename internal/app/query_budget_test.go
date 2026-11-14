@@ -18,7 +18,8 @@ var queryBudgets = map[string]int64{
 	"the tree":    14,
 	// Two more since spec 047: titles that hold the typed text, and titles near it, each
 	// asked only when the earlier tiers leave room on the page.
-	"search":           19,
+	// One more since spec 064, wave DC3: the second entry of a working version, for its authors.
+	"search":           20,
 	"the bell":         3,
 	"a page's summary": 13,
 	"the space":        11,

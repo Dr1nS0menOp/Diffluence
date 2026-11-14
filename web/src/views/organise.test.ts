@@ -44,6 +44,7 @@ const template = (extra: Partial<TemplateSummary>): TemplateSummary => ({
   version: 1,
   guided: false,
   template_version: 1,
+  workflow_id: null,
   ...extra,
 });
 

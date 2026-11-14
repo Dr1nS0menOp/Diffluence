@@ -59,7 +59,9 @@ type stored struct {
 }
 
 // visibleRows reads through perm_visible_pages: a row about a page the person may no
-// longer see simply does not come back, and returns if access does (COL-072).
+// longer see simply does not come back, and returns if access does (COL-072). A row about a
+// working version, or a thread for editors, comes back only while the person may edit the
+// page (spec 064, DOC-603, DOC-604).
 const visibleRows = `SELECT n.id, n.type, n.reason, COALESCE(u.display_name, ''), n.page_id, p.title, n.space_id, sp.name,
 		n.comment_id, n.read_at IS NOT NULL, n.created_at, n.data, n.group_key
 	FROM notifications n
@@ -67,7 +69,8 @@ const visibleRows = `SELECT n.id, n.type, n.reason, COALESCE(u.display_name, '')
 	JOIN pages p ON p.id = n.page_id
 	JOIN spaces sp ON sp.id = n.space_id
 	LEFT JOIN users u ON u.id = n.actor_id
-	WHERE n.user_id = $1 AND n.hidden_at IS NULL `
+	WHERE n.user_id = $1 AND n.hidden_at IS NULL
+	  AND (NOT n.needs_edit OR n.page_id IN (SELECT e.page_id FROM perm_editable_pages($1) e WHERE e.page_id = n.page_id)) `
 
 func scanStored(r pgx.CollectableRow) (stored, error) {
 	var v stored
@@ -86,6 +89,12 @@ func scanStored(r pgx.CollectableRow) (stored, error) {
 // versionOf reads the version a change made. JSON numbers arrive as floats.
 func versionOf(i Item) int {
 	n, _ := i.Data["version"].(float64)
+	return int(n)
+}
+
+// previousOf reads the version approved before a new approval.
+func previousOf(i Item) int {
+	n, _ := i.Data["previous"].(float64)
 	return int(n)
 }
 
@@ -164,7 +173,8 @@ func (s *Service) Count(ctx context.Context, c identity.Caller) (int, error) {
 	// few, where perm_visible_pages over every page cost tens of milliseconds (spec 050).
 	err := s.pool.QueryRow(ctx, `WITH unread AS MATERIALIZED (
 			SELECT n.group_key, n.page_id FROM notifications n
-			WHERE n.user_id = $1 AND n.read_at IS NULL AND n.hidden_at IS NULL)
+			WHERE n.user_id = $1 AND n.read_at IS NULL AND n.hidden_at IS NULL
+			  AND (NOT n.needs_edit OR n.page_id IN (SELECT e.page_id FROM perm_editable_pages($1) e WHERE e.page_id = n.page_id)))
 		SELECT count(DISTINCT r.group_key) FROM unread r
 		WHERE r.page_id IN (SELECT v.page_id FROM perm_visible_pages($1) v
 			WHERE v.page_id = ANY (ARRAY(SELECT DISTINCT page_id FROM unread WHERE page_id IS NOT NULL)))`, c.UserID).Scan(&n)

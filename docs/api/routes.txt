@@ -40,6 +40,7 @@ DELETE /api/v1/rules/{id}                                      object:space.auto
 DELETE /api/v1/saved-blocks/{id}                               authenticated
 DELETE /api/v1/sites/{id}                                      object:site.publish
 DELETE /api/v1/spaces/{id}                                     object:space.administer
+DELETE /api/v1/spaces/{id}/approvals-digest                    object:space.view
 DELETE /api/v1/spaces/{id}/favourite                           object:space.view
 DELETE /api/v1/spaces/{id}/icon                                object:space.look
 DELETE /api/v1/spaces/{id}/old-keys/{alias}                    object:space.administer
@@ -217,6 +218,7 @@ GET /api/v1/spaces/{id}                                        object:space.view
 GET /api/v1/spaces/{id}/access                                 object:space.manage_access
 GET /api/v1/spaces/{id}/access.csv                             object:space.manage_access
 GET /api/v1/spaces/{id}/approvals                              object:space.approvals
+GET /api/v1/spaces/{id}/approvals-digest                       object:space.view
 GET /api/v1/spaces/{id}/archive                                object:space.view
 GET /api/v1/spaces/{id}/audit                                  object:space.audit
 GET /api/v1/spaces/{id}/categories                             object:space.view
@@ -533,6 +535,7 @@ PUT /api/v1/pages/{id}/workflow                                object:page.workf
 PUT /api/v1/rules/{id}                                         object:space.automation
 PUT /api/v1/sites/{id}/pages                                   object:site.publish
 PUT /api/v1/spaces/{id}/approvals                              object:space.approvals
+PUT /api/v1/spaces/{id}/approvals-digest                       object:space.view
 PUT /api/v1/spaces/{id}/categories                             object:space.administer
 PUT /api/v1/spaces/{id}/favourite                              object:space.view
 PUT /api/v1/spaces/{id}/features                               object:space.administer

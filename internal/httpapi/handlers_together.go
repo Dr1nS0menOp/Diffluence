@@ -68,6 +68,10 @@ func (s *Server) registerTogetherRoutes() {
 	r.HandleFunc("GET /api/v1/spaces/{id}/watch", Object("space.view"), s.handleSpaceWatchState)
 	r.HandleFunc("PUT /api/v1/spaces/{id}/watch", Object("space.view"), s.handleWatchSpace(true))
 	r.HandleFunc("DELETE /api/v1/spaces/{id}/watch", Object("space.view"), s.handleWatchSpace(false))
+	// The approvals digest of a space: every approval in it, for whoever views it (DOC-607).
+	r.HandleFunc("GET /api/v1/spaces/{id}/approvals-digest", Object("space.view"), s.handleApprovalsDigest)
+	r.HandleFunc("PUT /api/v1/spaces/{id}/approvals-digest", Object("space.view"), s.handleSetApprovalsDigest(true))
+	r.HandleFunc("DELETE /api/v1/spaces/{id}/approvals-digest", Object("space.view"), s.handleSetApprovalsDigest(false))
 	r.HandleFunc("GET "+pagesPath+"/watchers", Object("page.watchers"), s.handleWatchers)
 	r.HandleFunc("PUT "+pagesPath+"/watchers/{user}", Object("page.watchers"), s.handleWatcher(true))
 	r.HandleFunc("DELETE "+pagesPath+"/watchers/{user}", Object("page.watchers"), s.handleWatcher(false))
@@ -373,6 +377,34 @@ func (s *Server) handleSpaceWatchState(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"watching": on})
+}
+
+func (s *Server) handleApprovalsDigest(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	out, err := s.deps.Notify.ApprovalsSubscribed(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
+}
+
+func (s *Server) handleSetApprovalsDigest(on bool) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id, ok := pathID(w, r, "id")
+		if !ok {
+			return
+		}
+		out, err := s.deps.Notify.SetApprovalsDigest(r.Context(), s.caller(r), id, on)
+		if err != nil {
+			s.fail(w, r, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, out)
+	}
 }
 
 func (s *Server) handleWatchSpace(on bool) http.HandlerFunc {

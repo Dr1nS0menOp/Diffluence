@@ -9,6 +9,7 @@ import {
   grant,
   login,
   newSpace,
+  paragraph,
   PASSWORD,
   publishedPage,
   test,
@@ -232,5 +233,70 @@ test('a workflow is built by keyboard only, and the validator speaks beside its 
   await expect(page.getByRole('alert')).toHaveCount(0);
   await press('Save workflow');
   await expect(page.getByRole('cell', { name: 'Draft, In review, Approved' })).toBeVisible();
+  await checkAccessibility(page);
+});
+
+// Wave DC3: what is around the page follows the version a person reads (DOC-500, DOC-560,
+// DOC-607). A reader keeps the approved text while the author's change and remark wait; the
+// space menu offers every approval of the space; a template names a workflow.
+test('a reader keeps the approved version and asks for every approval', async ({ page, browser }) => {
+  const space = await newSpace(page, 'Around');
+  const id = await publishedPage(page, space.id, 'Cleaning', 'Clean with water', space.home_page_id);
+  const made = await page.request.post(`/api/v1/spaces/${space.id}/workflows`, {
+    data: { name: 'Review', definition: flow },
+  });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const workflow = (await made.json()).id as string;
+  expect(
+    (await page.request.put(`/api/v1/pages/${id}/workflow`, { data: { workflow_id: workflow } })).ok(),
+  ).toBeTruthy();
+  for (const transition of ['submit', 'approve']) {
+    const band = await (await page.request.get(`/api/v1/pages/${id}`)).json();
+    const step = await page.request.post(`/api/v1/pages/${id}/transitions`, {
+      data: { transition, version: band.control.head_version },
+    });
+    expect(step.ok(), await step.text()).toBeTruthy();
+  }
+  const changed = await page.request.post(`/api/v1/pages/${id}/publish`, {
+    data: { title: 'Cleaning', document: paragraph('Clean with a new agent'), base_version: 1 },
+  });
+  expect(changed.ok(), await changed.text()).toBeTruthy();
+  const remark = await page.request.post(`/api/v1/pages/${id}/comments`, {
+    data: { body: paragraph('The new agent needs gloves') },
+  });
+  expect(remark.ok(), await remark.text()).toBeTruthy();
+
+  const name = unique('reader');
+  const reader = await createUser(browser, `${name}@example.com`);
+  await grant(page, space.id, { type: 'user', id: reader }, VIEWER);
+  const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
+  const other = await context.newPage();
+  await login(other, `${name}@example.com`, PASSWORD);
+  await other.goto(`/pages/${id}`);
+  await expect(other.getByText('Clean with water')).toBeVisible();
+  await expect(other.getByText('Clean with a new agent')).toHaveCount(0);
+  await expect(other.getByText('The new agent needs gloves')).toHaveCount(0);
+  await other.getByRole('button', { name: 'More for this space' }).click();
+  await other.getByRole('menuitem', { name: 'Tell me about every approval in this space' }).click();
+  await expect
+    .poll(
+      async () => (await (await other.request.get(`/api/v1/spaces/${space.id}/approvals-digest`)).json()).on,
+    )
+    .toBe(true);
+  await other.getByRole('button', { name: 'More for this space' }).click();
+  await expect(other.getByRole('menuitem', { name: 'Stop telling me about every approval' })).toBeVisible();
+  await context.close();
+
+  const template = await page.request.post(`/api/v1/spaces/${space.id}/templates`, {
+    data: { name: 'Procedure' },
+  });
+  expect(template.ok(), await template.text()).toBeTruthy();
+  const templateId = (await template.json()).id as string;
+  await page.goto(`/templates/${templateId}/edit`);
+  await page.getByLabel('Workflow').selectOption({ label: 'Review' });
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
+  await expect
+    .poll(async () => (await (await page.request.get(`/api/v1/templates/${templateId}`)).json()).workflow_id)
+    .toBe(workflow);
   await checkAccessibility(page);
 });

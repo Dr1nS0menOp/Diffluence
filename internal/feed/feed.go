@@ -149,12 +149,25 @@ var forYouSQL = `WITH candidates AS (
 		UNION ALL ` + runItems + ` AND pub.id IN (SELECT w.target_id FROM watches w WHERE w.user_id = $1 AND w.target_type = 'space')
 	)` + changesTail
 
+// approvedByAPerson is a controlled page whose version readers see was approved by a person.
+// Readers learn of it as approved, never of the working changes after it (spec 064, DOC-570).
+// It is asked of the rows of one page of the feed only, so the newest-first walk of versions
+// stays as it was; the item keeps the time its version was written (DC3-23).
+func approvedByAPerson(page string) string {
+	return `EXISTS (SELECT 1 FROM page_control pa WHERE pa.page_id = ` + page + ` AND pa.approved_by IS NOT NULL)`
+}
+
 // changesTail turns changes into items, and applies the space, the cursor and, for
-// "for you", who made the change and why the person sees it.
-const changesTail = `
-	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(c.note, left(d.body, $5), ''), COALESCE(u.display_name, ''), c.kind, c.at,
-		(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = c.page_id),
-		(SELECT count(*) FROM comments m WHERE m.page_id = c.page_id AND m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only),
+// "for you", who made the change and why the person sees it. Whether an item was approved is
+// asked outside, of the rows of this page of the feed only; a release run stays what it is.
+var changesTail = `
+	SELECT f.page_id, f.title, f.emoji, f.key, f.name, f.excerpt, f.author,
+		CASE WHEN f.kind <> 'released' AND ` + approvedByAPerson("f.page_id") + ` THEN 'approved' ELSE f.kind END, f.at, f.reactions, f.comments,
+		f.pages
+	FROM (SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(c.note, left(d.body, $5), '') AS excerpt, COALESCE(u.display_name, '') AS author,
+		c.kind, c.at,
+		(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = c.page_id) AS reactions,
+		(SELECT count(*) FROM comments m WHERE m.page_id = c.page_id AND m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only) AS comments,
 		c.pages
 	FROM changes c
 	JOIN pages p ON p.id = c.page_id AND p.status = 'published'
@@ -170,7 +183,8 @@ const changesTail = `
 			OR (w.target_type = 'space' AND w.target_id = p.space_id)
 			OR (w.target_type = 'branch' AND w.target_id IN
 				(SELECT t.ancestor_id FROM page_tree t WHERE t.descendant_id = c.page_id)))))))
-	ORDER BY c.at DESC, c.page_id LIMIT $4`
+	ORDER BY c.at DESC, c.page_id LIMIT $4) f
+	ORDER BY f.at DESC, f.page_id`
 
 // Popular pages count what happened to them in the last days, among comments that
 // the person may see. Only a page with a reaction or comment in those days can score, so

@@ -49,6 +49,10 @@ var (
 	// mentionTier stands apart: an OR with the words would keep the index of words from
 	// being used, for every search that matches a name.
 	mentionTier = tier{match: `w.page_id = ANY(@mentioned) AND NOT d.tsv @@ ` + matchesWords, readsText: true}
+	// workingTier is the working version of a controlled page, for its authors: its entry was
+	// matched in prepare, and only for pages the person may edit (spec 064, DOC-520). Everything
+	// else about the page, its space and the filters, still decides here.
+	workingTier = tier{match: `w.page_id = ANY(@authored)`}
 	// containsTier is a title that holds the typed text inside a word, such as "port" in
 	// "Quarterly report", through the index of trigrams (spec 047, D13).
 	containsTier = tier{match: `lower(w.title) LIKE @like AND NOT w.words @@ ` + matchesWords + notAsTyped}
@@ -221,14 +225,39 @@ const mentionHits = `SELECT n.page_id FROM (
 
 // pickedRows reads what is shown. perm_visible_pages is the rule, for each row on its own
 // and at this moment, so a permission that just changed counts at once. The rows are named
-// inside the subquery, so the rule looks at those rows and not at every page there is.
-const pickedRows = resultColumns + `CASE WHEN @snippets THEN ts_headline('simple', d.body, to_tsquery('simple', @words), ` + headlineOptions + `) ELSE '' END` + resultEnd + `
+// inside the subquery, so the rule looks at those rows and not at every page there is. An
+// author of a page with a working version sees its working title and excerpt (DOC-520): the
+// rule of editing is asked only about the shown rows that have a working entry.
+const pickedRows = `SELECT p.id, p.space_id, s.key, s.name, COALESCE(sw.title, p.title), p.emoji, p.kind, p.stage_text, p.stage_color,
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft',
+		CASE WHEN @snippets THEN ts_headline('simple', COALESCE(sw.body, d.body), to_tsquery('simple', @words), ` + headlineOptions + `) ELSE '' END` + resultEnd + `
 	FROM unnest(@ids::uuid[]) WITH ORDINALITY o(id, place)
 	JOIN pages p ON p.id = o.id AND p.status = 'published'
 	JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id
 	JOIN spaces s ON s.id = p.space_id
 	JOIN search_documents d ON d.page_id = p.id
+	LEFT JOIN search_working sw ON sw.page_id = p.id AND p.id IN (SELECT e.page_id FROM perm_editable_pages(@user) e
+		WHERE e.page_id = ANY (ARRAY(SELECT x.page_id FROM search_working x WHERE x.page_id = ANY(@ids))))
 	ORDER BY o.place`
+
+// workingMatches are the working entries a search may use (DOC-520): those that match, and
+// then only of pages the person may edit, so the rule is asked about the few rows of drafts
+// in progress, in one query.
+const workingMatches = `SELECT e.page_id FROM perm_editable_pages(@user) e WHERE e.page_id = ANY (ARRAY(
+	SELECT x.page_id FROM search_working x WHERE x.tsv @@ to_tsquery('simple', @words) OR (@plain AND lower(x.title) LIKE @like)))`
+
+// firstOfEach keeps the first place of each page in a list.
+func firstOfEach(list []uuid.UUID) []uuid.UUID {
+	seen := make(map[uuid.UUID]bool, len(list))
+	out := list[:0:0]
+	for _, id := range list {
+		if !seen[id] {
+			seen[id] = true
+			out = append(out, id)
+		}
+	}
+	return out
+}
 
 // picking is one search for words on its way through the tiers.
 type picking struct {
@@ -322,7 +351,7 @@ func wordArgs(userID uuid.UUID, q Query, parsed Parsed) pgx.NamedArgs {
 		"contributors": nilIfEmpty(q.Contributors), "stage": q.Stage, "below": optID(q.Below),
 		"spacekeys": nilIfEmpty(parsed.Spaces), "authors": nilIfEmpty(allowedAuthors(q, parsed)),
 		"patterns": nilIfEmpty(parsed.Patterns), "mentionlimit": mentionLimit, "snippets": !q.Quick,
-		"like": LikeOf(q.Text),
+		"like": LikeOf(q.Text), "plain": parsed.Plain && NearLength(q.Text),
 	}
 }
 
@@ -355,12 +384,21 @@ func prepare(ctx context.Context, tx pgx.Tx, args pgx.NamedArgs) (bool, error) {
 	if args["mentioned"], err = listOf(ctx, tx, mentionHits, args); err != nil {
 		return false, err
 	}
+	if args["authored"], err = listOf(ctx, tx, workingMatches, args); err != nil {
+		return false, err
+	}
 	_, err = tx.Exec(ctx, pickSettings)
 	return err == nil, err
 }
 
 // pick walks the tiers. A search by date has one tier: all of it.
 func (p *picking) pick(ctx context.Context, q Query, parsed Parsed) error {
+	// An author looking for what they are writing finds it first (DOC-520).
+	if authored, ok := p.args["authored"].([]uuid.UUID); ok && len(authored) > 0 {
+		if err := p.addAll(ctx, p.sql.titles, workingTier); err != nil {
+			return err
+		}
+	}
 	if q.ByDate {
 		if err := p.add(ctx, anyTier); err != nil {
 			return err
@@ -430,6 +468,8 @@ func (s *Service) searchWords(ctx context.Context, userID uuid.UUID, q Query, pa
 		if err := p.pick(ctx, q, parsed); err != nil {
 			return err
 		}
+		// A page found by its working entry may be found again by the entry readers match.
+		p.ids = firstOfEach(p.ids)
 		out.Total = min(len(p.ids), totalLimit)
 		out.Capped = len(p.ids) > totalLimit || p.stopped
 		shown := p.ids[min(offset, len(p.ids)):min(offset+q.Limit, len(p.ids))]

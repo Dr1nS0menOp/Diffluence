@@ -62,10 +62,33 @@ func Index(ctx context.Context, q db.Querier, pageID uuid.UUID, title, body stri
 	return err
 }
 
-// RefreshNames puts the names of the files and the labels of a page in the index.
+// RefreshNames puts the names of the files and the labels of a page in the index: in the
+// entry readers match, the names of the version they see, and in the working entry the names
+// as they are now (spec 064, DOC-520).
 func RefreshNames(ctx context.Context, q db.Querier, pageID uuid.UUID) error {
-	_, err := q.Exec(ctx, "UPDATE search_documents SET attachment_names = left(search_names($1), $2), updated_at = now() WHERE page_id = $1",
+	if _, err := q.Exec(ctx, "UPDATE search_documents SET attachment_names = left(search_names($1), $2), updated_at = now() WHERE page_id = $1",
+		pageID, maxBodyBytes); err != nil {
+		return err
+	}
+	_, err := q.Exec(ctx, "UPDATE search_working SET attachment_names = left(search_working_names($1), $2), updated_at = now() WHERE page_id = $1",
 		pageID, maxBodyBytes)
+	return err
+}
+
+// IndexWorking stores the working version of a controlled page as its second entry, which
+// only those who may see that version match (DOC-520). It exists only while the working
+// version differs from the approved one (DOC-1302).
+func IndexWorking(ctx context.Context, q db.Querier, pageID uuid.UUID, title, body string) error {
+	_, err := q.Exec(ctx, `INSERT INTO search_working (page_id, title, body, attachment_names) VALUES ($1, $2, $3, left(search_working_names($1), $4))
+		ON CONFLICT (page_id) DO UPDATE SET title = EXCLUDED.title, body = EXCLUDED.body, attachment_names = EXCLUDED.attachment_names, updated_at = now()`,
+		pageID, title, truncate(body, maxBodyBytes), maxBodyBytes)
+	return err
+}
+
+// DropWorking removes the working entry of a page, once nothing differs from what readers
+// see.
+func DropWorking(ctx context.Context, q db.Querier, pageID uuid.UUID) error {
+	_, err := q.Exec(ctx, "DELETE FROM search_working WHERE page_id = $1", pageID)
 	return err
 }
 
@@ -456,6 +479,7 @@ func (s *Service) spelling(ctx context.Context, userID uuid.UUID, text string) (
 		WHERE w.published AND NOT w.archived AND w.kind <> 'template'
 		  AND w.space_id IN (SELECT g.space_id FROM perm_spaces($1, 'space.view') g)
 		  AND w.page_id NOT IN (SELECT h.page_id FROM perm_hidden_pages($1) h)
+		  AND w.page_id NOT IN (SELECT c.page_id FROM perm_control_hidden_pages($1) c)
 		ORDER BY w.updated_at DESC, w.page_id DESC LIMIT $2`, userID, maxSpellingTitles)
 	if err != nil {
 		return "", err

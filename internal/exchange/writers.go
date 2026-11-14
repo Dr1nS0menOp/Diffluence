@@ -21,6 +21,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/office"
+	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -124,17 +125,55 @@ func textDocument(text string) document.Node {
 	return doc
 }
 
-// withComments adds the comments after the page, as a section of the same document.
+// notApproved is what a file says on every page when it holds a version nobody approved yet.
+const notApproved = "Not approved"
+
+// controlLine is the control block of a controlled page (spec 064, DOC-531): its state, the
+// version in the file, and when and by whom it was approved. A working version says that it
+// is not approved. Signatures join it with wave DC4.
+func controlLine(c *pages.ExportControl) string {
+	if c.Working {
+		line := fmt.Sprintf("%s. State: %s. Working version %d.", notApproved, c.StateName, c.Version)
+		if c.ApprovedVersion == nil {
+			return line + " Never approved."
+		}
+		return line + fmt.Sprintf(" The approved version is version %d.", *c.ApprovedVersion)
+	}
+	line := fmt.Sprintf("Controlled document. State: %s. Version %d", c.StateName, c.Version)
+	if c.ApprovedAt != nil {
+		line += ", approved on " + c.ApprovedAt.UTC().Format(time.DateOnly)
+	}
+	if c.ApprovedBy != "" {
+		line += " by " + c.ApprovedBy
+	}
+	return line + "."
+}
+
+// holdsWorking says a file holds a working version of some page.
+func (w *exportWriter) holdsWorking() bool {
+	for _, item := range w.items {
+		if item.page.Control != nil && item.page.Control.Working {
+			return true
+		}
+	}
+	return false
+}
+
+// withComments puts the control block before a controlled page, and adds the comments after
+// it, as a section of the same document.
 func (w *exportWriter) withComments(ctx context.Context, item exportItem) document.Node {
+	doc := item.doc
+	if item.page.Control != nil {
+		doc.Content = append([]document.Node{paragraph(controlLine(item.page.Control))}, doc.Content...)
+	}
 	list, err := w.commentsOf(ctx, item.page.ID)
 	if err != nil {
 		w.report.Failed = append(w.report.Failed, item.page.Title)
-		return item.doc
+		return doc
 	}
 	if len(list) == 0 {
-		return item.doc
+		return doc
 	}
-	doc := item.doc
 	doc.Content = append(append([]document.Node{}, doc.Content...), document.Node{
 		Type: document.TypeHeading, Attrs: map[string]any{"level": 2},
 		Content: []document.Node{{Type: document.TypeText, Text: "Comments"}}})
@@ -345,8 +384,12 @@ func (w *exportWriter) htmlPage(ctx context.Context, zw *zip.Writer, item export
 
 func htmlFileName(name string) string { return name + ".html" }
 
-// htmlVersions writes each old version as a page, and returns the links to them.
+// htmlVersions writes each old version as a page, and returns the links to them. A reader of
+// a controlled page has no history beyond the approved version (DOC-320, DOC-321).
 func (w *exportWriter) htmlVersions(ctx context.Context, zw *zip.Writer, item exportItem, options document.HTMLOptions) (string, error) {
+	if item.page.Control != nil && !item.page.Control.History {
+		return "", nil
+	}
 	rows, err := w.s.pool.Query(ctx, `SELECT number, document FROM page_versions
 		WHERE page_id = $1 AND number < (SELECT current_version FROM pages WHERE id = $1) ORDER BY number DESC`, item.page.ID)
 	if err != nil {

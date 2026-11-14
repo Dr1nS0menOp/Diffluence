@@ -3,7 +3,7 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Json, type Space, type TemplateSummary } from '../api';
+import { api, type Json, type Space, type TemplateSummary, type Workflow } from '../api';
 import { Link, navigate } from '../router';
 import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack } from '../components/icons';
@@ -29,6 +29,7 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
         default_parent: x.default_parent,
         hidden: x.hidden,
         promoted: x.promoted,
+        workflow_id: x.workflow_id,
       }),
     onSettled: onChanged,
   });
@@ -170,6 +171,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
     category: template.category,
     labels: template.labels.join(', '),
     title_pattern: template.title_pattern,
+    workflow_id: template.workflow_id ?? '',
   });
   const doc = useRef<Json>(template.document ?? { type: 'doc', content: [{ type: 'paragraph' }] });
   const save = useMutation({
@@ -184,6 +186,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         default_parent: template.default_parent,
         hidden: template.hidden,
         promoted: template.promoted,
+        workflow_id: form.workflow_id || null,
         document: doc.current,
       }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['template', template.id] }),
@@ -220,6 +223,13 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         <Field label={t('templates.titlePattern')} help={t('templates.titlePatternHelp')}>
           <input value={form.title_pattern} onChange={set('title_pattern')} />
         </Field>
+        {template.space_id && (
+          <TemplateWorkflow
+            spaceId={template.space_id}
+            value={form.workflow_id}
+            onChange={set('workflow_id')}
+          />
+        )}
       </div>
       <DocumentEditor
         pageId=""
@@ -236,6 +246,37 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
       />
       {guidedOn && <TemplatePages templateId={template.id} />}
     </>
+  );
+}
+
+/** The workflow a page made from a template of a space enters (spec 064, DOC-560). */
+function TemplateWorkflow({
+  spaceId,
+  value,
+  onChange,
+}: {
+  spaceId: string;
+  value: string;
+  onChange: (e: { target: { value: string } }) => void;
+}) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['workflows', spaceId],
+    queryFn: () => api.get<{ workflows: Workflow[] }>(`/spaces/${spaceId}/workflows`),
+  });
+  const active = (q.data?.workflows ?? []).filter((w) => !w.archived);
+  if (!q.data || (active.length === 0 && !value)) return null;
+  return (
+    <Field label={t('templates.workflow')} help={t('templates.workflowHelp')}>
+      <select value={value} onChange={onChange}>
+        <option value="">{t('templates.noWorkflow')}</option>
+        {active.map((w) => (
+          <option key={w.id} value={w.id}>
+            {w.name}
+          </option>
+        ))}
+      </select>
+    </Field>
   );
 }
 

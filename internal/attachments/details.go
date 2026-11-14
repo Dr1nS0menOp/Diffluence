@@ -85,10 +85,20 @@ func (s *Service) Rows(ctx context.Context, c identity.Caller, pageID uuid.UUID)
 		v.Inline, v.Office = IsInline(v.ContentType), IsOffice(v.Filename)
 		return v, err
 	})
+	if err != nil {
+		return nil, err
+	}
+	p, err := s.pinsFor(ctx, s.pool, c, pageID)
+	if err != nil {
+		return nil, err
+	}
+	if out, err = keepPinned(ctx, s.pool, out, p, func(v *Row) *Attachment { return &v.Attachment }); err != nil {
+		return nil, err
+	}
 	if out == nil {
 		out = []Row{}
 	}
-	return out, err
+	return out, nil
 }
 
 // RecordUse writes which files a new version shows, in the transaction that makes it.
@@ -123,6 +133,9 @@ func (s *Service) trashAll(ctx context.Context, c identity.Caller, list []uuid.U
 			a, err := get(ctx, tx, id)
 			if err == nil && belongs(a) {
 				err = s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.ActionAttachmentDelete, a.CreatedBy)
+				if err == nil {
+					err = requireNotPinned(ctx, tx, a, 0)
+				}
 			} else if err == nil {
 				err = apperr.NotFound()
 			}
@@ -193,9 +206,25 @@ func (s *Service) Events(ctx context.Context, c identity.Caller, pageID uuid.UUI
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {
 		return nil, err
 	}
+	p, err := s.pinsFor(ctx, s.pool, c, pageID)
+	if err != nil {
+		return nil, err
+	}
+	// A reader of a controlled page hears only of the files the approved version holds, up to
+	// when it was written: what happened since belongs to the working version (DOC-512).
+	var pinnedIDs []uuid.UUID
+	var until *time.Time
+	if p != nil {
+		pinnedIDs = make([]uuid.UUID, 0, len(p.files))
+		for id := range p.files {
+			pinnedIDs = append(pinnedIDs, id)
+		}
+		until = &p.at
+	}
 	rows, err := s.pool.Query(ctx, `SELECT e.filename, e.action, COALESCE(u.display_name, ''), e.created_at
 		FROM attachment_events e LEFT JOIN users u ON u.id = e.actor_id
-		WHERE e.page_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT $2`, pageID, maxListedEvents)
+		WHERE e.page_id = $1 AND ($3::timestamptz IS NULL OR (e.attachment_id = ANY($4) AND e.created_at <= $3))
+		ORDER BY e.created_at DESC, e.id DESC LIMIT $2`, pageID, maxListedEvents, until, pinnedIDs)
 	if err != nil {
 		return nil, err
 	}
@@ -296,9 +325,13 @@ func (s *Service) RemoveLabel(ctx context.Context, c identity.Caller, id uuid.UU
 // OpenVersion reads one stored version. It checks view on every request, so a link to a
 // version gives nothing to someone without access (FIL-042).
 func (s *Service) OpenVersion(ctx context.Context, c identity.Caller, id uuid.UUID, number int) (Attachment, io.ReadSeekCloser, error) {
-	a, err := s.viewable(ctx, c, id)
+	a, pinnedVersion, err := s.viewablePinned(ctx, c, id)
 	if err != nil {
 		return a, nil, err
+	}
+	if pinnedVersion && number != a.Version {
+		// A reader of a controlled page has the approved version of a file, and no other.
+		return a, nil, apperr.NotFound()
 	}
 	var key string
 	err = s.pool.QueryRow(ctx, `SELECT object_key, size, content_type, encode(sha256, 'hex') FROM attachment_versions

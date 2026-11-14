@@ -39,6 +39,8 @@ const (
 	ReasonAuthor    = "author"
 	ReasonThread    = "thread"
 	ReasonAsked     = "asked"
+	// ReasonApprovals is the approvals digest of a space (DOC-607).
+	ReasonApprovals = "approvals"
 )
 
 // Options are what the module needs to write mail.
@@ -138,10 +140,12 @@ func (s *Service) Deliver(ctx context.Context, q db.Querier, r Row) error {
 	}
 	id := ids.New()
 	// Anything but the digest channel is marked as already counted for the digest.
-	tag, err := q.Exec(ctx, `INSERT INTO notifications (id, user_id, type, reason, actor_id, page_id, space_id, comment_id, group_key, source_event, data, digested_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $12 THEN NULL ELSE now() END)
+	// A row for editors stays one: it is shown and mailed only while its person may edit.
+	tag, err := q.Exec(ctx, `INSERT INTO notifications (id, user_id, type, reason, actor_id, page_id, space_id, comment_id, group_key, source_event, data,
+			digested_at, needs_edit)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, CASE WHEN $12 THEN NULL ELSE now() END, $13)
 		ON CONFLICT (user_id, source_event) DO NOTHING`,
-		id, r.UserID, r.Type, r.Reason, actor, r.PageID, r.SpaceID, r.CommentID, groupKey(r), r.Event, data, channel == ChannelDigest)
+		id, r.UserID, r.Type, r.Reason, actor, r.PageID, r.SpaceID, r.CommentID, groupKey(r), r.Event, data, channel == ChannelDigest, r.NeedsEdit)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}

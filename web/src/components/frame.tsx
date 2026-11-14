@@ -14,6 +14,7 @@ import { NewLinkDialog, NewPageDialog, type CreateTarget } from './create';
 import {
   IconArchive,
   IconAttach,
+  IconBell,
   IconBlog,
   IconChevronLeft,
   IconChevronRight,
@@ -148,12 +149,29 @@ export function useSpaceWatch(space: Space) {
   return { watching: state.data?.watching ?? false, set: set.mutate };
 }
 
+/** Whether you hear of every approval in a space, the approvals digest (spec 064, DOC-607). */
+function useApprovalsDigest(space: Space) {
+  const client = useQueryClient();
+  const key = ['approvals-digest', space.id];
+  const state = useQuery({
+    queryKey: key,
+    queryFn: () => api.get<{ on: boolean }>(`/spaces/${space.id}/approvals-digest`),
+  });
+  const set = useMutation({
+    mutationFn: (on: boolean) =>
+      on ? api.put(`/spaces/${space.id}/approvals-digest`) : api.del(`/spaces/${space.id}/approvals-digest`),
+    onSettled: () => client.invalidateQueries({ queryKey: key }),
+  });
+  return { on: state.data?.on ?? false, set: set.mutate };
+}
+
 function SpaceMenu({ space }: { space: Space }) {
   const [exporting, setExporting] = useState(false);
   const { t } = useTranslation();
   const client = useQueryClient();
   const copy = useCopy();
   const watch = useSpaceWatch(space);
+  const approvals = useApprovalsDigest(space);
   const favourite = useMutation({
     mutationFn: (on: boolean) =>
       on ? api.put(`/spaces/${space.id}/favourite`) : api.del(`/spaces/${space.id}/favourite`),
@@ -172,6 +190,10 @@ function SpaceMenu({ space }: { space: Space }) {
         <MenuItem onClick={() => watch.set(!watch.watching)}>
           <IconEye size={MENU_ICON_SIZE} />{' '}
           {watch.watching ? t('watching.stopSpace') : t('watching.watchSpace')}
+        </MenuItem>
+        <MenuItem onClick={() => approvals.set(!approvals.on)}>
+          <IconBell size={MENU_ICON_SIZE} />{' '}
+          {approvals.on ? t('watching.stopApprovals') : t('watching.approvals')}
         </MenuItem>
         <MenuItem
           onClick={() => void copy(`${window.location.origin}/spaces/${space.key}`, t('tree.linkCopied'))}

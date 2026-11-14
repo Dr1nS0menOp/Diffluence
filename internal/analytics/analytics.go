@@ -26,6 +26,7 @@ import (
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
 )
@@ -200,6 +201,11 @@ func (s *Service) Record(ctx context.Context, c identity.Caller, v Visit) error 
 	}
 	on, err := s.features.Enabled(ctx, s.pool, f.spaceID, features.Analytics)
 	if err != nil || !on || !f.active || f.owner == c.UserID {
+		return err
+	}
+	// The version this person read: an author of a controlled page reads its working
+	// version, a reader the approved one (spec 064, DOC-571).
+	if f.version, err = pages.VersionSeen(ctx, s.pool, s.perms, c.UserID, v.PageID); err != nil {
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {

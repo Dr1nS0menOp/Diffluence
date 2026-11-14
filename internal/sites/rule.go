@@ -85,7 +85,9 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 	if slices.Contains(eventsThatCanHide, m.Type) {
 		return s.Enforce(ctx)
 	}
-	if m.Type != "page.published" {
+	// A new approval of a controlled page goes out like a publish; the first one of a page that was
+	// never approved is not a publish at all (spec 064, DOC-540).
+	if m.Type != "page.published" && m.Type != "page.version_approved" {
 		return nil
 	}
 	var p struct {

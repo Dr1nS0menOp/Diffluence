@@ -235,6 +235,19 @@ func (s *Service) Reviews(ctx context.Context, q db.Querier, userID, pageID uuid
 	return reviewsPage(ctx, q, userID, pageID)
 }
 
+// ReadsWorking answers the one question of document control for a person and a page: may
+// they see its working version (spec 064, DOC-300)? Authors may, that is whoever may edit the
+// page, and so may the reviewers of its open round in the stage the page is in. Everyone
+// else reads the version on the pages row, the approved one. Every door around a page asks
+// this, so comments, files, search, exports, notifications and the API cannot disagree.
+func (s *Service) ReadsWorking(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) (bool, error) {
+	d, err := s.CheckPage(ctx, q, userID, pageID, PageEdit, uuid.Nil)
+	if err != nil || d.Allowed {
+		return d.Allowed, err
+	}
+	return reviewsPage(ctx, q, userID, pageID)
+}
+
 // reviewsPage reads whether a person is an active reviewer of the open round of a page, in
 // the stage the page is in now (spec 064, DOC-203).
 func reviewsPage(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) (bool, error) {

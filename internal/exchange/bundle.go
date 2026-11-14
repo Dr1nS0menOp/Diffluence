@@ -33,13 +33,14 @@ const JobKindBundle = "bundle_export"
 
 const (
 	bundleFormat = "diffluence-bundle"
-	// bundleVersion 7 holds space.release, which spec 073 split off space.administer;
-	// version 6 space.workflows and page.workflow, which spec 064 split off
+	// bundleVersion 8 carries the record of document control and the version readers see of
+	// each page (spec 064, DOC-532); version 7 holds space.release, which spec 073 split off
+	// space.administer; version 6 space.workflows and page.workflow, which spec 064 split off
 	// space.administer and page.edit; version 5 database.edit, which spec 049 split off
 	// page.edit; version 4 the create permissions spec 045 split off page.create, version 3
 	// the permissions spec 040 split off broader ones, and version 2 those of spec 036. Older
 	// versions are still read: see heldSince.
-	bundleVersion = 7
+	bundleVersion = 8
 	// bundleVersionBeforeSplit is the oldest version read: its grants of a broader
 	// permission bring every finer one with them, as migrations 0036, 0040, 0041, 0044 and
 	// 0051 did.
@@ -51,9 +52,12 @@ const (
 	commentsFile             = "comments.json"
 	filesFile                = "attachments.json"
 	peopleFile               = "people.json"
-	bundleFiles              = "files/"
-	maxBundleJSON            = 512 << 20
-	maxPartEntries           = 1_000_000
+	controlFile              = "control.json"
+	// controlSince is the first bundle version with controlFile.
+	controlSince   = 8
+	bundleFiles    = "files/"
+	maxBundleJSON  = 512 << 20
+	maxPartEntries = 1_000_000
 )
 
 // bundleEntry is one file in a manifest.
@@ -243,18 +247,20 @@ func (s *Service) runBundle(ctx context.Context, j jobs.Job) (any, error) {
 
 // bundlePages reads all pages. One the person cannot see stops the bundle, because
 // a bundle that silently misses pages would be worse (G6).
-func (s *Service) bundlePages(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]pages.ImportedPage, error) {
+func (s *Service) bundlePages(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]pages.ImportedPage, pages.ControlRecord, error) {
 	var hidden int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM pages p WHERE p.space_id = $1 AND p.status = 'published'
 		AND p.id NOT IN (SELECT page_id FROM perm_visible_pages($2))`, spaceID, c.UserID).Scan(&hidden); err != nil {
-		return nil, err
+		return nil, pages.ControlRecord{}, err
 	}
 	if hidden > 0 {
-		return nil, apperr.Conflict("bundle_hidden_pages", "This space holds pages you cannot see, so a bundle would be incomplete. Ask for access first.")
+		return nil, pages.ControlRecord{}, apperr.Conflict("bundle_hidden_pages", "This space holds pages you cannot see, so a bundle would be incomplete. Ask for access first.")
 	}
 	var out []pages.ImportedPage
+	var control pages.ControlRecord
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `SELECT p.id, p.origin_instance_id, p.parent_id, p.position, p.title, p.kind, p.created_by, p.created_at
+		rows, err := tx.Query(ctx, `SELECT p.id, p.origin_instance_id, p.parent_id, p.position, p.title, p.kind, p.created_by, p.created_at,
+				p.current_version
 			FROM pages p WHERE p.space_id = $1 AND p.status = 'published'
 			ORDER BY (SELECT count(*) FROM page_tree a WHERE a.descendant_id = p.id), p.position, p.id`, spaceID)
 		if err != nil {
@@ -262,7 +268,7 @@ func (s *Service) bundlePages(ctx context.Context, c identity.Caller, spaceID uu
 		}
 		out, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (pages.ImportedPage, error) {
 			var p pages.ImportedPage
-			err := r.Scan(&p.ID, &p.Origin, &p.ParentID, &p.Position, &p.Title, &p.Kind, &p.CreatedBy, &p.CreatedAt)
+			err := r.Scan(&p.ID, &p.Origin, &p.ParentID, &p.Position, &p.Title, &p.Kind, &p.CreatedBy, &p.CreatedAt, &p.Current)
 			return p, err
 		})
 		if err != nil {
@@ -273,9 +279,10 @@ func (s *Service) bundlePages(ctx context.Context, c identity.Caller, spaceID uu
 				return err
 			}
 		}
-		return nil
+		control, err = s.pages.BundleControl(ctx, tx, spaceID)
+		return err
 	})
-	return out, err
+	return out, control, err
 }
 
 func (s *Service) bundleSpaceOf(ctx context.Context, spaceID uuid.UUID) (bundleSpace, error) {
@@ -378,8 +385,31 @@ func peopleIn(sp bundleSpace, list []pages.ImportedPage, comments []bundleCommen
 	return people
 }
 
+// addControlPeople adds who the record of document control names: approvers, those who took
+// a step, reviewers and the writers of review comments.
+func addControlPeople(people peopleSet, rec pages.ControlRecord) {
+	for _, pc := range rec.Pages {
+		if pc.ApprovedBy != nil {
+			people[*pc.ApprovedBy] = true
+		}
+	}
+	for _, r := range rec.Rounds {
+		for _, a := range r.Answers {
+			if a.UserID != nil {
+				people[*a.UserID] = true
+			}
+		}
+		for _, rv := range r.Reviewers {
+			people[rv.UserID] = true
+		}
+		for _, c := range r.Comments {
+			people[c.UserID] = true
+		}
+	}
+}
+
 func (s *Service) buildBundle(ctx context.Context, c identity.Caller, run *ExportRun, report *ExportReport) error {
-	list, err := s.bundlePages(ctx, c, run.SpaceID)
+	list, control, err := s.bundlePages(ctx, c, run.SpaceID)
 	if err != nil {
 		return err
 	}
@@ -407,11 +437,14 @@ func (s *Service) buildBundle(ctx context.Context, c identity.Caller, run *Expor
 	if err != nil {
 		return err
 	}
-	people, err := s.bundlePeople(ctx, peopleIn(sp, list, comments, files).list())
+	named := peopleIn(sp, list, comments, files)
+	addControlPeople(named, control)
+	people, err := s.bundlePeople(ctx, named.list())
 	if err != nil {
 		return err
 	}
-	for name, v := range map[string]any{spaceFile: sp, pagesFile: list, commentsFile: comments, filesFile: files, peopleFile: people} {
+	for name, v := range map[string]any{spaceFile: sp, pagesFile: list, commentsFile: comments, filesFile: files, peopleFile: people,
+		controlFile: control} {
 		if err := b.addJSON(name, v); err != nil {
 			return err
 		}
@@ -448,7 +481,7 @@ func (s *Service) buildBundle(ctx context.Context, c identity.Caller, run *Expor
 func (s *Service) addBundleFiles(ctx context.Context, b *bundleWriter, list []pages.ImportedPage) ([]bundleFile, error) {
 	files := []bundleFile{}
 	for _, p := range list {
-		stored, err := s.attachments.ListForPage(ctx, p.ID)
+		stored, err := s.attachments.ListForReaders(ctx, p.ID)
 		if err != nil {
 			return nil, err
 		}

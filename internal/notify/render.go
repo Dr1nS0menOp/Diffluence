@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/mail"
 	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/permissions"
 )
 
 // excerptRunes keeps an excerpt short when an instance allows them at all.
@@ -46,6 +47,7 @@ var sentences = map[string]string{
 	TypeReviewerRemoved:  "%s took a reviewer off the review of %s",
 	TypePagesReleased:    "%s released pages you watch in the space of %s",
 	TypeReleaseFinished:  "Your release from %[2]s has ended",
+	TypeVersionApproved:  "A new version of %[2]s was approved",
 }
 
 const (
@@ -118,12 +120,18 @@ func (s *Service) mailRows(ctx context.Context, j mail.Job) ([]stored, error) {
 	return pgx.CollectRows(rows, scanStored)
 }
 
-func (s *Service) excerpt(ctx context.Context, i Item, allowed bool) (string, error) {
+// excerpt is the start of a comment, through the same rule as the page: a thread kept for
+// editors gives nothing to someone who may not edit (spec 064, DOC-604).
+func (s *Service) excerpt(ctx context.Context, user uuid.UUID, i Item, allowed bool) (string, error) {
 	if !allowed || i.CommentID == nil {
 		return "", nil
 	}
+	editor, err := s.perms.CheckPage(ctx, s.pool, user, i.PageID, permissions.PageEdit, uuid.Nil)
+	if err != nil {
+		return "", err
+	}
 	var raw []byte
-	err := s.pool.QueryRow(ctx, "SELECT body FROM comments WHERE id = $1 AND trash_item_id IS NULL", *i.CommentID).Scan(&raw)
+	err = s.pool.QueryRow(ctx, "SELECT body FROM comments WHERE id = $1 AND trash_item_id IS NULL AND (NOT editors_only OR $2)", *i.CommentID, editor.Allowed).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return "", nil // a removed comment simply has no excerpt
 	}
@@ -153,12 +161,23 @@ func (s *Service) fillNames(ctx context.Context, n *document.Node) error {
 
 // changes shows what a page change was, when the instance allows content in mail. It
 // runs after mailRows, so the person may still see this page at the moment of sending.
-func (s *Service) changes(ctx context.Context, i Item, allowed bool) (string, template.HTML, error) {
-	newest := versionOf(i)
-	if !allowed || i.Type != TypePageChanged || i.firstVersion <= 1 {
+func (s *Service) changes(ctx context.Context, user uuid.UUID, i Item, allowed bool) (string, template.HTML, error) {
+	newest, from := versionOf(i), i.firstVersion-1
+	if i.Type == TypeVersionApproved {
+		// Between two approved versions only: the versions in between were never approved,
+		// and a reader may not see them (spec 064, DOC-604).
+		from = previousOf(i)
+	}
+	if !allowed || (i.Type != TypePageChanged && i.Type != TypeVersionApproved) || from < 1 {
 		return "", "", nil
 	}
-	before, after, found, err := pages.VersionsForMail(ctx, s.pool, i.PageID, i.firstVersion-1, newest)
+	reader, current, err := s.readsApprovedOnly(ctx, user, i.PageID)
+	if err != nil || (reader && (i.Type != TypeVersionApproved || newest > current)) {
+		// Whatever the row says, a reader of a controlled page gets no change but one between
+		// approved versions: every mail goes through the rule of DOC-300, not each kind.
+		return "", "", err
+	}
+	before, after, found, err := pages.VersionsForMail(ctx, s.pool, i.PageID, from, newest)
 	if err != nil || !found {
 		return "", "", err
 	}
@@ -172,6 +191,17 @@ func (s *Service) changes(ctx context.Context, i Item, allowed bool) (string, te
 	labels := document.ChangeLabels{Added: changeAdded, Removed: changeRemoved, More: changeMore}
 	//nolint:gosec // G203: ChangesHTML escapes every word that comes from a page.
 	return document.ChangesText(blocks, labels), template.HTML(document.ChangesHTML(blocks, labels)), nil
+}
+
+// readsApprovedOnly says a person reads only the approved version of a controlled page, and
+// which version that is.
+func (s *Service) readsApprovedOnly(ctx context.Context, user, pageID uuid.UUID) (bool, int, error) {
+	controlled, current, err := pages.Controlled(ctx, s.pool, pageID)
+	if err != nil || !controlled {
+		return false, current, err
+	}
+	working, err := s.perms.ReadsWorking(ctx, s.pool, user, pageID)
+	return !working, current, err
 }
 
 func (s *Service) stopLink(user uuid.UUID, i Item) (string, error) {
@@ -188,7 +218,7 @@ func (s *Service) stopLink(user uuid.UUID, i Item) (string, error) {
 func (s *Service) mailSpaces(ctx context.Context, user uuid.UUID, items []Item, excerpts bool) ([]mailSpace, error) {
 	out := []mailSpace{}
 	for _, i := range items {
-		text, err := s.excerpt(ctx, i, excerpts)
+		text, err := s.excerpt(ctx, user, i, excerpts)
 		if err != nil {
 			return nil, err
 		}
@@ -196,7 +226,7 @@ func (s *Service) mailSpaces(ctx context.Context, user uuid.UUID, items []Item, 
 		if err != nil {
 			return nil, err
 		}
-		changes, changesHTML, err := s.changes(ctx, i, excerpts)
+		changes, changesHTML, err := s.changes(ctx, user, i, excerpts)
 		if err != nil {
 			return nil, err
 		}

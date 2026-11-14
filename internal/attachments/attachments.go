@@ -60,6 +60,7 @@ type Service struct {
 	store      storage.Store
 	settings   *settings.Service
 	instanceID uuid.UUID
+	changes    ContentChanges
 }
 
 // NewService creates the service.
@@ -180,6 +181,7 @@ func fileRows(match, order string) string {
 	WHERE sp.status = 'active'
 	  AND a.page_id IN (SELECT v.page_id FROM perm_listed_pages($1) v
 		WHERE v.page_id = ANY (ARRAY(SELECT DISTINCT page_id FROM picked)))
+	  AND a.id NOT IN (SELECT x.attachment_id FROM perm_unpinned_files($1) x)
 	ORDER BY ` + order
 }
 
@@ -408,6 +410,9 @@ func (s *Service) Upload(ctx context.Context, c identity.Caller, pageID uuid.UUI
 		if err := s.addVersion(ctx, tx, c, target, in); err != nil {
 			return err
 		}
+		if err := s.fileChanged(ctx, tx, c, pageID, id); err != nil {
+			return err
+		}
 		a, err = get(ctx, tx, id)
 		return err
 	})
@@ -453,6 +458,9 @@ func (s *Service) AddVersion(ctx context.Context, c identity.Caller, id uuid.UUI
 		if err := s.addVersion(ctx, tx, c, a, in); err != nil {
 			return err
 		}
+		if err := s.fileChanged(ctx, tx, c, a.PageID, id); err != nil {
+			return err
+		}
 		out, err = get(ctx, tx, id)
 		return err
 	})
@@ -486,12 +494,21 @@ func get(ctx context.Context, q db.Querier, id uuid.UUID) (Attachment, error) {
 	return a, err
 }
 
-// List returns a page's files.
+// List returns a page's files, as this person gets them: a reader of a controlled page gets
+// the files of the approved version (DOC-510).
 func (s *Service) List(ctx context.Context, c identity.Caller, pageID uuid.UUID) ([]Attachment, error) {
 	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, pageID, permissions.ActionPageView, uuid.Nil); err != nil {
 		return nil, err
 	}
-	return s.ListForPage(ctx, pageID)
+	list, err := s.ListForPage(ctx, pageID)
+	if err != nil {
+		return nil, err
+	}
+	p, err := s.pinsFor(ctx, s.pool, c, pageID)
+	if err != nil {
+		return nil, err
+	}
+	return keepPinned(ctx, s.pool, list, p, func(a *Attachment) *Attachment { return a })
 }
 
 // ListForPage lists without a check, for callers that have already checked.
@@ -510,11 +527,8 @@ func (s *Service) ListForPage(ctx context.Context, pageID uuid.UUID) ([]Attachme
 // Open returns a file for reading. Downloads are audited; inline display of an
 // image inside a page is not, as it counts as viewing the page.
 func (s *Service) Open(ctx context.Context, c identity.Caller, id uuid.UUID, download bool) (Attachment, io.ReadSeekCloser, error) {
-	a, err := get(ctx, s.pool, id)
+	a, err := s.viewable(ctx, c, id)
 	if err != nil {
-		return a, nil, err
-	}
-	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {
 		return a, nil, err
 	}
 	f, err := s.OpenUnchecked(ctx, a)
@@ -573,6 +587,9 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 			return err
 		}
 		if err := s.perms.RequirePage(ctx, tx, c.UserID, a.PageID, permissions.ActionAttachmentDelete, a.CreatedBy); err != nil {
+			return err
+		}
+		if err := requireNotPinned(ctx, tx, a, 0); err != nil {
 			return err
 		}
 		return s.trashOne(ctx, tx, c, a, retention)

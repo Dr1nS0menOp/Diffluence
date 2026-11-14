@@ -468,6 +468,12 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if err := attachments.RecordUse(ctx, tx, p.ID, number, doc); err != nil {
 		return p, err
 	}
+	if controlled {
+		// Each version of a controlled page keeps the files it shows as they are now (DOC-510).
+		if err := attachments.Pin(ctx, tx, p.ID, number); err != nil {
+			return p, err
+		}
+	}
 	cause := causeChanged
 	if in.RestoredFrom != nil {
 		cause = causeRestored
@@ -479,13 +485,18 @@ func (s *Service) appendVersion(ctx context.Context, tx pgx.Tx, c identity.Calle
 			map[string]any{"version": number, "silent": in.Silent, "restored_from": in.RestoredFrom}); err != nil {
 			return p, err
 		}
-		return working, s.restartReview(ctx, tx, c, p, ctl, number, cause)
+		waits, err := s.restartReview(ctx, tx, c, p, ctl, number, cause)
+		if err != nil || !waits {
+			return working, err
+		}
+		return working, s.announceWorking(ctx, tx, c, p, max(ctl.headVersion, p.CurrentVersion), in, number)
 	}
 	p, err = s.makeCurrent(ctx, tx, c, p, current{number: number, title: title, doc: doc, author: author, version: in})
 	if err != nil || !controlled {
 		return p, err
 	}
-	return p, s.restartReview(ctx, tx, c, p, ctl, number, cause)
+	_, err = s.restartReview(ctx, tx, c, p, ctl, number, cause)
+	return p, err
 }
 
 // current is a version that becomes the one readers see.
@@ -496,6 +507,9 @@ type current struct {
 	author uuid.UUID
 	// version says how it was written; an approval passes the zero value.
 	version newVersion
+	// approval says a workflow approved it: watchers and held mentions hear of it through
+	// the approval itself (DOC-603, DOC-606).
+	approval bool
 }
 
 // makeCurrent makes a written version the current one: the page row, search, links,
@@ -519,6 +533,10 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		return p, nil // a template is never found, and has no page to link from
 	}
 	if err := search.Index(ctx, tx, p.ID, title, document.Text(doc)); err != nil {
+		return p, err
+	}
+	// What readers see is now the newest version, so search needs no second entry (DOC-1302).
+	if err := search.DropWorking(ctx, tx, p.ID); err != nil {
 		return p, err
 	}
 	if err := syncLinks(ctx, tx, p.ID, doc); err != nil {
@@ -554,7 +572,7 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		details["silent"] = true
 	}
 	payload := map[string]any{"actor_id": author, "silent": in.version.Silent, "first": first, "version": number,
-		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned}
+		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned, "approval": in.approval}
 	if in.version.Run != nil {
 		payload["release_run_id"] = *in.version.Run
 	}

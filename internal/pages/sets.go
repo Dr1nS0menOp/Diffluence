@@ -228,11 +228,13 @@ func (s *Service) writeSetText(ctx context.Context, tx pgx.Tx, c identity.Caller
 	return p, err
 }
 
-// putNewPageUnderWorkflow gives a new page the workflow its entry names (TPL-152). A
-// space workflow wins, and then the page already follows that one.
+// putNewPageUnderWorkflow gives a new page the workflow its entry, or its template, names
+// (TPL-152, spec 064 DOC-560). A space workflow wins, and so does the workflow of a branch
+// above it, as a page workflow is never set inside a branch (DOC-420): the page already
+// follows that one.
 func (s *Service) putNewPageUnderWorkflow(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, workflowID uuid.UUID) error {
-	spaceWide, err := s.SpaceHasWorkflow(ctx, tx, p.SpaceID)
-	if err != nil || spaceWide {
+	governed, err := governingOf(ctx, tx, []uuid.UUID{p.ID})
+	if err != nil || len(governed) > 0 {
 		return err
 	}
 	if err := workflowOfSpace(ctx, tx, workflowID, p.SpaceID); err != nil {
@@ -282,4 +284,10 @@ func (s *Service) TrashEmptyPage(ctx context.Context, tx pgx.Tx, c identity.Call
 		return err
 	}
 	return s.trashTree(ctx, tx, c, p, retention)
+}
+
+// WorkflowOfSpace refuses a workflow that is not an active one of the space, for a template
+// that names it (spec 064, DOC-560).
+func (s *Service) WorkflowOfSpace(ctx context.Context, tx pgx.Tx, workflowID, spaceID uuid.UUID) error {
+	return workflowOfSpace(ctx, tx, workflowID, spaceID)
 }

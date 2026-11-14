@@ -218,6 +218,7 @@ type bundleContent struct {
 	comments []bundleComment
 	files    []bundleFile
 	people   []BundlePerson
+	control  pages.ControlRecord
 }
 
 func (b openedBundle) content() (bundleContent, error) {
@@ -228,7 +229,10 @@ func (b openedBundle) content() (bundleContent, error) {
 			return out, err
 		}
 	}
-	return out, nil
+	if b.manifest.Version < controlSince {
+		return out, nil
+	}
+	return out, b.decode(controlFile, &out.control)
 }
 
 func (s *Service) openBundle(ctx context.Context, run ImportRun) (openedBundle, func(), error) {
@@ -537,6 +541,14 @@ func (in *bundleImport) write(ctx context.Context, tx pgx.Tx, m ImportMapping) e
 		return err
 	}
 	if err := in.comments(ctx, tx); err != nil {
+		return err
+	}
+	// Document control comes last: it pins the files of the pages it governs.
+	people := pages.People{Importer: in.c.UserID, Find: func(id uuid.UUID) (uuid.UUID, bool) {
+		to, ok := in.people.known[id]
+		return to, ok
+	}}
+	if err := in.s.pages.InsertImportedControl(ctx, tx, in.spaceID, in.content.control, in.ids.id, people, in.b.manifest.Instance); err != nil {
 		return err
 	}
 	return recordBundle(ctx, tx, in.c, in.b.manifest, in.spaceID, in.b.signer, in.result)

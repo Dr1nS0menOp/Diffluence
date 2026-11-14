@@ -209,6 +209,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.jobs.HoldWhile(a.inMaintenance)
 	a.attach = attachments.NewService(a.pool, a.perms, a.store, a.settings, a.instanceID)
 	a.pages = pages.NewService(a.pool, a.perms, a.attach, a.settings, a.features, a.jobs, a.instanceID)
+	a.attach.SetContentChanges(a.pages)
 	a.spaces = spaces.NewService(a.pool, a.perms, a.pages, a.settings, a.features, a.store, a.instanceID)
 	a.templates = templates.NewService(templates.Deps{Pool: a.pool, Perms: a.perms, Pages: a.pages, Spaces: a.spaces,
 		Identity: a.identity, Files: a.attach, Features: a.features, Jobs: a.jobs})

@@ -40,6 +40,9 @@ type ImportedPage struct {
 	CreatedBy uuid.UUID         `json:"created_by"`
 	CreatedAt time.Time         `json:"created_at"`
 	Versions  []ImportedVersion `json:"versions"`
+	// Current is the version readers saw, which on a controlled page can be older than the
+	// newest (spec 064, DOC-532). Zero, as in bundles before version 7, means the newest.
+	Current int `json:"current_version,omitempty"`
 }
 
 // BundleVersions reads every version of a page, for a bundle.
@@ -63,6 +66,11 @@ func (s *Service) InsertImported(ctx context.Context, tx pgx.Tx, spaceID uuid.UU
 		return apperr.Invalid("A page in the bundle has no versions.")
 	}
 	last := in.Versions[len(in.Versions)-1]
+	for _, v := range in.Versions {
+		if v.Number == in.Current {
+			last = v
+		}
+	}
 	kind := in.Kind
 	if !isKnownKind(kind) {
 		kind = KindPage
@@ -84,13 +92,13 @@ func (s *Service) InsertImported(ctx context.Context, tx pgx.Tx, spaceID uuid.UU
 		if err != nil {
 			return err
 		}
-		current = doc
 		if v.Number == last.Number {
-			if err := tasks.AssignIDs(ctx, tx, in.ID, &current); err != nil {
+			if err := tasks.AssignIDs(ctx, tx, in.ID, &doc); err != nil {
 				return err
 			}
+			current = doc
 		}
-		raw, err := document.Marshal(current)
+		raw, err := document.Marshal(doc)
 		if err != nil {
 			return err
 		}
@@ -100,7 +108,7 @@ func (s *Service) InsertImported(ctx context.Context, tx pgx.Tx, spaceID uuid.UU
 			document.SchemaVersion, v.AuthorID, v.Summary, v.CreatedAt); err != nil {
 			return err
 		}
-		if err := attachments.RecordUse(ctx, tx, in.ID, v.Number, current); err != nil {
+		if err := attachments.RecordUse(ctx, tx, in.ID, v.Number, doc); err != nil {
 			return err
 		}
 	}

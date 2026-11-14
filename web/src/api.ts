@@ -531,6 +531,8 @@ export interface TemplateSummary {
   guided: boolean;
   /** The template version a form opened on this answer is bound to (TPL-603). */
   template_version: number;
+  /** The workflow a page made from it enters (spec 064, DOC-560). */
+  workflow_id: string | null;
   fields?: TemplateField[];
   document?: Json;
 }

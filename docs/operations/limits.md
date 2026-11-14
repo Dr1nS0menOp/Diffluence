@@ -177,6 +177,18 @@ Through the whole application, the median of seven requests (`TestDocumentContro
 
 The tree of the largest space took 17 ms, search on a common word 28 ms, and the recent feed 28 ms. An approval that makes a working version current, with search, links and tasks, took 12.1 ms as the median of seven, 15.8 ms at most. Spec 064 allows a controlled read 5 ms more than an ordinary one, and a step 20 ms. The visible set is still built once per query as a hash, and the hidden pages are looked up by key: as a join, PostgreSQL first read all 60,385 pages for it.
 
+### The content around controlled pages on the real data set (spec 064, wave DC3)
+
+Measured on 14 November 2026 on the same dump, with the same tenth of the pages under control, 80% of them approved by a person, and their files pinned. Other builds ran beside it: the load of the machine was 11 to 13. The feed was measured with the queries of main and of this wave in turn, under that same load.
+
+| Request | Main | This wave |
+|---|---|---|
+| Feed, recent, member and watcher (median of seven) | 72 and 47 ms | 59 and 48 ms |
+| Feed, for you, member | 106 ms | 80 ms |
+| Feed, for you, watcher of every page | 789 ms | 582 ms |
+
+Both miss the budget of 500 ms for the watcher of every page on this machine, main by more than this wave; wave DC1 measured 390 ms on a quieter one. The change of this wave is not measurable beside the load. Through the whole application (`TestDocumentControlOnRealData`): a controlled page took 10.5 ms against 8.1 ms for an ordinary one, the tree of the largest space 19 ms, the Files screen of that space 81 to 134 ms, quick search with files 42 to 73 ms, and search on a common word 51 ms as an author and 69 ms as a reader. Seven approvals took 15.4 ms as the median, 26 ms at most. The second search entry held only the working versions waiting for review: after the approvals, none.
+
 ### Events through PostgreSQL on the real data set (spec 068, wave EV1)
 
 Measured on 13 November 2026 on the same dump in a PostgreSQL 16 of its own with `fsync` on, by `TestEventsOnRealData`: the new event path with the four real consumers, 32 writers, 20 seconds a stage. This path is built but not switched on in this release; the numbers are for the decision to switch.

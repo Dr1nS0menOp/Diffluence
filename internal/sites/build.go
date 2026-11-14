@@ -160,7 +160,7 @@ func (s *Service) prepare(ctx context.Context, list []pages.PublicPage, report *
 			report.Left = append(report.Left, p.Title+": this page cannot be read.")
 			continue
 		}
-		stored, err := s.attachments.ListForPage(ctx, p.ID)
+		stored, err := s.attachments.ListForReaders(ctx, p.ID)
 		if err != nil {
 			return nil, err
 		}
