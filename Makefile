@@ -23,8 +23,9 @@ test:
 	go test ./...
 
 test-race:
-	# internal/app alone nears Go's default of 10 minutes on a slow runner. A real hang still ends here.
-	go test -race -count=1 -timeout=20m ./...
+	# internal/app alone took over 20 minutes under the race detector on a hosted runner once
+	# document control and publishing added their tests. A real hang still ends here.
+	go test -race -count=1 -timeout=45m ./...
 
 fmt:
 	gofmt -w .
