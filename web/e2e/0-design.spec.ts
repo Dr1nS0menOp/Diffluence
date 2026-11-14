@@ -16,6 +16,7 @@ import {
   expect,
   grant,
   login,
+  paragraph,
   PASSWORD,
   publishedPage,
   test,
@@ -1755,5 +1756,87 @@ test.describe('the look of document control', () => {
     await picture(page, 'admin-document-control');
     await checkAccessibility(page);
     await page.context().close();
+  });
+});
+
+// Draft and published spaces (spec 073): the section of a draft space, the band on a draft page,
+// the line on a released page and the dialog that releases one page.
+test.describe('draft and published spaces', () => {
+  test.describe.configure({ mode: 'serial' });
+  let draftKey = '';
+  let draftPage = '';
+  let twin = '';
+
+  test.beforeAll(async ({ browser }) => {
+    const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(setup, ADMIN.email, ADMIN.password);
+    const created = await setup.request.post('/api/v1/spaces', {
+      data: { key: 'POLICIES', name: 'Policies' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const draft = (await created.json()) as { id: string; key: string; home_page_id: string };
+    draftKey = draft.key;
+    const linked = await setup.request.post(`/api/v1/spaces/${draft.id}/publishing/link`, {
+      data: { new_space: { key: 'POLICIESREAD', name: 'Policies for everyone' } },
+    });
+    expect(linked.ok(), await linked.text()).toBeTruthy();
+    draftPage = await publishedPage(
+      setup,
+      draft.id,
+      'Travel policy',
+      'Book trains for trips under 700 km.',
+      draft.home_page_id,
+    );
+    const preview = await setup.request.post(`/api/v1/pages/${draftPage}/release/preview`);
+    expect(preview.ok(), await preview.text()).toBeTruthy();
+    const released = await setup.request.post(`/api/v1/pages/${draftPage}/release`, {
+      data: { preview_id: ((await preview.json()) as { id: string }).id, note: 'First edition' },
+    });
+    expect(released.ok(), await released.text()).toBeTruthy();
+    const status = await setup.request.get(`/api/v1/pages/${draftPage}/release`);
+    twin = ((await status.json()) as { twin_page_id: string }).twin_page_id;
+    const edited = await setup.request.post(`/api/v1/pages/${draftPage}/publish`, {
+      data: {
+        title: 'Travel policy',
+        document: paragraph('Book trains for trips under 800 km.'),
+        base_version: 1,
+      },
+    });
+    expect(edited.ok(), await edited.text()).toBeTruthy();
+    await setup.context().close();
+  });
+
+  test('PublishingSection: the published space of a draft space', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/spaces/${draftKey}/settings?section=published`);
+    await expect(page.getByText('This is the draft space of Policies for everyone.')).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-settings');
+    await checkAccessibility(page);
+  });
+
+  test('ReleaseBand: a draft page changed since its release', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/pages/${draftPage}`);
+    await expect(page.getByText('Changed since release: text')).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-draft-page');
+    await checkAccessibility(page);
+    await page.getByRole('button', { name: 'More actions' }).click();
+    await page.getByRole('menuitem', { name: 'Release this page…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Release this page' });
+    await expect(dialog.getByText('Readers get version 2 of the draft. Changed: text.')).toBeVisible();
+    await picture(page, 'publishing-release');
+    await checkAccessibility(page);
+    await page.keyboard.press('Escape');
+  });
+
+  test('ReleaseBand: a released page as a reader sees it', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/pages/${twin}`);
+    await expect(page.getByText('Open the draft')).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-twin');
+    await checkAccessibility(page);
   });
 });

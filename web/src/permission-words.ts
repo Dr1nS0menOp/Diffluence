@@ -38,6 +38,7 @@ const SPACE_GROUPS: [PermissionGroup, string[]][] = [
       'space.statuses',
       'space.approvals',
       'space.workflows',
+      'space.release',
       'site.publish',
       'space.automation',
       'space.templates',

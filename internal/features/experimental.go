@@ -19,10 +19,13 @@ const (
 	ExperimentalDatabases      = "databases"
 	ExperimentalBundles        = "bundles"
 	ExperimentalConsoleRestore = "console_restore"
+	// ExperimentalPublishing is draft and published spaces (spec 073, PUB-1415).
+	ExperimentalPublishing = "publishing"
 )
 
 // ExperimentalParts lists every part that the experimental switch covers.
-var ExperimentalParts = []string{ExperimentalAutomation, ExperimentalDatabases, ExperimentalBundles, ExperimentalConsoleRestore}
+var ExperimentalParts = []string{ExperimentalAutomation, ExperimentalDatabases, ExperimentalBundles, ExperimentalConsoleRestore,
+	ExperimentalPublishing}
 
 // experimentalKey holds the parts an administrator turned on. Migration 0054 writes it
 // on upgrade from what the installation already used; without it, every part is off.

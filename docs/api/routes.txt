@@ -166,6 +166,7 @@ GET /api/v1/pages/{id}/placeholders                            object:page.view
 GET /api/v1/pages/{id}/public-link                             object:site.publish
 GET /api/v1/pages/{id}/public-state                            object:page.view
 GET /api/v1/pages/{id}/reactions                               object:page.view
+GET /api/v1/pages/{id}/release                                 object:page.view
 GET /api/v1/pages/{id}/restrictions                            object:page.view
 GET /api/v1/pages/{id}/review                                  authenticated
 GET /api/v1/pages/{id}/rules                                   object:page.view
@@ -227,6 +228,7 @@ GET /api/v1/spaces/{id}/people                                 object:space.view
 GET /api/v1/spaces/{id}/placeholders                           object:space.administer
 GET /api/v1/spaces/{id}/popular                                object:space.view
 GET /api/v1/spaces/{id}/posts                                  object:space.view
+GET /api/v1/spaces/{id}/publishing                             object:space.view
 GET /api/v1/spaces/{id}/role-assignments                       object:space.manage_access
 GET /api/v1/spaces/{id}/rules                                  object:space.automation
 GET /api/v1/spaces/{id}/shortcuts                              object:space.view
@@ -385,6 +387,8 @@ POST /api/v1/pages/{id}/labels                                 object:page.edit
 POST /api/v1/pages/{id}/move                                   object:page.edit
 POST /api/v1/pages/{id}/placeholders                           object:page.view
 POST /api/v1/pages/{id}/publish                                object:page.edit
+POST /api/v1/pages/{id}/release                                object:space.release
+POST /api/v1/pages/{id}/release/preview                        object:space.release
 POST /api/v1/pages/{id}/review/answer                          authenticated
 POST /api/v1/pages/{id}/review/comments                        authenticated
 POST /api/v1/pages/{id}/reviewers                              authenticated
@@ -418,6 +422,9 @@ POST /api/v1/spaces/{id}/icon                                  object:space.look
 POST /api/v1/spaces/{id}/imports                               object:page.create
 POST /api/v1/spaces/{id}/labels/rename                         object:space.labels
 POST /api/v1/spaces/{id}/preset                                object:space.administer
+POST /api/v1/spaces/{id}/publishing/end                        object:space.administer
+POST /api/v1/spaces/{id}/publishing/link                       object:space.administer
+POST /api/v1/spaces/{id}/publishing/link-preview               object:space.administer
 POST /api/v1/spaces/{id}/role-assignments/preview              object:space.manage_access
 POST /api/v1/spaces/{id}/rules                                 object:space.automation
 POST /api/v1/spaces/{id}/sites                                 object:site.publish
@@ -500,6 +507,7 @@ PUT /api/v1/spaces/{id}/key                                    object:space.admi
 PUT /api/v1/spaces/{id}/labels                                 object:space.labels
 PUT /api/v1/spaces/{id}/owners                                 object:space.administer
 PUT /api/v1/spaces/{id}/pdf-design                             object:space.administer
+PUT /api/v1/spaces/{id}/publishing/settings                    object:space.administer
 PUT /api/v1/spaces/{id}/review                                 object:space.statuses
 PUT /api/v1/spaces/{id}/role-assignments                       object:space.manage_access
 PUT /api/v1/spaces/{id}/shortcuts                              object:space.look

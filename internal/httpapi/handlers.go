@@ -68,6 +68,7 @@ func (s *Server) registerRoutes() {
 	s.registerCollabRoutes()
 	s.registerSetupRoutes()
 	s.registerRunningRoutes()
+	s.registerPublishingRoutes()
 }
 
 type userJSON struct {
@@ -216,6 +217,7 @@ func (s *Server) handleCapabilities(w http.ResponseWriter, r *http.Request) {
 		"databases":       slices.Contains(experimental.On, features.ExperimentalDatabases),
 		"bundles":         slices.Contains(experimental.On, features.ExperimentalBundles),
 		"console_restore": slices.Contains(experimental.On, features.ExperimentalConsoleRestore),
+		"publishing":      slices.Contains(experimental.On, features.ExperimentalPublishing),
 	})
 }
 

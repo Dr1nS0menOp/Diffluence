@@ -569,7 +569,8 @@ mutate "search shows a thread for editors" internal/db/migrations/0008_organisin
 mutate "search shows a comment in the trash" internal/db/migrations/0008_organising.sql \
   's.replace("WHERE c.trash_item_id IS NULL AND NOT c.purged", "WHERE NOT c.purged")' $app -run TestCommentSearchFollowsTheRuleOfAComment
 # Migration 0044 holds the latest perm_editable_pages.
-mutate "an edit restriction does not count for a thread" internal/db/migrations/0044_database_edit_and_role_names.sql \
+# perm_editable_pages lives in migration 0061 since spec 073, which keeps published spaces out of it.
+mutate "an edit restriction does not count for a thread" internal/db/migrations/0061_publishing.sql \
   's.replace("WHERE r.kind = \x27edit\x27\n        GROUP BY r.page_id", "WHERE r.kind = \x27none\x27\n        GROUP BY r.page_id")' $app -run TestCommentVisibilityAgreesWithTheCheckOnOneComment
 mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
   's.replace("case ActionPageView, ActionApprovalRead, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:", "case ActionPageView, ActionApprovalRead, ActionReact, SpaceExport, SpaceAdminister, ActionPageDelete, PageArchive, RestrictionManage, AnalyticsView:")' $app -run TestAReactionChangesNothingOnAnArchivedPageOrInAnArchivedSpace
@@ -1236,7 +1237,8 @@ mutate "an edit restriction does not stop a move out" internal/permissions/evalu
 mutate "asking for guests stops in an archived space" internal/permissions/evaluate.go \
   's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
 # Migration 0051 holds the latest rbac_split_off, so the mutations of the split aim there.
-mutate "the migration gives editors no move out" internal/db/migrations/0051_document_control.sql \
+# rbac_split_off is defined last in migration 0061 since spec 073.
+mutate "the migration gives editors no move out" internal/db/migrations/0061_publishing.sql \
   's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"'", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'database.edit'"'"'")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1247,7 +1249,8 @@ mutate "a revoked space grant does not count" internal/db/migrations/0057_counte
   's.replace("ON space_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON space_grants\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
 mutate "leaving a group does not count" internal/db/migrations/0057_counted_at_commit.sql \
   's.replace("ON group_members\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON group_members\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
-mutate "archiving a space does not count" internal/db/migrations/0057_counted_at_commit.sql \
+# The trigger on spaces is made again in migration 0061, which also counts the side of a pair.
+mutate "archiving a space does not count" internal/db/migrations/0061_publishing.sql \
   's.replace("ON spaces\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON spaces\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
 mutate "disabling an account does not count" internal/db/migrations/0057_counted_at_commit.sql \
   's.replace("ON users\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW EXECUTE", "ON users\n    DEFERRABLE INITIALLY DEFERRED FOR EACH ROW WHEN (false) EXECUTE")' $perms -run TestAChangeEndsKeptFactsAtOnce
@@ -1378,7 +1381,7 @@ mutate "a copied item asks for nothing of its kind" internal/pages/tree.go \
   's.replace("\tif err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {\n\t\treturn Page{}, err\n\t}\n", "")' $app -run TestCopyingADatabaseAsksForDatabasesWhereTheCopyGoes
 mutate "a branch moves out without the kinds in it" internal/pages/move.go \
   's.replace("append([]string{permissions.SpaceView}, needed...)", "append([]string{permissions.SpaceView, permissions.PageCreate}, needed[:0]...)")' $app -run TestMovingADatabaseToAnotherSpaceAsksForDatabasesThere
-mutate "the migration gives page creators no posts" internal/db/migrations/0051_document_control.sql \
+mutate "the migration gives page creators no posts" internal/db/migrations/0061_publishing.sql \
   's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"']", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves roles without posts and databases" internal/db/migrations/0041_posts_and_databases.sql \
   's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1491,9 +1494,9 @@ mutate "database.edit is not split off page.edit in Go" internal/permissions/eva
   's.replace("\tDatabaseEdit:      PageEdit,\n", "")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the built-in editor cannot edit databases" internal/permissions/manage.go \
   's.replace("PostCreate, DatabaseCreate,\n\t\tDatabaseEdit},", "PostCreate, DatabaseCreate},")' $perms -run TestBuiltInRolesMatchTheTemplates
-mutate "the editable list ignores the kind" internal/db/migrations/0044_database_edit_and_role_names.sql \
+mutate "the editable list ignores the kind" internal/db/migrations/0061_publishing.sql \
   's.replace("AND CASE WHEN p.kind = '"'"'database'"'"'", "AND CASE WHEN false")' $perms -run TestDatabasesAndPagesAreEditedApart
-mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0051_document_control.sql \
+mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0061_publishing.sql \
   's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"', ", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', ")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration gives editors no database editing" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("\nSELECT rbac_split_roles_from(", "\nSELECT 1, (")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1990,7 +1993,7 @@ mutate "a workflow may lack a way to approval" internal/workflow/workflow.go \
   's.replace("\t\tif !leadsToApproval(s.ID, next, states) {", "\t\tif false {")' ./internal/workflow/ -run TestNoAcceptedWorkflowLacksAWayToApproval
 mutate "a state may be unreachable" internal/workflow/workflow.go \
   's.replace("\t\tif !reached[s.ID] {", "\t\tif !reached[s.ID] \x26\x26 false {")' ./internal/workflow/ -run TestEachRuleOfAWorkflowIsChecked
-mutate "page.workflow is not split off page.edit in SQL" internal/db/migrations/0051_document_control.sql \
+mutate "page.workflow is not split off page.edit in SQL" internal/db/migrations/0061_publishing.sql \
   's.replace(", \x27database.edit\x27, \x27page.workflow\x27]", ", \x27database.edit\x27]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration gives administrators no workflows" internal/db/migrations/0051_document_control.sql \
   's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.workflows\x27]);", "SELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -2281,6 +2284,67 @@ mutate_collab "every recheck runs at once, beside the one in flight" access.mjs 
   's.replace("    if (!running) {\n", "    if (true) {\n")' access.test.mjs
 mutate_collab "rechecks asked for during a run are dropped" access.mjs \
   's.replace("    return queued;\n", "    return running;\n")' access.test.mjs
+# Spec 073 (wave PB1): draft and published spaces.
+pub=./internal/publishing/
+docpkg=./internal/document/
+mutate "the managed rule lets an administrator edit" internal/permissions/evaluate.go \
+  's.replace("check(LayerSpace, RuleManaged, in.Space.PairRole != PairPublished, false)", "check(LayerSpace, RuleManaged, in.Space.PairRole != PairPublished || holds(in, SpaceAdminister), false)")' $perms -run 'TestMatrixEvaluate$'
+mutate "SQL: the editing list ignores the managed rule" internal/db/migrations/0061_publishing.sql \
+  's.replace("      AND s.pair_role IS DISTINCT FROM \x27published\x27\n", "")' $perms -run 'TestMatrixSQLAgreesWithEvaluate$'
+mutate "a refusal in a published space does not say why" internal/permissions/service.go \
+  's.replace("} else if refusedOnlyAsManaged(d) {", "} else if false \x26\x26 refusedOnlyAsManaged(d) {")' $app -run '^TestNobodyWritesAPublishedSpaceByHand$'
+mutate "the trigger is dropped" internal/db/migrations/0061_publishing.sql \
+  's.replace("IF space IS NOT NULL AND current_setting(\x27diffluence.release\x27, true)", "IF false AND space IS NOT NULL AND current_setting(\x27diffluence.release\x27, true)")' $app -run '^TestTheDatabaseRefusesAWriteIntoAPublishedSpaceWithoutTheReleaseMark$'
+mutate "the end of a pair reaches no node" internal/db/migrations/0061_publishing.sql \
+  's.replace("UPDATE OF status, pair_role ON spaces", "UPDATE OF status ON spaces")' $app -run '^TestTurningThePartOffKeepsPublishedSpacesReadOnlyAndEndingOpen$'
+mutate "the migration gives administrators no release" internal/db/migrations/0061_publishing.sql \
+  's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.release\x27]);", "SELECT 1;")' $perms -run 'TestBuiltInRolesMatchTheTemplates$'
+mutate "out of step ignores the look" internal/db/migrations/0061_publishing.sql \
+  's.replace("IF p.look IS DISTINCT FROM pp.released_look THEN", "IF false THEN")' $app -run '^TestOutOfStepFollowsEachAspectAndComesBackWhenUndone$'
+mutate "a draft space builds a public site" internal/permissions/evaluate.go \
+  's.replace("check(LayerSpace, ruleDraftNotPublic, in.Space.PairRole != PairDraft, false)", "check(LayerSpace, ruleDraftNotPublic, true, false)")' $perms -run 'TestMatrixEvaluate$'
+mutate "a linked draft space keeps its site" internal/sites/rule.go \
+  's.replace("if space.PairRole == permissions.PairDraft {\n\t\treturn s.withdraw(ctx, system(), v)", "if space.PairRole == permissions.PairDraft \x26\x26 false {\n\t\treturn s.withdraw(ctx, system(), v)")' $app -run '^TestLinkingTakesTheSiteAndLinksOfTheDraftSpaceDown$'
+mutate "a public link of a draft space stays" internal/sites/rule.go \
+  's.replace("\t\tAND sp.pair_role IS DISTINCT FROM \x27draft\x27\n", "")' $app -run '^TestLinkingTakesTheSiteAndLinksOfTheDraftSpaceDown$'
+mutate "a release copies a comment" internal/publishing/release.go \
+  's.replace("\tshown := document.FilesShown(pl.version.Doc)\n", "\tshown := document.FilesShown(pl.version.Doc)\n\tif all, err := s.attachments.ListForPage(ctx, src.ID); err == nil {\n\t\tfor _, a := range all {\n\t\t\tshown = append(shown, a.ID)\n\t\t}\n\t}\n")' $app -run '^TestFilesAreCopiedOnlyWhenTheyChangedAndReadersGetTheCopy$'
+mutate "a link keeps the draft id" internal/publishing/rewrite.go \
+  's.replace("\t\tr.linkMap[id.String()] = twin.String()\n\t\treturn twin, toTwin", "\t\tr.linkMap[id.String()] = twin.String()\n\t\treturn id, toTwin")' $pub -run 'TestALinkToAReleasedPageNamesItsTwinAndKeepsItsHeading$'
+mutate "a file route serves the draft file" internal/publishing/rewrite.go \
+  's.replace("n.Attrs[document.FileAttribute] = copied.String()", "n.Attrs[document.FileAttribute] = map[bool]string{true: s}[copied != uuid.Nil]")' $app -run '^TestFilesAreCopiedOnlyWhenTheyChangedAndReadersGetTheCopy$'
+mutate "a twin version keeps the draft summary" internal/publishing/release.go \
+  's.replace("Summary: in.Note, Silent: silent}", "Summary: pl.version.Summary, Silent: silent}")' $app -run '^TestReleasingOnePageMakesATwinReadersSee$'
+mutate "a run takes the newest version instead of the previewed one" internal/publishing/release.go \
+  's.replace("pl, err := s.planPage(ctx, tx, p, src, number)", "pl, err := s.planPage(ctx, tx, p, src, src.CurrentVersion+0*number)")' $app -run '^TestARunTakesThePreviewedVersionAndRefusesAnOldPreview$'
+mutate "a preview older than an hour is taken" internal/publishing/release.go \
+  's.replace("\tif !fresh {\n", "\tif false \x26\x26 !fresh {\n")' $app -run '^TestARunTakesThePreviewedVersionAndRefusesAnOldPreview$'
+mutate "a release needs no view of the published space" internal/publishing/release.go \
+  's.replace("permissions.SpaceView); err != nil || !d.Allowed {", "permissions.SpaceView); err != nil || (!d.Allowed \x26\x26 false) {")' $app -run '^TestAReleaseNeedsEachOfItsRights$'
+mutate "a release needs no space.release" internal/publishing/release.go \
+  's.replaceAll("permissions.SpaceRelease); err != nil {", "permissions.SpaceView); err != nil {")' $app -run '^TestAReleaseNeedsEachOfItsRights$'
+mutate "an unchanged release makes a version" internal/publishing/release.go \
+  's.replace("\treturn aspects, actionNone\n}", "\treturn aspects, actionChange\n}")' $app -run '^TestReleasingOnePageMakesATwinReadersSee$'
+mutate "an unchanged file is copied again" internal/publishing/release.go \
+  's.replace("{ return f.copy == nil || f.copied != f.version }", "{ return true }")' $app -run '^TestFilesAreCopiedOnlyWhenTheyChangedAndReadersGetTheCopy$'
+mutate "a file removed in the draft stays on the twin" internal/publishing/release.go \
+  's.replace("if err := s.attachments.TrashForRelease(ctx, tx, c, copied); err != nil {", "if err := func() error { _ = copied; return nil }(); err != nil {")' $app -run '^TestFilesAreCopiedOnlyWhenTheyChangedAndReadersGetTheCopy$'
+mutate "a reader of the draft space sees its release status" internal/publishing/release.go \
+  's.replace("if err != nil || (!edits \x26\x26 !releases) {", "if err != nil || (!edits \x26\x26 !releases \x26\x26 false) {")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraft$'
+mutate "a twin names its draft to every reader" internal/publishing/release.go \
+  's.replace("\tif seen {\n\t\tout.DraftPageID = \x26draft", "\tif seen || true {\n\t\tout.DraftPageID = \x26draft")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraft$'
+mutate "the published space names its draft space to every reader" internal/publishing/pair.go \
+  's.replace("\t\tif seen {\n\t\t\tsp, err := spaces.LoadIn(ctx, s.pool, side.id)", "\t\tif seen || true {\n\t\t\tsp, err := spaces.LoadIn(ctx, s.pool, side.id)")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraft$'
+mutate "a chain of pairs is allowed" internal/publishing/pair.go \
+  's.replace("\tif published.PairRole == permissions.PairDraft {\n", "\tif false {\n")' $app -run '^TestAPairIsRefusedWhereItWouldBreakTheModel$'
+mutate "a space with content becomes a published space" internal/publishing/pair.go \
+  's.replace("\tif len(found) == 0 {\n\t\treturn nil\n\t}", "\tif true {\n\t\treturn nil\n\t}")' $app -run '^TestAPairIsRefusedWhereItWouldBreakTheModel$'
+mutate "the publishing routes are served while the part is off" internal/httpapi/handlers_publishing.go \
+  's.replace("\t\treturn s.experimental(features.ExperimentalPublishing, next)\n", "\t\t_ = features.ExperimentalPublishing\n\t\treturn next\n")' $app -run '^TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair$'
+mutate "ending a pair closes while the part is off" internal/httpapi/handlers_publishing.go \
+  's.replace("Object(permissions.SpaceAdminister), s.handlePublishingEnd)", "Object(permissions.SpaceAdminister), on(s.handlePublishingEnd))")' $app -run '^TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair$'
+mutate "a block reference is left out of the list a release rewrites" internal/document/references.go \
+  's.replace("\tTypePageCard: \"page_id\",\n", "")' $docpkg -run 'TestEveryAttributeThatHoldsAnIDIsListed$'
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

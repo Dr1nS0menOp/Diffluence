@@ -84,6 +84,16 @@ const (
 	SpaceWorkflows = "space.workflows"
 	// PageWorkflow sets a workflow of the space on a page or a branch, and removes it.
 	PageWorkflow = "page.workflow"
+
+	// SpaceRelease releases pages of a draft space into its published space, and sees what
+	// is out of step (spec 073, PUB-010). It is held in the draft space.
+	SpaceRelease = "space.release"
+)
+
+// Sides of a pair of spaces (spec 073). A space in no pair has no side.
+const (
+	PairDraft     = "draft"
+	PairPublished = "published"
 )
 
 // Kinds of item that have a create permission of their own (ADR-038). The pages package
@@ -115,7 +125,7 @@ var AllSpacePermissions = []string{
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
 	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
 	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit,
-	SpaceWorkflows, PageWorkflow,
+	SpaceWorkflows, PageWorkflow, SpaceRelease,
 }
 
 // SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
@@ -139,6 +149,7 @@ var SplitFrom = map[string]string{
 	DatabaseEdit:      PageEdit,
 	SpaceWorkflows:    SpaceAdminister,
 	PageWorkflow:      PageEdit,
+	SpaceRelease:      SpaceAdminister,
 }
 
 // splitOffAdminister reports whether a permission was split off space administration, so
@@ -194,7 +205,29 @@ type SpaceFacts struct {
 	ID     uuid.UUID
 	Status string // active, archived, trashed
 	Grants []Grant
+	// PairRole is the side of a pair the space is on: PairDraft, PairPublished, or empty
+	// (spec 073).
+	PairRole string
 }
+
+// writesContent lists what changes the content of a space: its pages, their versions,
+// files, labels, place and look, and what writes pages for people. A published space is
+// changed only by releases, so these are refused there for everyone (PUB-220).
+func writesContent(action string) bool {
+	switch action {
+	case PageCreate, PostCreate, DatabaseCreate, PageEdit, DatabaseEdit, PageArchive, ActionPageDelete,
+		AttachmentAdd, ActionAttachmentDelete, PageMoveOut, PageWorkflow, SpaceWorkflows, SpaceTemplates,
+		SpaceAutomation, SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceRelease:
+		return true
+	}
+	return false
+}
+
+// RuleManaged is the check that refuses a write in a published space.
+const RuleManaged = "space_not_managed"
+
+// ruleDraftNotPublic is the check that keeps a draft space off the web (PUB-610).
+const ruleDraftNotPublic = "draft_not_public"
 
 // RestrictionLevel is a page in the ancestor chain that has a view restriction.
 type RestrictionLevel struct {
@@ -372,6 +405,14 @@ func Evaluate(in Input) Decision {
 	}
 	if !worksWhenArchived(in.Action) {
 		check(LayerSpace, "space_not_archived", in.Space.Status != "archived", false)
+	}
+	// No grant, role or administrator right writes into a published space; only a release
+	// does (PUB-012, PUB-220, PUB-602). A draft space never goes on the web (PUB-610).
+	if writesContent(in.Action) {
+		check(LayerSpace, RuleManaged, in.Space.PairRole != PairPublished, false)
+	}
+	if in.Action == SitePublish {
+		check(LayerSpace, ruleDraftNotPublic, in.Space.PairRole != PairDraft, false)
 	}
 
 	if in.Page == nil {

@@ -26,6 +26,8 @@ import {
 } from './space-organise';
 import { TableBox } from '../components/table-box';
 import { WorkflowsSection } from './space-workflows';
+import { PublishingSection } from './space-publishing';
+import { useCapabilities } from '../capabilities';
 
 const SPACE_SECTIONS = [
   'details',
@@ -39,6 +41,7 @@ const SPACE_SECTIONS = [
   'statuses',
   'labels',
   'workflows',
+  'published',
   'placeholders',
   'rules',
   'import',
@@ -61,6 +64,7 @@ const SECTION_NEEDS: Record<string, string[]> = {
   statuses: ['space.statuses'],
   labels: ['space.labels'],
   workflows: ['space.workflows'],
+  published: ['space.administer', 'space.release'],
   shortcuts: ['space.look'],
   people: ['space.administer', 'space.look'],
   export: ['space.administer', 'space.bundle'],
@@ -241,6 +245,7 @@ function CategoriesSection({ space }: { space: Space }) {
 export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
+  const capabilities = useCapabilities();
   const q = useSpaceByKey(spaceKey);
   const current = useLocation().searchParams.get('section') ?? 'details';
   const [form, setForm] = useState<{ name: string; description: string; icon: string } | null>(null);
@@ -307,6 +312,8 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
         item('statuses', t('spaceSettings.statuses')),
         item('labels', t('organise.labels')),
         item('workflows', t('control.settingsTitle')),
+        // Draft and published spaces are an experimental part (spec 073): absent while off.
+        ...(capabilities.publishing ? [item('published', t('publishing.settingsTitle'))] : []),
         item('placeholders', t('space.placeholders')),
         away('content', t('content.title'), `${base}/content`),
         away('templates', t('templates.title'), `${base}/templates`),
@@ -406,6 +413,7 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
       {section === 'statuses' && <StatusesSection space={space} />}
       {section === 'labels' && <LabelsSection space={space} />}
       {section === 'workflows' && <WorkflowsSection space={space} />}
+      {section === 'published' && <PublishingSection space={space} />}
       {section === 'placeholders' && <PlaceholdersSection space={space} />}
       {section === 'rules' && <RulesSection space={space} />}
       {section === 'import' && <ImportSection space={space} />}

@@ -50,6 +50,7 @@ import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
 import { LabelBar } from '../components/page-labels';
 import { ControlBand, mayOpenReview } from '../components/control-band';
 import { ReviewPanel } from '../components/review-panel';
+import { ReleaseBand, ReleaseDialog, useReleaseStatus } from '../components/release-band';
 import {
   ApprovalBanner,
   ApprovalsDialog,
@@ -89,7 +90,8 @@ type PageDialog =
   | 'template'
   | 'folder'
   | 'page'
-  | 'post';
+  | 'post'
+  | 'release';
 type WatchScope = 'page' | 'branch';
 
 interface WatchState {
@@ -272,9 +274,11 @@ function PageMenu({
   onPresent,
   onComments,
   onWatch,
+  canRelease,
 }: {
   page: PageDetail;
   watching: WatchState | undefined;
+  canRelease: boolean;
   onOpen: (dialog: PageDialog) => void;
   onDetails: () => void;
   onReader: () => void;
@@ -383,6 +387,11 @@ function PageMenu({
       {canEdit && !published && page.kind === 'post' && mayCreate(page.can, 'page') && (
         <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
           {t('organise.turnInto_page')}
+        </MenuEntry>
+      )}
+      {canRelease && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('release')}>
+          {t('publishing.release')}
         </MenuEntry>
       )}
       {page.can['page.archive'] && !page.archived_at && (
@@ -623,6 +632,12 @@ export function PageView({ pageId }: { pageId: string }) {
     onSettled: () => client.invalidateQueries({ queryKey: ['page', pageId] }),
   });
   const page = q.data;
+  const pageSpace = useQuery({
+    queryKey: ['space-id', page?.space_id],
+    queryFn: () => api.get<Space>(`/spaces/${page?.space_id}`),
+    enabled: !!page,
+  });
+  const release = useReleaseStatus(page, pageSpace.data?.pair_role);
   const { watching, watch } = usePageWatch(pageId);
   const views = useViewCount(pageId, page?.status === 'published');
   const present = usePresence(pageId, 'reading');
@@ -730,6 +745,7 @@ export function PageView({ pageId }: { pageId: string }) {
               onPresent={() => setPresenting(true)}
               onComments={() => openComments(null)}
               onWatch={watch}
+              canRelease={release.data?.can_release ?? false}
             />
           </div>
         </div>
@@ -752,6 +768,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <PageNotes page={page} />
         <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
         <ControlBand page={page} onReview={openReview} />
+        <ReleaseBand status={release.data} />
         {page.status === 'draft' && (
           <p role="status" className="note">
             {t('page.unpublished')}
@@ -827,6 +844,7 @@ export function PageView({ pageId }: { pageId: string }) {
       )}
       {dialog === 'approvals' && <ApprovalsDialog page={page} onClose={close} />}
       {dialog === 'verify' && <VerifyDialog page={page} onClose={close} />}
+      {dialog === 'release' && <ReleaseDialog page={page} onClose={close} />}
       {dialog === 'archive' && <ArchiveDialog page={page} onClose={close} />}
       {dialog === 'template' && <SaveTemplateDialog page={page} onClose={close} />}
       {(dialog === 'folder' || dialog === 'page' || dialog === 'post') && (

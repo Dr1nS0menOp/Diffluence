@@ -78,6 +78,7 @@ const SETTINGS_PERMISSIONS = [
   'space.statuses',
   'space.approvals',
   'space.workflows',
+  'space.release',
   'space.bundle',
   'space.look',
 ];

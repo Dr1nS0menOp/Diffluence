@@ -15,6 +15,8 @@ export interface Capabilities {
   databases: boolean;
   bundles: boolean;
   console_restore: boolean;
+  /** Draft and published spaces (spec 073). */
+  publishing: boolean;
 }
 
 /** Until the answer is there, nothing is offered: better a moment late than a broken button. */
@@ -27,6 +29,7 @@ export const NOTHING_ON: Capabilities = {
   databases: false,
   bundles: false,
   console_restore: false,
+  publishing: false,
 };
 
 const CAPABILITIES_STALE_MS = 60_000;

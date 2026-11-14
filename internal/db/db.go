@@ -279,6 +279,13 @@ func IsUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
+// IsManagedSpace reports whether the database refused a write into the published space of a
+// pair (migration 0061, spec 073 PUB-224).
+func IsManagedSpace(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "DF073"
+}
+
 // isLockTimeout reports whether err was caused by lock_timeout.
 func isLockTimeout(err error) bool {
 	var pgErr *pgconn.PgError

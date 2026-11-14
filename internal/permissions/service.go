@@ -122,7 +122,7 @@ func (s *Service) LoadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (Sp
 
 func (s *Service) loadSpace(ctx context.Context, q db.Querier, id uuid.UUID) (SpaceFacts, error) {
 	f := SpaceFacts{ID: id}
-	err := q.QueryRow(ctx, "SELECT status FROM spaces WHERE id = $1", id).Scan(&f.Status)
+	err := q.QueryRow(ctx, "SELECT status, COALESCE(pair_role, '') FROM spaces WHERE id = $1", id).Scan(&f.Status, &f.PairRole)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return f, apperr.NotFound()
 	}
@@ -250,9 +250,33 @@ func refusal(d Decision, denied apperr.Denied) error {
 	e := apperr.Forbidden()
 	if !d.Visible {
 		e = apperr.NotFound()
+	} else if refusedOnlyAsManaged(d) {
+		// Someone who could otherwise write learns why they cannot (PUB-220). It names no
+		// draft space: who may see which space differs per person.
+		e = ManagedSpace()
 	}
 	e.Denied = &denied
 	return e
+}
+
+// refusedOnlyAsManaged says that the managed rule is the one check that failed.
+func refusedOnlyAsManaged(d Decision) bool {
+	managed := false
+	for _, c := range d.Checks {
+		if c.Passed {
+			continue
+		}
+		if c.Rule != RuleManaged {
+			return false
+		}
+		managed = true
+	}
+	return managed
+}
+
+// ManagedSpace is the answer to a write into a published space (PUB-220).
+func ManagedSpace() *apperr.Error {
+	return apperr.Conflict("managed_space", "This space is changed only by releases.")
 }
 
 // RequireSpace returns nil when allowed, otherwise a not-found or forbidden
@@ -306,6 +330,29 @@ func (s *Service) CheckPerson(ctx context.Context, q db.Querier, viewerID, targe
 	}
 	return EvaluatePerson(viewer, target), nil
 }
+
+// HoldersOf names the subjects that hold any of perms in a space, each once, by name. It
+// decides nothing; the caller checks who may know (spec 073, PUB-210, PUB-240).
+func (s *Service) HoldersOf(ctx context.Context, q db.Querier, spaceID uuid.UUID, perms []string) ([]NamedSubject, error) {
+	rows, err := q.Query(ctx, `SELECT DISTINCT g.subject_type, g.subject_id, COALESCE(u.display_name, gr.name, '')
+		FROM space_grants g
+		LEFT JOIN users u ON g.subject_type = 'user' AND u.id = g.subject_id
+		LEFT JOIN groups gr ON g.subject_type = 'group' AND gr.id = g.subject_id
+		WHERE g.space_id = $1 AND g.permission = ANY($2)
+		ORDER BY 3, 1, 2`, spaceID, perms)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (NamedSubject, error) {
+		var h NamedSubject
+		err := r.Scan(&h.Type, &h.ID, &h.Name) // a NamedSubject: its Subject, then the name
+		return h, err
+	})
+}
+
+// WritesContent says whether an action writes the content of a space, which a published
+// space refuses to everyone (PUB-220).
+func WritesContent(action string) bool { return writesContent(action) }
 
 // Administrators names who holds administer in each space, directly or through a
 // group. Everyone who can see a space may know who to ask (SPC-013).

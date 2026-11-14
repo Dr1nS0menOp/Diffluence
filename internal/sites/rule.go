@@ -16,6 +16,8 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/spaces"
 )
 
 // publicKinds are what a site can show. A template is no page of the space, and a
@@ -24,16 +26,20 @@ var publicKinds = []string{pages.KindPage, pages.KindPost}
 
 // eventsThatCanHide are all that can take a page's right to be public away (GAP-015).
 var eventsThatCanHide = []string{"restriction.added", "permission.restriction.added", "page.moved", "page.archived", "page.trashed",
-	"page.purged", "page.version_removed", "space.archived", "space.trashed", "space.purged", "page.withdrawn", "page.controlled"}
+	"page.purged", "page.version_removed", "space.archived", "space.trashed", "space.purged", "page.withdrawn", "page.controlled",
+	"space.paired"}
 
 // mayBePublic is the one rule for what the world may see (PRM-096, PRM-098): chosen
 // pages of this space that are published, not archived, in a space that is in use,
 // with no view restriction on them or above them, and not a controlled page that was
-// never approved or was withdrawn (spec 064, DOC-301, DOC-322). It answers with those
+// never approved or was withdrawn (spec 064, DOC-301, DOC-322), and never a page of a draft space,
+// whose content reaches readers only through its published space (spec 073, PUB-610, PUB-626).
+// It answers with those
 // that pass. No person's rights come into it.
 func (s *Service) mayBePublic(ctx context.Context, q db.Querier, spaceID uuid.UUID, list []uuid.UUID) (map[uuid.UUID]bool, error) {
 	rows, err := q.Query(ctx, `SELECT p.id FROM pages p JOIN spaces sp ON sp.id = p.space_id
 		WHERE p.id = ANY($1) AND p.space_id = $2 AND p.status = 'published' AND p.archived_at IS NULL AND sp.status = 'active' AND p.kind = ANY($3)
+		AND sp.pair_role IS DISTINCT FROM 'draft'
 		AND NOT EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id AND r.kind = 'view'
 			WHERE t.descendant_id = p.id)
 		AND NOT EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id
@@ -46,6 +52,16 @@ func (s *Service) mayBePublic(ctx context.Context, q db.Querier, spaceID uuid.UU
 		return nil, err
 	}
 	return uniqueIDs(allowed), nil
+}
+
+// LiveInSpace counts the live sites and the public links of a space, which linking it as a
+// draft space withdraws (spec 073, PUB-210, PUB-610).
+func LiveInSpace(ctx context.Context, q db.Querier, spaceID uuid.UUID) (sites, links int, err error) {
+	err = q.QueryRow(ctx, `SELECT
+		(SELECT count(*) FROM public_sites WHERE space_id = $1 AND live_build > 0 AND withdrawn_at IS NULL),
+		(SELECT count(*) FROM public_links l JOIN pages p ON p.id = l.page_id WHERE p.space_id = $1 AND l.withdrawn_at IS NULL)`,
+		spaceID).Scan(&sites, &links)
+	return sites, links, err
 }
 
 // versionsGone lists what a build shows of a version that was removed since.
@@ -110,6 +126,15 @@ func (s *Service) Enforce(ctx context.Context) error {
 }
 
 func (s *Service) enforceSite(ctx context.Context, v Site) error {
+	// A draft space never has a site: linking it to a published space takes its site down
+	// (spec 073, PUB-610).
+	space, err := spaces.LoadIn(ctx, s.pool, v.SpaceID)
+	if err != nil {
+		return err
+	}
+	if space.PairRole == permissions.PairDraft {
+		return s.withdraw(ctx, system(), v)
+	}
 	report, err := s.liveReport(ctx, v)
 	if err != nil {
 		return err

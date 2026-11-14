@@ -61,6 +61,8 @@ type Space struct {
 	ReviewMonths     int             `json:"review_months"`
 	ApprovalRequired bool            `json:"approval_required"`
 	Features         map[string]bool `json:"features,omitempty"`
+	// PairRole is the side of a pair the space is on, draft or published, or empty (spec 073).
+	PairRole string `json:"pair_role"`
 }
 
 // Input is what a user fills in.
@@ -111,12 +113,12 @@ func (in *Input) validate() error {
 }
 
 const columns = `id, key, name, description, icon, status, home_page_id, created_by, created_at, updated_at,
-	icon_object <> '', title_align, review_months, approval_required, kind, owner_id`
+	icon_object <> '', title_align, review_months, approval_required, kind, owner_id, COALESCE(pair_role, '')`
 
 func scan(r pgx.Row) (Space, error) {
 	var s Space
 	err := r.Scan(&s.ID, &s.Key, &s.Name, &s.Description, &s.Icon, &s.Status, &s.HomePageID, &s.CreatedBy, &s.CreatedAt, &s.UpdatedAt,
-		&s.HasIcon, &s.TitleAlign, &s.ReviewMonths, &s.ApprovalRequired, &s.Kind, &s.OwnerID)
+		&s.HasIcon, &s.TitleAlign, &s.ReviewMonths, &s.ApprovalRequired, &s.Kind, &s.OwnerID, &s.PairRole)
 	return s, err
 }
 
@@ -158,40 +160,76 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, in Input) (Spac
 	}
 	var out Space
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		id := ids.New()
-		taken, err := keyTaken(ctx, tx, in.Key, id)
-		if err != nil {
-			return err
-		}
-		if taken {
-			return apperr.Conflict("key_taken", "This key is already in use.")
-		}
-		out, err = scan(tx.QueryRow(ctx, `INSERT INTO spaces (id, origin_instance_id, key, name, description, icon, status, created_by)
-			VALUES ($1, $2, $3, $4, $5, $6, 'active', $7) RETURNING `+columns,
-			id, s.instanceID, in.Key, in.Name, in.Description, in.Icon, c.UserID))
-		if db.IsUniqueViolation(err) {
-			return apperr.Conflict("key_taken", "This key is already in use.")
-		}
-		if err != nil {
-			return err
-		}
-		if err := permissions.ApplyTemplateTx(ctx, tx, id, permissions.Subject{Type: permissions.SubjectUser, ID: c.UserID}, permissions.TemplateSpaceAdmin); err != nil {
-			return err
-		}
-		if err := s.features.Start(ctx, tx, id); err != nil {
-			return err
-		}
-		if err := record(ctx, tx, c, "space.created", out, map[string]any{"name": out.Name}); err != nil {
-			return err
-		}
-		page, err := s.pages.CreatePublished(ctx, tx, c, id, nil, in.Name, home, c.UserID)
-		if err != nil {
-			return err
-		}
-		out, err = scan(tx.QueryRow(ctx, "UPDATE spaces SET home_page_id = $2 WHERE id = $1 RETURNING "+columns, id, page.ID))
+		var err error
+		out, err = s.create(ctx, tx, c, in, home)
 		return err
 	})
 	return out, err
+}
+
+// CreateIn makes a space inside tx, as Create does, for a module that makes a space as one
+// step of its own (spec 073, PUB-211). The caller checks that c may create spaces.
+func (s *Service) CreateIn(ctx context.Context, tx pgx.Tx, c identity.Caller, in Input) (Space, error) {
+	if !keyPattern.MatchString(in.Key) {
+		return Space{}, apperr.Invalid("A key has 2 to 32 letters, digits, dashes or underscores.")
+	}
+	if err := in.validate(); err != nil {
+		return Space{}, err
+	}
+	return s.create(ctx, tx, c, in, document.Empty())
+}
+
+func (s *Service) create(ctx context.Context, tx pgx.Tx, c identity.Caller, in Input, home document.Node) (Space, error) {
+	id := ids.New()
+	taken, err := keyTaken(ctx, tx, in.Key, id)
+	if err != nil {
+		return Space{}, err
+	}
+	if taken {
+		return Space{}, apperr.Conflict("key_taken", "This key is already in use.")
+	}
+	out, err := scan(tx.QueryRow(ctx, `INSERT INTO spaces (id, origin_instance_id, key, name, description, icon, status, created_by)
+		VALUES ($1, $2, $3, $4, $5, $6, 'active', $7) RETURNING `+columns,
+		id, s.instanceID, in.Key, in.Name, in.Description, in.Icon, c.UserID))
+	if db.IsUniqueViolation(err) {
+		return Space{}, apperr.Conflict("key_taken", "This key is already in use.")
+	}
+	if err != nil {
+		return Space{}, err
+	}
+	if err := permissions.ApplyTemplateTx(ctx, tx, id, permissions.Subject{Type: permissions.SubjectUser, ID: c.UserID}, permissions.TemplateSpaceAdmin); err != nil {
+		return Space{}, err
+	}
+	if err := s.features.Start(ctx, tx, id); err != nil {
+		return Space{}, err
+	}
+	if err := record(ctx, tx, c, "space.created", out, map[string]any{"name": out.Name}); err != nil {
+		return Space{}, err
+	}
+	page, err := s.pages.CreatePublished(ctx, tx, c, id, nil, in.Name, home, c.UserID)
+	if err != nil {
+		return Space{}, err
+	}
+	return scan(tx.QueryRow(ctx, "UPDATE spaces SET home_page_id = $2 WHERE id = $1 RETURNING "+columns, id, page.ID))
+}
+
+// SetPairRole puts a space on a side of a pair, or takes it off with an empty role (spec
+// 073). The publishing module decides; the caller holds the transaction of the change.
+func SetPairRole(ctx context.Context, tx pgx.Tx, id uuid.UUID, role string) error {
+	_, err := tx.Exec(ctx, "UPDATE spaces SET pair_role = NULLIF($2, ''), updated_at = now() WHERE id = $1", id, role)
+	return err
+}
+
+// LoadIn reads a space through q, without a check, for a module that has checked already.
+func LoadIn(ctx context.Context, q db.Querier, id uuid.UUID) (Space, error) {
+	return load(ctx, q, id)
+}
+
+// LockForPairing locks the rows of two spaces in a fixed order, so two links made at once
+// over the same space take turns (PUB-1060).
+func LockForPairing(ctx context.Context, tx pgx.Tx, a, b uuid.UUID) error {
+	_, err := tx.Exec(ctx, "SELECT id FROM spaces WHERE id = ANY($1) ORDER BY id FOR UPDATE", []uuid.UUID{a, b})
+	return err
 }
 
 // List returns the active spaces the user may view. Archived spaces only show in
@@ -251,7 +289,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Spa
 	for _, action := range []string{permissions.SpaceAdminister, permissions.PageCreate, permissions.SpaceExport, permissions.SpaceManageAccess, permissions.AnalyticsView,
 		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle, permissions.SpaceLook,
-		permissions.SpaceInviteGuests, permissions.PostCreate, permissions.DatabaseCreate, permissions.SpaceWorkflows} {
+		permissions.SpaceInviteGuests, permissions.PostCreate, permissions.DatabaseCreate, permissions.SpaceWorkflows, permissions.SpaceRelease} {
 		sp.Can[action] = permissions.Evaluate(permissions.Input{User: user, Space: facts, Action: action}).Allowed
 	}
 	return sp, nil

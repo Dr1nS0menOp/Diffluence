@@ -79,8 +79,8 @@ func TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases(t *testi
 		t.Fatalf("a version 3 bundle knew nothing of posts and databases apart from pages: %v", got)
 	}
 	if got := permissionsOfGrant(versionOfSpec040, permissions.SpaceAdminister); !slices.Equal(got,
-		[]string{permissions.SpaceAdminister, permissions.SpaceWorkflows}) {
-		t.Fatalf("a version 3 bundle holds the eight of spec 040 itself, and knew nothing of workflows: %v", got)
+		[]string{permissions.SpaceAdminister, permissions.SpaceRelease, permissions.SpaceWorkflows}) {
+		t.Fatalf("a version 3 bundle holds the eight of spec 040 itself, and knew nothing of workflows or releases: %v", got)
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
 		t.Fatalf("a current bundle holds posts and databases itself, so pages alone must stay alone: %v", got)
@@ -110,10 +110,24 @@ func TestABundleOfVersionFiveGivesEditorsAndAdministratorsTheWorkflowPermissions
 		t.Fatalf("editing in a version 5 bundle set workflows as well, and must still: %v", got)
 	}
 	if got := permissionsOfGrant(versionOfSpec049, permissions.SpaceAdminister); !slices.Equal(got,
-		[]string{permissions.SpaceAdminister, permissions.SpaceWorkflows}) {
+		[]string{permissions.SpaceAdminister, permissions.SpaceRelease, permissions.SpaceWorkflows}) {
 		t.Fatalf("administering in a version 5 bundle ran the workflows as well, and must still: %v", got)
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
 		t.Fatalf("a current bundle holds space.workflows itself: %v", got)
+	}
+}
+
+// versionOfSpec064 is the bundle version that first held the workflow permissions, the last
+// before space.release of spec 073.
+const versionOfSpec064 = 6
+
+func TestABundleOfVersionSixGivesAdministratorsRelease(t *testing.T) {
+	if got := permissionsOfGrant(versionOfSpec064, permissions.SpaceAdminister); !slices.Equal(got,
+		[]string{permissions.SpaceAdminister, permissions.SpaceRelease}) {
+		t.Fatalf("administering in a version 6 bundle released as well, and must still: %v", got)
+	}
+	if got := permissionsOfGrant(bundleVersion, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
+		t.Fatalf("a current bundle holds space.release itself: %v", got)
 	}
 }

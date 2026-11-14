@@ -249,6 +249,16 @@ fieldset.matrix label {
   gap: var(--space-2);
 }
 
+/* Draft and published spaces (spec 073): the release status of a draft page is a note like
+   the band above; a released page and a page in step say so in one muted line. */
+.release-band > p {
+  margin-block: var(--space-1);
+}
+
+.release-line {
+  margin-block: var(--space-1);
+}
+
 .lozenge {
   display: inline-block;
   padding-inline: var(--space-1-5);

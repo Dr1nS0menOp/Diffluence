@@ -6769,6 +6769,85 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/release": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
+      },
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/release",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/pages/{id}/release/preview": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/release/preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
     "/api/v1/pages/{id}/restrictions": {
       "get": {
         "operationId": "get /api/v1/pages/{id}/restrictions",
@@ -10085,6 +10164,141 @@
     "/api/v1/spaces/{id}/preset": {
       "post": {
         "operationId": "post /api/v1/spaces/{id}/preset",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/publishing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/end": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/end",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/link": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/link",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/link-preview": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/link-preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/settings": {
+      "put": {
+        "operationId": "put /api/v1/spaces/{id}/publishing/settings",
         "parameters": [
           {
             "in": "path",

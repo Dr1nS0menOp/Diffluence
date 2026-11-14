@@ -260,6 +260,74 @@ export interface Space {
   review_months?: number;
   approval_required?: boolean;
   features?: Features;
+  /** The side of a pair of spaces, draft or published, or empty (spec 073). */
+  pair_role?: '' | 'draft' | 'published';
+}
+
+/** A space as the other side of a pair names it, for those who may see it (spec 073). */
+export interface PairSpaceRef {
+  id: string;
+  key: string;
+  name: string;
+}
+
+/** The settings of a pair, kept on the draft side (PUB-240). */
+export interface PairSettings {
+  notify_watchers: boolean;
+  mirror_removals: boolean;
+  default_note: string;
+}
+
+/** A space's side of a pair, for the settings section (PUB-1200). */
+export interface PublishingState {
+  side: '' | 'draft' | 'published';
+  pair: {
+    id: string;
+    created_at: string;
+    draft: PairSpaceRef | null;
+    published: PairSpaceRef | null;
+    settings: PairSettings | null;
+    releasers: { type: string; id: string; name: string }[] | null;
+    health: { drafts_readable: boolean; out_of_step: number; since: string | null } | null;
+  } | null;
+  can: { link: boolean; end: boolean; settings: boolean; release: boolean };
+}
+
+/** What linking two spaces would change (PUB-210). */
+export interface LinkPreview {
+  losing_editors: { people: number; groups: number; everyone: boolean; names: string[] | null };
+  drafts_readable: boolean;
+  sites: number;
+  links: number;
+  new_space: boolean;
+}
+
+/** The release status of a draft page, or the release line of a twin (PUB-330, PUB-1230). */
+export interface ReleaseStatus {
+  side: '' | 'draft' | 'published';
+  status?: 'not_released' | 'released' | 'changed' | 'cannot_release';
+  aspects: string[];
+  reason?: string;
+  released_version?: number;
+  twin_version?: number;
+  released_at?: string;
+  twin_page_id?: string;
+  draft_page_id?: string;
+  draft_space?: PairSpaceRef;
+  can_release: boolean;
+}
+
+/** What releasing one page would do (PUB-430). */
+export interface ReleasePreview {
+  id: string;
+  version: number;
+  action: 'make' | 'change' | 'update' | 'none';
+  aspects: string[];
+  placed_higher: boolean;
+  files: number;
+  bytes: number;
+  links_as_text: number;
+  expires_at: string;
 }
 
 export interface DirectorySpace extends Space {

@@ -15,6 +15,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -101,6 +102,10 @@ func (s *Server) caller(r *http.Request) identity.Caller {
 // fail answers with the right status for an expected error, and audits refusals.
 func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	e, ok := apperr.As(err)
+	if !ok && db.IsManagedSpace(err) {
+		// A write path that forgot the rule met the trigger of a published space (PUB-224).
+		e, ok = permissions.ManagedSpace(), true
+	}
 	if !ok {
 		s.internalError(w, r, err)
 		return

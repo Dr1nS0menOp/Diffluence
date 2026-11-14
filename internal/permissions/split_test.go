@@ -30,8 +30,8 @@ func TestAListFromBeforeASplitGetsWhatWasSplitOff(t *testing.T) {
 }
 
 func TestAListThatKnowsTheSplitStaysAsItIs(t *testing.T) {
-	// It names a permission of every split off administer: 036, 040 and 064.
-	in := []string{SpaceView, SpaceAdminister, SitePublish, SpaceLabels, SpaceWorkflows}
+	// It names a permission of every split off administer: 036, 040, 064 and 073.
+	in := []string{SpaceView, SpaceAdminister, SitePublish, SpaceLabels, SpaceWorkflows, SpaceRelease}
 	if got := WithSplitOff(in); !slices.Equal(got, slices.Sorted(slices.Values(in))) {
 		t.Fatalf("a list naming finer permissions changed: %v", got)
 	}

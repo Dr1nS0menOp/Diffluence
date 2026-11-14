@@ -87,7 +87,7 @@ var managerPerms = permissions.Templates[permissions.TemplateManager]
 // splitOffAdministerPerms is everything split off space administration, in specs 036 and 040.
 var splitOffAdministerPerms = []string{permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates,
 	permissions.SpaceAudit, permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals,
-	permissions.SpaceBundle, permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows}
+	permissions.SpaceBundle, permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows, permissions.SpaceRelease}
 
 var grantCases = []grantCase{
 	{name: "none", subject: "none"},
@@ -214,7 +214,18 @@ var pageStates = []pageState{
 	{"controlled-archived-never-approved", "published", false, true, "page", false, controlNever},
 }
 
-var spaceStates = []string{"active", "archived", "trashed"}
+// spaceStates are the states of a space, and the two sides of a pair, which are active spaces
+// (spec 073).
+var spaceStates = []string{"active", "archived", "trashed", permissions.PairPublished, permissions.PairDraft}
+
+// spaceFactsOf is a state of spaceStates as the facts of a space.
+func spaceFactsOf(id uuid.UUID, state string, grants []permissions.Grant) permissions.SpaceFacts {
+	switch state {
+	case permissions.PairPublished, permissions.PairDraft:
+		return permissions.SpaceFacts{ID: id, Status: "active", Grants: grants, PairRole: state}
+	}
+	return permissions.SpaceFacts{ID: id, Status: state, Grants: grants}
+}
 
 var actions = []string{
 	permissions.SpaceView, permissions.ActionPageView, permissions.PageCreate, permissions.PageEdit, permissions.PageArchive,
@@ -225,7 +236,7 @@ var actions = []string{
 	permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
 	permissions.SpaceLook, permissions.PageWatchers, permissions.PageMoveOut, permissions.SpaceInviteGuests,
 	permissions.PostCreate, permissions.DatabaseCreate, permissions.DatabaseEdit,
-	permissions.SpaceWorkflows, permissions.PageWorkflow,
+	permissions.SpaceWorkflows, permissions.PageWorkflow, permissions.SpaceRelease,
 }
 
 // isDeleteAction says whether the creator of the object decides, through "delete own".
@@ -308,7 +319,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		permissions.SpaceManageAccess, permissions.SpaceInviteGuests, permissions.AnalyticsView,
 		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
-		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows:
+		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows, permissions.SpaceRelease:
 	default:
 		if spaceStatus == "archived" {
 			return false
@@ -321,9 +332,25 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		permissions.ActionPageDelete, permissions.PageArchive, permissions.RestrictionManage, permissions.AnalyticsView,
 		permissions.SitePublish, permissions.SpaceAutomation, permissions.SpaceTemplates, permissions.SpaceAudit,
 		permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
-		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows:
+		permissions.SpaceLook, permissions.PageWatchers, permissions.SpaceWorkflows, permissions.SpaceRelease:
 	default:
 		if ps.archived {
+			return false
+		}
+	}
+	// A published space is changed only by releases, whoever asks; a draft space is never on
+	// the web (spec 073, PUB-220, PUB-610).
+	switch action {
+	case permissions.PageCreate, permissions.PostCreate, permissions.DatabaseCreate, permissions.PageEdit,
+		permissions.DatabaseEdit, permissions.PageArchive, permissions.ActionPageDelete, permissions.AttachmentAdd,
+		permissions.ActionAttachmentDelete, permissions.PageMoveOut, permissions.PageWorkflow, permissions.SpaceWorkflows,
+		permissions.SpaceTemplates, permissions.SpaceAutomation, permissions.SpaceLabels, permissions.SpaceStatuses,
+		permissions.SpaceApprovals, permissions.SpaceRelease:
+		if spaceStatus == permissions.PairPublished {
+			return false
+		}
+	case permissions.SitePublish:
+		if spaceStatus == permissions.PairDraft {
 			return false
 		}
 	}
@@ -491,7 +518,7 @@ func evaluateOnePerson(t *testing.T, u userCase, id matrixIDs, subjects func(str
 						ControlHidden: ps.control == controlNever || ps.control == controlWithdrawn}
 				}
 				for _, ss := range spaceStates {
-					space := permissions.SpaceFacts{ID: id.leaf, Status: ss, Grants: grants}
+					space := spaceFactsOf(id.leaf, ss, grants)
 					for _, action := range actions {
 						owners := []uuid.UUID{creator}
 						if isDeleteAction(action) {
@@ -532,9 +559,17 @@ func sqlShape(u userCase, g grantCase, r restrictionCase) ([]string, []pageState
 			pages = append(pages, ps)
 		}
 	}
+	// The SQL lists read the side of a pair only to keep published spaces out of editing,
+	// and a draft space is an active space to them: the published side is built for every
+	// person, grant and page without restrictions, and the draft side is left to Evaluate
+	// (spec 073). The full product took thirteen minutes.
+	states := []string{"active", "archived", "trashed"}
+	if r.name == "unrestricted" {
+		states = append(states, permissions.PairPublished)
+	}
 	switch extras {
 	case 0:
-		return spaceStates, pages, true
+		return states, pages, true
 	case 1:
 		return []string{"active", "archived"}, []pageState{pageStates[0], pageStates[1], pageStates[2], pageStates[4]}, true
 	}
@@ -620,7 +655,13 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 	queue := func(sql string, args ...any) { batch.Queue(sql, args...) }
 	flush := func() {
 		t.Helper()
-		if err := pool.SendBatch(ctx, &batch).Close(); err != nil {
+		// Pages of a published space are written as a release writes them (spec 073, PUB-224).
+		var marked pgx.Batch
+		marked.Queue("SELECT set_config('diffluence.release', 'on', false)")
+		for _, q := range batch.QueuedQueries {
+			marked.Queue(q.SQL, q.Arguments...)
+		}
+		if err := pool.SendBatch(ctx, &marked).Close(); err != nil {
 			t.Fatal(err)
 		}
 		batch = pgx.Batch{}
@@ -703,8 +744,9 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 				}
 				for _, ss := range states {
 					space := ids.New()
-					queue(`INSERT INTO spaces (id, origin_instance_id, key, name, status, created_by)
-						VALUES ($1, $2, $3, 's', $4, $5)`, space, inst, space.String(), ss, other)
+					facts := spaceFactsOf(space, ss, nil)
+					queue(`INSERT INTO spaces (id, origin_instance_id, key, name, status, created_by, pair_role)
+						VALUES ($1, $2, $3, 's', $4, $5, NULLIF($6, ''))`, space, inst, space.String(), facts.Status, other, facts.PairRole)
 					grantTo(space, g.subject, g.perms)
 					grantTo(space, g.also, g.alsoP)
 					for _, ps := range pages {

@@ -95,6 +95,13 @@ var tableOwners = map[string]string{
 	"workflow_review_comments": "internal/pages",
 	"workflow_templates":       "internal/pages",
 
+	// draft and published spaces (spec 073).
+	"space_pairs":       "internal/publishing",
+	"page_pairs":        "internal/publishing",
+	"file_pairs":        "internal/publishing",
+	"release_runs":      "internal/publishing",
+	"release_run_pages": "internal/publishing",
+
 	// files.
 	"attachments":         "internal/attachments",
 	"attachment_versions": "internal/attachments",
@@ -366,10 +373,11 @@ var crossings = map[crossing]int{
 	{"internal/people", "group_members"}: 1,
 	{"internal/people", "users"}:         2,
 
-	// permissions: the access rule reads the facts it decides from.
+	// permissions: the access rule reads the facts it decides from, and names who holds a
+	// permission in a space, for the preview of a pair (spec 073, PUB-210).
 	{"internal/permissions", "global_grants"}: 3,
 	{"internal/permissions", "group_members"}: 6,
-	{"internal/permissions", "groups"}:        7,
+	{"internal/permissions", "groups"}:        8,
 	{"internal/permissions", "page_control"}:  2,
 	// Being asked to review opens a page for the round only, so the rule reads the open
 	// round and its reviewers as a fact (spec 064, DOC-203).
@@ -378,7 +386,7 @@ var crossings = map[crossing]int{
 	{"internal/permissions", "page_tree"}:          3,
 	{"internal/permissions", "pages"}:              3,
 	{"internal/permissions", "spaces"}:             5,
-	{"internal/permissions", "users"}:              13,
+	{"internal/permissions", "users"}:              14,
 
 	// presence: one stamp of what changed on a page, read on every poll.
 	{"internal/presence", "comments"}:    3,
@@ -416,12 +424,13 @@ var crossings = map[crossing]int{
 	{"internal/sharing", "spaces"}:            1,
 	{"internal/sharing", "users"}:             5,
 
-	// sites: a public site is built from published pages without restrictions.
+	// sites: a public site is built from published pages without restrictions; the public
+	// links of a space are found by their pages, for the preview of a pair (spec 073, PUB-610).
 	{"internal/sites", "page_control"}:      2,
 	{"internal/sites", "page_restrictions"}: 2,
 	{"internal/sites", "page_tree"}:         3,
 	{"internal/sites", "page_versions"}:     1,
-	{"internal/sites", "pages"}:             6,
+	{"internal/sites", "pages"}:             7,
 	{"internal/sites", "spaces"}:            1,
 	{"internal/sites", "users"}:             2,
 
