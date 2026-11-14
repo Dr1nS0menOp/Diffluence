@@ -22,6 +22,10 @@ const TYPES = [
   'invitation_answer',
   'access_recovered',
   'draft_expiring',
+  'review_asked',
+  'review_answered',
+  'review_ended',
+  'reviewer_removed',
   'rule',
 ];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];

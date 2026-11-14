@@ -75,8 +75,10 @@ type Row struct {
 	Event     uuid.UUID // the same event never reaches a person twice
 	Data      map[string]any
 	NeedsEdit bool // a thread for editors only reaches editors
-	NoCheck   bool // the answer to someone who asked for access
-	ForceMail bool // a rule sends an e-mail: mail unless the person turned this type off
+	// NeedsReview reaches a reviewer through the reading being asked gives them (DOC-203).
+	NeedsReview bool
+	NoCheck     bool // the answer to someone who asked for access
+	ForceMail   bool // a rule sends an e-mail: mail unless the person turned this type off
 }
 
 // groupKey puts rows on one line. Each answer to an invitation has its own address and
@@ -93,8 +95,11 @@ func (s *Service) mayHear(ctx context.Context, q db.Querier, r Row) (bool, error
 		return true, nil
 	}
 	action := permissions.ActionPageView
-	if r.NeedsEdit {
+	switch {
+	case r.NeedsEdit:
 		action = permissions.PageEdit
+	case r.NeedsReview:
+		action = permissions.ActionApprovalRead
 	}
 	d, err := s.perms.CheckPage(ctx, q, r.UserID, r.PageID, action, uuid.Nil)
 	return d.Allowed, err

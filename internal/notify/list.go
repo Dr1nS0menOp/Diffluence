@@ -63,7 +63,7 @@ type stored struct {
 const visibleRows = `SELECT n.id, n.type, n.reason, COALESCE(u.display_name, ''), n.page_id, p.title, n.space_id, sp.name,
 		n.comment_id, n.read_at IS NOT NULL, n.created_at, n.data, n.group_key
 	FROM notifications n
-	JOIN perm_visible_pages($1) v ON v.page_id = n.page_id
+	JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id
 	JOIN pages p ON p.id = n.page_id
 	JOIN spaces sp ON sp.id = n.space_id
 	LEFT JOIN users u ON u.id = n.actor_id

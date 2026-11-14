@@ -40,6 +40,10 @@ var sentences = map[string]string{
 	TypeAccessRecovered:  "%s took access to %s as an administrator",
 	TypeDraftExpiring:    "Your draft of %[2]s will be removed in two weeks",
 	TypeInvitationAnswer: "%s answered your invitation from %s",
+	TypeReviewAsked:      "You are asked to review %[2]s",
+	TypeReviewAnswered:   "%s answered the review of %s",
+	TypeReviewEnded:      "The review of %[2]s has ended",
+	TypeReviewerRemoved:  "%s took a reviewer off the review of %s",
 }
 
 const (

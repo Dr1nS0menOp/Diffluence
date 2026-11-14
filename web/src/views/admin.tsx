@@ -43,6 +43,7 @@ import { SettingsSearch, SummaryTab } from './admin-summary';
 import { HealthBand, HealthChecks } from './admin-health';
 import { BackupsTab, ConfigurationTab, SessionsTab } from './admin-running';
 import { SettingsFrame } from '../components/settings-frame';
+import { ControlTab } from './admin-control';
 import { TableBox } from '../components/table-box';
 
 const TABS = [
@@ -53,6 +54,7 @@ const TABS = [
   'spaces',
   'templates',
   'organising',
+  'control',
   'export',
   'audit',
   'permissions',
@@ -76,7 +78,7 @@ const TABS = [
 const ADMIN_GROUPS: { id: string; tabs: (typeof TABS)[number][] }[] = [
   { id: 'overview', tabs: ['summary'] },
   { id: 'people', tabs: ['users', 'invitations', 'groups', 'permissions', 'scim', 'sessions'] },
-  { id: 'content', tabs: ['spaces', 'templates', 'organising', 'rules', 'export'] },
+  { id: 'content', tabs: ['spaces', 'templates', 'organising', 'control', 'rules', 'export'] },
   { id: 'automation', tabs: ['automation', 'webhooks', 'outgoing'] },
   { id: 'look', tabs: ['look'] },
   {
@@ -1537,6 +1539,7 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
       {tab === 'spaces' && <SpacesTab />}
       {tab === 'templates' && <TemplatesTab />}
       {tab === 'organising' && <OrganisingTab />}
+      {tab === 'control' && <ControlTab />}
       {tab === 'export' && <ExportTab />}
       {tab === 'audit' && <AuditTab />}
       {tab === 'settings' && <SettingsTab />}

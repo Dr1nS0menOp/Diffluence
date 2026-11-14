@@ -245,7 +245,7 @@ mutate "SQL: restrictions hide nothing" internal/db/migrations/0003_permission_f
 mutate "SQL: guests count as all members" internal/db/migrations/0010_people.sql \
   's.replace(`(g.subject_type = '"'"'all_members'"'"' AND x.type = '"'"'member'"'"')`, `(g.subject_type = '"'"'all_members'"'"')`)' $perms
 mutate "reading a page skips the check" internal/pages/pages.go \
-  's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn Detail{}, err\n\t}", "")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestANamedApproverCanReadAnUnpublishedPage|TestAPageTheAccountCannotSeeStopsTheRun|TestARestoreBelowAnArchivedPageCannotDropARestriction|TestAdministratorsHaveNoContentAccessUntilRecovery|TestAllowingAccessNamesEveryLevelAndNeedsThemAll|TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent|TestAskingForAccessReachesSomeoneWhoMayGrantIt|TestDeleteRestoreAndPurge|TestDeletingAPageTakesArchivedPagesBelowItAlong|TestDeletingAParentAloneIsRefusedSoNothingFallsOpen|TestEveryObjectRouteIsProtected|TestGroups|TestMoveToAnotherSpaceTakesTheBranchAlong|TestRestrictionsAcrossTreeSearchFavouritesAndExport|TestSeveralWordFilesWaitUnderARestrictedPage|TestSharingOnlyNotifies|TestSpaceKeepsAnAdministratorAndGuestsAreNotMembers|TestStarterTemplatesAreThereAndCanBeHidden|TestUnpublishedPageIsPrivate)$'
+  's.replace("\tviewErr := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil)\n", "\tviewErr := error(nil)\n")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestANamedApproverCanReadAnUnpublishedPage|TestAPageTheAccountCannotSeeStopsTheRun|TestARestoreBelowAnArchivedPageCannotDropARestriction|TestAdministratorsHaveNoContentAccessUntilRecovery|TestAllowingAccessNamesEveryLevelAndNeedsThemAll|TestAnApprovedInvitationGoesThroughTheQueueWithoutTheContent|TestAskingForAccessReachesSomeoneWhoMayGrantIt|TestDeleteRestoreAndPurge|TestDeletingAPageTakesArchivedPagesBelowItAlong|TestDeletingAParentAloneIsRefusedSoNothingFallsOpen|TestEveryObjectRouteIsProtected|TestGroups|TestMoveToAnotherSpaceTakesTheBranchAlong|TestRestrictionsAcrossTreeSearchFavouritesAndExport|TestSeveralWordFilesWaitUnderARestrictedPage|TestSharingOnlyNotifies|TestSpaceKeepsAnAdministratorAndGuestsAreNotMembers|TestStarterTemplatesAreThereAndCanBeHidden|TestUnpublishedPageIsPrivate)$'
 mutate "downloads skip the check" internal/attachments/attachments.go \
   's.replace("if err := s.perms.RequirePage(ctx, s.pool, c.UserID, a.PageID, permissions.ActionPageView, uuid.Nil); err != nil {\n\t\treturn a, nil, err\n\t}\n\tf, err :=", "f, err :=")' $app -run '^(TestAFileAnswersNotModifiedButStillChecksAccess|TestAFileMovesAcrossSpacesAndFollowsTheRulesOfItsNewPage|TestAnOfficeFileOpensAsPDFThroughTheHelper|TestAttachmentsNeverTrustAFile|TestEveryObjectRouteIsProtected|TestTemplateFilesFollowTheRuleOfTheTemplate)$'
 mutate "any member can import a font" internal/httpapi/handlers_appearance.go \
@@ -1975,7 +1975,7 @@ mutate "a publish leaves the round open" internal/pages/control.go \
 mutate "an answer about a replaced text counts" internal/pages/control.go \
   's.replace("\t\tif in.Version != ctl.headVersion {", "\t\tif false {")' $app -run TestAPublishSupersedesTheRoundAndItsAnswers
 mutate "a reader gets the head" internal/pages/control.go \
-  's.replace("\tif !d.Can[permissions.PageEdit] {", "\tif false {")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
+  's.replace("\tif !author \x26\x26 !ci.Reviewing {", "\tif false {")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
 mutate "a reader reaches every version of a controlled page" internal/pages/control.go \
   's.replace("return historyView{only: max(currentVersion, 1)}, nil", "return historyView{}, nil")' $app -run TestReadersSeeTheApprovedVersionWhileAChangeWaits
 mutate "the feed shows a version waiting for review" internal/feed/feed.go \
@@ -1996,6 +1996,40 @@ mutate "the migration gives administrators no workflows" internal/db/migrations/
   's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.workflows\x27]);", "SELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "a bundle from before spec 064 gives editors no workflows" internal/exchange/bundlein.go \
   's.replace("permissions.PageWorkflow:      6,", "permissions.PageWorkflow:      1,")' ./internal/exchange/ -run TestABundleOfVersionFiveGivesEditorsAndAdministratorsTheWorkflowPermissions
+# Spec 064, wave DC2: reviewers, the rules to pass, independence, and the reading being asked
+# gives, which ends with the round.
+mutate "a quorum counts as all" internal/workflow/review.go \
+  's.replace("\tcase RuleQuorum:\n\t\treturn r.Quorum", "\tcase RuleQuorum:\n\t\treturn asked")' ./internal/workflow/ -run TestPassingCountsByTheRule
+mutate "a changes answer does not end the round" internal/workflow/review.go \
+  's.replace("\tif changes \x3e 0 {", "\tif false {")' ./internal/workflow/ -run TestPassingCountsByTheRule
+mutate "the system ignores a changes answer" internal/pages/review.go \
+  's.replace("count(*) FILTER (WHERE answer = \x27changes\x27)", "0")' $app -run TestTheRulesToPassAndOneChangesEndsTheRound
+mutate "an author of the change is asked to review it" internal/pages/review.go \
+  's.replace("if seen[c.user] || slices.Contains(authors, c.user) {", "if seen[c.user] || len(authors) \x3c 0 {")' $app -run TestIndependence
+mutate "an author of the change is added as its reviewer" internal/pages/review.go \
+  's.replace("\t\t\tif slices.Contains(authors, user) {", "\t\t\tif len(authors) \x3c 0 {")' $app -run TestAddingAReviewer
+mutate "someone not asked answers" internal/pages/review.go \
+  's.replace("\t\tif !asked {\n\t\t\treturn apperr.Forbidden()\n\t\t}\n\t\tif in.Version", "\t\tif !asked \x26\x26 false {\n\t\t\treturn apperr.Forbidden()\n\t\t}\n\t\tif in.Version")' $app -run TestOnlyReviewersAnswerAndNobodyStepsAroundTheReview
+mutate "someone takes the reviewers' step by hand" internal/pages/control.go \
+  's.replace("\t\tif tr.Outcome != \"\" {", "\t\tif false {")' $app -run TestOnlyReviewersAnswerAndNobodyStepsAroundTheReview
+mutate "anyone takes a reviewer off" internal/pages/review.go \
+  's.replace("\t\tif user != c.UserID {", "\t\tif false {")' $app -run TestRemovalNeedsARightAndAReason
+mutate "a reviewer is taken off with too few left" internal/pages/review.go \
+  's.replace("if remaining == 0 || rc.state.Review.Needed(remaining) \x3e remaining {", "if false {")' $app -run TestRemovalNeedsARightAndAReason
+mutate "a reader reads the round" internal/pages/review_panel.go \
+  's.replace("\tif !author.Allowed \x26\x26 !named {", "\tif !author.Allowed \x26\x26 !named \x26\x26 false {")' $app -run TestTheCompareBaseIsTheApprovedVersionAndReviewCommentsStayWithTheRound
+mutate "a reviewer keeps reading after the round" internal/permissions/service.go \
+  's.replace("JOIN workflow_rounds r ON r.id = wr.round_id AND r.status = \x27open\x27 AND r.review_stage = wr.stage\n\t\tJOIN page_control pc ON pc.page_id = r.page_id AND pc.state_id = wr.state_id\n\t\tWHERE r.page_id = $2", "JOIN workflow_rounds r ON r.id = wr.round_id AND r.review_stage = wr.stage\n\t\tJOIN page_control pc ON pc.page_id = r.page_id\n\t\tWHERE r.page_id = $2")' $app -run TestARestrictedPageOpensToItsReviewersForTheRoundOnly
+mutate "being asked opens more than approval.read" internal/permissions/evaluate.go \
+  's.replace("return in.Action == ActionApprovalRead \x26\x26 in.Page.Reviewer", "return in.Page.Reviewer")' $perms -run TestAReviewerReadsTheirPageThroughRestrictionsForTheRoundOnly
+mutate "a guest named as a reviewer reads the page" internal/permissions/evaluate.go \
+  's.replace("in.Page.Reviewer \x26\x26 in.User.Type == \"member\"", "in.Page.Reviewer")' $perms -run TestAReviewerReadsTheirPageThroughRestrictionsForTheRoundOnly
+mutate "a guest is resolved as a reviewer" internal/pages/review.go \
+  's.replace("LEFT JOIN users m ON m.id = cand.user_id AND m.type = \x27member\x27", "LEFT JOIN users m ON m.id = cand.user_id")' $app -run TestAddingAReviewer
+mutate "a workflow names a guest" internal/pages/workflow_templates.go \
+  's.replace("\t\t\t\tif err == nil \x26\x26 typ == \"guest\" {", "\t\t\t\tif false {")' $app -run TestAddingAReviewer
+mutate "an author approves around the reviewers" internal/workflow/review.go \
+  's.replace("\t\t\tif from.Review != nil \x26\x26 to.Kind == KindApproved {", "\t\t\tif false {")' ./internal/workflow/ -run TestEachRuleOfAReviewIsChecked
 # Spec 067: every route that takes an id is walked as a stranger, and the service for
 # editing together holds a ticket in place of the cookie.
 mutate "anyone reads an export by its id" internal/exchange/export.go \

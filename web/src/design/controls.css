@@ -871,3 +871,149 @@ td.row > * {
   max-inline-size: 4rem;
   border-radius: var(--radius);
 }
+
+/* The review panel (spec 064, DC2): the panel of the page, with a table of who was asked. */
+.review-panel .review-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.review-panel .review-actions > p {
+  flex-basis: 100%;
+  margin: 0;
+}
+
+.review-table td {
+  vertical-align: top;
+}
+
+.review-comment {
+  margin-block: var(--space-1) 0;
+  color: var(--color-muted);
+  overflow-wrap: anywhere;
+}
+
+.review-comments li {
+  margin-block-end: var(--space-3);
+}
+
+.review-comments p {
+  margin-block: var(--space-1) 0;
+  overflow-wrap: anywhere;
+}
+
+/* The workflow editor: a form of states and transitions, and a diagram drawn from it. */
+.workflow-editor {
+  display: grid;
+  gap: var(--space-3);
+  max-inline-size: var(--size-reading);
+}
+
+/* Said only where the screen is narrow; nothing is hidden there. */
+.workflow-small-note {
+  display: none;
+}
+
+@media (width < 50rem) {
+  .workflow-small-note {
+    display: block;
+  }
+}
+
+.workflow-item {
+  display: grid;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.workflow-item legend {
+  padding-inline: var(--space-1);
+  font-weight: var(--weight-strong);
+}
+
+.workflow-row-actions,
+.workflow-pair {
+  flex-wrap: wrap;
+}
+
+.workflow-review {
+  display: grid;
+  gap: var(--space-2);
+  padding-inline-start: var(--space-3);
+  border-inline-start: 2px solid var(--color-line);
+}
+
+.workflow-starts li {
+  margin-block-end: var(--space-3);
+}
+
+.workflow-starts p {
+  margin-block: var(--space-1) 0;
+}
+
+.workflow-diagram-section {
+  overflow-x: auto;
+}
+
+.workflow-diagram {
+  display: block;
+  max-inline-size: 100%;
+  block-size: auto;
+}
+
+.workflow-box rect {
+  fill: var(--color-surface);
+  stroke: var(--color-guide);
+}
+
+.workflow-box text,
+.workflow-label {
+  fill: var(--color-ink);
+  font-size: var(--text-caption);
+}
+
+.workflow-kind-draft rect {
+  fill: var(--color-mark-grey);
+}
+
+.workflow-kind-in_review rect {
+  fill: var(--color-mark-yellow);
+}
+
+.workflow-kind-approved rect {
+  fill: var(--color-mark-green);
+}
+
+.workflow-kind-rejected rect {
+  fill: var(--color-mark-red);
+}
+
+.workflow-kind-obsolete rect {
+  fill: var(--color-mark-purple);
+}
+
+.workflow-line {
+  fill: none;
+  stroke: var(--color-muted);
+}
+
+.workflow-arrow-head {
+  fill: var(--color-muted);
+}
+
+.workflow-step-system .workflow-line {
+  stroke-dasharray: 4 3;
+}
+
+.workflow-step .workflow-line {
+  stroke-dasharray: none;
+}
+
+.workflow-sentences {
+  margin-block: var(--space-2) 0;
+}

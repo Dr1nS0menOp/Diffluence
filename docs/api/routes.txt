@@ -95,6 +95,7 @@ GET /api/v1/admin/users/{id}                                   session-only perm
 GET /api/v1/admin/users/{id}/reach                             session-only permission:administrator
 GET /api/v1/admin/users/{id}/type-impact                       session-only permission:administrator
 GET /api/v1/admin/webhooks                                     permission:administrator
+GET /api/v1/admin/workflow-templates                           session-only permission:administrator
 GET /api/v1/appearance                                         public
 GET /api/v1/appearance/font                                    public
 GET /api/v1/appearance/logo                                    public
@@ -166,6 +167,7 @@ GET /api/v1/pages/{id}/public-link                             object:site.publi
 GET /api/v1/pages/{id}/public-state                            object:page.view
 GET /api/v1/pages/{id}/reactions                               object:page.view
 GET /api/v1/pages/{id}/restrictions                            object:page.view
+GET /api/v1/pages/{id}/review                                  authenticated
 GET /api/v1/pages/{id}/rules                                   object:page.view
 GET /api/v1/pages/{id}/summary                                 object:page.view
 GET /api/v1/pages/{id}/targets                                 object:page.view
@@ -246,8 +248,10 @@ GET /api/v1/templates/{id}/export                              authenticated
 GET /api/v1/templates/{id}/files/{file}                        authenticated
 GET /api/v1/webhooks/{id}                                      object:space.automation
 GET /api/v1/webhooks/{id}/deliveries                           object:space.automation
+GET /api/v1/workflow-templates                                 authenticated
 GET /api/v1/workflows/{id}                                     authenticated
 GET /api/v1/workflows/{id}/history                             authenticated
+GET /api/v1/workflows/{id}/template-changes                    authenticated
 GET /collab                                                    public
 GET /collab/documents/{id}                                     public
 GET /livez                                                     public
@@ -315,6 +319,8 @@ POST /api/v1/admin/users/{id}/reset-mfa                        sensitive permiss
 POST /api/v1/admin/users/{id}/reset-password                   sensitive permission:administrator
 POST /api/v1/admin/users/{id}/unlock-password                  session-only permission:administrator
 POST /api/v1/admin/webhooks                                    permission:administrator
+POST /api/v1/admin/workflow-templates                          session-only permission:administrator
+POST /api/v1/admin/workflow-templates/{id}/archive             session-only permission:administrator
 POST /api/v1/approvals/{id}/close                              authenticated
 POST /api/v1/attachments/lookup                                authenticated
 POST /api/v1/attachments/{id}/copy                             object:page.view
@@ -379,6 +385,10 @@ POST /api/v1/pages/{id}/labels                                 object:page.edit
 POST /api/v1/pages/{id}/move                                   object:page.edit
 POST /api/v1/pages/{id}/placeholders                           object:page.view
 POST /api/v1/pages/{id}/publish                                object:page.edit
+POST /api/v1/pages/{id}/review/answer                          authenticated
+POST /api/v1/pages/{id}/review/comments                        authenticated
+POST /api/v1/pages/{id}/reviewers                              authenticated
+POST /api/v1/pages/{id}/reviewers/{user}/remove                authenticated
 POST /api/v1/pages/{id}/save-as-template                       object:space.templates
 POST /api/v1/pages/{id}/share                                  object:page.view
 POST /api/v1/pages/{id}/sort-children                          object:page.edit
@@ -417,12 +427,15 @@ POST /api/v1/spaces/{id}/trash/bulk                            object:space.admi
 POST /api/v1/spaces/{id}/unarchive                             object:space.administer
 POST /api/v1/spaces/{id}/webhooks                              object:space.automation
 POST /api/v1/spaces/{id}/workflows                             object:space.workflows
+POST /api/v1/spaces/{id}/workflows/from-template               object:space.workflows
 POST /api/v1/tasks/{id}/done                                   object:page.edit
 POST /api/v1/templates/{id}/use                                authenticated
 POST /api/v1/trash/{id}/restore                                object:space.administer
 POST /api/v1/webhooks/{id}/deliveries/{delivery}/resend        object:space.automation
 POST /api/v1/webhooks/{id}/rotate                              session-only object:space.automation
+POST /api/v1/workflows/check                                   authenticated
 POST /api/v1/workflows/{id}/archive                            authenticated
+POST /api/v1/workflows/{id}/take-template                      authenticated
 POST /collab/authorize                                         public
 POST /hooks/{token}                                            public
 POST /scim/v2/Groups                                           scim-token
@@ -448,6 +461,7 @@ PUT /api/v1/admin/settings/{section}                           session-only perm
 PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator
+PUT /api/v1/admin/workflow-templates/{id}                      session-only permission:administrator
 PUT /api/v1/approvals/{id}/answer                              authenticated
 PUT /api/v1/comments/{id}/reactions/{emoji}                    object:page.view
 PUT /api/v1/groups/{id}/members/{user}                         object:group.manage_members

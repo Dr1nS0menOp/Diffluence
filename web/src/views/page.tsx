@@ -48,7 +48,8 @@ import {
 } from '../components/icons';
 import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
 import { LabelBar } from '../components/page-labels';
-import { ControlBand } from '../components/control-band';
+import { ControlBand, mayOpenReview } from '../components/control-band';
+import { ReviewPanel } from '../components/review-panel';
 import {
   ApprovalBanner,
   ApprovalsDialog,
@@ -602,6 +603,7 @@ export function PageView({ pageId }: { pageId: string }) {
   const wantsShare = searchParams.has('share');
   const [dialog, setDialog] = useState<PageDialog | null>(null);
   const [details, setDetails] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
   const [lightbox, setLightbox] = useState<{ images: ShownImage[]; start: number } | null>(null);
   const [onImage, setOnImage] = useState<CommentAnchor | null>(null);
@@ -626,14 +628,22 @@ export function PageView({ pageId }: { pageId: string }) {
   const present = usePresence(pageId, 'reading');
   const { openThread, closeThreads, inline, ...threads } = useThreads(pageId, page?.status === 'published');
   const closeDetails = useCallback(() => setDetails(false), []);
-  // One panel at a time: both sit in the same place beside the page.
+  const closeReview = useCallback(() => setReviewOpen(false), []);
+  // One panel at a time: they all sit in the same place beside the page.
   const openDetails = () => {
     closeThreads();
+    setReviewOpen(false);
     setDetails(true);
+  };
+  const openReview = () => {
+    closeThreads();
+    setDetails(false);
+    setReviewOpen(true);
   };
   const openComments = useCallback(
     (id: string | null) => {
       setDetails(false);
+      setReviewOpen(false);
       openThread(id);
     },
     [openThread],
@@ -653,6 +663,11 @@ export function PageView({ pageId }: { pageId: string }) {
   });
   useShortcut('details', () => (details ? setDetails(false) : openDetails()));
   useShortcut('reader', () => setReader(!reader));
+  useShortcut('review', () => {
+    if (!page || !mayOpenReview(page)) return;
+    if (reviewOpen) setReviewOpen(false);
+    else openReview();
+  });
   // The address opens Share, for a request in a notification and a warning about a mention.
   useEffect(() => {
     if (wantsShare) setDialog('share');
@@ -660,6 +675,7 @@ export function PageView({ pageId }: { pageId: string }) {
 
   if (q.isPending) return <Loading />;
   if (q.error || !page) return <ErrorNote error={q.error} />;
+  if (page.review_only) return <ReviewOnlyPage page={page} />;
   const close = () => {
     setDialog(null);
     if (wantsShare) navigate(`/pages/${pageId}`, true);
@@ -735,7 +751,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <ErrorNote error={favourite.error} />
         <PageNotes page={page} />
         <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
-        <ControlBand page={page} />
+        <ControlBand page={page} onReview={openReview} />
         {page.status === 'draft' && (
           <p role="status" className="note">
             {t('page.unpublished')}
@@ -817,6 +833,7 @@ export function PageView({ pageId }: { pageId: string }) {
         <KindDialog page={page} kind={dialog} onClose={close} />
       )}
       {details && <DetailsPanel page={page} onClose={closeDetails} />}
+      {reviewOpen && <ReviewPanel page={page} onClose={closeReview} />}
       {threads.panel.open && (
         <CommentsPanel
           page={page}
@@ -854,6 +871,32 @@ export function PageView({ pageId }: { pageId: string }) {
       {presenting && (
         <Presentation title={page.title} document={page.document} onClose={() => setPresenting(false)} />
       )}
+    </div>
+  );
+}
+
+/**
+ * A page read only because its reader is asked to review it (DOC-203): the page, its band and
+ * its review, and nothing around it, which the reviewer may not see.
+ */
+function ReviewOnlyPage({ page }: { page: PageDetail }) {
+  const { t } = useTranslation();
+  const [reviewOpen, setReviewOpen] = useState(true);
+  const closeReview = useCallback(() => setReviewOpen(false), []);
+  useShortcut('review', () => setReviewOpen(!reviewOpen));
+  return (
+    <div className="page-layout">
+      <article className="page">
+        <h1>{page.title}</h1>
+        <p role="status" className="note">
+          {t('review.onlyForReview')}
+        </p>
+        <ControlBand page={page} onReview={() => setReviewOpen(true)} />
+        {page.kind !== 'folder' && page.kind !== 'link' && page.kind !== 'database' && (
+          <DocumentView document={page.document} language={page.language || undefined} pageId={page.id} />
+        )}
+      </article>
+      {reviewOpen && <ReviewPanel page={page} onClose={closeReview} />}
     </div>
   );
 }

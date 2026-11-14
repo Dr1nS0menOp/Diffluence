@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -41,22 +42,32 @@ type payload struct {
 	ExportID        uuid.UUID   `json:"export_id"`
 	Filename        string      `json:"filename"`
 	ObjectID        string      `json:"object_id"`
+	// UserIDs are the people a review event is for: the reviewers asked, or the authors.
+	UserIDs []uuid.UUID `json:"user_ids"`
+	Answer  string      `json:"answer"`
+	Outcome string      `json:"outcome"`
+	Rule    string      `json:"rule"`
+	Needed  int         `json:"needed"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
 // than once for the same event: a row is unique per person and event.
 func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 	handlers := map[string]func(context.Context, uuid.UUID, payload) error{
-		"page.published":      s.onPublished,
-		"comment.created":     s.onComment,
-		"comment.edited":      s.onCommentEdited,
-		"reaction.added":      s.onReaction,
-		"access.requested":    s.onAccessRequested,
-		"access.allowed":      s.onAccessAnswered,
-		"access.refused":      s.onAccessAnswered,
-		"export.finished":     s.onExportFinished,
-		"access.recovered":    s.onAccessRecovered,
-		"page.draft_expiring": s.onDraftExpiring,
+		"page.published":        s.onPublished,
+		"comment.created":       s.onComment,
+		"comment.edited":        s.onCommentEdited,
+		"reaction.added":        s.onReaction,
+		"access.requested":      s.onAccessRequested,
+		"access.allowed":        s.onAccessAnswered,
+		"access.refused":        s.onAccessAnswered,
+		"export.finished":       s.onExportFinished,
+		"access.recovered":      s.onAccessRecovered,
+		"page.draft_expiring":   s.onDraftExpiring,
+		"page.review_asked":     s.onReviewAsked,
+		"page.review_answered":  s.onReviewAnswered,
+		"page.review_ended":     s.onReviewEnded,
+		"page.reviewer_removed": s.onReviewerRemoved,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -252,6 +263,41 @@ func (s *Service) onDraftExpiring(ctx context.Context, event uuid.UUID, p payloa
 		return err
 	}
 	return s.Deliver(ctx, s.pool, Row{UserID: p.UserID, Type: TypeDraftExpiring, Reason: ReasonAuthor, PageID: p.PageID, SpaceID: spaceID, Event: event})
+}
+
+// onReviewAsked asks each reviewer for their answer, through the reading being asked gives
+// them, so a reviewer outside a restriction hears of it and nobody else does (DOC-600).
+func (s *Service) onReviewAsked(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsReview: true,
+		Data: map[string]any{"rule": p.Rule, "needed": p.Needed}}
+	return s.tell(ctx, p.UserIDs, base, TypeReviewAsked, ReasonAsked)
+}
+
+// onReviewAnswered tells the authors of the change each answer. It reaches only people who
+// may still edit the page, because it is about the working version (DOC-602, DOC-604).
+func (s *Service) onReviewAnswered(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsEdit: true,
+		Data: map[string]any{"answer": p.Answer}}
+	return s.tell(ctx, p.UserIDs, base, TypeReviewAnswered, ReasonAuthor)
+}
+
+// onReviewEnded tells the authors how the review ended (DOC-602).
+func (s *Service) onReviewEnded(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsEdit: true,
+		Data: map[string]any{"outcome": p.Outcome}}
+	return s.tell(ctx, p.UserIDs, base, TypeReviewEnded, ReasonAuthor)
+}
+
+// onReviewerRemoved tells both sides (DOC-608): the person taken off, as far as they may
+// still see the page, and the authors.
+func (s *Service) onReviewerRemoved(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event}
+	if err := s.tell(ctx, []uuid.UUID{p.UserID}, base, TypeReviewerRemoved, ReasonAsked); err != nil {
+		return err
+	}
+	base.NeedsEdit = true
+	authors := slices.DeleteFunc(slices.Clone(p.UserIDs), func(id uuid.UUID) bool { return id == p.UserID })
+	return s.tell(ctx, authors, base, TypeReviewerRemoved, ReasonAuthor)
 }
 
 // RemindDue tells people about tasks that reached their date, once.

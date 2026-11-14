@@ -22,10 +22,10 @@ Document control is only as strong as its weakest path. Each line here is a situ
 ## 13.3 People and groups
 
 - **DOC-1220** · new · A **reviewer who leaves** (disabled) is dropped from open rounds with an audit entry; the rule is recalculated, and the round escalates if it can no longer pass (DOC-242). *Proof:* a test.
-- **DOC-1221** · new · A **group that changes** while a round runs does not change the round (DOC-201); a group deleted while a round runs leaves the resolved reviewers in place. *Proof:* tests.
-- **DOC-1222** · new · A **role** removed from the space leaves running rounds as they are; new rounds resolve the role to nobody and are refused (DOC-200). *Proof:* a test.
+- **DOC-1221** · built · A **group that changes** while a round runs does not change the round (DOC-201); a group deleted while a round runs leaves the resolved reviewers in place. *Proof:* tests.
+- **DOC-1222** · built · A **role** removed from the space leaves running rounds as they are; new rounds resolve the role to nobody and are refused (DOC-200). *Proof:* a test.
 - **DOC-1223** · new · A **page owner** who leaves makes the space owners the target of review reminders (DOC-805). *Proof:* a test.
-- **DOC-1224** · new · A **guest** can never be a reviewer or signer (decided, DOC-1422), because guests are outside the organisation whose procedure it is. *Proof:* a test that a guest cannot be added and cannot answer.
+- **DOC-1224** · built · A **guest** can never be a reviewer or signer (decided, DOC-1422), because guests are outside the organisation whose procedure it is. *Proof:* a test that a guest cannot be added and cannot answer.
 - **DOC-1225** · new · A person renamed after signing keeps the printed name of the moment in the signature record (DOC-710); the page shows that name. *Proof:* a test.
 
 ## 13.4 Several nodes and concurrency

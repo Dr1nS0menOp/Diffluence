@@ -1606,3 +1606,154 @@ test.describe('the settings area at the widths of a laptop', () => {
     await page.context().close();
   });
 });
+
+// Document control, wave DC2 (spec 064): the review panel, the workflow editor and the
+// templates of the instance. A space of its own, so nothing here shows in the pictures above.
+test.describe('the look of document control', () => {
+  test.describe.configure({ mode: 'serial' });
+  const PHONE = { width: 360, height: 780 };
+  let pageId = '';
+
+  async function adminPage(browser: Browser, colorScheme: 'light' | 'dark' = 'light'): Promise<Page> {
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme });
+    const page = await context.newPage();
+    await login(page, ADMIN.email, ADMIN.password);
+    return page;
+  }
+
+  test.beforeAll(async ({ browser }) => {
+    const reviewer = await createNamedUser(browser, 'rosa.lind@example.com', 'Rosa Lind');
+    const setup = await adminPage(browser);
+    const created = await setup.request.post('/api/v1/spaces', {
+      data: { key: 'QUALITY', name: 'Quality manual' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const space = (await created.json()) as { id: string; home_page_id: string };
+    await grant(setup, space.id, { type: 'user', id: reviewer }, ['space.view']);
+    const flow = {
+      states: [
+        { id: 'draft', name: 'Draft', kind: 'draft', start: true },
+        {
+          id: 'review',
+          name: 'Quality review',
+          kind: 'in_review',
+          review: {
+            reviewers: [{ type: 'user', id: reviewer }],
+            rule: 'all',
+            authors_may_review: false,
+            authors_may_add: true,
+          },
+        },
+        { id: 'approved', name: 'Approved', kind: 'approved' },
+        { id: 'rejected', name: 'Changes asked', kind: 'rejected' },
+      ],
+      transitions: [
+        { id: 'submit', name: 'Send for review', from: 'draft', to: 'review' },
+        { id: 'approve', name: 'Approve', from: 'review', to: 'approved', outcome: 'approved' },
+        { id: 'changes', name: 'Ask for changes', from: 'review', to: 'rejected', outcome: 'changes' },
+        { id: 'rework', name: 'Work on it again', from: 'rejected', to: 'draft' },
+      ],
+    };
+    const made = await setup.request.post(`/api/v1/spaces/${space.id}/workflows`, {
+      data: {
+        name: 'Quality procedure',
+        description: 'Every procedure is reviewed by quality.',
+        definition: flow,
+      },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    pageId = await publishedPage(
+      setup,
+      space.id,
+      'Handling returns',
+      'Check every return within two days.',
+      space.home_page_id,
+    );
+    const set = await setup.request.put(`/api/v1/pages/${pageId}/workflow`, {
+      data: { workflow_id: (await made.json()).id },
+    });
+    expect(set.ok(), await set.text()).toBeTruthy();
+    const detail = (await (await setup.request.get(`/api/v1/pages/${pageId}`)).json()) as {
+      control: { head_version: number };
+    };
+    const step = await setup.request.post(`/api/v1/pages/${pageId}/transitions`, {
+      data: { transition: 'submit', version: detail.control.head_version },
+    });
+    expect(step.ok(), await step.text()).toBeTruthy();
+    const said = await setup.request.post(`/api/v1/pages/${pageId}/review/comments`, {
+      data: { body: 'Please name who signs off a return.' },
+    });
+    expect(said.status(), await said.text()).toBe(201);
+    const template = await setup.request.post('/api/v1/admin/workflow-templates', {
+      data: {
+        name: 'Company procedure',
+        description: 'The procedure every department follows.',
+        definition: flow,
+      },
+    });
+    expect(template.status(), await template.text()).toBe(201);
+    await setup.context().close();
+  });
+
+  test('the review panel of a page in review', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'Review', exact: true }).click();
+    const panel = page.getByRole('complementary', { name: 'Review' });
+    await expect(panel.getByText('0 of 1 needed so far.', { exact: false })).toBeVisible();
+    await expect(panel.getByRole('cell', { name: 'Rosa Lind' })).toBeVisible();
+    await fixText(page.locator('time'), 'now');
+    await picture(page, 'review-panel', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the review panel on a phone, right to left', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.setViewportSize(PHONE);
+    await page.goto(`/pages/${pageId}`);
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await page.getByRole('button', { name: 'Review', exact: true }).click();
+    await expect(page.getByRole('cell', { name: 'Rosa Lind' })).toBeVisible();
+    await fixText(page.locator('time'), 'now');
+    await picture(page, 'review-panel-phone-rtl', [page.getByTestId('last-updated')]);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.context().close();
+  });
+
+  test('the workflow editor, with its diagram and the steps in words', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto('/spaces/QUALITY/settings?section=workflows');
+    await page.getByRole('button', { name: 'Change Quality procedure' }).click();
+    await expect(page.getByRole('heading', { name: 'Diagram' })).toBeVisible();
+    await expect(
+      page.getByText('From Quality review, when the review passes, Approve leads to Approved.'),
+    ).toBeVisible();
+    await page.getByLabel('Name of the workflow').fill('Quality procedure');
+    await picture(page, 'workflow-editor');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the workflow editor on a phone', async ({ browser }) => {
+    const page = await adminPage(browser, 'dark');
+    await page.setViewportSize(PHONE);
+    await page.goto('/spaces/QUALITY/settings?section=workflows');
+    await page.getByRole('button', { name: 'Change Quality procedure' }).click();
+    await expect(
+      page.getByText('The workflow editor is easier on a larger screen.', { exact: false }),
+    ).toBeVisible();
+    await picture(page, 'workflow-editor-phone');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
+    await page.context().close();
+  });
+
+  test('AdminView: the templates of document control', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto('/admin/control');
+    await expect(page.getByRole('cell', { name: 'Company procedure', exact: true })).toBeVisible();
+    await picture(page, 'admin-document-control');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+});

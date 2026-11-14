@@ -505,10 +505,15 @@ export interface PageDetail extends PageSummary {
   scheduled: { at: string; silent: boolean } | null;
   approval: ApprovalMark | null;
   control: ControlInfo | null;
+  /** The person reads this page only because they are asked to review it (DOC-203). */
+  review_only: boolean;
 }
 
 /** What a state means to Diffluence, whatever a space calls it (spec 064). */
 export type WorkflowStateKind = 'draft' | 'in_review' | 'approved' | 'rejected' | 'obsolete';
+
+/** Which step the system takes when a review passes or asks for changes (spec 064, DC2). */
+export type WorkflowOutcome = 'approved' | 'changes';
 
 export interface WorkflowTransition {
   id: string;
@@ -517,6 +522,23 @@ export interface WorkflowTransition {
   from: string;
   to: string;
   requires_comment: boolean;
+  outcome?: WorkflowOutcome;
+}
+
+/** How many reviewers must approve: all, a number of them, or any one. */
+export type ReviewRule = 'all' | 'quorum' | 'any';
+
+export interface WorkflowReviewer {
+  type: 'user' | 'group' | 'role';
+  id: string;
+}
+
+export interface WorkflowReview {
+  reviewers: WorkflowReviewer[];
+  rule: ReviewRule;
+  quorum?: number;
+  authors_may_review: boolean;
+  authors_may_add: boolean;
 }
 
 export interface WorkflowState {
@@ -526,6 +548,12 @@ export interface WorkflowState {
   kind: WorkflowStateKind;
   start: boolean;
   timed: boolean;
+  review?: WorkflowReview;
+}
+
+export interface WorkflowDefinition {
+  states: WorkflowState[];
+  transitions: WorkflowTransition[];
 }
 
 export interface Workflow {
@@ -534,10 +562,120 @@ export interface Workflow {
   name: string;
   description: string;
   version: number;
-  definition: { states: WorkflowState[]; transitions: WorkflowTransition[] };
+  definition: WorkflowDefinition;
   archived: boolean;
+  created_at: string;
+  /** When its newest version was saved. */
+  saved_at: string;
+  /** Names of the people, groups and roles its reviews name, for those who may change it. */
+  names?: Record<string, string>;
   pages: number;
   space_workflow: boolean;
+  template_id: string | null;
+  template_version: number | null;
+  template_latest: number | null;
+}
+
+/** A rule a workflow breaks, with the state or transition it is about. */
+export interface WorkflowProblem {
+  rule: string;
+  subject?: string;
+  message: string;
+}
+
+/** One difference between two versions of a workflow. */
+export interface WorkflowChange {
+  kind: string;
+  id: string;
+  from?: string;
+  to?: string;
+}
+
+export interface WorkflowVersion {
+  version: number;
+  definition: WorkflowDefinition;
+  saved_by: string;
+  saved_at: string;
+  changes: WorkflowChange[];
+}
+
+/** A workflow Diffluence ships, which a space copies to start (DOC-131). */
+export interface WorkflowExample {
+  key: string;
+  name: string;
+  description: string;
+  definition: WorkflowDefinition;
+}
+
+export interface WorkflowTemplateCopy {
+  workflow_id: string;
+  workflow_name: string;
+  space_id: string;
+  space_name: string;
+  version: number;
+}
+
+/** An instance template of a workflow (DOC-130). */
+export interface WorkflowTemplate {
+  id: string;
+  name: string;
+  description: string;
+  version: number;
+  definition: WorkflowDefinition;
+  saved_at: string;
+  /** Names of the people, groups and roles it names, for administrators. */
+  names?: Record<string, string>;
+  copies?: WorkflowTemplateCopy[];
+}
+
+export interface ReviewerRow {
+  user_id: string;
+  name: string;
+  source: 'user' | 'group' | 'role' | 'added';
+  source_name: string;
+  answer: '' | 'approve' | 'changes';
+  comment: string;
+  answered_at: string | null;
+  removed: boolean;
+  removed_reason: string;
+}
+
+export interface ReviewComment {
+  id: string;
+  user_id: string;
+  name: string;
+  body: string;
+  created_at: string;
+}
+
+export interface ReviewText {
+  version: number;
+  title: string;
+  document: Json;
+}
+
+/** The round of a controlled page, for its authors and reviewers (DOC-250, DOC-921). */
+export interface ReviewPanelData {
+  round_id: string | null;
+  status: string;
+  ended_reason: string;
+  started_at: string | null;
+  state_id: string;
+  state_name: string;
+  in_review: boolean;
+  rule: ReviewRule | '';
+  needed: number;
+  approved: number;
+  asked: number;
+  independent: boolean;
+  my_answer: '' | 'approve' | 'changes';
+  reviewers: ReviewerRow[];
+  comments: ReviewComment[];
+  base: ReviewText | null;
+  head: ReviewText | null;
+  /** The change from the approved version, when the server compares for the panel. */
+  changes?: DiffBlock[];
+  can: { answer: boolean; add: boolean; remove: boolean; comment: boolean };
 }
 
 /** The workflow of a controlled page, as the band near its title shows it. */
@@ -558,6 +696,10 @@ export interface ControlInfo {
   governed_from_title: string;
   set_by: string;
   transitions: WorkflowTransition[];
+  /** The person is asked to review the page now. */
+  reviewing: boolean;
+  /** The page waits for the answers of reviewers. */
+  in_review: boolean;
 }
 
 export interface Draft {

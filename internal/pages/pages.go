@@ -105,10 +105,13 @@ type Detail struct {
 	Favourite     bool            `json:"favourite"`
 	Restricted    bool            `json:"restricted"`
 	Can           map[string]bool `json:"can"`
-	OwnerName     string          `json:"owner_name"`
-	OwnerDisabled bool            `json:"owner_disabled"`
-	Labels        []string        `json:"labels"`
-	Verified      *Verified       `json:"verified"`
+	// ReviewOnly says the person reads this page only because they are asked to review it:
+	// the screen shows the page and its review, and nothing around it (DOC-203).
+	ReviewOnly    bool      `json:"review_only"`
+	OwnerName     string    `json:"owner_name"`
+	OwnerDisabled bool      `json:"owner_disabled"`
+	Labels        []string  `json:"labels"`
+	Verified      *Verified `json:"verified"`
 	// SeenVersion is the version this person read last time, or 0 on a first visit.
 	SeenVersion int        `json:"seen_version"`
 	Scheduled   *Scheduled `json:"scheduled"`
@@ -541,7 +544,8 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 
 // Get returns a page for reading, and remembers it in the user's recent list.
 func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Detail, error) {
-	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
+	reviewOnly, err := s.readerOrReviewer(ctx, c, id)
+	if err != nil {
 		return Detail{}, err
 	}
 	// Whether the page is controlled rides along, so an ordinary page costs no extra query.
@@ -553,7 +557,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if err != nil {
 		return Detail{}, err
 	}
-	d := Detail{Page: p}
+	d := Detail{Page: p, ReviewOnly: reviewOnly}
 	if d.Features, err = s.features.ForSpace(ctx, s.pool, p.SpaceID); err != nil {
 		return d, err
 	}
@@ -561,7 +565,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		return d, err
 	}
 	if controlled {
-		if err := s.fillControl(ctx, &d); err != nil {
+		if err := s.fillControl(ctx, c.UserID, &d); err != nil {
 			return d, err
 		}
 	}
@@ -595,7 +599,8 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 	if err != nil {
 		return d, err
 	}
-	if d.Breadcrumbs == nil {
+	if d.Breadcrumbs == nil || reviewOnly {
+		// Being asked to review opens this page, never the pages around it (DOC-203).
 		d.Breadcrumbs = []Crumb{}
 	}
 	err = s.pool.QueryRow(ctx, `SELECT
@@ -623,8 +628,31 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 			d.HeaderAttachmentID = nil
 		}
 	}
-	s.touchRecent(ctx, c.UserID, d.Page)
+	if !reviewOnly {
+		s.touchRecent(ctx, c.UserID, d.Page)
+	}
 	return d, nil
+}
+
+// readerOrReviewer decides who reads a page: whoever may view it, or else a reviewer of its
+// open round, who reads it past restrictions and "never approved" for the round only
+// (DOC-203). It answers whether the reading is the reviewer's alone.
+func (s *Service) readerOrReviewer(ctx context.Context, c identity.Caller, id uuid.UUID) (bool, error) {
+	viewErr := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil)
+	if viewErr == nil || !apperr.IsNotFound(viewErr) {
+		return false, viewErr
+	}
+	asked, err := s.perms.Reviews(ctx, s.pool, c.UserID, id)
+	if err != nil {
+		return false, err
+	}
+	if !asked {
+		return false, viewErr
+	}
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionApprovalRead, uuid.Nil); err != nil {
+		return false, viewErr
+	}
+	return true, nil
 }
 
 // readable parses a stored document and fills in today's names. A stored document holds

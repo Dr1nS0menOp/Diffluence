@@ -216,6 +216,10 @@ type PageFacts struct {
 	// ControlHidden marks a controlled page that was never approved or was withdrawn: only
 	// its authors may see it (spec 064, DOC-300 to DOC-322).
 	ControlHidden bool
+	// Reviewer says the person is asked to review the page now: an active reviewer of the
+	// open round, in the stage the page is in. It is loaded for approval.read only, where it
+	// opens this page past its restrictions and past "never approved" (DOC-203).
+	Reviewer bool
 }
 
 // Input is one question: may this user do this?
@@ -382,16 +386,24 @@ func Evaluate(in Input) Decision {
 	if p.Archived && !worksOnArchivedPage(in.Action) {
 		check(LayerPage, "page_not_archived", false, false)
 	}
+	reviewing := reviewsNow(in)
 	for _, level := range p.ViewChain {
-		check(LayerRestriction, "view:"+level.PageID.String(), in.User.matchesAny(level.Subjects), true)
+		check(LayerRestriction, "view:"+level.PageID.String(), reviewing || in.User.matchesAny(level.Subjects), true)
 	}
 	if isEdit(in.Action) && len(p.EditSubjects) > 0 {
 		check(LayerRestriction, "edit:"+p.ID.String(), in.User.matchesAny(p.EditSubjects), false)
 	}
 	if p.ControlHidden {
-		check(LayerPage, "control_author", mayAuthor(in), true)
+		check(LayerPage, "control_author", reviewing || mayAuthor(in), true)
 	}
 	return d
+}
+
+// reviewsNow says a reviewer of the round reads the page they were asked about. Guests never
+// review (DOC-1422), and the grant is approval.read on this page alone: never a child page,
+// never viewing it in lists (DOC-203). perm_review_pages is the same rule in SQL.
+func reviewsNow(in Input) bool {
+	return in.Action == ActionApprovalRead && in.Page.Reviewer && in.User.Type == "member"
 }
 
 // mayAuthor says whether the person is an author of the page: they hold the edit permission

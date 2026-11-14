@@ -16,6 +16,7 @@ export type ShortcutAction =
   | 'sidebar'
   | 'reader'
   | 'details'
+  | 'review'
   | 'watch'
   | 'comment'
   | 'nextComment'
@@ -41,6 +42,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ['e'], label: 'edit', group: 'page' },
   { keys: ['s'], label: 'favourite', group: 'page' },
   { keys: ['i'], label: 'details', group: 'page' },
+  { keys: ['v'], label: 'review', group: 'page' },
   { keys: ['r'], label: 'reader', group: 'page' },
   { keys: ['w'], label: 'watch', group: 'page' },
   { keys: ['m'], label: 'comment', group: 'page' },
@@ -55,6 +57,7 @@ const SINGLE_KEYS: Record<string, ShortcutAction> = {
   '[': 'sidebar',
   r: 'reader',
   i: 'details',
+  v: 'review',
   w: 'watch',
   m: 'comment',
   n: 'nextComment',

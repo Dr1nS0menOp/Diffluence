@@ -6,13 +6,19 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type ControlInfo, type PageDetail, type WorkflowTransition } from '../api';
-import { IconVerified } from './icons';
+import { IconArchive, IconClock, IconPencil, IconVerified } from './icons';
 import { Dialog, ErrorNote, Field, RelativeTime } from './ui';
 
 const MARK_ICON_SIZE = 16;
 
+/** Whether the person may open the review panel: a reviewer now, or an author of a page in review. */
+export function mayOpenReview(page: PageDetail): boolean {
+  const c = page.control;
+  return !!c && (c.reviewing || (c.in_review && page.can['page.edit'] === true));
+}
+
 /** The band near the title of a controlled page. An ordinary page has none. */
-export function ControlBand({ page }: { page: PageDetail }) {
+export function ControlBand({ page, onReview }: { page: PageDetail; onReview: () => void }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<WorkflowTransition | null>(null);
   const c = page.control;
@@ -40,13 +46,19 @@ export function ControlBand({ page }: { page: PageDetail }) {
   return (
     <div role="status" className="note control-band" data-kind={c.state_kind}>
       <p>
-        <strong>{c.state_name}</strong> {approved}
+        <StateIcon kind={c.state_kind} /> <strong>{c.state_name}</strong> {approved}
       </p>
       {c.shows_working && <p>{t('control.working', { number: c.head_version })}</p>}
       {c.state_kind === 'obsolete' && <p>{t('control.withdrawn')}</p>}
       <p className="control-governed">{governed}</p>
-      {c.transitions.length > 0 && (
+      {c.reviewing && <p>{t('review.youAreAsked')}</p>}
+      {(c.transitions.length > 0 || mayOpenReview(page)) && (
         <p className="control-steps">
+          {mayOpenReview(page) && (
+            <button type="button" className={c.reviewing ? 'primary' : undefined} onClick={onReview}>
+              {t('review.open')}
+            </button>
+          )}
           {c.transitions.map((tr) => (
             <button key={tr.id} type="button" onClick={() => setStep(tr)}>
               {tr.name}
@@ -108,4 +120,13 @@ function StepDialog({
       </div>
     </Dialog>
   );
+}
+
+/** The kind of a state as an icon beside its name, so the state never rests on colour (DOC-920). */
+function StateIcon({ kind }: { kind: ControlInfo['state_kind'] }) {
+  // An approved state shows the mark of its approved version beside it.
+  if (kind === 'approved') return null;
+  if (kind === 'in_review') return <IconClock size={MARK_ICON_SIZE} />;
+  if (kind === 'obsolete') return <IconArchive size={MARK_ICON_SIZE} />;
+  return <IconPencil size={MARK_ICON_SIZE} />;
 }

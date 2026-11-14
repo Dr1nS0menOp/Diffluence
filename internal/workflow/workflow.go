@@ -7,6 +7,7 @@ package workflow
 
 import (
 	"fmt"
+	"reflect"
 	"regexp"
 	"strings"
 	"unicode/utf8"
@@ -49,6 +50,9 @@ type State struct {
 	Start bool `json:"start"`
 	// Timed marks an approved state whose documents come up for periodic review (DOC-103).
 	Timed bool `json:"timed"`
+	// Review names who is asked in a state of kind in review, and how many must agree. A
+	// review state without it is taken through by its authors, as in wave DC1.
+	Review *Review `json:"review,omitempty"`
 }
 
 // Transition is a named step from one state to another (DOC-104).
@@ -59,6 +63,9 @@ type Transition struct {
 	From            string `json:"from"`
 	To              string `json:"to"`
 	RequiresComment bool   `json:"requires_comment"`
+	// Outcome marks a step the system takes when the round of its review state passes, or
+	// when a reviewer asks for changes. Nobody takes it by hand.
+	Outcome Outcome `json:"outcome,omitempty"`
 }
 
 // Definition is one version of a workflow: its states and transitions.
@@ -151,6 +158,11 @@ func Validate(d Definition) error {
 		if s.Kind == KindApproved {
 			approved++
 		}
+		if s.Review != nil {
+			if p := checkReview(s); p != nil {
+				return p
+			}
+		}
 		states[s.ID] = s
 	}
 	if starts != 1 {
@@ -191,6 +203,9 @@ func Validate(d Definition) error {
 		}
 		pairs[pair] = true
 		next[tr.From] = append(next[tr.From], tr.To)
+	}
+	if p := checkOutcomes(d, states); p != nil {
+		return p
 	}
 	start := d.StartState()
 	reached := reach(start.ID, next)
@@ -298,10 +313,12 @@ type Change struct {
 
 // The kinds of change.
 const (
-	StateAdded        = "state_added"
-	StateRemoved      = "state_removed"
-	StateRenamed      = "state_renamed"
-	StateChanged      = "state_changed"
+	StateAdded   = "state_added"
+	StateRemoved = "state_removed"
+	StateRenamed = "state_renamed"
+	StateChanged = "state_changed"
+	// ReviewChanged says who reviews, how many must agree, or whether authors count changed.
+	ReviewChanged     = "review_changed"
 	TransitionAdded   = "transition_added"
 	TransitionRemoved = "transition_removed"
 	TransitionChanged = "transition_changed"
@@ -317,7 +334,10 @@ func Diff(before, after Definition) []Change {
 			out = append(out, Change{Kind: StateRemoved, ID: s.ID, From: s.Name})
 		case n.Name != s.Name:
 			out = append(out, Change{Kind: StateRenamed, ID: s.ID, From: s.Name, To: n.Name})
-		case n != s:
+		case reflect.DeepEqual(n, s):
+		case sameApartFromReview(n, s):
+			out = append(out, Change{Kind: ReviewChanged, ID: s.ID, From: s.Name, To: n.Name})
+		default:
 			out = append(out, Change{Kind: StateChanged, ID: s.ID, From: s.Name, To: n.Name})
 		}
 	}
@@ -344,4 +364,10 @@ func Diff(before, after Definition) []Change {
 		out = []Change{}
 	}
 	return out
+}
+
+// sameApartFromReview says two versions of a state differ in their review only.
+func sameApartFromReview(a, b State) bool {
+	a.Review, b.Review = nil, nil
+	return a == b
 }

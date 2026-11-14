@@ -220,7 +220,30 @@ func (s *Service) CheckPage(ctx context.Context, q db.Querier, userID, pageID uu
 	if owner == uuid.Nil {
 		owner = p.CreatedBy
 	}
+	if action == ActionApprovalRead {
+		// Only reading what one was asked about pays for the reviewer fact.
+		if p.Reviewer, err = reviewsPage(ctx, q, userID, pageID); err != nil {
+			return Decision{}, err
+		}
+	}
 	return Evaluate(Input{User: u, Space: sp, Page: &p, Action: action, Owner: owner}), nil
+}
+
+// Reviews says whether a person is asked to review a page now. It is a fact, not a
+// decision: approval.read decides what being asked opens.
+func (s *Service) Reviews(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) (bool, error) {
+	return reviewsPage(ctx, q, userID, pageID)
+}
+
+// reviewsPage reads whether a person is an active reviewer of the open round of a page, in
+// the stage the page is in now (spec 064, DOC-203).
+func reviewsPage(ctx context.Context, q db.Querier, userID, pageID uuid.UUID) (bool, error) {
+	var asked bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM workflow_reviewers wr
+		JOIN workflow_rounds r ON r.id = wr.round_id AND r.status = 'open' AND r.review_stage = wr.stage
+		JOIN page_control pc ON pc.page_id = r.page_id AND pc.state_id = wr.state_id
+		WHERE r.page_id = $2 AND wr.user_id = $1 AND wr.removed_at IS NULL)`, userID, pageID).Scan(&asked)
+	return asked, err
 }
 
 func refusal(d Decision, denied apperr.Denied) error {

@@ -94,6 +94,39 @@ Every wave follows these rules:
 - independence;
 - reviewer read access ending with the round.
 
+**Built:** see `docs/reports/2026-11-13-wave-dc2.md`. Migration 0058 adds `workflow_reviewers`, `workflow_review_comments`, `workflow_templates`, the stage of a round and `perm_review_pages`.
+
+**Load (DOC-1300):**
+- Reading a controlled page asks one more `EXISTS` inside the query the band already makes, on the partial index `workflow_reviewers_user`, so it adds no query.
+- `approval.read` alone loads the reviewer fact: one query, and only on that action.
+- The list of notifications joins `perm_review_pages`, an index scan of the person's own open reviews.
+- A step into a review state resolves its reviewers in one query and writes them in one statement.
+- An answer locks the page and its control row, then makes three to five small queries.
+
+**Decided on the product owner's behalf on 2026-11-13, may be overruled:**
+
+| # | Decision | Reason |
+|---|---|---|
+| DC2-1 | Document control is not an optional part under ADR-043: it is the first enterprise feature planned for 1.0 (ADR-038), DC1 shipped without a switch, and nothing changes in a space until someone assigns a workflow. DC2 has no switch of its own | The feature is opt-in per space already |
+| DC2-2 | A review state that names no review block keeps the DC1 behaviour: its authors take its steps | Workflows saved under DC1 keep working |
+| DC2-3 | A review state with reviewers has exactly one step for "approved" and one for "changes". The system takes them, and no person ever does. No author step leaves such a state for an approved one | DOC-013, DOC-1424: nobody steps around the reviewers |
+| DC2-4 | Independence is on by default for every review state, not only for those that lead into approval | Stricter than DOC-1403, and simpler to explain |
+| DC2-5 | Reviewers are resolved to members who view the space. Guests, disabled people and people without the space are left out. An entry that names nobody refuses the step and names the entry | DOC-200, DOC-1224 |
+| DC2-6 | A role resolves to the people and groups that hold it in the page's space. An "all members" or "all guests" holding names nobody | Thousands of reviewers is never meant |
+| DC2-7 | A round asks at most 50 people under "all" or a quorum, and at most 500 under "any one". A state names at most 20 people, groups and roles | DOC-1408, with a bound for "any one" too |
+| DC2-8 | A round that could not pass is refused when it would start, with the reason: nobody independent, too many people, or a quorum above who can review | The author sees why at once, instead of a round that waits for ever |
+| DC2-9 | "Ask for changes" needs a comment | The authors must know what to change |
+| DC2-10 | A removal that leaves too few people to pass is refused until someone is added. Escalation comes with DC5 | DOC-202, without the due-date machinery of DC5 |
+| DC2-11 | Being asked opens the page itself through `approval.read`, past restrictions and "never approved", while the round runs and the page sits in that review state. The tree, search, the feed and the pages around it keep the ordinary rule, and the breadcrumbs are empty. Afterwards the person keeps the record of the round (names, answers, comments), never its text | DOC-203 with the narrowest grant, and no cost on the read paths of everyone |
+| DC2-12 | Four notification kinds: asked to review, an answer, the end of a review, and a reviewer taken off. They go by mail by default. A reviewer taken off hears of it only while they may still see the page | DOC-600, DOC-602, DOC-608 |
+| DC2-13 | "Approved by" on the band names the reviewer whose answer passed the round; the panel lists every answer | One name fits the band; the record keeps all of them |
+| DC2-14 | Review comments are separate from page comments. The authors and the people the round asked read them, and nobody deletes them | DOC-251, DOC-501, DOC-502 |
+| DC2-15 | The two examples are starting points: a copy of one records no template. The screens translate their names, and the copy keeps the words that are saved. "Two-step review" gets its signature in DC4 | DOC-131; signatures are DC4 |
+| DC2-16 | An instance template has one current version. A copy records the template and the version. "Take the new version" saves the template's definition as the copy's next version, and running rounds keep theirs. An archived template leaves its copies as they are | DOC-130, DOC-1405, DOC-110 |
+| DC2-17 | Each entry into a review state is a new stage of the round, and it asks its reviewers afresh. A stage ends when the page leaves that state | One round per version, as in DC1, with a clear record per stage |
+| DC2-18 | DOC-924 (due dates) shows nothing until due dates exist in DC5 | No code for a need that does not exist yet |
+| DC2-19 | The validator runs while editing through `POST /api/v1/workflows/check`, which answers the first problem with the state or step it names | One validator, in Go, for the editor and for saving (DOC-912) |
+
 ## DC3: the content around the page
 
 **Scope:**

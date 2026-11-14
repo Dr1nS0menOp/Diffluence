@@ -40,6 +40,14 @@ const (
 	TypeDraftExpiring = "draft_expiring"
 	// TypeExportReady is the answer to something a person asked for, so it has no choice.
 	TypeExportReady = "export_ready"
+	// TypeReviewAsked asks a reviewer of document control for their answer (DOC-600).
+	TypeReviewAsked = "review_asked"
+	// TypeReviewAnswered tells the authors of a change what a reviewer said (DOC-602).
+	TypeReviewAnswered = "review_answered"
+	// TypeReviewEnded tells the authors how a review ended (DOC-602).
+	TypeReviewEnded = "review_ended"
+	// TypeReviewerRemoved tells a reviewer and the authors that a reviewer was taken off (DOC-608).
+	TypeReviewerRemoved = "reviewer_removed"
 )
 
 // Where a type of notification goes.
@@ -60,7 +68,8 @@ const defaultDigestHour = 8
 
 // Types lists every type a person can choose a channel for.
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
-	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer}
+	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
+	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -88,6 +97,7 @@ func defaultChannels() map[string]string {
 		TypeMention: ChannelMail, TypeTaskAssigned: ChannelMail, TypeTaskDue: ChannelMail, TypeShare: ChannelMail,
 		TypeAccessRequest: ChannelMail, TypeAccessAnswer: ChannelMail, TypeRule: ChannelApp,
 		TypeAccessRecovered: ChannelMail, TypeDraftExpiring: ChannelMail, TypeInvitationAnswer: ChannelMail,
+		TypeReviewAsked: ChannelMail, TypeReviewAnswered: ChannelMail, TypeReviewEnded: ChannelMail, TypeReviewerRemoved: ChannelMail,
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
 	}
 }

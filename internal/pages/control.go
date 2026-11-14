@@ -289,8 +289,9 @@ type TransitionInput struct {
 	Comment string
 }
 
-// Transition takes a step of the workflow of a page (DOC-104). In DC1 whoever may edit the
-// page takes it; who must answer comes with reviewers in DC2.
+// Transition takes a step of the workflow of a page (DOC-104). Its authors take the steps;
+// the steps that follow a review are taken by the system on the reviewers' answers
+// (DOC-013). A step into a review state asks its reviewers, or is refused with them.
 func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUID, in TransitionInput) (Page, error) {
 	comment := strings.TrimSpace(in.Comment)
 	if !utf8.ValidString(comment) || utf8.RuneCountInString(comment) > maxTransitionComment || strings.ContainsRune(comment, 0) {
@@ -319,6 +320,11 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 		tr, ok := def.Transition(in.Transition)
 		if !ok {
 			return apperr.Invalid("This workflow has no such step.")
+		}
+		// The step that follows a review is the reviewers' answers, never a person's own
+		// choice, not even an administrator's (DOC-013, DOC-1424).
+		if tr.Outcome != "" {
+			return apperr.Conflict("taken_by_review", "This step follows the review: the reviewers' answers take it.")
 		}
 		if tr.From != ctl.stateID {
 			return apperr.Conflict("state_changed", "This page has moved on since you looked: it is in another state now.")
@@ -364,7 +370,18 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 			return record(ctx, tx, c, "page.withdrawn", out, details)
 		}
 		out = p
-		return recordAudit(ctx, tx, c, "page.transition", "page", id, p.SpaceID, details)
+		if err := recordAudit(ctx, tx, c, "page.transition", "page", id, p.SpaceID, details); err != nil {
+			return err
+		}
+		if to.Review == nil {
+			return nil
+		}
+		ctl.stateID, ctl.stateKind = to.ID, to.Kind
+		asked, err := s.enterReview(ctx, tx, p, ctl, round, to)
+		if err != nil {
+			return err
+		}
+		return s.askReviewers(ctx, tx, c, p, to, asked)
 	})
 	return out, err
 }
@@ -416,19 +433,29 @@ type ControlInfo struct {
 	// ancestor or the page itself, whose titles the breadcrumbs show already.
 	GovernedFromTitle string `json:"governed_from_title"`
 	SetBy             string `json:"set_by"`
-	// Transitions are the steps this person may take now.
+	// Transitions are the steps this person may take now. The steps that follow a review
+	// are never among them: the reviewers' answers take those (DOC-013).
 	Transitions []workflow.Transition `json:"transitions"`
+	// Reviewing says the person is asked to review the page now, so the band offers the
+	// review panel; a reviewer sees the working version like an author (DOC-300).
+	Reviewing bool `json:"reviewing"`
+	// InReview says the page waits for the answers of reviewers.
+	InReview bool `json:"in_review"`
 }
 
-// fillControl adds the band of a controlled page to its detail. Its authors get the head
-// with a mark that it is not approved yet; anyone else keeps the approved version and
-// learns nothing of the head (DOC-300, DOC-303).
-func (s *Service) fillControl(ctx context.Context, d *Detail) error {
-	ci, def, headTitle, err := controlInfo(ctx, s.pool, d.Page)
+// fillControl adds the band of a controlled page to its detail. Its authors and reviewers
+// get the head with a mark that it is not approved yet; anyone else keeps the approved
+// version and learns nothing of the head (DOC-300, DOC-303).
+func (s *Service) fillControl(ctx context.Context, userID uuid.UUID, d *Detail) error {
+	ci, def, headTitle, err := controlInfo(ctx, s.pool, userID, d.Page)
 	if err != nil || ci == nil {
 		return err
 	}
-	if !d.Can[permissions.PageEdit] {
+	if st, ok := def.State(ci.StateID); ok && st.Review != nil {
+		ci.InReview = true
+	}
+	author := d.Can[permissions.PageEdit]
+	if !author && !ci.Reviewing {
 		ci.HeadVersion = d.CurrentVersion
 		d.Control = ci
 		return nil
@@ -436,7 +463,13 @@ func (s *Service) fillControl(ctx context.Context, d *Detail) error {
 	if ci.HeadVersion != d.CurrentVersion {
 		d.Title, d.CurrentVersion, ci.ShowsWorking = headTitle, ci.HeadVersion, true
 	}
-	ci.Transitions = def.From(ci.StateID)
+	if author {
+		for _, tr := range def.From(ci.StateID) {
+			if tr.Outcome == "" {
+				ci.Transitions = append(ci.Transitions, tr)
+			}
+		}
+	}
 	if ci.Transitions == nil {
 		ci.Transitions = []workflow.Transition{}
 	}
@@ -444,9 +477,9 @@ func (s *Service) fillControl(ctx context.Context, d *Detail) error {
 	return nil
 }
 
-// controlInfo reads the band of a controlled page, and the title of its head, in one query
-// (DOC-1300).
-func controlInfo(ctx context.Context, q db.Querier, p Page) (*ControlInfo, workflow.Definition, string, error) {
+// controlInfo reads the band of a controlled page, the title of its head and whether the
+// person reviews it now, in one query (DOC-1300).
+func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*ControlInfo, workflow.Definition, string, error) {
 	var ci ControlInfo
 	var raw []byte
 	var def workflow.Definition
@@ -454,7 +487,11 @@ func controlInfo(ctx context.Context, q db.Querier, p Page) (*ControlInfo, workf
 	err := q.QueryRow(ctx, `SELECT w.id, w.name, pc.workflow_version, v.definition, pc.state_id, pc.state_kind, pc.approved_version,
 			pc.approved_at, COALESCE(ua.display_name, ''), pc.head_version, pc.governed_by, pc.governed_from, COALESCE(gp.title, ''),
 			COALESCE(us.display_name, ''),
-			COALESCE((SELECT hv.title FROM page_versions hv WHERE hv.page_id = pc.page_id AND hv.number = pc.head_version), '')
+			COALESCE((SELECT hv.title FROM page_versions hv WHERE hv.page_id = pc.page_id AND hv.number = pc.head_version), ''),
+			EXISTS (SELECT 1 FROM workflow_reviewers wr
+				JOIN workflow_rounds r ON r.id = wr.round_id AND r.status = 'open' AND r.review_stage = wr.stage
+				JOIN users ru ON ru.id = wr.user_id AND ru.type = 'member'
+				WHERE r.page_id = pc.page_id AND wr.user_id = $3 AND wr.state_id = pc.state_id AND wr.removed_at IS NULL)
 		FROM page_control pc
 		JOIN workflows w ON w.id = pc.workflow_id
 		JOIN workflow_versions v ON v.workflow_id = pc.workflow_id AND v.version = pc.workflow_version
@@ -463,9 +500,10 @@ func controlInfo(ctx context.Context, q db.Querier, p Page) (*ControlInfo, workf
 		LEFT JOIN page_workflows pw ON pw.page_id = pc.governed_from
 		LEFT JOIN space_workflows sw ON sw.space_id = $2 AND pc.governed_by = 'space'
 		LEFT JOIN users us ON us.id = COALESCE(pw.set_by, sw.set_by)
-		WHERE pc.page_id = $1`, p.ID, p.SpaceID).
+		WHERE pc.page_id = $1`, p.ID, p.SpaceID, userID).
 		Scan(&ci.WorkflowID, &ci.WorkflowName, &ci.WorkflowVersion, &raw, &ci.StateID, &ci.StateKind, &ci.ApprovedVersion,
-			&ci.ApprovedAt, &ci.ApprovedBy, &ci.HeadVersion, &ci.GovernedBy, &ci.GovernedFrom, &ci.GovernedFromTitle, &ci.SetBy, &headTitle)
+			&ci.ApprovedAt, &ci.ApprovedBy, &ci.HeadVersion, &ci.GovernedBy, &ci.GovernedFrom, &ci.GovernedFromTitle, &ci.SetBy, &headTitle,
+			&ci.Reviewing)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, def, "", nil
 	}

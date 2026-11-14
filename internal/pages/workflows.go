@@ -37,6 +37,16 @@ type Workflow struct {
 	Pages int `json:"pages"`
 	// SpaceWorkflow says it is the workflow of the whole space.
 	SpaceWorkflow bool `json:"space_workflow"`
+	// TemplateID and TemplateVersion name the instance template it was copied from; and
+	// TemplateLatest the template's newest version, which the space may take (DOC-130).
+	TemplateID      *uuid.UUID `json:"template_id"`
+	TemplateVersion *int       `json:"template_version"`
+	TemplateLatest  *int       `json:"template_latest"`
+	// SavedAt is when its newest version was saved.
+	SavedAt time.Time `json:"saved_at"`
+	// Names gives the people, groups and roles its review states name, for those who may
+	// change it; others get the ids only, so the list reveals no one they may not see.
+	Names map[string]string `json:"names,omitempty"`
 }
 
 // WorkflowInput is a new workflow, or the next version of one.
@@ -84,12 +94,14 @@ func (in WorkflowInput) cleaned() (WorkflowInput, error) {
 
 const workflowColumns = `w.id, w.space_id, w.name, w.description, w.current_version, v.definition, w.archived_at IS NOT NULL, w.created_at,
 	(SELECT count(*) FROM page_control pc WHERE pc.workflow_id = w.id),
-	EXISTS (SELECT 1 FROM space_workflows sw WHERE sw.workflow_id = w.id)`
+	EXISTS (SELECT 1 FROM space_workflows sw WHERE sw.workflow_id = w.id),
+	w.template_id, w.template_version, (SELECT t.version FROM workflow_templates t WHERE t.id = w.template_id AND t.archived_at IS NULL), v.saved_at`
 
 func scanWorkflow(r pgx.Row) (Workflow, error) {
 	var w Workflow
 	var raw []byte
-	if err := r.Scan(&w.ID, &w.SpaceID, &w.Name, &w.Description, &w.Version, &raw, &w.Archived, &w.CreatedAt, &w.Pages, &w.SpaceWorkflow); err != nil {
+	if err := r.Scan(&w.ID, &w.SpaceID, &w.Name, &w.Description, &w.Version, &raw, &w.Archived, &w.CreatedAt, &w.Pages, &w.SpaceWorkflow,
+		&w.TemplateID, &w.TemplateVersion, &w.TemplateLatest, &w.SavedAt); err != nil {
 		return w, err
 	}
 	if err := json.Unmarshal(raw, &w.Definition); err != nil {
@@ -141,10 +153,74 @@ func (s *Service) Workflows(ctx context.Context, c identity.Caller, spaceID uuid
 		return nil, err
 	}
 	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Workflow, error) { return scanWorkflow(r) })
+	if err != nil {
+		return nil, err
+	}
 	if out == nil {
 		out = []Workflow{}
 	}
-	return out, err
+	return out, s.nameReviewers(ctx, c, spaceID, out)
+}
+
+// nameReviewers fills in the names of the people, groups and roles the workflows name, for
+// someone who may change the workflows of the space.
+func (s *Service) nameReviewers(ctx context.Context, c identity.Caller, spaceID uuid.UUID, list []Workflow) error {
+	d, err := s.perms.CheckSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceWorkflows)
+	if err != nil || !d.Allowed {
+		return err
+	}
+	var ids []uuid.UUID
+	for _, w := range list {
+		ids = append(ids, reviewerIDs(w.Definition)...)
+	}
+	names, err := reviewerNames(ctx, s.pool, ids)
+	if err != nil {
+		return err
+	}
+	for i := range list {
+		list[i].Names = map[string]string{}
+		for _, id := range reviewerIDs(list[i].Definition) {
+			if n, ok := names[id.String()]; ok {
+				list[i].Names[id.String()] = n
+			}
+		}
+	}
+	return nil
+}
+
+func reviewerIDs(d workflow.Definition) []uuid.UUID {
+	var ids []uuid.UUID
+	for _, st := range d.States {
+		if st.Review != nil {
+			for _, r := range st.Review.Reviewers {
+				ids = append(ids, r.ID)
+			}
+		}
+	}
+	return ids
+}
+
+// reviewerNames reads the names of people, groups and roles by id, in one query.
+func reviewerNames(ctx context.Context, q db.Querier, ids []uuid.UUID) (map[string]string, error) {
+	out := map[string]string{}
+	if len(ids) == 0 {
+		return out, nil
+	}
+	rows, err := q.Query(ctx, `SELECT id::text, display_name FROM users WHERE id = ANY($1)
+		UNION ALL SELECT id::text, name FROM groups WHERE id = ANY($1)
+		UNION ALL SELECT id::text, name FROM roles WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id, name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = name
+	}
+	return out, rows.Err()
 }
 
 // Workflow returns one workflow.
@@ -156,12 +232,26 @@ func (s *Service) Workflow(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, w.SpaceID, permissions.SpaceView); err != nil {
 		return Workflow{}, err
 	}
-	return w, nil
+	list := []Workflow{w}
+	if err := s.nameReviewers(ctx, c, w.SpaceID, list); err != nil {
+		return Workflow{}, err
+	}
+	return list[0], nil
 }
 
 // CreateWorkflow adds a workflow to a space (DOC-100).
 func (s *Service) CreateWorkflow(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in WorkflowInput) (Workflow, error) {
+	return s.createWorkflow(ctx, c, spaceID, in, nil)
+}
+
+// createWorkflow adds a workflow, made from a template when from names one.
+func (s *Service) createWorkflow(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in WorkflowInput, from *TemplateCopy) (Workflow, error) {
 	id := ids.New()
+	var templateID *uuid.UUID
+	var templateVersion *int
+	if from != nil {
+		templateID, templateVersion = &from.WorkflowID, &from.Version
+	}
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// Access first: a stranger learns nothing of the space from a refused input.
 		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceWorkflows); err != nil {
@@ -182,15 +272,18 @@ func (s *Service) CreateWorkflow(ctx context.Context, c identity.Caller, spaceID
 		if count >= maxWorkflowsPerSpace {
 			return apperr.Conflict("too_many_workflows", "A space has at most 50 workflows. Archive one first.")
 		}
-		if err := insertWorkflowName(ctx, tx, `INSERT INTO workflows (id, space_id, name, description, created_by) VALUES ($1, $2, $3, $4, $5)`,
-			id, spaceID, in.Name, in.Description, c.UserID); err != nil {
+		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
+			return err
+		}
+		if err := insertWorkflowName(ctx, tx, `INSERT INTO workflows (id, space_id, name, description, created_by, template_id, template_version)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)`, id, spaceID, in.Name, in.Description, c.UserID, templateID, templateVersion); err != nil {
 			return err
 		}
 		if _, err := tx.Exec(ctx, "INSERT INTO workflow_versions (workflow_id, version, definition, saved_by) VALUES ($1, 1, $2, $3)",
 			id, raw, c.UserID); err != nil {
 			return err
 		}
-		return recordAudit(ctx, tx, c, "workflow.created", "workflow", id, spaceID, map[string]any{"name": in.Name})
+		return recordAudit(ctx, tx, c, "workflow.created", "workflow", id, spaceID, map[string]any{"name": in.Name, "template": templateID})
 	})
 	if err != nil {
 		return Workflow{}, err
@@ -211,6 +304,11 @@ func insertWorkflowName(ctx context.Context, tx pgx.Tx, sql string, args ...any)
 // SaveWorkflow stores the next version of a workflow. Pages in a running round keep the
 // version they started under; a state some page is in cannot be removed (DOC-110).
 func (s *Service) SaveWorkflow(ctx context.Context, c identity.Caller, id uuid.UUID, in WorkflowInput) (Workflow, error) {
+	return s.saveWorkflow(ctx, c, id, in, nil)
+}
+
+// saveWorkflow stores the next version; from names the template version it takes, if any.
+func (s *Service) saveWorkflow(ctx context.Context, c identity.Caller, id uuid.UUID, in WorkflowInput, from *TemplateCopy) (Workflow, error) {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		w, err := scanWorkflow(tx.QueryRow(ctx, `SELECT `+workflowColumns+` FROM workflows w
 			JOIN workflow_versions v ON v.workflow_id = w.id AND v.version = w.current_version WHERE w.id = $1 FOR NO KEY UPDATE OF w`, id))
@@ -241,6 +339,14 @@ func (s *Service) SaveWorkflow(ctx context.Context, c identity.Caller, id uuid.U
 		if err := refuseOccupiedStates(ctx, tx, id, changes); err != nil {
 			return err
 		}
+		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
+			return err
+		}
+		if from != nil {
+			if _, err := tx.Exec(ctx, "UPDATE workflows SET template_version = $2 WHERE id = $1", id, from.Version); err != nil {
+				return err
+			}
+		}
 		next := w.Version + 1
 		if _, err := tx.Exec(ctx, "INSERT INTO workflow_versions (workflow_id, version, definition, saved_by) VALUES ($1, $2, $3, $4)",
 			id, next, raw, c.UserID); err != nil {
@@ -256,6 +362,16 @@ func (s *Service) SaveWorkflow(ctx context.Context, c identity.Caller, id uuid.U
 		return Workflow{}, err
 	}
 	return loadWorkflow(ctx, s.pool, id)
+}
+
+// CheckDefinition runs the validator for the editor while a person types, so each problem
+// shows beside its state before saving (DOC-912). It answers nil for a valid workflow.
+func CheckDefinition(d workflow.Definition) *workflow.Problem {
+	var p *workflow.Problem
+	if err := workflow.Validate(d); errors.As(err, &p) {
+		return p
+	}
+	return nil
 }
 
 func refuseOccupiedStates(ctx context.Context, tx pgx.Tx, id uuid.UUID, changes []workflow.Change) error {
