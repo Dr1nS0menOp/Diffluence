@@ -103,10 +103,15 @@ func TestARunningWorkerFollowsTheSwitchAndNotesTheDrain(t *testing.T) {
 	}
 	owner.publish(after, "After", 1, commentBody("hello again ", mention(anna.id, "Anna")))
 	waitFor(t, "the mention through the event log", unread(2))
-	var cursors int
-	if err := pool.QueryRow(ctx, "SELECT count(DISTINCT consumer) FROM event_cursors WHERE pos > 0").Scan(&cursors); err != nil || cursors != 4 {
-		t.Fatalf("%d consumers passed an event of the log, err %v", cursors, err)
-	}
+	// The notifications consumer gave Anna her mention; the other three run on their own and
+	// may pass the event later, so this waits for them as it waits for the mention.
+	waitFor(t, "every consumer past an event of the log", func() bool {
+		var cursors int
+		if err := pool.QueryRow(ctx, "SELECT count(DISTINCT consumer) FROM event_cursors WHERE pos > 0").Scan(&cursors); err != nil {
+			t.Fatal(err)
+		}
+		return cursors == len(app.EventConsumerNames())
+	})
 	waitFor(t, "the drain of NATS", func() bool {
 		if err := e.app.NoteNATSDrainedForTest(ctx); err != nil {
 			t.Fatal(err)

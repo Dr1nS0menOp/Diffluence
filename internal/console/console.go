@@ -32,11 +32,15 @@ const (
 type Service struct {
 	pool  *pgxpool.Pool
 	store storage.Store
+	// diskWarnLevel gives the percentage of free room below which the disk is named; zero is
+	// the default of the health rules (spec 075, CSL-581).
+	diskWarnLevel func() int
 }
 
-// NewService creates the service.
-func NewService(pool *pgxpool.Pool, store storage.Store) *Service {
-	return &Service{pool: pool, store: store}
+// NewService creates the service. diskWarnLevel is read at every look, so a new level holds
+// at once.
+func NewService(pool *pgxpool.Pool, store storage.Store, diskWarnLevel func() int) *Service {
+	return &Service{pool: pool, store: store, diskWarnLevel: diskWarnLevel}
 }
 
 // Summary is the first screen of the console.
@@ -156,7 +160,7 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	// this warns early. The count is the percentage still free.
 	if disk, ok := s.store.(storage.Spacer); ok {
 		if free, total, err := disk.Space(ctx); err == nil {
-			if percent, full := DiskNearlyFull(free, total); full {
+			if percent, full := DiskNearlyFull(free, total, s.diskWarnLevel()); full {
 				out = append(out, Item{Kind: "disk_nearly_full", Count: percent})
 			}
 		}
@@ -164,14 +168,18 @@ func (s *Service) Attention(ctx context.Context, mailReady bool) ([]Item, error)
 	return out, nil
 }
 
-// DiskNearlyFull says whether the free part of a disk is below the warning of the health
-// checks, and gives the free percentage. An unknown size never warns.
-func DiskNearlyFull(free, total uint64) (percent int, full bool) {
+// DiskNearlyFull says whether the free part of a disk is below warnPercent, the warning of
+// the health checks, and gives the free percentage. Zero is the default level. An unknown
+// size never warns.
+func DiskNearlyFull(free, total uint64, warnPercent int) (percent int, full bool) {
 	if total == 0 {
 		return 0, false
 	}
+	if warnPercent <= 0 {
+		warnPercent = health.DiskWarnPercent
+	}
 	percent = int(free * 100 / total)
-	return percent, percent < health.DiskWarnPercent
+	return percent, percent < warnPercent
 }
 
 // Sized is one entry of a report: a name and a size, and nothing of the content.

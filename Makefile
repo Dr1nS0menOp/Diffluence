@@ -24,8 +24,9 @@ test:
 
 test-race:
 	# internal/app alone took over 20 minutes under the race detector on a hosted runner once
-	# document control and publishing added their tests. A real hang still ends here.
-	go test -race -count=1 -timeout=45m ./...
+	# document control and publishing added their tests, one after another; the script deals its
+	# tests over TEST_SHARDS processes beside the other packages. A real hang still ends at 45m.
+	bash scripts/test-race.sh
 
 fmt:
 	gofmt -w .

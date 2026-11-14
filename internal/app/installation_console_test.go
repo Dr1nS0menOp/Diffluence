@@ -377,6 +377,16 @@ func TestTheDiskThresholdsAreBoundedAndFollowed(t *testing.T) {
 	if facts.Thresholds.DiskWarnPercent != 20 || facts.Thresholds.DiskRefusePercent != 5 {
 		t.Fatalf("the health rules read %+v", facts.Thresholds)
 	}
+	// The summary's attention list warns at the same level: 15% free is above the default
+	// of 10%, below the 20% set here.
+	e.app.StoreGuard().UseRoomOf(fixedRoom{free: 15, total: 100})
+	if out := root.want(http.StatusOK, "GET", "/api/v1/admin/attention", nil); !strings.Contains(out, `"kind":"disk_nearly_full","count":15`) {
+		t.Fatalf("the attention list at 15%% free with the warn level at 20%%: %s", out)
+	}
+	e.app.StoreGuard().UseRoomOf(fixedRoom{free: 21, total: 100})
+	if out := root.want(http.StatusOK, "GET", "/api/v1/admin/attention", nil); strings.Contains(out, "disk_nearly_full") {
+		t.Fatalf("the attention list at 21%% free: %s", out)
+	}
 }
 
 // The backup line follows the schedule: every 4 hours, so it warns after 6 (CSL-582).

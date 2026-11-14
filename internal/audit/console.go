@@ -53,7 +53,9 @@ func (w WitnessCheck) validate() error {
 	return nil
 }
 
-// RecordWitnessCheck stores the result of a comparison with the witness, as of now.
+// RecordWitnessCheck stores the result of a comparison with the witness, as of now. q must
+// connect as the owner of the tables: the application role may only read reports, and the
+// console shows only those the owner recorded (spec 077).
 func RecordWitnessCheck(ctx context.Context, q db.Querier, w WitnessCheck) error {
 	if err := w.validate(); err != nil {
 		return err
@@ -66,11 +68,16 @@ func RecordWitnessCheck(ctx context.Context, q db.Querier, w WitnessCheck) error
 	return nil
 }
 
-// LatestWitnessCheck is the newest reported comparison, or nil when none was ever reported.
+// LatestWitnessCheck is the newest comparison the owner of the tables reported, or nil when
+// it reported none. The database notes the role of each report (migration 0067); a report
+// of another role, such as one from before that migration, is not shown (spec 077).
 func LatestWitnessCheck(ctx context.Context, q db.Querier) (*WitnessCheck, error) {
 	var w WitnessCheck
-	err := q.QueryRow(ctx, `SELECT checked_at, ok, compared, pruned, first_bad_seq, reason
-		FROM audit_witness_checks ORDER BY checked_at DESC, id DESC LIMIT 1`).
+	err := q.QueryRow(ctx, `SELECT w.checked_at, w.ok, w.compared, w.pruned, w.first_bad_seq, w.reason
+		FROM audit_witness_checks w
+		WHERE w.recorded_by = (SELECT pg_get_userbyid(c.relowner)::text FROM pg_class c
+			WHERE c.oid = 'audit_witness_checks'::regclass)
+		ORDER BY w.checked_at DESC, w.id DESC LIMIT 1`).
 		Scan(&w.CheckedAt, &w.OK, &w.Compared, &w.Pruned, &w.FirstBadSeq, &w.Reason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil

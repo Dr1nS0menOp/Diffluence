@@ -5,8 +5,6 @@ package testutil
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"net/url"
 	"os"
 	"testing"
@@ -46,9 +44,13 @@ func Database(t testing.TB) TestDB {
 }
 
 // InstalledDatabase creates an empty, migrated database exactly as a new installation
-// starts, and drops it after the test.
+// starts, and drops it after the test. In a package whose TestMain runs MainWithTemplate it
+// is a copy of a database this test binary migrated once.
 func InstalledDatabase(t testing.TB) TestDB {
 	t.Helper()
+	if migrated.wanted {
+		return cloneMigrated(t)
+	}
 	tdb := EmptyDatabase(t)
 	migs, err := db.Migrations()
 	if err != nil {
@@ -63,6 +65,13 @@ func InstalledDatabase(t testing.TB) TestDB {
 // EmptyDatabase is Database without migrations.
 func EmptyDatabase(t testing.TB) TestDB {
 	t.Helper()
+	return createDatabase(t, "")
+}
+
+// createDatabase creates a database for the test, as a copy of template when one is named,
+// and drops it after the test.
+func createDatabase(t testing.TB, template string) TestDB {
+	t.Helper()
 	base := os.Getenv(EnvDatabaseURL)
 	if base == "" {
 		t.Skipf("%s not set; skipping integration test", EnvDatabaseURL)
@@ -72,12 +81,23 @@ func EmptyDatabase(t testing.TB) TestDB {
 	if err != nil {
 		t.Fatalf("connect to test server: %v", err)
 	}
-	b := make([]byte, 6)
-	_, _ = rand.Read(b)
-	name := "dfl_test_" + hex.EncodeToString(b)
+	name := randomName("dfl_test_")
 	ident := pgx.Identifier{name}.Sanitize()
-	if _, err := admin.Exec(ctx, "CREATE DATABASE "+ident); err != nil {
+	create := "CREATE DATABASE " + ident
+	if template != "" {
+		create += " TEMPLATE " + pgx.Identifier{template}.Sanitize()
+	}
+	if _, err := admin.Exec(ctx, create); err != nil {
 		t.Fatalf("create test database: %v", err)
+	}
+	t.Cleanup(func() {
+		_, _ = admin.Exec(context.Background(), "DROP DATABASE IF EXISTS "+ident+" WITH (FORCE)")
+		_ = admin.Close(context.Background())
+	})
+	if template != "" {
+		if err := copyDatabaseSettings(ctx, admin, template, name); err != nil {
+			t.Fatal(err)
+		}
 	}
 
 	u, err := url.Parse(base)
@@ -89,10 +109,7 @@ func EmptyDatabase(t testing.TB) TestDB {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() {
-		pool.Close()
-		_, _ = admin.Exec(context.Background(), "DROP DATABASE IF EXISTS "+ident+" WITH (FORCE)")
-		_ = admin.Close(context.Background())
-	})
+	// Cleanups run last first, so the pool closes before its database is dropped.
+	t.Cleanup(pool.Close)
 	return TestDB{Pool: pool, URL: u.String()}
 }

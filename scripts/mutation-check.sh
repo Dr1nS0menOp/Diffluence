@@ -1684,6 +1684,25 @@ mutate "lower disk thresholds need no confirmed change" internal/httpapi/handler
   's.replace(", settings.SectionBackups, settings.SectionHealth}", ", settings.SectionBackups}")' $app -run TestASystemAdministratorConfirmsAQuieterLevelWithASecondFactor
 mutate "the debug log writes the query of a request" internal/httpapi/middleware.go \
   's.replace("\"path\", loggedPath(r.URL.Path),", "\"path\", r.URL.RequestURI(),")' $app -run TestDebugLogsNoSecretOrTitleAndErrorKeepsTheWitness
+
+# Spec 077, wave RV7: witness reports are recorded by the owner of the tables, and the summary's
+# disk warning follows the health setting.
+mutate "the application role records a witness report" internal/db/db.go \
+  's.replace("\"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_witness_checks FROM \"", "\"REVOKE UPDATE, DELETE, TRUNCATE ON audit_witness_checks FROM \"")' ./internal/audit/ -run TestOnlyTheOwnerOfTheTablesRecordsAWitnessReport
+mutate "a witness report of another role is shown" internal/audit/console.go \
+  's.replace("WHERE w.recorded_by = (", "WHERE w.recorded_by <> \x27-\x27 OR w.recorded_by = (")' ./internal/audit/ -run TestAWitnessReportOfAnotherRoleIsNotShown
+mutate "a witness report keeps the role its insert names" internal/db/migrations/0067_witness_reports_by_owner.sql \
+  's.replace("NEW.recorded_by := current_user;", "NEW.recorded_by := COALESCE(NULLIF(NEW.recorded_by, \x27\x27), current_user);")' ./internal/audit/ -run TestTheDatabaseStampsTheRoleAndTimeOfAWitnessReport
+mutate "a witness report keeps the time its insert names" internal/db/migrations/0067_witness_reports_by_owner.sql \
+  's.replace("  NEW.checked_at := now();\n", "")' ./internal/audit/ -run TestTheDatabaseStampsTheRoleAndTimeOfAWitnessReport
+mutate "audit verify records its report with the application role" cmd/diffluence/main.go \
+  's.replace("recordWitnessReport(ctx, reportURL,", "recordWitnessReport(ctx, cfg.DatabaseURL+reportURL[:0],")' ./cmd/diffluence/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
+mutate "audit verify reports without the owner of the tables" cmd/diffluence/main.go \
+  's.replace("\tif errors.Is(err, errNoOwner) {\n\t\treturn \"\", errNoReportOwner\n\t}\n", "\tif errors.Is(err, errNoOwner) {\n\t\treturn cfg.DatabaseURL, nil\n\t}\n")' ./cmd/diffluence/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
+mutate "the summary warns of the disk at the default level only" internal/console/console.go \
+  's.replace("return percent, percent < warnPercent", "return percent, percent < health.DiskWarnPercent")' ./internal/console/ -run TestDiskNearlyFullFollowsTheWarnLevelOfTheHealthSettings
+mutate "the summary is not told the warn level" internal/app/app.go \
+  's.replace("console.NewService(a.pool, a.store, func() int { return a.thresholds().DiskWarnPercent })", "console.NewService(a.pool, a.store, func() int { return 0 })")' $app -run TestTheDiskThresholdsAreBoundedAndFollowed
 mutate "the growth is measured from the newest sample" internal/app/health.go \
   's.replace("WHERE taken_at <= now() - make_interval(secs => $2)", "WHERE taken_at >= now() - make_interval(secs => $2)")' $app -run TestTheDatabaseGrowthComesFromTheHourlySamples
 mutate "the cleaner keeps finished jobs" internal/app/health.go \

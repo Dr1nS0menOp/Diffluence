@@ -6,10 +6,13 @@ import (
 	"bytes"
 	"context"
 	"log/slog"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/config"
@@ -181,6 +184,80 @@ func TestAuditVerifyReportsTheWitnessComparison(t *testing.T) {
 	got, err = audit.LatestWitnessCheck(ctx, pool)
 	if err != nil || got == nil || got.OK || got.FirstBadSeq != cp.Seq || got.Reason == "" {
 		t.Fatalf("the report of a mismatch: %+v %v", got, err)
+	}
+}
+
+// A process that holds only the application role, as the server of compose.yaml, compares but
+// records no report, and says where the owner of the tables is; with the owner's address, as
+// the backup service holds it, the report is recorded and shown (spec 077).
+func TestAuditVerifyReportsAsTheOwnerOfTheTables(t *testing.T) {
+	ownerAddr := commandEnv(t)
+	ctx := context.Background()
+	pool, err := db.Open(ctx, ownerAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Closed after the role below is dropped through it.
+	t.Cleanup(pool.Close)
+	role := "dfl_app_" + strings.ReplaceAll(uuid.NewString()[:8], "-", "")
+	if _, err := pool.Exec(ctx, "CREATE ROLE "+role+" LOGIN PASSWORD 'app'"); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		if _, err := pool.Exec(context.Background(), "DROP OWNED BY "+role); err != nil {
+			t.Error(err)
+		}
+		if _, err := pool.Exec(context.Background(), "DROP ROLE "+role); err != nil {
+			t.Error(err)
+		}
+	})
+	if err := db.GrantApp(ctx, pool, role); err != nil {
+		t.Fatal(err)
+	}
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := keys.LoadOrCreate(cfg.KeyFile(), true); err != nil {
+		t.Fatal(err)
+	}
+	key, err := signingKey(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := audit.RecordSealed(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: "test",
+		Action: "audit.verified", ObjectType: "audit_log", Result: audit.ResultSuccess}); err != nil {
+		t.Fatal(err)
+	}
+	cp, signed, err := audit.SignCheckpoint(ctx, pool, key)
+	if err != nil || !signed {
+		t.Fatalf("signed %v: %v", signed, err)
+	}
+	var witness bytes.Buffer
+	slog.New(slog.NewJSONHandler(&witness, nil)).Info(audit.WitnessMessage, cp.WitnessAttrs()...)
+
+	u, err := url.Parse(ownerAddr)
+	if err != nil {
+		t.Fatal(err)
+	}
+	u.User = url.UserPassword(role, "app")
+	t.Setenv("DIFFLUENCE_DATABASE_URL", u.String())
+	t.Setenv("DIFFLUENCE_MIGRATE_ON_START", "false")
+	var out, errOut bytes.Buffer
+	if code := run([]string{"audit", "verify", "--witness", "-", "--report"}, strings.NewReader(witness.String()), &out, &errOut); code == 0 ||
+		!strings.Contains(errOut.String(), "owner of the tables") || !strings.Contains(errOut.String(), "backup") {
+		t.Fatalf("a report with only the application role: %d %q", code, errOut.String())
+	}
+	if got, err := audit.LatestWitnessCheck(ctx, pool); err != nil || got != nil {
+		t.Fatalf("a report without the owner was recorded: %+v %v", got, err)
+	}
+	t.Setenv("DIFFLUENCE_MIGRATE_DATABASE_URL", ownerAddr)
+	if code := run([]string{"audit", "verify", "--witness", "-", "--report"}, strings.NewReader(witness.String()), &out, &errOut); code != 0 {
+		t.Fatalf("a report with the owner's address: %d %s", code, errOut.String())
+	}
+	got, err := audit.LatestWitnessCheck(ctx, pool)
+	if err != nil || got == nil || !got.OK || got.Compared != 1 {
+		t.Fatalf("the report of the owner: %+v %v", got, err)
 	}
 }
 

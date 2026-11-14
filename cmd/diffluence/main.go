@@ -689,6 +689,14 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 	if err != nil {
 		return err
 	}
+	// A report is recorded as the owner of the tables (spec 077), so a process without it
+	// says so before it compares anything.
+	var reportURL string
+	if *report {
+		if reportURL, err = witnessReportURL(cfg); err != nil {
+			return err
+		}
+	}
 	key, err := signingKey(cfg)
 	if err != nil {
 		return err
@@ -730,7 +738,7 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 		return err
 	}
 	if *report {
-		if err := audit.RecordWitnessCheck(ctx, pool, witnessReport(res, compared)); err != nil {
+		if err := recordWitnessReport(ctx, reportURL, witnessReport(res, compared)); err != nil {
 			return err
 		}
 		fmt.Fprintln(stdout, "witness result reported to the console")
@@ -747,6 +755,30 @@ func cmdAuditVerify(ctx context.Context, args []string, stdin io.Reader, stdout 
 			compared.Compared, compared.Pruned)
 	}
 	return nil
+}
+
+// errNoReportOwner says that this process cannot record a witness report.
+var errNoReportOwner = errors.New("--report records as the owner of the tables (DIFFLUENCE_MIGRATE_DATABASE_URL), " +
+	"which this process lacks; in Compose the backup service holds it: " +
+	"docker compose run --rm -T --entrypoint diffluence backup audit verify --witness - --report")
+
+// witnessReportURL is the address a witness report is recorded with: the owner of the tables.
+func witnessReportURL(cfg config.Config) (string, error) {
+	url, err := ownerURL(cfg)
+	if errors.Is(err, errNoOwner) {
+		return "", errNoReportOwner
+	}
+	return url, err
+}
+
+// recordWitnessReport records a report as the owner of the tables at url.
+func recordWitnessReport(ctx context.Context, url string, w audit.WitnessCheck) error {
+	owner, err := db.Open(ctx, url)
+	if err != nil {
+		return err
+	}
+	defer owner.Close()
+	return audit.RecordWitnessCheck(ctx, owner, w)
 }
 
 // witnessReport is what the console is told of a check: a chain that is broken in itself

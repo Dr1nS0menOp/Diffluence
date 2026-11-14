@@ -240,8 +240,9 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 			// The keys that sign checkpoints after the installation's own are added by the
 			// backup service, as the owner (spec 070).
 			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_signing_keys FROM " + ident,
-			// A witness report is added and read, never changed (spec 075, CSL-532).
-			"REVOKE UPDATE, DELETE, TRUNCATE ON audit_witness_checks FROM " + ident,
+			// A witness report is read here and recorded by the owner of the tables, with
+			// "audit verify --witness --report" where that role is (specs 075 and 077).
+			"REVOKE INSERT, UPDATE, DELETE, TRUNCATE ON audit_witness_checks FROM " + ident,
 			// A personal part can be erased, and never changed.
 			"REVOKE UPDATE, TRUNCATE ON audit_personal FROM " + ident,
 			// The parts erased before erasures were counted are fixed at the upgrade.
