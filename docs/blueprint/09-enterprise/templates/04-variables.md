@@ -34,7 +34,7 @@ A **variable** is a named value that a template uses in more than one place. Dif
 
   They cannot be used in restrictions (TPL-131), in file names, or in the template's own name. *Why:* each place listed is one where people asked for the value in the situations of chapter 02; the others would widen what a form answer can do. *Proof:* tests for each place.
 - **TPL-211** · built · In the text, an answer is placed by today's `templateField` block, which shows a dashed box while editing (design standard). A built-in value or a link to an entry is placed by a new inline block, `templateValue`, with a source (`date`, `space`, `creator`, `set`, `template` or `entry:<key>`). *Why:* a field is something the form asks; a value is something the template knows. Keeping them apart keeps the form honest about what it asks. *Edge cases:* `Normalize` lets `templateValue` through only in templates, like `templateField` and `instruction` (spec 011). A page draft or a published page that contains one is refused, so a leftover can never reach a reader. *Proof:* a test that a page cannot be published with a `templateValue`, and a mutation that lets one through must be caught.
-- **TPL-212** · new · The value placed depends on the field's kind (chapter 05):
+- **TPL-212** · built · The value placed depends on the field's kind (chapter 05):
 
   | Kind | What lands in the page |
   |---|---|
@@ -63,4 +63,4 @@ A **variable** is a named value that a template uses in more than one place. Dif
   - the names `date`, `space`, `creator`, `set` and `template` are reserved for built-in values. A template from before this feature that has a field with one of those names keeps working: its field wins in its own title pattern, as `ExpandTitle` does today, and the editor asks for a new name at the next save.
 
   *Proof:* a test of a rename across three entries and a condition; a test of a reserved name in an old template.
-- **TPL-231** · new · A field has an optional **help text** of at most 300 characters, shown under its label and tied to the input (`aria-describedby`). *Why:* WCAG 3.3.2. *Proof:* an accessibility check.
+- **TPL-231** · built · A field has an optional **help text** of at most 300 characters, shown under its label and tied to the input (`aria-describedby`). *Why:* WCAG 3.3.2. *Proof:* an accessibility check.

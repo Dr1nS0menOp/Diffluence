@@ -35,6 +35,7 @@ import (
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/diffluence/diffluence/internal/templates/fields"
 )
 
 const (
@@ -53,22 +54,26 @@ type Step struct {
 
 // Template is a way to start a page. SpaceID is nil for templates of all spaces.
 type Template struct {
-	ID            uuid.UUID        `json:"id"`
-	SpaceID       *uuid.UUID       `json:"space_id"`
-	Name          string           `json:"name"`
-	Description   string           `json:"description"`
-	Category      string           `json:"category"`
-	Labels        []string         `json:"labels"`
-	TitlePattern  string           `json:"title_pattern"`
-	Steps         []Step           `json:"steps"`
-	DefaultParent *uuid.UUID       `json:"default_parent"`
-	Hidden        bool             `json:"hidden"`
-	Promoted      bool             `json:"promoted"`
-	Starter       bool             `json:"starter"`
-	Favourite     bool             `json:"favourite"`
-	UsedAt        *time.Time       `json:"used_at"`
-	Version       int              `json:"version"`
-	Fields        []document.Field `json:"fields,omitempty"`
+	ID            uuid.UUID  `json:"id"`
+	SpaceID       *uuid.UUID `json:"space_id"`
+	Name          string     `json:"name"`
+	Description   string     `json:"description"`
+	Category      string     `json:"category"`
+	Labels        []string   `json:"labels"`
+	TitlePattern  string     `json:"title_pattern"`
+	Steps         []Step     `json:"steps"`
+	DefaultParent *uuid.UUID `json:"default_parent"`
+	Hidden        bool       `json:"hidden"`
+	Promoted      bool       `json:"promoted"`
+	Starter       bool       `json:"starter"`
+	Favourite     bool       `json:"favourite"`
+	UsedAt        *time.Time `json:"used_at"`
+	Version       int        `json:"version"`
+	// Fields are the questions the form asks, with their settings, as the version it is
+	// bound to asks them (spec 074, TPL-603).
+	Fields []fields.Spec `json:"fields,omitempty"`
+	// Pages is how many pages the template makes, for the gallery (TPL-1021).
+	Pages int `json:"pages,omitempty"`
 	// Guided says the template uses a part of guided templates (spec 074, TPL-050).
 	Guided bool `json:"guided"`
 	// TemplateVersion is the version a form made from this answer is bound to (TPL-603).
@@ -109,8 +114,9 @@ func (in *Input) validate() error {
 		return apperr.Invalid("A category can have at most 50 characters.")
 	case utf8.RuneCountInString(in.TitlePattern) > maxPatternRunes:
 		return apperr.Invalid("A title pattern can have at most 255 characters.")
-	case len(in.Steps) > maxSteps:
-		return apperr.Invalid("A template can have at most ten steps.")
+	}
+	if err := checkSteps(in.Steps); err != nil {
+		return err
 	}
 	for i, raw := range in.Labels {
 		label, err := labels.Clean(raw)
@@ -305,7 +311,11 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Tem
 	if err != nil {
 		return t, err
 	}
-	t.Fields = document.Fields(doc)
+	form, err := s.formAt(ctx, c, t, 0)
+	if err != nil {
+		return t, err
+	}
+	t.Fields, t.Pages, t.TemplateVersion = form.Fields, form.Pages, form.Version
 	t.Document, err = document.Marshal(doc)
 	return t, err
 }
@@ -521,6 +531,8 @@ type UseInput struct {
 	Answers  map[string]string `json:"answers"`
 	// Replaces is the empty page that was waiting for the template (TPL-122).
 	Replaces *uuid.UUID `json:"replaces"`
+	// Version binds the form to the version it showed (TPL-603); 0 takes the one offered now.
+	Version int `json:"version"`
 }
 
 // Use starts pages from a template: one page, or the set a guided template makes, with
@@ -529,7 +541,7 @@ type UseInput struct {
 // the one-page case of MakeSet, so there is one way to make pages from a template.
 func (s *Service) Use(ctx context.Context, c identity.Caller, id uuid.UUID, in UseInput) (SetResult, error) {
 	return s.MakeSet(ctx, c, id, SetInput{SpaceID: in.SpaceID, ParentID: in.ParentID, Title: in.Title, Answers: in.Answers,
-		Replaces: in.Replaces})
+		Replaces: in.Replaces, Version: in.Version})
 }
 
 // FromPage saves a page as a template of its space. Its files are copied.

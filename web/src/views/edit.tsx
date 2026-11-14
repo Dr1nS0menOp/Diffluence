@@ -12,7 +12,6 @@ import {
   type Json,
   type PageDetail,
   type PageRef,
-  type Space,
 } from '../api';
 import { Link, navigate } from '../router';
 import { unsavedKey, usePerson } from '../personal';
@@ -38,7 +37,7 @@ import { LabelBar } from '../components/page-labels';
 import { PreviewDialog, PublishOptionsDialog, type PublishChoices } from '../components/publish-options';
 import { useDelayed } from '../components/quick-search';
 import { ShareDialog } from '../components/share-dialog';
-import { TemplateGallery } from '../components/template-gallery';
+import { TemplatePanel } from '../components/template-panel';
 import { useToast } from '../components/toast';
 import { useDates } from '../dates';
 import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
@@ -173,31 +172,6 @@ function BackupNote({
       <button type="button" className="ghost" onClick={onDiscard}>
         {t('editor.backupDiscard')}
       </button>
-    </p>
-  );
-}
-
-function TemplateOffer({ page }: { page: PageDetail }) {
-  const { t } = useTranslation();
-  const [open, setOpen] = useState(false);
-  const space = useQuery({
-    queryKey: ['space-id', page.space_id],
-    queryFn: () => api.get<Space>(`/spaces/${page.space_id}`),
-  });
-  return (
-    <p className="muted edit-hint">
-      {t('editor.emptyPage')}{' '}
-      <button type="button" className="ghost" onClick={() => setOpen(true)}>
-        {t('organise.fromTemplate')}
-      </button>
-      {open && space.data && (
-        <TemplateGallery
-          space={space.data}
-          parent={page.parent_id}
-          replaces={page.id}
-          onClose={() => setOpen(false)}
-        />
-      )}
     </p>
   );
 }
@@ -533,7 +507,7 @@ function Form({ data, together, link }: { data: Loaded; together: Together | nul
         />
       )}
       <EditorNotes page={page} title={title} />
-      {showOffer && <TemplateOffer page={page} />}
+      {showOffer && <TemplatePanel page={page} />}
       {isDatabase && (
         <div className="sheet-page">
           <PageHeader page={page} look={look} title={titleInput} />

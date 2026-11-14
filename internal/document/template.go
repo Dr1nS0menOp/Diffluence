@@ -68,6 +68,52 @@ func FillFields(n Node, answers map[string]string) (Node, error) {
 	return fillNode(n, answers), nil
 }
 
+// Filling is what an answer puts where its field stands (spec 074, TPL-212). Inline goes
+// among the words around the field. Blocks, when there are any, replace a paragraph that
+// holds the field alone, so a text of several paragraphs or a list lands as blocks.
+type Filling struct {
+	Inline []Node
+	Blocks []Node
+}
+
+// FillFieldsWith puts what each answered field gives where the field stands. A field
+// without a filling stays, for the writer to fill in. The fillings are made by the
+// product, never parsed from what a person typed.
+func FillFieldsWith(n Node, fills map[string]Filling) Node {
+	if len(n.Content) == 0 {
+		return n
+	}
+	content := make([]Node, 0, len(n.Content))
+	for _, c := range n.Content {
+		if f, alone := fieldAlone(c, fills); alone && len(f.Blocks) > 0 {
+			content = append(content, f.Blocks...)
+			continue
+		}
+		if c.Type != TypeTemplateField {
+			content = append(content, FillFieldsWith(c, fills))
+			continue
+		}
+		name, _ := c.Attrs["name"].(string)
+		if f, filled := fills[name]; filled {
+			content = append(content, f.Inline...)
+		} else {
+			content = append(content, c)
+		}
+	}
+	n.Content = content
+	return n
+}
+
+// fieldAlone reports the filling of a paragraph that holds one answered field and nothing else.
+func fieldAlone(c Node, fills map[string]Filling) (Filling, bool) {
+	if c.Type != TypeParagraph || len(c.Content) != 1 || c.Content[0].Type != TypeTemplateField {
+		return Filling{}, false
+	}
+	name, _ := c.Content[0].Attrs["name"].(string)
+	f, ok := fills[name]
+	return f, ok
+}
+
 func fillNode(n Node, answers map[string]string) Node {
 	if len(n.Content) == 0 {
 		return n

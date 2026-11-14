@@ -33,6 +33,26 @@ func (s *Service) CheckParentForSet(ctx context.Context, q db.Querier, c identit
 	return s.checkParent(ctx, q, c, placement{spaceID: spaceID, parent: parent, kind: KindPage})
 }
 
+// ChosenPage gives a page a person chose as the answer to a question of a template, when
+// they may view it and it is not in the trash. Otherwise it is not found, never with its
+// title, whatever id was sent (spec 074, TPL-306).
+func (s *Service) ChosenPage(ctx context.Context, c identity.Caller, id uuid.UUID) (Page, error) {
+	if err := s.perms.RequirePage(ctx, s.pool, c.UserID, id, permissions.ActionPageView, uuid.Nil); err != nil {
+		if _, refused := apperr.As(err); refused {
+			return Page{}, apperr.NotFound()
+		}
+		return Page{}, err
+	}
+	p, err := load(ctx, s.pool, id)
+	if err != nil {
+		return Page{}, err
+	}
+	if p.Status == StatusTrashed || p.Kind == KindTemplate {
+		return Page{}, apperr.NotFound()
+	}
+	return p, nil
+}
+
 // TemplateText is one version of the text of a template page, as a manifest pins it.
 type TemplateText struct {
 	PageID uuid.UUID

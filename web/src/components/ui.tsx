@@ -37,6 +37,7 @@ export function Dialog({
   wide,
   full,
   side,
+  onEscape,
 }: {
   title: string;
   onClose: () => void;
@@ -46,6 +47,11 @@ export function Dialog({
   side?: boolean;
   /** Fills the window, for something a person works in, such as a viewer. */
   full?: boolean;
+  /**
+   * Takes Escape instead of closing at once, so a dialog that holds typed answers can ask
+   * first (spec 074, TPL-332). The close button calls onClose as always.
+   */
+  onEscape?: () => void;
 }) {
   const { t } = useTranslation();
   const ref = useRef<HTMLDialogElement>(null);
@@ -57,6 +63,16 @@ export function Dialog({
     <dialog
       ref={ref}
       onClose={onClose}
+      onCancel={
+        onEscape
+          ? (e) => {
+              // The event bubbles from a dialog opened on top of this one; that one answers it.
+              if (e.target !== e.currentTarget) return;
+              e.preventDefault();
+              onEscape();
+            }
+          : undefined
+      }
       aria-label={title}
       className={full ? 'full' : side ? 'side' : wide ? 'wide' : undefined}
     >
@@ -150,12 +166,42 @@ export function ConfirmButton({
   );
 }
 
-export function Field({ label, help, children }: { label: string; help?: string; children: ReactNode }) {
+/** The ids a Field gives its help and its error, for the input's aria-describedby. */
+export const fieldHelpId = (id: string) => `${id}-help`;
+export const fieldErrorId = (id: string) => `${id}-error`;
+
+/**
+ * A labelled input. With an `id`, the help and the error get ids of their own, which the
+ * input names in aria-describedby (fieldHelpId, fieldErrorId), and the error stands in
+ * words under the input (WCAG 3.3.1).
+ */
+export function Field({
+  label,
+  help,
+  error,
+  id,
+  children,
+}: {
+  label: string;
+  help?: string;
+  error?: string;
+  id?: string;
+  children: ReactNode;
+}) {
   return (
     <label className="field">
       <span>{label}</span>
       {children}
-      {help && <small className="muted">{help}</small>}
+      {help && (
+        <small className="muted" id={id ? fieldHelpId(id) : undefined}>
+          {help}
+        </small>
+      )}
+      {error && (
+        <span className="field-error" id={id ? fieldErrorId(id) : undefined}>
+          {error}
+        </span>
+      )}
     </label>
   );
 }

@@ -1,15 +1,48 @@
 // SPDX-License-Identifier: Apache-2.0
-// The pages a guided template makes, in the template's own editor (spec 074, wave GT1).
-// A minimal list: add a page below another, write its text, remove it, and choose
-// whether the pages are published as they are made. The editor's full sections come later.
-import { useRef, useState, type FormEvent } from 'react';
+// The pages a guided template makes, in the Pages section of its settings (spec 074,
+// TPL-1011): an indented list of rows that move with Move up, Move down, Indent and Outdent
+// instead of dragging, and a way to add a page below another, write its text, or remove it.
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Json, type TemplateEntries, type TemplateEntry } from '../api';
+import { navigate } from '../router';
+import { useCapabilities } from '../capabilities';
 import { DocumentEditor } from '../components/editor/editor';
+import { templateValueLabel } from '../components/editor/inline';
+import type { TemplateValueChoice } from '../components/editor/template-item';
+import { IconArrowDown, IconArrowUp, IconIndent, IconOutdent } from '../components/icons';
 import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
+
+/** The ways a page of a template moves, as the server takes them. */
+type MoveTo = 'up' | 'down' | 'in' | 'out';
+
+const MOVE_ICON_SIZE = 16;
+
+const BUILT_IN_VALUES = ['date', 'space', 'creator', 'set', 'template'];
+
+/**
+ * What / can insert in the text of a guided template: the values it knows and a link to each
+ * page of its set (TPL-211, TPL-1013). Undefined while guided templates are off.
+ */
+export function useTemplateValues(templateId: string): TemplateValueChoice[] | undefined {
+  const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
+  const list = useQuery({
+    queryKey: ['template-entries', templateId],
+    queryFn: () => api.get<TemplateEntries>(`/templates/${templateId}/entries`),
+    enabled: guidedOn,
+  });
+  if (!guidedOn) return undefined;
+  return [
+    ...BUILT_IN_VALUES.map((source) => ({ source, label: templateValueLabel(source) })),
+    ...(list.data?.entries ?? [])
+      .filter((e) => e.key !== 'root')
+      .map((e) => ({ source: `entry:${e.key}`, label: t('templates.valueLink', { name: e.name }) })),
+  ];
+}
 
 /** How deep an entry sits below the first page, for indenting its name. */
 function depthOf(entry: TemplateEntry, all: TemplateEntry[]): number {
@@ -39,6 +72,7 @@ function EntryText({
   const [name, setName] = useState(entry.name);
   const [pattern, setPattern] = useState(entry.title_pattern);
   const doc = useRef<Json | null>(null);
+  const values = useTemplateValues(templateId);
   const save = useMutation({
     mutationFn: () =>
       api.patch(`/templates/${templateId}/entries/${entry.key}`, {
@@ -72,6 +106,7 @@ function EntryText({
         initial={full.data.document ?? { type: 'doc', content: [{ type: 'paragraph' }] }}
         canAttach={false}
         inTemplate
+        templateValues={values}
         fileAddress={templateFileAddress(templateId)}
         onChange={(next) => {
           doc.current = next;
@@ -116,8 +151,9 @@ export function TemplatePages({ templateId }: { templateId: string }) {
     mutationFn: (key: string) => api.del(`/templates/${templateId}/entries/${key}`),
     onSettled: refresh,
   });
-  const publishing = useMutation({
-    mutationFn: (publish: boolean) => api.put(`/templates/${templateId}/publishing`, { publish }),
+  const move = useMutation({
+    mutationFn: ({ key, to }: { key: string; to: MoveTo }) =>
+      api.post(`/templates/${templateId}/entries/${key}/move`, { to }),
     onSettled: refresh,
   });
   const entries = list.data?.entries ?? [];
@@ -127,31 +163,69 @@ export function TemplatePages({ templateId }: { templateId: string }) {
       <h2 id="template-pages-title">{t('templates.pages')}</h2>
       <p className="muted">{t('templates.pagesHelp')}</p>
       {list.isPending && <Loading />}
-      <ErrorNote error={list.error ?? add.error ?? remove.error ?? publishing.error} />
+      <ErrorNote error={list.error ?? add.error ?? remove.error ?? move.error} />
       {list.data && (
         <>
+          <p role="status">
+            {t('templates.makesSummary', {
+              count: entries.length,
+              levels: Math.max(1, ...entries.map((e) => depthOf(e, entries) + 1)),
+            })}
+          </p>
           <TableBox>
             <table>
               <thead>
                 <tr>
                   <th>{t('common.name')}</th>
                   <th>{t('templates.below')}</th>
+                  <th>{t('templates.entryKind')}</th>
                   <th>{t('common.actions')}</th>
                 </tr>
               </thead>
               <tbody>
                 {entries.map((entry) => {
                   const parent = entries.find((e) => e.key === entry.parent);
+                  const moveButton = (to: MoveTo, label: string, icon: ReactNode) => (
+                    <button
+                      type="button"
+                      className="icon"
+                      aria-label={t(label)}
+                      title={t(label)}
+                      disabled={move.isPending}
+                      onClick={() => move.mutate({ key: entry.key, to })}
+                    >
+                      {icon}
+                    </button>
+                  );
                   return (
                     <tr key={entry.key}>
                       <td data-depth={depthOf(entry, entries)}>{nameOf(entry)}</td>
                       <td>{parent ? nameOf(parent) : ''}</td>
+                      <td>{t(`templates.entry_${entry.kind}`)}</td>
                       <td className="row">
-                        {entry.key !== 'root' && (
+                        {entry.key === 'root' ? (
+                          <button
+                            type="button"
+                            className="ghost"
+                            onClick={() => navigate(`/templates/${templateId}/edit`)}
+                          >
+                            {t('templates.editText')}
+                          </button>
+                        ) : (
                           <>
-                            <button type="button" className="ghost" onClick={() => setWriting(entry)}>
-                              {t('templates.editText')}
-                            </button>
+                            {entry.kind === 'page' && (
+                              <button type="button" className="ghost" onClick={() => setWriting(entry)}>
+                                {t('templates.editText')}
+                              </button>
+                            )}
+                            {moveButton('up', 'templates.moveUp', <IconArrowUp size={MOVE_ICON_SIZE} />)}
+                            {moveButton(
+                              'down',
+                              'templates.moveDown',
+                              <IconArrowDown size={MOVE_ICON_SIZE} />,
+                            )}
+                            {moveButton('in', 'templates.moveIn', <IconIndent size={MOVE_ICON_SIZE} />)}
+                            {moveButton('out', 'templates.moveOut', <IconOutdent size={MOVE_ICON_SIZE} />)}
                             <button type="button" className="ghost" onClick={() => remove.mutate(entry.key)}>
                               {t('templates.removePage')}
                             </button>
@@ -193,16 +267,6 @@ export function TemplatePages({ templateId }: { templateId: string }) {
               {t('templates.addPage')}
             </button>
           </form>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={list.data.publish}
-              disabled={publishing.isPending}
-              onChange={(e) => publishing.mutate(e.target.checked)}
-            />
-            {t('templates.publishAtOnce')}
-          </label>
-          <p className="muted">{t('templates.publishAtOnceHelp')}</p>
         </>
       )}
       {writing && (

@@ -58,13 +58,13 @@
 
 ## 8.5 Templates
 
-- **ORG-045** · partly · An empty page offers templates beside the editor: a gallery with a search box, categories, a preview and a description. Choosing one fills the page. Still open: the gallery opens as a dialog from a note above the editor, not as a panel beside it.
+- **ORG-045** · built · An empty page offers templates beside the editor: a panel with a search box and the templates, which opens the gallery with its categories, preview and description. Choosing one fills the page (spec 074, wave GT2).
 - **ORG-046** · built · A space administrator makes templates for a space. An administrator makes them for all spaces.
 - **ORG-047** · built · A template is written in the same editor as a page.
 - **ORG-048** · built · A template can hold **labels**, which new pages receive, and **page facts** (BLK-039).
 - **ORG-049** · built · A template can hold **instruction text**, which shows only in the editor and disappears when typing starts. Readers never see it.
 - **ORG-050** · built · A template can hold **fields**: single line, multiple lines or a list of choices. Creating a page first shows a short form, and the answers fill in the page. Fields with the same name share a value.
-- **ORG-051** · partly · A template can set the title pattern, such as `Meeting {date}`, and a default parent page. Still open: a field for the default parent. The server keeps it.
+- **ORG-051** · built · A template can set the title pattern, such as `Meeting {date}`, and a default parent page, chosen in the General section of the template (spec 074, wave GT2).
 - **ORG-052** · built · Templates can hold images and attachments, which are copied to each new page.
 - **ORG-053** · built · Diffluence ships a starter set in our own words: meeting notes, decision record, project plan, how-to guide, incident review, retrospective, requirements, onboarding plan, team home, weekly update.
 - **ORG-054** · built · Administrators can hide starter templates, and promote templates so they come first.
@@ -73,8 +73,8 @@
 - **ORG-057** · built · A template can be saved from an existing page.
 - **ORG-058** · built · Changing a template does not change existing pages. Deleting one does not either.
 - **ORG-059** · partly · Templates can be exported and imported between instances. Still open: files in the exported file.
-- **ORG-060** · partly · Templates are versioned like pages, with the same comparison. Still open: the screens for the versions of a template. Each save is a version.
-- **ORG-061** · partly · **Guided page:** a template can start with a short wizard of several steps, which fills in the page and sets the labels and parent. Still open: writing steps on the template screen, and a last step for labels and parent.
+- **ORG-060** · built · Templates are versioned like pages, with the same comparison. Each save is a version; the Versions section lists them and shows what each changed, page by page (spec 074, wave GT2).
+- **ORG-061** · built · **Guided page:** a template can start with a short wizard of several steps, which fills in the page and sets the labels and parent. Steps are written in the Form section of the template; the last step sets the place and shows the labels (spec 074, wave GT2).
 
 ## 8.6 Blog posts
 

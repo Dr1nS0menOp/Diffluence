@@ -1193,6 +1193,157 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  test('TemplateSettingsView: the sections of a template', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/templates/${templateId}/settings`);
+    await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
+    await expect(page.getByLabel('Category')).toHaveValue('Teams');
+    await picture(page, 'template-settings');
+    await checkAccessibility(page);
+    await page.getByRole('link', { name: 'Form' }).click();
+    await expect(page.getByRole('cell', { name: 'Goal', exact: true })).toBeVisible();
+    await picture(page, 'template-settings-form');
+    await checkAccessibility(page);
+    await page.getByRole('button', { name: 'Settings of Goal' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Settings of Goal' });
+    await dialog.getByLabel('Kind of answer').selectOption('number');
+    await dialog.getByLabel('Lowest', { exact: true }).fill('5');
+    await dialog.getByLabel('Highest', { exact: true }).fill('1');
+    await dialog.getByRole('button', { name: 'Keep these settings' }).click();
+    await expect(dialog.getByText('The lowest number cannot be above the highest.')).toBeVisible();
+    await picture(page, 'template-field-dialog');
+    await checkAccessibility(page);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('link', { name: 'Versions' }).click();
+    await page.getByRole('button', { name: 'Changes in version 2' }).click();
+    await expect(page.getByRole('region', { name: 'What version 2 changed' })).toBeVisible();
+    await picture(page, 'template-versions', [page.locator('time')]);
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the form of a template, with every kind of field, and its check step', async ({ browser }) => {
+    const setup = await newReaderPage(browser, 'light');
+    const space = (await (await setup.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };
+    const kinds = [
+      { name: 'Full name', kind: 'line', required: true, help: 'As it appears on the badge.' },
+      { name: 'Email', kind: 'line', format: 'email', placeholder: 'name@example.org' },
+      { name: 'About you', kind: 'text' },
+      { name: 'Hours a week', kind: 'number', min: 1, max: 40, decimals: 1 },
+      { name: 'First day', kind: 'date', required: true, earliest: { fixed: '2027-03-01' } },
+      { name: 'Works remotely', kind: 'yesno' },
+      { name: 'Team', kind: 'choice', options: ['Platform', 'Product', 'Support'], required: true },
+      { name: 'Equipment', kind: 'choices', options: ['Laptop', 'Phone', 'Badge'], show: 'list' },
+      { name: 'Buddy', kind: 'person', default: { creator: true } },
+      { name: 'Interview panel', kind: 'people' },
+      { name: 'Handbook page', kind: 'page' },
+      { name: 'Portfolio', kind: 'link' },
+      { name: 'Area', kind: 'label' },
+    ];
+    const text = {
+      type: 'doc',
+      content: kinds.map((k) => ({
+        type: 'paragraph',
+        content: [{ type: 'templateField', attrs: { name: k.name, kind: 'line' } }],
+      })),
+    };
+    const made = await setup.request.post(`/api/v1/spaces/${space.id}/templates`, {
+      data: { name: 'Joining the team', category: 'People', labels: ['onboarding'], document: text },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    const joining = ((await made.json()) as { id: string }).id;
+    const fields = await setup.request.put(`/api/v1/templates/${joining}/fields`, {
+      data: {
+        fields: kinds,
+        steps: [
+          { title: 'About you', fields: kinds.slice(0, 6).map((k) => k.name) },
+          { title: 'Your first days', fields: kinds.slice(6).map((k) => k.name) },
+        ],
+      },
+    });
+    expect(fields.status(), await fields.text()).toBe(200);
+    await setup.context().close();
+
+    const open = async (page: Page) => {
+      await page.goto(`/pages/${pageId}`);
+      await page.getByRole('button', { name: 'More to create' }).click();
+      await page.getByRole('menuitem', { name: 'From a template' }).click();
+      const gallery = page.getByRole('dialog', { name: 'Start from a template' });
+      await gallery.getByRole('combobox', { name: 'Find a template' }).fill('Joining');
+      // Enter uses the template the preview loaded, so the preview comes first.
+      await expect(gallery.locator('.prose')).toBeVisible();
+      await gallery.getByRole('combobox', { name: 'Find a template' }).press('Enter');
+      const form = page.getByRole('dialog', { name: 'Joining the team' });
+      await expect(form.getByRole('status').filter({ hasText: 'Step 1 of 3' })).toBeVisible();
+      return form;
+    };
+    for (const colorScheme of ['light', 'dark'] as const) {
+      const page = await newReaderPage(browser, colorScheme);
+      const form = await open(page);
+      await picture(page, colorScheme === 'light' ? 'template-form' : 'template-form-dark');
+      await checkAccessibility(page);
+      if (colorScheme === 'light') {
+        // In error: a summary at the top and the words beside each field.
+        await form.getByLabel('Hours a week').fill('41.25');
+        await form.getByRole('button', { name: 'Next' }).click();
+        await expect(form.getByRole('alert').filter({ hasText: 'Some answers need a change' })).toBeFocused();
+        await picture(page, 'template-form-errors');
+        await checkAccessibility(page);
+        // Filled, and the second step with choices, people, a page and the place.
+        await form.getByLabel('Full name (required)').fill('Ada Lovelace');
+        await form.getByLabel('Email').fill('ada@example.org');
+        await form.getByLabel('About you').fill('Likes engines.\n\nWrites notes.');
+        await form.getByLabel('Hours a week').fill('32,5');
+        await form.getByLabel('First day (required)').fill('2027-03-01');
+        await form.getByRole('checkbox', { name: 'Works remotely' }).check();
+        await picture(page, 'template-form-filled');
+        await form.getByRole('button', { name: 'Next' }).click();
+        await form.getByRole('radio', { name: 'Product' }).check();
+        await form.getByRole('checkbox', { name: 'Laptop' }).check();
+        await form.getByLabel('Portfolio').fill('https://example.org/ada');
+        await form.getByLabel('Area').fill('Engines');
+        await picture(page, 'template-form-step-two');
+        await checkAccessibility(page);
+        await form.getByRole('button', { name: 'Next' }).click();
+        await expect(form.getByRole('heading', { name: 'Check before making' })).toBeVisible();
+        await expect(form.getByRole('button', { name: 'Create 1 draft' })).toBeEnabled();
+        await picture(page, 'template-check');
+        // The rows scroll under the dialog's buttons; a link half under them is out of reach until scrolled to.
+        await form.locator('.planned-pages').scrollIntoViewIfNeeded();
+        await checkAccessibility(page);
+      }
+      await page.context().close();
+    }
+    // The form works at 360 px, the narrowest phone the study names (TPL-1042).
+    const narrow = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { width: 360, height: 800 },
+    });
+    const small = await narrow.newPage();
+    await login(small, READER.email, PASSWORD);
+    await open(small);
+    await picture(small, 'template-form-narrow');
+    await checkAccessibility(small);
+    await small.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await picture(small, 'template-form-rtl');
+    await narrow.close();
+  });
+
+  test('an empty page offers templates beside the editor', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    const created = await page.request.post('/api/v1/pages', {
+      data: { space_id: spaceId, parent_id: null, title: 'Blank' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const { id } = (await created.json()) as { id: string };
+    await page.goto(`/pages/${id}/edit`);
+    await expect(page.getByRole('complementary', { name: 'Start it from a template' })).toBeVisible();
+    await picture(page, 'template-panel');
+    await checkAccessibility(page);
+    await page.request.delete(`/api/v1/pages/${id}`);
+    await page.context().close();
+  });
+
   test('the publish options', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}/edit`);

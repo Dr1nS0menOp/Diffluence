@@ -51,6 +51,7 @@ import { SpaceHome, SpaceSettingsView, TrashView } from './views/space';
 import { SpaceAccessView, SpaceAuditView, SpacePeopleView } from './views/space-access';
 import { TasksView } from './views/tasks';
 import { TemplatesView, TemplateView } from './views/templates';
+import { TemplateSettingsView } from './views/template-settings';
 import { UnsubscribeView } from './views/unsubscribe';
 import { PageInsightsView, SpaceInsightsView } from './views/insights';
 import { RulesView, RuleView } from './views/rules';
@@ -352,6 +353,8 @@ function Routes({ me }: { me: Me }) {
       </Plain>
     );
   }
+  if ((m = match('/templates/:id/settings', pathname)))
+    return <TemplateSettingsView templateId={m.id ?? ''} />;
   if ((m = match('/templates/:id/edit', pathname))) {
     return (
       <main id="main" className="focus">

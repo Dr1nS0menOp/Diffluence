@@ -7,7 +7,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-001** · built · A person with *create* adds a page from the Create button, from the add button in the sidebar, or from the add button on a tree row.
 - **PAG-002** · built · A dialog asks for a title. The page opens in the editor.
 - **PAG-003** · built · The dialog can be skipped: the editor opens with an empty title field that has the focus. A page without a title keeps its draft, and cannot be published.
-- **PAG-004** · partly · The editor offers a template panel beside an empty page. It closes as soon as the person starts typing, and can be opened again from the editor menu (ORG-045). Still open: the gallery opens as a dialog from a note above the editor, not as a panel beside it.
+- **PAG-004** · built · The editor offers a template panel beside an empty page. It closes as soon as the person starts typing, and can be opened again from the editor menu (ORG-045).
 - **PAG-005** · new · Create also offers importing a Word or Markdown file into the new page (chapter 11).
 - **PAG-006** · built · A new page starts unpublished: only its creator sees it.
 - **PAG-007** · built · A child page cannot be created below an unpublished page.

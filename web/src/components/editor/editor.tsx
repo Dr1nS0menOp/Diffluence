@@ -57,14 +57,15 @@ import {
   MentionSuggestions,
   SlashCommands,
   TEMPLATE_ITEMS,
+  TEMPLATE_VALUE_ITEM,
   type InsertItem,
 } from './insert';
-import { EditorKeys, noActions, type EditorActions } from './keys';
+import { EditorKeys, noActions, type EditorActions, type TemplateItemKind } from './keys';
 import { cleanWordHtml, convertPastedMarkdown, looksLikeMarkdown, pastedImages } from './paste';
 import { keepSharedClean } from './shared-clean';
 import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
-import { TemplateItemDialog } from './template-item';
+import { TemplateItemDialog, type TemplateValueChoice } from './template-item';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
 import { ReaderTables } from './reader-tables';
@@ -389,6 +390,7 @@ export function DocumentEditor({
   onFocusTitle,
   onComment,
   language,
+  templateValues,
 }: {
   pageId: string;
   initial: Json;
@@ -413,6 +415,8 @@ export function DocumentEditor({
   onComment?: () => void;
   /** What the text is written in, which the spell checker follows. */
   language?: string;
+  /** In a guided template: the values / can insert, built-in ones and the pages of the set. */
+  templateValues?: TemplateValueChoice[];
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -452,7 +456,9 @@ export function DocumentEditor({
   useEffect(() => {
     offeredNow.current = capabilities;
   }, [capabilities]);
-  const [templateItem, setTemplateItem] = useState<'field' | 'instruction' | null>(null);
+  const [templateItem, setTemplateItem] = useState<TemplateItemKind | null>(null);
+  const valueChoices = useRef(templateValues);
+  valueChoices.current = templateValues;
   const fileInput = useRef<HTMLInputElement>(null);
   const plainPaste = useRef(false);
   const change = useRef(onChange);
@@ -559,6 +565,7 @@ export function DocumentEditor({
         items: () => [
           ...offered(INSERT_ITEMS, offeredNow.current),
           ...(inTemplate ? TEMPLATE_ITEMS : []),
+          ...(inTemplate && valueChoices.current ? [TEMPLATE_VALUE_ITEM] : []),
           ...savedItems.current,
         ],
         recent: () => readRecentItems(person),
@@ -811,7 +818,12 @@ export function DocumentEditor({
         />
       )}
       {templateItem && (
-        <TemplateItemDialog editor={editor} what={templateItem} onClose={() => setTemplateItem(null)} />
+        <TemplateItemDialog
+          editor={editor}
+          what={templateItem}
+          values={templateValues ?? []}
+          onClose={() => setTemplateItem(null)}
+        />
       )}
       {inserting && (
         <InsertDialog

@@ -159,6 +159,9 @@ func (s *Service) saveVersion(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := m.checkTexts(texts, sizes); err != nil {
 		return 0, err
 	}
+	if err := s.checkSpecs(ctx, tx, m, texts, t.today); err != nil {
+		return 0, err
+	}
 	latest, found, err := latestVersion(ctx, tx, t.ID)
 	if err != nil {
 		return 0, err
@@ -190,8 +193,16 @@ func (s *Service) saveVersion(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	return number, auditTemplateDetails(ctx, tx, c, "template.version_saved", t, map[string]any{"version": number, "entries": len(m.Entries)})
 }
 
-// Versions lists the versions of a template, newest first, for its managers.
-func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID) ([]Version, error) {
+// VersionRow is a version as the history lists it (ORG-060).
+type VersionRow struct {
+	Version
+	AuthorName string `json:"author_name"`
+	// Pages is how many pages the version makes.
+	Pages int `json:"pages"`
+}
+
+// Versions lists the versions of a template, newest first, for its managers (ORG-060).
+func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID) ([]VersionRow, error) {
 	t, err := load(ctx, s.pool, c.UserID, id)
 	if err != nil {
 		return nil, err
@@ -203,9 +214,115 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
-	out, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Version, error) { return scanVersion(r) })
-	if out == nil {
-		out = []Version{}
+	list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (Version, error) { return scanVersion(r) })
+	if err != nil {
+		return nil, err
 	}
+	authors := make([]uuid.UUID, 0, len(list))
+	for _, v := range list {
+		authors = append(authors, v.AuthorID)
+	}
+	names, err := identity.DisplayNames(ctx, s.pool, authors)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]VersionRow, 0, len(list))
+	for _, v := range list {
+		out = append(out, VersionRow{Version: v, AuthorName: names[v.AuthorID], Pages: len(v.Manifest.Entries)})
+	}
+	return out, nil
+}
+
+// EntryChange is what one version changed in the text of one page of a template, in the
+// comparison pages use (ORG-060).
+type EntryChange struct {
+	Key  string `json:"key"`
+	Name string `json:"name"`
+	// Change is added, removed, changed or same.
+	Change string               `json:"change"`
+	Blocks []document.DiffBlock `json:"blocks"`
+}
+
+// Changes is a version of a template compared with the one before it.
+type Changes struct {
+	Number   int           `json:"number"`
+	Previous int           `json:"previous"`
+	Entries  []EntryChange `json:"entries"`
+	// Settings says that something besides the texts changed: the pages, the questions,
+	// the steps or where the pages go.
+	Settings bool `json:"settings"`
+}
+
+// VersionChanges compares a version of a template with the one before it, page by page,
+// for its managers (ORG-060). The first version is compared with an empty template.
+func (s *Service) VersionChanges(ctx context.Context, c identity.Caller, id uuid.UUID, number int) (Changes, error) {
+	t, err := load(ctx, s.pool, c.UserID, id)
+	if err != nil {
+		return Changes{}, err
+	}
+	if err := s.requireManager(ctx, s.pool, c, t.SpaceID); err != nil {
+		return Changes{}, err
+	}
+	after, err := versionAt(ctx, s.pool, id, number)
+	if err != nil {
+		return Changes{}, err
+	}
+	before := Version{Manifest: Manifest{Entries: []Entry{}}}
+	if number > 1 {
+		if before, err = versionAt(ctx, s.pool, id, number-1); err != nil {
+			return Changes{}, err
+		}
+	}
+	textsAfter, _, err := s.textsOf(ctx, s.pool, after.Manifest)
+	if err != nil {
+		return Changes{}, err
+	}
+	textsBefore, _, err := s.textsOf(ctx, s.pool, before.Manifest)
+	if err != nil {
+		return Changes{}, err
+	}
+	out := Changes{Number: number, Previous: before.Number, Entries: []EntryChange{}}
+	for _, e := range after.Manifest.ordered() {
+		old, _, existed := before.Manifest.entry(e.Key)
+		change := EntryChange{Key: e.Key, Name: e.Name, Change: "same"}
+		doc, oldDoc := texts(textsAfter, e.Key), texts(textsBefore, e.Key)
+		change.Blocks = document.Compare(oldDoc, doc)
+		switch {
+		case !existed:
+			change.Change = "added"
+		case old.PageID != nil && e.PageID != nil && old.PageVersion != e.PageVersion:
+			change.Change = "changed"
+		}
+		out.Entries = append(out.Entries, change)
+	}
+	for _, e := range before.Manifest.Entries {
+		if _, _, kept := after.Manifest.entry(e.Key); !kept {
+			out.Entries = append(out.Entries, EntryChange{Key: e.Key, Name: e.Name, Change: "removed",
+				Blocks: document.Compare(texts(textsBefore, e.Key), document.Empty())})
+		}
+	}
+	out.Settings, err = settingsDiffer(before.Manifest, after.Manifest)
 	return out, err
+}
+
+// texts gives the text of an entry, or an empty one for a folder or a missing entry.
+func texts(all map[string]document.Node, key string) document.Node {
+	if doc, ok := all[key]; ok {
+		return doc
+	}
+	return document.Empty()
+}
+
+// settingsDiffer says whether two manifests differ in anything but the versions of texts.
+func settingsDiffer(a, b Manifest) (bool, error) {
+	strip := func(m Manifest) Manifest {
+		m.Entries = slices.Clone(m.Entries)
+		for i := range m.Entries {
+			m.Entries[i].PageVersion = 0
+		}
+		m.normalise()
+		return m
+	}
+	same, err := sameManifest(strip(a), strip(b))
+	return !same, err
 }

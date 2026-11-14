@@ -12,7 +12,7 @@ import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, FilePicker, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
 import { useCapabilities } from '../capabilities';
-import { TemplatePages } from './template-pages';
+import { TemplatePages, useTemplateValues } from './template-pages';
 
 function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -53,7 +53,7 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
             {list.map((x) => (
               <tr key={x.id}>
                 <td>
-                  <Link href={`/templates/${x.id}/edit`}>{x.name}</Link>
+                  <Link href={`/templates/${x.id}/settings`}>{x.name}</Link>
                   {x.hidden && <span className="muted"> {t('templates.hidden')}</span>}
                   {x.guided && !guidedOn && <span className="muted"> ({t('templates.needsGuided')})</span>}
                 </td>
@@ -174,6 +174,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
     workflow_id: template.workflow_id ?? '',
   });
   const doc = useRef<Json>(template.document ?? { type: 'doc', content: [{ type: 'paragraph' }] });
+  const values = useTemplateValues(template.id);
   const save = useMutation({
     mutationFn: () =>
       api.patch(`/templates/${template.id}`, {
@@ -236,6 +237,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         initial={doc.current}
         canAttach={false}
         inTemplate
+        templateValues={values}
         fileAddress={templateFileAddress(template.id)}
         onChange={(next) => {
           doc.current = next;
@@ -244,6 +246,9 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         onSave={() => save.mutate()}
         header={null}
       />
+      <p className="template-details">
+        <Link href={`/templates/${template.id}/settings`}>{t('templates.openSettings')}</Link>
+      </p>
       {guidedOn && <TemplatePages templateId={template.id} />}
     </>
   );

@@ -134,6 +134,8 @@ run_web() {
   mkdir -p "$dir/web"
   tar -C "$snapshot/web" -cf - . | tar -C "$dir/web" -xf -
   ln -s "$src/web/node_modules" "$dir/web/node_modules"
+  # The form's checks read the table of cases they share with Go (spec 074, TPL-325).
+  ln -s "$snapshot/repo/internal" "$dir/internal"
   if ! apply "$dir/web/${files[i]}" "${exprs[i]}" 2>/dev/null; then
     echo "BROKEN  ${names[i]} (the mutation no longer applies; update this script)"
     return
@@ -419,6 +421,48 @@ mutate "the empty page of someone else makes way for a set" internal/templates/s
   's.replace("if err := s.pages.TrashEmptyPage(ctx, tx, c, *p.replaces); err != nil {", "if err := s.pages.TrashEmptyPage(ctx, tx, c, *p.replaces); err != nil && err == nil {")' $app -run TestTheEmptyPageMakesWayInTheSameTransaction
 mutate "a plain template changed by the previous release keeps its old version" internal/templates/versions.go \
   's.replace("m.Entries = slices.Clone(m.Entries)", "m.Entries = m.Entries[:len(m.Entries):len(m.Entries)]")' $app -run TestAPlainTemplateSavedByTheOlderReleaseGetsItsNextVersionOnFirstUse
+# Guided templates (spec 074, wave GT2): the server checks every answer, whatever the browser said.
+fields=./internal/templates/fields/
+mutate "a required question is not checked on the server" internal/templates/fields/answer.go \
+  's.replace("if s.Required && s.Kind != KindYesNo {", "if false && s.Required && s.Kind != KindYesNo {")' $fields
+mutate "a number over its highest is let through" internal/templates/fields/answer.go \
+  's.replace("if s.Max != nil && n > *s.Max {", "if false && s.Max != nil && n > *s.Max {")' $fields
+mutate "a number under its lowest is let through" internal/templates/fields/answer.go \
+  's.replace("if s.Min != nil && n < *s.Min {", "if false && s.Min != nil && n < *s.Min {")' $fields
+mutate "a date before its earliest day is let through" internal/templates/fields/answer.go \
+  's.replace("ok && value < earliest {", "ok && false && value < earliest {")' $fields
+mutate "a date after its latest day is let through" internal/templates/fields/answer.go \
+  's.replace("ok && value > latest {", "ok && false && value > latest {")' $fields
+mutate "a link of another scheme is let through" internal/templates/fields/answer.go \
+  's.replace("(!strings.EqualFold(u.Scheme, \"https\") && !strings.EqualFold(u.Scheme, \"http\"))", "false")' $fields
+mutate "a choice that is not an option is let through" internal/templates/fields/answer.go \
+  's.replace("\t\tif !slices.Contains(s.Options, value) {", "\t\tif false {")' $fields
+mutate "a default that is no answer is saved" internal/templates/fields/spec.go \
+  's.replace("\tif _, p := Answer(loose, s.DefaultValue(today, \"\"), today); p != nil {", "\tif _, p := Answer(loose, s.DefaultValue(today, \"\"), today); p != nil && false {")' $fields
+mutate "a required yes/no field is saved" internal/templates/fields/spec.go \
+  's.replace("\tcase s.Kind == KindYesNo && s.Required:", "\tcase s.Kind == KindYesNo && s.Required && false:")' $fields
+mutate "a page field accepts a page the creator cannot see" internal/templates/answers.go \
+  's.replace("\t\tif apperr.IsNotFound(err) {", "\t\tif apperr.IsNotFound(err) {\n\t\t\terr = nil\n\t\t}\n\t\tif false {")' $app -run TestPagesAndPeopleAreCheckedAgainstWhatTheCreatorMaySee
+mutate "a person the creator cannot see is chosen" internal/templates/answers.go \
+  's.replace("\t\tif !visible {", "\t\tif !visible && false {")' $app -run TestPagesAndPeopleAreCheckedAgainstWhatTheCreatorMaySee
+mutate "a person who is no longer active is chosen" internal/templates/answers.go \
+  's.replace("\t\tif len(gone) > 0 {", "\t\tif len(gone) < 0 {")' $app -run TestPagesAndPeopleAreCheckedAgainstWhatTheCreatorMaySee
+mutate "a label off the fixed list of the space is taken" internal/templates/answers.go \
+  's.replace("refused, err := labels.Refused(ctx, s.pool, p.spaceID, value)", "refused, err := labels.Refused(ctx, s.pool, p.spaceID, value)\n\t\trefused = false")' $app -run TestALabelFieldFollowsTheFixedListOfTheSpace
+mutate "the settings of a question are saved without their check" internal/templates/form.go \
+  's.replace("\tif len(problems) > 0 {", "\tif len(problems) < 0 {")' $app -run TestTheSettingsOfAQuestionAreCheckedBeforeTheyAreSaved
+mutate "saving plain questions turns a template guided" internal/templates/form.go \
+  's.replace("\t\t\tif string(a) == string(b) {", "\t\t\tif string(a) == string(b) && false {")' $app -run TestSavingPlainQuestionsKeepsATemplatePlain
+mutate "a form bound to an older version gets the newest" internal/templates/sets.go \
+  's.replace("\tif number > 0 {", "\tif number > 0 && false {")' $app -run TestAFormBoundToAnOlderVersionMakesThatVersion
+mutate "the dry run checks other answers than the real run" internal/templates/sets.go \
+  's.replace("func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetCheck, error) {", "func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetCheck, error) {\n\tdelete(in.Answers, \"Size\")")' $app -run TestTheDryRunAndTheRealRunAgree
+mutate "the real run titles its pages otherwise than the dry run" internal/templates/sets.go \
+  's.replace("Title: pp.Title,", "Title: strings.ToUpper(pp.Title),")' $app -run TestTheDryRunAndTheRealRunAgree
+mutate_web "the form lets a number over its highest through" src/template-fields.ts \
+  's.replace("if (s.max !== undefined && parsed.n > s.max)", "if (false)")' src/template-fields.test.ts
+mutate_web "the form lets a link of any scheme through" src/template-fields.ts \
+  's.replace("if ((u.protocol !== \x27https:\x27 && u.protocol !== \x27http:\x27) || u.host === \x27\x27)", "if (u.host === \x27\x27)")' src/template-fields.test.ts
 mutate "the link filter tells hidden from gone" internal/pages/content.go \
   's.replace("AND k.target_id NOT IN (SELECT g.page_id FROM perm_visible_pages($1) g)))", "AND k.target_id NOT IN (SELECT g.id FROM pages g WHERE g.status <> \x27trashed\x27 AND $1::uuid IS NOT NULL)))")' $app -run TestABrokenLinkFilterTreatsHiddenPagesAsGone
 mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \

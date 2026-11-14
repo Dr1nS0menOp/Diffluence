@@ -16,6 +16,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/templates/fields"
 )
 
 // The bounds of a template (spec 074, TPL-102, TPL-825, TPL-906).
@@ -69,6 +70,10 @@ type Manifest struct {
 	Steps         []Step     `json:"steps"`
 	Publish       bool       `json:"publish"`
 	DefaultParent *uuid.UUID `json:"default_parent"`
+	// Fields holds what a question needs beyond its name and place, which the texts hold
+	// (TPL-1431): its kind, help, default and validation (spec 074, wave GT2). A question
+	// without an entry here asks as its text says, as every question did before.
+	Fields []fields.Spec `json:"fields,omitempty"`
 }
 
 func (m Manifest) entry(key string) (Entry, int, bool) {
@@ -233,10 +238,10 @@ func sameManifest(a, b Manifest) (bool, error) {
 }
 
 // usesGuidedParts says whether a template needs the experimental part guided templates
-// to be offered (TPL-050): more than one page, publishing at once, a restriction, a
-// workflow, or a value of the template in its text.
+// to be offered (TPL-050): more than one page, publishing at once, the settings of a
+// question beyond its text, a restriction, a workflow, or a value of the template in its text.
 func (m Manifest) usesGuidedParts(texts map[string]document.Node) bool {
-	if len(m.Entries) > 1 || m.Publish {
+	if len(m.Entries) > 1 || m.Publish || len(m.Fields) > 0 {
 		return true
 	}
 	for _, e := range m.Entries {

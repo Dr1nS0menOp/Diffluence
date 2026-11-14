@@ -424,3 +424,160 @@ fieldset.choices legend {
   margin: 0 0 var(--space-1);
   font-size: var(--text-ui);
 }
+
+/* The form of a template (spec 074, wave GT2): errors in words beside their field and in a
+   summary at the top of the step, and the check step's list of pages, indented as the tree. */
+.field-error {
+  color: var(--color-danger);
+  font-size: var(--text-small);
+}
+
+.template-form fieldset.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.error-summary {
+  margin-block-end: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-inline-start: var(--space-1) solid var(--color-danger);
+  border-radius: var(--radius);
+  background: var(--color-danger-tint);
+}
+
+.error-summary h3 {
+  margin-block: 0 var(--space-2);
+  font-size: var(--text-ui);
+}
+
+.error-summary ul {
+  margin: 0;
+  padding-inline-start: var(--space-4);
+}
+
+.check-answers {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto;
+  margin: 0 0 var(--space-4);
+}
+
+/* Each answer is a row of the list's own columns, so names, answers and links line up. */
+.check-answer {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  gap: var(--space-2);
+  align-items: baseline;
+  padding-block: var(--space-1);
+  border-block-end: 1px solid var(--color-line);
+}
+
+.check-answer dt {
+  font-weight: var(--weight-strong);
+}
+
+.check-answer dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+/* A Change link of its own size, so rows of answers never crowd it (WCAG 2.5.8). */
+.check-answer button {
+  min-block-size: var(--size-tool);
+}
+
+.planned-pages {
+  margin: 0;
+  padding-inline-start: var(--tree-indent);
+  list-style: none;
+}
+
+.planned-pages > li {
+  padding-block: var(--space-1);
+}
+
+.planned-title {
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.planned-label {
+  margin-inline-start: var(--space-2);
+  color: var(--color-muted);
+}
+
+.planned-lock {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: var(--space-2);
+  color: var(--color-muted);
+}
+
+@media (max-width: 40rem) {
+  .check-answers {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* The settings of a template are made for a larger screen; a phone gets a note, and every
+   function stays (spec 074, TPL-1042). */
+.template-narrow-note {
+  display: none;
+}
+
+.template-changes article {
+  margin-block: var(--space-4);
+}
+
+@media (max-width: 40rem) {
+  .template-narrow-note {
+    display: block;
+  }
+}
+/* An empty page offers templates beside the editor (ORG-045). Where the room beside the
+   sheet allows, it stands at the end of the editor; elsewhere it sits above the sheet. */
+.template-panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-5);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.template-panel h2 {
+  margin: 0;
+  font-size: var(--text-ui);
+}
+
+.template-panel .edit-hint {
+  margin: 0;
+}
+
+.template-panel-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+@container content (min-width: 88rem) {
+  .template-panel {
+    position: absolute;
+    inset-inline-end: var(--space-5);
+    z-index: var(--layer-bar);
+    inline-size: var(--size-card);
+    margin: 0;
+  }
+
+  .template-panel-list {
+    flex-direction: column;
+  }
+}
+
+/* A yes/no question is a checkbox with its words, not a field-wide input (TPL-305). */
+.field .check input[type='checkbox'] {
+  inline-size: auto;
+}

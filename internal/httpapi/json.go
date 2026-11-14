@@ -8,12 +8,16 @@ import (
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/diffluence/diffluence/internal/apperr"
 )
 
 type errorBody struct {
 	Error struct {
 		Code    string `json:"code"`
 		Message string `json:"message"`
+		// Fields names the refused fields of a form, each with why (spec 074, TPL-324).
+		Fields []apperr.FieldProblem `json:"fields,omitempty"`
 	} `json:"error"`
 }
 
@@ -28,8 +32,13 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 // writeError sends {"error":{"code":..., "message":...}}. Messages are meant
 // for users: never put internal details in them.
 func writeError(w http.ResponseWriter, status int, code, message string) {
+	writeErrorFields(w, status, code, message, nil)
+}
+
+// writeErrorFields is writeError with the refused fields of a form.
+func writeErrorFields(w http.ResponseWriter, status int, code, message string, fields []apperr.FieldProblem) {
 	var b errorBody
-	b.Error.Code, b.Error.Message = code, message
+	b.Error.Code, b.Error.Message, b.Error.Fields = code, message, fields
 	writeJSON(w, status, b)
 }
 

@@ -1,9 +1,54 @@
 // SPDX-License-Identifier: Apache-2.0
-// Adding a field or instruction text to a template.
+// Adding a field, instruction text or a value of the template to a template's text.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Editor } from '@tiptap/core';
 import { Dialog, Field } from '../ui';
+import type { TemplateItemKind } from './keys';
+
+/** A value / can insert in a guided template: a built-in value, or a page of the set. */
+export interface TemplateValueChoice {
+  source: string;
+  label: string;
+}
+
+/** Puts a value of the template at the cursor (spec 074, TPL-211, TPL-1013). */
+function ValueForm({
+  editor,
+  values,
+  onClose,
+}: {
+  editor: Editor;
+  values: TemplateValueChoice[];
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [source, setSource] = useState(values[0]?.source ?? 'date');
+  return (
+    <form
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        editor.chain().focus().insertContent({ type: 'templateValue', attrs: { source } }).run();
+        onClose();
+      }}
+    >
+      <Field label={t('templates.valueSource')} help={t('templates.valueSourceHelp')}>
+        <select value={source} autoFocus onChange={(e) => setSource(e.target.value)}>
+          {values.map((v) => (
+            <option key={v.source} value={v.source}>
+              {v.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+      <div className="dialog-actions">
+        <button type="submit" className="primary">
+          {t('common.add')}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 const FIELD_KINDS = ['line', 'text', 'choice'];
 
@@ -83,20 +128,20 @@ function FieldForm({ editor, onClose }: { editor: Editor; onClose: () => void })
 export function TemplateItemDialog({
   editor,
   what,
+  values,
   onClose,
 }: {
   editor: Editor;
-  what: 'field' | 'instruction';
+  what: TemplateItemKind;
+  values: TemplateValueChoice[];
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   return (
-    <Dialog title={t(`insert.${what}.name`)} onClose={onClose}>
-      {what === 'field' ? (
-        <FieldForm editor={editor} onClose={onClose} />
-      ) : (
-        <InstructionForm editor={editor} onClose={onClose} />
-      )}
+    <Dialog title={t(`insert.${what === 'value' ? 'templateValue' : what}.name`)} onClose={onClose}>
+      {what === 'field' && <FieldForm editor={editor} onClose={onClose} />}
+      {what === 'instruction' && <InstructionForm editor={editor} onClose={onClose} />}
+      {what === 'value' && <ValueForm editor={editor} values={values} onClose={onClose} />}
     </Dialog>
   );
 }

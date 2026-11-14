@@ -15,6 +15,9 @@ import { ruleUndoPlugin, undoLastRule } from './rule-undo';
 
 const LINK_SHORTHAND = /\[([^\]]+)\]\(((?:https?:\/\/|mailto:|\/)[^\s)]+)\)$/;
 
+/** What a template's text can have inserted from /: a field, instruction text or a value. */
+export type TemplateItemKind = 'field' | 'instruction' | 'value';
+
 /** What the editor asks of the screen around it. */
 export interface EditorActions {
   pickFiles: () => void;
@@ -26,7 +29,7 @@ export interface EditorActions {
   openBlockMenu: () => void;
   openTableMenu: () => void;
   openTableSize: () => void;
-  openTemplateItem: (what: 'field' | 'instruction') => void;
+  openTemplateItem: (what: TemplateItemKind) => void;
   publish: () => void;
   save: () => void;
   mentionNoAccess: (name: string) => void;

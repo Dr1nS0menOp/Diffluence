@@ -4,6 +4,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/diffluence/diffluence/internal/templates"
 )
@@ -122,6 +123,59 @@ func (s *Server) handleTemplateVersions(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"versions": list})
+}
+
+func (s *Server) handleTemplateVersionChanges(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	number, err := strconv.Atoi(r.PathValue("number"))
+	if err != nil || number < 1 {
+		writeError(w, http.StatusNotFound, "not_found", "Not found.")
+		return
+	}
+	changes, err := s.deps.Templates.VersionChanges(r.Context(), s.caller(r), id, number)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, changes)
+}
+
+func (s *Server) handleTemplateEntryMove(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		To string `json:"to"`
+	}
+	if !body(w, r, &in) {
+		return
+	}
+	if err := s.deps.Templates.MoveEntry(r.Context(), s.caller(r), id, r.PathValue("key"), in.To); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleTemplateFields(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in templates.FieldsInput
+	if !body(w, r, &in) {
+		return
+	}
+	form, err := s.deps.Templates.SetFields(r.Context(), s.caller(r), id, in)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, form)
 }
 
 func (s *Server) handleTemplateSet(w http.ResponseWriter, r *http.Request) {

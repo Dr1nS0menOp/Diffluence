@@ -42,7 +42,12 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("PATCH /api/v1/templates/{id}/entries/{key}", me, guided(s.handleTemplateEntryUpdate))
 	r.HandleFunc("DELETE /api/v1/templates/{id}/entries/{key}", me, guided(s.handleTemplateEntryRemove))
 	r.HandleFunc("PUT /api/v1/templates/{id}/publishing", me, guided(s.handleTemplatePublishing))
-	r.HandleFunc("GET /api/v1/templates/{id}/versions", me, guided(s.handleTemplateVersions))
+	r.HandleFunc("PUT /api/v1/templates/{id}/fields", me, guided(s.handleTemplateFields))
+	r.HandleFunc("POST /api/v1/templates/{id}/entries/{key}/move", me, guided(s.handleTemplateEntryMove))
+	// The versions of a template finish a part that exists (ORG-060, TPL-1104), so they are
+	// not behind the switch: every template has versions.
+	r.HandleFunc("GET /api/v1/templates/{id}/versions", me, s.handleTemplateVersions)
+	r.HandleFunc("GET /api/v1/templates/{id}/versions/{number}/changes", me, s.handleTemplateVersionChanges)
 	r.HandleFunc("POST /api/v1/templates/{id}/sets", me, guided(s.handleTemplateSet))
 	r.HandleFunc("POST /api/v1/templates/{id}/sets/check", me, guided(s.handleTemplateSetCheck))
 	r.HandleFunc("GET /api/v1/templates/{id}/files/{file}", me, s.handleTemplateFile)

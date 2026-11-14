@@ -145,6 +145,8 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 - a page field that accepts a page the creator cannot see;
 - the dry run and the real run drifting apart.
 
+**Status (2026-11-14):** built, with no migration. Report: [2026-11-14-wave-gt2.md](../reports/2026-11-14-wave-gt2.md). The kinds live in `internal/templates/fields` and `web/src/template-fields.ts`, and both run `internal/templates/fields/testdata/cases.json`. Left for later, each with its reason in the decision table below: the Rules and Who can use it sections (GT3, GT4); the text of a page other than the first is still written in place in the Pages section, not yet in the Focus frame (TPL-1011); the test of dates in two locales (TPL-1043); the measurements on the real-data dump (TPL-1422).
+
 ## GT3: conditions
 
 **Scope:**
@@ -334,6 +336,35 @@ Decided on the product owner's behalf on 2026-11-14, may be overruled.
 | TPL-1438 | Who is on the restriction of a page made from a restricted entry | The template's people and groups, and its creator, as when a restriction is set by hand (ACC-065) | Nobody makes a page they cannot open |
 | TPL-1439 | Which empty page makes way for a set (TPL-122) | Only an unpublished page of one's own with no title, no text and no pages below it | A page with any content is someone's work |
 | TPL-1440 | An entry's workflow in a space that has a space workflow | Needs no right: the space workflow wins (DOC-420) | The entry's choice is not used, so nothing is chosen |
+
+### Decided while building GT2
+
+Decided on the product owner's behalf on 2026-11-14, may be overruled.
+
+| # | Question | Decision | Reason |
+|---|---|---|---|
+| TPL-1441 | Where do the settings of a question live? | In the manifest, as `fields`, holding only what the text does not already say; the field in the text keeps its name, and `line`, `text` or `choice` as its kind | One place per fact (TPL-1431); the previous release reads an unknown kind as a line |
+| TPL-1442 | Does saving the Form section make a template guided? | Only when a question gets a setting beyond its text; settings equal to the text are dropped on save | A plain template must stay offered while the part is off (TPL-050) |
+| TPL-1443 | Which templates get the check step? | Guided templates, while the part is on. A plain template keeps the form it had, with the place on its last step | Today's templates behave as today, and their tests run unchanged |
+| TPL-1444 | Is the place of the pages a step of its own (TPL-333)? | No: it sits under the questions of the last step; a template without questions gets a step with the place alone | "The last step sets the parent"; one more click for every form would add nothing |
+| TPL-1445 | How does an answer of several people or options travel? | One per line in the same text answer | The API keeps `answers` as text; an option cannot hold a line break |
+| TPL-1446 | How does a number land in the page? | As typed, with the decimal sign the person used. No grouping sign is read: `1,000` is one with three decimals | The server has no locale formatting without a new dependency; what the person typed is how their locale writes it (TPL-303) |
+| TPL-1447 | The words of a yes/no answer in a page | "Yes" or "No", or nothing when the author chooses | Diffluence speaks one language today (TPL-212) |
+| TPL-1448 | Which guests and people can be chosen? | Anyone the access rule lets the creator see (`CheckPerson`: a shared space or `profiles.view`), while their account is active | One rule for who sees whom; a disabled person or a service account is never an answer |
+| TPL-1449 | A suggested person who later leaves | The form shows the field empty with a note, the server treats it as no answer, and the next save of the template is refused until the suggestion changes | TPL-316; nobody is assigned who cannot act |
+| TPL-1450 | How do refused answers come back? | `fields` in the error, each with the field, a problem code, its values and English words; the form translates the code | The form shows the words of its own language beside the field (TPL-324) |
+| TPL-1451 | Are the versions routes experimental? | No: listing and comparing versions leave the switch | ORG-060 finishes a part every template has (TPL-1104) |
+| TPL-1452 | What does the Versions section compare? | Each page's text with the version before, in the comparison pages use, and a note when anything else changed | ORG-060 asks for the same comparison as pages; the full list of changed settings is TPL-602, GT5 |
+| TPL-1453 | Which sections does the editor have in GT2? | General, Pages, Form and Versions | Rules need conditions (GT3) and Who can use it needs rights (GT4) |
+| TPL-1454 | Where is the text of a page other than the first written? | In place, below the Pages section's list, as GT1 built it; the first page in the editor | Moving it to a Focus frame of its own is a new screen and route; left for when the sections are finished (TPL-1011) |
+| TPL-1455 | Where does the panel of templates stand (ORG-045)? | Beside the sheet where the editor has room for it, otherwise above the sheet | The design standard's rule for side lists: beside when there is room, never over the text |
+| TPL-1456 | A step that names a question no text asks any longer | Kept, and the question shows nowhere until a text asks it again | Nothing quietly dropped; a field removed and added back lands in its step |
+| TPL-1457 | A line break in a one-line answer | Refused (`one_line`), also through the API | The form cannot type one; the server decides as the form does (TPL-320) |
+| TPL-1458 | A question named `date`, `space`, `creator`, `set` or `template` | Keeps working as before; giving it settings is refused until it is renamed | TPL-230: the editor asks for a new name at the next save |
+| TPL-1459 | What does Try the form show? | The saved version, with the dry run at its end; a change is tried after Save | The dry run is the server's, and the server knows only what is saved |
+| TPL-1460 | The usual place of a template of all spaces | Not offered: only a template of a space has one | A page belongs to one space; the server already ignores a place in another space (TPL-802) |
+| TPL-1461 | An upgrade from GT1 with the part on | No grace refusal, because GT2 has no migration: the changelog says to finish the upgrade before changing questions | A node of GT1 keeps no settings when it saves; experimental and off by default, so the note suffices |
+| TPL-1462 | An answer given empty to a question with a suggestion | It is an answer, and a required question refuses it; only a question left out takes the suggestion | The person cleared it on purpose |
 
 ## What these waves do not cover
 

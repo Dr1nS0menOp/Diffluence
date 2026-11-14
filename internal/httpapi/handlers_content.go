@@ -134,7 +134,7 @@ func (s *Server) fail(w http.ResponseWriter, r *http.Request, err error) {
 	case apperr.KindNoRoom:
 		status = http.StatusInsufficientStorage
 	}
-	writeError(w, status, e.Code, e.Message)
+	writeErrorFields(w, status, e.Code, e.Message, e.Fields)
 }
 
 // busyRetrySeconds is how soon a refused request can come back.

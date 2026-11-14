@@ -105,7 +105,8 @@ func TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff(t *testing.T) {
 		{"PATCH", "/api/v1/templates/" + tpl + "/entries/root"},
 		{"DELETE", "/api/v1/templates/" + tpl + "/entries/root"},
 		{"PUT", "/api/v1/templates/" + tpl + "/publishing"},
-		{"GET", "/api/v1/templates/" + tpl + "/versions"},
+		{"PUT", "/api/v1/templates/" + tpl + "/fields"},
+		{"POST", "/api/v1/templates/" + tpl + "/entries/root/move"},
 		{"POST", "/api/v1/templates/" + tpl + "/sets"},
 		{"POST", "/api/v1/templates/" + tpl + "/sets/check"},
 	}
@@ -129,6 +130,10 @@ func TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff(t *testing.T) {
 		t.Fatalf("use while off: %s", out)
 	}
 	editor.ok("POST", "/api/v1/templates/"+plain+"/use", map[string]any{"space_id": space})
+	// The versions of a template finish a part that every template has (ORG-060, TPL-1104),
+	// so they answer while the part is off.
+	owner.ok("GET", "/api/v1/templates/"+plain+"/versions", nil)
+	owner.ok("GET", "/api/v1/templates/"+plain+"/versions/1/changes", nil)
 	// Managers still list, change and delete it.
 	managed := owner.want(200, "GET", "/api/v1/spaces/"+space+"/manage-templates", nil)
 	if !strings.Contains(managed, `"name":"Onboarding"`) || !strings.Contains(managed, `"guided":true`) {
@@ -1013,6 +1018,16 @@ func TestTheTemplateActionsFollowThePermissionMatrix(t *testing.T) {
 		}
 		if got, out := u.do("POST", "/api/v1/templates/"+tpl+"/entries", map[string]any{"name": "By " + u.email, "parent": "root"}); got != w.edit {
 			t.Errorf("%s edits: %d %s", u.email, got, out)
+		}
+		// The questions and the history follow seeing the entries (spec 074, wave GT2).
+		if got, out := u.do("PUT", "/api/v1/templates/"+tpl+"/fields", map[string]any{"fields": []any{}}); got != w.see {
+			t.Errorf("%s changes the questions: %d %s", u.email, got, out)
+		}
+		if got, out := u.do("GET", "/api/v1/templates/"+tpl+"/versions", nil); got != w.see {
+			t.Errorf("%s reads the history: %d %s", u.email, got, out)
+		}
+		if got, out := u.do("POST", "/api/v1/templates/"+tpl+"/sets/check", map[string]any{"space_id": space}); got != w.use && !(w.use == 201 && got == 200) {
+			t.Errorf("%s checks a set: %d %s", u.email, got, out)
 		}
 	}
 	// A template of all spaces is edited by administrators only, and used where page.create holds.

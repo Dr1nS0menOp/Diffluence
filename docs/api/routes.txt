@@ -271,6 +271,7 @@ GET /api/v1/templates/{id}/entries/{key}                       authenticated
 GET /api/v1/templates/{id}/export                              authenticated
 GET /api/v1/templates/{id}/files/{file}                        authenticated
 GET /api/v1/templates/{id}/versions                            authenticated
+GET /api/v1/templates/{id}/versions/{number}/changes           authenticated
 GET /api/v1/webhooks/{id}                                      object:space.automation
 GET /api/v1/webhooks/{id}/deliveries                           object:space.automation
 GET /api/v1/workflow-templates                                 authenticated
@@ -467,6 +468,7 @@ POST /api/v1/spaces/{id}/workflows                             object:space.work
 POST /api/v1/spaces/{id}/workflows/from-template               object:space.workflows
 POST /api/v1/tasks/{id}/done                                   object:page.edit
 POST /api/v1/templates/{id}/entries                            authenticated
+POST /api/v1/templates/{id}/entries/{key}/move                 authenticated
 POST /api/v1/templates/{id}/sets                               authenticated
 POST /api/v1/templates/{id}/sets/check                         authenticated
 POST /api/v1/templates/{id}/use                                authenticated
@@ -554,6 +556,7 @@ PUT /api/v1/spaces/{id}/title-align                            object:space.look
 PUT /api/v1/spaces/{id}/watch                                  object:space.view
 PUT /api/v1/spaces/{id}/workflow                               object:space.workflows
 PUT /api/v1/templates/{id}/favourite                           authenticated
+PUT /api/v1/templates/{id}/fields                              authenticated
 PUT /api/v1/templates/{id}/publishing                          authenticated
 PUT /api/v1/users/{id}/follow                                  authenticated
 PUT /api/v1/workflows/{id}                                     authenticated

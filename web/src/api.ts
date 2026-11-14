@@ -1,11 +1,22 @@
 // SPDX-License-Identifier: Apache-2.0
 // The frontend uses only the public API, like any other client (blueprint 01).
+import type { FieldSpec } from './template-fields';
+
+/** One field of a form the server refused, with why (spec 074, TPL-324). */
+export interface FieldProblem {
+  field: string;
+  problem: string;
+  params?: Record<string, string>;
+  message: string;
+}
 
 export class ApiError extends Error {
   constructor(
     readonly status: number,
     readonly code: string,
     message: string,
+    /** The refused fields of a form, when the failure is about fields. */
+    readonly fields: FieldProblem[] = [],
   ) {
     super(message);
   }
@@ -88,13 +99,15 @@ function sendOnce(call: Call): Promise<Response> {
 async function errorOf(res: Response): Promise<ApiError> {
   let code = 'error';
   let message = res.statusText;
+  let fields: FieldProblem[] = [];
   try {
-    const e = (await res.json()) as { error?: { code: string; message: string } };
+    const e = (await res.json()) as { error?: { code: string; message: string; fields?: FieldProblem[] } };
     if (e.error) ({ code, message } = e.error);
+    fields = e.error?.fields ?? [];
   } catch {
     // not JSON: keep the status text
   }
-  return new ApiError(res.status, code, message);
+  return new ApiError(res.status, code, message, fields);
 }
 
 async function send(call: Call): Promise<Response> {
@@ -505,12 +518,11 @@ export interface ApprovalRound {
   document?: Json;
 }
 
-export interface TemplateField {
-  name: string;
-  kind: string;
-  options?: string[];
-  required: boolean;
-}
+/**
+ * A question of a template, with its settings (spec 074, wave GT2), as the server sends it.
+ * The kind is read with `fieldSpecOf`, which treats a kind this release does not know as a line.
+ */
+export type TemplateField = Omit<FieldSpec, 'kind'> & { kind: string };
 
 export interface TemplateSummary {
   id: string;
@@ -534,7 +546,54 @@ export interface TemplateSummary {
   /** The workflow a page made from it enters (spec 064, DOC-560). */
   workflow_id: string | null;
   fields?: TemplateField[];
+  /** How many pages the template makes (TPL-1021). */
+  pages?: number;
   document?: Json;
+}
+
+/** One page a set will make, as the check step shows it (TPL-340). */
+export interface PlannedPage {
+  entry: string;
+  entry_name: string;
+  parent_entry: string;
+  id: string;
+  title: string;
+  exists: boolean;
+  labels: string[];
+  restricted: '' | 'view' | 'edit';
+}
+
+/** What the dry run of a set answers (TPL-341). */
+export interface SetCheck {
+  version: number;
+  pages: PlannedPage[];
+  parent_id: string | null;
+  default_parent_unusable: boolean;
+  background: boolean;
+  publish: boolean;
+}
+
+/** A version of a template, as its history lists it (ORG-060). */
+export interface TemplateVersionRow {
+  number: number;
+  author_id: string;
+  author_name: string;
+  state: string;
+  created_at: string;
+  pages: number;
+}
+
+/** What a version changed, page by page (ORG-060). */
+export interface TemplateChanges {
+  number: number;
+  previous: number;
+  settings: boolean;
+  entries: {
+    key: string;
+    name: string;
+    change: 'added' | 'removed' | 'changed' | 'same';
+    blocks: DiffBlock[];
+  }[];
 }
 
 /** Who a page made from an entry of a template is restricted to (spec 074, TPL-130). */

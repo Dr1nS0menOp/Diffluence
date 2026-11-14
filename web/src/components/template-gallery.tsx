@@ -1,192 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // Starting a page from a template: a list with a preview, then the form.
-import { useState, type FormEvent, type KeyboardEvent } from 'react';
+import { useCallback, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  api,
-  type Page,
-  type SetOutcome,
-  type Space,
-  type TemplateField,
-  type TemplateSummary,
-} from '../api';
-import { navigate } from '../router';
+import { api, type Space, type TemplateSummary } from '../api';
+import { useCapabilities } from '../capabilities';
 import { DocumentView } from './editor/editor';
-import { Dialog, ErrorNote, Field, Loading } from './ui';
+import { CloseFormDialog, startPage, TemplateForm } from './template-form';
+import { Dialog, ErrorNote, Loading } from './ui';
 
-function FieldInput({
-  field,
-  value,
-  onChange,
-}: {
-  field: TemplateField;
-  value: string;
-  onChange: (next: string) => void;
-}) {
-  const { t } = useTranslation();
-  const help = field.required ? t('organise.required') : undefined;
-  if (field.kind === 'text') {
-    return (
-      <Field label={field.name} help={help}>
-        <textarea
-          rows={3}
-          value={value}
-          required={field.required}
-          onChange={(e) => onChange(e.target.value)}
-        />
-      </Field>
-    );
-  }
-  if (field.kind === 'choice') {
-    return (
-      <Field label={field.name} help={help}>
-        <select value={value} required={field.required} onChange={(e) => onChange(e.target.value)}>
-          <option value="">{t('organise.chooseOne')}</option>
-          {field.options?.map((option) => (
-            <option key={option} value={option}>
-              {option}
-            </option>
-          ))}
-        </select>
-      </Field>
-    );
-  }
-  return (
-    <Field label={field.name} help={help}>
-      <input value={value} required={field.required} onChange={(e) => onChange(e.target.value)} />
-    </Field>
-  );
-}
-
-/** Groups fields in the steps of a template. Fields outside any step go last. */
-export function stepsOf(template: TemplateSummary): { title: string; fields: TemplateField[] }[] {
-  const fields = template.fields ?? [];
-  const placed = new Set(template.steps.flatMap((s) => s.fields));
-  const steps = template.steps.map((s) => ({
-    title: s.title,
-    fields: fields.filter((f) => s.fields.includes(f.name)),
-  }));
-  const rest = fields.filter((f) => !placed.has(f.name));
-  return rest.length > 0 || steps.length === 0 ? [...steps, { title: '', fields: rest }] : steps;
-}
+export { stepsOf } from './template-form';
 
 /** A template is not a page, so its files have a route of their own. */
 export const templateFileAddress = (templateId: string) => (fileId: string) =>
   `/api/v1/templates/${templateId}/files/${fileId}`;
 
-/**
- * Makes the page, or the set of pages of a guided template. An empty page that was waiting
- * for a template makes way for it in the same step on the server (spec 074, TPL-122). A
- * guided template is bound to the version the form showed and to a key made when the form
- * opened, so a second press makes no second set (TPL-123, TPL-603).
- */
-async function startPage(
-  template: TemplateSummary,
-  space: Space,
-  parent: string | null,
-  answers: Record<string, string>,
-  requestKey: string,
-  replaces?: string,
-): Promise<SetOutcome> {
-  const body = { space_id: space.id, parent_id: parent, answers, replaces: replaces ?? null };
-  const made = template.guided
-    ? await api.post<{ page?: Page; set_id?: string; job_id?: string }>(`/templates/${template.id}/sets`, {
-        ...body,
-        version: template.template_version,
-        request_key: requestKey,
-      })
-    : await api.post<{ page?: Page; set_id?: string; job_id?: string }>(
-        `/templates/${template.id}/use`,
-        body,
-      );
-  if (made.job_id) return { kind: 'queued', job_id: made.job_id };
-  if (!made.page) throw new Error('no page');
-  navigate(`/pages/${made.page.id}/edit`);
-  return { kind: 'made', page: made.page, set_id: made.set_id ?? '' };
-}
-
-/** A key for one opening of a form. */
-function newRequestKey(): string {
-  return crypto.randomUUID();
-}
-
-function TemplateForm({
-  template,
-  space,
-  parent,
-  replaces,
-  onBack,
-  onClose,
-}: {
-  template: TemplateSummary;
-  space: Space;
-  parent: string | null;
-  replaces?: string;
-  onBack: () => void;
-  onClose: () => void;
-}) {
-  const { t } = useTranslation();
-  const [answers, setAnswers] = useState<Record<string, string>>({});
-  const [step, setStep] = useState(0);
-  const [requestKey] = useState(newRequestKey);
-  const steps = stepsOf(template);
-  const current = steps[step];
-  const last = step === steps.length - 1;
-  const use = useMutation({
-    mutationFn: () => startPage(template, space, parent, answers, requestKey, replaces),
-    onSuccess: (outcome) => {
-      if (outcome.kind === 'made') onClose();
-    },
-  });
-  if (use.data?.kind === 'queued') {
-    return (
-      <>
-        <p role="status" className="note">
-          {t('templates.setQueued')}
-        </p>
-        <div className="dialog-actions">
-          <button type="button" className="primary" onClick={onClose}>
-            {t('common.close')}
-          </button>
-        </div>
-      </>
-    );
-  }
-  return (
-    <form
-      onSubmit={(e: FormEvent) => {
-        e.preventDefault();
-        if (last) use.mutate();
-        else setStep(step + 1);
-      }}
-    >
-      <ErrorNote error={use.error} />
-      {current?.title && <h3>{current.title}</h3>}
-      {steps.length > 1 && (
-        <p role="status" className="muted">
-          {t('organise.stepOf', { at: step + 1, total: steps.length })}
-        </p>
-      )}
-      {current?.fields.map((f) => (
-        <FieldInput
-          key={f.name}
-          field={f}
-          value={answers[f.name] ?? ''}
-          onChange={(value) => setAnswers({ ...answers, [f.name]: value })}
-        />
-      ))}
-      <div className="dialog-actions">
-        <button type="button" className="quiet" onClick={step === 0 ? onBack : () => setStep(step - 1)}>
-          {t('organise.back')}
-        </button>
-        <button type="submit" className="primary" disabled={use.isPending}>
-          {last ? t('organise.startPage') : t('organise.next')}
-        </button>
-      </div>
-    </form>
-  );
-}
+/** A template asks first when it has questions, or makes more than one page to check (TPL-340). */
+const asksFirst = (template: TemplateSummary) =>
+  (template.fields?.length ?? 0) > 0 || (template.pages ?? 1) > 1;
 
 function FavouriteButton({ template, spaceId }: { template: TemplateSummary; spaceId: string }) {
   const { t } = useTranslation();
@@ -206,21 +37,68 @@ function FavouriteButton({ template, spaceId }: { template: TemplateSummary; spa
   );
 }
 
+/** The form of one template in its dialog, which asks before it closes with answers in it. */
+function FormDialog({
+  template,
+  space,
+  parent,
+  replaces,
+  onBack,
+  onClose,
+}: {
+  template: TemplateSummary;
+  space: Space;
+  parent: string | null;
+  replaces?: string;
+  onBack: () => void;
+  onClose: () => void;
+}) {
+  const guidedOn = useCapabilities().guided_templates;
+  const [dirty, setDirty] = useState(false);
+  const [asking, setAsking] = useState<'close' | 'back' | null>(null);
+  const markDirty = useCallback(() => setDirty(true), []);
+  const leave = (how: 'close' | 'back') => (dirty ? setAsking(how) : how === 'close' ? onClose() : onBack());
+  // The question stands beside the form's dialog, not inside it: React passes the close of a
+  // dialog on to the dialogs around it, which would close the form as well.
+  return (
+    <>
+      <Dialog title={template.name} onClose={() => leave('close')} onEscape={() => leave('close')}>
+        <TemplateForm
+          template={template}
+          space={space}
+          parent={parent}
+          replaces={replaces}
+          guidedOn={guidedOn}
+          onBack={() => leave('back')}
+          onClose={onClose}
+          onDirty={markDirty}
+        />
+      </Dialog>
+      {asking && (
+        <CloseFormDialog onConfirm={asking === 'close' ? onClose : onBack} onClose={() => setAsking(null)} />
+      )}
+    </>
+  );
+}
+
 export function TemplateGallery({
   space,
   parent,
   replaces,
   onClose,
+  initial,
 }: {
   space: Space;
   parent: string | null;
   /** An empty page to remove once the new one exists. */
   replaces?: string;
   onClose: () => void;
+  /** A template to mark when the gallery opens, such as one chosen in the panel beside the editor. */
+  initial?: string;
 }) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState('');
-  const [marked, setMarked] = useState(0);
+  const [marked, setMarked] = useState<number | null>(null);
   const [chosen, setChosen] = useState<TemplateSummary | null>(null);
   const [queued, setQueued] = useState(false);
   const list = useQuery({
@@ -231,7 +109,13 @@ export function TemplateGallery({
   const rows = (list.data?.templates ?? []).filter((x) =>
     `${x.name} ${x.description} ${x.category}`.toLowerCase().includes(wanted),
   );
-  const row = rows[marked];
+  const markedIndex =
+    marked ??
+    Math.max(
+      0,
+      rows.findIndex((x) => x.id === initial),
+    );
+  const row = rows[markedIndex];
   const preview = useQuery({
     queryKey: ['template', row?.id],
     queryFn: () => api.get<TemplateSummary>(`/templates/${row?.id}`),
@@ -241,11 +125,16 @@ export function TemplateGallery({
     mutationFn: async () => {
       const full = preview.data;
       if (!full) return;
-      if ((full.fields?.length ?? 0) > 0) {
+      if (asksFirst(full)) {
         setChosen(full);
         return;
       }
-      const outcome = await startPage(full, space, parent, {}, newRequestKey(), replaces);
+      const outcome = await startPage(
+        full,
+        space,
+        { parent_id: parent, answers: {}, replaces: replaces ?? null },
+        crypto.randomUUID(),
+      );
       if (outcome.kind === 'made') onClose();
       else setQueued(true);
     },
@@ -254,7 +143,7 @@ export function TemplateGallery({
     if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
       e.preventDefault();
       if (rows.length > 0) {
-        setMarked((marked + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
+        setMarked((markedIndex + (e.key === 'ArrowDown' ? 1 : rows.length - 1)) % rows.length);
       }
     } else if (e.key === 'Enter') {
       e.preventDefault();
@@ -263,18 +152,17 @@ export function TemplateGallery({
   };
   if (chosen) {
     return (
-      <Dialog title={chosen.name} onClose={onClose}>
-        <TemplateForm
-          template={chosen}
-          space={space}
-          parent={parent}
-          replaces={replaces}
-          onBack={() => setChosen(null)}
-          onClose={onClose}
-        />
-      </Dialog>
+      <FormDialog
+        template={chosen}
+        space={space}
+        parent={parent}
+        replaces={replaces}
+        onBack={() => setChosen(null)}
+        onClose={onClose}
+      />
     );
   }
+  const pages = preview.data?.pages ?? 1;
   return (
     <Dialog title={t('organise.gallery')} onClose={onClose} wide>
       <ErrorNote error={list.error ?? start.error} />
@@ -309,9 +197,10 @@ export function TemplateGallery({
                 key={x.id}
                 id={`template-${x.id}`}
                 role="option"
-                aria-selected={index === marked}
-                className={index === marked ? 'quick-row marked' : 'quick-row'}
-                onMouseEnter={() => setMarked(index)}
+                aria-selected={index === markedIndex}
+                className={index === markedIndex ? 'quick-row marked' : 'quick-row'}
+                // Only a mouse that moves marks a row: one that rests where the dialog opened does not.
+                onMouseMove={() => setMarked(index)}
                 onClick={() => start.mutate()}
               >
                 <span className="quick-title">{x.name}</span>
@@ -323,6 +212,7 @@ export function TemplateGallery({
         </div>
         <div className="gallery-preview" aria-label={t('organise.preview')}>
           {row && <p className="muted">{row.description}</p>}
+          {preview.data && pages > 1 && <p>{t('templates.makesPages', { count: pages })}</p>}
           {row && <FavouriteButton template={row} spaceId={space.id} />}
           {preview.data?.document && (
             <DocumentView

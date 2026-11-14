@@ -200,6 +200,11 @@ test('a template that makes a set: the Pages list, then one action makes every p
   const dialog = page.getByRole('dialog', { name: 'Start from a template' });
   await dialog.getByRole('combobox', { name: 'Find a template' }).fill(name);
   await dialog.getByRole('button', { name: 'Use this template' }).click();
+  // A set is checked before it is made (spec 074, wave GT2, TPL-340): the place, then the pages.
+  const form = page.getByRole('dialog', { name });
+  await form.getByRole('button', { name: 'Next' }).click();
+  await expect(form.getByText('Laptop')).toBeVisible();
+  await form.getByRole('button', { name: 'Create 3 drafts' }).click();
   await expect(page.getByLabel('Title')).toBeVisible();
   const root = new URL(page.url()).pathname.split('/')[2];
 

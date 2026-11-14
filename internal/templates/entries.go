@@ -249,6 +249,69 @@ func (s *Service) RemoveEntry(ctx context.Context, c identity.Caller, id uuid.UU
 	return err
 }
 
+// The ways an entry moves in the Pages section (TPL-1011): among its siblings, below the
+// sibling before it, or out to sit after its parent.
+const (
+	MoveUp   = "up"
+	MoveDown = "down"
+	MoveIn   = "in"
+	MoveOut  = "out"
+)
+
+// MoveEntry moves an entry in the list of a template's pages, with Move up, Move down,
+// Indent and Outdent instead of dragging (design standard). The validator of the manifest
+// still holds it to six levels.
+func (s *Service) MoveEntry(ctx context.Context, c identity.Caller, id uuid.UUID, key, to string) error {
+	_, err := s.editTemplate(ctx, c, id, func(_ pgx.Tx, _ Template, m Manifest) (Manifest, error) {
+		e, i, found := m.entry(key)
+		if !found {
+			return m, apperr.NotFound()
+		}
+		if key == RootKey {
+			return m, apperr.Conflict("first_page", "The first page of a template stays first.")
+		}
+		siblings := []int{}
+		for j, other := range m.Entries {
+			if other.Parent == e.Parent && other.Key != RootKey {
+				siblings = append(siblings, j)
+			}
+		}
+		at := slices.Index(siblings, i)
+		cannot := apperr.Conflict("cannot_move", "This page cannot move that way.")
+		switch to {
+		case MoveUp, MoveDown:
+			step := -1
+			if to == MoveDown {
+				step = 1
+			}
+			if at+step < 0 || at+step >= len(siblings) {
+				return m, cannot
+			}
+			other := siblings[at+step]
+			m.Entries[i], m.Entries[other] = m.Entries[other], m.Entries[i]
+		case MoveIn:
+			if at == 0 {
+				return m, cannot
+			}
+			m.Entries[i].Parent = m.Entries[siblings[at-1]].Key
+		case MoveOut:
+			parent, p, _ := m.entry(e.Parent)
+			if parent.Key == RootKey || p < 0 {
+				return m, cannot
+			}
+			moved := m.Entries[i]
+			moved.Parent = parent.Parent
+			m.Entries = slices.Delete(m.Entries, i, i+1)
+			_, p, _ = m.entry(parent.Key)
+			m.Entries = slices.Insert(m.Entries, p+1, moved)
+		default:
+			return m, apperr.Invalid("Move a page up, down, in or out.")
+		}
+		return m, nil
+	})
+	return err
+}
+
 // SetPublishing says whether the pages of a set are published as they are made, or start
 // as drafts of their creator (TPL-150, TPL-151).
 func (s *Service) SetPublishing(ctx context.Context, c identity.Caller, id uuid.UUID, publish bool) error {

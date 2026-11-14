@@ -29,12 +29,33 @@ type Denied struct {
 	SpaceID    string
 }
 
+// FieldProblem is one field of a form that was refused, so the form can show the words
+// next to that field and keep every other answer (spec 074, TPL-324). Problem is a code
+// the browser translates; Message is the same in English, for any other client.
+type FieldProblem struct {
+	Field   string            `json:"field"`
+	Problem string            `json:"problem"`
+	Params  map[string]string `json:"params,omitempty"`
+	Message string            `json:"message"`
+}
+
 // Error is an expected failure with a message that is safe to show to users.
 type Error struct {
 	Kind    Kind
 	Code    string
 	Message string
 	Denied  *Denied
+	// Fields names each field of a form that was refused, when the failure is about fields.
+	Fields []FieldProblem
+}
+
+// InvalidFields means some fields of a form were refused, each named with why.
+func InvalidFields(code string, problems []FieldProblem) *Error {
+	message := "Some answers need a change."
+	for _, p := range problems {
+		message += " " + p.Field + ": " + p.Message
+	}
+	return &Error{Kind: KindInvalid, Code: code, Message: message, Fields: problems}
 }
 
 func (e *Error) Error() string { return e.Code + ": " + e.Message }

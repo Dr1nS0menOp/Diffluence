@@ -20,7 +20,7 @@ Teams already use templates: their own, the ten starters, space templates, and t
   The previous release can still save a **plain** template the old way: it updates the row and the hidden page, and writes no manifest. The new release treats a plain template whose newest page version is newer than its newest manifest as changed by the older release. It makes the next version from the row and that text on first read. *Why:* an old release must never save or use a guided template with its parts dropped. Later upgrades meet two releases that both know guided templates. *Proof:*
   - the N/N+1 upgrade test with a plain template saved through the old release;
   - a test that turning the part on during the grace period is refused.
-- **TPL-1104** · new · The lines of today's templates that are still **partly** built are finished in GT2, whether the experimental part is on or off:
+- **TPL-1104** · built · The lines of today's templates that are still **partly** built are finished in GT2, whether the experimental part is on or off:
   - ORG-045, the gallery as a panel beside the editor;
   - ORG-051, a field for the default parent;
   - ORG-060, the screens for versions;

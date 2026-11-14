@@ -24,7 +24,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
 
 ## 12.2 The template editor
 
-- **TPL-1010** · new · Opening a template shows the **Settings** frame with the template's sections in the sidebar, one at a time at its own address (`?section=`):
+- **TPL-1010** · partly · Opening a template shows the **Settings** frame with the template's sections in the sidebar, one at a time at its own address (`?section=`):
 
   | Section | What it holds |
   |---|---|
@@ -36,15 +36,15 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
   | Versions | History, comparison, proposal and decisions (TPL-602) |
 
   *Why:* a guided template has settings of very different kinds. The settings frame is the standard's answer to "many sections, one at a time". *Proof:* an e2e picture per section.
-- **TPL-1011** · new · **Pages** is an indented list of entries, as rows with:
+- **TPL-1011** · partly · **Pages** is an indented list of entries, as rows with:
   - the entry's name and kind;
   - its condition as a sentence;
   - Edit text, which opens the entry's text in the **Focus** frame, the editor;
   - Move up, Move down, Indent and Outdent as buttons, with the same keys as the tree.
 
   There is no dragging (design standard, "Move up and Move down instead of dragging"). A text summary above the list says "This template makes up to 7 pages, 3 levels deep". *Why:* a list of buttons works with a keyboard and a screen reader from the first day (as DOC-1419). *Proof:* an e2e test that builds a three-level set by keyboard only.
-- **TPL-1012** · new · **Form** lists the steps, each with its fields as rows: name, kind, required, condition. Opening a field shows its settings in a `Dialog`, with only the settings its kind has (TPL-300 to TPL-311). The validator's messages stand next to the field they concern, before saving (WCAG 3.3.1). A **Try the form** button opens the form exactly as people will see it, with a dry run at the end that makes nothing. *Proof:* e2e tests per kind; an accessibility check of the dialog.
-- **TPL-1013** · new · In an entry's text, `/` offers:
+- **TPL-1012** · built · **Form** lists the steps, each with its fields as rows: name, kind, required, condition. Opening a field shows its settings in a `Dialog`, with only the settings its kind has (TPL-300 to TPL-311). The validator's messages stand next to the field they concern, before saving (WCAG 3.3.1). A **Try the form** button opens the form exactly as people will see it, with a dry run at the end that makes nothing. *Proof:* e2e tests per kind; an accessibility check of the dialog.
+- **TPL-1013** · partly · In an entry's text, `/` offers:
   - **Field**, as today;
   - **Value**, for a built-in value or a link to a page of the set (TPL-211);
   - **Section shown when…** (TPL-422).
@@ -60,8 +60,8 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
 ## 12.3 The form for the person who creates
 
 - **TPL-1020** · built · The gallery opens as a `Dialog` from Create or from the empty page, with a list, a search box and a preview (ORG-045). *Proof:* existing pictures.
-- **TPL-1021** · new · A set template in the gallery says how many pages it makes, in the preview and in words ("Makes up to 7 pages"). *Proof:* a picture.
-- **TPL-1022** · new · The form keeps the `Dialog`:
+- **TPL-1021** · built · A set template in the gallery says how many pages it makes, in the preview and in words ("Makes up to 7 pages"). *Proof:* a picture.
+- **TPL-1022** · built · The form keeps the `Dialog`:
   - one step at a time;
   - the step's title as its heading;
   - "Step 2 of 4" in a status line (TPL-331);
@@ -69,9 +69,9 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
 
   Inputs use `Field`, with the label, "required" in words where it applies, the help text, and the error. A person field uses `SubjectPicker`. *Why:* the components of the standard, so the form feels like the rest of the product. *Proof:* pictures of every field kind, empty, filled and in error.
 - **TPL-1023** · new · A field or step that a condition shows **appears after** the field that caused it. The change is announced in a polite live region ("1 more question"), and the focus never moves by itself. *Why:* WCAG 3.2.2 (on input) and 4.1.3. A change of context while typing disorients. *Proof:* an accessibility test with a screen-reader query.
-- **TPL-1024** · new · The **check step** (TPL-340) shows the answers as a description list with Change links, and the pages as an indented list with titles, labels as plain `#` words and restrictions as the lock icon with its words. The primary button names the action: "Create 7 pages" or "Create 7 drafts". *Why:* the design standard's rule that a button says what it does. *Proof:* a picture.
-- **TPL-1025** · new · A **background set** (TPL-121) shows a status line with progress in words ("Making 64 pages…"), and the person can close the dialog. A `useToast` and the bell tell them when it is ready, with a link to the root page. *Proof:* an e2e test with a slowed set.
-- **TPL-1026** · new · Errors from the server after Create show in an `ErrorNote` at the top of the check step, with the list of TPL-810 when rights are missing. The answers stay. *Proof:* an e2e test.
+- **TPL-1024** · built · The **check step** (TPL-340) shows the answers as a description list with Change links, and the pages as an indented list with titles, labels as plain `#` words and restrictions as the lock icon with its words. The primary button names the action: "Create 7 pages" or "Create 7 drafts". *Why:* the design standard's rule that a button says what it does. *Proof:* a picture.
+- **TPL-1025** · partly · A **background set** (TPL-121) shows a status line with progress in words ("Making 64 pages…"), and the person can close the dialog. A `useToast` and the bell tell them when it is ready, with a link to the root page. *Proof:* an e2e test with a slowed set.
+- **TPL-1026** · built · Errors from the server after Create show in an `ErrorNote` at the top of the check step, with the list of TPL-810 when rights are missing. The answers stay. *Proof:* an e2e test.
 
 ## 12.4 Approval
 
@@ -84,7 +84,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
 
 ## 12.5 Keyboard, language, small screens
 
-- **TPL-1040** · new · Every action has a keyboard path. The form never traps focus: Escape asks before closing when answers exist (TPL-332), and focus returns to the button that opened the dialog. *Why:* WCAG 2.1.1, 2.1.2 and 2.4.3. *Proof:* keyboard e2e tests.
-- **TPL-1041** · new · Words people type (names of fields, options, steps and entries) are shown as typed. All other words are translation strings, and the layout uses logical properties only, so the form works right to left. *Proof:* the strings check and an RTL picture of the form.
-- **TPL-1042** · new · The form, the check step and approval work at **360 px**. The template editor works at tablet width; on a phone it says it is best used on a larger screen, without hiding any function (as DOC-950). *Proof:* pictures at the narrow width.
-- **TPL-1043** · new · Dates in the form use the reader's locale, and date fields offer the browser's own date input with a typed fallback. *Proof:* a test in two locales.
+- **TPL-1040** · built · Every action has a keyboard path. The form never traps focus: Escape asks before closing when answers exist (TPL-332), and focus returns to the button that opened the dialog. *Why:* WCAG 2.1.1, 2.1.2 and 2.4.3. *Proof:* keyboard e2e tests.
+- **TPL-1041** · built · Words people type (names of fields, options, steps and entries) are shown as typed. All other words are translation strings, and the layout uses logical properties only, so the form works right to left. *Proof:* the strings check and an RTL picture of the form.
+- **TPL-1042** · built · The form, the check step and approval work at **360 px**. The template editor works at tablet width; on a phone it says it is best used on a larger screen, without hiding any function (as DOC-950). *Proof:* pictures at the narrow width.
+- **TPL-1043** · partly · Dates in the form use the reader's locale, and date fields offer the browser's own date input with a typed fallback. *Proof:* a test in two locales.

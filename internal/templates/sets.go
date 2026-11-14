@@ -59,6 +59,21 @@ type PlannedPage struct {
 	Title       string    `json:"title"`
 	// Exists marks a title a page of the space already has (TPL-141).
 	Exists bool `json:"exists"`
+	// Labels and Restricted are what the check step shows of each page (TPL-340): the
+	// labels it gets, and whether it is restricted to view ("view") or to edit ("edit").
+	Labels     []string `json:"labels"`
+	Restricted string   `json:"restricted"`
+}
+
+// restrictionOf says how the page of an entry is restricted, for the check step.
+func restrictionOf(e Entry) string {
+	switch {
+	case len(e.Restrictions.View) > 0:
+		return "view"
+	case len(e.Restrictions.Edit) > 0:
+		return "edit"
+	}
+	return ""
 }
 
 // SetResult is a set that was made, or the job that will make it.
@@ -81,6 +96,8 @@ type SetCheck struct {
 	// so the set goes to the top of the space (TPL-802).
 	DefaultParentUnusable bool `json:"default_parent_unusable"`
 	Background            bool `json:"background"`
+	// Publish says the pages are published as they are made, not drafts (TPL-340).
+	Publish bool `json:"publish"`
 }
 
 // plan is a set worked out in full before a page exists.
@@ -321,31 +338,16 @@ func parentUnusable(err error) error {
 func (s *Service) fill(ctx context.Context, c identity.Caller, p *plan, in SetInput) error {
 	m := p.version.Manifest
 	texts := p.texts
-	answers := map[string]string{}
-	for name, answer := range in.Answers {
-		answers[name] = answer
+	got, err := s.checkAnswers(ctx, c, p, in.Answers)
+	if err != nil {
+		return err
 	}
-	seen := map[string]bool{}
-	for _, e := range m.ordered() {
-		for _, f := range document.Fields(texts[e.Key]) {
-			if f.Required && strings.TrimSpace(answers[f.Name]) == "" {
-				return apperr.Invalid("Fill in " + f.Name + ".")
-			}
-			if m.Publish {
-				// A page published at once holds no question left open (TPL-151).
-				answers[f.Name] = in.Answers[f.Name]
-			}
-			if !seen[f.Name] {
-				seen[f.Name] = true
-				p.fields = append(p.fields, f.Name)
-			}
-		}
-	}
+	p.fields = got.asked
 	spaceName, today := p.spaceName, p.today
 	// In a title, a question nobody answered counts as empty, so the entry's name stands in.
 	titleAnswers := map[string]string{}
 	for _, name := range p.fields {
-		titleAnswers[name] = answers[name]
+		titleAnswers[name] = got.titles[name]
 	}
 	ordered := m.ordered()
 	pageOf := map[string]uuid.UUID{}
@@ -358,7 +360,7 @@ func (s *Service) fill(ctx context.Context, c identity.Caller, p *plan, in SetIn
 			return err
 		}
 		planned := plannedEntry{entry: e, PlannedPage: PlannedPage{Entry: e.Key, EntryName: e.Name, ParentEntry: e.Parent,
-			ID: pageOf[e.Key], Title: title}}
+			ID: pageOf[e.Key], Title: title, Labels: slices.Clone(e.Labels), Restricted: restrictionOf(e)}}
 		if i == 0 {
 			planned.parent = p.parent
 		} else {
@@ -366,10 +368,7 @@ func (s *Service) fill(ctx context.Context, c identity.Caller, p *plan, in SetIn
 			planned.parent = &parent
 		}
 		if e.PageID != nil {
-			doc, err := document.FillFields(texts[e.Key], answers)
-			if err != nil {
-				return err
-			}
+			doc := document.FillFieldsWith(texts[e.Key], got.fills)
 			planned.doc = document.FillValues(doc, valuesOf(c, p.t, spaceName, today, pageOf))
 		}
 		p.pages = append(p.pages, planned)
@@ -386,6 +385,7 @@ func (p *plan) summarise() {
 	}
 	p.check.Version = p.version.Number
 	p.check.Background = len(p.pages) > backgroundAbove
+	p.check.Publish = p.version.Manifest.Publish
 }
 
 // valuesOf gives what a template knows without asking (TPL-201) and the pages of the

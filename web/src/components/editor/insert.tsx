@@ -144,6 +144,13 @@ export const TEMPLATE_ITEMS: InsertItem[] = [
   },
 ];
 
+/** A value the template knows, or a link to a page of its set (spec 074, TPL-1013). */
+export const TEMPLATE_VALUE_ITEM: InsertItem = {
+  id: 'templateValue',
+  icon: IconDate,
+  run: (_editor, actions) => actions.openTemplateItem('value'),
+};
+
 const TURN_INTO_IDS = [
   'text',
   'h1',

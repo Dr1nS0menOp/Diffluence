@@ -120,11 +120,14 @@ export function PagePicker({
   help,
   value,
   onChange,
+  spaceKey,
 }: {
   label: string;
   help: string;
   value: string;
   onChange: (id: string) => void;
+  /** Finds only pages of this space. */
+  spaceKey?: string;
 }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
@@ -134,11 +137,13 @@ export function PagePicker({
     enabled: value !== '',
     retry: false,
   });
+  // The search language narrows to a space with space:KEY, as the search box does.
+  const query = spaceKey ? `space:${spaceKey} ${search}` : search;
   const found = useQuery({
-    queryKey: ['page-picker', search],
+    queryKey: ['page-picker', query],
     queryFn: () =>
       api.get<{ results: SearchResult[] }>(
-        `/search?q=${encodeURIComponent(search)}&limit=${MAX_PAGE_RESULTS}`,
+        `/search?q=${encodeURIComponent(query)}&limit=${MAX_PAGE_RESULTS}`,
       ),
     enabled: search.trim().length > 0,
   });
