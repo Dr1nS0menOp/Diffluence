@@ -21,6 +21,7 @@ import (
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/diffluence/diffluence/internal/spaces"
 )
 
 const (
@@ -160,8 +161,8 @@ func (s *Service) askGuestInvitation(ctx context.Context, c identity.Caller, spa
 	}
 	id := ids.New()
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		var home *uuid.UUID
-		if err := tx.QueryRow(ctx, "SELECT home_page_id FROM spaces WHERE id = $1", spaceID).Scan(&home); err != nil {
+		home, err := spaces.HomePage(ctx, tx, spaceID)
+		if err != nil {
 			return err
 		}
 		if home == nil {

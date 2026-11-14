@@ -1748,9 +1748,9 @@ mutate "no address logs everyone out" internal/httpapi/handlers_running.go \
 mutate "a restore takes any name typed" internal/restore/restore.go \
   's.replace("if strings.TrimSpace(a.Confirm) != a.Installation {", "if false {")' $app -run TestOneRestoreAtATimeAndOneADay
 mutate "a restore takes a backup that never completed" internal/restore/restore.go \
-  's.replace("if !complete {", "if false {")' $app -run TestOnlyAnAdministratorRestoresACompleteBackup
+  's.replace("if !ready.Complete {", "if false {")' $app -run TestOnlyAnAdministratorRestoresACompleteBackup
 mutate "a restore runs beside a backup asked for" internal/restore/restore.go \
-  's.replace("if backingUp {", "if false {")' $app -run TestOneRestoreAtATimeAndOneADay
+  's.replace("if ready.BackupOpen {", "if false {")' $app -run TestOneRestoreAtATimeAndOneADay
 mutate "two restores a day" internal/restore/restore.go \
   's.replace("if today >= PerDay {", "if today > PerDay {")' $app -run TestOneRestoreAtATimeAndOneADay
 mutate "a failed restore lets the nodes serve" internal/restore/restore.go \
@@ -2160,6 +2160,25 @@ mutate_collab "the editing service takes any bearer as the API" access.mjs \
   's.replace("return timingSafeEqual(digest(authorization), digest(`Bearer ${token}`));", "return authorization.startsWith(\"Bearer \");")' access.test.mjs
 mutate_collab "an unset token lets the API in" access.mjs \
   's.replace("if (!token || typeof authorization", "if (typeof authorization")' access.test.mjs
+# Spec 072: the module boundary, the owner's password, and slow work one at a time.
+mutate "a module names another module's table" internal/labels/labels.go \
+  's + "\nconst crossing = `SELECT id FROM users`\n"' ./internal/db/ -run TestModulesNameOnlyTheirOwnTablesOrListedOnes
+mutate "the boundary check counts the SQL of tests" internal/db/boundary_test.go \
+  's.replace(" || strings.HasSuffix(path, \"_test.go\") {\n\t\t\t\treturn err", " {\n\t\t\t\treturn err")' ./internal/db/ -run TestCountCrossingsCountsOnlyOtherModulesOutsideTests
+mutate "a view of the migrations has no owner to check" internal/db/boundary_test.go \
+  's.replace("\t\tfor _, match := range createdView.FindAllStringSubmatch(code, -1) {\n\t\t\tout[tableKey(match[1])] = true\n\t\t}\n", "")' ./internal/db/ -run TestEveryTableHasAnOwningModule
+mutate "the owner's password stays in the address on psql's command line" cmd/diffluence/restore.go \
+  's.replace("\tu.User = neturl.User(u.User.Username())\n", "")' ./cmd/diffluence/ -run TestTheOwnersPasswordIsTakenOutOfTheAddress
+mutate "a failed backup can be restored" internal/backups/readiness.go \
+  's.replace("WHERE name = $1 AND ok)", "WHERE name = $1)")' ./internal/backups/ -run TestReadinessSaysWhetherABackupIsWholeAndWhetherOneIsOpen
+mutate "a node that left still holds up a restore" internal/restore/restore.go \
+  's.replace("\"DELETE FROM ops.nodes WHERE node_id = $1\"", "\"SELECT $1::uuid\"")' ./internal/restore/ -run TestALeavingNodeNoLongerCountsAsBusy
+mutate "a stored choice of another module is not read" internal/settings/settings.go \
+  's.replace("\treturn json.Unmarshal(raw, v)\n}\n\n// Store", "\treturn nil\n}\n\n// Store")' ./internal/settings/ -run TestLoadFillsAStoredValueAndLeavesAMissingOneAlone
+mutate_collab "every recheck runs at once, beside the one in flight" access.mjs \
+  's.replace("    if (!running) {\n", "    if (true) {\n")' access.test.mjs
+mutate_collab "rechecks asked for during a run are dropped" access.mjs \
+  's.replace("    return queued;\n", "    return running;\n")' access.test.mjs
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

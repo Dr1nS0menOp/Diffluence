@@ -466,15 +466,10 @@ func runsPerHour(ctx context.Context, q db.Querier) (int, error) {
 		RunsPerHour int `json:"runs_per_hour"`
 	}
 	v.RunsPerHour = defaultRunsPerHour
-	var raw []byte
-	err := q.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", settingsKey).Scan(&raw)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return v.RunsPerHour, nil
-	}
-	if err != nil {
+	if err := settings.Load(ctx, q, settingsKey, &v); err != nil {
 		return 0, err
 	}
-	return v.RunsPerHour, json.Unmarshal(raw, &v)
+	return v.RunsPerHour, nil
 }
 
 // SetRunsPerHour stores the limit. The route requires administrator.

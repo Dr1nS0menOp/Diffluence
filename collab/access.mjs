@@ -51,8 +51,36 @@ export function createAccess(ask) {
     if (connections.get(documentName)?.size === 0) connections.delete(documentName);
   }
 
-  /** Asks again for everyone. A failed answer counts as no: a right must be proven. */
-  async function recheck() {
+  // One check runs at a time. Calls that arrive while it runs share one more run after it,
+  // because a change of rights may have come after the running check passed that person;
+  // a storm of changes, such as a sync of a directory, then costs two runs, not one each.
+  let running = null;
+  let queued = null;
+
+  /**
+   * Asks again for everyone, once the check in flight is done. A failed answer counts as
+   * no: a right must be proven.
+   */
+  function recheck() {
+    if (!running) {
+      running = checkAll().finally(() => {
+        running = null;
+      });
+      return running;
+    }
+    if (!queued) {
+      // The failure of the run in flight reaches its own callers; it must not stop this one.
+      queued = running
+        .catch(() => undefined)
+        .then(() => {
+          queued = null;
+          return recheck();
+        });
+    }
+    return queued;
+  }
+
+  async function checkAll() {
     for (const [documentName, entries] of connections) {
       for (const entry of [...entries]) {
         const answer = await authorize(documentName, entry.ticket).catch(() => null);

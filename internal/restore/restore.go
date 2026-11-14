@@ -23,6 +23,7 @@ import (
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
@@ -150,15 +151,14 @@ func Request(ctx context.Context, pool *pgxpool.Pool, a Ask) (Restore, error) {
 	}
 	var out Restore
 	err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-		var complete, backingUp bool
-		if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM backup_runs WHERE name = $1 AND ok),
-				EXISTS (SELECT 1 FROM backup_requests WHERE finished_at IS NULL)`, a.BackupName).Scan(&complete, &backingUp); err != nil {
+		ready, err := backups.ReadinessToRestore(ctx, tx, a.BackupName)
+		if err != nil {
 			return err
 		}
-		if !complete {
+		if !ready.Complete {
 			return apperr.Invalid("Only a backup the worker reported complete can be restored.")
 		}
-		if backingUp {
+		if ready.BackupOpen {
 			return apperr.Conflict("backup_requested", "A backup was asked for and is not finished yet. Restore after it.")
 		}
 		var today int
@@ -244,6 +244,15 @@ func MustWait(ctx context.Context, q db.Querier) (*Restore, error) {
 func Seen(ctx context.Context, q db.Querier, node uuid.UUID, mode string) error {
 	_, err := q.Exec(ctx, `INSERT INTO ops.nodes (node_id, mode, seen_at) VALUES ($1, $2, now())
 		ON CONFLICT (node_id) DO UPDATE SET mode = EXCLUDED.mode, seen_at = now()`, node, mode)
+	if missing(err) {
+		return nil
+	}
+	return err
+}
+
+// Leave forgets a node at once, for a node that stops saying it is starting.
+func Leave(ctx context.Context, q db.Querier, node uuid.UUID) error {
+	_, err := q.Exec(ctx, "DELETE FROM ops.nodes WHERE node_id = $1", node)
 	if missing(err) {
 		return nil
 	}

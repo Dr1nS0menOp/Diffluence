@@ -286,7 +286,9 @@ func sayStarting(ctx context.Context, databaseURL string) func() {
 			case <-beatCtx.Done():
 				// The node's own row takes over once it serves; this one ends now.
 				leave, stop := context.WithTimeout(context.WithoutCancel(beatCtx), 2*time.Second)
-				_, _ = pool.Exec(leave, "DELETE FROM ops.nodes WHERE node_id = $1", node)
+				// A row left behind ends on its own after restore.NodeGoneAfter, so a failure
+				// here only makes a restore wait that long.
+				_ = restore.Leave(leave, pool, node)
 				stop()
 				return
 			case <-tick.C:

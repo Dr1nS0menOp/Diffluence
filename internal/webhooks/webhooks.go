@@ -30,6 +30,7 @@ import (
 	"github.com/diffluence/diffluence/internal/notify"
 	"github.com/diffluence/diffluence/internal/outbox"
 	"github.com/diffluence/diffluence/internal/outward"
+	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 )
 
@@ -357,8 +358,8 @@ func (s *Service) body(ctx context.Context, t target, d delivery) ([]byte, bool,
 		}
 		data["page_id"] = d.page
 		if t.WithTitles {
-			var title string
-			if err := s.pool.QueryRow(ctx, "SELECT title FROM pages WHERE id = $1", *d.page).Scan(&title); err != nil {
+			title, err := pages.Title(ctx, s.pool, *d.page)
+			if err != nil {
 				return nil, false, err
 			}
 			data["title"] = title

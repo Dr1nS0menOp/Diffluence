@@ -14,6 +14,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	neturl "net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -411,7 +412,34 @@ func (s *shellSteps) RestoreDatabase(ctx context.Context, name string) error {
 	return s.shell(ctx, `{ printf 'DROP SCHEMA public CASCADE;\nCREATE SCHEMA public;\nGRANT USAGE ON SCHEMA public TO PUBLIC;\n'; `+
 		decrypt+` "$DIR/database.dump.gpg" | pg_restore --use-list="$LIST" --file=-; } | `+
 		`psql --dbname="$OWNER_URL" --no-psqlrc --quiet -v ON_ERROR_STOP=1 --single-transaction >/dev/null`,
-		map[string]string{"DIR": dir, "LIST": kept.Name(), "OWNER_URL": s.ownerURL}, nil)
+		ownerEnv(map[string]string{"DIR": dir, "LIST": kept.Name()}, s.ownerURL), nil)
+}
+
+// ownerEnv adds the owner's address to env for psql: the address without its password as
+// OWNER_URL, which lands on psql's command line, and the password as PGPASSWORD, which only
+// the process itself and root can read (spec 072).
+func ownerEnv(env map[string]string, ownerURL string) map[string]string {
+	address, password := passwordApart(ownerURL)
+	env["OWNER_URL"] = address
+	if password != "" {
+		env["PGPASSWORD"] = password
+	}
+	return env
+}
+
+// passwordApart splits the password out of a postgres:// address. An address in the
+// key=value form is returned whole, with no password apart.
+func passwordApart(raw string) (address, password string) {
+	u, err := neturl.Parse(raw)
+	if err != nil || (u.Scheme != "postgres" && u.Scheme != "postgresql") || u.User == nil {
+		return raw, ""
+	}
+	password, set := u.User.Password()
+	if !set {
+		return raw, ""
+	}
+	u.User = neturl.User(u.User.Username())
+	return u.String(), password
 }
 
 // withoutOps drops every entry of the schema ops from a pg_restore list, and the entry

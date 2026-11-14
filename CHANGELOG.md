@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: the module boundary is checked, and smaller fixes (spec 072, wave RV5)
+- A test gives every table one owning module and lists, with a reason, each place a module still reads another module's table; a new one fails the checks. Five reads moved behind small functions of their owner (`settings.Load`, `pages.Title`, `spaces.HomePage`, `backups.ReadinessToRestore`, `restore.Leave`), from 564 mentions to 557
+- The service for editing together runs one check of its connections at a time; changes of rights that arrive meanwhile share one more check after it, instead of one check each
+- The backup service and a restore give `psql` and `pg_dump` the owner's address without its password, which goes through the environment instead, so other processes in the container cannot read it from the command line
+- The install guide says to keep `master.key` apart from the data directory on a real installation. The development guide says why the placeholder migrations stay, and a test runs a contract migration end to end on a copy of an installed database
+- Upgrade impact: none. No migration. Rebuild the backup service with the server as usual (`docker compose up -d --build`) to take the change to its script
 ### Changed: limits of signing in, counted audit erasures and exports, and accounts from single sign-on (spec 071, wave RV4)
 - The limits per address count an IPv6 address by its /64 network. The limiter forgets ended windows as it goes. Signing in has its own share of the database pool beside saving, and a request that ends while waiting for a password hash stops waiting
 - An audit CSV ends with a line that says `#complete`, `#limit-reached` or `#incomplete` with the number of events. It is read in pages of 5,000, and a long export or export download is no longer cut off by the server's write timeout. The check of the audit log from the console may walk the chain for up to ten minutes

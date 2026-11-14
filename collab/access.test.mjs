@@ -93,6 +93,49 @@ test('an API that cannot answer ends access at the recheck', async () => {
   assert.deepEqual(closed, [CLOSE_ACCESS_ENDED]);
 });
 
+/** An API that holds every answer until it is let go, and counts the questions. */
+function slowAPI() {
+  let asked = 0;
+  let release;
+  const gate = new Promise((resolve) => {
+    release = resolve;
+  });
+  const ask = async () => {
+    asked += 1;
+    await gate;
+    return { ok: true, json: async () => ({ allowed: true, ticket: `t${asked}` }) };
+  };
+  return { ask, release, asked: () => asked };
+}
+
+test('a storm of rechecks runs one check at a time, and one more after it', async () => {
+  const api = slowAPI();
+  const access = createAccess(api.ask);
+  access.remember(PAGE, connection('t0').entry);
+  const storm = Array.from({ length: 10 }, () => access.recheck());
+  assert.equal(api.asked(), 1, 'a second check started while the first was in flight');
+  api.release();
+  await Promise.all(storm);
+  // The changes of rights that came in during the first run are seen by the second.
+  assert.equal(api.asked(), 2);
+  await access.recheck();
+  assert.equal(api.asked(), 3, 'a recheck after the storm did not run');
+});
+
+test('a recheck that fails reports it, and the one queued after it still runs', async () => {
+  let calls = 0;
+  const access = createAccess(async () => {
+    calls += 1;
+    return { ok: true, json: async () => ({ allowed: calls > 1, ticket: 't' }) };
+  });
+  const broken = { ticket: 'a', close: () => { throw new Error('socket gone'); } };
+  access.remember(PAGE, broken);
+  const [first, queued] = await Promise.allSettled([access.recheck(), access.recheck()]);
+  assert.equal(first.status, 'rejected', 'the failure of the first run was swallowed');
+  assert.equal(queued.status, 'fulfilled');
+  assert.equal(calls, 2, 'the queued recheck did not run');
+});
+
 test('a connection that left is not asked about', async () => {
   const api = fakeAPI({ allowed: true, ticket: 't2' });
   const access = createAccess(api.ask);

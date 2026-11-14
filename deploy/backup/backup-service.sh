@@ -66,9 +66,32 @@ tend() {
   fi
 }
 
+# as_owner runs a PostgreSQL client as the owner of the tables. The address goes on the
+# command line without its password, which goes through PGPASSWORD instead: every process
+# of the container can read a command line, but only the process itself and root read its
+# environment (spec 072). A key=value address is passed whole.
+as_owner() {
+  local url rest auth pass
+  url=$(cat /run/secrets/migrate_database_url) || return 1
+  rest=${url#*://}
+  auth=${rest%@*}
+  case "$url" in
+    postgres://*:*@* | postgresql://*:*@*)
+      if [ "$auth" != "$rest" ] && [ "${auth#*:}" != "$auth" ]; then
+        pass=${auth#*:}
+        # The address percent-encodes the password; PGPASSWORD holds it as it is.
+        pass=${pass//\\/\\\\}
+        PGPASSWORD=$(printf '%b' "${pass//%/\\x}") "$@" --dbname="${url%%://*}://${auth%%:*}@${rest##*@}"
+        return
+      fi
+      ;;
+  esac
+  "$@" --dbname="$url"
+}
+
 # schema_ready is whether Diffluence has made its tables, so a backup can be noted.
 schema_ready() {
-  [ "$(psql --dbname="$(cat /run/secrets/migrate_database_url)" -tAc "SELECT to_regclass('audit_events') IS NOT NULL" 2>/dev/null)" = t ]
+  [ "$(as_owner psql -tAc "SELECT to_regclass('audit_events') IS NOT NULL" 2>/dev/null)" = t ]
 }
 
 encrypt_to() {
@@ -104,7 +127,7 @@ backup_once() {
   step="dumping the database"
   # The schema ops steers a restore and is never restored, so a backup holds its tables
   # without their rows (spec 059).
-  pg_dump --dbname="$(cat /run/secrets/migrate_database_url)" -Fc --exclude-table-data='ops.*' |
+  as_owner pg_dump -Fc --exclude-table-data='ops.*' |
     encrypt_to "$work/database.dump.gpg" || return 1
   step="packing the stored files"
   tar -C /data -czf - --exclude=./master.key --exclude=./master.key.next --exclude=./master.key.previous \

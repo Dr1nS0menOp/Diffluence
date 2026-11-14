@@ -77,15 +77,8 @@ func (s *Service) today() time.Time { return s.now().UTC().Truncate(24 * time.Ho
 
 func readSettings(ctx context.Context, q db.Querier) (Settings, error) {
 	out := defaults()
-	var raw []byte
-	err := q.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", settingsKey).Scan(&raw)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return out, nil
-	}
-	if err != nil {
-		return out, err
-	}
-	return out, json.Unmarshal(raw, &out)
+	err := settings.Load(ctx, q, settingsKey, &out)
+	return out, err
 }
 
 // Settings returns the choices of the administrator.

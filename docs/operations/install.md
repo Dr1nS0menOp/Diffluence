@@ -161,6 +161,8 @@ Mailpit is a tool for developers and catches mail without delivering it, so it i
 
 Diffluence creates `master.key` in the data directory on first start. It protects every stored file and secret, and derives the installation's checkpoint key, which signs the audit checkpoints until the backup service's key takes over, and endorses that key (spec 070). **Back it up separately from your data.** Without it, no file can be read and users must set up their authenticator app again. To replace it, see [backup and restore](backup-restore.md#replace-it).
 
+**Keep the key apart from the data on a real installation.** The key in the data directory is convenient for a first try, but then every copy of that directory, such as a disk snapshot or a copied volume, carries the key that opens it, and encryption at rest protects nothing in that copy. With the packages, the LXC script or Kubernetes, set `DIFFLUENCE_MASTER_KEY_FILE` before the first start to a file on another disk, mount or secret store, readable only by the user Diffluence runs as; an installation that already started moves the file there with the server stopped, then sets the variable. In Compose the backup service reads the key from the data volume, so leave it there, and leave that volume out of any snapshot or copy that does not also get the care a key needs. The backup service's own backups keep the key apart already: they hold it only encrypted with the backup key, in `master.key.gpg`.
+
 With more than one node (`DIFFLUENCE_ROLE=api` or `worker`) set `DIFFLUENCE_MASTER_KEY_FILE` to the same key on every node. Diffluence refuses to start without it. HA itself is phase 3: attachments are on local disk until the S3 store exists.
 
 ## Backups before an upgrade

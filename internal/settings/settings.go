@@ -117,6 +117,13 @@ func (s *Service) Read(ctx context.Context, key string, v any) error {
 
 // ReadIn is Read through q, for code that holds a transaction.
 func (s *Service) ReadIn(ctx context.Context, q db.Querier, key string, v any) error {
+	return Load(ctx, q, key, v)
+}
+
+// Load fills v with one stored value through q, and leaves it alone when there is none.
+// Other modules read their own choices here through this, as they write them through
+// Store, so only settings names its table (ARC-027).
+func Load(ctx context.Context, q db.Querier, key string, v any) error {
 	var raw []byte
 	err := q.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1", key).Scan(&raw)
 	if errors.Is(err, pgx.ErrNoRows) {
