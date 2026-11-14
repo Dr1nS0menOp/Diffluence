@@ -32,6 +32,12 @@ func room(ctx context.Context, q db.Querier, spaceID uuid.UUID) (left int64, lim
 	return left, limited, err
 }
 
+// RoomForRelease says how many bytes a published space can still take, and whether it has a
+// limit at all, for the preview of a release (PUB-1054). The copy itself checks again.
+func RoomForRelease(ctx context.Context, q db.Querier, spaceID uuid.UUID) (left int64, limited bool, err error) {
+	return room(ctx, q, spaceID)
+}
+
 // requireRoom is the check that counts. The lock makes two uploads at once take turns, so
 // they cannot both take the last room (spec 024, D11).
 func requireRoom(ctx context.Context, tx pgx.Tx, spaceID uuid.UUID, size int64) error {

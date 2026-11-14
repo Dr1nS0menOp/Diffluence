@@ -15,6 +15,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/comments"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -25,13 +26,23 @@ import (
 	"github.com/diffluence/diffluence/internal/spaces"
 )
 
-// The release status of a draft page, in words (PUB-330). Left out, waiting for approval and
-// removed in the draft come with PB2 and PB3.
+// The release status of a draft page, in words (PUB-330, PUB-331, PUB-421). Waiting for
+// approval comes with PB3.
 const (
-	StatusNotReleased = "not_released"
-	StatusReleased    = "released"
-	StatusChanged     = "changed"
-	StatusCannot      = "cannot_release"
+	StatusNotReleased     = "not_released"
+	StatusReleased        = "released"
+	StatusChanged         = "changed"
+	StatusCannot          = "cannot_release"
+	StatusLeftOut         = "left_out"
+	StatusLeftOutReleased = "left_out_released"
+	StatusRemoved         = "removed"
+)
+
+// Aspects of out of step that PB2 adds to those of PB1 (PUB-305, PUB-306, PUB-1013); the
+// others are text, title, place, look and labels.
+const (
+	aspectLinks   = "links"
+	aspectArchive = "archive"
 )
 
 // What a release does to one page.
@@ -113,6 +124,20 @@ type PageStatus struct {
 	DraftPageID     *uuid.UUID `json:"draft_page_id,omitempty"`
 	DraftSpace      *SpaceRef  `json:"draft_space,omitempty"`
 	CanRelease      bool       `json:"can_release"`
+	// LeftOut is the mark that leaves a draft page out of releases (PUB-420).
+	LeftOut *Exclusion `json:"left_out,omitempty"`
+	// ReaderComments counts the comments readers left on the twin, for those who may view it
+	// (PUB-223, PUB-1232). No comment text crosses.
+	ReaderComments int `json:"reader_comments"`
+}
+
+// Exclusion is the mark that leaves a page out: on the page itself, or on a page above it
+// with everything below.
+type Exclusion struct {
+	PageID       uuid.UUID `json:"page_id"`
+	WithChildren bool      `json:"with_children"`
+	Reason       string    `json:"reason"`
+	At           time.Time `json:"at"`
 }
 
 func (s *Service) mayPage(ctx context.Context, c identity.Caller, id uuid.UUID, action string) (bool, error) {
@@ -183,6 +208,15 @@ func (s *Service) draftStatus(ctx context.Context, c identity.Caller, src pages.
 		return out, err
 	}
 	out.Status, out.Aspects = statusOf(pp)
+	if out.LeftOut, err = exclusionOf(ctx, s.pool, src); err != nil {
+		return out, err
+	}
+	if out.LeftOut != nil {
+		out.Status = StatusLeftOut
+		if pp != nil && pp.ReleasedVersion > 0 {
+			out.Status = StatusLeftOutReleased
+		}
+	}
 	if pp != nil {
 		out.ReleasedVersion, out.TwinVersion, out.ReleasedAt = pp.ReleasedVersion, pp.TwinVersion, pp.ReleasedAt
 		seen, err := s.mayPage(ctx, c, pp.Twin, permissions.ActionPageView)
@@ -192,6 +226,9 @@ func (s *Service) draftStatus(ctx context.Context, c identity.Caller, src pages.
 		if seen {
 			twin := pp.Twin
 			out.TwinPageID = &twin
+			if out.ReaderComments, err = comments.CountForReaders(ctx, s.pool, twin); err != nil {
+				return out, err
+			}
 		}
 	}
 	viewsPublished, err := s.maySpace(ctx, c, p.Published, permissions.SpaceView)
@@ -266,6 +303,11 @@ type plan struct {
 	targets   map[uuid.UUID]pages.LinkTarget
 	twins     map[uuid.UUID]uuid.UUID
 	foreign   map[uuid.UUID]bool
+	// made is the twin a run made for this page before writing it, so links from pages
+	// written earlier could lead to it (PUB-513, PUB-514).
+	made *uuid.UUID
+	// unarchive brings the twin back from the archive, as the draft page came back (PUB-1013).
+	unarchive bool
 }
 
 // fileStep is one file the released document shows.
@@ -300,28 +342,48 @@ func (s *Service) requireRelease(ctx context.Context, q db.Querier, c identity.C
 
 // planPage works out the release of one page at a version, through q.
 func (s *Service) planPage(ctx context.Context, q db.Querier, p pair, src pages.ReleaseSource, number int) (plan, error) {
-	pl := plan{pair: p, src: src, number: number}
+	draft, published, err := bothActive(ctx, q, p)
+	if err != nil {
+		return plan{}, err
+	}
+	return s.planPageWith(ctx, q, planInput{pair: p, src: src, number: number, draft: draft, published: published})
+}
+
+// planInput is what working out the release of one page starts from: in a run, the spaces it
+// read once and the twins it made already, so the run's links resolve to each other (PUB-513).
+type planInput struct {
+	pair             pair
+	src              pages.ReleaseSource
+	number           int
+	draft, published spaces.Space
+	runTwins         map[uuid.UUID]uuid.UUID
+}
+
+// planPageWith works out the release of one page from what the caller read already.
+func (s *Service) planPageWith(ctx context.Context, q db.Querier, in planInput) (plan, error) {
+	p, src, runTwins := in.pair, in.src, in.runTwins
+	pl := plan{pair: p, src: src, number: in.number, draft: in.draft, published: in.published}
 	var err error
-	if pl.draft, err = spaces.LoadIn(ctx, q, p.Draft); err != nil {
-		return pl, err
-	}
-	if pl.published, err = spaces.LoadIn(ctx, q, p.Published); err != nil {
-		return pl, err
-	}
-	if pl.draft.Status != spaces.StatusActive || pl.published.Status != spaces.StatusActive {
-		return pl, apperr.Conflict("space_not_active", "Both spaces of the pair must be in use to release.")
-	}
 	if pl.existing, err = loadPagePair(ctx, q, p.ID, src.ID); err != nil {
 		return pl, err
 	}
-	if pl.version, err = pages.VersionForRelease(ctx, q, src.ID, number); err != nil {
+	if pl.version, err = pages.VersionForRelease(ctx, q, src.ID, in.number); err != nil {
 		return pl, err
 	}
 	if pl.twins, err = twinsOf(ctx, q, p.ID, append(slices.Clone(src.Ancestors), referencedPages(pl.version.Doc)...)); err != nil {
 		return pl, err
 	}
+	for draft, twin := range runTwins {
+		if _, ok := pl.twins[draft]; !ok {
+			pl.twins[draft] = twin
+		}
+	}
+	if made, ok := runTwins[src.ID]; ok && pl.existing == nil {
+		pl.made = &made
+	}
 	pl.place = placeTwin(src.Ancestors, pl.twins)
 	pl.aspects, pl.action = pl.diff()
+	pl.unarchive = slices.Contains(pl.aspects, aspectArchive)
 	if pl.targets, err = pages.ReleaseTargets(ctx, q, append(referencedPages(pl.version.Doc), src.ID)); err != nil {
 		return pl, err
 	}
@@ -357,7 +419,8 @@ func (pl plan) diff() ([]string, string) {
 		}
 	}
 	switch {
-	case slices.Contains(aspects, "text") || slices.Contains(aspects, "title"):
+	// A link waiting turns back into a link, which is a new version (PUB-512).
+	case slices.Contains(aspects, "text") || slices.Contains(aspects, "title") || slices.Contains(aspects, aspectLinks):
 		return aspects, actionChange
 	case len(aspects) > 0:
 		return aspects, actionUpdate
@@ -534,6 +597,13 @@ func (s *Service) draftPage(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 	if reason := cannotRelease(src.Page, facts.ControlHidden); reason != "" {
 		return src, p, apperr.Conflict("cannot_release", cannotReleaseWords[reason])
 	}
+	out, err := leftOut(ctx, tx, src)
+	if err != nil {
+		return src, p, err
+	}
+	if out {
+		return src, p, apperr.Conflict(codeLeftOut, "This page is left out of releases. Include it again to release it.")
+	}
 	return src, p, nil
 }
 
@@ -592,6 +662,11 @@ func (s *Service) Release(ctx context.Context, c identity.Caller, pageID uuid.UU
 		if err != nil {
 			return err
 		}
+		// One run per pair: a release of one page waits until a larger run has finished
+		// (PUB-452, decision D25).
+		if err := s.refuseWhileRunning(ctx, tx, p.ID); err != nil {
+			return err
+		}
 		number, err := s.claimPreview(ctx, tx, c, p, pageID, in.PreviewID)
 		if err != nil {
 			return err
@@ -629,11 +704,50 @@ func (s *Service) claimPreview(ctx context.Context, tx pgx.Tx, c identity.Caller
 
 func (s *Service) releaseOne(ctx context.Context, tx pgx.Tx, c identity.Caller, pl plan, in RunInput) (Report, error) {
 	out := Report{RunID: in.PreviewID, Action: pl.action, Version: pl.number, PlacedHigher: pl.place.Higher}
-	silent := in.Silent || !pl.pair.Settings.NotifyWatchers
 	if pl.action == actionNone {
 		return out, s.finishRun(ctx, tx, c, pl, out, in, nil)
 	}
+	w, err := s.writePage(ctx, tx, c, &pl, pageWrite{note: in.Note, silent: in.Silent || !pl.pair.Settings.NotifyWatchers, runID: in.PreviewID})
+	if err != nil {
+		return out, err
+	}
+	out.TwinVersion, out.LinksAsText, out.FilesCopied = w.twinVersion, len(w.res.textLinks), w.filesCopied
+	// The twin takes its place among its siblings as in the draft (PUB-412).
+	if err := s.orderWritten(ctx, tx, batchState{pair: pl.pair, published: pl.published},
+		[]writtenPage{{draft: pl.src.ID, draftParent: pl.src.ParentID, twin: w.twin, twinParent: pl.place.Parent}}); err != nil {
+		return out, err
+	}
+	return out, s.finishRun(ctx, tx, c, pl, out, in, &w.res)
+}
+
+// pageWrite is how a run writes one page: the note and silence of the run, and the run.
+type pageWrite struct {
+	note   string
+	silent bool
+	runID  uuid.UUID
+	// bulk is set for a run of more than one page, whose watchers hear of the run once
+	// (PUB-813); a release of one page tells them as a change of that page.
+	bulk *uuid.UUID
+}
+
+// written is what writing one page did.
+type written struct {
+	twin        uuid.UUID
+	twinVersion int
+	filesCopied int
+	res         rewritten
+}
+
+// writePage writes one page of a run onto its twin: the twin is made if it has none, the
+// files it shows are copied when they changed, the document is rewritten and passes the gate,
+// and the facts of the release are kept (PUB-410 to PUB-412, PUB-320, PUB-500 to PUB-534).
+func (s *Service) writePage(ctx context.Context, tx pgx.Tx, c identity.Caller, pl *plan, w pageWrite) (written, error) {
+	var out written
 	twin := twinOf(pl.existing)
+	if twin == nil && pl.made != nil {
+		twin = pl.made
+		pl.existing = &pagePair{Twin: *pl.made}
+	}
 	if twin == nil {
 		made, err := s.pages.MakeTwin(ctx, tx, c, pl.published.ID, pl.place.Parent, pl.src.Page)
 		if err != nil {
@@ -642,6 +756,7 @@ func (s *Service) releaseOne(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 		twin = &made.ID
 		pl.existing = &pagePair{Twin: made.ID}
 	}
+	out.twin = *twin
 	files := map[uuid.UUID]uuid.UUID{}
 	for i, f := range pl.files {
 		if !f.needed() {
@@ -653,7 +768,7 @@ func (s *Service) releaseOne(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 			return out, err
 		}
 		files[f.from], pl.files[i].copy, pl.files[i].copied = copied, &copied, version
-		out.FilesCopied++
+		out.filesCopied++
 	}
 	res := rewrite(pl.version.Doc, pl.rewriteInput(files))
 	raw, err := document.Marshal(res.doc)
@@ -665,7 +780,9 @@ func (s *Service) releaseOne(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 	if err != nil {
 		return out, fmt.Errorf("publishing: a released document did not pass the gate: %w", err)
 	}
-	write := pages.TwinWrite{ID: *twin, Parent: pl.place.Parent, Look: pl.src.Look, Labels: pl.src.Labels}
+	// The look and the labels are written when the twin is new or they changed (PUB-303, PUB-304).
+	write := pages.TwinWrite{ID: *twin, Parent: pl.place.Parent, Look: pl.src.Look, Labels: pl.src.Labels,
+		Same: pl.action != actionMake && !slices.Contains(pl.aspects, "look") && !slices.Contains(pl.aspects, "labels")}
 	write.Look.HeaderAttachmentID = nil
 	if h := pl.src.HeaderAttachmentID; h != nil {
 		if copied, ok := files[*h]; ok {
@@ -674,20 +791,32 @@ func (s *Service) releaseOne(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 	}
 	if pl.action == actionMake || pl.action == actionChange {
 		// The releaser is the author and the note the summary, never the draft's (PUB-1408).
-		write.Version = &pages.TwinVersion{Title: pl.version.Title, Doc: doc, Summary: in.Note, Silent: silent}
+		write.Version = &pages.TwinVersion{Title: twinTitle(*pl), Doc: doc, Summary: w.note, Silent: w.silent, Run: w.bulk}
 	}
-	written, err := s.pages.WriteTwin(ctx, tx, c, write)
+	twinPage, err := s.pages.WriteTwin(ctx, tx, c, write)
 	if err != nil {
 		return out, err
 	}
-	out.TwinVersion, out.LinksAsText = written.CurrentVersion, len(res.textLinks)
-	if err := s.keepFacts(ctx, tx, c, pl, written, res, in.PreviewID); err != nil {
+	if pl.unarchive {
+		if err := s.pages.SetTwinArchived(ctx, tx, c, *twin, false); err != nil {
+			return out, err
+		}
+	}
+	out.twinVersion, out.res = twinPage.CurrentVersion, res
+	if err := s.keepFacts(ctx, tx, c, *pl, twinPage, res, w.runID); err != nil {
 		return out, err
 	}
-	if err := s.keepFiles(ctx, tx, c, pl); err != nil {
-		return out, err
+	return out, s.keepFiles(ctx, tx, c, *pl)
+}
+
+// twinTitle is the title a twin gets. A home page is named after its space until someone
+// renames it, so a draft home page with the draft space's name gives readers the name of their
+// own space instead: the name of the draft space never reaches them (PUB-108, decision D28).
+func twinTitle(pl plan) string {
+	if pl.draft.HomePageID != nil && *pl.draft.HomePageID == pl.src.ID && pl.version.Title == pl.draft.Name {
+		return pl.published.Name
 	}
-	return out, s.finishRun(ctx, tx, c, pl, out, in, &res)
+	return pl.version.Title
 }
 
 // keepFacts records the release in the page pair: the version, and the facts of each aspect
@@ -708,10 +837,9 @@ func (s *Service) keepFacts(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 		pl.src.Labels, pl.version.Hash, nonNil(res.textLinks)); err != nil {
 		return err
 	}
-	// The draft may have changed since the preview: compare again, so a newer version stays
-	// Changed since release (PUB-431).
-	_, err := tx.Exec(ctx, "SELECT page_pair_refresh($1)", pl.src.ID)
-	return err
+	// The draft may have changed since the preview; orderWritten compares every page of the
+	// group again, so a newer version stays Changed since release (PUB-431).
+	return nil
 }
 
 func nonNil(list []uuid.UUID) []uuid.UUID {
@@ -766,30 +894,53 @@ func (s *Service) finishRun(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 	}
 	counts := map[string]any{"pages": 1, "released": boolCount(res != nil), "files_copied": out.FilesCopied, "links_as_text": out.LinksAsText}
 	if _, err := tx.Exec(ctx, `UPDATE release_runs SET status = 'done', note = $2, silent = $3, started_at = now(), finished_at = now(),
-		counts = $4, report = $5 WHERE id = $1`, in.PreviewID, in.Note, in.Silent, counts, out); err != nil {
+		counts = $4, report = $5, total = 1, done = 1 WHERE id = $1`, in.PreviewID, in.Note, in.Silent, counts, out); err != nil {
 		return err
 	}
-	if _, err := tx.Exec(ctx, `UPDATE release_run_pages SET twin_page_id = $3, twin_version = $4, outcome = $5, link_map = $6
-		WHERE run_id = $1 AND draft_page_id = $2`, in.PreviewID, pl.src.ID, twin, out.TwinVersion, outcome, links); err != nil {
+	return s.recordPage(ctx, tx, c, pl, pageRecord{runID: in.PreviewID, note: in.Note, silent: in.Silent, outcome: outcome,
+		twin: twin, twinVersion: out.TwinVersion, twinHash: twinHash, links: links})
+}
+
+// pageRecord is what a run did to one page, for its row and its audit.
+type pageRecord struct {
+	runID       uuid.UUID
+	note        string
+	silent      bool
+	outcome     string
+	twin        *uuid.UUID
+	twinVersion int
+	twinHash    string
+	links       map[string]string
+	// hash is the content hash of the draft version released (PUB-732, D9).
+	hash string
+}
+
+// recordPage keeps what a run did to one page, and audits it: in the draft space with both
+// sides, in the published space with the twin only (PUB-900 to PUB-903, PUB-922, PUB-923).
+func (s *Service) recordPage(ctx context.Context, tx pgx.Tx, c identity.Caller, pl plan, r pageRecord) error {
+	if _, err := tx.Exec(ctx, `UPDATE release_run_pages SET twin_page_id = $3, twin_version = $4, outcome = $5, link_map = $6,
+		content_hash = COALESCE(NULLIF($7, ''), content_hash) WHERE run_id = $1 AND draft_page_id = $2`,
+		r.runID, pl.src.ID, r.twin, r.twinVersion, r.outcome, r.links, r.hash); err != nil {
 		return err
 	}
 	details := map[string]any{"pair_id": pl.pair.ID, "page_id": pl.src.ID, "version": pl.number, "content_hash": pl.version.Hash,
-		"action": pl.action, "aspects": pl.aspects, "placed_higher": pl.place.Higher, "note": in.Note, "silent": in.Silent, "outcome": outcome}
-	if twin != nil {
-		details["twin_page_id"], details["twin_version"], details["twin_hash"] = *twin, out.TwinVersion, twinHash
+		"action": pl.action, "aspects": pl.aspects, "placed_higher": pl.place.Higher, "note": r.note, "silent": r.silent, "outcome": r.outcome,
+		"run_id": r.runID}
+	if r.twin != nil {
+		details["twin_page_id"], details["twin_version"], details["twin_hash"] = *r.twin, r.twinVersion, r.twinHash
 	}
 	if _, err := audit.Record(ctx, tx, c.Event("release.page", "page", pl.src.ID.String(), pl.pair.Draft.String(), details)); err != nil {
 		return err
 	}
-	if twin == nil {
+	if r.twin == nil {
 		return nil
 	}
-	if _, err := audit.Record(ctx, tx, c.Event("page.released", "page", twin.String(), pl.published.ID.String(),
-		map[string]any{"run_id": in.PreviewID, "version": out.TwinVersion, "content_hash": twinHash, "note": in.Note})); err != nil {
+	if _, err := audit.Record(ctx, tx, c.Event("page.released", "page", r.twin.String(), pl.published.ID.String(),
+		map[string]any{"run_id": r.runID, "version": r.twinVersion, "content_hash": r.twinHash, "note": r.note})); err != nil {
 		return err
 	}
-	_, err := outbox.Enqueue(ctx, tx, "page.released", map[string]any{"page_id": *twin, "space_id": pl.published.ID, "version": out.TwinVersion,
-		"run_id": in.PreviewID, "actor_id": c.UserID})
+	_, err := outbox.Enqueue(ctx, tx, "page.released", map[string]any{"page_id": *r.twin, "space_id": pl.published.ID, "version": r.twinVersion,
+		"run_id": r.runID, "actor_id": c.UserID})
 	return err
 }
 

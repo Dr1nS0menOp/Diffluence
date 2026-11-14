@@ -25,6 +25,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
 	"github.com/diffluence/diffluence/internal/spaces"
@@ -45,11 +46,27 @@ type Service struct {
 	pages       *pages.Service
 	spaces      *spaces.Service
 	attachments *attachments.Service
+	jobs        *jobs.Service
+	limits      Limits
+	// slots bounds the runs this node carries out at once (PUB-1105).
+	slots chan struct{}
 }
 
-// NewService creates the service.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, sp *spaces.Service, att *attachments.Service) *Service {
-	return &Service{pool: pool, perms: perms, pages: pg, spaces: sp, attachments: att}
+// JobKindRun is the background work of a run of more than one page.
+const JobKindRun = "release.run"
+
+// NewService creates the service, and registers the background work of runs with jb.
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, sp *spaces.Service, att *attachments.Service, jb *jobs.Service) *Service {
+	s := &Service{pool: pool, perms: perms, pages: pg, spaces: sp, attachments: att, jobs: jb}
+	s.SetLimits(DefaultLimits())
+	jb.RegisterLong(JobKindRun, s.runJob)
+	return s
+}
+
+// SetLimits changes the bounds of runs. It is called before the service is used.
+func (s *Service) SetLimits(l Limits) {
+	s.limits = l
+	s.slots = make(chan struct{}, l.RunsPerNode)
 }
 
 // Settings are the choices of a pair, kept on the draft side (PUB-240). Who may release is

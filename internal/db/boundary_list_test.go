@@ -97,11 +97,13 @@ var tableOwners = map[string]string{
 	"workflow_templates":       "internal/pages",
 
 	// draft and published spaces (spec 073).
-	"space_pairs":       "internal/publishing",
-	"page_pairs":        "internal/publishing",
-	"file_pairs":        "internal/publishing",
-	"release_runs":      "internal/publishing",
-	"release_run_pages": "internal/publishing",
+	"space_pairs":        "internal/publishing",
+	"page_pairs":         "internal/publishing",
+	"file_pairs":         "internal/publishing",
+	"release_runs":       "internal/publishing",
+	"release_run_pages":  "internal/publishing",
+	"release_exclusions": "internal/publishing",
+	"release_removals":   "internal/publishing",
 
 	// files.
 	"attachments":         "internal/attachments",
@@ -332,9 +334,13 @@ var crossings = map[crossing]int{
 	{"internal/feed", "pages"}:            5,
 	{"internal/feed", "reactions"}:        2,
 	{"internal/feed", "search_documents"}: 2,
-	{"internal/feed", "spaces"}:           2,
+	{"internal/feed", "spaces"}:           3,
 	{"internal/feed", "users"}:            2,
-	{"internal/feed", "watches"}:          4,
+	{"internal/feed", "watches"}:          5,
+	// feed: a run of a release of many pages is one item, read from its runs (spec 073, PUB-810).
+	{"internal/feed", "release_run_pages"}: 2,
+	{"internal/feed", "release_runs"}:      2,
+	{"internal/feed", "space_pairs"}:       1,
 
 	// identity: erasing a person removes their rows, and a deleted group its grants, in one
 	// transaction (spec 032); the list of a person's spaces shows names.
@@ -365,7 +371,7 @@ var crossings = map[crossing]int{
 	{"internal/pages", "attachments"}:       3,
 	{"internal/pages", "comments"}:          2,
 	{"internal/pages", "page_restrictions"}: 8,
-	{"internal/pages", "spaces"}:            27,
+	{"internal/pages", "spaces"}:            29,
 	{"internal/pages", "trash_items"}:       1,
 	{"internal/pages", "users"}:             31,
 	// Document control resolves the people, groups and roles a review state names when a
@@ -394,6 +400,17 @@ var crossings = map[crossing]int{
 	{"internal/permissions", "pages"}:              3,
 	{"internal/permissions", "spaces"}:             5,
 	{"internal/permissions", "users"}:              14,
+
+	// publishing: the release screen, the scope of a run and the history read the page pairs with
+	// the pages of the draft space, their places, restrictions and approval, and the twins'
+	// versions and who released, in one query each, as a list joins its display columns; a call
+	// per page would be thousands at 5,000 pages (spec 073, PUB-1103, PUB-1104, PUB-912).
+	{"internal/publishing", "page_control"}:      3,
+	{"internal/publishing", "page_restrictions"}: 2,
+	{"internal/publishing", "page_tree"}:         8,
+	{"internal/publishing", "page_versions"}:     5,
+	{"internal/publishing", "pages"}:             12,
+	{"internal/publishing", "users"}:             2,
 
 	// presence: one stamp of what changed on a page, read on every poll.
 	{"internal/presence", "comments"}:    3,

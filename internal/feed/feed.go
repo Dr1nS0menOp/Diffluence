@@ -55,6 +55,9 @@ type Item struct {
 	At         time.Time `json:"at"`
 	Reactions  int       `json:"reactions"`
 	Comments   int       `json:"comments"`
+	// Pages is the number of pages of a run of a release the person may see; the item is then
+	// of kind released, on the home page of the published space, with the note as its excerpt.
+	Pages int `json:"pages,omitempty"`
 }
 
 // Service reads feeds.
@@ -88,13 +91,31 @@ func readable(version string) string {
 // page of twenty items reads about twenty versions (spec 050).
 var changesSQL = `WITH changes AS (
 		SELECT v.page_id, v.author_id, v.created_at AS at,
-			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
+			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind, NULL::text AS note, 0 AS pages
 		FROM page_versions v
 		WHERE NOT v.silent AND ` + readable("v") + `
 		  AND NOT EXISTS (SELECT 1 FROM page_versions n WHERE n.page_id = v.page_id AND n.number > v.number AND NOT n.silent
 			AND ` + readable("n") + `)
 		  AND ` + visible("v.page_id") + `
+		  AND NOT ` + byRun("v") + `
+		UNION ALL ` + runItems + `
 	)` + changesTail
+
+// byRun asks whether a run of a release of many pages wrote a version. Such a run is one item
+// of its own, so its pages do not show one by one (spec 073, PUB-810).
+func byRun(version string) string {
+	return `EXISTS (SELECT 1 FROM release_run_pages rp JOIN release_runs rr ON rr.id = rp.run_id AND rr.scope <> 'page'
+		WHERE rp.twin_page_id = ` + version + `.page_id AND rp.twin_version = ` + version + `.number)`
+}
+
+// runItems are the runs of a release of many pages, each one item on the home page of the
+// published space, with the note and the number of its pages the person may see (PUB-810). A
+// silent run is in the feed too, as it only keeps people from being told (PUB-821).
+var runItems = `SELECT pub.home_page_id, r.actor_id, r.finished_at, 'released', r.note,
+			(SELECT count(*)::int FROM release_run_pages rp WHERE rp.run_id = r.id AND rp.outcome = 'released'
+				AND ` + visible("rp.twin_page_id") + `)
+		FROM release_runs r JOIN space_pairs sp ON sp.id = r.pair_id JOIN spaces pub ON pub.id = sp.published_space_id
+		WHERE r.scope <> 'page' AND r.status = 'done' AND pub.home_page_id IS NOT NULL AND ` + visible("pub.home_page_id")
 
 // "For you" holds only pages a person watches, pages below a branch they watch, pages
 // of spaces they watch, and pages of people they follow. Walking every version newest
@@ -117,28 +138,30 @@ var forYouSQL = `WITH candidates AS (
 	),
 	changes AS (
 		SELECT v.page_id, v.author_id, v.created_at AS at,
-			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind
+			CASE WHEN v.number = 1 THEN 'created' ELSE 'changed' END AS kind, NULL::text AS note, 0 AS pages
 		FROM candidates k
 		JOIN pages cp ON cp.id = k.page_id
 		CROSS JOIN LATERAL (
 			SELECT n.page_id, n.author_id, n.created_at, n.number FROM page_versions n
 			WHERE n.page_id = k.page_id AND NOT n.silent AND n.number <= cp.current_version
 			ORDER BY n.number DESC LIMIT 1) v
-		WHERE ` + visible("v.page_id") + `
+		WHERE ` + visible("v.page_id") + ` AND NOT ` + byRun("v") + `
+		UNION ALL ` + runItems + ` AND pub.id IN (SELECT w.target_id FROM watches w WHERE w.user_id = $1 AND w.target_type = 'space')
 	)` + changesTail
 
 // changesTail turns changes into items, and applies the space, the cursor and, for
 // "for you", who made the change and why the person sees it.
 const changesTail = `
-	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), c.kind, c.at,
+	SELECT c.page_id, p.title, p.emoji, s.key, s.name, COALESCE(c.note, left(d.body, $5), ''), COALESCE(u.display_name, ''), c.kind, c.at,
 		(SELECT count(*) FROM reactions r WHERE r.target_type = 'page' AND r.target_id = c.page_id),
-		(SELECT count(*) FROM comments m WHERE m.page_id = c.page_id AND m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only)
+		(SELECT count(*) FROM comments m WHERE m.page_id = c.page_id AND m.trash_item_id IS NULL AND NOT m.purged AND NOT m.editors_only),
+		c.pages
 	FROM changes c
 	JOIN pages p ON p.id = c.page_id AND p.status = 'published'
 	JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
 	LEFT JOIN search_documents d ON d.page_id = c.page_id
 	LEFT JOIN users u ON u.id = c.author_id
-	WHERE ($2::uuid IS NULL OR p.space_id = $2)
+	WHERE ($2::uuid IS NULL OR p.space_id = $2) AND (c.kind <> 'released' OR c.pages > 0)
 	  AND ($3::timestamptz IS NULL OR c.at < $3 OR (c.at = $3 AND $7::uuid IS NOT NULL AND c.page_id > $7))
 	  AND (NOT $6 OR (c.author_id <> $1 AND (
 		c.author_id IN (SELECT followed_id FROM follows WHERE user_id = $1)
@@ -179,7 +202,7 @@ var popularSQL = `WITH counted AS (
 		ORDER BY c.reactions + c.comments DESC, p.updated_at DESC, c.page_id LIMIT $3
 	)
 	SELECT t.page_id, t.title, t.emoji, t.key, t.name, COALESCE(left(d.body, $5), ''), COALESCE(u.display_name, ''), 'popular', t.updated_at,
-		t.reactions, t.comments
+		t.reactions, t.comments, 0
 	FROM top t
 	LEFT JOIN search_documents d ON d.page_id = t.page_id
 	LEFT JOIN users u ON u.id = t.updated_by
@@ -187,7 +210,7 @@ var popularSQL = `WITH counted AS (
 
 func scan(r pgx.CollectableRow) (Item, error) {
 	var v Item
-	err := r.Scan(&v.PageID, &v.Title, &v.Emoji, &v.SpaceKey, &v.SpaceName, &v.Excerpt, &v.AuthorName, &v.Kind, &v.At, &v.Reactions, &v.Comments)
+	err := r.Scan(&v.PageID, &v.Title, &v.Emoji, &v.SpaceKey, &v.SpaceName, &v.Excerpt, &v.AuthorName, &v.Kind, &v.At, &v.Reactions, &v.Comments, &v.Pages)
 	return v, err
 }
 

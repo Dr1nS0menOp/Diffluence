@@ -4,7 +4,14 @@ import { useTranslation } from 'react-i18next';
 import { useDates } from '../dates';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EditorView } from '@tiptap/pm/view';
-import { api, type CommentAnchor, type NotificationSettings, type PageDetail, type Space } from '../api';
+import {
+  api,
+  type CommentAnchor,
+  type NotificationSettings,
+  type PageDetail,
+  type ReleaseStatus,
+  type Space,
+} from '../api';
 import { mayCreate } from '../create-permission';
 import { Link, navigate, useLocation } from '../router';
 import { usePreferences } from '../preferences';
@@ -50,7 +57,7 @@ import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
 import { LabelBar } from '../components/page-labels';
 import { ControlBand, mayOpenReview } from '../components/control-band';
 import { ReviewPanel } from '../components/review-panel';
-import { ReleaseBand, ReleaseDialog, useReleaseStatus } from '../components/release-band';
+import { ReleaseBand, ReleaseDialogs, useReleaseStatus } from '../components/release-band';
 import {
   ApprovalBanner,
   ApprovalsDialog,
@@ -91,7 +98,9 @@ type PageDialog =
   | 'folder'
   | 'page'
   | 'post'
-  | 'release';
+  | 'release'
+  | 'leave_out'
+  | 'take_off';
 type WatchScope = 'page' | 'branch';
 
 interface WatchState {
@@ -274,11 +283,11 @@ function PageMenu({
   onPresent,
   onComments,
   onWatch,
-  canRelease,
+  release,
 }: {
   page: PageDetail;
   watching: WatchState | undefined;
-  canRelease: boolean;
+  release: ReleaseStatus | undefined;
   onOpen: (dialog: PageDialog) => void;
   onDetails: () => void;
   onReader: () => void;
@@ -389,9 +398,19 @@ function PageMenu({
           {t('organise.turnInto_page')}
         </MenuEntry>
       )}
-      {canRelease && (
+      {release?.can_release && !release.left_out && (
         <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('release')}>
           {t('publishing.release')}
+        </MenuEntry>
+      )}
+      {release?.can_release && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('leave_out')}>
+          {release.left_out?.page_id === page.id ? t('publishing.include') : t('publishing.leaveOut')}
+        </MenuEntry>
+      )}
+      {release?.can_release && release.twin_page_id && (
+        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('take_off')}>
+          {t('publishing.takeOff')}
         </MenuEntry>
       )}
       {page.can['page.archive'] && !page.archived_at && (
@@ -745,7 +764,7 @@ export function PageView({ pageId }: { pageId: string }) {
               onPresent={() => setPresenting(true)}
               onComments={() => openComments(null)}
               onWatch={watch}
-              canRelease={release.data?.can_release ?? false}
+              release={release.data}
             />
           </div>
         </div>
@@ -844,7 +863,7 @@ export function PageView({ pageId }: { pageId: string }) {
       )}
       {dialog === 'approvals' && <ApprovalsDialog page={page} onClose={close} />}
       {dialog === 'verify' && <VerifyDialog page={page} onClose={close} />}
-      {dialog === 'release' && <ReleaseDialog page={page} onClose={close} />}
+      <ReleaseDialogs dialog={dialog} page={page} status={release.data} onClose={close} />
       {dialog === 'archive' && <ArchiveDialog page={page} onClose={close} />}
       {dialog === 'template' && <SaveTemplateDialog page={page} onClose={close} />}
       {(dialog === 'folder' || dialog === 'page' || dialog === 'post') && (

@@ -1877,6 +1877,27 @@ test.describe('draft and published spaces', () => {
     await picture(page, 'publishing-twin', [page.getByTestId('last-updated')]);
     await checkAccessibility(page);
   });
+
+  test('ReleaseView: the release screen, its preview and its history', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/spaces/${draftKey}/release`);
+    await expect(page.getByRole('cell', { name: 'Travel policy', exact: true })).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-screen');
+    await checkAccessibility(page);
+    const open = page.getByRole('button', { name: 'Release everything that changed…' });
+    await open.click();
+    const dialog = page.getByRole('dialog', { name: 'Release', exact: true });
+    await expect(dialog.getByText('will change for readers', { exact: false })).toBeVisible();
+    await picture(page, 'publishing-run-preview');
+    await checkAccessibility(page);
+    await page.keyboard.press('Escape');
+    await expect(open).toBeFocused();
+    await page.getByRole('tab', { name: 'History' }).click();
+    await expect(page.getByRole('cell', { name: 'One page' })).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-history');
+  });
 });
 
 // The console that runs the installation (spec 075, wave CS1): upgrades, events, signatures,

@@ -300,12 +300,22 @@ export interface LinkPreview {
   sites: number;
   links: number;
   new_space: boolean;
+  restores: number;
+  edited_by_hand: number;
+}
+
+/** The mark that leaves a page out of releases (PUB-420). */
+export interface Exclusion {
+  page_id: string;
+  with_children: boolean;
+  reason: string;
+  at: string;
 }
 
 /** The release status of a draft page, or the release line of a twin (PUB-330, PUB-1230). */
 export interface ReleaseStatus {
   side: '' | 'draft' | 'published';
-  status?: 'not_released' | 'released' | 'changed' | 'cannot_release';
+  status?: ReleaseStatusWord;
   aspects: string[];
   reason?: string;
   released_version?: number;
@@ -315,6 +325,94 @@ export interface ReleaseStatus {
   draft_page_id?: string;
   draft_space?: PairSpaceRef;
   can_release: boolean;
+  left_out?: Exclusion;
+  reader_comments: number;
+}
+
+export type ReleaseStatusWord =
+  'not_released' | 'released' | 'changed' | 'cannot_release' | 'left_out' | 'left_out_released' | 'removed';
+
+/** One row of the release screen (PUB-1211). */
+export interface ReleaseRow {
+  page_id: string;
+  twin_page_id?: string;
+  title: string;
+  emoji: string;
+  path: string[];
+  status: ReleaseStatusWord;
+  aspects: string[];
+  reason?: string;
+  released_version: number;
+  current_version: number;
+  released_at: string | null;
+  since: string;
+  left_out?: Exclusion;
+  twin_restricted: boolean;
+}
+
+/** A run of a release as the screen shows it (PUB-453, PUB-910, PUB-1214). */
+export interface ReleaseRun {
+  id: string;
+  scope: 'page' | 'branch' | 'space' | 'pages' | 'take_off';
+  status: 'previewed' | 'queued' | 'running' | 'stopped' | 'cancelled' | 'done' | 'failed' | 'expired';
+  note: string;
+  silent: boolean;
+  actor_name: string;
+  total: number;
+  done: number;
+  batches: number;
+  batches_done: number;
+  stop_reason?: string;
+  previewed_at: string;
+  started_at: string | null;
+  finished_at: string | null;
+  pages?: RunPage[];
+}
+
+/** One page of a run's preview or report. */
+export interface RunPage {
+  page_id: string;
+  twin_page_id?: string;
+  title: string;
+  action: string;
+  aspects: string[];
+  reason?: string;
+  outcome?: string;
+}
+
+/** One part of the release screen (PUB-1210). */
+export interface ReleaseScreen {
+  tiles: { not_released: number; changed: number; cannot_release: number; removed: number; left_out: number };
+  rows: ReleaseRow[];
+  more: boolean;
+  going: ReleaseRun | null;
+}
+
+/** What a run of more than one page would do (PUB-430). */
+export interface RunPreview {
+  id: string;
+  scope: string;
+  counts: {
+    make: number;
+    change: number;
+    update: number;
+    take_off: number;
+    archive: number;
+    left_out: number;
+    restricted: number;
+    cannot: number;
+    hidden: number;
+  };
+  pages: RunPage[];
+  skipped: RunPage[];
+  kept_below: RunPage[];
+  files: number;
+  bytes: number;
+  room: number | null;
+  fits: boolean;
+  links_as_text: number;
+  batches: number;
+  expires_at: string;
 }
 
 /** What releasing one page would do (PUB-430). */
@@ -911,6 +1009,8 @@ export interface SearchResult {
   stage_text?: string;
   stage_color?: string;
   archived?: boolean;
+  /** A result from the draft space of a pair (spec 073, PUB-801). */
+  draft?: boolean;
   breadcrumbs?: { id: string; title: string }[];
   comment_id?: string;
 }
@@ -1085,6 +1185,8 @@ export interface FeedItem {
   at: string;
   reactions: number;
   comments: number;
+  /** The pages of a release run the person may see, for an item of kind released. */
+  pages?: number;
 }
 
 export interface AccessEntry {

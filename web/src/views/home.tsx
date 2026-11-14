@@ -114,8 +114,12 @@ function FeedEntry({ item, at, total }: { item: FeedItem; at: number; total: num
         <PageMark page={item} /> <Link href={`/pages/${item.page_id}`}>{item.title}</Link>
       </h3>
       <p className="muted">
-        {item.space_name} · {t(`home.kind_${item.kind}`, { name: item.author_name || t('common.unknown') })} ·{' '}
-        <RelativeTime value={item.at} />
+        {item.space_name} ·{' '}
+        {t(`home.kind_${item.kind}`, {
+          name: item.author_name || t('common.unknown'),
+          count: item.pages ?? 0,
+        })}{' '}
+        · <RelativeTime value={item.at} />
       </p>
       {item.excerpt && <p>{item.excerpt}</p>}
       {(item.reactions > 0 || item.comments > 0) && (

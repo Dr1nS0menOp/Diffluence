@@ -129,7 +129,7 @@ func TestEveryNonPublicRouteRequiresASession(t *testing.T) {
 		if !ok {
 			t.Fatalf("route %q has no method", r.Pattern)
 		}
-		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}", "{kind}", "{delivery}"} {
+		for _, wildcard := range []string{"{id}", "{key}", "{number}", "{user}", "{emoji}", "{section}", "{label}", "{alias}", "{file}", "{kind}", "{delivery}", "{run}"} {
 			path = strings.ReplaceAll(path, wildcard, "00000000-0000-0000-0000-000000000001")
 		}
 		if strings.Contains(path, "{") {

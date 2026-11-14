@@ -73,3 +73,43 @@ test('a space is linked to a new published space, and one page is released to it
   await expect(other.getByText('does not exist, or you cannot see it')).toBeVisible();
   await context.close();
 });
+
+// Wave PB2 (spec 073, PUB-1212 to PUB-1214, PUB-1241): the whole space released from the release
+// screen by keyboard, with a page left out from its More menu.
+test('the whole space is released from the release screen, and a page left out stays in the draft', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Manual drafts');
+  const guide = await publishedPage(page, space.id, 'Getting started', 'Open the app.', space.home_page_id);
+  const notes = await publishedPage(page, space.id, 'Working notes', 'Not for readers.', space.home_page_id);
+  const key = unique('MAN');
+  const linked = await page.request.post(`/api/v1/spaces/${space.id}/publishing/link`, {
+    data: { new_space: { key, name: 'Manual' } },
+  });
+  expect(linked.ok(), await linked.text()).toBeTruthy();
+
+  await page.goto(`/pages/${notes}`);
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: 'Leave out of releases…' }).click();
+  const leaving = page.getByRole('dialog', { name: 'Leave out of releases' });
+  await leaving.getByLabel('Reason, shown on the release screen').fill('Internal');
+  await leaving.getByRole('button', { name: 'Leave out' }).click();
+  await expect(page.getByText('Left out of releases')).toBeVisible();
+
+  await page.goto(`/pages/${guide}`);
+  await page.getByRole('link', { name: 'Release', exact: true }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('cell', { name: 'Getting started', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Release everything that changed…' }).focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Release', exact: true });
+  await dialog.getByText('Pages that stay as they are').click();
+  await expect(dialog.getByText('Working notes')).toBeVisible();
+  await dialog.getByLabel('Note for readers').fill('First edition');
+  await dialog.getByRole('button', { name: /^Release \d+ pages?$/ }).click();
+  await expect(page.getByText('Everything is released.', { exact: false })).toBeVisible({ timeout: 15000 });
+  await checkAccessibility(page);
+
+  const status = await page.request.get(`/api/v1/pages/${notes}/release`);
+  expect(((await status.json()) as { status: string }).status).toBe('left_out');
+});

@@ -6577,6 +6577,58 @@
         "x-access": "object:page.edit"
       }
     },
+    "/api/v1/pages/{id}/leave-out": {
+      "delete": {
+        "operationId": "delete /api/v1/pages/{id}/leave-out",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:space.release"
+      },
+      "put": {
+        "operationId": "put /api/v1/pages/{id}/leave-out",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
     "/api/v1/pages/{id}/look": {
       "patch": {
         "operationId": "patch /api/v1/pages/{id}/look",
@@ -10490,6 +10542,33 @@
         "x-access": "object:space.administer"
       }
     },
+    "/api/v1/spaces/{id}/publishing/end-preview": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/publishing/end-preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
     "/api/v1/spaces/{id}/publishing/link": {
       "post": {
         "operationId": "post /api/v1/spaces/{id}/publishing/link",
@@ -10544,6 +10623,33 @@
         "x-access": "object:space.administer"
       }
     },
+    "/api/v1/spaces/{id}/publishing/linking-in": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/publishing/linking-in",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
     "/api/v1/spaces/{id}/publishing/settings": {
       "put": {
         "operationId": "put /api/v1/spaces/{id}/publishing/settings",
@@ -10569,6 +10675,308 @@
           "spaces"
         ],
         "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/releases": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/releases",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/as-of": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/releases/as-of",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/check": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/check",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/export": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/releases/export",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.audit"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/history": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/releases/history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/preview": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/{run}": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/releases/{run}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/{run}/cancel": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/{run}/cancel",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/{run}/resume": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/{run}/resume",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/{run}/start": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/{run}/start",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "run",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.release"
       }
     },
     "/api/v1/spaces/{id}/review": {

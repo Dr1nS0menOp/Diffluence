@@ -69,6 +69,7 @@ func (s *Server) registerRoutes() {
 	s.registerSetupRoutes()
 	s.registerRunningRoutes()
 	s.registerPublishingRoutes()
+	s.registerReleaseRoutes()
 }
 
 type userJSON struct {

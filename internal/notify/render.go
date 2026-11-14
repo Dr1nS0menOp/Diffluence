@@ -44,6 +44,8 @@ var sentences = map[string]string{
 	TypeReviewAnswered:   "%s answered the review of %s",
 	TypeReviewEnded:      "The review of %[2]s has ended",
 	TypeReviewerRemoved:  "%s took a reviewer off the review of %s",
+	TypePagesReleased:    "%s released pages you watch in the space of %s",
+	TypeReleaseFinished:  "Your release from %[2]s has ended",
 }
 
 const (

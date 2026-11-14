@@ -78,6 +78,22 @@ type LinkPreview struct {
 	Sites    int  `json:"sites"`
 	Links    int  `json:"links"`
 	NewSpace bool `json:"new_space"`
+	// Restores counts the page pairs that linking the same two spaces again brings back, and
+	// EditedByHand those whose twin was changed by hand meanwhile, which the next release
+	// overwrites (PUB-245).
+	Restores     int `json:"restores"`
+	EditedByHand int `json:"edited_by_hand"`
+}
+
+// endedPair finds the last ended pair of the same two spaces, which linking again restores.
+func endedPair(ctx context.Context, q db.Querier, draft, published uuid.UUID) (*uuid.UUID, error) {
+	var id uuid.UUID
+	err := q.QueryRow(ctx, `SELECT id FROM space_pairs WHERE draft_space_id = $1 AND published_space_id = $2 AND ended_at IS NOT NULL
+		ORDER BY ended_at DESC LIMIT 1`, draft, published).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return &id, err
 }
 
 // writePermissions are the permissions whose holders lose editing in a published space.
@@ -198,7 +214,17 @@ func (s *Service) PreviewLink(ctx context.Context, c identity.Caller, draftID uu
 	if published == nil {
 		out.NewSpace = true
 	} else {
-		if err := checkEmpty(ctx, s.pool, *published); err != nil {
+		previous, err := endedPair(ctx, s.pool, draft.ID, published.ID)
+		if err != nil {
+			return out, err
+		}
+		if previous == nil {
+			if err := checkEmpty(ctx, s.pool, *published); err != nil {
+				return out, err
+			}
+		} else if err := s.pool.QueryRow(ctx, `SELECT count(*), count(*) FILTER (WHERE t.current_version <> pp.twin_version)
+			FROM page_pairs pp JOIN pages t ON t.id = pp.twin_page_id WHERE pp.pair_id = $1 AND pp.released_version > 0`, *previous).
+			Scan(&out.Restores, &out.EditedByHand); err != nil {
 			return out, err
 		}
 		holders, err := s.perms.HoldersOf(ctx, s.pool, published.ID, writePermissions())
@@ -296,10 +322,16 @@ func (s *Service) Link(ctx context.Context, c identity.Caller, draftID uuid.UUID
 		if err := checkSides(draft, &published); err != nil {
 			return err
 		}
-		if err := checkEmpty(ctx, tx, published); err != nil {
+		previous, err := endedPair(ctx, tx, draft.ID, published.ID)
+		if err != nil {
 			return err
 		}
-		return s.makePair(ctx, tx, c, draft, published)
+		if previous == nil {
+			if err := checkEmpty(ctx, tx, published); err != nil {
+				return err
+			}
+		}
+		return s.makePair(ctx, tx, c, draft, published, previous)
 	})
 	if err != nil {
 		return State{}, err
@@ -307,7 +339,7 @@ func (s *Service) Link(ctx context.Context, c identity.Caller, draftID uuid.UUID
 	return s.State(ctx, c, draftID)
 }
 
-func (s *Service) makePair(ctx context.Context, tx pgx.Tx, c identity.Caller, draft, published spaces.Space) error {
+func (s *Service) makePair(ctx context.Context, tx pgx.Tx, c identity.Caller, draft, published spaces.Space, previous *uuid.UUID) error {
 	id := ids.New()
 	settings := defaultSettings()
 	_, err := tx.Exec(ctx, `INSERT INTO space_pairs (id, draft_space_id, published_space_id, settings, created_by)
@@ -317,6 +349,11 @@ func (s *Service) makePair(ctx context.Context, tx pgx.Tx, c identity.Caller, dr
 	}
 	if err != nil {
 		return err
+	}
+	if previous != nil {
+		if err := restorePagePairs(ctx, tx, *previous, id); err != nil {
+			return err
+		}
 	}
 	if err := spaces.SetPairRole(ctx, tx, draft.ID, permissions.PairDraft); err != nil {
 		return err
@@ -332,7 +369,8 @@ func (s *Service) makePair(ctx context.Context, tx pgx.Tx, c identity.Caller, dr
 			ON CONFLICT (draft_page_id) DO UPDATE SET pair_id = EXCLUDED.pair_id, twin_page_id = EXCLUDED.twin_page_id,
 				released_version = 0, twin_version = 0, released_at = NULL, released_by = NULL, run_id = NULL, released_title = '',
 				released_parent_id = NULL, released_look = '{}', released_labels = '{}', released_hash = '', text_links = '{}',
-				changed = '{}', changed_since = NULL`,
+				changed = '{}', changed_since = NULL
+			WHERE page_pairs.pair_id <> EXCLUDED.pair_id`,
 			*draft.HomePageID, id, *published.HomePageID); err != nil {
 			return err
 		}
@@ -353,6 +391,23 @@ func (s *Service) makePair(ctx context.Context, tx pgx.Tx, c identity.Caller, dr
 	return err
 }
 
+// restorePagePairs brings back the page pairs of an ended pair of the same two spaces whose
+// pages both still exist, which the foreign keys guarantee, and marks every page by comparing
+// again. A twin changed by hand meanwhile is marked changed, so the next release overwrites the
+// edit (PUB-245).
+func restorePagePairs(ctx context.Context, tx pgx.Tx, from, to uuid.UUID) error {
+	if _, err := tx.Exec(ctx, `UPDATE page_pairs pp SET pair_id = $2,
+			released_hash = CASE WHEN t.current_version <> pp.twin_version THEN '' ELSE pp.released_hash END
+		FROM pages t WHERE t.id = pp.twin_page_id AND pp.pair_id = $1`, from, to); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE release_removals SET pair_id = $2 WHERE pair_id = $1", from, to); err != nil {
+		return err
+	}
+	_, err := tx.Exec(ctx, "SELECT page_pair_refresh(draft_page_id) FROM page_pairs WHERE pair_id = $1", to)
+	return err
+}
+
 // End ends a pair: the published space becomes an ordinary space its editors can change
 // again, and the draft space stays as it is (PUB-243). It needs space.administer in both
 // spaces, and stays open while the experimental part is off (PUB-1304).
@@ -369,6 +424,10 @@ func (s *Service) End(ctx context.Context, c identity.Caller, spaceID uuid.UUID)
 			if err := s.perms.RequireSpace(ctx, tx, c.UserID, side, permissions.SpaceAdminister); err != nil {
 				return err
 			}
+		}
+		// A pair is not ended under a run that writes into it (PUB-244).
+		if err := s.refuseWhileRunning(ctx, tx, p.ID); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, "UPDATE space_pairs SET ended_at = now(), ended_by = $2 WHERE id = $1", p.ID, c.UserID); err != nil {
 			return err
@@ -389,6 +448,63 @@ func (s *Service) End(ctx context.Context, c identity.Caller, spaceID uuid.UUID)
 		_, err = outbox.Enqueue(ctx, tx, "space.unpaired", map[string]any{"space_id": p.Draft, "pair_id": p.ID})
 		return err
 	})
+}
+
+// EndPreview says what ending a pair would leave: the pages out of step that stay so, and
+// whether a run is going, which refuses the end (PUB-243, PUB-244).
+type EndPreview struct {
+	OutOfStep int  `json:"out_of_step"`
+	Going     bool `json:"going"`
+}
+
+// PreviewEnd says what ending the pair of a space would leave, for those who may end it.
+func (s *Service) PreviewEnd(ctx context.Context, c identity.Caller, spaceID uuid.UUID) (EndPreview, error) {
+	var out EndPreview
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceAdminister); err != nil {
+		return out, err
+	}
+	p, err := activePairOf(ctx, s.pool, spaceID, false)
+	if err != nil {
+		return out, err
+	}
+	for _, side := range []uuid.UUID{p.Draft, p.Published} {
+		if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, side, permissions.SpaceAdminister); err != nil {
+			return out, err
+		}
+	}
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM page_pairs WHERE pair_id = $1 AND cardinality(changed) > 0`, p.ID).Scan(&out.OutOfStep); err != nil {
+		return out, err
+	}
+	out.Going, err = runGoing(ctx, s.pool, p.ID, s.limits.StaleAfter)
+	return out, err
+}
+
+// LinkingPage is a page of another space that links into a draft space.
+type LinkingPage struct {
+	PageID    uuid.UUID `json:"page_id"`
+	Title     string    `json:"title"`
+	SpaceName string    `json:"space_name"`
+}
+
+// maxLinkingPages bounds the list of pages that link into a draft space.
+const maxLinkingPages = 200
+
+// LinkingIn lists the pages of other spaces that link into a draft space, as far as the person
+// may see them, so writers can point them to the published space; a release never changes
+// them (PUB-522).
+func (s *Service) LinkingIn(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]LinkingPage, error) {
+	if _, err := s.draftPairToRead(ctx, c, spaceID); err != nil {
+		return nil, err
+	}
+	list, err := pages.LinkingInto(ctx, s.pool, c.UserID, spaceID, maxLinkingPages)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]LinkingPage, len(list))
+	for i, l := range list {
+		out[i] = LinkingPage{PageID: l.PageID, Title: l.Title, SpaceName: l.SpaceName}
+	}
+	return out, nil
 }
 
 // SetSettings changes the settings of a pair, from the draft space (PUB-240).

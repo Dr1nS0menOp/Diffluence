@@ -75,6 +75,31 @@ func VersionForRelease(ctx context.Context, q db.Querier, pageID uuid.UUID, numb
 	return v, err
 }
 
+// CurrentDocuments reads the document of the current version of each page among list, for
+// the preview of a run of many pages: which links will stay text, and which files go.
+func CurrentDocuments(ctx context.Context, q db.Querier, list []uuid.UUID) (map[uuid.UUID]document.Node, error) {
+	out := map[uuid.UUID]document.Node{}
+	rows, err := q.Query(ctx, `SELECT v.page_id, v.document FROM pages p
+		JOIN page_versions v ON v.page_id = p.id AND v.number = p.current_version WHERE p.id = ANY($1)`, list)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var id uuid.UUID
+		var raw []byte
+		if err := rows.Scan(&id, &raw); err != nil {
+			return nil, err
+		}
+		doc, err := document.Parse(raw)
+		if err != nil {
+			return nil, err
+		}
+		out[id] = doc
+	}
+	return out, rows.Err()
+}
+
 // LinkTarget is what a release needs to know of a page a document links to.
 type LinkTarget struct {
 	SpaceID uuid.UUID
@@ -146,6 +171,9 @@ type TwinVersion struct {
 	Doc     document.Node
 	Summary string
 	Silent  bool
+	// Run is the bulk run that writes it; nil for a release of one page, which watchers
+	// hear of as a change of that page (PUB-810, PUB-813).
+	Run *uuid.UUID
 }
 
 // TwinWrite is everything a release changes on a twin.
@@ -157,6 +185,9 @@ type TwinWrite struct {
 	Version *TwinVersion
 	Look    Look
 	Labels  []string
+	// Same says the look and the labels are those the twin has already, so a run of many pages
+	// spends no statement on them.
+	Same bool
 }
 
 // WriteTwin writes a release onto a twin. The caller has marked its transaction as a release
@@ -190,16 +221,19 @@ func (s *Service) WriteTwin(ctx context.Context, tx pgx.Tx, c identity.Caller, i
 			return Page{}, err
 		}
 	}
-	if _, err := tx.Exec(ctx, `UPDATE pages SET emoji = $2, full_width = $3, header_attachment_id = $4, header_position = $5, language = $6
-		WHERE id = $1`, p.ID, in.Look.Emoji, in.Look.FullWidth, in.Look.HeaderAttachmentID, in.Look.HeaderPosition, in.Look.Language); err != nil {
-		return Page{}, err
-	}
-	if err := setReleasedLabels(ctx, tx, c, p.ID, in.Labels); err != nil {
-		return Page{}, err
+	if !in.Same {
+		if _, err := tx.Exec(ctx, `UPDATE pages SET emoji = $2, full_width = $3, header_attachment_id = $4, header_position = $5, language = $6
+			WHERE id = $1`, p.ID, in.Look.Emoji, in.Look.FullWidth, in.Look.HeaderAttachmentID, in.Look.HeaderPosition, in.Look.Language); err != nil {
+			return Page{}, err
+		}
+		if err := setReleasedLabels(ctx, tx, c, p.ID, in.Labels); err != nil {
+			return Page{}, err
+		}
 	}
 	if in.Version != nil {
 		v := in.Version
-		if p, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: v.Title, Doc: v.Doc, Author: c.UserID, Summary: v.Summary, Silent: v.Silent}); err != nil {
+		if p, err = s.appendVersion(ctx, tx, c, p, newVersion{Title: v.Title, Doc: v.Doc, Author: c.UserID, Summary: v.Summary, Silent: v.Silent,
+			Released: true, Run: v.Run}); err != nil {
 			return Page{}, err
 		}
 	}

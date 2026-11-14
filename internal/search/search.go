@@ -125,16 +125,19 @@ type Crumb struct {
 
 // Result is one found page.
 type Result struct {
-	PageID      uuid.UUID `json:"page_id"`
-	SpaceID     uuid.UUID `json:"space_id"`
-	SpaceKey    string    `json:"space_key"`
-	SpaceName   string    `json:"space_name"`
-	Title       string    `json:"title"`
-	Emoji       string    `json:"emoji"`
-	Kind        string    `json:"kind"`
-	StageText   string    `json:"stage_text"`
-	StageColor  string    `json:"stage_color"`
-	Archived    bool      `json:"archived"`
+	PageID     uuid.UUID `json:"page_id"`
+	SpaceID    uuid.UUID `json:"space_id"`
+	SpaceKey   string    `json:"space_key"`
+	SpaceName  string    `json:"space_name"`
+	Title      string    `json:"title"`
+	Emoji      string    `json:"emoji"`
+	Kind       string    `json:"kind"`
+	StageText  string    `json:"stage_text"`
+	StageColor string    `json:"stage_color"`
+	Archived   bool      `json:"archived"`
+	// Draft marks a result from the draft space of a pair, so a person who sees both copies
+	// knows which one readers have (spec 073, PUB-801).
+	Draft       bool      `json:"draft"`
 	Snippet     string    `json:"snippet"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	UpdatedBy   uuid.UUID `json:"updated_by"`
@@ -231,7 +234,7 @@ const (
 	JOIN search_documents d ON true` + searchFilters
 
 	resultColumns = `SELECT p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
-		p.archived_at IS NOT NULL OR s.status <> 'active', `
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', `
 	headlineOptions = `'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'`
 	resultEnd       = `, p.updated_at, p.updated_by `
 	orderByDate     = ` ORDER BY CASE WHEN $16 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $17 OFFSET $18`
@@ -269,7 +272,7 @@ const (
 	  AND ($6::timestamptz IS NULL OR c.created_at < $6)
 	  AND ($7::boolean OR (s.status = 'active' AND p.archived_at IS NULL))`
 	commentsSQL = `SELECT c.id, p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
-		p.archived_at IS NOT NULL OR s.status <> 'active',
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft',
 		ts_headline('simple', (SELECT string_agg(w, ' ') FROM jsonb_array_elements_text(` + commentWords + `) AS w), q.query,
 			'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'),
 		c.created_at, c.author_id ` + commentsFrom + ` ORDER BY c.created_at DESC, c.id LIMIT $8 OFFSET $9`
@@ -308,7 +311,7 @@ func scanResults(rows pgx.Rows) ([]Result, error) {
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Result, error) {
 		var v Result
 		err := r.Scan(&v.PageID, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.Title, &v.Emoji, &v.Kind, &v.StageText, &v.StageColor,
-			&v.Archived, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
+			&v.Archived, &v.Draft, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
 		return v, err
 	})
 }
@@ -427,7 +430,7 @@ func scanComments(rows pgx.Rows) ([]Result, error) {
 		var v Result
 		var id uuid.UUID
 		err := r.Scan(&id, &v.PageID, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.Title, &v.Emoji, &v.Kind, &v.StageText, &v.StageColor,
-			&v.Archived, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
+			&v.Archived, &v.Draft, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
 		v.CommentID = &id
 		return v, err
 	})

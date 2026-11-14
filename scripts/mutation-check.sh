@@ -524,9 +524,9 @@ mutate "a rotated token keeps its full life" internal/scim/scim.go \
 mutate "a notification reaches someone who cannot see the page" internal/notify/notify.go \
   's.replace("if err != nil || !allowed {\n\t\treturn err\n\t}\n\tdata, err :=", "if err != nil || (!allowed && len(r.Type) < 0) {\n\t\treturn err\n\t}\n\tdata, err :=")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "the bell shows a page you lost" internal/notify/list.go \
-  's.replaceAll("JOIN perm_visible_pages($1) v ON v.page_id = n.page_id", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+  's.replaceAll("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "mail about a page you lost still goes out" internal/notify/render.go \
-  's.replace("s.pool.Query(ctx, visibleRows+", "s.pool.Query(ctx, strings.Replace(visibleRows, \"JOIN perm_visible_pages($1) v ON v.page_id = n.page_id\", \"JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id\", 1)+")' $app -run TestMailIsWrittenWhenSentAndChecksAccessAgain
+  's.replace("s.pool.Query(ctx, visibleRows+", "s.pool.Query(ctx, strings.Replace(visibleRows, \"JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id\", \"JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id\", 1)+")' $app -run TestMailIsWrittenWhenSentAndChecksAccessAgain
 mutate "people hear about their own actions" internal/notify/notify.go \
   's.replace("(r.UserID == r.ActorID && !choices.NotifyOwn)", "(len(r.Type) < 0 && !choices.NotifyOwn)")' $app -run TestOwnActionsOnlyWhenAskedFor
 mutate "a forged unsubscribe token works" internal/notify/unsubscribe.go \
@@ -593,7 +593,7 @@ mutate "added text in a mail is not escaped" internal/document/changes.go \
 mutate "a mail shows changes without the setting" internal/notify/render.go \
   's.replace("if !allowed || i.Type != TypePageChanged || i.firstVersion <= 1 {", "if i.Type != TypePageChanged || i.firstVersion <= 1 {")' $app -run TestAMailShowsNoChanges
 mutate "a mail of changes reads through access" internal/notify/list.go \
-  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
+  's.replace("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
 
 mutate "a move leaves comments behind" internal/pages/move.go \
   's.replace("var tablesWithSpace = []string{\"comments\", ", "var tablesWithSpace = []string{")' $app -run TestAMoveTakesEveryRowOfTheBranchAlong
@@ -2384,7 +2384,7 @@ mutate "the end of a pair reaches no node" internal/db/migrations/0061_publishin
   's.replace("UPDATE OF status, pair_role ON spaces", "UPDATE OF status ON spaces")' $app -run '^TestTurningThePartOffKeepsPublishedSpacesReadOnlyAndEndingOpen$'
 mutate "the migration gives administrators no release" internal/db/migrations/0061_publishing.sql \
   's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.release\x27]);", "SELECT 1;")' $perms -run 'TestBuiltInRolesMatchTheTemplates$'
-mutate "out of step ignores the look" internal/db/migrations/0061_publishing.sql \
+mutate "out of step ignores the look" internal/db/migrations/0064_release_exclusions.sql \
   's.replace("IF p.look IS DISTINCT FROM pp.released_look THEN", "IF false THEN")' $app -run '^TestOutOfStepFollowsEachAspectAndComesBackWhenUndone$'
 mutate "a draft space builds a public site" internal/permissions/evaluate.go \
   's.replace("check(LayerSpace, ruleDraftNotPublic, in.Space.PairRole != PairDraft, false)", "check(LayerSpace, ruleDraftNotPublic, true, false)")' $perms -run 'TestMatrixEvaluate$'
@@ -2399,7 +2399,7 @@ mutate "a link keeps the draft id" internal/publishing/rewrite.go \
 mutate "a file route serves the draft file" internal/publishing/rewrite.go \
   's.replace("n.Attrs[document.FileAttribute] = copied.String()", "n.Attrs[document.FileAttribute] = map[bool]string{true: s}[copied != uuid.Nil]")' $app -run '^TestFilesAreCopiedOnlyWhenTheyChangedAndReadersGetTheCopy$'
 mutate "a twin version keeps the draft summary" internal/publishing/release.go \
-  's.replace("Summary: in.Note, Silent: silent}", "Summary: pl.version.Summary, Silent: silent}")' $app -run '^TestReleasingOnePageMakesATwinReadersSee$'
+  's.replace("Summary: w.note, Silent: w.silent, Run: w.bulk}", "Summary: pl.version.Summary, Silent: w.silent, Run: w.bulk}")' $app -run '^TestReleasingOnePageMakesATwinReadersSee$'
 mutate "a run takes the newest version instead of the previewed one" internal/publishing/release.go \
   's.replace("pl, err := s.planPage(ctx, tx, p, src, number)", "pl, err := s.planPage(ctx, tx, p, src, src.CurrentVersion+0*number)")' $app -run '^TestARunTakesThePreviewedVersionAndRefusesAnOldPreview$'
 mutate "a preview older than an hour is taken" internal/publishing/release.go \
@@ -2503,6 +2503,59 @@ mutate "an administrator enters the code for fewer backups" internal/httpapi/han
   's.replace("\"POST /api/v1/admin/backups/schedule/code\", system,", "\"POST /api/v1/admin/backups/schedule/code\", admin,")' $app -run TestKeepingFewerBackupsNeedsTheWorkerCode
 mutate "a restore cannot be confirmed during maintenance" internal/httpapi/middleware.go \
   's.replace("\t\"/api/v1/admin/backups/restore/code\",\n", "")' $app -run TestTheRestoreCodeIsTakenDuringMaintenance
+# Spec 073 (wave PB2): the whole space, leaving out, taking off, batches and the release screen.
+mutate "a left-out page goes in a whole-space run" internal/publishing/runs.go \
+  's.replace("\tcase r.LeftOut:\n", "\tcase false \x26\x26 r.LeftOut:\n")' $pub -run 'TestEachPageOfAScopeGetsItsPartInARun$'
+mutate "a restricted draft page goes in a bulk run unnamed" internal/publishing/runs.go \
+  's.replace("\tcase r.Restricted \x26\x26 !r.released()", "\tcase false \x26\x26 r.Restricted \x26\x26 !r.released()")' $pub -run 'TestEachPageOfAScopeGetsItsPartInARun$'
+mutate "a page below a page left out goes" internal/publishing/runs.go \
+  's.replace("\tcase r.ParentID != nil \x26\x26 skippedAbove[*r.ParentID]:", "\tcase false \x26\x26 r.ParentID != nil \x26\x26 skippedAbove[*r.ParentID]:")' $pub -run 'TestEachPageOfAScopeGetsItsPartInARun$'
+mutate "an archived draft page leaves its twin as it is" internal/publishing/runs.go \
+  's.replace("\t\t\treturn decision{action: actionArchive, reason: \"archived\"}", "\t\t\treturn decision{action: actionNone}")' $pub -run 'TestEachPageOfAScopeGetsItsPartInARun$'
+mutate "a deleted draft page leaves its twin to readers" internal/publishing/runs.go \
+  's.replace("\t\t\treturn decision{action: actionTakeOff, reason: \"deleted\"}", "\t\t\treturn decision{action: actionNone}")' $pub -run 'TestEachPageOfAScopeGetsItsPartInARun$'
+mutate "a released twin goes to the end of its siblings" internal/publishing/runexec.go \
+  's.replace("\t\t\tat = slices.Index(order, inDraftOrder[i-1]) + 1", "\t\t\tat = len(order)")' $pub -run 'TestATwinTakesItsPlaceAfterTheSiblingBeforeItsDraftPage$'
+mutate "a run past the limit is one transaction" internal/publishing/limits.go \
+  's.replace("\treturn (pages + l.BatchSize - 1) / l.BatchSize", "\treturn 0")' $pub -run 'TestARunThatWouldTakeLongGoesInBatches$'
+mutate "take-off purges" internal/pages/release_bulk.go \
+  's.replace("UPDATE pages SET pre_trash_status = status, status = \x27trashed\x27, trash_item_id = $2, updated_at = now()\n\t\t\tWHERE id IN (SELECT descendant_id FROM page_tree WHERE ancestor_id = $1) AND status <> \x27trashed\x27", "DELETE FROM pages WHERE id IN (SELECT descendant_id FROM page_tree WHERE ancestor_id = $1) AND $2::uuid IS NOT NULL")' $app -run '^TestTakingOffSendsTwinsToTheTrashAndNeverPurges$'
+mutate "a batch commits half" internal/publishing/runexec.go \
+  's.replace("\tif slices.ContainsFunc(pl.files, fileStep.needed) {", "\tif true {").replace("\t\tif errors.Is(err, storage.ErrNotFound) {\n\t\t\tfailed[p.draft] = true", "\t\tif err != nil || errors.Is(err, storage.ErrNotFound) {\n\t\t\tfailed[p.draft] = true")' $app -run '^TestABatchedRunStopsInsideABatchAndResumesWithTheSameVersions$'
+mutate "a run ignores lost rights" internal/publishing/runexec.go \
+  's.replace("\tif err := s.runRights(ctx, tx, r.actor, p); err != nil {", "\tif err := s.runRights(ctx, tx, r.actor, p); false \x26\x26 err != nil {")' $app -run '^TestARunStopsWhenItsReleaserLosesTheRightAndCanBeCancelled$'
+mutate "a single release goes while a larger run goes" internal/publishing/runs.go \
+  's.replace("\tif going {\n\t\treturn errRunGoing()", "\tif false \x26\x26 going {\n\t\treturn errRunGoing()")' $app -run '^TestARunStopsWhenItsReleaserLosesTheRightAndCanBeCancelled$'
+mutate "watchers get one notification per page" internal/notify/fanout.go \
+  's.replace("\tif p.ReleaseRunID != nil {\n", "\tif false \x26\x26 p.ReleaseRunID != nil {\n")' $app -run '^TestARunIsOneFeedItemAndOneNotificationPerPerson$'
+mutate "a silent run tells watchers" internal/notify/releases.go \
+  's.replace("\tif p.Silent || p.Outcome != \"done\"", "\tif p.Outcome != \"done\"")' $app -run '^TestARunIsOneFeedItemAndOneNotificationPerPerson$'
+mutate "the feed shows one item per page" internal/feed/feed.go \
+  's.replace("\t\t  AND NOT ` + byRun(\"v\") + `\n", "\n")' $app -run '^TestARunIsOneFeedItemAndOneNotificationPerPerson$'
+mutate "a released task list makes task rows" internal/pages/pages.go \
+  's.replace("\tif in.version.Released {\n", "\tif false \x26\x26 in.version.Released {\n")' $app -run '^TestARunIsOneFeedItemAndOneNotificationPerPerson$'
+mutate "the consistency check reports nothing" internal/publishing/check.go \
+  's.replace("\tout.Found = append(out.Found, items...)", "\tout.Found = append(out.Found, items[:0]...)")' $app -run '^TestTheConsistencyCheckFindsAndFixesWhatDrifted$'
+mutate "the consistency check fixes what it only looks at" internal/publishing/check.go \
+  's.replace("\t\tif !fix {\n\t\t\treturn errCheckOnly\n\t\t}", "\t\tif false {\n\t\t\treturn errCheckOnly\n\t\t}")' $app -run '^TestTheConsistencyCheckFindsAndFixesWhatDrifted$'
+mutate "a sibling of a moved page is marked" internal/db/migrations/0064_release_exclusions.sql \
+  's.replace("IF dprev IS DISTINCT FROM tprev AND dnext IS DISTINCT FROM tnext THEN", "IF dprev IS DISTINCT FROM tprev OR dnext IS DISTINCT FROM tnext THEN")' $app -run '^TestSiblingsAreOrderedAsInTheDraftAndOnlyAMovedPageIsMarked$'
+mutate "a waiting link marks nothing" internal/db/migrations/0064_release_exclusions.sql \
+  's.replace("        aspects := aspects || \x27links\x27::text;\n", "")' $app -run '^TestLinksInOneRunResolveBothWaysAndWaitingLinksMarkTheirPage$'
+mutate "a new version of a file marks nothing" internal/db/migrations/0064_release_exclusions.sql \
+  's.replace("        aspects := aspects || \x27files\x27::text;\n", "")' $app -run '^TestANewVersionOfAFileMarksItsPageAndItsReleaseCopiesIt$'
+mutate "a page moved away keeps its pair" internal/db/migrations/0064_release_exclusions.sql \
+  's.replace("    DELETE FROM page_pairs WHERE draft_page_id = OLD.id;\n    RETURN NULL;", "    RETURN NULL;")' $app -run '^TestRemovalsInTheDraftAreMirroredByAWholeSpaceRelease$'
+mutate "deleting a space of a pair keeps the pair" internal/db/migrations/0064_release_exclusions.sql \
+  's.replace("    UPDATE space_pairs SET ended_at = now() WHERE id = sp.id;\n", "")' $app -run '^TestEndingRelinkingAndDeletingSpacesOfAPair$'
+mutate "the export needs no audit right" internal/publishing/export.go \
+  's.replace("permissions.SpaceAudit); err != nil {", "permissions.SpaceView); err != nil {")' $app -run '^TestEveryReleaseRouteAsksForItsRight$'
+mutate "the release routes are served while the part is off" internal/httpapi/handlers_releases.go \
+  's.replace("\t\treturn s.experimental(features.ExperimentalPublishing, next)\n", "\t\t_ = features.ExperimentalPublishing\n\t\treturn next\n")' $app -run '^TestEveryReleaseRouteAsksForItsRight$'
+mutate "a page hidden from the releaser goes in a bulk run" internal/publishing/runs.go \
+  's.replace("\t\tif !r.Visible {\n", "\t\tif false \x26\x26 !r.Visible {\n")' $app -run '^TestRestrictedDraftPagesStayOutOfBulkRunsUnlessNamed$'
+mutate "the home page of the draft names the draft space to readers" internal/publishing/release.go \
+  's.replace("\t\treturn pl.published.Name\n", "\t\treturn pl.version.Title\n")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraftAfterABulkRun$'
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

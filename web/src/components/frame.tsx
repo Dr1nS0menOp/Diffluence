@@ -3,6 +3,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent, typ
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, ApiError, type PageDetail, type PageSummary, type Shortcut, type Space } from '../api';
+import { useCapabilities } from '../capabilities';
 import { mayCreateAnything } from '../create-permission';
 import { Link, match, useLocation } from '../router';
 import { usePreferences } from '../preferences';
@@ -29,6 +30,7 @@ import {
   IconStar,
   IconTable2,
   IconTrash,
+  IconUpload,
 } from './icons';
 import { Menu, MenuItem, MenuLink } from './menu';
 import { useShortcut } from './shortcuts';
@@ -56,6 +58,7 @@ const SPACE_ROUTES = [
   '/spaces/:key/archive',
   '/spaces/:key/labels',
   '/spaces/:key/templates',
+  '/spaces/:key/release',
 ];
 const MIN_SIDEBAR_REM = 14;
 const MAX_SIDEBAR_REM = 32;
@@ -216,6 +219,7 @@ function SpaceLinks({ space, current }: { space: Space; current?: string }) {
     queryFn: () => api.get<{ shortcuts: Shortcut[] }>(`/spaces/${space.id}/shortcuts`),
   });
   const overview = `/spaces/${space.key}/overview`;
+  const { publishing } = useCapabilities();
   return (
     <nav className="side-links" aria-label={t('space.links')}>
       {space.home_page_id && (
@@ -260,6 +264,15 @@ function SpaceLinks({ space, current }: { space: Space; current?: string }) {
       >
         <IconArchive size={LINK_ICON_SIZE} /> {t('organise.archive')}
       </Link>
+      {publishing && space.pair_role === 'draft' && space.can?.['space.release'] && (
+        <Link
+          href={`/spaces/${space.key}/release`}
+          className="side-link"
+          aria-current={pathname === `/spaces/${space.key}/release` ? 'page' : undefined}
+        >
+          <IconUpload size={LINK_ICON_SIZE} /> {t('publishing.screenLink')}
+        </Link>
+      )}
       {shortcuts.data?.shortcuts.map((s) => (
         <ShortcutLink key={s.id} shortcut={s} />
       ))}

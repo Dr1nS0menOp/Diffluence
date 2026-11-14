@@ -1071,6 +1071,7 @@ func objectRoute(pattern string, ids map[string]string) (method, path string) {
 	path = strings.ReplaceAll(path, "{alias}", "x")
 	path = strings.ReplaceAll(path, "{emoji}", url.PathEscape("👍"))
 	path = strings.ReplaceAll(path, "{user}", ids["owner"])
+	path = strings.ReplaceAll(path, "{run}", ids["owner"])
 	return method, path
 }
 

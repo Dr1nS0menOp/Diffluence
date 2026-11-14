@@ -54,7 +54,7 @@ var waits = []time.Duration{time.Minute, 10 * time.Minute, 2 * time.Hour, 22 * t
 // Events lists what an endpoint can ask for.
 var Events = []string{"page.created", "page.published", "page.renamed", "page.moved", "page.archived", "page.trashed", "page.restored",
 	"page.labelled", "page.stage_changed", "page.owner_changed", "comment.created", "attachment.uploaded", "attachment.trashed",
-	"space.created", "space.archived"}
+	"space.created", "space.archived", "page.released", "release.finished"}
 
 // Service keeps endpoints and delivers.
 type Service struct {

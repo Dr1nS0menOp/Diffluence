@@ -61,6 +61,7 @@ export function PublishingSection({ space }: { space: Space }) {
             )}
           </p>
           {pair.health && <Health health={pair.health} />}
+          {state.can.release && <LinkingIn space={space} />}
           {pair.settings && <PairSettingsForm space={space} settings={pair.settings} onSaved={refresh} />}
           {pair.releasers && (
             <>
@@ -296,10 +297,43 @@ function LinkPreviewWords({ preview }: { preview: LinkPreview }) {
         </p>
       )}
       {preview.drafts_readable && <p>{t('publishing.previewReadable')}</p>}
+      {preview.restores > 0 && <p>{t('publishing.restores', { count: preview.restores })}</p>}
+      {preview.edited_by_hand > 0 && <p>{t('publishing.editedByHand', { count: preview.edited_by_hand })}</p>}
       {(preview.sites > 0 || preview.links > 0) && (
         <p>{t('publishing.previewSites', { sites: preview.sites, links: preview.links })}</p>
       )}
       <p>{t('publishing.previewNoRelease')}</p>
     </div>
+  );
+}
+
+/** The pages of other spaces that link into this draft space, as far as the person may see
+ * them; a release never changes them (PUB-522). */
+function LinkingIn({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const q = useQuery({
+    queryKey: ['linking-in', space.id],
+    queryFn: () =>
+      api.get<{ pages: { page_id: string; title: string; space_name: string }[] }>(
+        `/spaces/${space.id}/publishing/linking-in`,
+      ),
+  });
+  return (
+    <>
+      <h2>{t('publishing.linkingIn')}</h2>
+      <p className="muted">{t('publishing.linkingInHelp')}</p>
+      <ErrorNote error={q.error} />
+      {q.data && q.data.pages.length === 0 && <p className="muted">{t('publishing.linkingInNone')}</p>}
+      {q.data && q.data.pages.length > 0 && (
+        <ul className="plain-list">
+          {q.data.pages.map((p) => (
+            <li key={p.page_id}>
+              <Link href={`/pages/${p.page_id}`}>{p.title}</Link>{' '}
+              <span className="muted">· {p.space_name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
   );
 }

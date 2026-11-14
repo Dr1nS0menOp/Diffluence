@@ -29,6 +29,7 @@ DELETE /api/v1/pages/{id}                                      object:page.delet
 DELETE /api/v1/pages/{id}/draft                                object:page.view
 DELETE /api/v1/pages/{id}/favourite                            object:page.view
 DELETE /api/v1/pages/{id}/labels/{label}                       object:page.edit
+DELETE /api/v1/pages/{id}/leave-out                            object:space.release
 DELETE /api/v1/pages/{id}/public-link                          object:site.publish
 DELETE /api/v1/pages/{id}/reactions/{emoji}                    object:page.view
 DELETE /api/v1/pages/{id}/schedule                             object:page.edit
@@ -239,6 +240,13 @@ GET /api/v1/spaces/{id}/placeholders                           object:space.admi
 GET /api/v1/spaces/{id}/popular                                object:space.view
 GET /api/v1/spaces/{id}/posts                                  object:space.view
 GET /api/v1/spaces/{id}/publishing                             object:space.view
+GET /api/v1/spaces/{id}/publishing/end-preview                 object:space.administer
+GET /api/v1/spaces/{id}/publishing/linking-in                  object:space.release
+GET /api/v1/spaces/{id}/releases                               object:space.release
+GET /api/v1/spaces/{id}/releases/as-of                         object:space.release
+GET /api/v1/spaces/{id}/releases/export                        object:space.audit
+GET /api/v1/spaces/{id}/releases/history                       object:space.release
+GET /api/v1/spaces/{id}/releases/{run}                         object:space.release
 GET /api/v1/spaces/{id}/role-assignments                       object:space.manage_access
 GET /api/v1/spaces/{id}/rules                                  object:space.automation
 GET /api/v1/spaces/{id}/shortcuts                              object:space.view
@@ -440,6 +448,11 @@ POST /api/v1/spaces/{id}/preset                                object:space.admi
 POST /api/v1/spaces/{id}/publishing/end                        object:space.administer
 POST /api/v1/spaces/{id}/publishing/link                       object:space.administer
 POST /api/v1/spaces/{id}/publishing/link-preview               object:space.administer
+POST /api/v1/spaces/{id}/releases/check                        object:space.administer
+POST /api/v1/spaces/{id}/releases/preview                      object:space.release
+POST /api/v1/spaces/{id}/releases/{run}/cancel                 object:space.release
+POST /api/v1/spaces/{id}/releases/{run}/resume                 object:space.release
+POST /api/v1/spaces/{id}/releases/{run}/start                  object:space.release
 POST /api/v1/spaces/{id}/role-assignments/preview              object:space.manage_access
 POST /api/v1/spaces/{id}/rules                                 object:space.automation
 POST /api/v1/spaces/{id}/sites                                 object:site.publish
@@ -504,6 +517,7 @@ PUT /api/v1/me/profile                                         session-only auth
 PUT /api/v1/pages/{id}/comments/seen                           object:page.view
 PUT /api/v1/pages/{id}/draft                                   object:page.edit
 PUT /api/v1/pages/{id}/favourite                               object:page.view
+PUT /api/v1/pages/{id}/leave-out                               object:space.release
 PUT /api/v1/pages/{id}/owner                                   object:page.edit
 PUT /api/v1/pages/{id}/presence                                object:page.view
 PUT /api/v1/pages/{id}/public-link                             object:site.publish

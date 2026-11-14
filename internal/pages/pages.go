@@ -405,6 +405,12 @@ type newVersion struct {
 	Summary      string
 	RestoredFrom *int
 	Silent       bool // reaches no watcher, and the history still shows it (PAG-025)
+	// Released marks a version a release writes on a twin: its tasks are read-only and are in
+	// nobody's Tasks screen (PUB-817).
+	Released bool
+	// Run is the bulk run that wrote it, whose watchers hear of the run once instead of each
+	// page (PUB-813).
+	Run *uuid.UUID
 }
 
 // syncMentions keeps the list of people and groups a page mentions, and returns those
@@ -525,7 +531,11 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err != nil {
 		return p, err
 	}
-	assigned, err := tasks.Sync(ctx, tx, p.ID, p.SpaceID, author, doc)
+	taskDoc := doc
+	if in.version.Released {
+		taskDoc = document.Node{Type: document.TypeDoc} // a twin keeps no task rows (PUB-817)
+	}
+	assigned, err := tasks.Sync(ctx, tx, p.ID, p.SpaceID, author, taskDoc)
 	if err != nil {
 		return p, err
 	}
@@ -543,8 +553,12 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if in.version.Silent {
 		details["silent"] = true
 	}
-	return p, recordEvent(ctx, tx, c, "page.published", p, details, map[string]any{"actor_id": author, "silent": in.version.Silent, "first": first, "version": number,
-		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned})
+	payload := map[string]any{"actor_id": author, "silent": in.version.Silent, "first": first, "version": number,
+		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned}
+	if in.version.Run != nil {
+		payload["release_run_id"] = *in.version.Run
+	}
+	return p, recordEvent(ctx, tx, c, "page.published", p, details, payload)
 }
 
 // Get returns a page for reading, and remembers it in the user's recent list.

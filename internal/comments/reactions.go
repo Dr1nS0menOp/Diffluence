@@ -301,6 +301,16 @@ func Author(ctx context.Context, q db.Querier, id uuid.UUID) (uuid.UUID, error) 
 	return author, err
 }
 
+// CountForReaders counts the comments of a page that every reader of it sees: not in the
+// trash, not purged, not for editors only. The caller has checked that the person may view
+// the page; the count carries no text (spec 073, PUB-223).
+func CountForReaders(ctx context.Context, q db.Querier, pageID uuid.UUID) (int, error) {
+	var n int
+	err := q.QueryRow(ctx, `SELECT count(*) FROM comments WHERE page_id = $1 AND trash_item_id IS NULL AND NOT purged AND NOT editors_only`,
+		pageID).Scan(&n)
+	return n, err
+}
+
 // ThreadPeople lists who wrote in a thread, for replies.
 func ThreadPeople(ctx context.Context, q db.Querier, root uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.Query(ctx, "SELECT DISTINCT author_id FROM comments WHERE id = $1 OR parent_id = $1", root)

@@ -51,6 +51,7 @@ function ResultRow({ result }: { result: SearchResult }) {
         {result.title}
       </Link>{' '}
       <span className="muted">{result.space_name}</span>{' '}
+      {result.draft && <span className="lozenge">{t('publishing.draftMark')}</span>}{' '}
       <StageMark text={result.stage_text ?? ''} color={result.stage_color ?? ''} />
       {result.archived && <span className="lozenge">{t('search.archived')}</span>}
       {(result.breadcrumbs?.length ?? 0) > 0 && (

@@ -56,6 +56,8 @@ type Service struct {
 	watches  *watches.Service
 	options  Options
 	now      func() time.Time
+	// releasedPages reads a run of a release for its notifications (spec 073).
+	releasedPages func(context.Context, uuid.UUID) (ReleasedRun, error)
 }
 
 // NewService creates the service.

@@ -48,6 +48,11 @@ type payload struct {
 	Outcome string      `json:"outcome"`
 	Rule    string      `json:"rule"`
 	Needed  int         `json:"needed"`
+	// ReleaseRunID marks a version written by a run of a release of many pages, and names the
+	// run of release.finished (spec 073).
+	ReleaseRunID *uuid.UUID `json:"release_run_id"`
+	RunID        uuid.UUID  `json:"run_id"`
+	DraftSpaceID uuid.UUID  `json:"draft_space_id"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
@@ -68,6 +73,7 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"page.review_answered":  s.onReviewAnswered,
 		"page.review_ended":     s.onReviewEnded,
 		"page.reviewer_removed": s.onReviewerRemoved,
+		"release.finished":      s.onReleaseFinished,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -157,6 +163,14 @@ func (s *Service) tellMentions(ctx context.Context, base Row, p payload) error {
 // person and event, so whoever fits the first gets that, the most personal one. A
 // silent update reaches no watcher, and a new mention still reaches its person.
 func (s *Service) onPublished(ctx context.Context, event uuid.UUID, p payload) error {
+	if p.ReleaseRunID != nil {
+		// A page of a run of many pages: its watchers hear of the run once (PUB-813), and a
+		// silent run tells nobody (PUB-821). A new mention in the twin is told (PUB-812).
+		if p.Silent {
+			return nil
+		}
+		return s.tellMentions(ctx, Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event}, p)
+	}
 	want := func(v Settings) bool { return v.AutoWatchEdit }
 	if p.First {
 		want = func(v Settings) bool { return v.AutoWatchCreate }

@@ -16,6 +16,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"slices"
 	"strings"
 	"syscall"
 	"time"
@@ -30,6 +31,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/diffluence/diffluence/internal/publishing"
 	"github.com/diffluence/diffluence/internal/restore"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/version"
@@ -78,6 +80,8 @@ Commands:
   config check [--offline]  check the environment and DIFFLUENCE_CONFIG_FILE as a start would,
                             print each setting and where it came from, secrets hidden, and
                             try the mail server, identity provider and publish folder
+  check publishing [--fix]  recompute the release status of every page of every pair of draft
+                            and published spaces, list what drifted, and fix it with --fix
   healthcheck               ask a running server on this machine whether it is ready
   doctor                    check disk, database, backup, migrations, work, mail, login,
                             release, configuration and keys, and print a report that
@@ -181,6 +185,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			return 2
 		}
 		err = cmdConfigCheck(ctx, args[2:], stdout)
+	case "check":
+		if len(args) < 2 || args[1] != "publishing" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdCheckPublishing(ctx, args[2:], stdout)
 	case "healthcheck":
 		err = cmdHealthcheck(ctx)
 	case "doctor":
@@ -770,4 +780,41 @@ func readWitness(path string, stdin io.Reader) ([]audit.Checkpoint, error) {
 		return nil, errors.New("the witness log holds no audit checkpoints")
 	}
 	return witness, nil
+}
+
+// cmdCheckPublishing is the consistency check of draft and published spaces (spec 073,
+// PUB-343, PUB-921): it recomputes every status from the versions, lists what drifted and twin
+// versions no release wrote, and fixes the statuses with --fix.
+func cmdCheckPublishing(ctx context.Context, args []string, stdout io.Writer) error {
+	fix := slices.Contains(args, "--fix")
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	results, err := publishing.CheckAll(ctx, pool, fix)
+	if err != nil {
+		return err
+	}
+	found := 0
+	for _, r := range results {
+		fmt.Fprintf(stdout, "pair %s: %d pages, %d differences\n", r.PairID, r.Pages, len(r.Found))
+		for _, item := range r.Found {
+			fmt.Fprintf(stdout, "  %s version %d: %s\n", item.PageID, item.Version, item.What)
+		}
+		found += len(r.Found)
+	}
+	switch {
+	case found == 0:
+		fmt.Fprintln(stdout, "every pair is consistent")
+	case fix:
+		fmt.Fprintln(stdout, "the statuses were recomputed; a twin version no release wrote stays, for a person to look at")
+	default:
+		return fmt.Errorf("%d differences; run with --fix to recompute the statuses", found)
+	}
+	return nil
 }

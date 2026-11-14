@@ -107,6 +107,7 @@ type App struct {
 	spaces     *spaces.Service
 	trash      *trash.Service
 	jobs       *jobs.Service
+	publishing *publishing.Service
 	exchange   *exchange.Service
 	sites      *sites.Service
 	example    *example.Service
@@ -248,6 +249,12 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		exchange.Options{TempDir: cfg.DataDir, PDFURL: cfg.PDFURL, PDFPassword: cfg.PDFPassword, CollaboraURL: cfg.CollaboraURL, Log: log, Keyring: a.keyring, InstanceID: a.instanceID})
 	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,
 		sites.Options{PublishDir: cfg.PublishDir, Origin: cfg.PublicOrigin(), Log: log})
+	// Runs of more than one page are work of the worker, so every role knows them (spec 073).
+	a.publishing = publishing.NewService(a.pool, a.perms, a.pages, a.spaces, a.attach, a.jobs)
+	a.notify.SetReleasedPages(func(ctx context.Context, run uuid.UUID) (notify.ReleasedRun, error) {
+		r, err := a.publishing.RunPages(ctx, run)
+		return notify.ReleasedRun{Released: r.Released, TakenOff: r.TakenOff, PublishedHome: r.PublishedHome, DraftHome: r.DraftHome}, err
+	})
 	a.example = example.NewService(a.identity, a.settings, a.spaces, a.pages, a.attach, a.perms, a.comments, a.templates)
 	a.scim = scim.NewService(a.pool, a.identity, cfg.PublicOrigin(), log)
 	if cfg.OIDC.Issuer != "" {
@@ -260,7 +267,7 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 		a.api, err = httpapi.New(httpapi.Deps{Config: cfg, Pool: a.pool, Identity: a.identity,
 			Permissions: a.perms, Spaces: a.spaces, Pages: a.pages, Attachments: a.attach, Blocks: blocks.NewService(a.pool, a.perms, a.people, a.analytics), People: a.people, Console: a.console, Search: a.search,
 			Trash: a.trash, Settings: a.settings, Jobs: a.jobs, Exchange: a.exchange, Sites: a.sites, Example: a.example,
-			Publishing: publishing.NewService(a.pool, a.perms, a.pages, a.spaces, a.attach),
+			Publishing: a.publishing,
 			SCIM:       a.scim, SSO: a.sso, Comments: a.comments, Watches: a.watches, Tasks: a.tasks, Notify: a.notify, Mail: a.mail,
 			Sharing: a.sharing, SavedBlocks: savedblocks.NewService(a.pool), Feed: a.feed, Features: a.features, Templates: a.templates,
 			Analytics: a.analytics, Presence: a.presence, Outward: a.outward, Automation: a.automation, Webhooks: a.webhooks, Collab: a.collab,

@@ -10,6 +10,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/diffluence/diffluence/internal/publishing"
 	"github.com/diffluence/diffluence/internal/sharing"
 )
 
@@ -86,6 +87,9 @@ func (a *App) EventListenersForTest() map[string]func(context.Context, []byte) e
 
 // SharingForTest is the sharing module, for a test that calls it without the HTTP layer.
 func (a *App) SharingForTest() *sharing.Service { return a.sharing }
+
+// PublishingForTest lets a test lower the limits of release runs (spec 073).
+func (a *App) PublishingForTest() *publishing.Service { return a.publishing }
 
 // NoteNATSDrainedForTest runs the task that notes the drain of NATS after the switch.
 func (a *App) NoteNATSDrainedForTest(ctx context.Context) error { return a.noteNATSDrained(ctx) }

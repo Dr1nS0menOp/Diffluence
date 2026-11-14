@@ -9,6 +9,7 @@ import { api, type PageDetail, type ReleasePreview, type ReleaseStatus } from '.
 import { useCapabilities } from '../capabilities';
 import { Link } from '../router';
 import { Dialog, ErrorNote, Field, formatSize, Loading, RelativeTime } from './ui';
+import { LeaveOutDialog, RunDialog } from './release-dialogs';
 import { useToast } from './toast';
 
 /** The status of a page in a pair. Nothing is asked of a page outside a pair. */
@@ -66,6 +67,12 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
     case 'cannot_release':
       line = t('publishing.statusCannot', { reason: t(`publishing.reason_${status.reason ?? 'kind'}`) });
       break;
+    case 'left_out':
+      line = t('publishing.statusLeftOut');
+      break;
+    case 'left_out_released':
+      line = t('publishing.statusLeftOutReleased');
+      break;
     default:
       line = t('publishing.statusNotReleased');
   }
@@ -84,6 +91,14 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
       {status.twin_page_id && (
         <p>
           <Link href={`/pages/${status.twin_page_id}`}>{t('publishing.openTwin')}</Link>
+          {status.reader_comments > 0 && (
+            <>
+              {' · '}
+              <Link href={`/pages/${status.twin_page_id}#comments`}>
+                {t('publishing.readerComments', { count: status.reader_comments })}
+              </Link>
+            </>
+          )}
         </p>
       )}
     </div>
@@ -151,4 +166,81 @@ export function ReleaseDialog({ page, onClose }: { page: PageDetail; onClose: ()
       </div>
     </Dialog>
   );
+}
+
+/** The dialogs of the page's More menu about releases: releasing it, leaving it out or
+ * including it again, and taking it off the published space (PUB-1222). */
+export function ReleaseDialogs({
+  dialog,
+  page,
+  status,
+  onClose,
+}: {
+  dialog: string | null;
+  page: PageDetail;
+  status: ReleaseStatus | undefined;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [takingOff, setTakingOff] = useState(false);
+  const include = useMutation({
+    mutationFn: () => api.del(`/pages/${page.id}/leave-out`),
+    onSettled: async () => {
+      await client.invalidateQueries({ queryKey: ['release', page.id] });
+      onClose();
+    },
+  });
+  const done = async () => {
+    await client.invalidateQueries({ queryKey: ['release', page.id] });
+  };
+  if (dialog === 'release') return <ReleaseDialog page={page} onClose={onClose} />;
+  if (dialog === 'leave_out' && status?.left_out?.page_id === page.id) {
+    return (
+      <Dialog title={t('publishing.include')} onClose={onClose}>
+        <ErrorNote error={include.error} />
+        <p>{status.left_out.reason || t('publishing.statusLeftOut')}</p>
+        <div className="dialog-actions">
+          <button type="button" className="quiet" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button
+            type="button"
+            className="primary"
+            disabled={include.isPending}
+            onClick={() => include.mutate()}
+          >
+            {t('publishing.include')}
+          </button>
+        </div>
+      </Dialog>
+    );
+  }
+  if (dialog === 'leave_out' && !takingOff) {
+    return (
+      <LeaveOutDialog
+        pageId={page.id}
+        released={!!status?.twin_page_id}
+        onClose={() => {
+          void done();
+          onClose();
+        }}
+        onTakeOff={() => setTakingOff(true)}
+      />
+    );
+  }
+  if (dialog === 'take_off' || takingOff) {
+    return (
+      <RunDialog
+        spaceId={page.space_id}
+        scope={{ scope: 'take_off', page_ids: [page.id] }}
+        onClose={() => {
+          setTakingOff(false);
+          onClose();
+        }}
+        onStarted={() => void done()}
+      />
+    );
+  }
+  return null;
 }

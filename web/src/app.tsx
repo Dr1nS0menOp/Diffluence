@@ -39,6 +39,7 @@ import { EditView } from './views/edit';
 import { ExportView } from './views/exchange';
 import { CompareView, HistoryView } from './views/history';
 import { FilesView } from './views/files';
+import { ReleaseView } from './views/releases';
 import { SpaceOverviewView } from './views/overview';
 import { PageView } from './views/page';
 import { PeopleView, PersonView } from './views/people';
@@ -363,6 +364,7 @@ function Routes({ me }: { me: Me }) {
   if ((m = match('/spaces/:key', pathname))) return <SpaceHome spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/overview', pathname))) return <SpaceOverviewView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/files', pathname))) return <FilesView spaceKey={m.key ?? ''} />;
+  if ((m = match('/spaces/:key/release', pathname))) return <ReleaseView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings', pathname))) return <SpaceSettingsView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings/automation', pathname))) return <RulesView spaceKey={m.key ?? ''} />;
   if ((m = match('/spaces/:key/settings/webhooks', pathname))) return <WebhooksView spaceKey={m.key ?? ''} />;

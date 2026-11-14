@@ -26,11 +26,14 @@ export function SortTable<Row>({
   columns,
   rows,
   rowKey,
+  rowClass,
 }: {
   caption: string;
   columns: SortColumn<Row>[];
   rows: Row[];
   rowKey: (row: Row) => string;
+  /** A class for a row, such as picked for a chosen one, which also has a real checkbox. */
+  rowClass?: (row: Row) => string | undefined;
 }) {
   const [sorted, setSorted] = useState<{ key: string; ascending: boolean } | null>(null);
   const shown = useMemo(() => {
@@ -64,7 +67,7 @@ export function SortTable<Row>({
         </thead>
         <tbody>
           {shown.map((row) => (
-            <tr key={rowKey(row)}>
+            <tr key={rowKey(row)} className={rowClass?.(row)}>
               {columns.map((c) => (
                 <td key={c.key}>{c.show ? c.show(row) : c.value(row)}</td>
               ))}

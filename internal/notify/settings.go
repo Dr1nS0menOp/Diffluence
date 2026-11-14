@@ -48,6 +48,11 @@ const (
 	TypeReviewEnded = "review_ended"
 	// TypeReviewerRemoved tells a reviewer and the authors that a reviewer was taken off (DOC-608).
 	TypeReviewerRemoved = "reviewer_removed"
+	// TypePagesReleased tells a watcher once per run of a release which watched pages changed or
+	// left (spec 073, PUB-813, PUB-818).
+	TypePagesReleased = "pages_released"
+	// TypeReleaseFinished tells the releaser that a run in the background ended (PUB-822).
+	TypeReleaseFinished = "release_finished"
 )
 
 // Where a type of notification goes.
@@ -69,7 +74,7 @@ const defaultDigestHour = 8
 // Types lists every type a person can choose a channel for.
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
 	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
-	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved}
+	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -99,6 +104,7 @@ func defaultChannels() map[string]string {
 		TypeAccessRecovered: ChannelMail, TypeDraftExpiring: ChannelMail, TypeInvitationAnswer: ChannelMail,
 		TypeReviewAsked: ChannelMail, TypeReviewAnswered: ChannelMail, TypeReviewEnded: ChannelMail, TypeReviewerRemoved: ChannelMail,
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
+		TypePagesReleased: ChannelDigest, TypeReleaseFinished: ChannelApp,
 	}
 }
 
