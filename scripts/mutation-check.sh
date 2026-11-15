@@ -2448,7 +2448,21 @@ mutate "a late joiner is never asked" internal/pages/deadlines.go \
 mutate "a periodic review makes a new approval" internal/pages/control.go \
   's.replace("\tconfirmation := ctl.approved() \x26\x26 *ctl.approvedVersion == ctl.headVersion\n", "\tconfirmation := false\n")' $app -run '^(TestAPeriodicReviewConfirmsWithoutANewVersion)$'
 mutate "page.edit alone touches an exempt label" internal/pages/exempt.go \
-  's.replace("\tif !d.Allowed {\n\t\treturn true, apperr.Forbidden()\n", "\tif !d.Allowed \x26\x26 false {\n\t\treturn true, apperr.Forbidden()\n")' $app -run '^(TestOnlyThoseWhoLookAfterWorkflowsTouchAnExemptLabel)$'
+  's.replace("\tif !d.Allowed {\n\t\treturn exempt, apperr.Forbidden()\n", "\tif !d.Allowed \x26\x26 false {\n\t\treturn exempt, apperr.Forbidden()\n")' $app -run '^(TestOnlyThoseWhoLookAfterWorkflowsTouchAnExemptLabel|TestAReleaseCopiesLabelsUnderTheRuleForExemptLabels)$'
+# Wave RV9: a release copies labels under the rule for exempt labels, a published space follows
+# no workflow, reading is asked of those who may read the page, and the job takes only joins.
+mutate "a release copies labels past the rule for exempt labels" internal/pages/release.go \
+  's.replace("exempt, err := s.requireExemptRights(ctx, tx, c, twin.SpaceID, changedLabels(before, labels))", "exempt, err := s.requireExemptRights(ctx, tx, c, twin.SpaceID, changedLabels(before, before))")' $app -run '^(TestAReleaseCopiesLabelsUnderTheRuleForExemptLabels)$'
+mutate "a space that follows a workflow becomes a published space" internal/publishing/pair.go \
+  's.replace("\tif err != nil || !follows {\n", "\tif err != nil || !follows || true {\n")' $app -run '^(TestASpaceThatFollowsAWorkflowIsNotLinkedAsThePublishedSpace)$'
+mutate "a link skips the check its preview makes" internal/publishing/pair.go \
+  's.replace("\t\tif err := checkUncontrolled(ctx, tx, published); err != nil {\n", "\t\tif err := checkUncontrolled(ctx, tx, published); err != nil \x26\x26 false {\n")' $app -run '^(TestASpaceThatFollowsAWorkflowIsNotLinkedAsThePublishedSpace)$'
+mutate "someone a restriction keeps out is asked to confirm reading" internal/pages/reading.go \
+  's.replace("SELECT $1, $2, r.user_id FROM perm_page_readers($1, ARRAY(", "SELECT $1, $2, r.user_id FROM unnest(ARRAY(").replace("WHERE gm.group_id = ANY($3))) r\n", "WHERE gm.group_id = ANY($3))) r (user_id)\n")' $app -run '^(TestOnlyPeopleWhoMayReadThePageAreAskedToConfirmIt)$'
+mutate "a late joiner a restriction keeps out is asked" internal/pages/reading.go \
+  's.replace("CROSS JOIN LATERAL perm_page_readers(rq.page_id, ARRAY(", "CROSS JOIN LATERAL unnest(ARRAY(").replace("WHERE j.group_id = ANY (rq.groups))) r\n", "WHERE j.group_id = ANY (rq.groups))) r (user_id)\n")' $app -run '^(TestOnlyPeopleWhoMayReadThePageAreAskedToConfirmIt)$'
+mutate "someone who left the group is asked" internal/pages/reading.go \
+  's.replace("\t\t\tJOIN group_members gm ON gm.group_id = j.group_id AND gm.user_id = j.user_id\n", "")' $app -run '^(TestTheJobAsksEachLaterJoinerOnceAndOnlyAfterTheyJoin)$'
 mutate "a step is taken past its conditions" internal/pages/step_conditions.go \
   's.replace("\tif ok, reason := tr.Allows(f); !ok {\n\t\treturn apperr.Conflict(", "\tif ok, reason := tr.Allows(f); !ok \x26\x26 false {\n\t\treturn apperr.Conflict(")' $app -run '^(TestAStepWithConditionsSaysWhyItCannotBeTaken)$'
 mutate "the move keeps the approval of another space" internal/pages/assign.go \

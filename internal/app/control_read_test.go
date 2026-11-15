@@ -135,6 +135,79 @@ func TestPeopleWhoJoinTheGroupLaterAreAsked(t *testing.T) {
 	}
 }
 
+// TestOnlyPeopleWhoMayReadThePageAreAskedToConfirmIt is DOC-820 and DOC-823 under page
+// restrictions: the groups are resolved by who may read the page, at approval and for people
+// who join later, so the list names nobody a restriction keeps out.
+func TestOnlyPeopleWhoMayReadThePageAreAskedToConfirmIt(t *testing.T) {
+	e := newEnv(t)
+	w := newReviewWorld(e, "DRP")
+	staff := w.newGroup("Staff of DRP", w.reader, w.r2)
+	page := w.author.page(w.space, w.home, "Restricted policy", "text")
+	w.admin.restrict(page, "view", w.author.id, w.reader.id, w.r3.id)
+	w.author.ok("PUT", "/api/v1/pages/"+page+"/workflow", map[string]any{"workflow_id": w.workflowOf("Read it", readDef(staff))})
+	w.approve(page)
+	asked := func(u *user) bool {
+		t.Helper()
+		return e.count("SELECT count(*) FROM read_confirmations WHERE page_id = $1 AND user_id = $2", page, u.id) == 1
+	}
+	if !asked(w.reader) || asked(w.r2) {
+		t.Fatalf("at approval: reader asked %v, someone kept out asked %v", asked(w.reader), asked(w.r2))
+	}
+	for _, u := range []*user{w.r3, w.r1} {
+		w.root.want(204, "PUT", "/api/v1/admin/groups/"+staff+"/members/"+u.id, nil)
+	}
+	e.dueJob()
+	if !asked(w.r3) || asked(w.r1) {
+		t.Fatalf("later: a reader who joined asked %v, someone kept out asked %v", asked(w.r3), asked(w.r1))
+	}
+	if people := w.admin.ok("GET", "/api/v1/pages/"+page+"/read-confirmations", nil)["people"].([]any); len(people) != 2 {
+		t.Fatalf("the list holds %d people, want the two who may read the page", len(people))
+	}
+}
+
+// TestTheJobAsksEachLaterJoinerOnceAndOnlyAfterTheyJoin is DOC-1418 on the incremental pass: a
+// person who joins after the approval is asked at the next pass, once; a pass with nobody new
+// asks nobody; someone who joined and left before the pass is not asked; and a person who
+// joins a second group of the same request is not asked twice.
+func TestTheJobAsksEachLaterJoinerOnceAndOnlyAfterTheyJoin(t *testing.T) {
+	e := newEnv(t)
+	w := newReviewWorld(e, "DRJ")
+	staff := w.newGroup("Staff of DRJ", w.reader)
+	d := reviewFlow()
+	d["states"].([]any)[2].(map[string]any)["read_and_understood"] = map[string]any{"groups": []any{staff, w.group}}
+	page := w.author.page(w.space, w.home, "Joined policy", "text")
+	w.author.ok("PUT", "/api/v1/pages/"+page+"/workflow", map[string]any{"workflow_id": w.workflowOf("Read it", d)})
+	w.approve(page)
+	late := func(u *user) int {
+		t.Helper()
+		return e.count("SELECT count(*) FROM read_confirmations WHERE page_id = $1 AND user_id = $2 AND late", page, u.id)
+	}
+	e.dueJob()
+	if n := e.count("SELECT count(*) FROM read_confirmations WHERE page_id = $1 AND late", page); n != 0 {
+		t.Fatalf("a pass with nobody new asked %d people", n)
+	}
+	w.root.want(204, "PUT", "/api/v1/admin/groups/"+staff+"/members/"+w.r1.id, nil)
+	w.root.want(204, "PUT", "/api/v1/admin/groups/"+staff+"/members/"+w.r2.id, nil)
+	w.root.want(204, "DELETE", "/api/v1/admin/groups/"+staff+"/members/"+w.r1.id, nil)
+	e.dueJob()
+	if late(w.r1) != 0 {
+		t.Fatal("someone who left the group before the pass was asked")
+	}
+	if n := e.count("SELECT count(*) FROM read_confirmations WHERE page_id = $1 AND user_id = $2", page, w.r2.id); n != 1 {
+		t.Fatalf("someone in both groups was asked %d times", n)
+	}
+	w.root.want(204, "PUT", "/api/v1/admin/groups/"+staff+"/members/"+w.r1.id, nil)
+	e.dueJob()
+	e.dueJob()
+	if late(w.r1) != 1 {
+		t.Fatalf("a person who joined later was asked %d times", late(w.r1))
+	}
+	e.deliver()
+	if notificationCount(e, w.r1, notify.TypeReadRequested) != 1 {
+		t.Fatal("the person who joined later was not told once")
+	}
+}
+
 // periodicDef is the review flow with reviewers whose approved state is timed, with a
 // periodic review step into the review state.
 func periodicDef(rv map[string]any, months int) map[string]any {

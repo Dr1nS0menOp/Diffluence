@@ -580,6 +580,89 @@ func TestWorkflowsAreRefusedInThePublishedSpace(t *testing.T) {
 	}
 }
 
+// TestASpaceThatFollowsAWorkflowIsNotLinkedAsThePublishedSpace is PUB-703 at linking: a space
+// that follows a workflow, on the space or on a page, becomes no published space, also when the
+// same two spaces are linked again; once its workflows are off it links.
+func TestASpaceThatFollowsAWorkflowIsNotLinkedAsThePublishedSpace(t *testing.T) {
+	e := newEnv(t)
+	admin := e.user("plw-admin@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	draft, _ := admin.space("PLWDRAFT")
+	target, targetHome := admin.space("PLWREAD")
+	flow := admin.ok("POST", "/api/v1/spaces/"+target+"/workflows", map[string]any{"name": "Review", "definition": reviewFlow()})["id"].(string)
+	link := map[string]any{"published_space_id": target}
+	refused := func(why string) {
+		t.Helper()
+		for _, path := range []string{"/publishing/link-preview", "/publishing/link"} {
+			if out := admin.want(http.StatusConflict, "POST", "/api/v1/spaces/"+draft+path, link); !strings.Contains(out, "published_space_controlled") {
+				t.Fatalf("%s: %s linked: %s", why, path, out)
+			}
+		}
+		if n := e.count("SELECT count(*) FROM space_pairs WHERE ended_at IS NULL"); n != 0 {
+			t.Fatalf("%s: a refused link left a pair", why)
+		}
+	}
+	admin.ok("PUT", "/api/v1/spaces/"+target+"/workflow", map[string]any{"workflow_id": flow, "kinds": []string{"page"},
+		"exempt_labels": []string{"working-notes"}})
+	refused("a space workflow")
+	admin.ok("PUT", "/api/v1/spaces/"+target+"/workflow", map[string]any{"workflow_id": nil})
+	admin.ok("PUT", "/api/v1/pages/"+targetHome+"/workflow", map[string]any{"workflow_id": flow})
+	refused("a page workflow")
+	admin.ok("PUT", "/api/v1/pages/"+targetHome+"/workflow", map[string]any{"workflow_id": nil})
+	admin.ok("POST", "/api/v1/spaces/"+draft+"/publishing/link", link)
+
+	// Ended, given a workflow, and linked again.
+	admin.want(http.StatusNoContent, "POST", "/api/v1/spaces/"+target+"/publishing/end", nil)
+	admin.ok("PUT", "/api/v1/spaces/"+target+"/workflow", map[string]any{"workflow_id": flow, "kinds": []string{"page"}})
+	refused("linked again")
+}
+
+// TestAReleaseCopiesLabelsUnderTheRuleForExemptLabels is DOC-402 with PUB-304: a release puts
+// labels on a twin and takes them off under the same rule for exempt labels as a person's
+// change, in the twin's space. A published space that follows a workflow, as one linked
+// before the check at linking could, exempts a label that no release may then set or remove.
+func TestAReleaseCopiesLabelsUnderTheRuleForExemptLabels(t *testing.T) {
+	e := newEnv(t)
+	w := newPubWorld(e, "RXL")
+	other, _ := w.admin.space("RXLOTHER")
+	flow := w.admin.ok("POST", "/api/v1/spaces/"+other+"/workflows", map[string]any{"name": "Review", "definition": reviewFlow()})["id"].(string)
+	page := w.page(w.writer, w.draftHome, "Guide", "words")
+	w.writer.ok("POST", "/api/v1/pages/"+page+"/labels", map[string]any{"label": "working-notes"})
+	w.release(w.admin, page, "")
+	twin := w.twin(page)
+	e.sql("UPDATE workflows SET space_id = $1 WHERE id = $2", w.published, flow)
+	e.sql(`INSERT INTO space_workflows (space_id, workflow_id, kinds, set_by, exempt_labels) VALUES ($1, $2, '{page}', $3, '{working-notes}')`,
+		w.published, flow, w.admin.id)
+	labelsOf := func() string {
+		t.Helper()
+		return e.scalar("SELECT COALESCE(string_agg(label, ',' ORDER BY label), '') FROM page_labels WHERE page_id = $1", twin)
+	}
+
+	w.writer.ok("DELETE", "/api/v1/pages/"+page+"/labels/working-notes", nil)
+	preview := w.preview(w.admin, page)
+	if code, out := w.admin.do("POST", "/api/v1/pages/"+page+"/release", map[string]any{"preview_id": preview["id"]}); code != http.StatusForbidden {
+		t.Fatalf("a release took an exempt label off: %d %s", code, out)
+	}
+	if got := labelsOf(); got != "working-notes" {
+		t.Fatalf("the twin's labels after a refused release: %q", got)
+	}
+	w.writer.ok("POST", "/api/v1/pages/"+page+"/labels", map[string]any{"label": "working-notes"})
+	w.writer.ok("POST", "/api/v1/pages/"+page+"/labels", map[string]any{"label": "reference"})
+	w.release(w.admin, page, "")
+	if got := labelsOf(); got != "reference,working-notes" {
+		t.Fatalf("an ordinary label beside a kept exempt one: %q", got)
+	}
+
+	fresh := w.page(w.writer, w.draftHome, "New guide", "words")
+	w.writer.ok("POST", "/api/v1/pages/"+fresh+"/labels", map[string]any{"label": "working-notes"})
+	preview = w.preview(w.admin, fresh)
+	if code, out := w.admin.do("POST", "/api/v1/pages/"+fresh+"/release", map[string]any{"preview_id": preview["id"]}); code != http.StatusForbidden {
+		t.Fatalf("a release put an exempt label on: %d %s", code, out)
+	}
+	if n := e.auditActions("page.exempted") + e.auditActions("page.exemption_ended"); n != 0 {
+		t.Fatalf("a release changed an exemption: %d", n)
+	}
+}
+
 // TestATwinVerifiesAgainstItsDraftVersion is PUB-732: verification maps the links of the
 // release back and compares the content hash, so a twin verifies and a twin changed in the
 // database does not; only those who see the draft space's audit may run it.

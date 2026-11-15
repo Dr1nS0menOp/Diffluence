@@ -787,6 +787,27 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 			return found
 		}
 		visible, listed, editable := pagesIn("perm_visible_pages"), pagesIn("perm_listed_pages"), pagesIn("perm_editable_pages")
+		// perm_page_readers asks the same rule per page, of a list of people.
+		leaves := make([]uuid.UUID, 0, len(all))
+		for _, b := range all {
+			leaves = append(leaves, b.leaf)
+		}
+		readable := map[uuid.UUID]bool{}
+		rows, err := pool.Query(ctx, `SELECT l FROM unnest($1::uuid[]) AS l
+			WHERE $2 IN (SELECT r.user_id FROM perm_page_readers(l, ARRAY[$2::uuid]) r)`, leaves, ru.id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var id uuid.UUID
+			if err := rows.Scan(&id); err != nil {
+				t.Fatal(err)
+			}
+			readable[id] = true
+		}
+		if err := rows.Err(); err != nil {
+			t.Fatal(err)
+		}
 
 		facts, err := svc.LoadUser(ctx, pool, ru.id)
 		if err != nil {
@@ -804,6 +825,9 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 			want := literalRule(ru.userCase, b.g, b.r, b.page, b.spaceStatus, permissions.ActionPageView, own)
 			if visible[b.leaf] != want {
 				return fmt.Errorf("%s: SQL said %v, rule says %v", name, visible[b.leaf], want)
+			}
+			if readable[b.leaf] != want {
+				return fmt.Errorf("%s: perm_page_readers said %v, rule says %v", name, readable[b.leaf], want)
 			}
 			if listed[b.leaf] != (want && !b.page.archived) {
 				return fmt.Errorf("%s: lists said %v, rule says %v", name, listed[b.leaf], want && !b.page.archived)

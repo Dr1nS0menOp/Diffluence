@@ -56,21 +56,38 @@ func exemptLabelsOf(ctx context.Context, q db.Querier, spaceID uuid.UUID) ([]str
 	return list, err
 }
 
-// isExempt says whether a label is exempt in a space, and refuses a person who may not touch
-// it there.
+// requireExemptRight says whether a label is exempt in a space, and refuses a person who may
+// not touch it there.
 func (s *Service) requireExemptRight(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, label string) (bool, error) {
+	exempt, err := s.requireExemptRights(ctx, tx, c, spaceID, []string{label})
+	return len(exempt) > 0, err
+}
+
+// requireExemptRights is the one rule for every writer of labels: of the labels a change puts
+// on or takes off, it answers those that are exempt in the space, and refuses the change when
+// there are any and the caller lacks space.workflows there (DOC-402).
+func (s *Service) requireExemptRights(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, changed []string) ([]string, error) {
 	list, err := exemptLabelsOf(ctx, tx, spaceID)
-	if err != nil || !slices.Contains(list, label) {
-		return false, err
+	if err != nil {
+		return nil, err
+	}
+	var exempt []string
+	for _, label := range changed {
+		if slices.Contains(list, label) {
+			exempt = append(exempt, label)
+		}
+	}
+	if len(exempt) == 0 {
+		return nil, nil
 	}
 	d, err := s.perms.CheckSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceWorkflows)
 	if err != nil {
-		return true, err
+		return exempt, err
 	}
 	if !d.Allowed {
-		return true, apperr.Forbidden()
+		return exempt, apperr.Forbidden()
 	}
-	return true, nil
+	return exempt, nil
 }
 
 // followExemption settles a page after an exempt label went on or came off, and audits it.

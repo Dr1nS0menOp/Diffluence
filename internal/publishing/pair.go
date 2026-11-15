@@ -193,6 +193,18 @@ func checkEmpty(ctx context.Context, q db.Querier, space spaces.Space) error {
 		". Choose an empty space, or make a new one. A space with content becomes a published space by starting a draft space from it.")
 }
 
+// checkUncontrolled refuses a published space that follows a workflow, also one linked again:
+// readers there see only what was approved in the draft space, so no second procedure may
+// apply to its pages (PUB-703, DOC-411).
+func checkUncontrolled(ctx context.Context, q db.Querier, space spaces.Space) error {
+	follows, err := pages.FollowsWorkflow(ctx, q, space.ID)
+	if err != nil || !follows {
+		return err
+	}
+	return apperr.Conflict("published_space_controlled", "The published space must not follow a workflow: control happens in the draft space. "+
+		"Turn off the workflows of that space first, or make a new one.")
+}
+
 // PreviewLink says what linking would do, and refuses as Link would (PUB-210).
 func (s *Service) PreviewLink(ctx context.Context, c identity.Caller, draftID uuid.UUID, in LinkInput) (LinkPreview, error) {
 	out := LinkPreview{LosingEditors: LosingEditors{Names: []string{}}}
@@ -217,6 +229,9 @@ func (s *Service) PreviewLink(ctx context.Context, c identity.Caller, draftID uu
 	if published == nil {
 		out.NewSpace = true
 	} else {
+		if err := checkUncontrolled(ctx, s.pool, *published); err != nil {
+			return out, err
+		}
 		previous, err := endedPair(ctx, s.pool, draft.ID, published.ID)
 		if err != nil {
 			return out, err
@@ -323,6 +338,9 @@ func (s *Service) Link(ctx context.Context, c identity.Caller, draftID uuid.UUID
 			return err
 		}
 		if err := checkSides(draft, &published); err != nil {
+			return err
+		}
+		if err := checkUncontrolled(ctx, tx, published); err != nil {
 			return err
 		}
 		previous, err := endedPair(ctx, tx, draft.ID, published.ID)

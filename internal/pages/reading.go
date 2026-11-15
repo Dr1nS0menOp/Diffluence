@@ -38,16 +38,22 @@ func (s *Service) afterApproval(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if to.ReadAndUnderstood == nil {
 		return nil
 	}
+	if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock_shared(hashtext($1))", readRequestsLock); err != nil {
+		return err
+	}
 	tag, err := tx.Exec(ctx, "INSERT INTO read_requests (page_id, version_number, groups) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
 		p.ID, version, to.ReadAndUnderstood.Groups)
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
+	// Only people who may read the page are asked: a restriction keeps someone out of the list
+	// as it keeps them out of the page (DOC-823).
 	rows, err := tx.Query(ctx, `INSERT INTO read_confirmations (page_id, version_number, user_id)
-		SELECT DISTINCT $1::uuid, $2::int, gm.user_id FROM group_members gm
-		JOIN users u ON u.id = gm.user_id AND u.type = 'member' AND u.status = 'active'
-		WHERE gm.group_id = ANY($3) AND $4::uuid IN (SELECT ps.space_id FROM perm_spaces(u.id, 'space.view') ps)
-		ON CONFLICT DO NOTHING RETURNING user_id`, p.ID, version, to.ReadAndUnderstood.Groups, p.SpaceID)
+		SELECT $1, $2, r.user_id FROM perm_page_readers($1, ARRAY(
+			SELECT DISTINCT gm.user_id FROM group_members gm
+			JOIN users u ON u.id = gm.user_id AND u.type = 'member' AND u.status = 'active'
+			WHERE gm.group_id = ANY($3))) r
+		ON CONFLICT DO NOTHING RETURNING user_id`, p.ID, version, to.ReadAndUnderstood.Groups)
 	if err != nil {
 		return err
 	}
@@ -169,58 +175,88 @@ func (s *Service) ReadList(ctx context.Context, c identity.Caller, id uuid.UUID)
 	return out, err
 }
 
-// askLateReaders asks people who joined a group after a version was approved, as the job sees
-// them (DOC-1418). Guests and people who do not view the space are never asked.
+// readRequestsLock orders the job of late joiners after every approval that is asking for
+// reading at that moment. An approval resolves the groups as its snapshot sees them; a join
+// that commits after that snapshot but before the approval commits is invisible to it, and its
+// request is invisible to a job that runs in between. Approvals share the lock and the job
+// takes it alone, so the job waits for such an approval and then sees its request.
+const readRequestsLock = "read requests"
+
+// askLateReaders asks people who joined a group after a version was approved (DOC-1418). It
+// takes only the joins noted since the last pass, so its cost follows the joins, not the open
+// requests times the members of their groups. A person still in the group, a member and not a
+// guest, active and allowed to read the page is asked; a join no request names is let go.
 func (s *Service) askLateReaders(ctx context.Context) (int, error) {
 	n := 0
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, `INSERT INTO read_confirmations (page_id, version_number, user_id, late)
-			SELECT x.page_id, x.version_number, x.user_id, true FROM (
-				SELECT DISTINCT rq.page_id, rq.version_number, gm.user_id
-				FROM read_requests rq
-				JOIN page_control pc ON pc.page_id = rq.page_id AND pc.approved_version = rq.version_number AND pc.state_kind <> 'obsolete'
-				JOIN pages p ON p.id = rq.page_id AND p.status = 'published'
-				JOIN group_members gm ON gm.group_id = ANY (rq.groups)
-				JOIN users u ON u.id = gm.user_id AND u.type = 'member' AND u.status = 'active'
-				WHERE NOT EXISTS (SELECT 1 FROM read_confirmations rc
-				                  WHERE rc.page_id = rq.page_id AND rc.version_number = rq.version_number AND rc.user_id = gm.user_id)
-				  AND p.space_id IN (SELECT ps.space_id FROM perm_spaces(u.id, 'space.view') ps)
-				LIMIT $1) x
-			ON CONFLICT DO NOTHING RETURNING page_id, version_number, user_id`, maxDuePass)
-		if err != nil {
+		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock(hashtext($1))", readRequestsLock); err != nil {
 			return err
 		}
-		type late struct {
-			page    uuid.UUID
-			version int
-			user    uuid.UUID
-		}
-		list, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (late, error) {
-			var l late
-			return l, r.Scan(&l.page, &l.version, &l.user)
-		})
-		if err != nil {
+		groups, people, err := takeJoins(ctx, tx)
+		// The passes go on while a pass takes a full batch of joins.
+		n = len(groups)
+		if err != nil || n == 0 {
 			return err
 		}
-		n = len(list)
-		byPage := map[uuid.UUID][]uuid.UUID{}
-		versions := map[uuid.UUID]int{}
-		for _, l := range list {
-			byPage[l.page] = append(byPage[l.page], l.user)
-			versions[l.page] = l.version
-		}
-		for id, people := range byPage {
-			p, err := load(ctx, tx, id)
-			if err != nil {
-				return err
-			}
-			if err := askToRead(ctx, tx, systemWorkflow, p, versions[id], people, true); err != nil {
-				return err
-			}
-		}
-		return nil
+		return askJoiners(ctx, tx, groups, people)
 	})
 	return n, err
+}
+
+// takeJoins takes a batch of noted joins off the list, as pairs of a group and a person.
+func takeJoins(ctx context.Context, tx pgx.Tx) (groups, people []uuid.UUID, err error) {
+	rows, err := tx.Query(ctx, `DELETE FROM read_joins WHERE (group_id, user_id) IN (
+		SELECT group_id, user_id FROM read_joins LIMIT $1 FOR UPDATE SKIP LOCKED) RETURNING group_id, user_id`, maxDuePass)
+	if err != nil {
+		return nil, nil, err
+	}
+	var group, person uuid.UUID
+	_, err = pgx.ForEachRow(rows, []any{&group, &person}, func() error {
+		groups, people = append(groups, group), append(people, person)
+		return nil
+	})
+	return groups, people, err
+}
+
+// askJoiners asks the people of these joins to confirm each version a request of their group
+// asks for, once, and tells them per page.
+func askJoiners(ctx context.Context, tx pgx.Tx, groups, people []uuid.UUID) error {
+	rows, err := tx.Query(ctx, `INSERT INTO read_confirmations (page_id, version_number, user_id, late)
+		SELECT rq.page_id, rq.version_number, r.user_id, true
+		FROM read_requests rq
+		JOIN page_control pc ON pc.page_id = rq.page_id AND pc.approved_version = rq.version_number AND pc.state_kind <> 'obsolete'
+		JOIN pages p ON p.id = rq.page_id AND p.status = 'published'
+		CROSS JOIN LATERAL perm_page_readers(rq.page_id, ARRAY(
+			SELECT DISTINCT j.user_id FROM unnest($1::uuid[], $2::uuid[]) AS j (group_id, user_id)
+			JOIN group_members gm ON gm.group_id = j.group_id AND gm.user_id = j.user_id
+			JOIN users u ON u.id = j.user_id AND u.type = 'member' AND u.status = 'active'
+			WHERE j.group_id = ANY (rq.groups))) r
+		WHERE rq.groups && $1::uuid[]
+		ON CONFLICT DO NOTHING RETURNING page_id, version_number, user_id`, groups, people)
+	if err != nil {
+		return err
+	}
+	byPage := map[uuid.UUID][]uuid.UUID{}
+	versions := map[uuid.UUID]int{}
+	var page, person uuid.UUID
+	var version int
+	if _, err := pgx.ForEachRow(rows, []any{&page, &version, &person}, func() error {
+		byPage[page] = append(byPage[page], person)
+		versions[page] = version
+		return nil
+	}); err != nil {
+		return err
+	}
+	for id, asked := range byPage {
+		p, err := load(ctx, tx, id)
+		if err != nil {
+			return err
+		}
+		if err := askToRead(ctx, tx, systemWorkflow, p, versions[id], asked, true); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Periodic review.

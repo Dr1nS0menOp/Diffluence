@@ -252,10 +252,8 @@ func (s *Service) RenameLabel(ctx context.Context, c identity.Caller, spaceID uu
 			return err
 		}
 		// Renaming onto or away from an exempt label changes which pages are controlled.
-		for _, l := range []string{from, target} {
-			if _, err := s.requireExemptRight(ctx, tx, c, spaceID, l); err != nil {
-				return err
-			}
+		if _, err := s.requireExemptRights(ctx, tx, c, spaceID, []string{from, target}); err != nil {
+			return err
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)
 			SELECT l.page_id, $3, l.created_by FROM page_labels l JOIN pages p ON p.id = l.page_id

@@ -107,6 +107,7 @@ var tableOwners = map[string]string{
 	"periodic_reviews":    "internal/pages",
 	"read_requests":       "internal/pages",
 	"read_confirmations":  "internal/pages",
+	"read_joins":          "internal/pages",
 	"imported_signatures": "internal/pages",
 
 	// draft and published spaces (spec 073).

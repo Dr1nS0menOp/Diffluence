@@ -154,6 +154,16 @@ func ContentInTheWay(ctx context.Context, q db.Querier, spaceID uuid.UUID, home 
 	return out, nil
 }
 
+// FollowsWorkflow says whether a space or a page in it follows a workflow, which a published
+// space must not: control happens in the draft space (PUB-703).
+func FollowsWorkflow(ctx context.Context, q db.Querier, spaceID uuid.UUID) (bool, error) {
+	var follows bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM space_workflows WHERE space_id = $1)
+		OR EXISTS (SELECT 1 FROM page_workflows w JOIN pages p ON p.id = w.page_id WHERE p.space_id = $1)
+		OR EXISTS (SELECT 1 FROM page_control c JOIN pages p ON p.id = c.page_id WHERE p.space_id = $1)`, spaceID).Scan(&follows)
+	return follows, err
+}
+
 // MakeTwin adds the row of a twin in a published space, with no version yet: a page with no
 // version is seen by nobody but its creator until the release writes one in the same
 // transaction (PUB-410). The caller has marked its transaction as a release.
@@ -234,7 +244,7 @@ func (s *Service) WriteTwin(ctx context.Context, tx pgx.Tx, c identity.Caller, i
 			WHERE id = $1`, p.ID, in.Look.Emoji, in.Look.FullWidth, in.Look.HeaderAttachmentID, in.Look.HeaderPosition, in.Look.Language); err != nil {
 			return Page{}, err
 		}
-		if err := setReleasedLabels(ctx, tx, c, p.ID, in.Labels); err != nil {
+		if err := s.setReleasedLabels(ctx, tx, c, p, in.Labels); err != nil {
 			return Page{}, err
 		}
 	}
@@ -252,14 +262,45 @@ func sameParent(a, b *uuid.UUID) bool {
 	return (a == nil && b == nil) || (a != nil && b != nil && *a == *b)
 }
 
-// setReleasedLabels gives a twin exactly the labels of its draft (PUB-304, PUB-1407).
-func setReleasedLabels(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID, labels []string) error {
-	if _, err := tx.Exec(ctx, `DELETE FROM page_labels WHERE page_id = $1 AND NOT (label = ANY($2))`, id, labels); err != nil {
+// setReleasedLabels gives a twin exactly the labels of its draft (PUB-304, PUB-1407). A
+// label it puts on or takes off follows the rule for exempt labels of the twin's space, as a
+// person's change does (DOC-402).
+func (s *Service) setReleasedLabels(ctx context.Context, tx pgx.Tx, c identity.Caller, twin Page, labels []string) error {
+	before, err := labelsOf(ctx, tx, twin.ID)
+	if err != nil {
+		return err
+	}
+	exempt, err := s.requireExemptRights(ctx, tx, c, twin.SpaceID, changedLabels(before, labels))
+	if err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM page_labels WHERE page_id = $1 AND NOT (label = ANY($2))`, twin.ID, labels); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by) SELECT $1, l, $3 FROM unnest($2::text[]) AS l
-		ON CONFLICT DO NOTHING`, id, labels, c.UserID); err != nil {
+		ON CONFLICT DO NOTHING`, twin.ID, labels, c.UserID); err != nil {
 		return err
 	}
-	return search.RefreshNames(ctx, tx, id)
+	for _, label := range exempt {
+		if err := s.followExemption(ctx, tx, c, twin, label, slices.Contains(labels, label)); err != nil {
+			return err
+		}
+	}
+	return search.RefreshNames(ctx, tx, twin.ID)
+}
+
+// changedLabels lists the labels that are in one list and not in the other.
+func changedLabels(before, after []string) []string {
+	out := []string{}
+	for _, l := range before {
+		if !slices.Contains(after, l) {
+			out = append(out, l)
+		}
+	}
+	for _, l := range after {
+		if !slices.Contains(before, l) && !slices.Contains(out, l) {
+			out = append(out, l)
+		}
+	}
+	return out
 }
