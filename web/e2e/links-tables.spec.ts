@@ -227,25 +227,28 @@ test('a reader who may not create pages is told so at a placeholder', async ({ p
 
 test('a selected link gets its tools in the row', async ({ page }) => {
   const { space } = await editing(page, 'Tools');
-  const target = await publishedPage(page, space.id, 'Target page', 'x');
-  await publishDocument(page, target, 'Target page', [line({ type: 'text', text: 'x' })]);
+  // A word no other page holds keeps the search to this one page. The exact name keeps
+  // the click off "Link to a new page: …", which is offered until the search answers.
+  const title = unique('Tooltarget');
+  const target = await publishedPage(page, space.id, title, 'x');
+  await publishDocument(page, target, title, [line({ type: 'text', text: 'x' })]);
   await page.keyboard.press(' ');
   await page.keyboard.press('Control+k');
   const dialog = page.getByRole('dialog', { name: 'Link' });
-  await dialog.getByLabel('Find a page').fill('Target page');
-  await dialog.getByRole('button', { name: 'Target page' }).click();
+  await dialog.getByLabel('Find a page').fill(title);
+  await dialog.getByRole('button', { name: title, exact: true }).click();
   await dialog.getByRole('button', { name: 'Save' }).click();
-  const link = body(page).getByRole('link', { name: 'Target page' });
+  const link = body(page).getByRole('link', { name: title });
   await link.click();
   await expect(page.getByRole('button', { name: 'Open link' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Copy link' })).toBeVisible();
   await page.getByLabel('Show as').selectOption('Tag');
-  await expect(body(page).locator('.page-tag')).toHaveText('Target page');
+  await expect(body(page).locator('.page-tag')).toHaveText(title);
 
   await body(page).locator('.page-tag').click();
   await page.getByRole('button', { name: 'Remove link' }).click();
   await expect(body(page).locator('.page-tag')).toHaveCount(0);
-  await expect(body(page)).toContainText('Target page');
+  await expect(body(page)).toContainText(title);
 });
 
 test('a new table asks for its size, and Enter takes three by three', async ({ page }) => {

@@ -1272,6 +1272,17 @@ test.describe('the look of every kind of screen', () => {
       },
     });
     expect(rights.status(), await rights.text()).toBe(200);
+    // The proposal reaches the bell on its own time: wait for it, so every picture here
+    // shows the same number.
+    await expect
+      .poll(
+        async () => {
+          const res = await setup.request.get('/api/v1/me/notifications/count');
+          return ((await res.json()) as { unread: number }).unread;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(1);
     await setup.context().close();
 
     const page = await newReaderPage(browser, 'light');
@@ -1287,6 +1298,9 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/templates/${badge}/settings?section=versions`);
     await expect(page.getByRole('group', { name: 'Decision on version 1' })).toBeVisible();
     await expect(page.getByRole('region', { name: /What version 1/ })).toBeVisible();
+    // The date and time of the proposal are the clock of this run: masked alone, their
+    // width still moved the columns beside them.
+    await fixText(page.locator('main time'), 'just now');
     await picture(page, 'template-decision', [page.locator('time')]);
     await checkAccessibility(page);
     await page.getByRole('button', { name: 'Send back' }).click();
