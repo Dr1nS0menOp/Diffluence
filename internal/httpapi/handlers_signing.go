@@ -161,8 +161,8 @@ func (s *Server) handleSigningAtProvider(w http.ResponseWriter, r *http.Request)
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: 600})
 	// The address is the provider's own login page from its discovery document; the token of
 	// the request is kept in the stored flow and never becomes part of it, as at login.
-	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
-	http.Redirect(w, r, to, http.StatusFound)
+	// codeql[go/unvalidated-url-redirection]
+	http.Redirect(w, r, to, http.StatusFound) // nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 }
 
 // finishProviderSigning sends the browser back to the page of the signing step, which says
