@@ -142,7 +142,7 @@ Every wave follows these rules:
 
 Needs DC1 (built) and DC2 (the workflow editor form, to set the mark on a state). PUB-731 needs DC4 and is built when DC4 lands, in whichever wave comes second.
 
-**Built** on 2026-11-14, except PUB-731 (waits for DC4); decisions D39 to D51, report `docs/reports/2026-11-14-wave-pb3.md`.
+**Built** on 2026-11-14, except PUB-731 (waits for DC4; its band came with DC4 on 2026-11-15, its export block comes with PB4, DC4-21 of spec 064); decisions D39 to D51, report `docs/reports/2026-11-14-wave-pb3.md`.
 
 **Scope:**
 - PUB-700 to PUB-703;

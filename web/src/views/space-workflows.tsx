@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   api,
+  type SignatureMeaning,
   type Space,
   type Workflow,
   type WorkflowChange,
@@ -16,7 +17,8 @@ import {
 } from '../api';
 import { useCapabilities } from '../capabilities';
 import { TableBox } from '../components/table-box';
-import { Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
+import { meaningName } from '../components/signing-dialog';
+import { Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
 import { WorkflowEditor, type WorkflowDraft } from '../components/workflow-editor';
 
 const BLANK: WorkflowDraft = { name: '', description: '', definition: { states: [], transitions: [] } };
@@ -66,6 +68,10 @@ export function WorkflowsSection({ space }: { space: Space }) {
     queryKey: key,
     queryFn: () => api.get<{ workflows: Workflow[] }>(`/spaces/${space.id}/workflows`),
   });
+  const meanings = useQuery({
+    queryKey: ['signature-meanings', space.id],
+    queryFn: () => api.get<{ meanings: SignatureMeaning[] }>(`/spaces/${space.id}/signature-meanings`),
+  });
   const done = async () => {
     await client.invalidateQueries({ queryKey: key });
     setEditing(null);
@@ -112,6 +118,7 @@ export function WorkflowsSection({ space }: { space: Space }) {
           existing={editing.kind === 'edit' ? editing.workflow.definition : undefined}
           names={editing.kind === 'edit' ? editing.workflow.names : undefined}
           releases={releases}
+          meanings={meanings.data?.meanings}
           busy={save.isPending}
           error={save.error}
           onSave={(draft) => save.mutate(draft)}
@@ -138,6 +145,7 @@ export function WorkflowsSection({ space }: { space: Space }) {
       ) : (
         <WorkflowTable list={list} onEdit={(workflow) => setEditing({ kind: 'edit', workflow })} />
       )}
+      <MeaningsPart spaceId={space.id} meanings={meanings.data?.meanings ?? []} />
       {choosing && (
         <StartDialog
           busy={copy.isPending}
@@ -303,5 +311,52 @@ function TemplateDialog({ workflow, onClose }: { workflow: Workflow; onClose: ()
         </>
       )}
     </Dialog>
+  );
+}
+
+/** The meanings of signatures a space can name in its workflows; it may add its own (DOC-721). */
+function MeaningsPart({ spaceId, meanings }: { spaceId: string; meanings: SignatureMeaning[] }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
+  const add = useMutation({
+    mutationFn: () => api.post(`/spaces/${spaceId}/signature-meanings`, { name, description }),
+    onSuccess: async () => {
+      setName('');
+      setDescription('');
+      await client.invalidateQueries({ queryKey: ['signature-meanings', spaceId] });
+    },
+  });
+  return (
+    <>
+      <h3>{t('signing.meaningsTitle')}</h3>
+      <p className="muted">{t('signing.meaningsIntro')}</p>
+      <ul className="plain-list">
+        {meanings.map((m) => (
+          <li key={m.key}>
+            <strong>{meaningName(t, m)}</strong>{' '}
+            <span className="muted">{m.built_in ? t(`signing.meaningHelp_${m.key}`) : m.description}</span>
+          </li>
+        ))}
+      </ul>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          add.mutate();
+        }}
+      >
+        <Field label={t('signing.meaningName')}>
+          <input value={name} onChange={(e) => setName(e.target.value)} maxLength={60} />
+        </Field>
+        <Field label={t('signing.meaningDescription')}>
+          <input value={description} onChange={(e) => setDescription(e.target.value)} maxLength={300} />
+        </Field>
+        <ErrorNote error={add.error} />
+        <button type="submit" disabled={add.isPending || name.trim() === '' || description.trim() === ''}>
+          {t('signing.meaningAdd')}
+        </button>
+      </form>
+    </>
   );
 }

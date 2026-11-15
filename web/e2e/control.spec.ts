@@ -5,6 +5,7 @@ import {
   ADMIN,
   checkAccessibility,
   createUser,
+  EDITOR,
   expect,
   grant,
   login,
@@ -12,7 +13,10 @@ import {
   paragraph,
   PASSWORD,
   publishedPage,
+  SIGNED_FLOW,
+  signer,
   test,
+  totpCode,
   unique,
   VIEWER,
 } from './helpers';
@@ -299,4 +303,51 @@ test('a reader keeps the approved version and asks for every approval', async ({
     .poll(async () => (await (await page.request.get(`/api/v1/templates/${templateId}`)).json()).workflow_id)
     .toBe(workflow);
   await checkAccessibility(page);
+});
+
+// Wave DC4: the signing dialog names the meaning in its heading and its button, asks for the
+// password and a code in the same dialog, and says the result in a live region (DOC-720,
+// DOC-923). The signature then shows on the band with its mark (DOC-740).
+test('an author signs an approval in the signing dialog', async ({ page, browser }) => {
+  const space = await newSpace(page, 'Signed');
+  const who = await signer(browser, `${unique('signer')}@example.com`, 'Mara Quist');
+  await grant(page, space.id, { type: 'user', id: who.id }, EDITOR);
+  const id = await publishedPage(
+    page,
+    space.id,
+    'Cleaning procedure B',
+    'Clean with water',
+    space.home_page_id,
+  );
+  const made = await page.request.post(`/api/v1/spaces/${space.id}/workflows`, {
+    data: { name: 'Signed review', definition: SIGNED_FLOW },
+  });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const set = await page.request.put(`/api/v1/pages/${id}/workflow`, {
+    data: { workflow_id: (await made.json()).id },
+  });
+  expect(set.ok(), await set.text()).toBeTruthy();
+
+  const author = who.page;
+  await author.goto(`/pages/${id}`);
+  await author.getByRole('button', { name: 'Send for review' }).click();
+  await author.getByRole('dialog').getByRole('button', { name: 'Send for review' }).click();
+  await author.getByRole('button', { name: 'Approve' }).click();
+  await author.getByRole('dialog').getByRole('button', { name: 'Continue to sign' }).click();
+  const dialog = author.getByRole('dialog', {
+    name: /^Sign as approved: version \d+ of “Cleaning procedure B”$/,
+  });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Sign as approved' })).toBeDisabled();
+  await expect(dialog.getByRole('link', { name: 'Read the exact text of this version' })).toBeVisible();
+  await checkAccessibility(author);
+  await dialog.getByLabel('Your password').fill(PASSWORD);
+  // The code of the next step of 30 seconds: the one of now was used to set the app up.
+  await dialog.getByLabel('Code from your authenticator app').fill(totpCode(who.secret, Date.now() + 30_000));
+  await dialog.getByRole('button', { name: 'Sign as approved' }).click();
+  await expect(author.getByText('Version 1 is approved.')).toBeVisible();
+  const signatures = author.getByRole('list', { name: 'Signatures of this version' });
+  await expect(signatures.getByText('Signed as approved by Mara Quist')).toBeVisible();
+  await expect(signatures.getByText('Signature valid')).toBeVisible();
+  await who.close();
 });

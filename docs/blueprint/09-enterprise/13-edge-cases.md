@@ -26,7 +26,7 @@ Document control is only as strong as its weakest path. Each line here is a situ
 - **DOC-1222** · built · A **role** removed from the space leaves running rounds as they are; new rounds resolve the role to nobody and are refused (DOC-200). *Proof:* a test.
 - **DOC-1223** · new · A **page owner** who leaves makes the space owners the target of review reminders (DOC-805). *Proof:* a test.
 - **DOC-1224** · built · A **guest** can never be a reviewer or signer (decided, DOC-1422), because guests are outside the organisation whose procedure it is. *Proof:* a test that a guest cannot be added and cannot answer.
-- **DOC-1225** · new · A person renamed after signing keeps the printed name of the moment in the signature record (DOC-710); the page shows that name. *Proof:* a test.
+- **DOC-1225** · built · A person renamed after signing keeps the printed name of the moment in the signature record (DOC-710); the page shows that name. *Proof:* a test.
 
 ## 13.4 Several nodes and concurrency
 

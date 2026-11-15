@@ -24,7 +24,7 @@ A page is never alone: it has comments, files, a search index, exports, sometime
 ## 6.4 Export
 
 - **DOC-530** · built · Every export (PDF, Word, ODT, HTML, Markdown, bundle) of a controlled page or space contains the version the person may see. *Proof:* tests per format as reader and as author.
-- **DOC-531** · partly · PDF and Word exports of a controlled page print a **control block**: the state, the version, the approval date, and every signature of that version with the printed name, the date and time, and the meaning. *Why:* Part 11 §11.50(b): the signature's name, date and time, and meaning shall be included in any human-readable form of the record. *Edge cases:* an export of the working version by an author prints "not approved" in the block, on every page of the PDF. *Proof:* tests that read the generated PDF text and Word XML for the block.
+- **DOC-531** · built · PDF and Word exports of a controlled page print a **control block**: the state, the version, the approval date, and every signature of that version with the printed name, the date and time, and the meaning. *Why:* Part 11 §11.50(b): the signature's name, date and time, and meaning shall be included in any human-readable form of the record. *Edge cases:* an export of the working version by an author prints "not approved" in the block, on every page of the PDF. *Proof:* tests that read the generated PDF text and Word XML for the block.
 - **DOC-532** · partly · A **bundle** export carries the workflow, the rounds, the answers and the signatures, so that an import elsewhere keeps the record (09.13). *Proof:* a round-trip test.
 
 ## 6.5 Public sites
@@ -34,7 +34,7 @@ A page is never alone: it has comments, files, a search index, exports, sometime
 ## 6.6 The API and webhooks
 
 - **DOC-550** · built · Reading a controlled page through the API returns the version the caller may see, with the state, the version numbers of the approved and working versions (the latter only to those who may see it), and the signatures. *Proof:* API tests per kind of caller.
-- **DOC-551** · partly · The API can start a round, answer it, take transitions and read the record, with the same checks as the screens. It can **not sign** (decided, DOC-1413). *Why:* a signature needs a person present and a fresh second component (09.8); a token is not a person. *Proof:* a test that a signing transition through a token is refused.
+- **DOC-551** · built · The API can start a round, answer it, take transitions and read the record, with the same checks as the screens. It can **not sign** (decided, DOC-1413). *Why:* a signature needs a person present and a fresh second component (09.8); a token is not a person. *Proof:* a test that a signing transition through a token is refused.
 - **DOC-552** · built · Webhook events for controlled pages say "a new version was approved" to subscribers who may only see approved content, and "a working version changed" only to subscriptions of owners with `page.edit`. *Why:* webhooks are a distribution channel too. *Proof:* tests per subscription.
 
 ## 6.7 Templates

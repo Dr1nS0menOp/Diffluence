@@ -296,6 +296,8 @@ type TransitionInput struct {
 	// about a text that has been replaced (DOC-330).
 	Version int
 	Comment string
+	// Signature carries the confirmation of a step that requires a signature (DOC-700).
+	Signature SignatureInput
 }
 
 // Transition takes a step of the workflow of a page (DOC-104). Its authors take the steps;
@@ -348,6 +350,15 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 		if !ok {
 			return apperr.Invalid("This workflow has no such state.")
 		}
+		var signature *uuid.UUID
+		if tr.SignatureMeaning != "" {
+			signed, err := s.sign(ctx, tx, c, in.Signature, signTarget{page: p, ctl: ctl, transition: tr,
+				purpose: transitionPurpose(id, ctl.headVersion, tr.ID)})
+			if err != nil {
+				return err
+			}
+			signature = &signed
+		}
 		round, err := openRound(ctx, tx, id, ctl)
 		if err != nil {
 			return err
@@ -361,6 +372,9 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 			return err
 		}
 		details := map[string]any{"transition": tr.ID, "from": ctl.stateID, "to": to.ID, "version": ctl.headVersion}
+		if signature != nil {
+			details["signature"] = *signature
+		}
 		switch to.Kind {
 		case workflow.KindApproved:
 			if err := endRound(ctx, tx, id, roundStatusApproved, ""); err != nil {
@@ -453,6 +467,11 @@ type ControlInfo struct {
 	Reviewing bool `json:"reviewing"`
 	// InReview says the page waits for the answers of reviewers.
 	InReview bool `json:"in_review"`
+	// Signatures are those of the version on display, with their marks (DOC-740).
+	Signatures []SignatureView `json:"signatures"`
+	// signed holds the signatures of the head and of the version readers see, until the
+	// band knows which of the two it shows.
+	signed []SignatureView
 }
 
 // fillControl adds the band of a controlled page to its detail. Its authors and reviewers
@@ -469,12 +488,14 @@ func (s *Service) fillControl(ctx context.Context, userID uuid.UUID, d *Detail) 
 	author := d.Can[permissions.PageEdit]
 	if !author && !ci.Reviewing {
 		ci.HeadVersion = d.CurrentVersion
+		ci.keepSignaturesOf(d.CurrentVersion)
 		d.Control = ci
 		return nil
 	}
 	if ci.HeadVersion != d.CurrentVersion {
 		d.Title, d.CurrentVersion, ci.ShowsWorking = headTitle, ci.HeadVersion, true
 	}
+	ci.keepSignaturesOf(d.CurrentVersion)
 	if author {
 		for _, tr := range def.From(ci.StateID) {
 			if tr.Outcome == "" {
@@ -493,7 +514,7 @@ func (s *Service) fillControl(ctx context.Context, userID uuid.UUID, d *Detail) 
 // person reviews it now, in one query (DOC-1300).
 func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*ControlInfo, workflow.Definition, string, error) {
 	var ci ControlInfo
-	var raw []byte
+	var raw, signed []byte
 	var def workflow.Definition
 	var headTitle string
 	err := q.QueryRow(ctx, `SELECT w.id, w.name, pc.workflow_version, v.definition, pc.state_id, pc.state_kind, pc.approved_version,
@@ -503,7 +524,13 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 			EXISTS (SELECT 1 FROM workflow_reviewers wr
 				JOIN workflow_rounds r ON r.id = wr.round_id AND r.status = 'open' AND r.review_stage = wr.stage
 				JOIN users ru ON ru.id = wr.user_id AND ru.type = 'member'
-				WHERE r.page_id = pc.page_id AND wr.user_id = $3 AND wr.state_id = pc.state_id AND wr.removed_at IS NULL)
+				WHERE r.page_id = pc.page_id AND wr.user_id = $3 AND wr.state_id = pc.state_id AND wr.removed_at IS NULL),
+			COALESCE((SELECT json_agg(json_build_object('id', s.id, 'version', s.version_number, 'signer_name', s.printed_name,
+					'meaning', s.meaning, 'meaning_name', s.meaning_name, 'signed_at', s.signed_at, 'method', s.method,
+					'matches', s.content_hash IS NOT DISTINCT FROM sv.content_hash AND s.content_form IS NOT DISTINCT FROM sv.content_form)
+					ORDER BY s.signed_at, s.id)
+				FROM signatures s LEFT JOIN version_hashes sv ON sv.page_id = s.page_id AND sv.number = s.version_number
+				WHERE s.page_id = pc.page_id AND s.version_number IN (pc.head_version, $4)), '[]')
 		FROM page_control pc
 		JOIN workflows w ON w.id = pc.workflow_id
 		JOIN workflow_versions v ON v.workflow_id = pc.workflow_id AND v.version = pc.workflow_version
@@ -512,10 +539,10 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 		LEFT JOIN page_workflows pw ON pw.page_id = pc.governed_from
 		LEFT JOIN space_workflows sw ON sw.space_id = $2 AND pc.governed_by = 'space'
 		LEFT JOIN users us ON us.id = COALESCE(pw.set_by, sw.set_by)
-		WHERE pc.page_id = $1`, p.ID, p.SpaceID, userID).
+		WHERE pc.page_id = $1`, p.ID, p.SpaceID, userID, p.CurrentVersion).
 		Scan(&ci.WorkflowID, &ci.WorkflowName, &ci.WorkflowVersion, &raw, &ci.StateID, &ci.StateKind, &ci.ApprovedVersion,
 			&ci.ApprovedAt, &ci.ApprovedBy, &ci.HeadVersion, &ci.GovernedBy, &ci.GovernedFrom, &ci.GovernedFromTitle, &ci.SetBy, &headTitle,
-			&ci.Reviewing)
+			&ci.Reviewing, &signed)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, def, "", nil
 	}
@@ -524,6 +551,9 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 	}
 	if err := json.Unmarshal(raw, &def); err != nil {
 		return nil, def, "", fmt.Errorf("pages: read workflow of page %s: %v", p.ID, err)
+	}
+	if ci.signed, err = readSignatureViews(signed); err != nil {
+		return nil, def, "", err
 	}
 	if st, ok := def.State(ci.StateID); ok {
 		ci.StateName = st.Name

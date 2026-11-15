@@ -292,6 +292,7 @@ var exportRoutes = []string{
 	"GET /api/v1/pages/{id}/export.md",
 	"GET /api/v1/pages/{id}/export.zip",
 	"GET /api/v1/spaces/{id}/export.zip",
+	"GET /api/v1/spaces/{id}/auditor-export",
 	"GET /api/v1/spaces/{id}/releases/export",
 	"GET /api/v1/templates/{id}/export",
 	"POST /api/v1/exports",

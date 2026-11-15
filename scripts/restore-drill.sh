@@ -277,6 +277,8 @@ fi
 safety=$(restores safety_name)
 [ -d "backups/$safety" ] || { echo "the safety backup $safety is missing"; exit 1; }
 docker compose exec -T diffluence diffluence audit verify >/dev/null
+# Signatures verify after the restore, as they did before it (spec 064, DOC-772).
+docker compose exec -T diffluence diffluence signatures verify >/dev/null
 
 echo "7. a restore that stops halfway keeps every node waiting, and the way back"
 # Checksums that match a file cut short: the check passes, the restore stops in the files.

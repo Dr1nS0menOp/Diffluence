@@ -129,9 +129,27 @@ func textDocument(text string) document.Node {
 const notApproved = "Not approved"
 
 // controlLine is the control block of a controlled page (spec 064, DOC-531): its state, the
-// version in the file, and when and by whom it was approved. A working version says that it
-// is not approved. Signatures join it with wave DC4.
+// version in the file, and when and by whom it was approved, with the signatures of that
+// version: name, meaning, date and time (Part 11 §11.50(b)). A working version says that it
+// is not approved.
 func controlLine(c *pages.ExportControl) string {
+	return controlState(c) + signatureLines(c.Signatures)
+}
+
+// signatureLines names each signature of the version in a file, with its mark.
+func signatureLines(list []pages.SignatureView) string {
+	out := ""
+	for _, s := range list {
+		mark := ""
+		if s.Mark != pages.MarkValid {
+			mark = " (does not match its record)"
+		}
+		out += fmt.Sprintf(" Signed as %s by %s on %s UTC%s.", s.MeaningName, s.SignerName, s.SignedAt.UTC().Format("2006-01-02 15:04"), mark)
+	}
+	return out
+}
+
+func controlState(c *pages.ExportControl) string {
 	if c.Working {
 		line := fmt.Sprintf("%s. State: %s. Working version %d.", notApproved, c.StateName, c.Version)
 		if c.ApprovedVersion == nil {

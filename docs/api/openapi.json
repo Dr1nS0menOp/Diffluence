@@ -2743,6 +2743,83 @@
         "x-access": "sensitive permission:administrator"
       }
     },
+    "/api/v1/admin/users/{id}/signing": {
+      "delete": {
+        "operationId": "delete /api/v1/admin/users/{id}/signing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "get": {
+        "operationId": "get /api/v1/admin/users/{id}/signing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/users/{id}/signing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "sensitive permission:administrator"
+      }
+    },
     "/api/v1/admin/users/{id}/type-impact": {
       "get": {
         "operationId": "get /api/v1/admin/users/{id}/type-impact",
@@ -3671,6 +3748,24 @@
           "auth"
         ],
         "x-access": "public"
+      }
+    },
+    "/api/v1/auth/oidc/sign": {
+      "get": {
+        "operationId": "get /api/v1/auth/oidc/sign",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "auth"
+        ],
+        "x-access": "session-only authenticated"
       }
     },
     "/api/v1/auth/oidc/start": {
@@ -6010,6 +6105,33 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/control-history": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/control-history",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/pages/{id}/copy": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/copy",
@@ -7528,6 +7650,33 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/signing": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/signing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
     "/api/v1/pages/{id}/sort-children": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/sort-children",
@@ -7918,6 +8067,41 @@
           "pages"
         ],
         "x-access": "object:page.edit"
+      }
+    },
+    "/api/v1/pages/{id}/versions/{number}/signatures": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/versions/{number}/signatures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
       }
     },
     "/api/v1/pages/{id}/views": {
@@ -8719,6 +8903,42 @@
         "x-access": "public"
       }
     },
+    "/api/v1/signing/confirm": {
+      "post": {
+        "operationId": "post /api/v1/signing/confirm",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "signing"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
+    "/api/v1/signing/passkey": {
+      "post": {
+        "operationId": "post /api/v1/signing/passkey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "signing"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
     "/api/v1/sites/{id}": {
       "delete": {
         "operationId": "delete /api/v1/sites/{id}",
@@ -9440,6 +9660,33 @@
     "/api/v1/spaces/{id}/audit": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/audit",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.audit"
+      }
+    },
+    "/api/v1/spaces/{id}/auditor-export": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/auditor-export",
         "parameters": [
           {
             "in": "path",
@@ -11291,6 +11538,58 @@
           "spaces"
         ],
         "x-access": "object:space.look"
+      }
+    },
+    "/api/v1/spaces/{id}/signature-meanings": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/signature-meanings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.view"
+      },
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/signature-meanings",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
       }
     },
     "/api/v1/spaces/{id}/sites": {

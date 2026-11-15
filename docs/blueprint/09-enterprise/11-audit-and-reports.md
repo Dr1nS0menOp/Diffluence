@@ -12,12 +12,12 @@ When an auditor visits, they ask for the history of a document: every version, w
 
 ## 11.2 On the page
 
-- **DOC-1010** · new · The page's history gains, for those with `space.audit`, a **control history** view: versions, rounds, answers, signatures and transitions in one time line, with the audit entry of each and its verification mark. *Proof:* an e2e picture.
+- **DOC-1010** · built · The page's history gains, for those with `space.audit`, a **control history** view: versions, rounds, answers, signatures and transitions in one time line, with the audit entry of each and its verification mark. *Proof:* an e2e picture.
 
 ## 11.3 The auditor's export
 
-- **DOC-1020** · new · An **auditor's export** of one page, a branch or a whole space, for a chosen period, gives: every version with its content hash; the approved and obsolete versions with their dates; every round with reviewers, rule, answers, comments and times; every signature with its record and verification; every transition; the workflow versions that applied; read-and-understood records; and the audit entries of all of these with their chain positions. It comes as a **PDF report** for people and a **machine-readable file** (JSON Lines) for tools. *Why:* Part 11 §11.10(b): accurate and complete copies in human-readable and electronic form. *Edge cases:* a space of thousands of pages runs the export as background work and mails a link when ready; the link needs `space.audit` and expires. *Proof:* a test that the export of a seeded space contains every expected item; a test that the JSON Lines file verifies with the documented procedure (DOC-742).
-- **DOC-1021** · new · The export needs `space.audit`, and making one is itself audited, with the scope and the period. *Proof:* a test.
+- **DOC-1020** · partly · An **auditor's export** of one page, a branch or a whole space, for a chosen period, gives: every version with its content hash; the approved and obsolete versions with their dates; every round with reviewers, rule, answers, comments and times; every signature with its record and verification; every transition; the workflow versions that applied; read-and-understood records; and the audit entries of all of these with their chain positions. It comes as a **PDF report** for people and a **machine-readable file** (JSON Lines) for tools. *Why:* Part 11 §11.10(b): accurate and complete copies in human-readable and electronic form. *Edge cases:* a space of thousands of pages runs the export as background work and mails a link when ready; the link needs `space.audit` and expires. *Proof:* a test that the export of a seeded space contains every expected item; a test that the JSON Lines file verifies with the documented procedure (DOC-742).
+- **DOC-1021** · built · The export needs `space.audit`, and making one is itself audited, with the scope and the period. *Proof:* a test.
 
 ## 11.4 Reports
 

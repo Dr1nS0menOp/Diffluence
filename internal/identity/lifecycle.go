@@ -778,7 +778,7 @@ func (s *Service) Anonymise(ctx context.Context, c Caller, id uuid.UUID, reason 
 var personalTables = []string{"sessions", "api_tokens", "local_credentials", "totp_credentials", "recovery_codes",
 	"webauthn_credentials", "user_identities", "login_history", "known_devices", "user_preferences", "group_owners",
 	"group_members", "follows", "watches", "comment_seen", "notifications", "mail_queue", "favourites", "recent_pages",
-	"space_favourites", "drafts"}
+	"space_favourites", "drafts", "signing_rights", "signing_confirmations"}
 
 // forgetLinksOf removes where others point at this person, without taking from others
 // more than that link.

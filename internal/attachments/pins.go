@@ -188,6 +188,9 @@ func errPinned() error {
 // requireNotPinned refuses a removal of a file, or of one of its versions, that the version
 // readers see holds (DOC-510). number 0 means the whole file.
 func requireNotPinned(ctx context.Context, q db.Querier, a Attachment, number int) error {
+	if err := requireNotSigned(ctx, q, a, number); err != nil {
+		return err
+	}
 	p, err := readerPins(ctx, q, a.PageID)
 	if err != nil || p == nil {
 		return err
@@ -196,4 +199,45 @@ func requireNotPinned(ctx context.Context, q db.Querier, a Attachment, number in
 		return errPinned()
 	}
 	return nil
+}
+
+// requireNotSigned refuses a removal of a file, or of one of its versions, that a signed
+// version of its page shows: it stays as long as the signature (DOC-770). number 0 means the
+// whole file. The pages module owns signatures and answers through signed_file_versions.
+func requireNotSigned(ctx context.Context, q db.Querier, a Attachment, number int) error {
+	var signed bool
+	if err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM signed_file_versions($1) f WHERE f.attachment_id = $2 AND ($3 = 0 OR f.version = $3))`,
+		a.PageID, a.ID, number).Scan(&signed); err != nil {
+		return err
+	}
+	if signed {
+		return apperr.Conflict("file_signed", "A signed version of the page shows this file. It is kept for the retention of signed records.")
+	}
+	return nil
+}
+
+// PinnedFile is one file a version of a page pins, with the SHA-256 of its pinned bytes.
+type PinnedFile struct {
+	ID       uuid.UUID
+	Version  int
+	Filename string
+	SHA256   string
+}
+
+// PinnedFiles lists the files a version of a page pins, at their pinned version and name, with
+// the hash of that version's bytes, for the content a signature covers (spec 064, DOC-711).
+func PinnedFiles(ctx context.Context, q db.Querier, pageID uuid.UUID, version int) ([]PinnedFile, error) {
+	rows, err := q.Query(ctx, `SELECT f.attachment_id, f.version, f.filename, COALESCE(encode(av.sha256, 'hex'), '')
+		FROM attachment_pins pin
+		CROSS JOIN LATERAL unnest(pin.attachment_ids, pin.versions, pin.filenames) AS f (attachment_id, version, filename)
+		LEFT JOIN attachment_versions av ON av.attachment_id = f.attachment_id AND av.number = f.version
+		WHERE pin.page_id = $1 AND pin.page_version = $2`, pageID, version)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (PinnedFile, error) {
+		var f PinnedFile
+		err := r.Scan(&f.ID, &f.Version, &f.Filename, &f.SHA256)
+		return f, err
+	})
 }

@@ -2,7 +2,16 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, type DiffBlock, type Me, type PageDetail, type Version } from '../api';
+import {
+  api,
+  ApiError,
+  type DiffBlock,
+  type Me,
+  type PageDetail,
+  type SignatureView,
+  type Version,
+} from '../api';
+import { Signatures } from '../components/signatures';
 import { Link, navigate, useLocation } from '../router';
 import { DiffDocument } from '../components/editor/diff-view';
 import { DocumentView } from '../components/editor/editor';
@@ -142,6 +151,86 @@ function FileHistory({ pageId }: { pageId: string }) {
   );
 }
 
+/** The signatures of a version, and their full verification on demand (DOC-740, DOC-741). */
+function VersionSignatures({ pageId, version }: { pageId: string; version: Version }) {
+  const { t } = useTranslation();
+  const check = useMutation({
+    mutationFn: () =>
+      api.get<{ signatures: SignatureView[] }>(`/pages/${pageId}/versions/${version.number}/signatures`),
+  });
+  return (
+    <>
+      <Signatures list={check.data?.signatures ?? version.signatures ?? []} />
+      <button type="button" className="ghost" disabled={check.isPending} onClick={() => check.mutate()}>
+        {t('signing.verify')}
+      </button>
+      {check.data && (
+        <p role="status" className="muted">
+          {check.data.signatures.every((s) => s.mark === 'valid')
+            ? t('signing.verifiedAll')
+            : t('signing.verifiedNot')}
+        </p>
+      )}
+      <ErrorNote error={check.error} />
+    </>
+  );
+}
+
+interface ControlHistoryItem {
+  at: string;
+  action: string;
+  actor_name: string;
+  system: boolean;
+  details: Record<string, unknown>;
+  seq: number;
+  linked: boolean;
+  signature?: SignatureView;
+}
+
+/**
+ * The control history, for whoever reads the audit of the space (DOC-1010): every entry of
+ * the audit log about the page, in time order, with its place in the chain and its mark.
+ */
+function ControlHistory({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const q = useQuery({
+    queryKey: ['control-history', pageId],
+    queryFn: () =>
+      api.get<{ items: ControlHistoryItem[]; truncated: boolean }>(`/pages/${pageId}/control-history`),
+    retry: false,
+  });
+  // Without the audit of the space the history is not there, and neither is its part.
+  if (!q.data) return null;
+  return (
+    <section>
+      <h2>{t('signing.controlHistory')}</h2>
+      {q.data.truncated && <p className="muted">{t('signing.controlTruncated')}</p>}
+      {q.data.items.length === 0 ? (
+        <p className="muted">{t('signing.controlEmpty')}</p>
+      ) : (
+        <ol className="plain-list">
+          {q.data.items.map((it, i) => (
+            <li key={`${it.seq}-${i}`}>
+              <span className="muted">{dates.moment(it.at)}</span> <code>{it.action}</code>{' '}
+              {it.system ? t('signing.bySystem') : it.actor_name}{' '}
+              {typeof it.details.version === 'number' && t('history.version', { number: it.details.version })}{' '}
+              <span className={it.linked ? 'muted' : 'lozenge'}>
+                {it.seq === 0
+                  ? t('signing.entryWaiting')
+                  : it.linked
+                    ? t('signing.entryLinked', { seq: it.seq })
+                    : t('signing.entryBroken', { seq: it.seq })}
+              </span>
+              {it.signature && <Signatures list={[it.signature]} />}
+            </li>
+          ))}
+        </ol>
+      )}
+    </section>
+  );
+}
+
 export function HistoryView({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
   const dates = useDates();
@@ -212,6 +301,9 @@ export function HistoryView({ pageId }: { pageId: string }) {
                   {v.removed && <span className="lozenge">{t('history.removed')}</span>}
                   {v.imported && <span className="muted"> · {t('history.imported')}</span>}
                   {v.summary && <div>{v.summary}</div>}
+                  {v.signatures && v.signatures.length > 0 && (
+                    <VersionSignatures pageId={pageId} version={v} />
+                  )}
                 </td>
                 <td className="row">
                   {!v.removed && (
@@ -247,6 +339,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
         </div>
       )}
       <FileHistory pageId={pageId} />
+      {page.data?.control && <ControlHistory pageId={pageId} />}
       {removing !== null && (
         <RemoveVersionDialog pageId={pageId} number={removing} onClose={() => setRemoving(null)} />
       )}

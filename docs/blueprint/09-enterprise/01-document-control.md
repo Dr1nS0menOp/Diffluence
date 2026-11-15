@@ -46,7 +46,7 @@ What is missing is everything in chapters 02 to 14: own states and transitions, 
 - **DOC-011** · partly · `page.workflow`: set a workflow of the space on a page or branch where the space has none, and a shorter review period on a page. Split off `page.edit`. *Proof:* as above.
 - **DOC-012** · built · `space.audit` ("See the audit") also covers the control history, the auditor's export, the reports and the read-and-understood lists. *Proof:* matrix cases.
 - **DOC-013** · built · Taking a transition needs the right named on it: a reviewer of the round, an author (`page.edit`), the escalation target, or the page owner for periodic review. There is no permission to move any page to any state, not even for administrators (decided, DOC-1424); an administrator who must step in reassigns reviewers, which is audited. *Proof:* a matrix test over all transitions and kinds of person.
-- **DOC-014** · new · Signing is enabled per person (DOC-751) and is never part of a role, so a role change never gives signing rights. *Proof:* a test.
+- **DOC-014** · built · Signing is enabled per person (DOC-751) and is never part of a role, so a role change never gives signing rights. *Proof:* a test.
 - **DOC-015** · built · The permission matrix gains the workflow actions and the visibility of the working version, decided in one place (DOC-300). *Proof:* the matrix test, extended.
 
 ## 1.3 Decided on the product owner's behalf on 2026-11-13

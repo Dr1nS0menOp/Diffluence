@@ -10,6 +10,7 @@ import { api, type PageDetail, type ReviewPanelData, type ReviewerRow } from '..
 import { DiffDocument } from './editor/diff-view';
 import { IconClose } from './icons';
 import { SubjectPicker } from './picker';
+import { SigningDialog } from './signing-dialog';
 import { TableBox } from './table-box';
 import { Dialog, ErrorNote, Field, Loading, RelativeTime } from './ui';
 
@@ -262,6 +263,7 @@ function AnswerDialog({
 }) {
   const { t } = useTranslation();
   const [comment, setComment] = useState('');
+  const [signing, setSigning] = useState(false);
   const field = useRef<HTMLTextAreaElement>(null);
   // The dialog opens as a modal after its children mount and then focuses its first
   // control, so the comment field takes the focus one frame later (DOC-922).
@@ -277,6 +279,23 @@ function AnswerDialog({
   });
   const label = answer === 'approve' ? t('review.approve') : t('review.askChanges');
   const needsComment = answer === 'changes';
+  // An approval that is signed goes through the signing dialog, which sends it (DOC-700).
+  const signs = answer === 'approve' && panel.signature_meaning !== '';
+  const version = panel.head?.version ?? 0;
+  if (signing) {
+    return (
+      <SigningDialog
+        pageId={page.id}
+        step={{ version }}
+        comment={comment}
+        onSign={(confirmation) =>
+          api.post(`/pages/${page.id}/review/answer`, { answer, comment, version, confirmation })
+        }
+        onSigned={() => void done()}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <Dialog title={label} onClose={onClose}>
       <Field label={needsComment ? t('review.answerCommentNeeded') : t('review.answerComment')}>
@@ -291,9 +310,9 @@ function AnswerDialog({
           type="button"
           className="primary"
           disabled={send.isPending || (needsComment && comment.trim() === '')}
-          onClick={() => send.mutate()}
+          onClick={() => (signs ? setSigning(true) : send.mutate())}
         >
-          {label}
+          {signs ? t('signing.continue') : label}
         </button>
       </div>
     </Dialog>

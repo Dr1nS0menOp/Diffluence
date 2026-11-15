@@ -98,6 +98,45 @@ export async function confirmingAdministrator(
   return { api: context.request, codes, close: () => context.close() };
 }
 
+/** The steps of a workflow whose approval its author signs as approved (spec 064, DOC-700). */
+export const SIGNED_FLOW = {
+  states: [
+    { id: 'draft', name: 'Draft', kind: 'draft', start: true },
+    { id: 'review', name: 'In review', kind: 'in_review' },
+    { id: 'approved', name: 'Approved', kind: 'approved' },
+  ],
+  transitions: [
+    { id: 'submit', name: 'Send for review', from: 'draft', to: 'review' },
+    { id: 'approve', name: 'Approve', from: 'review', to: 'approved', signature_meaning: 'approved' },
+  ],
+};
+
+/**
+ * A person who may sign: a member with an authenticator app, whose signing an administrator
+ * enabled after identifying them in person (DOC-751). It answers a logged-in context of theirs
+ * and the secret of their app.
+ */
+export async function signer(
+  browser: Browser,
+  email: string,
+  displayName: string,
+): Promise<{ id: string; page: Page; secret: string; close: () => Promise<void> }> {
+  const id = await createNamedUser(browser, email, displayName);
+  const { api, close } = await adminRequest(browser);
+  const enabled = await api.put(`/api/v1/admin/users/${id}/signing`, {
+    data: { identified_by: 'in_person' },
+  });
+  expect(enabled.status(), await enabled.text()).toBe(204);
+  await close();
+  const context = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:8080' });
+  const page = await context.newPage();
+  await login(page, email, PASSWORD);
+  const setup = await page.request.post('/api/v1/me/totp/begin', { data: { password: PASSWORD } });
+  const { secret } = (await setup.json()) as { secret: string };
+  const confirm = await page.request.post('/api/v1/me/totp/confirm', { data: { code: totpCode(secret) } });
+  expect(confirm.ok(), await confirm.text()).toBeTruthy();
+  return { id, page, secret, close: () => context.close() };
+}
 /** A user with a real name, for screens where the name shows. */
 export async function createNamedUser(browser: Browser, email: string, displayName: string) {
   const { api, close } = await adminRequest(browser);

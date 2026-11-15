@@ -177,6 +177,9 @@ var idColumns = map[string]string{
 	"access_requests.asked_id":        "someone else's request keeps who it went to",
 	"access_requests.answered_by":     "someone else's request keeps who answered",
 	"invitation_requests.decided_by":  "someone else's request keeps who answered",
+	"signatures.signer_id":            "a signature in a controlled space is kept against erasure, with its printed name (DOC-771, DOC-1417)",
+	"signing_rights.enabled_by":       "someone else's right to sign keeps who enabled it",
+	"signature_meanings.created_by":   "authorship resolves to the neutral name",
 }
 
 func uuidColumns(t *testing.T, e *env) []string {

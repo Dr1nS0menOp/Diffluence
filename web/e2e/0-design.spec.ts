@@ -19,7 +19,10 @@ import {
   paragraph,
   PASSWORD,
   publishedPage,
+  SIGNED_FLOW,
+  signer,
   test,
+  totpCode,
 } from './helpers';
 
 const READER = { email: 'anna.visser@example.com', name: 'Anna Visser' };
@@ -1951,6 +1954,79 @@ test.describe('the look of document control', () => {
   });
 });
 
+// Electronic signatures, wave DC4 (spec 064): the signing dialog, which names the meaning
+// before anything else (DOC-720), and the signatures on the band. A space of its own.
+test.describe('the look of signatures', () => {
+  test.describe.configure({ mode: 'serial' });
+  let pageId = '';
+  let who: Awaited<ReturnType<typeof signer>> | null = null;
+
+  test.beforeAll(async ({ browser }) => {
+    who = await signer(browser, 'jonas.berg@example.com', 'Jonas Berg');
+    const { api, close } = await adminRequest(browser);
+    const created = await api.post('/api/v1/spaces', { data: { key: 'SIGNING', name: 'Signed procedures' } });
+    expect(created.status(), await created.text()).toBe(201);
+    const space = (await created.json()) as { id: string; home_page_id: string };
+    const granted = await api.put(`/api/v1/spaces/${space.id}/grants`, {
+      data: { subject: { type: 'user', id: who.id }, permissions: EDITOR },
+    });
+    expect(granted.ok(), await granted.text()).toBeTruthy();
+    const made = await api.post(`/api/v1/spaces/${space.id}/workflows`, {
+      data: { name: 'Signed review', definition: SIGNED_FLOW },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    const page = await api.post('/api/v1/pages', {
+      data: { space_id: space.id, parent_id: space.home_page_id, title: 'Cleaning procedure B' },
+    });
+    pageId = ((await page.json()) as { id: string }).id;
+    const published = await api.post(`/api/v1/pages/${pageId}/publish`, {
+      data: {
+        title: 'Cleaning procedure B',
+        document: paragraph('Clean every surface with water.'),
+        base_version: 0,
+      },
+    });
+    expect(published.ok(), await published.text()).toBeTruthy();
+    const set = await api.put(`/api/v1/pages/${pageId}/workflow`, {
+      data: { workflow_id: (await made.json()).id },
+    });
+    expect(set.ok(), await set.text()).toBeTruthy();
+    const step = await api.post(`/api/v1/pages/${pageId}/transitions`, {
+      data: { transition: 'submit', version: 1 },
+    });
+    expect(step.ok(), await step.text()).toBeTruthy();
+    await close();
+  });
+
+  test.afterAll(async () => {
+    await who?.close();
+  });
+
+  test('the signing dialog names the meaning, the version and its title', async () => {
+    const page = who!.page;
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'Approve' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Continue to sign' }).click();
+    const dialog = page.getByRole('dialog', {
+      name: 'Sign as approved: version 1 of “Cleaning procedure B”',
+    });
+    await expect(dialog.getByLabel('Your password')).toBeVisible();
+    // The byline shows behind the dialog: its time is fixed rather than masked, as a mask
+    // would cover the dialog's heading.
+    await fixText(page.getByTestId('last-updated'), 'now');
+    await picture(page, 'signing-dialog');
+    await checkAccessibility(page);
+    await dialog.getByLabel('Your password').fill(PASSWORD);
+    await dialog
+      .getByLabel('Code from your authenticator app')
+      .fill(totpCode(who!.secret, Date.now() + 30_000));
+    await dialog.getByRole('button', { name: 'Sign as approved' }).click();
+    await expect(page.getByText('Signed as approved by Jonas Berg')).toBeVisible();
+    await fixText(page.locator('time'), 'now');
+    await fixText(page.getByTestId('last-updated'), 'now');
+    await picture(page, 'signed-band');
+  });
+});
 // Draft and published spaces (spec 073): the section of a draft space, the band on a draft page,
 // the line on a released page and the dialog that releases one page.
 test.describe('draft and published spaces', () => {

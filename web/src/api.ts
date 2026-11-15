@@ -347,7 +347,7 @@ export interface ReleaseStatus {
   /** The approval release of the approved version that did not go (PUB-711). */
   approval_release?: { outcome: 'stopped' | 'cancelled' | 'skipped'; reason: string; at: string };
   /** When what a twin shows was approved, and by whom when the pair shows approvers (PUB-730). */
-  approval?: { approved_at: string; version: number; approved_by?: string };
+  approval?: { approved_at: string; version: number; approved_by?: string; signatures?: SignatureView[] };
   can_verify: boolean;
 }
 
@@ -819,6 +819,8 @@ export interface WorkflowTransition {
   to: string;
   requires_comment: boolean;
   outcome?: WorkflowOutcome;
+  /** The meaning of the signature the step requires, when it requires one (DOC-700). */
+  signature_meaning?: string;
 }
 
 /** How many reviewers must approve: all, a number of them, or any one. */
@@ -974,6 +976,8 @@ export interface ReviewPanelData {
   /** The change from the approved version, when the server compares for the panel. */
   changes?: DiffBlock[];
   can: { answer: boolean; add: boolean; remove: boolean; comment: boolean };
+  /** The meaning an approval is signed with, or empty when approvals are not signed. */
+  signature_meaning: string;
 }
 
 /** The workflow of a controlled page, as the band near its title shows it. */
@@ -998,6 +1002,44 @@ export interface ControlInfo {
   reviewing: boolean;
   /** The page waits for the answers of reviewers. */
   in_review: boolean;
+  /** The signatures of the version on display (DOC-740). */
+  signatures: SignatureView[];
+}
+
+/** A signature as a page and its history show it. */
+export interface SignatureView {
+  id: string;
+  version: number;
+  signer_name: string;
+  meaning: string;
+  meaning_name: string;
+  signed_at: string;
+  method: 'password_and_code' | 'passkey' | 'identity_provider';
+  mark: 'valid' | 'does_not_match';
+  reason?: string;
+}
+
+/** What a signature states (DOC-721). */
+export interface SignatureMeaning {
+  key: string;
+  name: string;
+  description: string;
+  built_in: boolean;
+}
+
+/** What the signing dialog shows before anything else, and how to confirm (DOC-720). */
+export interface SignaturePrompt {
+  page_id: string;
+  title: string;
+  version: number;
+  step_name: string;
+  meaning: SignatureMeaning;
+  start: {
+    token: string;
+    methods: ('password_and_code' | 'passkey' | 'identity_provider')[];
+    passkey?: { publicKey: PublicKeyCredentialRequestOptionsJSON };
+    expires_at: string;
+  };
 }
 
 export interface Draft {
@@ -1017,6 +1059,7 @@ export interface Version {
   created_at: string;
   document?: Json;
   removed?: boolean;
+  signatures?: SignatureView[];
 }
 
 export interface WordOp {

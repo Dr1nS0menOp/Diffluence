@@ -431,6 +431,12 @@ func (s *Service) countWrongPassword(ctx context.Context, tx pgx.Tx, f failedLog
 	if f.known && f.reason == "bad_password" {
 		id = f.account.ID
 	}
+	return countGuess(ctx, tx, id)
+}
+
+// countGuess adds one to the run of wrong guesses of an account, a password or a code of a
+// signing confirmation (DOC-732), and reports whether this one stopped password login.
+func countGuess(ctx context.Context, tx pgx.Tx, id uuid.UUID) (bool, error) {
 	var locked bool
 	err := tx.QueryRow(ctx, `UPDATE local_credentials SET failed_logins_in_row = failed_logins_in_row + 1,
 			password_locked_at = CASE WHEN failed_logins_in_row + 1 >= $2 THEN now() END

@@ -155,6 +155,10 @@ type TwinApproval struct {
 	ApprovedAt time.Time `json:"approved_at"`
 	Version    int       `json:"version"`
 	ApprovedBy string    `json:"approved_by,omitempty"`
+	// Signatures are those of the released draft version: the printed name, date and time, and
+	// meaning of each, shown whatever the setting of approvers, since a signature means nothing
+	// without its name (PUB-731, Part 11 §11.50(b)). The records stay in the draft space.
+	Signatures []pages.SignatureView `json:"signatures,omitempty"`
 }
 
 // Exclusion is the mark that leaves a page out: on the page itself, or on a page above it
@@ -365,6 +369,9 @@ func twinApproval(ctx context.Context, q db.Querier, draft uuid.UUID, released, 
 	out := &TwinApproval{ApprovedAt: a.At, Version: twinVersion}
 	if settings.ShowApprovers {
 		out.ApprovedBy = a.ByName
+	}
+	if out.Signatures, err = pages.SignaturesOfVersion(ctx, q, draft, released); err != nil {
+		return nil, err
 	}
 	return out, nil
 }

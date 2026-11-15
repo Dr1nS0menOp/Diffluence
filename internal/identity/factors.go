@@ -369,24 +369,12 @@ func (s *Service) removeTOTP(ctx context.Context, tx pgx.Tx, c Caller, id uuid.U
 func (s *Service) useSecondFactor(ctx context.Context, tx pgx.Tx, userID uuid.UUID, code string) (string, error) {
 	// An account whose second factor is a passkey has no authenticator app; a recovery
 	// code still counts.
-	var step int64
-	secret, err := s.totpSecret(ctx, tx, userID)
-	switch {
-	case errors.Is(err, pgx.ErrNoRows):
-	case err != nil:
+	matched, used, err := s.useTOTP(ctx, tx, userID, code)
+	if err != nil {
 		return "", err
-	default:
-		if step, err = s.matchTOTP(secret, code); err != nil {
-			return "", err
-		}
 	}
-	if step != 0 {
-		// A code works once: the step must be newer than the last one used.
-		tag, err := tx.Exec(ctx, "UPDATE totp_credentials SET last_step = $2 WHERE user_id = $1 AND last_step < $2", userID, step)
-		if err != nil {
-			return "", err
-		}
-		if tag.RowsAffected() == 1 {
+	if matched {
+		if used {
 			return "totp", nil
 		}
 		return "", nil
@@ -400,6 +388,28 @@ func (s *Service) useSecondFactor(ctx context.Context, tx pgx.Tx, userID uuid.UU
 		return "recovery_code", nil
 	}
 	return "", nil
+}
+
+// useTOTP checks a code of the authenticator app inside tx. matched says the code belongs to
+// a time step of the account's app; used says it was taken now, which a code is only once:
+// its step must be newer than the last one used.
+func (s *Service) useTOTP(ctx context.Context, tx pgx.Tx, userID uuid.UUID, code string) (matched, used bool, err error) {
+	secret, err := s.totpSecret(ctx, tx, userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, err
+	}
+	step, err := s.matchTOTP(secret, code)
+	if err != nil || step == 0 {
+		return false, false, err
+	}
+	tag, err := tx.Exec(ctx, "UPDATE totp_credentials SET last_step = $2 WHERE user_id = $1 AND last_step < $2", userID, step)
+	if err != nil {
+		return true, false, err
+	}
+	return true, tag.RowsAffected() == 1, nil
 }
 
 // secondStep is how a login is finished after the password: check says, inside tx, which
@@ -546,6 +556,9 @@ func (s *Service) PurgeExpired(ctx context.Context) error {
 	if _, err := s.pool.Exec(ctx, "DELETE FROM sessions WHERE expires_at < now() OR last_seen_at < now() - make_interval(secs => $1)", s.idle.Seconds()); err != nil {
 		return err
 	}
-	_, err := s.pool.Exec(ctx, "DELETE FROM auth_challenges WHERE expires_at < now()")
+	if _, err := s.pool.Exec(ctx, "DELETE FROM auth_challenges WHERE expires_at < now()"); err != nil {
+		return err
+	}
+	_, err := s.pool.Exec(ctx, "DELETE FROM signing_confirmations WHERE expires_at < now()")
 	return err
 }

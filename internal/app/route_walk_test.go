@@ -63,6 +63,8 @@ var idRoutes = map[string]idRoute{
 	"POST /api/v1/workflows/{id}/take-template":            {owner: "a holder of space.workflows"},
 	"GET /api/v1/pages/{id}/review":                        {owner: "the page's authors and the people its round asked"},
 	"POST /api/v1/pages/{id}/review/answer":                {owner: "a reviewer of the current stage"},
+	"POST /api/v1/pages/{id}/signing":                      {owner: "an author of the step, or a reviewer of the current stage, who may sign"},
+	"GET /api/v1/pages/{id}/control-history":               {owner: "whoever reads the audit of the page's space"},
 	"POST /api/v1/pages/{id}/review/comments":              {owner: "the page's authors and its current reviewers"},
 	"POST /api/v1/pages/{id}/reviewers":                    {owner: "a holder of space.workflows, or an author where the state allows"},
 	"POST /api/v1/pages/{id}/reviewers/{user}/remove":      {owner: "a holder of space.workflows, or the reviewer"},

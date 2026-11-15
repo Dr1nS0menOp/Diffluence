@@ -71,15 +71,17 @@ type ReviewPanel struct {
 	StateID     string     `json:"state_id"`
 	StateName   string     `json:"state_name"`
 	// InReview says the page waits for the answers of this stage now.
-	InReview    bool            `json:"in_review"`
-	Rule        workflow.Rule   `json:"rule"`
-	Needed      int             `json:"needed"`
-	Approved    int             `json:"approved"`
-	Asked       int             `json:"asked"`
-	Independent bool            `json:"independent"`
-	MyAnswer    string          `json:"my_answer"`
-	Reviewers   []ReviewerRow   `json:"reviewers"`
-	Comments    []ReviewComment `json:"comments"`
+	InReview    bool          `json:"in_review"`
+	Rule        workflow.Rule `json:"rule"`
+	Needed      int           `json:"needed"`
+	Approved    int           `json:"approved"`
+	Asked       int           `json:"asked"`
+	Independent bool          `json:"independent"`
+	// SignatureMeaning is the meaning an approval is signed with, when it must be (DOC-700).
+	SignatureMeaning string          `json:"signature_meaning"`
+	MyAnswer         string          `json:"my_answer"`
+	Reviewers        []ReviewerRow   `json:"reviewers"`
+	Comments         []ReviewComment `json:"comments"`
 	// Base is the approved version, which the change is compared with (DOC-250); nil when the
 	// page was never approved. Head is the version under review. Both only reach someone who
 	// may see the working version.
@@ -156,6 +158,9 @@ func (s *Service) Review(ctx context.Context, c identity.Caller, id uuid.UUID) (
 		if state.Review != nil {
 			out.Rule = state.Review.Rule
 			out.Independent = !state.Review.AuthorsMayReview
+			if tr, ok := def.Outcome(state.ID, workflow.OutcomeApproved); ok {
+				out.SignatureMeaning = tr.SignatureMeaning
+			}
 		}
 	}
 	reviewing := false

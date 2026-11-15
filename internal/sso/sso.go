@@ -164,6 +164,9 @@ type flow struct {
 	// FreshAfter is set for a step-up: the provider must say the person logged in after
 	// this moment, in Unix seconds. Zero = an ordinary login.
 	FreshAfter int64 `json:"fresh_after,omitempty"`
+	// Signing is the token of a signing step this login confirms (DOC-731). Such a login
+	// opens no session: it only proves who is at the keyboard now.
+	Signing string `json:"signing,omitempty"`
 }
 
 // Start begins a login. It returns the URL to send the browser to, and a value
@@ -182,14 +185,30 @@ func (p *Provider) StartFresh(ctx context.Context) (redirect, binding string, er
 	return p.start(ctx, true, oauth2.SetAuthURLParam("prompt", "login"), oauth2.SetAuthURLParam("max_age", "0"))
 }
 
+// StartSigning begins a login that confirms a signing step (DOC-731): the provider must ask
+// again, and say it did after the step began.
+func (p *Provider) StartSigning(ctx context.Context, token string, began time.Time) (redirect, binding string, err error) {
+	f := p.newFlow()
+	f.FreshAfter, f.Signing = began.Add(-freshSkew).Unix(), token
+	return p.startFlow(ctx, f, oauth2.SetAuthURLParam("prompt", "login"), oauth2.SetAuthURLParam("max_age", "0"))
+}
+
+func (p *Provider) newFlow() flow {
+	return flow{Nonce: oauth2.GenerateVerifier(), Verifier: oauth2.GenerateVerifier(), Binding: oauth2.GenerateVerifier()}
+}
+
 func (p *Provider) start(ctx context.Context, fresh bool, extra ...oauth2.AuthCodeOption) (redirect, binding string, err error) {
+	f := p.newFlow()
+	if fresh {
+		f.FreshAfter = time.Now().Add(-freshSkew).Unix()
+	}
+	return p.startFlow(ctx, f, extra...)
+}
+
+func (p *Provider) startFlow(ctx context.Context, f flow, extra ...oauth2.AuthCodeOption) (redirect, binding string, err error) {
 	_, config, err := p.discover(ctx)
 	if err != nil {
 		return "", "", err
-	}
-	f := flow{Nonce: oauth2.GenerateVerifier(), Verifier: oauth2.GenerateVerifier(), Binding: oauth2.GenerateVerifier()}
-	if fresh {
-		f.FreshAfter = time.Now().Add(-freshSkew).Unix()
 	}
 	state, err := p.identity.NewChallenge(ctx, p.pool, challengeKind, nil, f, flowTTL)
 	if err != nil {
@@ -226,56 +245,133 @@ func (p *Provider) Refused(ctx context.Context, state, code string, meta identit
 	return p.identity.RecordLoginFailure(ctx, "oidc", "provider_error:"+code, meta)
 }
 
-// Callback finishes a login and opens a session.
-func (p *Provider) Callback(ctx context.Context, state, code, binding string, meta identity.RequestMeta) (string, error) {
+// Result is how a return from the provider ended: a session for a login, or, for a login
+// that confirmed a signing step, where the browser goes back to.
+type Result struct {
+	Session string
+	// Signing says the login was for a signing step; SigningReturn is its page.
+	Signing       bool
+	SigningReturn string
+}
+
+// Complete finishes a return from the provider: a login opens a session, and a login for a
+// signing step confirms that step and opens nothing (DOC-731).
+func (p *Provider) Complete(ctx context.Context, state, code, binding string, meta identity.RequestMeta) (Result, error) {
+	var f flow
+	if _, err := p.identity.TakeChallenge(ctx, p.pool, challengeKind, state, &f); err != nil {
+		if errors.Is(err, identity.ErrInvalidCredentials) {
+			if rerr := p.identity.RecordLoginFailure(ctx, "oidc", "bad_state", meta); rerr != nil {
+				return Result{}, rerr
+			}
+			return Result{}, ErrFailed
+		}
+		return Result{}, err
+	}
+	if f.Signing == "" {
+		session, err := p.login(ctx, f, code, binding, meta)
+		return Result{Session: session}, err
+	}
+	back, err := p.confirmSigning(ctx, f, code, binding, meta)
+	if err != nil {
+		// A refused step still goes back to its page, which says so.
+		var lookup error
+		if back, lookup = p.identity.SigningReturnPath(ctx, f.Signing); lookup != nil {
+			return Result{}, lookup
+		}
+	}
+	return Result{Signing: true, SigningReturn: back}, err
+}
+
+// confirmSigning checks the provider's answer for a signing step: the account it names must
+// be the one that began the step, and its login must be fresh (DOC-731). An account is never
+// made or linked here.
+func (p *Provider) confirmSigning(ctx context.Context, f flow, code, binding string, meta identity.RequestMeta) (string, error) {
+	c, _, reason, err := p.verify(ctx, f, code, binding)
+	if err != nil {
+		return "", err
+	}
+	if reason != "" {
+		return "", p.recordSigningFailure(ctx, reason, meta)
+	}
+	var userID uuid.UUID
+	err = p.pool.QueryRow(ctx, "SELECT user_id FROM user_identities WHERE provider = $1 AND subject = $2", p.cfg.Issuer, c.Subject).Scan(&userID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", p.recordSigningFailure(ctx, "no_account", meta)
+	}
+	if err != nil {
+		return "", err
+	}
+	back, err := p.identity.ConfirmSigningByProvider(ctx, f.Signing, userID, meta)
+	if e, ok := apperr.As(err); ok && e.Kind == apperr.KindForbidden {
+		return "", p.recordSigningFailure(ctx, "other_account", meta)
+	}
+	return back, err
+}
+
+func (p *Provider) recordSigningFailure(ctx context.Context, reason string, meta identity.RequestMeta) error {
+	if err := p.identity.RecordLoginFailure(ctx, "oidc_signing", reason, meta); err != nil {
+		return err
+	}
+	return ErrFailed
+}
+
+// verify checks the provider's answer to a flow. It answers the reason of a refusal, which
+// the caller records, or an error it could not check.
+func (p *Provider) verify(ctx context.Context, f flow, code, binding string) (claims, map[string]any, string, error) {
+	var c claims
+	if binding == "" || binding != f.Binding {
+		return c, nil, "bad_binding", nil
+	}
+	verifier, config, err := p.discover(ctx)
+	if err != nil {
+		return c, nil, "", err
+	}
+	tok, err := config.Exchange(ctx, code, oauth2.VerifierOption(f.Verifier))
+	if err != nil {
+		return c, nil, "exchange_failed", nil
+	}
+	raw, ok := tok.Extra("id_token").(string)
+	if !ok {
+		return c, nil, "no_id_token", nil
+	}
+	idToken, err := verifier.Verify(ctx, raw)
+	if err != nil {
+		return c, nil, "bad_token", nil
+	}
+	if idToken.Nonce != f.Nonce {
+		return c, nil, "bad_nonce", nil
+	}
+	if err := idToken.Claims(&c); err != nil || c.Subject == "" {
+		return c, nil, "bad_claims", nil
+	}
+	if f.FreshAfter != 0 && c.AuthTime < f.FreshAfter {
+		return c, nil, "not_fresh", nil
+	}
+	var all map[string]any
+	if err := idToken.Claims(&all); err != nil {
+		return c, nil, "bad_claims", nil
+	}
+	return c, all, "", nil
+}
+
+// login finishes a login and opens a session.
+func (p *Provider) login(ctx context.Context, f flow, code, binding string, meta identity.RequestMeta) (string, error) {
 	fail := func(reason string, err error) (string, error) {
 		if rerr := p.identity.RecordLoginFailure(ctx, "oidc", reason, meta); rerr != nil {
 			return "", rerr
 		}
 		return "", err
 	}
-	var f flow
-	if _, err := p.identity.TakeChallenge(ctx, p.pool, challengeKind, state, &f); err != nil {
-		if errors.Is(err, identity.ErrInvalidCredentials) {
-			return fail("bad_state", ErrFailed)
-		}
-		return "", err
-	}
-	if binding == "" || binding != f.Binding {
-		return fail("bad_binding", ErrFailed)
-	}
-	verifier, config, err := p.discover(ctx)
+	c, all, reason, err := p.verify(ctx, f, code, binding)
 	if err != nil {
 		return "", err
 	}
-	tok, err := config.Exchange(ctx, code, oauth2.VerifierOption(f.Verifier))
-	if err != nil {
-		return fail("exchange_failed", ErrFailed)
-	}
-	raw, ok := tok.Extra("id_token").(string)
-	if !ok {
-		return fail("no_id_token", ErrFailed)
-	}
-	idToken, err := verifier.Verify(ctx, raw)
-	if err != nil {
-		return fail("bad_token", ErrFailed)
-	}
-	if idToken.Nonce != f.Nonce {
-		return fail("bad_nonce", ErrFailed)
-	}
-	var c claims
-	if err := idToken.Claims(&c); err != nil || c.Subject == "" {
-		return fail("bad_claims", ErrFailed)
-	}
-	if f.FreshAfter != 0 && c.AuthTime < f.FreshAfter {
-		return fail("not_fresh", ErrFailed)
-	}
-	var all map[string]any
-	if err := idToken.Claims(&all); err != nil {
-		return fail("bad_claims", ErrFailed)
+	if reason != "" {
+		return fail(reason, ErrFailed)
 	}
 
 	var session string
+
 	err = pgx.BeginFunc(ctx, p.pool, func(tx pgx.Tx) error {
 		userID, err := p.resolve(ctx, tx, c, meta)
 		if err != nil {

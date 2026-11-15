@@ -371,6 +371,8 @@ type ReviewAnswerInput struct {
 	Comment string
 	// Version is the version the reviewer looked at; a newer one ended their round (DOC-330).
 	Version int
+	// Signature carries the confirmation of an approval that requires a signature (DOC-700).
+	Signature SignatureInput
 }
 
 func cleanComment(comment string, limit int) (string, error) {
@@ -416,8 +418,12 @@ func (s *Service) AnswerReview(ctx context.Context, c identity.Caller, id uuid.U
 		if in.Version != rc.ctl.headVersion {
 			return apperr.Conflict("superseded", "A newer version of this page was published. Look at it first.")
 		}
-		if _, err := tx.Exec(ctx, `UPDATE workflow_reviewers SET answer = $4, comment = $5, answered_at = now()
-			WHERE round_id = $1 AND stage = $2 AND user_id = $3`, rc.stage.round, rc.stage.number, c.UserID, in.Answer, comment); err != nil {
+		signature, err := s.signApproval(ctx, tx, c, rc, in)
+		if err != nil {
+			return err
+		}
+		if _, err := tx.Exec(ctx, `UPDATE workflow_reviewers SET answer = $4, comment = $5, answered_at = now(), signature_id = $6
+			WHERE round_id = $1 AND stage = $2 AND user_id = $3`, rc.stage.round, rc.stage.number, c.UserID, in.Answer, comment, signature); err != nil {
 			return err
 		}
 		authors, err := changeAuthors(ctx, tx, id, rc.ctl)
@@ -433,6 +439,26 @@ func (s *Service) AnswerReview(ctx context.Context, c identity.Caller, id uuid.U
 		return err
 	})
 	return out, err
+}
+
+// signApproval signs a reviewer's approval when the step that follows the review requires a
+// signature. A signed approval is final for its stage: the signature stands, so the answer
+// cannot change afterwards. It answers the signature, or nil when none was needed.
+func (s *Service) signApproval(ctx context.Context, tx pgx.Tx, c identity.Caller, rc reviewContext, in ReviewAnswerInput) (*uuid.UUID, error) {
+	var signed bool
+	if err := tx.QueryRow(ctx, `SELECT signature_id IS NOT NULL FROM workflow_reviewers WHERE round_id = $1 AND stage = $2 AND user_id = $3`,
+		rc.stage.round, rc.stage.number, c.UserID).Scan(&signed); err != nil {
+		return nil, err
+	}
+	if signed {
+		return nil, apperr.Conflict("signed_answer_final", "You signed your approval. A signature stands, so it cannot be changed.")
+	}
+	t, required := approvalSignature(rc)
+	if in.Answer != ReviewApprove || !required {
+		return nil, nil
+	}
+	id, err := s.sign(ctx, tx, c, in.Signature, t)
+	return &id, err
 }
 
 // requireReviewManager allows what changes who reviews: someone with space.workflows, who

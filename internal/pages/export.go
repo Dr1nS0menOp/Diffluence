@@ -39,6 +39,8 @@ type ExportControl struct {
 	ApprovedBy      string
 	// History says the person may see the versions before, as an author may (DOC-321).
 	History bool
+	// Signatures are those of the version in the file, oldest first (DOC-740, §11.50(b)).
+	Signatures []SignatureView
 }
 
 // ForExport returns the published pages the user may view, parents first. With
@@ -153,6 +155,9 @@ func (s *Service) exportControl(ctx context.Context, c identity.Caller, list []E
 				return err
 			}
 			control.Version, control.Working, control.StateName = f.head, true, f.workingState
+		}
+		if control.Signatures, err = signaturesOf(ctx, s.pool, f.id, []int{control.Version}); err != nil {
+			return err
 		}
 		p.Control = &control
 	}

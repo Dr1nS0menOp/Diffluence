@@ -131,6 +131,8 @@ type Service struct {
 	features    *features.Service
 	jobs        *jobs.Service
 	instanceID  uuid.UUID
+	// confirmations is the identity module's part in signing (spec 064, DC4).
+	confirmations Confirmations
 }
 
 // NewService creates the service.

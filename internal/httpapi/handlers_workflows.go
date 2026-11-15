@@ -30,6 +30,7 @@ func (s *Server) registerWorkflowRoutes() {
 	r.HandleFunc("PUT "+pagesPath+"/{id}/workflow", Object(permissions.PageWorkflow), s.handlePageWorkflow)
 	r.HandleFunc("POST "+pagesPath+"/{id}/transitions", Object(permissions.PageEdit), s.handleTransition)
 	s.registerReviewRoutes()
+	s.registerSigningRoutes()
 }
 
 // registerReviewRoutes is wave DC2: reviewers and their answers, the review panel, the
@@ -77,14 +78,16 @@ func (s *Server) handleReviewAnswer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Answer  string `json:"answer"`
-		Comment string `json:"comment"`
-		Version int    `json:"version"`
+		Answer       string `json:"answer"`
+		Comment      string `json:"comment"`
+		Version      int    `json:"version"`
+		Confirmation string `json:"confirmation"`
 	}
 	if !body(w, r, &in) {
 		return
 	}
-	p, err := s.deps.Pages.AnswerReview(r.Context(), s.caller(r), id, pages.ReviewAnswerInput{Answer: in.Answer, Comment: in.Comment, Version: in.Version})
+	p, err := s.deps.Pages.AnswerReview(r.Context(), s.caller(r), id, pages.ReviewAnswerInput{Answer: in.Answer, Comment: in.Comment,
+		Version: in.Version, Signature: s.signatureFrom(r, in.Confirmation)})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -421,15 +424,16 @@ func (s *Server) handleTransition(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		Transition string `json:"transition"`
-		Version    int    `json:"version"`
-		Comment    string `json:"comment"`
+		Transition   string `json:"transition"`
+		Version      int    `json:"version"`
+		Comment      string `json:"comment"`
+		Confirmation string `json:"confirmation"`
 	}
 	if !body(w, r, &in) {
 		return
 	}
 	p, err := s.deps.Pages.Transition(r.Context(), s.caller(r), id, pages.TransitionInput{
-		Transition: in.Transition, Version: in.Version, Comment: in.Comment})
+		Transition: in.Transition, Version: in.Version, Comment: in.Comment, Signature: s.signatureFrom(r, in.Confirmation)})
 	if err != nil {
 		s.fail(w, r, err)
 		return

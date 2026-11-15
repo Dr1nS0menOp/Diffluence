@@ -2,11 +2,13 @@
 // The band of a controlled page, under the byline (spec 064, DOC-302, DOC-303, DOC-422):
 // readers see the state and the approved version; authors also see that what they look at
 // is not approved yet, and the steps they can take.
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type ControlInfo, type PageDetail, type WorkflowTransition } from '../api';
 import { IconArchive, IconClock, IconPencil, IconVerified } from './icons';
+import { Signatures } from './signatures';
+import { pendingSigning, SigningDialog } from './signing-dialog';
 import { Dialog, ErrorNote, Field, RelativeTime } from './ui';
 
 const MARK_ICON_SIZE = 16;
@@ -30,6 +32,15 @@ export function ControlBand({
 }) {
   const { t } = useTranslation();
   const [step, setStep] = useState<WorkflowTransition | null>(null);
+  // A signing step that comes back from the identity provider opens again (DOC-731).
+  const [back] = useState(() => new URLSearchParams(window.location.search).get('signing'));
+  const [resumed, setResumed] = useState(() => (back === 'confirmed' ? pendingSigning(page.id) : null));
+  useEffect(() => {
+    if (!back) return;
+    const url = new URL(window.location.href);
+    url.searchParams.delete('signing');
+    window.history.replaceState(window.history.state, '', url);
+  }, [back]);
   const c = page.control;
   if (!c) return null;
   const approved =
@@ -62,6 +73,8 @@ export function ControlBand({
       <p className="control-governed">{governed}</p>
       {children}
       {c.reviewing && <p>{t('review.youAreAsked')}</p>}
+      {back === 'failed' && <p className="note-error">{t('signing.providerFailed')}</p>}
+      <Signatures list={c.signatures ?? []} />
       {(c.transitions.length > 0 || mayOpenReview(page)) && (
         <p className="control-steps">
           {mayOpenReview(page) && (
@@ -77,7 +90,53 @@ export function ControlBand({
         </p>
       )}
       {step && <StepDialog page={page} control={c} step={step} onClose={() => setStep(null)} />}
+      {resumed && resumed.step.transition && (
+        <SignedStep
+          page={page}
+          transition={resumed.step.transition}
+          version={resumed.step.version}
+          comment={resumed.comment}
+          resumed={resumed.token}
+          onClose={() => setResumed(null)}
+        />
+      )}
     </div>
+  );
+}
+
+/** The signing dialog of an author's own step, which takes the step once signed. */
+function SignedStep({
+  page,
+  transition,
+  version,
+  comment,
+  resumed,
+  onClose,
+}: {
+  page: PageDetail;
+  transition: string;
+  version: number;
+  comment: string;
+  resumed?: string;
+  onClose: () => void;
+}) {
+  const client = useQueryClient();
+  return (
+    <SigningDialog
+      pageId={page.id}
+      step={{ transition, version }}
+      comment={comment}
+      resumed={resumed}
+      onSign={(confirmation) =>
+        api.post(`/pages/${page.id}/transitions`, { transition, version, comment, confirmation })
+      }
+      onSigned={() => {
+        void client.invalidateQueries({ queryKey: ['page', page.id] });
+        void client.invalidateQueries({ queryKey: ['tree', page.space_id] });
+        onClose();
+      }}
+      onClose={onClose}
+    />
   );
 }
 
@@ -95,6 +154,7 @@ function StepDialog({
   const { t } = useTranslation();
   const client = useQueryClient();
   const [comment, setComment] = useState('');
+  const [signing, setSigning] = useState(false);
   const take = useMutation({
     mutationFn: () =>
       api.post(`/pages/${page.id}/transitions`, {
@@ -108,6 +168,17 @@ function StepDialog({
       onClose();
     },
   });
+  if (signing) {
+    return (
+      <SignedStep
+        page={page}
+        transition={step.id}
+        version={control.head_version}
+        comment={comment}
+        onClose={onClose}
+      />
+    );
+  }
   return (
     <Dialog title={step.name} onClose={onClose}>
       {step.description && <p>{step.description}</p>}
@@ -123,9 +194,9 @@ function StepDialog({
           type="button"
           className="primary"
           disabled={take.isPending || (step.requires_comment && comment.trim() === '')}
-          onClick={() => take.mutate()}
+          onClick={() => (step.signature_meaning ? setSigning(true) : take.mutate())}
         >
-          {step.name}
+          {step.signature_meaning ? t('signing.continue') : step.name}
         </button>
       </div>
     </Dialog>

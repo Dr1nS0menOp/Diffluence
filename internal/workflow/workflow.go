@@ -69,6 +69,10 @@ type Transition struct {
 	// Outcome marks a step the system takes when the round of its review state passes, or
 	// when a reviewer asks for changes. Nobody takes it by hand.
 	Outcome Outcome `json:"outcome,omitempty"`
+	// SignatureMeaning, when set, makes the step require an electronic signature with that
+	// meaning (DOC-700): the person taking the step signs, or, on the step that follows an
+	// approved review, every reviewer who approves.
+	SignatureMeaning string `json:"signature_meaning,omitempty"`
 }
 
 // Definition is one version of a workflow: its states and transitions.
@@ -208,6 +212,9 @@ func Validate(d Definition) error {
 			return problem("duplicate_name", tr.ID, "Two transitions between the same states are called %q.", tr.Name)
 		}
 		pairs[pair] = true
+		if p := checkSignature(tr); p != nil {
+			return p
+		}
 		next[tr.From] = append(next[tr.From], tr.To)
 	}
 	if p := checkOutcomes(d, states); p != nil {

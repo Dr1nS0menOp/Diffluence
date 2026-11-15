@@ -278,6 +278,9 @@ func (s *Service) createWorkflow(ctx context.Context, c identity.Caller, spaceID
 		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
 			return err
 		}
+		if err := checkMeanings(ctx, tx, spaceID, in.Definition); err != nil {
+			return err
+		}
 		if err := insertWorkflowName(ctx, tx, `INSERT INTO workflows (id, space_id, name, description, created_by, template_id, template_version)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)`, id, spaceID, in.Name, in.Description, c.UserID, templateID, templateVersion); err != nil {
 			return err
@@ -346,6 +349,9 @@ func (s *Service) saveWorkflow(ctx context.Context, c identity.Caller, id uuid.U
 			return err
 		}
 		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
+			return err
+		}
+		if err := checkMeanings(ctx, tx, w.SpaceID, in.Definition); err != nil {
 			return err
 		}
 		if from != nil {

@@ -31,6 +31,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/instance"
 	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/publishing"
 	"github.com/diffluence/diffluence/internal/restore"
 	"github.com/diffluence/diffluence/internal/settings"
@@ -75,6 +76,8 @@ Commands:
                             sign the head of the audit chain with the backup service's key,
                             derived from the backup key FILE (spec 070)
   key <step>                replace master.key without downtime; see diffluence key
+  signatures verify         verify every electronic signature against its content and its
+                            audit entry, such as after a restore; exits 1 when one does not match
   session end --email ADDR  log one person out everywhere, without disabling them
   session end --all         log everyone out, for an incident
   config check [--offline]  check the environment and DIFFLUENCE_CONFIG_FILE as a start would,
@@ -155,6 +158,12 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) int {
 			fmt.Fprint(stderr, usage)
 			return 2
 		}
+	case "signatures":
+		if len(args) != 2 || args[1] != "verify" {
+			fmt.Fprint(stderr, usage)
+			return 2
+		}
+		err = cmdSignaturesVerify(ctx, stdout)
 	case "events":
 		switch {
 		case len(args) == 2 && args[1] == "check":
@@ -553,11 +562,48 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
-	res, err := audit.Prune(ctx, pool, time.Now().AddDate(0, 0, -days), key)
+	cut := time.Now().AddDate(0, 0, -days)
+	// Signed records are kept: the audit entries of signatures stay, and so does every entry
+	// after the first of them, so the chain still holds them (spec 064, DOC-770).
+	signed, err := pages.OldestSignature(ctx, pool)
+	if err != nil {
+		return err
+	}
+	if signed != nil && signed.Before(cut) {
+		cut = *signed
+		fmt.Fprintf(stdout, "keeping the audit log from %s on, where signed records begin\n", cut.UTC().Format(time.RFC3339))
+	}
+	res, err := audit.Prune(ctx, pool, cut, key)
 	if err != nil {
 		return err
 	}
 	fmt.Fprintf(stdout, "removed %d audit rows, up to %d\n", res.Removed, res.AnchorSeq)
+	return nil
+}
+
+// cmdSignaturesVerify runs the full verification of every electronic signature, such as
+// after a restore (spec 064, DOC-741, DOC-772). It fails when one does not match.
+func cmdSignaturesVerify(ctx context.Context, stdout io.Writer) error {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer pool.Close()
+	res, err := pages.VerifyAllSignatures(ctx, pool)
+	if err != nil {
+		return err
+	}
+	for _, m := range res.Mismatches {
+		fmt.Fprintf(stdout, "does not match: signature %s of version %d of page %s: %s\n", m.ID, m.Version, m.PageID, m.Reason)
+	}
+	fmt.Fprintf(stdout, "%d signatures checked, %d do not match\n", res.Checked, len(res.Mismatches))
+	if len(res.Mismatches) > 0 {
+		return errors.New("signatures do not match")
+	}
 	return nil
 }
 

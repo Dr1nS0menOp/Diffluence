@@ -156,6 +156,9 @@ func (s *Service) CreateWorkflowTemplate(ctx context.Context, c identity.Caller,
 		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
 			return err
 		}
+		if err := checkMeanings(ctx, tx, uuid.Nil, in.Definition); err != nil {
+			return err
+		}
 		raw, err := json.Marshal(in.Definition)
 		if err != nil {
 			return err
@@ -190,6 +193,9 @@ func (s *Service) SaveWorkflowTemplate(ctx context.Context, c identity.Caller, i
 			return apperr.Conflict("version_conflict", "Someone else changed this template while you were editing it.")
 		}
 		if err := checkReviewerRefs(ctx, tx, in.Definition); err != nil {
+			return err
+		}
+		if err := checkMeanings(ctx, tx, uuid.Nil, in.Definition); err != nil {
 			return err
 		}
 		raw, err := json.Marshal(in.Definition)

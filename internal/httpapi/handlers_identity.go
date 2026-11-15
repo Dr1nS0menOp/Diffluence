@@ -241,7 +241,12 @@ func (s *Server) handleOIDCCallback(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login?error=oidc_failed", http.StatusFound)
 		return
 	}
-	token, err := s.deps.SSO.Callback(r.Context(), q.Get("state"), q.Get("code"), binding, metaFrom(r))
+	res, err := s.deps.SSO.Complete(r.Context(), q.Get("state"), q.Get("code"), binding, metaFrom(r))
+	if res.Signing {
+		s.finishProviderSigning(w, r, res.SigningReturn, err)
+		return
+	}
+	token := res.Session
 	switch {
 	case errors.Is(err, sso.ErrAccountExists):
 		http.Redirect(w, r, "/login?error=oidc_account_exists", http.StatusFound)

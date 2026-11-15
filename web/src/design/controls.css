@@ -243,6 +243,15 @@ fieldset.matrix label {
   margin-block-start: var(--space-2);
 }
 
+/* The signatures of the version on display (DOC-740): one line each, the mark in words. */
+.control-signatures {
+  margin-block-start: var(--space-2);
+}
+
+.control-signatures li + li {
+  margin-block-start: var(--space-1);
+}
+
 .control-band .control-steps {
   display: flex;
   flex-wrap: wrap;

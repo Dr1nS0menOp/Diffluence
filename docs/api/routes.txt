@@ -14,6 +14,7 @@ DELETE /api/v1/admin/permission-sets/{id}                      session-only perm
 DELETE /api/v1/admin/roles/{id}                                session-only permission:administrator
 DELETE /api/v1/admin/scim-tokens/{id}                          session-only permission:administrator
 DELETE /api/v1/admin/settings/retention/lowering               session-only permission:administrator
+DELETE /api/v1/admin/users/{id}/signing                        session-only permission:administrator
 DELETE /api/v1/approvals/{id}/people/{user}                    authenticated
 DELETE /api/v1/attachments/{id}                                object:attachment.delete
 DELETE /api/v1/attachments/{id}/labels/{label}                 object:attachment.add
@@ -105,6 +106,7 @@ GET /api/v1/admin/upgrades                                     session-only perm
 GET /api/v1/admin/users                                        session-only permission:administrator
 GET /api/v1/admin/users/{id}                                   session-only permission:administrator
 GET /api/v1/admin/users/{id}/reach                             session-only permission:administrator
+GET /api/v1/admin/users/{id}/signing                           session-only permission:administrator
 GET /api/v1/admin/users/{id}/type-impact                       session-only permission:administrator
 GET /api/v1/admin/webhooks                                     permission:administrator
 GET /api/v1/admin/workflow-templates                           session-only permission:administrator
@@ -119,6 +121,7 @@ GET /api/v1/attachments/{id}/versions                          object:page.view
 GET /api/v1/attachments/{id}/versions/{number}/content         object:page.view
 GET /api/v1/auth/invitation                                    public
 GET /api/v1/auth/oidc/callback                                 public
+GET /api/v1/auth/oidc/sign                                     session-only authenticated
 GET /api/v1/auth/oidc/start                                    public
 GET /api/v1/auth/providers                                     public
 GET /api/v1/categories                                         authenticated
@@ -161,6 +164,7 @@ GET /api/v1/pages/{id}/attachments.zip                         object:page.view
 GET /api/v1/pages/{id}/collab                                  object:page.view
 GET /api/v1/pages/{id}/comments                                object:page.view
 GET /api/v1/pages/{id}/compare                                 object:page.view
+GET /api/v1/pages/{id}/control-history                         authenticated
 GET /api/v1/pages/{id}/copy-impact                             object:page.view
 GET /api/v1/pages/{id}/details                                 object:page.view
 GET /api/v1/pages/{id}/draft                                   object:page.view
@@ -188,6 +192,7 @@ GET /api/v1/pages/{id}/used-by                                 object:page.view
 GET /api/v1/pages/{id}/version-authors                         object:page.view
 GET /api/v1/pages/{id}/versions                                object:page.view
 GET /api/v1/pages/{id}/versions/{number}                       object:page.view
+GET /api/v1/pages/{id}/versions/{number}/signatures            object:page.view
 GET /api/v1/pages/{id}/watch                                   object:page.view
 GET /api/v1/pages/{id}/watchers                                object:page.watchers
 GET /api/v1/people                                             authenticated
@@ -221,6 +226,7 @@ GET /api/v1/spaces/{id}/approvals                              object:space.appr
 GET /api/v1/spaces/{id}/approvals-digest                       object:space.view
 GET /api/v1/spaces/{id}/archive                                object:space.view
 GET /api/v1/spaces/{id}/audit                                  object:space.audit
+GET /api/v1/spaces/{id}/auditor-export                         object:space.audit
 GET /api/v1/spaces/{id}/categories                             object:space.view
 GET /api/v1/spaces/{id}/content                                object:space.administer
 GET /api/v1/spaces/{id}/export.zip                             object:space.export
@@ -252,6 +258,7 @@ GET /api/v1/spaces/{id}/releases/{run}                         object:space.rele
 GET /api/v1/spaces/{id}/role-assignments                       object:space.manage_access
 GET /api/v1/spaces/{id}/rules                                  object:space.automation
 GET /api/v1/spaces/{id}/shortcuts                              object:space.view
+GET /api/v1/spaces/{id}/signature-meanings                     object:space.view
 GET /api/v1/spaces/{id}/sites                                  object:site.publish
 GET /api/v1/spaces/{id}/statuses                               object:space.view
 GET /api/v1/spaces/{id}/templates                              object:page.create
@@ -422,6 +429,7 @@ POST /api/v1/pages/{id}/reviewers                              authenticated
 POST /api/v1/pages/{id}/reviewers/{user}/remove                authenticated
 POST /api/v1/pages/{id}/save-as-template                       object:space.templates
 POST /api/v1/pages/{id}/share                                  object:page.view
+POST /api/v1/pages/{id}/signing                                session-only authenticated
 POST /api/v1/pages/{id}/sort-children                          object:page.edit
 POST /api/v1/pages/{id}/transitions                            object:page.edit
 POST /api/v1/pages/{id}/unarchive                              object:page.archive
@@ -433,6 +441,8 @@ POST /api/v1/rules/{id}/run                                    object:page.view
 POST /api/v1/rules/{id}/test                                   object:space.automation
 POST /api/v1/saved-blocks                                      authenticated
 POST /api/v1/setup                                             public
+POST /api/v1/signing/confirm                                   session-only authenticated
+POST /api/v1/signing/passkey                                   session-only authenticated
 POST /api/v1/sites/{id}/preview                                object:site.publish
 POST /api/v1/sites/{id}/publish                                object:site.publish
 POST /api/v1/sites/{id}/rollback                               object:site.publish
@@ -459,6 +469,7 @@ POST /api/v1/spaces/{id}/releases/{run}/resume                 object:space.rele
 POST /api/v1/spaces/{id}/releases/{run}/start                  object:space.release
 POST /api/v1/spaces/{id}/role-assignments/preview              object:space.manage_access
 POST /api/v1/spaces/{id}/rules                                 object:space.automation
+POST /api/v1/spaces/{id}/signature-meanings                    object:space.workflows
 POST /api/v1/spaces/{id}/sites                                 object:site.publish
 POST /api/v1/spaces/{id}/templates                             object:space.templates
 POST /api/v1/spaces/{id}/templates/import                      object:space.templates
@@ -507,6 +518,7 @@ PUT /api/v1/admin/settings/{section}/confirmed                 sensitive permiss
 PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator
+PUT /api/v1/admin/users/{id}/signing                           sensitive permission:administrator
 PUT /api/v1/admin/workflow-templates/{id}                      session-only permission:administrator
 PUT /api/v1/approvals/{id}/answer                              authenticated
 PUT /api/v1/comments/{id}/reactions/{emoji}                    object:page.view

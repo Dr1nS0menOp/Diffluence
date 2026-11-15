@@ -170,6 +170,75 @@ function UserReach({ userId }: { userId: string }) {
   );
 }
 
+/**
+ * The right to sign, given per person by an administrator who confirmed who they are, never
+ * through a role (DOC-014, DOC-751). How they were identified is a choice, so the record that
+ * is kept for good holds no number of an identity document.
+ */
+function SigningRight({ userId }: { userId: string }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const key = ['signing-right', userId];
+  const q = useQuery({
+    queryKey: key,
+    queryFn: () =>
+      api.get<{
+        right: { enabled: boolean; enabled_by: string; identified_by: string; enabled_at: string | null };
+        methods: string[];
+      }>(`/admin/users/${userId}/signing`),
+  });
+  const [method, setMethod] = useState('');
+  const change = useMutation({
+    mutationFn: (on: boolean) =>
+      on
+        ? api.put(`/admin/users/${userId}/signing`, { identified_by: method })
+        : api.del(`/admin/users/${userId}/signing`),
+    onSuccess: () => client.invalidateQueries({ queryKey: key }),
+  });
+  if (!q.data) return <ErrorNote error={q.error} />;
+  const { right, methods } = q.data;
+  return (
+    <fieldset>
+      <legend>{t('signing.rightTitle')}</legend>
+      <ErrorNote error={change.error} />
+      {right.enabled ? (
+        <div className="row">
+          <p>
+            {t('signing.rightEnabled', {
+              name: right.enabled_by,
+              method: t(`signing.identified_${right.identified_by}`),
+            })}
+          </p>
+          <button type="button" onClick={() => change.mutate(false)} disabled={change.isPending}>
+            {t('signing.rightDisable')}
+          </button>
+        </div>
+      ) : (
+        <>
+          <p className="muted">{t('signing.rightHelp')}</p>
+          <Field label={t('signing.identifiedBy')}>
+            <select value={method} onChange={(e) => setMethod(e.target.value)}>
+              <option value="">{t('signing.identifiedChoose')}</option>
+              {methods.map((m) => (
+                <option key={m} value={m}>
+                  {t(`signing.identified_${m}`)}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <button
+            type="button"
+            onClick={() => change.mutate(true)}
+            disabled={change.isPending || method === ''}
+          >
+            {t('signing.rightEnable')}
+          </button>
+        </>
+      )}
+    </fieldset>
+  );
+}
+
 function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -236,6 +305,7 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
         <AnonymiseButton user={user} onDone={() => void finish()} />
       </div>
       <ExpiryField user={user} onDone={() => void finish()} />
+      {user.type === 'member' && <SigningRight userId={user.id} />}
       {user.source === 'local' && user.type !== 'service' && user.status === 'active' && (
         <div className="row">
           <button type="button" onClick={() => reset.mutate()} disabled={reset.isPending}>

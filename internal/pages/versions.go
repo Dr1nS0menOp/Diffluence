@@ -267,6 +267,8 @@ type Version struct {
 	Document json.RawMessage `json:"document,omitempty"`
 	// Removed marks a version an administrator took out, whose number stays.
 	Removed bool `json:"removed"`
+	// Signatures are the signatures of this version, with their marks (DOC-740).
+	Signatures []SignatureView `json:"signatures,omitempty"`
 }
 
 const versionColumns = `v.number, v.title, v.author_id, COALESCE(u.display_name, ''), v.summary, v.restored_from, v.created_at, v.imported`
@@ -305,12 +307,35 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err != nil {
 		return nil, err
 	}
+	if err := attachSignatures(ctx, s.pool, id, out); err != nil {
+		return nil, err
+	}
 	out = append(out, gone...)
 	slices.SortFunc(out, func(a, b Version) int { return b.Number - a.Number })
 	if out == nil {
 		out = []Version{}
 	}
 	return out, nil
+}
+
+// attachSignatures adds to each version of a history the signatures it has, in one query.
+func attachSignatures(ctx context.Context, q db.Querier, pageID uuid.UUID, list []Version) error {
+	numbers := make([]int, len(list))
+	for i, v := range list {
+		numbers[i] = v.Number
+	}
+	signed, err := signaturesOf(ctx, q, pageID, numbers)
+	if err != nil {
+		return err
+	}
+	for _, sv := range signed {
+		for i := range list {
+			if list[i].Number == sv.Version {
+				list[i].Signatures = append(list[i].Signatures, sv)
+			}
+		}
+	}
+	return nil
 }
 
 func (s *Service) version(ctx context.Context, c identity.Caller, id uuid.UUID, number int) (Version, error) {
@@ -357,6 +382,9 @@ func (s *Service) RemoveVersion(ctx context.Context, c identity.Caller, id uuid.
 		}
 		if number == p.CurrentVersion || number == head {
 			return apperr.Conflict("current_version", "The current version cannot be removed. Publish a new one first.")
+		}
+		if err := signedVersionGuard(ctx, tx, id, number); err != nil {
+			return err
 		}
 		var raw []byte
 		err = tx.QueryRow(ctx, "DELETE FROM page_versions WHERE page_id = $1 AND number = $2 RETURNING document", id, number).Scan(&raw)

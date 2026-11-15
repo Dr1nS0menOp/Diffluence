@@ -44,8 +44,8 @@ func reviewThenApproveExample() Example {
 	}
 }
 
-// twoStepExample is a technical review followed by a quality approval. The signature its
-// study names comes with signatures, in wave DC4.
+// twoStepExample is a technical review followed by a quality approval, which every quality
+// reviewer signs as approved (DC2-15).
 func twoStepExample() Example {
 	return Example{
 		Key:         "two-step",
@@ -62,7 +62,8 @@ func twoStepExample() Example {
 				{ID: "submit", Name: "Send for technical review", From: "draft", To: "technical-review"},
 				{ID: "technical-ok", Name: "Technically correct", From: "technical-review", To: "quality-approval", Outcome: OutcomeApproved},
 				{ID: "technical-changes", Name: "Ask for technical changes", From: "technical-review", To: "draft", Outcome: OutcomeChanges},
-				{ID: "quality-ok", Name: "Approve as effective", From: "quality-approval", To: "effective", Outcome: OutcomeApproved},
+				{ID: "quality-ok", Name: "Approve as effective", From: "quality-approval", To: "effective", Outcome: OutcomeApproved,
+					SignatureMeaning: MeaningApproved},
 				{ID: "quality-changes", Name: "Ask for changes", From: "quality-approval", To: "draft", Outcome: OutcomeChanges},
 			},
 		},

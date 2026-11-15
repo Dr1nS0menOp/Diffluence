@@ -10,6 +10,7 @@ import { useQuery } from '@tanstack/react-query';
 import {
   api,
   type DirectoryEntry,
+  type SignatureMeaning,
   type WorkflowChange,
   type WorkflowDefinition,
   type WorkflowOutcome,
@@ -95,12 +96,15 @@ export function WorkflowEditor({
   names: knownNames = {},
   existing,
   releases = false,
+  meanings = [],
   busy,
   error,
   onSave,
   onCancel,
 }: {
   initial: WorkflowDraft;
+  /** The meanings a space added to the four every space has (DOC-721). */
+  meanings?: SignatureMeaning[];
   names?: Names;
   /** The space is a draft space of a pair, where "release when approved" acts (PUB-710). */
   releases?: boolean;
@@ -144,6 +148,7 @@ export function WorkflowEditor({
     rekey,
     keyNew,
     releases,
+    meanings,
   };
   const save = () => (existing ? setConfirming(true) : onSave({ name, description, definition: def }));
   return (
@@ -206,7 +211,12 @@ interface Editing {
   keyNew: (id: string) => void;
   /** "Release when approved" acts here, in a draft space of a pair. */
   releases: boolean;
+  /** The meanings a space added, beside the four every space has. */
+  meanings: SignatureMeaning[];
 }
+
+/** The meanings every space has (DOC-721); the screens translate them by key. */
+const BUILT_IN_MEANINGS = ['reviewed', 'approved', 'released', 'verified'];
 
 /** The validator's message, beside what it is about (DOC-912, WCAG 3.3.1). */
 function ProblemNote({ problem }: { problem: WorkflowProblem }) {
@@ -665,6 +675,28 @@ function TransitionFields({
                 {t(`workflowEditor.outcome_${o || 'none'}`)}
               </option>
             ))}
+          </select>
+        </Field>
+      )}
+      {tr.outcome !== 'changes' && (
+        <Field label={t('workflowEditor.signature')} help={t('workflowEditor.signatureHelp')}>
+          <select
+            value={tr.signature_meaning ?? ''}
+            onChange={(e) => update({ ...tr, signature_meaning: e.target.value || undefined })}
+          >
+            <option value="">{t('workflowEditor.signatureNone')}</option>
+            {BUILT_IN_MEANINGS.map((m) => (
+              <option key={m} value={m}>
+                {t('workflowEditor.signatureAs', { meaning: t(`signing.meaning_${m}`) })}
+              </option>
+            ))}
+            {editing.meanings
+              .filter((m) => !m.built_in)
+              .map((m) => (
+                <option key={m.key} value={m.key}>
+                  {t('workflowEditor.signatureAs', { meaning: m.name })}
+                </option>
+              ))}
           </select>
         </Field>
       )}

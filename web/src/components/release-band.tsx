@@ -16,6 +16,7 @@ import { useCapabilities } from '../capabilities';
 import { Link } from '../router';
 import { Dialog, ErrorNote, Field, formatSize, Loading, RelativeTime } from './ui';
 import { LeaveOutDialog, RunDialog } from './release-dialogs';
+import { Signatures } from './signatures';
 import { useToast } from './toast';
 
 /** The status of a page in a pair. Nothing is asked of a page outside a pair. */
@@ -80,22 +81,28 @@ export function ReleaseBand({
   if (status.side === 'published') {
     if (!status.released_at) return null;
     return (
-      <p className={inBand ? 'release-line' : 'muted release-line'}>
-        {status.approval ? (
-          <ApprovedLine approval={status.approval} />
-        ) : (
-          <>
-            {t('publishing.twinLine')} <RelativeTime value={status.released_at} />
-            {status.twin_version ? ` · ${t('publishing.twinVersion', { number: status.twin_version })}` : ''}
-          </>
-        )}
-        {status.draft_page_id && (
-          <>
-            {' · '}
-            <Link href={`/pages/${status.draft_page_id}`}>{t('publishing.openDraft')}</Link>
-          </>
-        )}
-      </p>
+      <>
+        <p className={inBand ? 'release-line' : 'muted release-line'}>
+          {status.approval ? (
+            <ApprovedLine approval={status.approval} />
+          ) : (
+            <>
+              {t('publishing.twinLine')} <RelativeTime value={status.released_at} />
+              {status.twin_version
+                ? ` · ${t('publishing.twinVersion', { number: status.twin_version })}`
+                : ''}
+            </>
+          )}
+          {status.draft_page_id && (
+            <>
+              {' · '}
+              <Link href={`/pages/${status.draft_page_id}`}>{t('publishing.openDraft')}</Link>
+            </>
+          )}
+        </p>
+        {/* A twin of a signed version shows its signatures; the records stay in the draft (PUB-731). */}
+        <Signatures list={status.approval?.signatures ?? []} />
+      </>
     );
   }
   let line: string;

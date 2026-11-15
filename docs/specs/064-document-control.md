@@ -244,6 +244,39 @@ Every wave follows these rules:
 
 **Guide:** `docs/operations/regulated-use.md`, covering what the software provides and what remains the customer's (RMP-015).
 
+**Built:** see `docs/reports/2026-11-15-wave-dc4.md`. Migration 0069 adds `signatures`, `version_hashes`, `signing_rights`, `signing_confirmations` and `signature_meanings`, the signature of a reviewer's answer, an index of the audit entries of pages, and the functions `signed_file_versions` and `holds_signed_records`. The validation pack is `docs/operations/validation-pack.md`.
+
+**Load (DOC-1303):**
+- Signing hashes the version once, when it is first signed, and keeps the hash in `version_hashes`; later signatures of that version compare with it.
+- Showing a controlled page reads its signatures inside the query the band already makes, so it adds no query. The history adds one query for the signatures of the versions it lists.
+- A full verification recomputes the hash and reads the audit entry with its two neighbours: three small queries per signature, only on demand, in the control history, the auditor's export and `diffluence signatures verify`.
+
+**Decided on the product owner's behalf on 2026-11-15, may be overruled:**
+
+| # | Decision | Reason |
+|---|---|---|
+| DC4-1 | Signatures have no switch of their own, like the rest of document control (DC2-1). Nothing signs until a workflow names a meaning on a step and an administrator enables a person | Opt-in per step and per person already; a switch would be one more thing to validate |
+| DC4-2 | A step requires a signature by naming a meaning. On an author's step its taker signs; on the step that follows an approved review, every reviewer who approves signs. A request for changes is never signed | DOC-700; a signature states agreement with a version |
+| DC4-3 | A signed approval is final for its stage: the reviewer cannot change it into a request for changes | A signature stands; DOC-212 still holds for answers that are not signed |
+| DC4-4 | Four meanings every space has (reviewed, approved, released, verified); a space adds its own, which are never changed or removed. A template of the instance names only the four. The record keeps the meaning's words as shown | DOC-721; records and workflows keep pointing at what was meant |
+| DC4-5 | An administrator enables signing per person and says how they identified them, as one of four choices, never free text; never their own signing; never for a guest or a service account. Disabling keeps the signatures made | DOC-014, DOC-751, DOC-1422; the audit chain keeps the choice for good, so it must hold no number of an identity document |
+| DC4-6 | Signing is begun for one signature (the page, its version, and the step or the stage of the round), in the person's own session; confirmed within ten minutes; then taken once, within two minutes of the confirmation. A person has one step waiting for confirmation at a time | DOC-730, DOC-1416 |
+| DC4-7 | A confirmation is the password with a code of the authenticator app (never a recovery code), a passkey with user verification, or, only for someone without a password, a new login at the identity provider after the step began, allowing one minute of clock difference as the step-up does. That login opens no session, and never makes or links an account | DOC-730, DOC-731; a recovery code is written down where others may find it |
+| DC4-8 | A wrong password or code of a confirmation counts toward the stop after 100 wrong passwords, with the same answer for both; a failed passkey is audited but does not count, because a passkey is not guessed | DOC-732 |
+| DC4-9 | The signed content is canonical form 1: title, document format version, the document as canonical JSON, and the files the version shows with their version, name and SHA-256, each with its length, as written in `docs/operations/regulated-use.md` | DOC-711; an auditor can rebuild it by hand |
+| DC4-10 | The page shows the quick mark (the record against the hash its version keeps); the history verifies in full on demand, as do the control history, the auditor's export and `diffluence signatures verify` | DOC-741, DOC-1303 |
+| DC4-11 | Signed records are kept without end: signatures, the versions they sign and the file versions those show. A trash item that holds them cannot be purged and stays past its time; a signed version cannot be removed; pruning the audit log stops at the first signature | DOC-770; Diffluence has no retention period per space yet |
+| DC4-12 | The control history lists every audit entry about the page with its place in the chain, the newest 2000, with the verification of each signature. It shows no title or text, and needs `space.audit` | DOC-1010; reading the audit of a space is not reading every page |
+| DC4-13 | The auditor's export is JSON Lines, made while the request waits, for at most 1000 pages, with a period. A page the exporter may not read gives its record without title or text. The PDF report and the export as background work come with DC5 and DOC-1305 | DOC-1020 partly; the machine-readable copy first, so outside verification works now |
+| DC4-14 | The outside verification is `scripts/verify-signatures.mjs`, which needs only Node.js, and the same steps written for doing by hand | DOC-742 |
+| DC4-15 | Bundles do not carry signatures yet; DC5 brings them with DOC-1212. A workflow imported from a bundle that names a meaning the space lacks refuses signing until the space adds it | Imported signatures need their own record (DOC-1421) |
+| DC4-16 | Every export's control line names the signatures of the version in the file | DC3-11, Part 11 §11.50(b) |
+| DC4-17 | "Two-step review" signs its quality approval as approved | DC2-15 |
+| DC4-18 | Diffluence has no impersonation and no support sessions. The signature itself refuses everything but a person's own live session without a pending second factor, so such a session, if one comes, cannot sign without its own decision | DOC-733 |
+| DC4-19 | Qualified signatures through a trust provider (open question 1): not now. Recommended for after 1.0, when a customer needs them, because they cost a provider and a contract | DOC-791 |
+| DC4-20 | Retention against erasure (open question 2): keep DOC-1417 for every controlled space, without a choice per space, until there are retention periods per space | A choice per space would need a period to end at |
+| DC4-21 | PUB-731 comes with DC4, which landed after PB3: the published copy of a signed version shows its signatures in its band, with the printed name, date and time, and meaning, whatever "show approvers to readers" says; no record is copied. The control block of PDF and Word exports of a published copy comes with PB4, because an export of the published space would need the pair's records, which belong to publishing | Part 11 §11.50(b) on the screen now; the exports with the wave that owns them |
+
 ## DC5: time, review, read and understood, moves, imports and migration
 
 **Scope:**

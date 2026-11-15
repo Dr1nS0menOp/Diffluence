@@ -302,14 +302,32 @@ func (s *Service) Purge(ctx context.Context, c identity.Caller, id uuid.UUID) er
 		if hidden {
 			return apperr.Conflict("hidden_item", "This holds something you cannot see, so you cannot delete it for good. It goes by itself when its time in the trash ends.")
 		}
+		kept, err := holdsSignedRecords(ctx, tx, it)
+		if err != nil {
+			return err
+		}
+		if kept {
+			return apperr.Conflict("signed_records", "This holds signed versions, which are kept for the retention of signed records. It can stay in the trash or be restored.")
+		}
 		return h.Purge(ctx, tx, c, it)
 	})
+}
+
+// holdsSignedRecords says whether an item holds signed versions or the files they show. The
+// pages module owns signatures and answers through holds_signed_records.
+func holdsSignedRecords(ctx context.Context, q db.Querier, it Item) (bool, error) {
+	var kept bool
+	err := q.QueryRow(ctx, "SELECT holds_signed_records($1, $2)", it.ObjectType, it.ObjectID).Scan(&kept)
+	return kept, err
 }
 
 // PurgeExpired removes items past their retention period. Each item is its own
 // transaction, so one failing item cannot block the others.
 func (s *Service) PurgeExpired(ctx context.Context) (int, error) {
-	rows, err := s.pool.Query(ctx, "SELECT "+columns+" FROM trash_items WHERE purge_after <= now() ORDER BY purge_after LIMIT 500")
+	// An item that holds signed records stays past its time (DOC-770). It is left out here,
+	// not refused below, so such items never fill the batch and hold up the others.
+	rows, err := s.pool.Query(ctx, "SELECT "+columns+` FROM trash_items WHERE purge_after <= now()
+		AND NOT holds_signed_records(object_type, object_id) ORDER BY purge_after LIMIT 500`)
 	items, err := collect(rows, err)
 	if err != nil {
 		return 0, err

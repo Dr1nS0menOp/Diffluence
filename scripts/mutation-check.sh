@@ -2228,6 +2228,51 @@ mutate "a page from a template ignores its workflow" internal/templates/sets.go 
   's.replace("\tif workflowID == nil || root \x3c 0 ||", "\tif true || workflowID == nil || root \x3c 0 ||")' $app -run TestAPageMadeFromATemplateEntersTheWorkflowItNames
 mutate "analytics count the approved version for an author" internal/pages/around.go \
   's.replace("\tworking, err := perms.ReadsWorking(ctx, q, userID, pageID)\n\tif err != nil || !working {", "\tworking, err := perms.ReadsWorking(ctx, q, userID, pageID)\n\tif err != nil || !working || true {")' $app -run TestAnalyticsCountTheVersionThePersonRead
+# Spec 064, wave DC4: electronic signatures. The hash covers every part of the content, a
+# verification sees every kind of tampering, a confirmation counts once, fresh and for its own
+# step, only a person who may sign signs, in a session of their own, and signed records stay.
+mutate "the hash leaves out the title" internal/pages/content_hash.go \
+  's.replace("\tfield(\"title\", c.Title)\n", "\tfield(\"title\", \"\")\n")' ./internal/pages/ -run TestAnyChangeToTheSignedContentChangesItsHash
+mutate "the hash leaves out the document" internal/pages/content_hash.go \
+  's.replace("\tfield(\"document\", c.Document)\n", "\tfield(\"document\", \"\")\n")' ./internal/pages/ -run TestAnyChangeToTheSignedContentChangesItsHash
+mutate "the hash leaves out the files" internal/pages/content_hash.go \
+  's.replace("\tfor _, f := range files {\n", "\tfor _, f := range files[:0] {\n")' ./internal/pages/ -run TestAnyChangeToTheSignedContentChangesItsHash
+mutate "the hash leaves out the bytes of a file" internal/pages/content_hash.go \
+  's.replace("\t\tfield(\"sha256\", f.SHA256)\n", "")' ./internal/pages/ -run TestAnyChangeToTheSignedContentChangesItsHash
+mutate "verification trusts changed content" internal/pages/signatures.go \
+  's.replace("\tcase v.Recomputed != v.VersionHash:\n", "\tcase false:\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch|TestTheAuditorsExportVerifiesOutsideDiffluence)$'
+mutate "verification trusts a moved record" internal/pages/signatures.go \
+  's.replace("\tcase rec.ContentHash != v.VersionHash:\n", "\tcase false:\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch)$'
+mutate "verification trusts a changed audit entry" internal/pages/signatures.go \
+  's.replace("\t\td.Meaning != rec.Meaning {\n", "\t\tfalse {\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch)$'
+mutate "verification trusts a broken chain" internal/pages/signatures.go \
+  's.replace("\tif !entry.Linked {\n\t\treturn mismatch(v, reasonChainBroken), nil", "\tif false {\n\t\treturn mismatch(v, reasonChainBroken), nil")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch)$'
+mutate "a confirmation counts twice" internal/identity/signing.go \
+  's.replace("DELETE FROM signing_confirmations WHERE token_hash = $1\n\t\tRETURNING", "UPDATE signing_confirmations SET purpose = purpose WHERE token_hash = $1\n\t\tRETURNING")' $app -run '^(TestAConfirmationThatSignedOnceIsRefusedForTheSameStepAgain)$'
+mutate "an expired confirmation signs" internal/identity/signing.go \
+  's.replace("\tif !fresh {\n", "\tif false {\n")' $app -run '^(TestAConfirmationCountsOnceForOneSignatureWithinTwoMinutes)$'
+mutate "a confirmation signs another step" internal/identity/signing.go \
+  's.replace("owner != c.UserID || session != sessionID || bound != purpose || method == nil", "owner != c.UserID || session != sessionID || method == nil")' $app -run '^(TestAConfirmationCountsOnceForOneSignatureWithinTwoMinutes|TestASignatureIsRefusedForAVersionThatChangedAfterItWasConfirmed)$'
+mutate "a confirmation of another session signs" internal/identity/signing.go \
+  's.replace("owner != c.UserID || session != sessionID || bound != purpose", "owner != c.UserID || bound != purpose")' $app -run '^(TestAConfirmationCountsOnceForOneSignatureWithinTwoMinutes)$'
+mutate "a token signs" internal/identity/signing.go \
+  's.replace("c.UserID == uuid.Nil || sessionID == uuid.Nil {\n\t\treturn errSigningNeedsPerson()\n\t}\n\tvar live", "c.UserID == uuid.Nil {\n\t\treturn errSigningNeedsPerson()\n\t}\n\tvar live").replace("\tif !live {\n\t\treturn errSigningNeedsPerson()", "\tif false {\n\t\treturn errSigningNeedsPerson()")' $app -run '^(TestASignatureIsRefusedToAnyoneButItsSigner)$'
+mutate "someone without the right to sign signs" internal/identity/signing.go \
+  's.replace("\tif !enabled {\n", "\tif false {\n")' $app -run '^(TestASignatureIsRefusedToAnyoneButItsSigner|TestAConfirmationCountsOnceForOneSignatureWithinTwoMinutes)$'
+mutate "a wrong code is no guess" internal/identity/signing.go \
+  's.replace("\t\tif guess {\n", "\t\tif false {\n")' $app -run '^(TestFailedSigningConfirmationsCountTowardTheLockout)$'
+mutate "a passkey signs without user verification" internal/identity/signing.go \
+  's.replace("options, data, err := s.webauthn.BeginLogin(u, requireLocalCheck())", "options, data, err := s.webauthn.BeginLogin(u)")' $app -run '^(TestAPasskeySignsOnlyWithUserVerification)$'
+mutate "an old login at the provider signs" internal/sso/sso.go \
+  's.replace("\tif f.FreshAfter != 0 \x26\x26 c.AuthTime < f.FreshAfter {\n", "\tif false {\n")' $app -run '^(TestTheIdentityProviderMustConfirmAfterTheSigningStepBegan|TestAStepUpThroughTheProviderNeedsALoginAfterItStarted)$'
+mutate "a step signs without a signature" internal/pages/control.go \
+  's.replace("\t\tif tr.SignatureMeaning != \"\" {\n\t\t\tsigned, err := s.sign(", "\t\tif false {\n\t\t\tsigned, err := s.sign(")' $app -run '^(TestASignatureIsRefusedToAnyoneButItsSigner|TestAConfirmationCountsOnceForOneSignatureWithinTwoMinutes)$'
+mutate "a signed approval changes" internal/pages/review.go \
+  's.replace("\tif signed {\n\t\treturn nil, apperr.Conflict(\"signed_answer_final\"", "\tif false {\n\t\treturn nil, apperr.Conflict(\"signed_answer_final\"")' $app -run '^(TestEveryApprovingReviewerSignsAndARemovedOneCannot)$'
+mutate "the trash purges signed records" internal/trash/trash.go \
+  's.replace("\t\tkept, err := holdsSignedRecords(ctx, tx, it)\n", "\t\tkept, err := holdsSignedRecords(ctx, tx, it)\n\t\tkept = false\n")' $app -run '^(TestSignedVersionsSurviveDeletePurgeAndRemoval)$'
+mutate "a signed version is removed" internal/pages/signatures.go \
+  's.replace("\tif signed {\n\t\treturn apperr.Conflict(\"signed_version\"", "\tif false {\n\t\treturn apperr.Conflict(\"signed_version\"")' $app -run '^(TestSignedVersionsSurviveDeletePurgeAndRemoval)$'
 # Spec 067: every route that takes an id is walked as a stranger, and the service for
 # editing together holds a ticket in place of the cookie.
 mutate "anyone reads an export by its id" internal/exchange/export.go \
