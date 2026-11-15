@@ -46,11 +46,18 @@ func VerifyAllSignatures(ctx context.Context, q db.Querier) (SignatureCheck, err
 	return out, nil
 }
 
-// OldestSignature is when the first signature that stays was made, or nil when there is
-// none. The audit entries from then on hold signatures in the chain, so pruning the audit
-// log stops before it (DOC-770, Part 11 §11.10(c)).
-func OldestSignature(ctx context.Context, q db.Querier) (*time.Time, error) {
+// OldestControlRecord is the moment of the oldest record of document control, or nil when
+// there is none: a signature, or an audit entry about a page that is or was controlled, or
+// about workflows. Pruning the audit log stops before it, so audit retention never removes
+// the trail of a controlled document earlier than the document's own records (DOC-1002).
+func OldestControlRecord(ctx context.Context, q db.Querier) (*time.Time, error) {
 	var at *time.Time
-	err := q.QueryRow(ctx, "SELECT min(signed_at) FROM signatures").Scan(&at)
+	err := q.QueryRow(ctx, `SELECT min(t) FROM (
+			SELECT min(signed_at) AS t FROM signatures
+			UNION ALL SELECT min(e.occurred_at) FROM audit_events e
+				WHERE e.object_type = 'page' AND e.object_id IN (SELECT r.page_id::text FROM workflow_rounds r UNION SELECT c.page_id::text FROM page_control c)
+			UNION ALL SELECT min(e.occurred_at) FROM audit_events e
+				WHERE e.action LIKE 'workflow.%' OR e.action LIKE 'space.workflow%' OR e.action LIKE 'space.approval_rule%'
+		) x`).Scan(&at)
 	return at, err
 }

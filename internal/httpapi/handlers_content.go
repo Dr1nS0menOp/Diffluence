@@ -457,6 +457,10 @@ func (s *Server) handlePageGet(w http.ResponseWriter, r *http.Request) {
 		s.failPage(w, r, id, err)
 		return
 	}
+	if err := s.noteReadOpened(r, &d); err != nil {
+		s.internalError(w, r, err)
+		return
+	}
 	writeJSON(w, http.StatusOK, d)
 }
 

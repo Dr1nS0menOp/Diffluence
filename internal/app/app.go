@@ -694,6 +694,9 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "contract-migrations", Every: time.Minute, Run: a.runContractMigrations},
 		{Name: "publish-scheduled", Every: time.Minute, Run: a.pages.PublishDue},
 		{Name: "remind-reviews", Every: 24 * time.Hour, Run: a.pages.RemindReviews},
+		// Due dates, reminders, escalation, review dates and late readers of document control
+		// (spec 064, DC5); each worker runs it, and it claims each item once.
+		{Name: "control-due", Every: time.Minute, Run: a.pages.RunControlDue},
 		{Name: "expire-drafts", Every: 24 * time.Hour, Run: a.pages.ExpireDrafts},
 		{Name: "task-reminders", Every: time.Hour, Run: a.notify.RemindDue},
 		{Name: "notification-digests", Every: time.Hour, Run: a.notify.SendDigests},

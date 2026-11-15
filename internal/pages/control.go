@@ -127,6 +127,9 @@ func openRound(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, ctl control) (u
 
 // endRound closes the open round of a page, if any, keeping its record (DOC-330).
 func endRound(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, status, reason string) error {
+	if err := closeDeadlines(ctx, tx, pageID); err != nil {
+		return err
+	}
 	_, err := tx.Exec(ctx, `UPDATE workflow_rounds SET status = $2, ended_reason = $3, ended_at = now()
 		WHERE page_id = $1 AND status = 'open'`, pageID, status, reason)
 	return err
@@ -346,6 +349,9 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 		if tr.RequiresComment && comment == "" {
 			return apperr.Invalid("This step needs a comment.")
 		}
+		if err := requireConditions(ctx, tx, p, ctl, def, tr); err != nil {
+			return err
+		}
 		to, ok := def.State(tr.To)
 		if !ok {
 			return apperr.Invalid("This workflow has no such state.")
@@ -372,6 +378,10 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 			return err
 		}
 		details := map[string]any{"transition": tr.ID, "from": ctl.stateID, "to": to.ID, "version": ctl.headVersion}
+		// A step that asks for a reason keeps it in its audit entry (DOC-1001).
+		if comment != "" {
+			details["comment"] = comment
+		}
 		if signature != nil {
 			details["signature"] = *signature
 		}
@@ -412,6 +422,9 @@ func (s *Service) Transition(ctx context.Context, c identity.Caller, id uuid.UUI
 // approve makes the head the version readers see (DOC-320): the version approved before
 // becomes obsolete, and search, links, tasks and watchers follow the new one.
 func (s *Service) approve(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, ctl control, to workflow.State) (Page, error) {
+	// A round on the version readers already see confirms it without a new version: the
+	// periodic review of DOC-803.
+	confirmation := ctl.approved() && *ctl.approvedVersion == ctl.headVersion
 	if _, err := tx.Exec(ctx, `UPDATE page_control SET approved_version = $2, approved_state_id = $3, approved_at = now(), approved_by = $4
 		WHERE page_id = $1`, p.ID, ctl.headVersion, to.ID, c.UserID); err != nil {
 		return p, err
@@ -433,6 +446,13 @@ func (s *Service) approve(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 		if out, err = s.makeCurrent(ctx, tx, c, p, current{number: ctl.headVersion, title: title, doc: doc, author: authorID, approval: true}); err != nil {
 			return out, err
 		}
+	}
+	if err := s.afterApproval(ctx, tx, c, out, ctl.headVersion, to); err != nil {
+		return out, err
+	}
+	if confirmation {
+		return out, recordAudit(ctx, tx, c, "page.review_confirmed", "page", p.ID, p.SpaceID,
+			map[string]any{"version": ctl.headVersion, "state": to.ID})
 	}
 	return out, announceApproval(ctx, tx, c, out, ctl, doc)
 }
@@ -469,6 +489,19 @@ type ControlInfo struct {
 	InReview bool `json:"in_review"`
 	// Signatures are those of the version on display, with their marks (DOC-740).
 	Signatures []SignatureView `json:"signatures"`
+	// DueAt and Overdue are the due date of the stage the page is in (DOC-230, DOC-924).
+	DueAt   *time.Time `json:"due_at"`
+	Overdue bool       `json:"overdue"`
+	// NextReviewAt is the next periodic review date, shown to everyone who sees the page
+	// (DOC-801).
+	NextReviewAt *time.Time `json:"next_review_at"`
+	// ReadRequest is set when the person is asked to confirm reading the approved version.
+	ReadRequest *ReadRequest `json:"read_request,omitempty"`
+	// CarriedOver says the approved version was approved by one of today's approval rounds,
+	// before signatures (DOC-1103).
+	CarriedOver bool `json:"carried_over"`
+	// Blocked names, for each step the conditions hold back, why (DOC-120).
+	Blocked map[string]string `json:"blocked"`
 	// signed holds the signatures of the head and of the version readers see, until the
 	// band knows which of the two it shows.
 	signed []SignatureView
@@ -502,6 +535,11 @@ func (s *Service) fillControl(ctx context.Context, userID uuid.UUID, d *Detail) 
 				ci.Transitions = append(ci.Transitions, tr)
 			}
 		}
+		ctl := control{workflowID: ci.WorkflowID, workflowVersion: ci.WorkflowVersion, stateID: ci.StateID, approvedVersion: ci.ApprovedVersion,
+			headVersion: ci.HeadVersion}
+		if ci.Blocked, err = blockedSteps(ctx, s.pool, d.Page, ctl, def, ci.Transitions); err != nil {
+			return err
+		}
 	}
 	if ci.Transitions == nil {
 		ci.Transitions = []workflow.Transition{}
@@ -517,6 +555,7 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 	var raw, signed []byte
 	var def workflow.Definition
 	var headTitle string
+	var readConfirmed *bool
 	err := q.QueryRow(ctx, `SELECT w.id, w.name, pc.workflow_version, v.definition, pc.state_id, pc.state_kind, pc.approved_version,
 			pc.approved_at, COALESCE(ua.display_name, ''), pc.head_version, pc.governed_by, pc.governed_from, COALESCE(gp.title, ''),
 			COALESCE(us.display_name, ''),
@@ -530,8 +569,16 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 					'matches', s.content_hash IS NOT DISTINCT FROM sv.content_hash AND s.content_form IS NOT DISTINCT FROM sv.content_form)
 					ORDER BY s.signed_at, s.id)
 				FROM signatures s LEFT JOIN version_hashes sv ON sv.page_id = s.page_id AND sv.number = s.version_number
-				WHERE s.page_id = pc.page_id AND s.version_number IN (pc.head_version, $4)), '[]')
+				WHERE s.page_id = pc.page_id AND s.version_number IN (pc.head_version, $4)), '[]'),
+			dl.due_at, COALESCE(dl.due_at <= now(), false),
+			(SELECT pr.due_at FROM periodic_reviews pr WHERE pr.page_id = pc.page_id),
+			(SELECT rc.confirmed_at IS NOT NULL FROM read_confirmations rc
+				WHERE rc.page_id = pc.page_id AND rc.version_number = pc.approved_version AND rc.user_id = $3 AND pc.state_kind <> 'obsolete'),
+			pc.carried_round IS NOT NULL
 		FROM page_control pc
+		LEFT JOIN LATERAL (SELECT d.due_at FROM review_deadlines d
+			JOIN workflow_rounds dr ON dr.id = d.round_id AND dr.status = 'open' AND dr.review_stage = d.stage
+			WHERE dr.page_id = pc.page_id LIMIT 1) dl ON true
 		JOIN workflows w ON w.id = pc.workflow_id
 		JOIN workflow_versions v ON v.workflow_id = pc.workflow_id AND v.version = pc.workflow_version
 		LEFT JOIN users ua ON ua.id = pc.approved_by
@@ -542,7 +589,7 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 		WHERE pc.page_id = $1`, p.ID, p.SpaceID, userID, p.CurrentVersion).
 		Scan(&ci.WorkflowID, &ci.WorkflowName, &ci.WorkflowVersion, &raw, &ci.StateID, &ci.StateKind, &ci.ApprovedVersion,
 			&ci.ApprovedAt, &ci.ApprovedBy, &ci.HeadVersion, &ci.GovernedBy, &ci.GovernedFrom, &ci.GovernedFromTitle, &ci.SetBy, &headTitle,
-			&ci.Reviewing, &signed)
+			&ci.Reviewing, &signed, &ci.DueAt, &ci.Overdue, &ci.NextReviewAt, &readConfirmed, &ci.CarriedOver)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, def, "", nil
 	}
@@ -558,6 +605,10 @@ func controlInfo(ctx context.Context, q db.Querier, userID uuid.UUID, p Page) (*
 	if st, ok := def.State(ci.StateID); ok {
 		ci.StateName = st.Name
 	}
+	if readConfirmed != nil && ci.ApprovedVersion != nil {
+		ci.ReadRequest = &ReadRequest{Version: *ci.ApprovedVersion, Confirmed: *readConfirmed}
+	}
 	ci.Transitions = []workflow.Transition{}
+	ci.Blocked = map[string]string{}
 	return &ci, def, headTitle, nil
 }

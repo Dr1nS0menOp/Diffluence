@@ -4221,6 +4221,33 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/control-reports/{kind}": {
+      "get": {
+        "operationId": "get /api/v1/control-reports/{kind}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "control-reports"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/directory": {
       "get": {
         "operationId": "get /api/v1/directory",
@@ -4755,6 +4782,56 @@
           "me"
         ],
         "x-access": "authenticated"
+      }
+    },
+    "/api/v1/me/absence": {
+      "delete": {
+        "operationId": "delete /api/v1/me/absence",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "me"
+        ],
+        "x-access": "session-only authenticated"
+      },
+      "get": {
+        "operationId": "get /api/v1/me/absence",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "me"
+        ],
+        "x-access": "session-only authenticated"
+      },
+      "put": {
+        "operationId": "put /api/v1/me/absence",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "me"
+        ],
+        "x-access": "session-only authenticated"
       }
     },
     "/api/v1/me/export": {
@@ -6531,6 +6608,33 @@
         "x-access": "object:page.edit"
       }
     },
+    "/api/v1/pages/{id}/imported-signatures": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/imported-signatures",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
     "/api/v1/pages/{id}/insights": {
       "get": {
         "operationId": "get /api/v1/pages/{id}/insights",
@@ -7191,6 +7295,60 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/read-confirmation": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/read-confirmation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "session-only authenticated"
+      }
+    },
+    "/api/v1/pages/{id}/read-confirmations": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/read-confirmations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/pages/{id}/release": {
       "get": {
         "operationId": "get /api/v1/pages/{id}/release",
@@ -7401,6 +7559,33 @@
         "x-access": "object:page.edit"
       }
     },
+    "/api/v1/pages/{id}/review-period": {
+      "put": {
+        "operationId": "put /api/v1/pages/{id}/review-period",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/pages/{id}/review/answer": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/review/answer",
@@ -7431,6 +7616,33 @@
     "/api/v1/pages/{id}/review/comments": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/review/comments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/pages/{id}/review/delegate": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/review/delegate",
         "parameters": [
           {
             "in": "path",
@@ -9871,6 +10083,41 @@
         "x-access": "object:space.administer"
       }
     },
+    "/api/v1/spaces/{id}/control-reports/{kind}": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/control-reports/{kind}",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.audit"
+      }
+    },
     "/api/v1/spaces/{id}/export.zip": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/export.zip",
@@ -12096,6 +12343,85 @@
     "/api/v1/spaces/{id}/workflow": {
       "put": {
         "operationId": "put /api/v1/spaces/{id}/workflow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
+      }
+    },
+    "/api/v1/spaces/{id}/workflow/from-approval-rule": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/workflow/from-approval-rule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
+      },
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/workflow/from-approval-rule",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.workflows"
+      }
+    },
+    "/api/v1/spaces/{id}/workflow/from-approval-rule/undo": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/workflow/from-approval-rule/undo",
         "parameters": [
           {
             "in": "path",

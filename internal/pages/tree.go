@@ -316,6 +316,14 @@ func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 			SELECT $2::uuid, label, $3 FROM page_labels WHERE page_id = $1`, p.ID, n.ID, c.UserID); err != nil {
 			return Page{}, err
 		}
+		// An exempt label of the target comes along only for someone who may set it there,
+		// and then the copy follows it (DOC-402).
+		if err := s.dropExemptLabels(ctx, tx, c, n); err != nil {
+			return Page{}, err
+		}
+		if _, err := s.settle(ctx, tx, c, []uuid.UUID{n.ID}, settleExempt); err != nil {
+			return Page{}, err
+		}
 	}
 	// A copy is a new page: its tasks are its own, and nobody is told about them twice.
 	if n, err = s.appendVersion(ctx, tx, c, n, newVersion{Title: title, Doc: doc, Author: c.UserID, Silent: true}); err != nil {

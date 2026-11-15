@@ -199,7 +199,12 @@ func (s *Service) moveToSpace(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := reposition(ctx, tx, moved, in); err != nil {
 		return Page{}, err
 	}
-	if err := s.settleBranch(ctx, tx, c, p.ID, settleMoved); err != nil {
+	// A workflow belongs to its space (DOC-430): a page workflow of the old space never
+	// follows the branch, and the target's rule decides alone (DOC-1200).
+	if _, err := tx.Exec(ctx, "DELETE FROM page_workflows WHERE page_id = ANY($1)", tree); err != nil {
+		return Page{}, err
+	}
+	if err := s.settleBranch(ctx, tx, c, p.ID, settleMovedSpace); err != nil {
 		return Page{}, err
 	}
 	out, err := load(ctx, tx, p.ID)

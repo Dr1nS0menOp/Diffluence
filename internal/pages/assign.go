@@ -28,10 +28,13 @@ var governableKinds = []string{KindPage, KindPost, KindDatabase}
 
 // Why pages are settled again.
 const (
-	settleCreated  = "created"
-	settleMoved    = "moved"
-	settleKind     = "kind_changed"
-	settleAssigned = causeAssigned
+	settleCreated = "created"
+	settleMoved   = "moved"
+	// settleMovedSpace follows a move to another space: approval under one space's procedure is
+	// not approval under another's (DOC-1200).
+	settleMovedSpace = "moved_space"
+	settleKind       = "kind_changed"
+	settleAssigned   = causeAssigned
 )
 
 // governing is what governs one page.
@@ -49,7 +52,9 @@ func governingOf(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID) (map[uuid.
 			CASE WHEN sw.workflow_id IS NOT NULL THEN 'space' WHEN pw.workflow_id IS NOT NULL THEN 'page' ELSE 'branch' END,
 			CASE WHEN sw.workflow_id IS NOT NULL THEN NULL WHEN pw.workflow_id IS NOT NULL THEN p.id ELSE bw.page_id END
 		FROM pages p
+		-- A page with an exempt label of the space workflow is an ordinary page (DOC-402).
 		LEFT JOIN space_workflows sw ON sw.space_id = p.space_id AND p.kind = ANY(sw.kinds)
+			AND NOT EXISTS (SELECT 1 FROM page_labels pl WHERE pl.page_id = p.id AND pl.label = ANY (sw.exempt_labels))
 		LEFT JOIN page_workflows pw ON pw.page_id = p.id
 		LEFT JOIN LATERAL (SELECT w.page_id, w.workflow_id FROM page_tree t JOIN page_workflows w ON w.page_id = t.ancestor_id AND w.branch
 			WHERE t.descendant_id = p.id AND t.depth > 0 ORDER BY t.depth LIMIT 1) bw ON true
@@ -178,26 +183,40 @@ func lockControls(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID) (map[uuid
 // the start state with an approved version readers keep seeing.
 func (s *Service) landPage(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID, g governing, ctl control, controlled bool, cause string) (workflow.Kind, error) {
 	var version, current int
-	var published, approvedToday bool
-	if err := tx.QueryRow(ctx, `SELECT w.current_version, p.current_version, p.status = 'published',
-			EXISTS (SELECT 1 FROM approval_rounds r WHERE r.page_id = p.id AND r.status = 'approved' AND r.approved_version = p.current_version)
-		FROM workflows w, pages p WHERE w.id = $1 AND p.id = $2`, g.workflowID, id).Scan(&version, &current, &published, &approvedToday); err != nil {
+	var published bool
+	// The newest version today's approval rounds approved, and the round that did (09.12).
+	var todayRound *uuid.UUID
+	var todayVersion *int
+	if err := tx.QueryRow(ctx, `SELECT w.current_version, p.current_version, p.status = 'published', r.id, r.approved_version
+		FROM workflows w CROSS JOIN pages p
+		LEFT JOIN LATERAL (SELECT ar.id, ar.approved_version FROM approval_rounds ar
+			WHERE ar.page_id = p.id AND ar.status = 'approved' AND ar.approved_version <= p.current_version
+			ORDER BY ar.approved_version DESC, ar.created_at DESC LIMIT 1) r ON true
+		WHERE w.id = $1 AND p.id = $2`, g.workflowID, id).Scan(&version, &current, &published, &todayRound, &todayVersion); err != nil {
 		return "", err
 	}
+	var carried *uuid.UUID
 	def, err := definitionOf(ctx, tx, g.workflowID, version)
 	if err != nil {
 		return "", err
 	}
 	next := control{workflowID: g.workflowID, workflowVersion: version, headVersion: current, governedBy: g.by, governedFrom: g.from}
 	switch {
+	case controlled && cause == settleMovedSpace:
+		// Moved in from another space: the target's procedure never approved it, so it starts
+		// there from its newest version and readers see nothing until it is approved.
+		next.headVersion = max(ctl.headVersion, current)
 	case controlled && ctl.approved():
 		// It stays approved as it was; a change waiting for review starts again.
 		next.approvedVersion, next.headVersion = ctl.approvedVersion, ctl.headVersion
 		next.approvedStateID = def.FirstApproved().ID
-	case cause == settleAssigned && published && approvedToday:
-		// Approved under today's approval rounds (DOC-401, 09.12).
-		next.approvedVersion = &current
+	case cause == settleAssigned && published && todayVersion != nil:
+		// Approved under today's approval rounds (DOC-401, DOC-1102): at the newest version, it
+		// lands approved; at an older one, that one is what readers see and the newer one waits
+		// for review. It is approved before signatures, never signed (DOC-1103).
+		next.approvedVersion = todayVersion
 		next.approvedStateID = def.FirstApproved().ID
+		carried = todayRound
 	}
 	state := def.StartState()
 	if next.approved() && next.headVersion == *next.approvedVersion {
@@ -220,9 +239,36 @@ func (s *Service) landPage(ctx context.Context, tx pgx.Tx, c identity.Caller, id
 		VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), CASE WHEN $6::int IS NOT NULL THEN now() END, $8, $9, $10)
 		ON CONFLICT (page_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id, workflow_version = EXCLUDED.workflow_version,
 			state_id = EXCLUDED.state_id, state_kind = EXCLUDED.state_kind, approved_state_id = EXCLUDED.approved_state_id,
+			approved_version = EXCLUDED.approved_version,
+			approved_at = CASE WHEN EXCLUDED.approved_version IS NULL THEN NULL
+				WHEN page_control.approved_version IS NOT DISTINCT FROM EXCLUDED.approved_version THEN page_control.approved_at
+				ELSE EXCLUDED.approved_at END,
+			approved_by = CASE WHEN EXCLUDED.approved_version IS NULL THEN NULL ELSE page_control.approved_by END,
+			head_version = GREATEST(page_control.head_version, EXCLUDED.head_version),
 			governed_by = EXCLUDED.governed_by, governed_from = EXCLUDED.governed_from, updated_at = now()`,
 		id, g.workflowID, version, state.ID, state.Kind, next.approvedVersion, next.approvedStateID, next.headVersion, g.by, g.from); err != nil {
 		return "", err
+	}
+	if _, err := tx.Exec(ctx, `UPDATE page_control SET carried_round = CASE WHEN approved_version IS NULL THEN NULL ELSE COALESCE($2, carried_round) END
+		WHERE page_id = $1`, id, carried); err != nil {
+		return "", err
+	}
+	if carried != nil && *next.approvedVersion < current {
+		if err := s.showCarriedVersion(ctx, tx, c, id, *next.approvedVersion, current); err != nil {
+			return "", err
+		}
+	}
+	// A page that lands approved in a timed state gets its review date; one that lost its
+	// approval has none (DOC-800).
+	switch {
+	case state.Kind == workflow.KindApproved:
+		if err := scheduleReview(ctx, tx, id, next.headVersion, state); err != nil {
+			return "", err
+		}
+	case !next.approved():
+		if _, err := tx.Exec(ctx, "DELETE FROM periodic_reviews WHERE page_id = $1", id); err != nil {
+			return "", err
+		}
 	}
 	// From now on readers keep the files of the version they see (DOC-510).
 	for _, number := range []int{current, next.headVersion} {
@@ -270,6 +316,9 @@ func (s *Service) removeControl(ctx context.Context, tx pgx.Tx, c identity.Calle
 	if _, err := tx.Exec(ctx, "DELETE FROM page_control WHERE page_id = $1", id); err != nil {
 		return err
 	}
+	if _, err := tx.Exec(ctx, "DELETE FROM periodic_reviews WHERE page_id = $1", id); err != nil {
+		return err
+	}
 	// Readers keep the approved version until the next publish, and so do they in search; the
 	// working entry has no reader left (DOC-141).
 	if err := search.DropWorking(ctx, tx, id); err != nil {
@@ -309,8 +358,12 @@ type SpaceWorkflowInput struct {
 	// WorkflowID nil turns the space workflow off (DOC-421).
 	WorkflowID *uuid.UUID
 	Kinds      []string
+	// ExemptLabels keep pages that carry one of them out of the space workflow (DOC-402).
+	ExemptLabels []string
 	// Preview counts what would change and changes nothing (DOC-140).
 	Preview bool
+	// fromApprovalRule marks the workflow generated from today's approval rule (DOC-1101).
+	fromApprovalRule bool
 }
 
 // errPreview rolls a preview back after it has counted.
@@ -325,7 +378,31 @@ func (s *Service) SetSpaceWorkflow(ctx context.Context, c identity.Caller, space
 		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceWorkflows); err != nil {
 			return err
 		}
+		var err error
+		land, err = s.setSpaceWorkflowIn(ctx, tx, c, spaceID, in)
+		if err != nil {
+			return err
+		}
+		if in.Preview {
+			return errPreview
+		}
+		return nil
+	})
+	if errors.Is(err, errPreview) {
+		err = nil
+	}
+	return land, err
+}
+
+// setSpaceWorkflowIn is SetSpaceWorkflow inside the caller's transaction, after its check.
+func (s *Service) setSpaceWorkflowIn(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, in SpaceWorkflowInput) (Landing, error) {
+	var land Landing
+	err := func() error {
 		kinds, err := cleanKinds(in.Kinds, in.WorkflowID != nil)
+		if err != nil {
+			return err
+		}
+		exempt, err := cleanExemptLabels(in.ExemptLabels)
 		if err != nil {
 			return err
 		}
@@ -350,9 +427,11 @@ func (s *Service) SetSpaceWorkflow(ctx context.Context, c identity.Caller, space
 			if _, err := tx.Exec(ctx, "DELETE FROM page_workflows pw USING pages p WHERE p.id = pw.page_id AND p.space_id = $1", spaceID); err != nil {
 				return err
 			}
-			if _, err := tx.Exec(ctx, `INSERT INTO space_workflows (space_id, workflow_id, kinds, set_by) VALUES ($1, $2, $3, $4)
-				ON CONFLICT (space_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id, kinds = EXCLUDED.kinds, set_by = EXCLUDED.set_by, set_at = now()`,
-				spaceID, *in.WorkflowID, kinds, c.UserID); err != nil {
+			if _, err := tx.Exec(ctx, `INSERT INTO space_workflows (space_id, workflow_id, kinds, set_by, exempt_labels, from_approval_rule)
+				VALUES ($1, $2, $3, $4, $5, $6)
+				ON CONFLICT (space_id) DO UPDATE SET workflow_id = EXCLUDED.workflow_id, kinds = EXCLUDED.kinds, set_by = EXCLUDED.set_by,
+					set_at = now(), exempt_labels = EXCLUDED.exempt_labels, from_approval_rule = EXCLUDED.from_approval_rule`,
+				spaceID, *in.WorkflowID, kinds, c.UserID, exempt, in.fromApprovalRule); err != nil {
 				return err
 			}
 		}
@@ -368,15 +447,9 @@ func (s *Service) SetSpaceWorkflow(ctx context.Context, c identity.Caller, space
 			return err
 		}
 		land.ReplacedWorkflows = replaced
-		if in.Preview {
-			return errPreview
-		}
 		return recordAudit(ctx, tx, c, "space.workflow_set", "space", spaceID, spaceID, map[string]any{
-			"workflow_id": in.WorkflowID, "kinds": kinds, "pages": land.Pages, "start": land.Start, "replaced": len(replaced)})
-	})
-	if errors.Is(err, errPreview) {
-		err = nil
-	}
+			"workflow_id": in.WorkflowID, "kinds": kinds, "exempt_labels": exempt, "pages": land.Pages, "start": land.Start, "replaced": len(replaced)})
+	}()
 	return land, err
 }
 

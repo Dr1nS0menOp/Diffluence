@@ -35,6 +35,8 @@ import (
 type Confirmations interface {
 	BeginSigning(ctx context.Context, c identity.Caller, in identity.SigningRequest) (identity.SigningStart, error)
 	TakeSigningConfirmation(ctx context.Context, tx pgx.Tx, c identity.Caller, sessionID uuid.UUID, token, purpose string) (string, error)
+	// MaySign says whether a person may sign at all, for a delegation or a stand-in.
+	MaySign(ctx context.Context, q db.Querier, id uuid.UUID) (bool, error)
 }
 
 // SetConfirmations connects the identity module. It is set once while the application is

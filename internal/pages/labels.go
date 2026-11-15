@@ -34,8 +34,13 @@ func labelsOf(ctx context.Context, q db.Querier, pageID uuid.UUID) ([]string, er
 	return out, err
 }
 
-// addLabel puts a label on a page inside tx. The caller has checked the rights.
-func addLabel(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, label string) error {
+// addLabel puts a label on a page inside tx. The caller has checked the rights to edit; an
+// exempt label of the space workflow asks for space.workflows here (DOC-402).
+func (s *Service) addLabel(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, label string) error {
+	exempt, err := s.requireExemptRight(ctx, tx, c, p.SpaceID, label)
+	if err != nil {
+		return err
+	}
 	var count int
 	if err := tx.QueryRow(ctx, "SELECT count(*) FROM page_labels WHERE page_id = $1", p.ID).Scan(&count); err != nil {
 		return err
@@ -47,7 +52,13 @@ func addLabel(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, label s
 	if err != nil || tag.RowsAffected() == 0 {
 		return err
 	}
-	return record(ctx, tx, c, "page.labelled", p, map[string]any{"label": label})
+	if err := record(ctx, tx, c, "page.labelled", p, map[string]any{"label": label}); err != nil {
+		return err
+	}
+	if !exempt {
+		return nil
+	}
+	return s.followExemption(ctx, tx, c, p, label, true)
 }
 
 // AddLabel adds a label. It makes no version.
@@ -72,7 +83,7 @@ func (s *Service) AddLabel(ctx context.Context, c identity.Caller, id uuid.UUID,
 		if refused {
 			return apperr.Invalid("This space has a fixed list of labels.")
 		}
-		if err := addLabel(ctx, tx, c, p, label); err != nil {
+		if err := s.addLabel(ctx, tx, c, p, label); err != nil {
 			return err
 		}
 		out, err = labelsOf(ctx, tx, id)
@@ -92,6 +103,10 @@ func (s *Service) RemoveLabel(ctx context.Context, c identity.Caller, id uuid.UU
 		if err != nil {
 			return err
 		}
+		exempt, err := s.requireExemptRight(ctx, tx, c, p.SpaceID, label)
+		if err != nil {
+			return err
+		}
 		tag, err := tx.Exec(ctx, "DELETE FROM page_labels WHERE page_id = $1 AND label = $2", id, label)
 		if err != nil {
 			return err
@@ -99,6 +114,11 @@ func (s *Service) RemoveLabel(ctx context.Context, c identity.Caller, id uuid.UU
 		if tag.RowsAffected() > 0 {
 			if err := record(ctx, tx, c, "page.unlabelled", p, map[string]any{"label": label}); err != nil {
 				return err
+			}
+			if exempt {
+				if err := s.followExemption(ctx, tx, c, p, label, false); err != nil {
+					return err
+				}
 			}
 		}
 		out, err = labelsOf(ctx, tx, id)
@@ -230,6 +250,12 @@ func (s *Service) RenameLabel(ctx context.Context, c identity.Caller, spaceID uu
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceLabels); err != nil {
 			return err
+		}
+		// Renaming onto or away from an exempt label changes which pages are controlled.
+		for _, l := range []string{from, target} {
+			if _, err := s.requireExemptRight(ctx, tx, c, spaceID, l); err != nil {
+				return err
+			}
 		}
 		if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)
 			SELECT l.page_id, $3, l.created_by FROM page_labels l JOIN pages p ON p.id = l.page_id

@@ -9,7 +9,7 @@ Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a valida
 | Clause | What Diffluence does |
 |---|---|
 | Part 11 §11.10(b), Annex 11 clause 8 | Every export holds the version a person reads, with a control line that names its state, version, approval and signatures. The auditor's export (below) is the machine-readable copy. |
-| §11.10(c) | Signatures, the versions they sign and the files those versions show cannot be deleted or changed, by administrators either. A signed page goes to the trash as before, but is never purged; pruning the audit log stops where signed records begin. |
+| §11.10(c) | Signatures, the versions they sign and the files those versions show cannot be deleted or changed, by administrators either. A signed page goes to the trash as before, but is never purged; pruning the audit log stops where the records of document control begin. |
 | §11.10(d), (g) | Each step of a workflow names who may take it. Signing is enabled per person, never through a role. |
 | §11.10(e), Annex 11 clause 9 | Every step, answer and signature is in the hash-chained, sealed audit log, which a witness can check outside the installation. |
 | §11.10(f) | Workflows enforce their sequence of states; nobody steps around the reviewers. |
@@ -28,6 +28,14 @@ Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a valida
 - **Periodic review** of the system and of who may sign.
 - **Backups and restores** as part of your procedure. A restore brings back the signatures of the backup and loses those made after it; run `diffluence signatures verify` after every restore.
 - **Retention periods.** Diffluence keeps signed records without end. A space that must let them go after a period needs a decision of the product owner first.
+
+## Review dates, reading and absence
+
+- **Periodic review** (Annex 11 clause 11). A timed approved state gives each approved version a next review date, shown to everyone who sees the page. The page owner is reminded before it; on the date the workflow starts a review of the same text, and passing it confirms the version without a new one.
+- **Read and understood.** An approved state can ask groups to confirm that they read each new version. The button appears only after the person opened that version, in the same session. It records an acknowledgement: that the person says they read it. It is not a test of understanding, and Diffluence makes no claim beyond that.
+- **Due dates** count working days of the working week set under **Administration, Settings, General**, in its time zone. Holidays are not known: set a longer period around them.
+- **Delegation and absence.** A reviewer can hand a review only to someone the workflow names for it in the same way, and someone who looks after the workflows can choose another person who may review. A stand-in takes a review only when the workflow names them too. Nobody signs for someone else.
+- **Bundles from another installation** bring their signatures as records of that installation. They verify against the content here, but they are not signatures of this installation, and they approve nothing here.
 
 ## Who may sign
 

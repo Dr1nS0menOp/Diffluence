@@ -77,6 +77,7 @@ func newHiddenWorld(t *testing.T) hiddenWorld {
 var unwalked = map[string]string{
 	"GET /api/v1/admin/settings/{section}":    "administrators only, and holds settings, not content",
 	"GET /api/v1/admin/monitoring/{kind}":     "administrators only, and sends a file of the release, not content",
+	"GET /api/v1/control-reports/{kind}":      "only spaces the caller audits, and no title of a page they cannot read (TestReportsShowOnlySpacesWithTheAuditRight)",
 	"GET /api/v1/templates/{id}/files/{file}": "a file of a template, which follows the rule of its template (TestTemplateFilesFollowTheRuleOfTheTemplate)",
 }
 

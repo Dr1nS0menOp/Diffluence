@@ -563,15 +563,16 @@ func cmdAuditPrune(ctx context.Context, stdout io.Writer) error {
 		return err
 	}
 	cut := time.Now().AddDate(0, 0, -days)
-	// Signed records are kept: the audit entries of signatures stay, and so does every entry
-	// after the first of them, so the chain still holds them (spec 064, DOC-770).
-	signed, err := pages.OldestSignature(ctx, pool)
+	// The records of document control are kept: signatures and the audit entries of controlled
+	// pages and workflows stay, and so does every entry after the first of them, so the chain
+	// still holds them (spec 064, DOC-770, DOC-1002).
+	kept, err := pages.OldestControlRecord(ctx, pool)
 	if err != nil {
 		return err
 	}
-	if signed != nil && signed.Before(cut) {
-		cut = *signed
-		fmt.Fprintf(stdout, "keeping the audit log from %s on, where signed records begin\n", cut.UTC().Format(time.RFC3339))
+	if kept != nil && kept.Before(cut) {
+		cut = *kept
+		fmt.Fprintf(stdout, "keeping the audit log from %s on, where the records of document control begin\n", cut.UTC().Format(time.RFC3339))
 	}
 	res, err := audit.Prune(ctx, pool, cut, key)
 	if err != nil {

@@ -56,6 +56,12 @@ type State struct {
 	// ReleaseWhenApproved marks an approved state whose pages go to the published space when
 	// they enter it, in a draft space of a pair (spec 073, PUB-710). Elsewhere it does nothing.
 	ReleaseWhenApproved bool `json:"release_when_approved,omitempty"`
+	// ReviewMonths is the review period of a timed approved state; zero means
+	// DefaultReviewMonths (DOC-800).
+	ReviewMonths int `json:"review_months,omitempty"`
+	// ReadAndUnderstood asks groups to confirm they read each version approved into the
+	// state (DOC-820).
+	ReadAndUnderstood *ReadAndUnderstood `json:"read_and_understood,omitempty"`
 }
 
 // Transition is a named step from one state to another (DOC-104).
@@ -73,6 +79,8 @@ type Transition struct {
 	// meaning (DOC-700): the person taking the step signs, or, on the step that follows an
 	// approved review, every reviewer who approves.
 	SignatureMeaning string `json:"signature_meaning,omitempty"`
+	// Conditions must hold before a person can take the step (DOC-120).
+	Conditions *Conditions `json:"conditions,omitempty"`
 }
 
 // Definition is one version of a workflow: its states and transitions.
@@ -173,6 +181,9 @@ func Validate(d Definition) error {
 				return p
 			}
 		}
+		if p := checkTime(s); p != nil {
+			return p
+		}
 		states[s.ID] = s
 	}
 	if starts != 1 {
@@ -215,9 +226,15 @@ func Validate(d Definition) error {
 		if p := checkSignature(tr); p != nil {
 			return p
 		}
+		if p := checkConditions(tr); p != nil {
+			return p
+		}
 		next[tr.From] = append(next[tr.From], tr.To)
 	}
 	if p := checkOutcomes(d, states); p != nil {
+		return p
+	}
+	if p := checkTimedCounts(d); p != nil {
 		return p
 	}
 	start := d.StartState()
@@ -364,7 +381,7 @@ func Diff(before, after Definition) []Change {
 		switch {
 		case !ok:
 			out = append(out, Change{Kind: TransitionRemoved, ID: t.ID, From: t.Name})
-		case n != t:
+		case !reflect.DeepEqual(n, t):
 			out = append(out, Change{Kind: TransitionChanged, ID: t.ID, From: t.Name, To: n.Name})
 		}
 	}
@@ -406,5 +423,5 @@ func ReleaseMarksDiffer(before, after Definition) bool {
 // sameApartFromReview says two versions of a state differ in their review only.
 func sameApartFromReview(a, b State) bool {
 	a.Review, b.Review = nil, nil
-	return a == b
+	return reflect.DeepEqual(a, b)
 }

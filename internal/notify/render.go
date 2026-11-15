@@ -49,6 +49,9 @@ var sentences = map[string]string{
 	TypeReleaseFinished:  "Your release from %[2]s has ended",
 	TypeVersionApproved:  "A new version of %[2]s was approved",
 	TypeApprovalRelease:  "The release of the approved %[2]s has ended",
+	TypeReviewReminder:   "The review of %[2]s waits for your answer",
+	TypeReadRequested:    "Please confirm you read %[2]s",
+	TypePeriodicReview:   "%[2]s comes up for its periodic review",
 }
 
 const (

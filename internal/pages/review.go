@@ -168,9 +168,38 @@ func (s *Service) enterReview(ctx context.Context, tx pgx.Tx, p Page, ctl contro
 			return nil, err
 		}
 	}
-	var asked []candidate
+	// A stand-in must be able to take the place: not an author, and able to sign a signed
+	// approval (DOC-240, DOC-241).
+	def, err := definitionOf(ctx, tx, ctl.workflowID, ctl.workflowVersion)
+	if err != nil {
+		return nil, err
+	}
+	approving, _ := def.Outcome(st.ID, workflow.OutcomeApproved)
+	signed := approving.SignatureMeaning != ""
+	var eligibleErr error
+	eligible := func(user uuid.UUID) bool {
+		if slices.Contains(authors, user) {
+			return false
+		}
+		if !signed {
+			return true
+		}
+		ok, err := s.maySign(ctx, tx, user)
+		if err != nil && eligibleErr == nil {
+			eligibleErr = err
+		}
+		return ok
+	}
+	replaced, err := s.replaceAbsent(ctx, tx, p, st, found, eligible)
+	if err != nil {
+		return nil, err
+	}
+	if eligibleErr != nil {
+		return nil, eligibleErr
+	}
+	var asked []askedPerson
 	seen := map[uuid.UUID]bool{}
-	for _, c := range found {
+	for _, c := range replaced {
 		if seen[c.user] || slices.Contains(authors, c.user) {
 			continue
 		}
@@ -192,15 +221,19 @@ func (s *Service) enterReview(ctx context.Context, tx pgx.Tx, p Page, ctl contro
 	people := make([]uuid.UUID, len(asked))
 	types := make([]string, len(asked))
 	sources := make([]uuid.UUID, len(asked))
+	vias := make([]string, len(asked))
+	froms := make([]*uuid.UUID, len(asked))
+	reasons := make([]string, len(asked))
 	for i, c := range asked {
 		people[i], types[i], sources[i] = c.user, c.sourceType, c.sourceID
+		vias[i], froms[i], reasons[i] = c.via, c.viaFrom, c.reason
 	}
-	if _, err := tx.Exec(ctx, `INSERT INTO workflow_reviewers (round_id, stage, state_id, user_id, source_type, source_id)
-		SELECT $1, $2, $3, u, t, src FROM unnest($4::uuid[], $5::text[], $6::uuid[]) AS x(u, t, src)`,
-		round, number, st.ID, people, types, sources); err != nil {
+	if _, err := tx.Exec(ctx, `INSERT INTO workflow_reviewers (round_id, stage, state_id, user_id, source_type, source_id, via, via_from, via_reason)
+		SELECT $1, $2, $3, u, t, src, v, f, why FROM unnest($4::uuid[], $5::text[], $6::uuid[], $7::text[], $8::uuid[], $9::text[]) AS x(u, t, src, v, f, why)`,
+		round, number, st.ID, people, types, sources, vias, froms, reasons); err != nil {
 		return nil, err
 	}
-	return people, nil
+	return people, s.startDeadline(ctx, tx, p.ID, round, number, rv.Due)
 }
 
 func quoted(list []string) []string {
@@ -255,9 +288,17 @@ func (s *Service) takeOutcome(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if !ok {
 		return p, fmt.Errorf("pages: workflow %s version %d has no state %s", ctl.workflowID, ctl.workflowVersion, tr.To)
 	}
+	// Only a passed round approves: never a time-out, whatever a stored definition says
+	// (DOC-105, DOC-1401). The check comes before anything is written.
+	if to.Kind == workflow.KindApproved && outcome != workflow.OutcomeApproved {
+		return p, errTimeOutApproves
+	}
 	cause := causeReviewPassed
-	if outcome == workflow.OutcomeChanges {
+	switch outcome {
+	case workflow.OutcomeChanges:
 		cause = causeChangesAsked
+	case workflow.OutcomeOverdue:
+		cause = causeOverdue
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO workflow_answers (id, round_id, page_id, user_id, transition_id, from_state, to_state, version_number, cause)
 		VALUES ($1, $2, $3, NULL, $4, $5, $6, $7, $8)`, ids.New(), st.round, p.ID, tr.ID, ctl.stateID, to.ID, ctl.headVersion, cause); err != nil {
@@ -296,7 +337,7 @@ func (s *Service) takeOutcome(ctx context.Context, tx pgx.Tx, c identity.Caller,
 			return p, err
 		}
 		return p, s.askReviewers(ctx, tx, system, p, to, asked)
-	case outcome == workflow.OutcomeChanges:
+	case outcome == workflow.OutcomeChanges || outcome == workflow.OutcomeOverdue:
 		if err := endRound(ctx, tx, p.ID, roundStatusEnded, cause); err != nil {
 			return p, err
 		}
@@ -567,7 +608,9 @@ func (s *Service) RemoveReviewer(ctx context.Context, c identity.Caller, id, use
 			return err
 		}
 		remaining--
-		if remaining == 0 || rc.state.Review.Needed(remaining) > remaining {
+		// A state with an escalation target asks it instead of refusing (DC2-10, DOC-242).
+		impossible := remaining == 0 || rc.state.Review.Needed(remaining) > remaining
+		if impossible && len(rc.state.Escalation()) == 0 {
 			return apperr.Conflict("round_impossible", "Without this person the round cannot pass. Add another reviewer first.")
 		}
 		if _, err := tx.Exec(ctx, `UPDATE workflow_reviewers SET removed_at = now(), removed_by = $4, removed_reason = $5
@@ -582,6 +625,17 @@ func (s *Service) RemoveReviewer(ctx context.Context, c identity.Caller, id, use
 			map[string]any{"user_id": user, "reason": reason, "round": rc.stage.round, "stage": rc.stage.number},
 			map[string]any{"user_ids": authors}); err != nil {
 			return err
+		}
+		if impossible {
+			if _, err := s.escalate(ctx, tx, rc, "removed"); err != nil {
+				return err
+			}
+			if still, err := cannotPass(ctx, tx, rc); err != nil || still {
+				if err != nil {
+					return err
+				}
+				return apperr.Conflict("round_impossible", "Without this person the round cannot pass, and nobody it escalates to can review. Add another reviewer first.")
+			}
 		}
 		_, out, err = s.settleReview(ctx, tx, c, rc.page, rc.ctl, rc.stage)
 		return err

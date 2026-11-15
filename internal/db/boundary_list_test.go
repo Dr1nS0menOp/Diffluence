@@ -101,6 +101,13 @@ var tableOwners = map[string]string{
 	"workflow_reviewers":       "internal/pages",
 	"workflow_review_comments": "internal/pages",
 	"workflow_templates":       "internal/pages",
+	// Time, delegation, periodic review and read and understood (spec 064, wave DC5).
+	"review_deadlines":    "internal/pages",
+	"absences":            "internal/pages",
+	"periodic_reviews":    "internal/pages",
+	"read_requests":       "internal/pages",
+	"read_confirmations":  "internal/pages",
+	"imported_signatures": "internal/pages",
 
 	// draft and published spaces (spec 073).
 	"space_pairs":        "internal/publishing",
@@ -380,17 +387,28 @@ var crossings = map[crossing]int{
 
 	// pages: lists show spaces and people; a move or copy carries restrictions and trash
 	// rows, and space settings for approval live on spaces (spec 032).
-	{"internal/pages", "attachments"}:       3,
+	// A condition of a step counts the files of the page (spec 064, DOC-120).
+	{"internal/pages", "attachments"}:       4,
 	{"internal/pages", "comments"}:          2,
 	{"internal/pages", "page_restrictions"}: 8,
-	{"internal/pages", "spaces"}:            29,
-	{"internal/pages", "trash_items"}:       1,
+	// The move from today's approvals reads the rule of the space (spec 064, DOC-1101).
+	{"internal/pages", "spaces"}:      30,
+	{"internal/pages", "trash_items"}: 1,
 	// The control history and the auditor's export name the author of each version (DOC-1010).
-	{"internal/pages", "users"}: 34,
+	// Delegation, absence, reminders, reports and the reading list name and check active
+	// members (spec 064, DC5).
+	{"internal/pages", "users"}: 48,
 	// Document control resolves the people, groups and roles a review state names when a
 	// round starts, inside the transaction of the step, and names them on the panel and in
-	// the editor (spec 064, DOC-200, DOC-201).
-	{"internal/pages", "group_members"}:    2,
+	// the editor (spec 064, DOC-200, DOC-201), and the groups asked to confirm reading
+	// (DOC-820).
+	{"internal/pages", "group_members"}: 5,
+	// Pruning the audit log stops at the oldest entry of document control, which only the
+	// pages module can tell from its tables (spec 064, DOC-1002).
+	{"internal/pages", "audit_events"}: 2,
+	// Reminders of a periodic review go to the administrators of the space when the owner
+	// left (spec 064, DOC-805).
+	{"internal/pages", "space_grants"}:     2,
 	{"internal/pages", "groups"}:           4,
 	{"internal/pages", "role_assignments"}: 2,
 	{"internal/pages", "roles"}:            4,

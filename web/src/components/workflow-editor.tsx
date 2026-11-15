@@ -28,7 +28,7 @@ import { Dialog, ErrorNote, Field } from './ui';
 
 const KINDS: WorkflowStateKind[] = ['draft', 'in_review', 'approved', 'rejected', 'obsolete'];
 const RULES = ['all', 'quorum', 'any'] as const;
-const OUTCOMES: ('' | WorkflowOutcome)[] = ['', 'approved', 'changes'];
+const OUTCOMES: ('' | WorkflowOutcome)[] = ['', 'approved', 'changes', 'overdue', 'review_due'];
 const MAX_ID = 40;
 const NO_ROLE = '';
 
@@ -369,6 +369,7 @@ function StateFields({ editing, state, index }: { editing: Editing; state: Workf
       {state.kind === 'in_review' && (
         <ReviewFields editing={editing} state={state} onChange={(review) => update({ ...state, review })} />
       )}
+      {state.kind === 'approved' && <PeriodicFields state={state} onChange={update} />}
       {state.kind === 'approved' && (editing.releases || state.release_when_approved) && (
         <>
           <label className="check">
@@ -474,9 +475,97 @@ function ReviewFields({
             />
             {t('workflowEditor.authorsMayAdd')}
           </label>
+          <DueFields review={review} onChange={onChange} />
         </>
       )}
     </div>
+  );
+}
+
+/** The due period of a review state, in working days, with a reminder before it (DOC-230). Who
+ * it escalates to is part of the definition the API takes. */
+function DueFields({
+  review,
+  onChange,
+}: {
+  review: WorkflowReview;
+  onChange: (review: WorkflowReview) => void;
+}) {
+  const { t } = useTranslation();
+  const due = review.due;
+  return (
+    <>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={!!due}
+          onChange={(e) =>
+            onChange({ ...review, due: e.target.checked ? { working_days: 5, remind_before: 1 } : undefined })
+          }
+        />
+        {t('workflowEditor.dueOn')}
+      </label>
+      {due && (
+        <>
+          <Field label={t('workflowEditor.dueDays')} help={t('workflowEditor.dueHelp')}>
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={due.working_days}
+              onChange={(e) => onChange({ ...review, due: { ...due, working_days: Number(e.target.value) } })}
+            />
+          </Field>
+          <Field label={t('workflowEditor.remindBefore')}>
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, due.working_days - 1)}
+              value={due.remind_before}
+              onChange={(e) =>
+                onChange({ ...review, due: { ...due, remind_before: Number(e.target.value) } })
+              }
+            />
+          </Field>
+        </>
+      )}
+    </>
+  );
+}
+
+/** Periodic review of an approved state (DOC-800): its documents come up again after a period. */
+function PeriodicFields({
+  state,
+  onChange,
+}: {
+  state: WorkflowState;
+  onChange: (state: WorkflowState) => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={state.timed}
+          onChange={(e) =>
+            onChange({ ...state, timed: e.target.checked, review_months: e.target.checked ? 12 : undefined })
+          }
+        />
+        {t('workflowEditor.timed')}
+      </label>
+      {state.timed && (
+        <Field label={t('workflowEditor.reviewMonths')} help={t('workflowEditor.reviewMonthsHelp')}>
+          <input
+            type="number"
+            min={1}
+            max={120}
+            value={state.review_months ?? 12}
+            onChange={(e) => onChange({ ...state, review_months: Number(e.target.value) })}
+          />
+        </Field>
+      )}
+    </>
   );
 }
 

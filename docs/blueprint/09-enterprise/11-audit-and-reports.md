@@ -6,9 +6,9 @@ When an auditor visits, they ask for the history of a document: every version, w
 
 ## 11.1 What is audited
 
-- **DOC-1000** · new · Every step of document control writes an audit entry: workflow created, changed (with the version) or archived; workflow assigned to or removed from a space, branch or page; a round started, superseded, passed or ended; each answer and each change of an answer; reviewers added, removed, delegated or replaced by a stand-in; due dates, reminders and escalations; each transition, by a person or the system with its cause; each signature with its hash; each read-and-understood confirmation; periodic review confirmations; and enabling or disabling signing for a person. *Why:* Part 11 §11.10(e); Annex 11 clause 9. *Proof:* a test per event that it is written with the right fields; the audit chain tests of ADR-041 cover integrity.
-- **DOC-1001** · new · Transitions that the workflow marks as needing a **reason** (for example "withdraw" or "reject") require a comment, and the comment is in the audit entry. *Why:* Annex 11 clause 9. *Proof:* a test.
-- **DOC-1002** · new · Audit entries of document control are kept at least as long as the retention of the controlled space; audit retention cannot prune them earlier, and the retention screen says so. *Why:* Part 11 §11.10(e), "retained for a period at least as long as that required for the subject electronic records". *Proof:* a test that `audit prune` keeps them.
+- **DOC-1000** · partly · Every step of document control writes an audit entry: workflow created, changed (with the version) or archived; workflow assigned to or removed from a space, branch or page; a round started, superseded, passed or ended; each answer and each change of an answer; reviewers added, removed, delegated or replaced by a stand-in; due dates, reminders and escalations; each transition, by a person or the system with its cause; each signature with its hash; each read-and-understood confirmation; periodic review confirmations; and enabling or disabling signing for a person. *Why:* Part 11 §11.10(e); Annex 11 clause 9. *Proof:* a test per event that it is written with the right fields; the audit chain tests of ADR-041 cover integrity.
+- **DOC-1001** · built · Transitions that the workflow marks as needing a **reason** (for example "withdraw" or "reject") require a comment, and the comment is in the audit entry. *Why:* Annex 11 clause 9. *Proof:* a test.
+- **DOC-1002** · built · Audit entries of document control are kept at least as long as the retention of the controlled space; audit retention cannot prune them earlier, and the retention screen says so. *Why:* Part 11 §11.10(e), "retained for a period at least as long as that required for the subject electronic records". *Proof:* a test that `audit prune` keeps them.
 
 ## 11.2 On the page
 
@@ -21,5 +21,5 @@ When an auditor visits, they ask for the history of a document: every version, w
 
 ## 11.4 Reports
 
-- **DOC-1030** · new · Reports for a space and across spaces: documents by state; rounds overdue; documents due for periodic review; read-and-understood completion per document; and approvals per person in a period. Each can be exported as CSV. *Proof:* report tests on the real-data benchmark of wave PF for speed (09.14).
-- **DOC-1031** · new · Reports show only spaces and pages the person may see with `space.audit`. *Proof:* a matrix test.
+- **DOC-1030** · built · Reports for a space and across spaces: documents by state; rounds overdue; documents due for periodic review; read-and-understood completion per document; and approvals per person in a period. Each can be exported as CSV. *Proof:* report tests on the real-data benchmark of wave PF for speed (09.14).
+- **DOC-1031** · built · Reports show only spaces and pages the person may see with `space.audit`. *Proof:* a matrix test.

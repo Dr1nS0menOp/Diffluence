@@ -24,7 +24,7 @@ Document control is used by quality teams for years at a time, often under press
 - **DOC-921** · built · The review panel lists reviewers with their answers as a table with headers, the rule and count as text, and the actions as buttons named by their transition. *Why:* WCAG 1.3.1 (info and relationships). *Proof:* an accessibility check.
 - **DOC-922** · built · Answering opens a small dialog with the comment field first, focus on it, and the answer buttons named "Approve" and "Ask for changes" (or the workflow's names). Escape closes it without answering, and focus returns to the button that opened it. *Why:* WCAG 2.1.2 (no keyboard trap) and 2.4.3 (focus order). *Proof:* keyboard e2e tests.
 - **DOC-923** · built · The **signing dialog** (DOC-720) names the meaning in its heading and button, asks for the confirmation in the same dialog, and announces the result in a live region. *Why:* WCAG 4.1.3 (status messages). *Proof:* an accessibility test with a screen reader query of the dialog's accessible name.
-- **DOC-924** · new · Due dates show as dates in the reader's locale and, for screen readers, with the full date; overdue rounds are marked with text. *Proof:* a test.
+- **DOC-924** · built · Due dates show as dates in the reader's locale and, for screen readers, with the full date; overdue rounds are marked with text. *Proof:* a test.
 
 ## 10.4 Keyboard
 

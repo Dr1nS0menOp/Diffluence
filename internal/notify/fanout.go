@@ -87,6 +87,9 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"page.review_answered":  s.onReviewAnswered,
 		"page.review_ended":     s.onReviewEnded,
 		"page.reviewer_removed": s.onReviewerRemoved,
+		"page.review_reminded":  s.onReviewReminded,
+		"page.read_requested":   s.onReadRequested,
+		"page.periodic_review":  s.onPeriodicReview,
 		"release.finished":      s.onReleaseFinished,
 		"page.working_changed":  s.onWorkingChanged,
 		"page.version_approved": s.onVersionApproved,
@@ -407,6 +410,27 @@ func (s *Service) onReviewerRemoved(ctx context.Context, event uuid.UUID, p payl
 	base.NeedsEdit = true
 	authors := slices.DeleteFunc(slices.Clone(p.UserIDs), func(id uuid.UUID) bool { return id == p.UserID })
 	return s.tell(ctx, authors, base, TypeReviewerRemoved, ReasonAuthor)
+}
+
+// onReviewReminded reminds the reviewers who have not answered, through the reading being
+// asked gives them, like the first ask (DOC-601).
+func (s *Service) onReviewReminded(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, NeedsReview: true}
+	return s.tell(ctx, p.UserIDs, base, TypeReviewReminder, ReasonAsked)
+}
+
+// onReadRequested asks people to confirm they read the approved version (DOC-820). It is about
+// the version readers see, so it needs no more than the right to view the page.
+func (s *Service) onReadRequested(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event, Data: map[string]any{"version": p.Version}}
+	return s.tell(ctx, p.UserIDs, base, TypeReadRequested, ReasonAsked)
+}
+
+// onPeriodicReview tells the page owner, or the space owners, that the review date comes
+// (DOC-802, DOC-805).
+func (s *Service) onPeriodicReview(ctx context.Context, event uuid.UUID, p payload) error {
+	base := Row{ActorID: p.ActorID, PageID: p.PageID, SpaceID: p.SpaceID, Event: event}
+	return s.tell(ctx, p.UserIDs, base, TypePeriodicReview, ReasonAuthor)
 }
 
 // RemindDue tells people about tasks that reached their date, once.

@@ -36,6 +36,11 @@ type ReviewerRow struct {
 	AnsweredAt    *time.Time `json:"answered_at"`
 	Removed       bool       `json:"removed"`
 	RemovedReason string     `json:"removed_reason"`
+	// Via says the person was asked through a delegation, a stand-in or an escalation, from
+	// whom and why (DOC-240 to DOC-242).
+	Via       string `json:"via"`
+	ViaFrom   string `json:"via_from"`
+	ViaReason string `json:"via_reason"`
 }
 
 // ReviewComment is a comment that belongs to the round, not to the page (DOC-251).
@@ -60,6 +65,10 @@ type ReviewCan struct {
 	Add     bool `json:"add"`
 	Remove  bool `json:"remove"`
 	Comment bool `json:"comment"`
+	// Delegate lets a reviewer who has not answered hand their place on (DOC-240); Hand lets
+	// whoever looks after the workflows hand someone's place on.
+	Delegate bool `json:"delegate"`
+	Hand     bool `json:"hand"`
 }
 
 // ReviewPanel is the round of a page: the open one, or else the last one.
@@ -90,6 +99,9 @@ type ReviewPanel struct {
 	// Changes is the comparison of Base and Head, block by block, for the same people.
 	Changes []document.DiffBlock `json:"changes,omitempty"`
 	Can     ReviewCan            `json:"can"`
+	// DueAt is the due date of the stage, when its state sets one (DOC-230, DOC-924).
+	DueAt   *string `json:"due_at"`
+	Overdue bool    `json:"overdue"`
 }
 
 // lastRound reads the open round of a page, or else its newest one.
@@ -202,6 +214,15 @@ func (s *Service) Review(ctx context.Context, c identity.Caller, id uuid.UUID) (
 		}
 		out.Can.Add = manager.Allowed || (author.Allowed && state.Review.AuthorsMayAdd)
 		out.Can.Remove = out.Can.Remove || manager.Allowed
+		out.Can.Delegate = out.Can.Answer && out.MyAnswer == ""
+		out.Can.Hand = manager.Allowed
+		due, err := deadlineOf(ctx, s.pool, p.ID)
+		if err != nil {
+			return out, err
+		}
+		if due != nil {
+			out.DueAt, out.Overdue = &due.DueAt, due.Overdue
+		}
 	}
 	out.Can.Comment = found && status == roundStatusOpen && (author.Allowed || reviewing)
 	if author.Allowed || reviewing {
@@ -245,9 +266,11 @@ func currentStageState(ctx context.Context, q db.Querier, st stage) string {
 
 func reviewersOf(ctx context.Context, q db.Querier, st stage) ([]ReviewerRow, error) {
 	rows, err := q.Query(ctx, `SELECT wr.user_id, COALESCE(u.display_name, ''), wr.source_type, COALESCE(g.name, ro.name, ''),
-			COALESCE(wr.answer, ''), wr.comment, wr.answered_at, wr.removed_at IS NOT NULL, wr.removed_reason
+			COALESCE(wr.answer, ''), wr.comment, wr.answered_at, wr.removed_at IS NOT NULL, wr.removed_reason,
+			wr.via, COALESCE(vf.display_name, ''), wr.via_reason
 		FROM workflow_reviewers wr
 		LEFT JOIN users u ON u.id = wr.user_id
+		LEFT JOIN users vf ON vf.id = wr.via_from
 		LEFT JOIN groups g ON wr.source_type = 'group' AND g.id = wr.source_id
 		LEFT JOIN roles ro ON wr.source_type = 'role' AND ro.id = wr.source_id
 		WHERE wr.round_id = $1 AND wr.stage = $2 ORDER BY wr.removed_at IS NOT NULL, lower(u.display_name), wr.user_id LIMIT $3`,

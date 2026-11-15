@@ -5,7 +5,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { api, type ControlInfo, type PageDetail, type WorkflowTransition } from '../api';
+import { api, type ControlInfo, type PageDetail, type ReadRequest, type WorkflowTransition } from '../api';
 import { IconArchive, IconClock, IconPencil, IconVerified } from './icons';
 import { Signatures } from './signatures';
 import { pendingSigning, SigningDialog } from './signing-dialog';
@@ -76,6 +76,18 @@ export function ControlBand({
       {c.state_kind === 'obsolete' && <p>{t('control.withdrawn')}</p>}
       <p className="control-governed">{governed}</p>
       {children}
+      {c.carried_over && <p>{t('control.carriedOver')}</p>}
+      {c.due_at && (
+        <p>
+          {c.overdue ? t('control.overdue') : t('control.due')} <RelativeTime value={c.due_at} />
+        </p>
+      )}
+      {c.next_review_at && (
+        <p>
+          {t('control.nextReview')} <RelativeTime value={c.next_review_at} />
+        </p>
+      )}
+      {c.read_request && <ReadConfirmation page={page} request={c.read_request} />}
       {c.reviewing && <p>{t('review.youAreAsked')}</p>}
       {back === 'failed' && <p className="note-error">{t('signing.providerFailed')}</p>}
       <Signatures list={c.signatures ?? []} />
@@ -87,12 +99,25 @@ export function ControlBand({
             </button>
           )}
           {c.transitions.map((tr) => (
-            <button key={tr.id} type="button" onClick={() => setStep(tr)}>
+            <button
+              key={tr.id}
+              type="button"
+              disabled={!!c.blocked?.[tr.id]}
+              aria-describedby={c.blocked?.[tr.id] ? `blocked-${tr.id}` : undefined}
+              onClick={() => setStep(tr)}
+            >
               {tr.name}
             </button>
           ))}
         </p>
       )}
+      {c.transitions
+        .filter((tr) => c.blocked?.[tr.id])
+        .map((tr) => (
+          <p key={tr.id} id={`blocked-${tr.id}`} className="muted">
+            {t(`control.blocked_${c.blocked[tr.id] ?? 'bad_conditions'}`, { step: tr.name })}
+          </p>
+        ))}
       {step && <StepDialog page={page} control={c} step={step} onClose={() => setStep(null)} />}
       {resumed && resumed.step.transition && (
         <SignedStep
@@ -105,6 +130,32 @@ export function ControlBand({
         />
       )}
     </div>
+  );
+}
+
+/** The confirmation that a person read and understood the version readers see (DOC-821). It
+ * is offered only once the person opened that version in this session (DOC-824). */
+function ReadConfirmation({ page, request }: { page: PageDetail; request: ReadRequest }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const confirm = useMutation({
+    mutationFn: () => api.post(`/pages/${page.id}/read-confirmation`, { version: request.version }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['page', page.id] }),
+  });
+  if (request.confirmed) return <p>{t('control.readConfirmed', { number: request.version })}</p>;
+  return (
+    <>
+      <p>{t('control.readAsked', { number: request.version })}</p>
+      <p className="muted">{t('control.readMeaning')}</p>
+      <ErrorNote error={confirm.error} />
+      {request.can_confirm && (
+        <p className="control-steps">
+          <button type="button" disabled={confirm.isPending} onClick={() => confirm.mutate()}>
+            {t('control.readConfirm', { number: request.version })}
+          </button>
+        </p>
+      )}
+    </>
   );
 }
 

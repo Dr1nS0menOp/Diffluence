@@ -55,6 +55,8 @@ type Review struct {
 	AuthorsMayReview bool `json:"authors_may_review"`
 	// AuthorsMayAdd lets the authors add reviewers to a running round (DOC-202).
 	AuthorsMayAdd bool `json:"authors_may_add"`
+	// Due is how long the reviewers have, and who is asked when that runs out (DOC-230).
+	Due *Due `json:"due,omitempty"`
 }
 
 // Outcome is where a round stands, and which transition the system takes for it.
@@ -154,6 +156,12 @@ func checkReview(s State) *Problem {
 func checkOutcomes(d Definition, states map[string]State) *Problem {
 	for _, tr := range d.Transitions {
 		from, to := states[tr.From], states[tr.To]
+		if p, timed := checkTimedOutcome(tr, from, to); timed {
+			if p != nil {
+				return p
+			}
+			continue
+		}
 		switch tr.Outcome {
 		case "":
 			if from.Review != nil && to.Kind == KindApproved {

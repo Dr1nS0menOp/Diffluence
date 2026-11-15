@@ -79,6 +79,16 @@ type SigningRight struct {
 	EnabledAt    *time.Time `json:"enabled_at"`
 }
 
+// MaySign says whether a person may sign now: an active member whose signing an
+// administrator enabled (DOC-014, DOC-751). Document control asks it before a delegation or a
+// stand-in hands someone a step that is signed (DOC-240).
+func (s *Service) MaySign(ctx context.Context, q db.Querier, id uuid.UUID) (bool, error) {
+	var ok bool
+	err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM signing_rights r JOIN users u ON u.id = r.user_id
+		WHERE r.user_id = $1 AND u.type = $2 AND u.status = $3)`, id, TypeMember, StatusActive).Scan(&ok)
+	return ok, err
+}
+
 // SigningRightOf reads whether a person may sign.
 func (s *Service) SigningRightOf(ctx context.Context, id uuid.UUID) (SigningRight, error) {
 	var r SigningRight

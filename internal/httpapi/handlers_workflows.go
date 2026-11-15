@@ -31,6 +31,7 @@ func (s *Server) registerWorkflowRoutes() {
 	r.HandleFunc("POST "+pagesPath+"/{id}/transitions", Object(permissions.PageEdit), s.handleTransition)
 	s.registerReviewRoutes()
 	s.registerSigningRoutes()
+	s.registerControlTimeRoutes()
 }
 
 // registerReviewRoutes is wave DC2: reviewers and their answers, the review panel, the
@@ -379,15 +380,16 @@ func (s *Server) handleSpaceWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var in struct {
-		WorkflowID *uuid.UUID `json:"workflow_id"`
-		Kinds      []string   `json:"kinds"`
-		Preview    bool       `json:"preview"`
+		WorkflowID   *uuid.UUID `json:"workflow_id"`
+		Kinds        []string   `json:"kinds"`
+		ExemptLabels []string   `json:"exempt_labels"`
+		Preview      bool       `json:"preview"`
 	}
 	if !body(w, r, &in) {
 		return
 	}
 	land, err := s.deps.Pages.SetSpaceWorkflow(r.Context(), s.caller(r), id, pages.SpaceWorkflowInput{
-		WorkflowID: in.WorkflowID, Kinds: in.Kinds, Preview: in.Preview})
+		WorkflowID: in.WorkflowID, Kinds: in.Kinds, ExemptLabels: in.ExemptLabels, Preview: in.Preview})
 	if err != nil {
 		s.fail(w, r, err)
 		return

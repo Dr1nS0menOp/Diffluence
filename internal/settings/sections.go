@@ -77,6 +77,28 @@ type General struct {
 	// EmbedHosts are the outside addresses link cards and embeds may use. Empty by
 	// default: nothing outside is reached until an operator says so (ADM-024).
 	EmbedHosts []string `json:"embed_hosts"`
+	// WorkingDays are the days of the working week, as ISO days (1 is Monday), for due dates
+	// of document control. Empty means Monday to Friday; holidays are not known (DOC-1409).
+	WorkingDays []int `json:"working_days,omitempty"`
+}
+
+// DefaultWorkingDays are Monday to Friday (DOC-1409).
+var DefaultWorkingDays = []int{1, 2, 3, 4, 5}
+
+// Week is the working week of the instance.
+func (g General) Week() []int {
+	if len(g.WorkingDays) == 0 {
+		return DefaultWorkingDays
+	}
+	return g.WorkingDays
+}
+
+// Zone is the time zone of the instance, UTC when none was set.
+func (g General) Zone() string {
+	if g.DefaultTimeZone == "" {
+		return "UTC"
+	}
+	return g.DefaultTimeZone
 }
 
 // Features turns parts of the product on or off. Off hides and deletes nothing.
@@ -213,6 +235,13 @@ func (g General) validate() error {
 	}
 	if !safeAddress(g.HelpURL) {
 		return apperr.Invalid("The help address must be an http or https address.")
+	}
+	seen := map[int]bool{}
+	for _, day := range g.WorkingDays {
+		if day < 1 || day > 7 || seen[day] {
+			return apperr.Invalid("The working week names each day once, from 1 for Monday to 7 for Sunday.")
+		}
+		seen[day] = true
 	}
 	return nil
 }

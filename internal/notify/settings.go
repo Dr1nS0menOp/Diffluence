@@ -59,6 +59,13 @@ const (
 	// TypeApprovalRelease tells the approver and the authors that an approved page was released,
 	// or why not (spec 073, PUB-820).
 	TypeApprovalRelease = "approval_release"
+	// TypeReviewReminder reminds a reviewer before the due date and when it passes (DOC-601).
+	TypeReviewReminder = "review_reminder"
+	// TypeReadRequested asks someone to confirm they read an approved version (DOC-820).
+	TypeReadRequested = "read_requested"
+	// TypePeriodicReview tells the page owner, or the space owners when the owner left, that
+	// a controlled page comes up for its periodic review (DOC-802, DOC-805).
+	TypePeriodicReview = "periodic_review"
 )
 
 // Where a type of notification goes.
@@ -81,7 +88,7 @@ const defaultDigestHour = 8
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
 	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
 	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished, TypeVersionApproved,
-	TypeApprovalRelease}
+	TypeApprovalRelease, TypeReviewReminder, TypeReadRequested, TypePeriodicReview}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -113,6 +120,7 @@ func defaultChannels() map[string]string {
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
 		TypePagesReleased: ChannelDigest, TypeReleaseFinished: ChannelApp,
 		TypeVersionApproved: ChannelDigest, TypeApprovalRelease: ChannelApp,
+		TypeReviewReminder: ChannelMail, TypeReadRequested: ChannelMail, TypePeriodicReview: ChannelMail,
 	}
 }
 

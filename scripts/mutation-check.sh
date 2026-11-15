@@ -2257,7 +2257,7 @@ mutate "someone takes the reviewers' step by hand" internal/pages/control.go \
 mutate "anyone takes a reviewer off" internal/pages/review.go \
   's.replace("\t\tif user != c.UserID {", "\t\tif false {")' $app -run TestRemovalNeedsARightAndAReason
 mutate "a reviewer is taken off with too few left" internal/pages/review.go \
-  's.replace("if remaining == 0 || rc.state.Review.Needed(remaining) \x3e remaining {", "if false {")' $app -run TestRemovalNeedsARightAndAReason
+  's.replace("\t\timpossible := remaining == 0 || rc.state.Review.Needed(remaining) \x3e remaining\n", "\t\timpossible := false\n")' $app -run TestRemovalNeedsARightAndAReason
 mutate "a reader reads the round" internal/pages/review_panel.go \
   's.replace("\tif !author.Allowed \x26\x26 !named {", "\tif !author.Allowed \x26\x26 !named \x26\x26 false {")' $app -run TestTheCompareBaseIsTheApprovedVersionAndReviewCommentsStayWithTheRound
 mutate "a reviewer keeps reading after the round" internal/permissions/service.go \
@@ -2364,6 +2364,58 @@ mutate "the trash purges signed records" internal/trash/trash.go \
   's.replace("\t\tkept, err := holdsSignedRecords(ctx, tx, it)\n", "\t\tkept, err := holdsSignedRecords(ctx, tx, it)\n\t\tkept = false\n")' $app -run '^(TestSignedVersionsSurviveDeletePurgeAndRemoval)$'
 mutate "a signed version is removed" internal/pages/signatures.go \
   's.replace("\tif signed {\n\t\treturn apperr.Conflict(\"signed_version\"", "\tif false {\n\t\treturn apperr.Conflict(\"signed_version\"")' $app -run '^(TestSignedVersionsSurviveDeletePurgeAndRemoval)$'
+# Spec 064, wave DC5: time, delegation, read and understood, moves, imports and migration. A
+# time-out never approves, the job acts once, nobody gains a place in a round they could not
+# hold, a confirmation of reading is bound to its version and its session, a move takes the
+# target's rule, an import brings no reader to a working version and no foreign reviewer.
+mutate "a time-out approves" internal/pages/review.go \
+  's.replace("\tif to.Kind == workflow.KindApproved \x26\x26 outcome != workflow.OutcomeApproved {\n", "\tif false {\n")' $app -run '^(TestATimeOutNeverApproves)$'
+mutate "the due job acts on a deadline another worker took" internal/pages/deadlines.go \
+  's.replace("\t\tWHERE round_id = $1 AND stage = $2 AND next_at <= now() FOR UPDATE SKIP LOCKED`", "\t\tWHERE round_id = $1 AND stage = $2 FOR UPDATE SKIP LOCKED`")' $app -run '^(TestTheDueJobOnTwoWorkersActsOnceForEachRound)$'
+mutate "a reminder does not move its moment on" internal/pages/deadlines.go \
+  's.replace("next_at = CASE WHEN $3 THEN due_at ELSE control_working_days_after(now(), 1, $4, $5) END", "next_at = CASE WHEN $3 THEN now() - make_interval(mins => 1) ELSE control_working_days_after(now(), 1, $4, $5) END")' $app -run '^(TestAClockMovedBackGivesOneReminder)$'
+mutate "escalation asks an author" internal/pages/deadlines.go \
+  's.replace("if slices.Contains(present, c.user) || slices.Contains(authors, c.user) ||", "if slices.Contains(present, c.user) || slices.Contains(authors[:0], c.user) ||")' $app -run '^(TestEscalationAddsTheTargetOnceAndNeverAnAuthor)$'
+mutate "a delegate need not be named by the same entry" internal/pages/delegation.go \
+  's.replace("\t\tif !named {\n", "\t\tif !named \x26\x26 false {\n")' $app -run '^(TestDelegationNeverWidensWhoMayApprove)$'
+mutate "a delegate may be an author" internal/pages/delegation.go \
+  's.replace("\t\tif slices.Contains(authors, to) {\n", "\t\tif slices.Contains(authors, to) \x26\x26 false {\n")' $app -run '^(TestDelegationNeverWidensWhoMayApprove)$'
+mutate "a delegate of a signed step need not sign" internal/pages/delegation.go \
+  's.replace("\tif _, signed := approvalSignature(rc); !signed {\n", "\tif true {\n")' $app -run '^(TestADelegateMustHoldTheRightToSign)$'
+mutate "a stand-in the state does not name takes the place" internal/pages/delegation.go \
+  's.replace("\t\tif !isNamed || !eligible(*next) {\n", "\t\tif (!isNamed \x26\x26 false) || !eligible(*next) {\n")' $app -run '^(TestAStandInIsAskedOnlyWhenTheyCouldReview)$'
+mutate "a chain of stand-ins has no end" internal/pages/delegation.go \
+  's.replace("\tfor range maxStandInSteps {\n", "\tfor range maxStandInSteps + 2 {\n")' $app -run '^(TestAStandInIsAskedOnlyWhenTheyCouldReview)$'
+mutate "a reader confirms another version" internal/pages/reading.go \
+  's.replace("\t\tif approved == nil || *approved != version {\n", "\t\tif approved == nil {\n")' $app -run '^(TestAReadConfirmationIsBoundToTheVersionAndToOpeningIt)$'
+mutate "a confirmation needs no opening in its session" internal/pages/reading.go \
+  's.replace("\t\tcase opened == nil || *opened != session:\n", "\t\tcase opened == nil:\n")' $app -run '^(TestAReadConfirmationIsBoundToTheVersionAndToOpeningIt)$'
+mutate "a late joiner is never asked" internal/pages/deadlines.go \
+  's.replace("s.dueDeadlinesPass, s.periodicPass, s.askLateReaders}", "s.dueDeadlinesPass, s.periodicPass}")' $app -run '^(TestPeopleWhoJoinTheGroupLaterAreAsked)$'
+mutate "a periodic review makes a new approval" internal/pages/control.go \
+  's.replace("\tconfirmation := ctl.approved() \x26\x26 *ctl.approvedVersion == ctl.headVersion\n", "\tconfirmation := false\n")' $app -run '^(TestAPeriodicReviewConfirmsWithoutANewVersion)$'
+mutate "page.edit alone touches an exempt label" internal/pages/exempt.go \
+  's.replace("\tif !d.Allowed {\n\t\treturn true, apperr.Forbidden()\n", "\tif !d.Allowed \x26\x26 false {\n\t\treturn true, apperr.Forbidden()\n")' $app -run '^(TestOnlyThoseWhoLookAfterWorkflowsTouchAnExemptLabel)$'
+mutate "a step is taken past its conditions" internal/pages/step_conditions.go \
+  's.replace("\tif ok, reason := tr.Allows(f); !ok {\n\t\treturn apperr.Conflict(", "\tif ok, reason := tr.Allows(f); !ok \x26\x26 false {\n\t\treturn apperr.Conflict(")' $app -run '^(TestAStepWithConditionsSaysWhyItCannotBeTaken)$'
+mutate "the move keeps the approval of another space" internal/pages/assign.go \
+  's.replace("\tcase controlled \x26\x26 cause == settleMovedSpace:\n", "\tcase false:\n")' $app -run '^(TestAMoveToAnotherSpaceTakesItsRule)$'
+mutate "a page workflow follows the page to another space" internal/pages/move.go \
+  's.replace("\tif _, err := tx.Exec(ctx, \"DELETE FROM page_workflows WHERE page_id = ANY($1)\", tree); err != nil {\n", "\tif _, err := tx.Exec(ctx, \"SELECT $1::uuid[]\", tree); err != nil {\n")' $app -run '^(TestAMoveToAnotherSpaceTakesItsRule)$'
+mutate "an import keeps foreign reviewers" internal/pages/bundle_control.go \
+  's.replace("\t\tw.Definition = withoutPeople(w.Definition)\n", "")' $app -run '^(TestAnImportNeverBringsReadersToAWorkingVersionNorForeignReviewers)$'
+mutate "an import shows readers a working version" internal/pages/bundle_control.go \
+  's.replace("\tif pc.ApprovedVersion != nil \x26\x26 current != *pc.ApprovedVersion {\n", "\tif false {\n")' $app -run '^(TestAnImportNeverBringsReadersToAWorkingVersionNorForeignReviewers)$'
+mutate "an imported signature verifies whatever the content" internal/pages/imported_signatures.go \
+  's.replace("\t\tx.Matches = x.form == ContentForm \x26\x26 bytes.Equal(hash, x.hash)\n", "\t\tx.Matches = x.form == ContentForm || bytes.Equal(hash, x.hash)\n")' $app -run '^(TestImportedSignaturesVerifyAndNeverApprove)$'
+mutate "a carried-over approval is not marked" internal/pages/assign.go \
+  's.replace("\t\tcarried = todayRound\n", "")' $app -run '^(TestTodaysApprovalsMoveToAWorkflowByChoice)$'
+mutate "the move is undone after a round" internal/pages/approval_rule_move.go \
+  's.replace("\t\tif acted {\n", "\t\tif false {\n")' $app -run '^(TestTodaysApprovalsMoveToAWorkflowByChoice)$'
+mutate "a reason stays out of the audit" internal/pages/control.go \
+  's.replace("\t\t\tdetails[\"comment\"] = comment\n", "")' $app -run '^(TestAStepThatNeedsAReasonKeepsItInTheAudit)$'
+mutate "pruning removes the records of document control" internal/pages/verify_all.go \
+  's.replaceAll("UNION ALL SELECT min(e.occurred_at)", "UNION ALL SELECT NULL::timestamptz")' $app -run '^(TestPruningKeepsTheRecordsOfDocumentControl)$'
 # Spec 067: every route that takes an id is walked as a stranger, and the service for
 # editing together holds a ticket in place of the cookie.
 mutate "anyone reads an export by its id" internal/exchange/export.go \

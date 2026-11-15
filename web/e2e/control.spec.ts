@@ -305,6 +305,62 @@ test('a reader keeps the approved version and asks for every approval', async ({
   await checkAccessibility(page);
 });
 
+// Wave DC5: the band tells a reader when the page comes up for review, and asks them to confirm
+// that they read the version, once they opened it (DOC-801, DOC-820 to DOC-824).
+test('a reader sees the review date and confirms reading the approved version', async ({ page, browser }) => {
+  const space = await newSpace(page, 'Reading');
+  const id = await publishedPage(
+    page,
+    space.id,
+    'Hand washing',
+    'Wash for twenty seconds',
+    space.home_page_id,
+  );
+  const name = unique('reader');
+  const reader = await createUser(browser, `${name}@example.com`);
+  await grant(page, space.id, { type: 'user', id: reader }, VIEWER);
+  const group = await page.request.post('/api/v1/admin/groups', { data: { name: unique('Staff') } });
+  expect(group.ok(), await group.text()).toBeTruthy();
+  const groupId = (await group.json()).id as string;
+  expect((await page.request.put(`/api/v1/admin/groups/${groupId}/members/${reader}`)).ok()).toBeTruthy();
+  const definition = {
+    ...flow,
+    states: flow.states.map((s) =>
+      s.id === 'approved'
+        ? { ...s, timed: true, review_months: 12, read_and_understood: { groups: [groupId] } }
+        : s,
+    ),
+  };
+  const made = await page.request.post(`/api/v1/spaces/${space.id}/workflows`, {
+    data: { name: 'Read it', definition },
+  });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const workflow = (await made.json()).id as string;
+  expect(
+    (await page.request.put(`/api/v1/pages/${id}/workflow`, { data: { workflow_id: workflow } })).ok(),
+  ).toBeTruthy();
+  for (const transition of ['submit', 'approve']) {
+    const band = await (await page.request.get(`/api/v1/pages/${id}`)).json();
+    const step = await page.request.post(`/api/v1/pages/${id}/transitions`, {
+      data: { transition, version: band.control.head_version },
+    });
+    expect(step.ok(), await step.text()).toBeTruthy();
+  }
+  const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
+  const other = await context.newPage();
+  await login(other, `${name}@example.com`, PASSWORD);
+  await other.goto(`/pages/${id}`);
+  const band = other.locator('.control-band');
+  await expect(band.getByText('Next periodic review')).toBeVisible();
+  await expect(
+    band.getByText('You are asked to confirm that you read and understood version 1.'),
+  ).toBeVisible();
+  await band.getByRole('button', { name: 'I read and understood version 1' }).click();
+  await expect(band.getByText('You confirmed that you read version 1.')).toBeVisible();
+  await checkAccessibility(other);
+  await context.close();
+});
+
 // Wave DC4: the signing dialog names the meaning in its heading and its button, asks for the
 // password and a code in the same dialog, and says the result in a live region (DOC-720,
 // DOC-923). The signature then shows on the band with its mark (DOC-740).

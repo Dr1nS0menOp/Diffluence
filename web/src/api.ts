@@ -832,7 +832,7 @@ export interface PageDetail extends PageSummary {
 export type WorkflowStateKind = 'draft' | 'in_review' | 'approved' | 'rejected' | 'obsolete';
 
 /** Which step the system takes when a review passes or asks for changes (spec 064, DC2). */
-export type WorkflowOutcome = 'approved' | 'changes';
+export type WorkflowOutcome = 'approved' | 'changes' | 'overdue' | 'review_due';
 
 export interface WorkflowTransition {
   id: string;
@@ -860,6 +860,14 @@ export interface WorkflowReview {
   quorum?: number;
   authors_may_review: boolean;
   authors_may_add: boolean;
+  /** How long the reviewers have, in working days, and who is asked when it runs out (DOC-230). */
+  due?: WorkflowDue;
+}
+
+export interface WorkflowDue {
+  working_days: number;
+  remind_before: number;
+  escalate?: WorkflowReviewer[];
 }
 
 export interface WorkflowState {
@@ -872,6 +880,10 @@ export interface WorkflowState {
   review?: WorkflowReview;
   /** An approved state that releases its pages to the published space (spec 073, PUB-710). */
   release_when_approved?: boolean;
+  /** The review period of a timed approved state, in months (DOC-800). */
+  review_months?: number;
+  /** Groups asked to confirm they read each version approved into the state (DOC-820). */
+  read_and_understood?: { groups: string[] };
 }
 
 export interface WorkflowDefinition {
@@ -961,6 +973,10 @@ export interface ReviewerRow {
   answered_at: string | null;
   removed: boolean;
   removed_reason: string;
+  /** How the person came to be asked besides the entries of the state (DOC-240 to DOC-242). */
+  via: '' | 'delegated' | 'stand_in' | 'escalated';
+  via_from: string;
+  via_reason: string;
 }
 
 export interface ReviewComment {
@@ -998,10 +1014,31 @@ export interface ReviewPanelData {
   head: ReviewText | null;
   /** The change from the approved version, when the server compares for the panel. */
   changes?: DiffBlock[];
-  can: { answer: boolean; add: boolean; remove: boolean; comment: boolean };
+  can: { answer: boolean; add: boolean; remove: boolean; comment: boolean; delegate: boolean; hand: boolean };
   /** The meaning an approval is signed with, or empty when approvals are not signed. */
   signature_meaning: string;
+  /** The due date of the stage, when its state sets one (DOC-230, DOC-924). */
+  due_at: string | null;
+  overdue: boolean;
 }
+
+/** A request to confirm reading the version readers see (DOC-820, DOC-824). */
+export interface ReadRequest {
+  version: number;
+  confirmed: boolean;
+  /** The person opened this version in this session, so the confirmation is offered. */
+  can_confirm: boolean;
+}
+
+/** Why the conditions of a step hold it back (DOC-120). */
+export type BlockedReason =
+  | 'label_missing'
+  | 'label_present'
+  | 'label_gone'
+  | 'unchanged'
+  | 'no_attachment'
+  | 'none_holds'
+  | 'bad_conditions';
 
 /** The workflow of a controlled page, as the band near its title shows it. */
 export interface ControlInfo {
@@ -1027,6 +1064,16 @@ export interface ControlInfo {
   in_review: boolean;
   /** The signatures of the version on display (DOC-740). */
   signatures: SignatureView[];
+  /** The due date of the stage the page is in (DOC-230). */
+  due_at: string | null;
+  overdue: boolean;
+  /** The next periodic review date (DOC-801). */
+  next_review_at: string | null;
+  read_request?: ReadRequest;
+  /** Approved by one of the approval rounds from before workflows, never signed (DOC-1103). */
+  carried_over: boolean;
+  /** Why each step its conditions hold back cannot be taken now. */
+  blocked: Record<string, BlockedReason>;
 }
 
 /** A signature as a page and its history show it. */

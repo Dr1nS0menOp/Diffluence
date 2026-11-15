@@ -214,6 +214,9 @@ func TestAnonymisingLeavesTheIdOnlyWhereThatIsDecided(t *testing.T) {
 	anna.ok("PUT", "/api/v1/users/"+bob.id+"/follow", nil)
 	bob.ok("PUT", "/api/v1/users/"+anna.id+"/follow", nil)
 	anna.ok("GET", "/api/v1/pages/"+page, nil)
+	// Time away, and standing in for someone, go with the person (spec 064, DOC-241).
+	anna.ok("PUT", "/api/v1/me/absence", map[string]any{"starts_on": "2026-01-01", "ends_on": "2026-01-31", "stand_in": bob.id})
+	bob.ok("PUT", "/api/v1/me/absence", map[string]any{"starts_on": "2026-02-01", "ends_on": "2026-02-28", "stand_in": anna.id})
 	e.sql(`INSERT INTO notifications (id, user_id, actor_id, type, reason, group_key, source_event) VALUES
 		(gen_random_uuid(), $1, $2, 'mention', 'mention', 'a', gen_random_uuid()),
 		(gen_random_uuid(), $2, $1, 'mention', 'mention', 'b', gen_random_uuid())`, anna.id, bob.id)

@@ -210,6 +210,9 @@ func (s *Service) mayReadRound(ctx context.Context, q db.Querier, userID, pageID
 type ApprovalRule struct {
 	Required  bool     `json:"required"`
 	Approvers []Person `json:"approvers"`
+	// MovedToWorkflow says the space moved to a workflow: the rule is switched off and kept
+	// as history (DOC-1105).
+	MovedToWorkflow bool `json:"moved_to_workflow"`
 }
 
 // Person is someone named on a screen.
@@ -224,7 +227,8 @@ func (s *Service) ApprovalRuleOf(ctx context.Context, c identity.Caller, spaceID
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.SpaceApprovals); err != nil {
 		return out, err
 	}
-	if err := s.pool.QueryRow(ctx, "SELECT approval_required FROM spaces WHERE id = $1", spaceID).Scan(&out.Required); err != nil {
+	if err := s.pool.QueryRow(ctx, `SELECT approval_required, EXISTS (SELECT 1 FROM space_workflows w WHERE w.space_id = $1 AND w.from_approval_rule)
+		FROM spaces WHERE id = $1`, spaceID).Scan(&out.Required, &out.MovedToWorkflow); err != nil {
 		return out, err
 	}
 	rows, err := s.pool.Query(ctx, `SELECT u.id, u.display_name FROM space_approvers a

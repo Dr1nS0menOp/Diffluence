@@ -326,6 +326,43 @@ Every wave follows these rules:
 - the move taking the target's rule;
 - copies dropping signatures.
 
+**Built:** see `docs/reports/2026-11-15-wave-dc5.md`. Migration 0071 adds `review_deadlines`, `absences`, `periodic_reviews`, `read_requests`, `read_confirmations` and `imported_signatures`, the columns `via`, `via_from` and `via_reason` of a reviewer, `review_months` and `carried_round` of `page_control`, `exempt_labels` and `from_approval_rule` of a space workflow, the function `control_working_days_after`, and imported signatures in `holds_signed_records`. `0070_reserved.sql` holds the number of GT4.
+
+**Not in this wave:**
+- the PDF report of the auditor's export and the export as background work (DOC-1020 partly, DOC-1305 partly);
+- a signature of meaning "read and understood" (DOC-821 partly): confirming is an acknowledgement for now;
+- conditions on page properties, which Diffluence does not have (DOC-120 partly);
+- a screen for absences and for the escalation targets and reading groups of a state; the API takes them (DOC-241, DOC-231, DOC-820);
+- the restore drill step with an open round (DOC-1211), resuming a large assignment killed halfway (DOC-1251), and the budgets of DOC-1306 on the real-data dump.
+
+**Load (DOC-1304 to DOC-1306):**
+- A controlled read asks its due date, review date and reading request inside the query the band already makes: no query more. A workflow with conditions adds three to five small queries for its authors' band only.
+- A stage with a due period writes one row when it starts; the job reads due rows by the partial index `review_deadlines_next`, at most 500 a pass, and locks one page at a time.
+- Late readers are found in one bounded statement a minute; its cost grows with the open reading requests times the members of their groups.
+- Reports read one space or the spaces a person audits, at most 5000 rows, under the 15-second limit of every request.
+
+**Decided on the product owner's behalf on 2026-11-15, may be overruled:**
+
+| # | Decision | Reason |
+|---|---|---|
+| DC5-1 | No part of DC5 has an experimental switch. Due dates, escalation, periodic review, reading and conditions are set per state or step, delegation and absence per person, exempt labels per space workflow, and the move from today's approvals is an offer | DC2-1: each part is opt-in already, and a switch would be one more thing to validate |
+| DC5-2 | A due period is 1 to 60 working days, counted in the database from the start of the stage, in the instance's time zone and working week (Monday to Friday unless set under General), at the same time of day. Reviewers who have not answered are reminded the chosen number of working days before, on the date, and each working day after | DOC-230, DOC-232, DOC-1240, DOC-1242 |
+| DC5-3 | When the date passes, the state's overdue step is taken if it has one; otherwise its escalation targets are asked, once; otherwise the reviewers are reminded. An overdue step never leads into approval: the validator refuses it, and the step itself refuses it whatever a stored definition says, leaving the page in review with the refusal on record | DOC-105, DOC-231, DOC-1401 |
+| DC5-4 | The due job runs every minute: at most 500 items a pass and 40 passes a run, each in its own transaction that locks the page with SKIP LOCKED, checks the stored moment again and moves it on. One item that fails holds up no other | DOC-1232, DOC-1241, DOC-1304 |
+| DC5-5 | A reviewer who has not answered hands their place only to someone the same entry of the state names. Whoever looks after the workflows may hand anyone's place to any member who may review. Never to a guest, an author under independence, someone the stage asked already, or, for a signed approval, someone who may not sign. A reason is needed; the delegator answers no more; both sides are told; the record keeps who, from whom and why | DOC-240, DOC-608: delegation never widens who may approve, and a signature is never handed on |
+| DC5-6 | A person sets their own absence, with dates in the instance's zone and an active member as stand-in. When a stage starts, an absent reviewer's stand-in takes the place only when the state names the stand-in too and they may take it; a chain is followed for three steps, then the escalation targets are asked; with none, the absent person stays asked. A running stage does not change | DOC-241, without widening who reviews |
+| DC5-7 | The job drops disabled and removed people from open stages within a minute, with an audit entry each. A stage that can no longer pass escalates, and one that now passes takes its step. A removal by hand that leaves too few escalates where the state names a target, and is refused otherwise (DC2-10) | DOC-242, DOC-1220 |
+| DC5-8 | An approved state asks 1 to 10 groups to confirm reading. They are resolved at approval to active members who view the space, never guests; people who join later are asked by the job. A confirmation is for the version readers see now, once, only after the page showed that version in the same session, and never through a token | DOC-820 to DOC-824, DOC-1418 |
+| DC5-9 | A timed approved state has a period of 1 to 120 months, 12 when it names none. A page may have a shorter one, set by whoever may set its workflow. The owner, or the space's administrators when the owner left, is reminded 30 days before and on the date, then weekly. On the date the state's periodic review step starts a round on the same text as the system; passing it confirms the version without a new one and moves the date on, and watchers are not told of a new version | DOC-800 to DOC-805, DOC-1223 |
+| DC5-10 | A space workflow exempts at most 20 labels. Adding or removing one, and renaming a label onto or away from one, needs space.workflows; a copy keeps an exempt label only for someone who may set it | DOC-402: nobody escapes review with a label |
+| DC5-11 | Conditions are a label present or absent, a change of the title, the body or the files since the approved version, and at least one file, joined by "all of" or "any of", at most ten, through `conditions.Combine` and `conditions.MaxTests`. A label the space's fixed list no longer allows fails closed. Diffluence has no page properties, so there is no property condition yet | DOC-120, TPL-433 |
+| DC5-12 | No automation action takes a step. A token takes steps with every check of a person, conditions included, and never signs or confirms reading | DOC-121, DOC-1413 |
+| DC5-13 | A move to another space never takes a page workflow along, and an approval under the other space's procedure never counts: under control there the page starts at its newest version and readers see nothing until it is approved; without control it is an ordinary page at its approved version | DOC-1200, DOC-430 |
+| DC5-14 | A bundle's workflows arrive without their reviewers, escalation targets and reading groups, which are people of another installation. A bundle whose readers' version is not the approved one is refused. Signatures arrive as imported records, shown with their installation and verified against the content here, and never count as a signature or an approval here. The bundle keeps version 8 with an optional list of signatures | DOC-1212, DOC-1421 |
+| DC5-15 | A step's comment is kept in its audit entry. Pruning the audit log stops at the oldest record of document control: a signature, or an entry about a controlled page or a workflow | DOC-1001, DOC-1002 |
+| DC5-16 | Five reports (states, overdue, periodic review, reading, approvals per person in a period), for a space with space.audit and across every space the person audits, as JSON or CSV, at most 5000 rows. A page the person may not read is listed without its title | DOC-804, DOC-823, DOC-1030, DOC-1031 |
+| DC5-17 | A space that requires approval and has no space workflow is offered "Approval as before": a draft, a review by every fixed approver under "all" with authors allowed to review and add, approved, and changes. A page approved at its newest version lands approved; at an older version, that one is what readers see and the newer one waits; never approved, it starts hidden. Carried approvals are marked, never signed. The old rule is off while the space follows that workflow and stays readable. Undo is open until a person acts under it | DOC-1101 to DOC-1107 |
+
 ## Load budget (ARC-238)
 
 DOC-1300 to DOC-1306:

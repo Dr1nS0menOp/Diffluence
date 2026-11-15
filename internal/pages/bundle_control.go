@@ -90,11 +90,28 @@ type BundledRound struct {
 	Comments  []BundledComment  `json:"comments"`
 }
 
+// BundledSignature is an electronic signature of a version of a bundled page (DOC-1212). An
+// import keeps it as a record of the other installation, never as a signature made here.
+type BundledSignature struct {
+	ID          uuid.UUID `json:"id"`
+	PageID      uuid.UUID `json:"page_id"`
+	Version     int       `json:"version_number"`
+	PrintedName string    `json:"printed_name"`
+	Meaning     string    `json:"meaning"`
+	MeaningName string    `json:"meaning_name"`
+	Method      string    `json:"method"`
+	ContentHash []byte    `json:"content_hash"`
+	ContentForm int16     `json:"content_form"`
+	SignedAt    time.Time `json:"signed_at"`
+}
+
 // ControlRecord is all of document control a bundle of a space carries.
 type ControlRecord struct {
 	Workflows []BundledWorkflow `json:"workflows"`
 	Pages     []BundledControl  `json:"pages"`
 	Rounds    []BundledRound    `json:"rounds"`
+	// Signatures came with DC5; a bundle from before has none.
+	Signatures []BundledSignature `json:"signatures,omitempty"`
 }
 
 // People is how an import finds the people of a bundle here: ok is false for someone with no
@@ -149,6 +166,15 @@ func (s *Service) BundleControl(ctx context.Context, tx pgx.Tx, spaceID uuid.UUI
 		return w, json.Unmarshal(raw, &w.Definition)
 	})
 	if err != nil {
+		return out, err
+	}
+	rows, err = tx.Query(ctx, `SELECT s.id, s.page_id, s.version_number, s.printed_name, s.meaning, s.meaning_name, s.method, s.content_hash,
+			s.content_form, s.signed_at
+		FROM signatures s JOIN pages p ON p.id = s.page_id WHERE p.space_id = $1 AND p.status = 'published' ORDER BY s.signed_at, s.id`, spaceID)
+	if err != nil {
+		return out, err
+	}
+	if out.Signatures, err = pgx.CollectRows(rows, pgx.RowToStructByPos[BundledSignature]); err != nil {
 		return out, err
 	}
 	return out, s.bundleRounds(ctx, tx, spaceID, &out)
@@ -221,6 +247,9 @@ func (s *Service) InsertImportedControl(ctx context.Context, tx pgx.Tx, spaceID 
 	defs := map[uuid.UUID]workflow.Definition{}
 	copies := map[uuid.UUID]uuid.UUID{}
 	for _, w := range rec.Workflows {
+		// The people, groups and roles a workflow names are those of the other installation:
+		// an id that happens to match someone here never makes them a reviewer (DOC-1212).
+		w.Definition = withoutPeople(w.Definition)
 		if err := workflow.Validate(w.Definition); err != nil {
 			return apperr.Invalid(fmt.Sprintf("A workflow in this bundle is not valid: %s", w.Name))
 		}
@@ -253,7 +282,52 @@ func (s *Service) InsertImportedControl(ctx context.Context, tx pgx.Tx, spaceID 
 			return err
 		}
 	}
+	for _, sig := range rec.Signatures {
+		if err := importSignature(ctx, tx, page(sig.PageID), sig, people, source); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+// withoutPeople takes the reviewers, escalation targets and reading groups out of a bundled
+// workflow. Whoever looks after the workflows here names them again; until then a round
+// cannot start, and says so (DOC-200).
+func withoutPeople(d workflow.Definition) workflow.Definition {
+	states := make([]workflow.State, len(d.States))
+	for i, st := range d.States {
+		if st.Review != nil {
+			rv := *st.Review
+			rv.Reviewers = []workflow.Reviewer{}
+			if rv.Due != nil {
+				due := *rv.Due
+				due.Escalate = nil
+				rv.Due = &due
+			}
+			st.Review = &rv
+		}
+		st.ReadAndUnderstood = nil
+		states[i] = st
+	}
+	d.States = states
+	return d
+}
+
+// importSignature keeps a signature of the other installation as an imported record of the
+// version here. It verifies against the content of that version and never approves (DOC-1421).
+func importSignature(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, sig BundledSignature, people People, source uuid.UUID) error {
+	var exists bool
+	if err := tx.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM page_versions WHERE page_id = $1 AND number = $2)", pageID, sig.Version).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists || len(sig.ContentHash) != sha256Size {
+		return apperr.Invalid("A signature in this bundle is about a version it does not hold.")
+	}
+	_, err := tx.Exec(ctx, `INSERT INTO imported_signatures (id, page_id, version_number, source_instance, source_id, printed_name, meaning,
+			meaning_name, method, content_hash, content_form, signed_at, imported_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`, ids.New(), pageID, sig.Version, source, sig.ID, sig.PrintedName,
+		sig.Meaning, sig.MeaningName, sig.Method, sig.ContentHash, sig.ContentForm, sig.SignedAt, people.Importer)
+	return err
 }
 
 // importControl puts one page under the copy of its workflow, as a page workflow.
@@ -283,6 +357,11 @@ func (s *Service) importControl(ctx context.Context, tx pgx.Tx, pageID uuid.UUID
 	var current int
 	if err := tx.QueryRow(ctx, "SELECT current_version FROM pages WHERE id = $1", pageID).Scan(&current); err != nil {
 		return err
+	}
+	// Readers here see the pages row; it must hold the version the bundle says was approved,
+	// so no bundle brings readers to a working version (DOC-1212).
+	if pc.ApprovedVersion != nil && current != *pc.ApprovedVersion {
+		return apperr.Invalid("A page in this bundle shows its readers a version that was not approved.")
 	}
 	for _, number := range []int{current, pc.HeadVersion} {
 		if err := attachments.Pin(ctx, tx, pageID, number); err != nil {

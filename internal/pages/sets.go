@@ -211,7 +211,7 @@ func (s *Service) AddSetPage(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 			skipped = append(skipped, label)
 			continue
 		}
-		if err := addLabel(ctx, tx, c, p, label); err != nil {
+		if err := s.addLabel(ctx, tx, c, p, label); err != nil {
 			return p, nil, err
 		}
 	}

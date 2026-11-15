@@ -31,7 +31,12 @@ interface General {
   default_time_zone: string;
   help_url: string;
   embed_hosts: string[];
+  /** The working week for due dates of document control, as ISO days; empty is Monday to Friday. */
+  working_days?: number[];
 }
+
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 7] as const;
+const DEFAULT_WORKING_DAYS = [1, 2, 3, 4, 5];
 
 type Features = Record<(typeof FEATURES)[number], boolean>;
 
@@ -163,6 +168,25 @@ function GeneralForm() {
               ))}
             </select>
           </Field>
+          <fieldset className="choices">
+            <legend>{t('rules.workingDays')}</legend>
+            <p className="muted">{t('rules.workingDaysHelp')}</p>
+            {WEEK_DAYS.map((day) => {
+              const week = form.working_days?.length ? form.working_days : DEFAULT_WORKING_DAYS;
+              return (
+                <Switch
+                  key={day}
+                  label={t(`rules.weekDay_${day}`)}
+                  value={week.includes(day)}
+                  onChange={(on) =>
+                    set({
+                      working_days: on ? [...week, day].sort((a, b) => a - b) : week.filter((d) => d !== day),
+                    })
+                  }
+                />
+              );
+            })}
+          </fieldset>
           <Field label={t('rules.helpUrl')}>
             <input type="url" value={form.help_url} onChange={(e) => set({ help_url: e.target.value })} />
           </Field>

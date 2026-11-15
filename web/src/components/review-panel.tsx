@@ -75,6 +75,7 @@ function ReviewBody({ page, panel }: { page: PageDetail; panel: ReviewPanelData 
   const { t } = useTranslation();
   const [answering, setAnswering] = useState<Answer | null>(null);
   const [removing, setRemoving] = useState<ReviewerRow | null>(null);
+  const [handing, setHanding] = useState<ReviewerRow | 'me' | null>(null);
   if (!panel.round_id) return <p className="muted">{t('review.noRound')}</p>;
   const active = panel.reviewers.filter((r) => !r.removed);
   return (
@@ -94,6 +95,11 @@ function ReviewBody({ page, panel }: { page: PageDetail; panel: ReviewPanelData 
       {panel.in_review && (
         <p className="muted">{panel.independent ? t('review.independent') : t('review.notIndependent')}</p>
       )}
+      {panel.in_review && panel.due_at && (
+        <p>
+          {panel.overdue ? t('review.overdue') : t('review.due')} <RelativeTime value={panel.due_at} />
+        </p>
+      )}
       {panel.can.answer && (
         <div className="review-actions">
           {panel.my_answer && <p>{t(`review.mine_${panel.my_answer}`)}</p>}
@@ -103,13 +109,18 @@ function ReviewBody({ page, panel }: { page: PageDetail; panel: ReviewPanelData 
           <button type="button" onClick={() => setAnswering('changes')}>
             {t('review.askChanges')}
           </button>
+          {panel.can.delegate && (
+            <button type="button" className="quiet" onClick={() => setHanding('me')}>
+              {t('review.delegate')}
+            </button>
+          )}
         </div>
       )}
       <h3>{t('review.reviewers')}</h3>
       {active.length === 0 && panel.reviewers.length === 0 ? (
         <p className="muted">{t('review.nobody')}</p>
       ) : (
-        <ReviewerTable panel={panel} onRemove={setRemoving} />
+        <ReviewerTable panel={panel} onRemove={setRemoving} onHand={setHanding} />
       )}
       {panel.in_review && panel.can.add && <AddReviewer pageId={page.id} />}
       <h3>{t('review.change')}</h3>
@@ -120,11 +131,26 @@ function ReviewBody({ page, panel }: { page: PageDetail; panel: ReviewPanelData 
         <AnswerDialog page={page} panel={panel} answer={answering} onClose={() => setAnswering(null)} />
       )}
       {removing && <RemoveDialog page={page} reviewer={removing} onClose={() => setRemoving(null)} />}
+      {handing && (
+        <DelegateDialog
+          page={page}
+          from={handing === 'me' ? null : handing}
+          onClose={() => setHanding(null)}
+        />
+      )}
     </>
   );
 }
 
-function ReviewerTable({ panel, onRemove }: { panel: ReviewPanelData; onRemove: (r: ReviewerRow) => void }) {
+function ReviewerTable({
+  panel,
+  onRemove,
+  onHand,
+}: {
+  panel: ReviewPanelData;
+  onRemove: (r: ReviewerRow) => void;
+  onHand: (r: ReviewerRow) => void;
+}) {
   const { t } = useTranslation();
   return (
     <TableBox>
@@ -149,6 +175,11 @@ function ReviewerTable({ panel, onRemove }: { panel: ReviewPanelData; onRemove: 
                 {r.source_name
                   ? t(`review.source_${r.source}_named`, { name: r.source_name })
                   : t(`review.source_${r.source}`)}
+                {r.via && (
+                  <p className="muted">
+                    {t(`review.via_${r.via}`, { name: r.via_from })} {r.via_reason}
+                  </p>
+                )}
               </td>
               <td>
                 {r.removed ? (
@@ -165,6 +196,11 @@ function ReviewerTable({ panel, onRemove }: { panel: ReviewPanelData; onRemove: 
                   {!r.removed && (
                     <button type="button" className="ghost" onClick={() => onRemove(r)}>
                       {t('review.remove')}
+                    </button>
+                  )}
+                  {!r.removed && !r.answer && panel.can.hand && (
+                    <button type="button" className="ghost" onClick={() => onHand(r)}>
+                      {t('review.handOn')}
                     </button>
                   )}
                 </td>
@@ -354,6 +390,67 @@ function RemoveDialog({
           onClick={() => remove.mutate()}
         >
           {t('review.remove')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+/** Handing a place in the round to someone else needs a reason, and never a signature: the
+ * delegate answers, and signs, themselves (DOC-240). */
+function DelegateDialog({
+  page,
+  from,
+  onClose,
+}: {
+  page: PageDetail;
+  from: ReviewerRow | null;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [to, setTo] = useState<{ id: string; name: string } | null>(null);
+  const [reason, setReason] = useState('');
+  const done = useReviewDone(page, onClose);
+  const hand = useMutation({
+    mutationFn: () =>
+      api.post(`/pages/${page.id}/review/delegate`, { from: from?.user_id, to: to?.id, reason }),
+    onSuccess: done,
+  });
+  return (
+    <Dialog
+      title={from ? t('review.handTitle', { name: from.name }) : t('review.delegateTitle')}
+      onClose={onClose}
+    >
+      <p>{from ? t('review.handHelp') : t('review.delegateHelp')}</p>
+      {to ? (
+        <p>
+          {t('review.delegateTo', { name: to.name })}{' '}
+          <button type="button" className="ghost" onClick={() => setTo(null)}>
+            {t('review.delegateOther')}
+          </button>
+        </p>
+      ) : (
+        <SubjectPicker
+          usersOnly
+          label={t('review.delegatePick')}
+          onPick={(e) => setTo({ id: e.id, name: e.name })}
+        />
+      )}
+      <Field label={t('review.reason')}>
+        <textarea value={reason} onChange={(e) => setReason(e.target.value)} />
+      </Field>
+      <ErrorNote error={hand.error} />
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          className="primary"
+          disabled={hand.isPending || !to || reason.trim() === ''}
+          onClick={() => hand.mutate()}
+        >
+          {t('review.delegateSubmit')}
         </button>
       </div>
     </Dialog>
