@@ -51,7 +51,9 @@ function usePageChoices(search: string) {
     search.trim().length > 0
       ? (found.data?.results ?? []).map((result) => ({ id: result.page_id, title: result.title }))
       : (recent.data?.pages ?? []).map((page) => ({ id: page.id, title: page.title }));
-  return { choices: choices.slice(0, MAX_PAGE_RESULTS), error: found.error ?? recent.error };
+  // Until the search has answered, nobody can tell whether the title already exists.
+  const answered = search.trim().length === 0 || found.isSuccess;
+  return { choices: choices.slice(0, MAX_PAGE_RESULTS), error: found.error ?? recent.error, answered };
 }
 
 function useTargets(page: string | null): LinkTarget[] {
@@ -110,7 +112,7 @@ export function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () =>
   );
   const [search, setSearch] = useState('');
   const [invalid, setInvalid] = useState(false);
-  const { choices, error } = usePageChoices(search);
+  const { choices, error, answered } = usePageChoices(search);
   const linkedPage = pageOfAddress(href) ?? null;
   const onThisPage = href.startsWith('#');
   const otherTargets = useTargets(linkedPage);
@@ -177,7 +179,7 @@ export function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () =>
             </ul>
           </>
         )}
-        {newTitle !== '' && !choices.some((choice) => choice.title === newTitle) && (
+        {newTitle !== '' && answered && !choices.some((choice) => choice.title === newTitle) && (
           <button type="button" className="quiet" onClick={addPlaceholder}>
             {t('editor.linkPlaceholder', { title: newTitle })}
           </button>
