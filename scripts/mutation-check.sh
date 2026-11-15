@@ -396,7 +396,7 @@ mutate "a restricted entry is made without its restriction" internal/templates/s
 mutate "a value of a template reaches a reader" internal/document/template.go \
   's.replace("if HasTemplateValues(n) {", "if HasTemplateValues(n) && len(n.Type) < 0 {")' ./internal/document/
 mutate "a link of a set points to the wrong page" internal/templates/sets.go \
-  's.replace("id, ok := pageOf[key]", "_, ok := pageOf[key]\n\t\tid := pageOf[RootKey]")' $app -run TestLinksBetweenEntriesResolveInOnePass
+  's.replace("if id, ok := pageOf[key]; ok {\n\t\t\treturn link(id), true", "if _, ok := pageOf[key]; ok {\n\t\t\treturn link(pageOf[RootKey]), true")' $app -run TestLinksBetweenEntriesResolveInOnePass
 mutate "a request sent twice makes two sets" internal/templates/sets.go \
   's.replace("if p.key != \"\" {", "if p.key == \"never\" {")' $app -run TestADoubleSubmitMakesOneSet
 mutate "a guided template is offered while its part is off" internal/templates/templates.go \
@@ -463,6 +463,88 @@ mutate_web "the form lets a number over its highest through" src/template-fields
   's.replace("if (s.max !== undefined && parsed.n > s.max)", "if (false)")' src/template-fields.test.ts
 mutate_web "the form lets a link of any scheme through" src/template-fields.ts \
   's.replace("if ((u.protocol !== \x27https:\x27 && u.protocol !== \x27http:\x27) || u.host === \x27\x27)", "if (u.host === \x27\x27)")' src/template-fields.test.ts
+# Guided templates (spec 074, wave GT3): conditions, decided by the server, again on submit.
+conds=./internal/conditions/
+mutate "a condition: below takes the bound itself" internal/conditions/conditions.go \
+  's.replace("\tcase OpLt:\n\t\treturn a < b", "\tcase OpLt:\n\t\treturn a <= b")' $conds
+mutate "a condition: at most refuses the bound itself" internal/conditions/conditions.go \
+  's.replace("\tcase OpLe:\n\t\treturn a <= b", "\tcase OpLe:\n\t\treturn a < b")' $conds
+mutate "a condition: above takes the bound itself" internal/conditions/conditions.go \
+  's.replace("\tcase OpGt:\n\t\treturn a > b", "\tcase OpGt:\n\t\treturn a >= b")' $conds
+mutate "a condition: at least refuses the bound itself" internal/conditions/conditions.go \
+  's.replace("\tcase OpGe:\n\t\treturn a >= b", "\tcase OpGe:\n\t\treturn a > b")' $conds
+mutate "a condition: equals is the wrong way round" internal/conditions/conditions.go \
+  's.replace("\tcase OpEq:\n\t\treturn a == b", "\tcase OpEq:\n\t\treturn a != b")' $conds
+mutate "a condition: before takes the same day" internal/conditions/conditions.go \
+  's.replace("\t\treturn answer < day", "\t\treturn answer <= day")' $conds
+mutate "a condition: on or after refuses the same day" internal/conditions/conditions.go \
+  's.replace("\t\treturn answer >= day", "\t\treturn answer > day")' $conds
+mutate "a condition: contains tests only the start" internal/conditions/conditions.go \
+  's.replace("return strings.Contains(a.lower, strings.ToLower(t.Value))", "return strings.HasPrefix(a.lower, strings.ToLower(t.Value))")' $conds
+mutate "a condition: is minds capitals in words" internal/conditions/conditions.go \
+  's.replace("return a.lower == strings.ToLower(t.Value)", "return a.value == t.Value")' $conds
+mutate "a condition: is one of takes anything" internal/conditions/conditions.go \
+  's.replace("\t\treturn listed(t.Values, value, steps)", "\t\treturn len(t.Values) > 0")' $conds
+mutate "a condition: includes takes any choice" internal/conditions/conditions.go \
+  's.replace("\t\t_, found := a.items[t.Value]", "\t\tfound := len(a.items) > 0")' $conds
+mutate "a condition: includes all of takes some of them" internal/conditions/conditions.go \
+  's.replace("if _, found := a.items[want]; !found {", "if _, found := a.items[want]; !found && false {")' $conds
+mutate "a condition: an unanswered yes/no is not a no" internal/conditions/conditions.go \
+  's.replace("\t\treturn value != \"yes\"", "\t\treturn value == \"no\"")' $conds
+mutate "a condition: is a member of is the wrong way round" internal/conditions/conditions.go \
+  's.replace("\tcase OpMember:\n\t\t\treturn member", "\tcase OpMember:\n\t\t\treturn !member")' $conds
+mutate "a condition: a deleted group still decides" internal/conditions/conditions.go \
+  's.replace("slices.Contains(f.MissingGroups, t.Value)", "len(f.MissingGroups) < 0")' $conds
+mutate "a condition: an empty value is treated as not empty" internal/conditions/conditions.go \
+  's.replace("\tempty := value == \"\"\n", "\tempty := value == \"\" && false\n")' $conds
+mutate "a condition: is not on an empty value is false" internal/conditions/conditions.go \
+  's.replace("\tcase OpIsNot, OpNe, OpExcludes:\n\t\tif empty {\n\t\t\treturn true", "\tcase OpIsNot, OpNe, OpExcludes:\n\t\tif empty {\n\t\t\treturn false")' $conds
+mutate "a condition: all of holds when one test fails" internal/conditions/conditions.go \
+  's.replace("\t\t\tif !test(i) {", "\t\t\tif !test(i) && false {")' $conds
+mutate "a condition takes an eleventh test" internal/conditions/conditions.go \
+  's.replace("\tif len(c.Tests) > MaxTests {\n\t\treturn &Problem{Code: \"too_many_tests\"", "\tif len(c.Tests) > MaxTests+1 {\n\t\treturn &Problem{Code: \"too_many_tests\"")' $conds
+mutate "a condition tests a later question" internal/conditions/conditions.go \
+  's.replace("\t\tif s.Later[t.Field] {", "\t\tif false {")' $conds
+mutate "a condition takes an operator its kind lacks" internal/conditions/conditions.go \
+  's.replace("\tif !slices.Contains(Operators[field.Kind], t.Op) {\n\t\treturn \"bad_op\"", "\tif false {\n\t\treturn \"bad_op\"")' $conds
+mutate "a section a condition removes is kept" internal/document/conditional.go \
+  's.replace("ok && holds(cond) {", "ok && (holds(cond) || true) {")' ./internal/document/
+mutate "a section of a template reaches a reader" internal/document/template.go \
+  's.replace("if HasConditionals(n) {", "if HasConditionals(n) && len(n.Type) < 0 {")' ./internal/document/
+mutate "sections nest four deep" internal/document/conditional.go \
+  's.replace("if depth > MaxConditionalDepth {", "if depth > MaxConditionalDepth+1 {")' ./internal/document/
+mutate "an answer to a hidden question is kept" internal/templates/answers.go \
+  's.replace("if !shown || !conditions.Holds(spec.Condition, facts) {", "if !shown {")' $app -run TestATamperedSubmitThatAnswersAHiddenFieldIsIgnored
+mutate "the server trusts the browser on which questions were shown" internal/templates/answers.go \
+  's.replace("if !shown || !conditions.Holds(spec.Condition, facts) {", "if _, sent := given[spec.Name]; !sent && (!shown || !conditions.Holds(spec.Condition, facts)) {")' $app -run TestATamperedSubmitThatAnswersAHiddenFieldIsIgnored
+mutate "a hidden step still asks its questions" internal/templates/answers.go \
+  's.replace("shown = step >= len(m.Steps) || conditions.Holds(m.Steps[step].Condition, facts)", "shown = true")' $app -run TestAHiddenStepDropsTheAnswersOfItsQuestions
+mutate "an entry is made whatever its condition" internal/templates/sets.go \
+  's.replace("(kept[e.Parent] && conditions.Holds(e.Condition, got.facts))", "kept[e.Parent]")' $app -run TestAnEntryLeftOutTakesItsChildrenAndItsLinksBecomeText
+mutate "the pages below an entry left out are made" internal/templates/sets.go \
+  's.replace("(kept[e.Parent] && conditions.Holds(e.Condition, got.facts))", "(true && conditions.Holds(e.Condition, got.facts))")' $app -run TestAnEntryLeftOutTakesItsChildrenAndItsLinksBecomeText
+mutate "a link to an entry left out leaves nothing" internal/templates/sets.go \
+  's.replace("\t\ttitle := titles[key]", "\t\ttitle := \"\"")' $app -run TestAnEntryLeftOutTakesItsChildrenAndItsLinksBecomeText
+mutate "a file of a removed section is copied" internal/templates/sets.go \
+  's.replace("planned.skipFiles = filesLeftOut(texts[e.Key], doc)", "planned.skipFiles = nil")' $app -run TestSectionsOfTextAreKeptOrRemovedWithTheirFiles
+mutate "conditions are saved without their check" internal/templates/versions.go \
+  's.replace("if err := s.checkConditions(ctx, tx, t, m, texts); err != nil {", "if err := s.checkConditions(ctx, tx, t, m, texts); err != nil && false {")' $app -run 'TestAConditionOnAQuestionThatNoLongerExistsIsRefusedAtSave|TestACycleOrASelfReferenceIsRefusedAtSave'
+mutate "a deleted group is saved in a condition" internal/templates/rules.go \
+  's.replace("for _, id := range gone {", "for _, id := range gone[:0] {")' $app -run TestTheValidatorHoldsAConditionToItsShape
+mutate "the first page takes a condition" internal/templates/rules.go \
+  's.replace("root.Condition != nil {", "root.Condition != nil && false {")' $app -run TestTheValidatorHoldsAConditionToItsShape
+mutate "a label rule adds its label whatever its condition" internal/templates/rules.go \
+  's.replace("if r.Entry != e.Key || !conditions.Holds(r.When, facts) {", "if r.Entry != e.Key {")' $app -run TestLabelRulesAddLabelsAndFollowTheFixedList
+mutate "a rename leaves the conditions of questions behind" internal/templates/rules.go \
+  's.replace("\t\tout[i].Condition = renamedCondition(out[i].Condition, from, to)\n\t}\n\treturn out\n}\n\nfunc renameInSteps", "\t}\n\treturn out\n}\n\nfunc renameInSteps")' $app -run TestARenameOfAQuestionIsCarriedIntoItsConditions
+mutate_web "the form: below takes the bound itself" src/template-conditions.ts \
+  's.replace("    case \x27lt\x27:\n      return a < b;", "    case \x27lt\x27:\n      return a <= b;")' src/template-conditions.test.ts
+mutate_web "the form: an empty value is treated as not empty" src/template-conditions.ts \
+  's.replace("const empty = value === \x27\x27;", "const empty = false;")' src/template-conditions.test.ts
+mutate_web "the form: is not on an empty value is false" src/template-conditions.ts \
+  's.replace("if (empty) return t.op === \x27is_not\x27 || t.op === \x27ne\x27 || t.op === \x27excludes\x27;", "if (empty) return false;")' src/template-conditions.test.ts
+mutate_web "the form: a condition tests a later question" src/template-conditions.ts \
+  's.replace("if (s.later.has(name)) return \x27later_field\x27;", "")' src/template-conditions.test.ts
 mutate "the link filter tells hidden from gone" internal/pages/content.go \
   's.replace("AND k.target_id NOT IN (SELECT g.page_id FROM perm_visible_pages($1) g)))", "AND k.target_id NOT IN (SELECT g.id FROM pages g WHERE g.status <> \x27trashed\x27 AND $1::uuid IS NOT NULL)))")' $app -run TestABrokenLinkFilterTreatsHiddenPagesAsGone
 mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \

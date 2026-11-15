@@ -180,6 +180,8 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 - an answer to a hidden field kept;
 - the server trusting the browser's evaluation.
 
+**Status (2026-11-15):** built, with no migration. Report: [2026-11-15-wave-gt3.md](../reports/2026-11-15-wave-gt3.md). `internal/conditions` holds the shape, the validator and the evaluator, with `Combine` and `MaxTests` as the part document control's transitions reuse (TPL-433); `web/src/template-conditions.ts` mirrors it, and both run `internal/conditions/testdata/cases.json`. Left for later, each with its reason in the decision table below: the warning in the template list for a deleted group (TPL-1468, with the state column of GT4); the measurements on the real-data dump (TPL-1422).
+
 ## GT4: rights per template and approval
 
 **Scope:**
@@ -365,6 +367,27 @@ Decided on the product owner's behalf on 2026-11-14, may be overruled.
 | TPL-1460 | The usual place of a template of all spaces | Not offered: only a template of a space has one | A page belongs to one space; the server already ignores a place in another space (TPL-802) |
 | TPL-1461 | An upgrade from GT1 with the part on | No grace refusal, because GT2 has no migration: the changelog says to finish the upgrade before changing questions | A node of GT1 keeps no settings when it saves; experimental and off by default, so the note suffices |
 | TPL-1462 | An answer given empty to a question with a suggestion | It is an answer, and a required question refuses it; only a question left out takes the suggestion | The person cleared it on purpose |
+
+### Decided while building GT3
+
+Decided on the product owner's behalf on 2026-11-15, may be overruled.
+
+| # | Question | Decision | Reason |
+|---|---|---|---|
+| TPL-1463 | Is "≠" of a number true on an empty answer? | Yes, like "is not" | "≠" is the "is not" of numbers; TPL-403 names "is not" as true on empty |
+| TPL-1464 | What is an unanswered yes/no question? | A no: "is no" holds, "is yes" does not | A yes/no question is never required because no is an answer (TPL-305) |
+| TPL-1465 | Do "is" and "is not" on words mind capitals? | No, like "contains"; an option, a label and a date compare exactly | People type words in any case; options and labels have one spelling |
+| TPL-1466 | Which rights does a set need when a condition leaves pages out? | Those of the pages it makes, checked after the conditions | A page that is not made needs no right; a condition still never grants one (TPL-424) |
+| TPL-1467 | Where is each condition set? | A question's in its row of the Form section, a step's in its row, a page's in the Pages section through its own route, a rule's in the Rules section, a section's from its block in the text | Each condition stands next to what it switches; a route of its own for a page keeps an edit of the page from clearing it |
+| TPL-1468 | The warning in the template list for a deleted group (TPL-402) | Not in GT3: a save is refused while a condition names one, and the test is false meanwhile; the warning comes with the list's state column (TPL-1001, GT4) | The list gains its columns once; nothing is made wrongly in the meantime |
+| TPL-1469 | A text change that removes a question a condition tests | Refused, naming the condition, until the condition changes | A condition never points at nothing (TPL-230, TPL-432) |
+| TPL-1470 | Which files does a page get when a section is removed? | Every file of its template but those only removed sections showed; a file the text never showed is copied as before | TPL-422 asks that files in a removed section are not copied; everything else behaves as today |
+| TPL-1471 | How does the form preview a test of the creator's groups? | The template tells the reader which of the tested groups they are in, and which are gone | The reader's own membership leaks nothing; the server decides on submit |
+| TPL-1472 | What may a rename choose? | One line of at most 100 bytes, no braces, not the name of another question ignoring capitals, and no reserved name | The same rules as a question has; braces would break a title pattern |
+| TPL-1473 | How does a test of the space choose spaces? | Checkboxes of the spaces, for a template of all spaces only | A template of a space is only used in that space |
+| TPL-1474 | An answer of more items than a question holds (over 50) | Every test of a list on it is false | Only a tampered answer has that many, and it never adds content |
+| TPL-1475 | A question hidden by a condition, with a suggested answer | The suggestion is not used: the question is empty everywhere | A person cannot be bound by an answer they never saw (TPL-1407) |
+| TPL-1476 | An upgrade from GT2 with the part on | No grace refusal, because GT3 has no migration: the changelog says to finish the upgrade before adding conditions | As TPL-1461; experimental and off by default |
 
 ## What these waves do not cover
 

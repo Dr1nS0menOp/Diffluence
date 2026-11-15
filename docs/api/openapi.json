@@ -12510,6 +12510,41 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/entries/{key}/condition": {
+      "put": {
+        "operationId": "put /api/v1/templates/{id}/entries/{key}/condition",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/entries/{key}/move": {
       "post": {
         "operationId": "post /api/v1/templates/{id}/entries/{key}/move",
@@ -12651,6 +12686,33 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/fields/rename": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/fields/rename",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/files/{file}": {
       "get": {
         "operationId": "get /api/v1/templates/{id}/files/{file}",
@@ -12689,6 +12751,33 @@
     "/api/v1/templates/{id}/publishing": {
       "put": {
         "operationId": "put /api/v1/templates/{id}/publishing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/rules": {
+      "put": {
+        "operationId": "put /api/v1/templates/{id}/rules",
         "parameters": [
           {
             "in": "path",

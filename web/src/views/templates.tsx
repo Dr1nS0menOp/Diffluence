@@ -13,6 +13,7 @@ import { ErrorNote, Field, FilePicker, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
 import { useCapabilities } from '../capabilities';
 import { TemplatePages, useTemplateValues } from './template-pages';
+import { useConditionScope } from './template-rules';
 
 function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -175,6 +176,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
   });
   const doc = useRef<Json>(template.document ?? { type: 'doc', content: [{ type: 'paragraph' }] });
   const values = useTemplateValues(template.id);
+  const conditions = useConditionScope(template.id);
   const save = useMutation({
     mutationFn: () =>
       api.patch(`/templates/${template.id}`, {
@@ -238,6 +240,7 @@ function TemplateForm({ template }: { template: TemplateSummary }) {
         canAttach={false}
         inTemplate
         templateValues={values}
+        templateConditions={conditions}
         fileAddress={templateFileAddress(template.id)}
         onChange={(next) => {
           doc.current = next;

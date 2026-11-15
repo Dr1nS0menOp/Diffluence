@@ -23,7 +23,7 @@ A **variable** is a named value that a template uses in more than one place. Dif
 
   *Proof:* a table test for each value; a test that `date` comes from the database.
 - **TPL-202** · built · **Links to entries** (TPL-110) are variables whose value is the page made from an entry. *Proof:* see TPL-110.
-- **TPL-203** · new · There are **no computed variables**: no arithmetic, no joining of text, no "start date plus two weeks" written as a formula. *Why:* a formula is a small language, and this feature has none (TPL-1405). The one common need, a date relative to another, is met by the date field's default (TPL-304), which offers fixed choices. *Proof:* nothing to test; listed in chapter 14 (TPL-1201).
+- **TPL-203** · built · There are **no computed variables**: no arithmetic, no joining of text, no "start date plus two weeks" written as a formula. *Why:* a formula is a small language, and this feature has none (TPL-1405). The one common need, a date relative to another, is met by the date field's default (TPL-304), which offers fixed choices. *Proof:* nothing to test; listed in chapter 14 (TPL-1201).
 
 ## 4.2 Where variables can be used
 
@@ -58,7 +58,7 @@ A **variable** is a named value that a template uses in more than one place. Dif
 
 ## 4.4 Names
 
-- **TPL-230** · partly · A field's **name** is what the form shows as its label and what the title pattern uses. It must be unique in the template, ignoring case, and at most 100 bytes, as today. The editor refuses two fields that differ only in case. *Edge cases:*
+- **TPL-230** · built · A field's **name** is what the form shows as its label and what the title pattern uses. It must be unique in the template, ignoring case, and at most 100 bytes, as today. The editor refuses two fields that differ only in case. *Edge cases:*
   - renaming a field in the template's editor renames every use in every entry, every title pattern and every condition, as one change and one new version. A rename never leaves a condition pointing at nothing;
   - the names `date`, `space`, `creator`, `set` and `template` are reserved for built-in values. A template from before this feature that has a field with one of those names keeps working: its field wins in its own title pattern, as `ExpandTitle` does today, and the editor asks for a new name at the next save.
 

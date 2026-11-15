@@ -152,8 +152,11 @@ type SetPage struct {
 	Title        string
 	Folder       bool
 	TemplatePage *uuid.UUID
-	Document     document.Node
-	Labels       []string
+	// SkipFiles are files of the template page that are not copied: those only a section a
+	// condition removed showed (spec 074, TPL-422).
+	SkipFiles []uuid.UUID
+	Document  document.Node
+	Labels    []string
 	// Publish makes the first version at once (TPL-151); otherwise the page is an
 	// unpublished page with a draft of its creator, as one page from a template always was.
 	Publish bool
@@ -186,7 +189,7 @@ func (s *Service) AddSetPage(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 		if err := in.before("file"); err != nil {
 			return p, nil, err
 		}
-		mapping, err := s.attachments.CopyAll(ctx, tx, c, *in.TemplatePage, p.ID, in.SpaceID)
+		mapping, err := s.attachments.CopyAllExcept(ctx, tx, c, *in.TemplatePage, p.ID, in.SpaceID, in.SkipFiles)
 		if err != nil {
 			return p, nil, err
 		}

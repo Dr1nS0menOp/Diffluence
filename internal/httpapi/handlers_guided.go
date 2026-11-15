@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/diffluence/diffluence/internal/conditions"
 	"github.com/diffluence/diffluence/internal/templates"
 )
 
@@ -159,6 +160,62 @@ func (s *Server) handleTemplateEntryMove(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleTemplateEntryCondition(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in struct {
+		Condition *conditions.Condition `json:"condition"`
+	}
+	if !body(w, r, &in) {
+		return
+	}
+	if err := s.deps.Templates.SetEntryCondition(r.Context(), s.caller(r), id, r.PathValue("key"), in.Condition); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleTemplateRules(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in templates.RulesInput
+	if !body(w, r, &in) {
+		return
+	}
+	rules, err := s.deps.Templates.SetLabelRules(r.Context(), s.caller(r), id, in)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"label_rules": rules})
+}
+
+func (s *Server) handleTemplateFieldRename(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	var in templates.RenameInput
+	if !body(w, r, &in) {
+		return
+	}
+	if err := s.deps.Templates.RenameField(r.Context(), s.caller(r), id, in); err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	form, err := s.deps.Templates.FormOf(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, form)
 }
 
 func (s *Server) handleTemplateFields(w http.ResponseWriter, r *http.Request) {

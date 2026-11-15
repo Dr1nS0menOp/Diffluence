@@ -199,18 +199,23 @@ func (s *Service) SetFields(ctx context.Context, c identity.Caller, id uuid.UUID
 		if m.Steps == nil {
 			m.Steps = []Step{}
 		}
-		// The row keeps the steps too, for the previous release and the gallery (syncRow).
-		raw, err := json.Marshal(m.Steps)
-		if err != nil {
-			return m, err
-		}
-		_, err = tx.Exec(ctx, "UPDATE templates SET steps = $2 WHERE id = $1", t.ID, raw)
-		return m, err
+		return m, saveRowSteps(ctx, tx, t.ID, m.Steps)
 	})
 	if err != nil {
 		return Form{}, err
 	}
 	return s.FormOf(ctx, c, id)
+}
+
+// saveRowSteps writes the steps to the row of a template too, for the previous release and
+// the gallery (syncRow).
+func saveRowSteps(ctx context.Context, tx pgx.Tx, id uuid.UUID, steps []Step) error {
+	raw, err := json.Marshal(steps)
+	if err != nil {
+		return err
+	}
+	_, err = tx.Exec(ctx, "UPDATE templates SET steps = $2 WHERE id = $1", id, raw)
+	return err
 }
 
 // beyondTexts keeps the settings that say more than the texts already do. A question whose

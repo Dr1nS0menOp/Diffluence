@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/conditions"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/labels"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -58,6 +59,9 @@ type Entry struct {
 	Labels       []string     `json:"labels"`
 	Restrictions Restrictions `json:"restrictions"`
 	WorkflowID   *uuid.UUID   `json:"workflow_id"`
+	// Condition makes the page, and every page below it, only when it holds (TPL-420). The
+	// first entry has none: a set needs its first page.
+	Condition *conditions.Condition `json:"condition,omitempty"`
 }
 
 // Manifest is everything one version of a template makes (TPL-600). The text of each
@@ -74,6 +78,9 @@ type Manifest struct {
 	// (TPL-1431): its kind, help, default and validation (spec 074, wave GT2). A question
 	// without an entry here asks as its text says, as every question did before.
 	Fields []fields.Spec `json:"fields,omitempty"`
+	// LabelRules add labels to the pages of entries, always or when a condition holds
+	// (spec 074, wave GT3, TPL-423).
+	LabelRules []LabelRule `json:"label_rules,omitempty"`
 }
 
 func (m Manifest) entry(key string) (Entry, int, bool) {
@@ -239,18 +246,24 @@ func sameManifest(a, b Manifest) (bool, error) {
 
 // usesGuidedParts says whether a template needs the experimental part guided templates
 // to be offered (TPL-050): more than one page, publishing at once, the settings of a
-// question beyond its text, a restriction, a workflow, or a value of the template in its text.
+// question beyond its text, a restriction, a workflow, a condition, a label rule, or a
+// value of the template or a section a condition shows in its text.
 func (m Manifest) usesGuidedParts(texts map[string]document.Node) bool {
-	if len(m.Entries) > 1 || m.Publish || len(m.Fields) > 0 {
+	if len(m.Entries) > 1 || m.Publish || len(m.Fields) > 0 || len(m.LabelRules) > 0 {
 		return true
 	}
 	for _, e := range m.Entries {
-		if e.Restrictions.any() || e.WorkflowID != nil {
+		if e.Restrictions.any() || e.WorkflowID != nil || e.Condition != nil {
+			return true
+		}
+	}
+	for _, st := range m.Steps {
+		if st.Condition != nil {
 			return true
 		}
 	}
 	for _, doc := range texts {
-		if document.HasTemplateValues(doc) {
+		if document.HasTemplateValues(doc) || document.HasConditionals(doc) {
 			return true
 		}
 	}

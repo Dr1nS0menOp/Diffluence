@@ -144,6 +144,13 @@ export const TEMPLATE_ITEMS: InsertItem[] = [
   },
 ];
 
+/** A section of text a condition shows, in a guided template (spec 074, TPL-422, TPL-1013). */
+export const TEMPLATE_SECTION_ITEM: InsertItem = {
+  id: 'conditional',
+  icon: IconExpand,
+  run: (_editor, actions) => actions.openSection(null),
+};
+
 /** A value the template knows, or a link to a page of its set (spec 074, TPL-1013). */
 export const TEMPLATE_VALUE_ITEM: InsertItem = {
   id: 'templateValue',

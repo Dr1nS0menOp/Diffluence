@@ -85,8 +85,8 @@ func TestTheExampleShowsEverythingTheFormatCanHold(t *testing.T) {
 		// Nobody writes the unknown block: it is what a block of a newer release turns into.
 		// A value of a template makes its template a guided one (spec 074), which a new
 		// installation does not offer while that experimental part is off, so the example's
-		// template stays plain.
-		if !nodes[name] && name != document.TypeUnknownBlock && name != document.TypeTemplateValue {
+		// template stays plain. A section a condition shows makes it guided as well.
+		if !nodes[name] && name != document.TypeUnknownBlock && name != document.TypeTemplateValue && name != document.TypeConditional {
 			missing = append(missing, "node "+name)
 		}
 	}

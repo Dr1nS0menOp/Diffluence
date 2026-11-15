@@ -14,6 +14,7 @@ import {
 } from './attachments';
 import { Column, Columns, Decision, Expand, Panel, Spotlight, UnknownBlock } from './blocks';
 import { CodeBlock } from './code';
+import { Conditional } from './conditional';
 import { Dynamic } from './dynamic/dynamic';
 import { Anchor, ChartNode, Excerpt, Media, PageFacts } from './dynamic/nodes';
 import { DateMark, Instruction, Status, TemplateField, TemplateValue } from './inline';
@@ -127,6 +128,7 @@ export function documentExtensions({
     Mention,
     TemplateField,
     TemplateValue,
+    Conditional,
     Instruction,
     TextColor,
     Highlight,

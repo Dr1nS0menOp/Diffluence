@@ -41,6 +41,10 @@ type Entries struct {
 	Publish       bool       `json:"publish"`
 	DefaultParent *uuid.UUID `json:"default_parent"`
 	Entries       []Entry    `json:"entries"`
+	// LabelRules are the template's label rules, for the Rules section (TPL-423).
+	LabelRules []LabelRule `json:"label_rules"`
+	// Names are today's names of the groups and spaces its conditions test, by id.
+	Names map[string]string `json:"names"`
 }
 
 // editTemplate runs change on the newest manifest of a template that the caller manages,
@@ -97,8 +101,17 @@ func (s *Service) Entries(ctx context.Context, c identity.Caller, id uuid.UUID) 
 		if err != nil {
 			return err
 		}
-		out = Entries{Version: v.Number, Publish: v.Manifest.Publish, DefaultParent: v.Manifest.DefaultParent, Entries: v.Manifest.ordered()}
-		return nil
+		out = Entries{Version: v.Number, Publish: v.Manifest.Publish, DefaultParent: v.Manifest.DefaultParent, Entries: v.Manifest.ordered(),
+			LabelRules: v.Manifest.LabelRules}
+		if out.LabelRules == nil {
+			out.LabelRules = []LabelRule{}
+		}
+		texts, _, err := s.textsOf(ctx, tx, v.Manifest)
+		if err != nil {
+			return err
+		}
+		out.Names, err = s.conditionNames(ctx, tx, t, v.Manifest, texts)
+		return err
 	})
 	return out, err
 }

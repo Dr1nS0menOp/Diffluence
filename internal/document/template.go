@@ -157,6 +157,9 @@ func ForPublish(n Node) (Node, error) {
 	if HasTemplateValues(n) {
 		return n, apperr.Invalid("A value of a template cannot be published. Remove it first.")
 	}
+	if HasConditionals(n) {
+		return n, apperr.Invalid("A section of a template that a condition shows cannot be published. Remove it first.")
+	}
 	return stripInstructions(n), nil
 }
 

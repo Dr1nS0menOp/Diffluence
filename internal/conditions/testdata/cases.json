@@ -1,0 +1,534 @@
+{
+  "today": "2027-03-01",
+  "operators": {
+    "line": ["empty", "not_empty", "is", "is_not", "contains"],
+    "text": ["empty", "not_empty", "is", "is_not", "contains"],
+    "link": ["empty", "not_empty", "is", "is_not", "contains"],
+    "number": ["empty", "not_empty", "eq", "ne", "lt", "le", "gt", "ge"],
+    "date": ["empty", "not_empty", "is", "before", "after", "on_or_before", "on_or_after"],
+    "yesno": ["yes", "no"],
+    "choice": ["empty", "is", "is_not", "one_of"],
+    "choices": ["empty", "includes", "excludes", "includes_all"],
+    "person": ["empty", "not_empty"],
+    "people": ["empty", "not_empty"],
+    "page": ["empty", "not_empty"],
+    "label": ["is", "is_not", "one_of"],
+    "space": ["one_of"],
+    "groups": ["member", "not_member"]
+  },
+  "tests": [
+    { "name": "line: is empty, on empty", "kind": "line", "op": "empty", "answer": "", "result": true },
+    { "name": "line: is empty, on spaces", "kind": "line", "op": "empty", "answer": "   ", "result": true },
+    { "name": "line: is empty, on words", "kind": "line", "op": "empty", "answer": "Ada", "result": false },
+    { "name": "line: is not empty, on empty", "kind": "line", "op": "not_empty", "answer": "", "result": false },
+    { "name": "line: is not empty, on words", "kind": "line", "op": "not_empty", "answer": "Ada", "result": true },
+    { "name": "line: is, same words", "kind": "line", "op": "is", "value": "Ada", "answer": "Ada", "result": true },
+    { "name": "line: is, ignoring case", "kind": "line", "op": "is", "value": "ada", "answer": "ADA", "result": true },
+    { "name": "line: is, other words", "kind": "line", "op": "is", "value": "Ada", "answer": "Adam", "result": false },
+    { "name": "line: is, on empty", "kind": "line", "op": "is", "value": "Ada", "answer": "", "result": false },
+    { "name": "line: is not, other words", "kind": "line", "op": "is_not", "value": "Ada", "answer": "Bob", "result": true },
+    { "name": "line: is not, same words", "kind": "line", "op": "is_not", "value": "Ada", "answer": "ada", "result": false },
+    { "name": "line: is not, on empty", "kind": "line", "op": "is_not", "value": "Ada", "answer": "", "result": true },
+    { "name": "line: contains, inside", "kind": "line", "op": "contains", "value": "lap", "answer": "A Laptop", "result": true },
+    { "name": "line: contains, not inside", "kind": "line", "op": "contains", "value": "phone", "answer": "A Laptop", "result": false },
+    { "name": "line: contains, on empty", "kind": "line", "op": "contains", "value": "lap", "answer": "", "result": false },
+    { "name": "text: contains across lines", "kind": "text", "op": "contains", "value": "second", "answer": "first\nSecond line", "result": true },
+    { "name": "text: is empty, on empty", "kind": "text", "op": "empty", "answer": "", "result": true },
+    { "name": "text: is not empty, on empty", "kind": "text", "op": "not_empty", "answer": "", "result": false },
+    { "name": "text: is, on empty", "kind": "text", "op": "is", "value": "x", "answer": "", "result": false },
+    { "name": "text: is not, on empty", "kind": "text", "op": "is_not", "value": "x", "answer": "", "result": true },
+    { "name": "text: contains, on empty", "kind": "text", "op": "contains", "value": "x", "answer": "", "result": false },
+    { "name": "link: is, ignoring case", "kind": "link", "op": "is", "value": "https://example.org", "answer": "HTTPS://EXAMPLE.ORG", "result": true },
+    { "name": "link: contains a host", "kind": "link", "op": "contains", "value": "example.org", "answer": "https://www.example.org/a", "result": true },
+    { "name": "link: is empty, on empty", "kind": "link", "op": "empty", "answer": "", "result": true },
+    { "name": "link: is not empty, on empty", "kind": "link", "op": "not_empty", "answer": "", "result": false },
+    { "name": "link: is, on empty", "kind": "link", "op": "is", "value": "https://example.org", "answer": "", "result": false },
+    { "name": "link: is not, on empty", "kind": "link", "op": "is_not", "value": "https://example.org", "answer": "", "result": true },
+    { "name": "link: contains, on empty", "kind": "link", "op": "contains", "value": "example", "answer": "", "result": false },
+
+    { "name": "number: is empty, on empty", "kind": "number", "op": "empty", "answer": "", "result": true },
+    { "name": "number: is not empty, on a number", "kind": "number", "op": "not_empty", "answer": "0", "result": true },
+    { "name": "number: is not empty, on empty", "kind": "number", "op": "not_empty", "answer": "", "result": false },
+    { "name": "number: equals, same", "kind": "number", "op": "eq", "value": "3", "answer": "3", "result": true },
+    { "name": "number: equals, comma and point", "kind": "number", "op": "eq", "value": "3.5", "answer": "3,5", "result": true },
+    { "name": "number: equals, other", "kind": "number", "op": "eq", "value": "3", "answer": "4", "result": false },
+    { "name": "number: equals, on empty", "kind": "number", "op": "eq", "value": "0", "answer": "", "result": false },
+    { "name": "number: differs, other", "kind": "number", "op": "ne", "value": "3", "answer": "4", "result": true },
+    { "name": "number: differs, same", "kind": "number", "op": "ne", "value": "3", "answer": "3.0", "result": false },
+    { "name": "number: differs, on empty", "kind": "number", "op": "ne", "value": "3", "answer": "", "result": true },
+    { "name": "number: below, just below", "kind": "number", "op": "lt", "value": "10", "answer": "9.99", "result": true },
+    { "name": "number: below, equal", "kind": "number", "op": "lt", "value": "10", "answer": "10", "result": false },
+    { "name": "number: below, above", "kind": "number", "op": "lt", "value": "10", "answer": "11", "result": false },
+    { "name": "number: below, negative", "kind": "number", "op": "lt", "value": "0", "answer": "-1", "result": true },
+    { "name": "number: below, on empty", "kind": "number", "op": "lt", "value": "10", "answer": "", "result": false },
+    { "name": "number: at most, equal", "kind": "number", "op": "le", "value": "10", "answer": "10", "result": true },
+    { "name": "number: at most, above", "kind": "number", "op": "le", "value": "10", "answer": "10.01", "result": false },
+    { "name": "number: at most, on empty", "kind": "number", "op": "le", "value": "10", "answer": "", "result": false },
+    { "name": "number: above, just above", "kind": "number", "op": "gt", "value": "10", "answer": "10.01", "result": true },
+    { "name": "number: above, equal", "kind": "number", "op": "gt", "value": "10", "answer": "10", "result": false },
+    { "name": "number: above, on empty", "kind": "number", "op": "gt", "value": "-5", "answer": "", "result": false },
+    { "name": "number: at least, equal", "kind": "number", "op": "ge", "value": "10", "answer": "10", "result": true },
+    { "name": "number: at least, below", "kind": "number", "op": "ge", "value": "10", "answer": "9", "result": false },
+    { "name": "number: at least, on empty", "kind": "number", "op": "ge", "value": "0", "answer": "", "result": false },
+
+    { "name": "date: is empty, on empty", "kind": "date", "op": "empty", "answer": "", "result": true },
+    { "name": "date: is not empty, on a date", "kind": "date", "op": "not_empty", "answer": "2027-03-01", "result": true },
+    { "name": "date: is not empty, on empty", "kind": "date", "op": "not_empty", "answer": "", "result": false },
+    { "name": "date: is, same day", "kind": "date", "op": "is", "value": "2028-02-29", "answer": "2028-02-29", "result": true },
+    { "name": "date: is, other day", "kind": "date", "op": "is", "value": "2028-02-29", "answer": "2028-03-01", "result": false },
+    { "name": "date: is, the day the set is made", "kind": "date", "op": "is", "today": true, "answer": "2027-03-01", "result": true },
+    { "name": "date: is, on empty", "kind": "date", "op": "is", "today": true, "answer": "", "result": false },
+    { "name": "date: before, the day before", "kind": "date", "op": "before", "value": "2027-03-01", "answer": "2027-02-28", "result": true },
+    { "name": "date: before, the same day", "kind": "date", "op": "before", "value": "2027-03-01", "answer": "2027-03-01", "result": false },
+    { "name": "date: before, across a year end", "kind": "date", "op": "before", "value": "2027-01-01", "answer": "2026-12-31", "result": true },
+    { "name": "date: before, on empty", "kind": "date", "op": "before", "value": "2027-03-01", "answer": "", "result": false },
+    { "name": "date: after, the day after", "kind": "date", "op": "after", "today": true, "answer": "2027-03-02", "result": true },
+    { "name": "date: after, the same day", "kind": "date", "op": "after", "today": true, "answer": "2027-03-01", "result": false },
+    { "name": "date: after, on empty", "kind": "date", "op": "after", "today": true, "answer": "", "result": false },
+    { "name": "date: on or before, the same day", "kind": "date", "op": "on_or_before", "value": "2028-02-29", "answer": "2028-02-29", "result": true },
+    { "name": "date: on or before, the day after", "kind": "date", "op": "on_or_before", "value": "2028-02-29", "answer": "2028-03-01", "result": false },
+    { "name": "date: on or before, on empty", "kind": "date", "op": "on_or_before", "value": "2028-02-29", "answer": "", "result": false },
+    { "name": "date: on or after, the same day", "kind": "date", "op": "on_or_after", "today": true, "answer": "2027-03-01", "result": true },
+    { "name": "date: on or after, the day before", "kind": "date", "op": "on_or_after", "today": true, "answer": "2027-02-28", "result": false },
+    { "name": "date: on or after, on empty", "kind": "date", "op": "on_or_after", "today": true, "answer": "", "result": false },
+
+    { "name": "yes/no: is yes, on yes", "kind": "yesno", "op": "yes", "answer": "yes", "result": true },
+    { "name": "yes/no: is yes, on no", "kind": "yesno", "op": "yes", "answer": "no", "result": false },
+    { "name": "yes/no: is yes, unanswered", "kind": "yesno", "op": "yes", "answer": "", "result": false },
+    { "name": "yes/no: is no, on no", "kind": "yesno", "op": "no", "answer": "no", "result": true },
+    { "name": "yes/no: is no, on yes", "kind": "yesno", "op": "no", "answer": "yes", "result": false },
+    { "name": "yes/no: is no, unanswered", "kind": "yesno", "op": "no", "answer": "", "result": true },
+
+    { "name": "choice: is empty, on empty", "kind": "choice", "op": "empty", "answer": "", "result": true },
+    { "name": "choice: is empty, chosen", "kind": "choice", "op": "empty", "answer": "Red", "result": false },
+    { "name": "choice: is, same option", "kind": "choice", "op": "is", "value": "Red", "answer": "Red", "result": true },
+    { "name": "choice: is, case counts", "kind": "choice", "op": "is", "value": "Red", "answer": "red", "result": false },
+    { "name": "choice: is, on empty", "kind": "choice", "op": "is", "value": "Red", "answer": "", "result": false },
+    { "name": "choice: is not, other option", "kind": "choice", "op": "is_not", "value": "Red", "answer": "Blue", "result": true },
+    { "name": "choice: is not, same option", "kind": "choice", "op": "is_not", "value": "Red", "answer": "Red", "result": false },
+    { "name": "choice: is not, on empty", "kind": "choice", "op": "is_not", "value": "Red", "answer": "", "result": true },
+    { "name": "choice: is one of, in the list", "kind": "choice", "op": "one_of", "values": ["Red", "Blue"], "answer": "Blue", "result": true },
+    { "name": "choice: is one of, not in the list", "kind": "choice", "op": "one_of", "values": ["Red", "Blue"], "answer": "Green", "result": false },
+    { "name": "choice: is one of, on empty", "kind": "choice", "op": "one_of", "values": ["Red", "Blue"], "answer": "", "result": false },
+
+    { "name": "choices: is empty, on empty", "kind": "choices", "op": "empty", "answer": "", "result": true },
+    { "name": "choices: is empty, chosen", "kind": "choices", "op": "empty", "answer": "Laptop", "result": false },
+    { "name": "choices: includes, chosen", "kind": "choices", "op": "includes", "value": "Phone", "answer": "Laptop\nPhone", "result": true },
+    { "name": "choices: includes, not chosen", "kind": "choices", "op": "includes", "value": "Badge", "answer": "Laptop\nPhone", "result": false },
+    { "name": "choices: includes, a part of an option is not the option", "kind": "choices", "op": "includes", "value": "Lap", "answer": "Laptop", "result": false },
+    { "name": "choices: includes, on empty", "kind": "choices", "op": "includes", "value": "Badge", "answer": "", "result": false },
+    { "name": "choices: does not include, not chosen", "kind": "choices", "op": "excludes", "value": "Badge", "answer": "Laptop\nPhone", "result": true },
+    { "name": "choices: does not include, chosen", "kind": "choices", "op": "excludes", "value": "Phone", "answer": "Laptop\nPhone", "result": false },
+    { "name": "choices: does not include, on empty", "kind": "choices", "op": "excludes", "value": "Badge", "answer": "", "result": true },
+    { "name": "choices: includes all of, all chosen", "kind": "choices", "op": "includes_all", "values": ["Laptop", "Phone"], "answer": "Phone\nBadge\nLaptop", "result": true },
+    { "name": "choices: includes all of, one missing", "kind": "choices", "op": "includes_all", "values": ["Laptop", "Phone"], "answer": "Laptop\nBadge", "result": false },
+    { "name": "choices: includes all of, on empty", "kind": "choices", "op": "includes_all", "values": ["Laptop"], "answer": "", "result": false },
+
+    { "name": "person: is empty, on empty", "kind": "person", "op": "empty", "answer": "", "result": true },
+    { "name": "person: is not empty, chosen", "kind": "person", "op": "not_empty", "answer": "01938f2e-7b3a-7cde-8f00-00000000c0de", "result": true },
+    { "name": "person: is not empty, on empty", "kind": "person", "op": "not_empty", "answer": "", "result": false },
+    { "name": "people: is empty, chosen", "kind": "people", "op": "empty", "answer": "01938f2e-7b3a-7cde-8f00-00000000c0de", "result": false },
+    { "name": "people: is empty, on empty", "kind": "people", "op": "empty", "answer": "", "result": true },
+    { "name": "people: is not empty, on empty", "kind": "people", "op": "not_empty", "answer": "", "result": false },
+    { "name": "page: is empty, on empty", "kind": "page", "op": "empty", "answer": "", "result": true },
+    { "name": "page: is not empty, on empty", "kind": "page", "op": "not_empty", "answer": "", "result": false },
+    { "name": "page: is not empty, chosen", "kind": "page", "op": "not_empty", "answer": "01938f2e-7b3a-7cde-8f00-0123456789ab", "result": true },
+
+    { "name": "label: is, same label", "kind": "label", "op": "is", "value": "fixed-price", "answer": "fixed-price", "result": true },
+    { "name": "label: is, other label", "kind": "label", "op": "is", "value": "fixed-price", "answer": "hourly", "result": false },
+    { "name": "label: is, on empty", "kind": "label", "op": "is", "value": "fixed-price", "answer": "", "result": false },
+    { "name": "label: is not, other label", "kind": "label", "op": "is_not", "value": "fixed-price", "answer": "hourly", "result": true },
+    { "name": "label: is not, on empty", "kind": "label", "op": "is_not", "value": "fixed-price", "answer": "", "result": true },
+    { "name": "label: is one of, in the list", "kind": "label", "op": "one_of", "values": ["a", "b"], "answer": "b", "result": true },
+    { "name": "label: is one of, on empty", "kind": "label", "op": "one_of", "values": ["a", "b"], "answer": "", "result": false },
+
+    { "name": "an operator the kind does not have is false", "kind": "number", "op": "contains", "value": "1", "answer": "12", "result": false },
+    { "name": "an unknown operator is false", "kind": "line", "op": "matches", "value": "a", "answer": "a", "result": false },
+    { "name": "a number that does not read is false", "kind": "number", "op": "lt", "value": "ten", "answer": "3", "result": false },
+    { "name": "a date that does not read is false", "kind": "date", "op": "before", "value": "2027-02-30", "answer": "2027-01-01", "result": false }
+  ],
+  "conditions": [
+    {
+      "name": "all of two, both hold",
+      "condition": { "match": "all", "tests": [
+        { "subject": "field", "field": "Severity", "op": "is", "value": "High" },
+        { "subject": "field", "field": "Remote", "op": "no" }
+      ] },
+      "answers": { "Severity": { "kind": "choice", "value": "High" }, "Remote": { "kind": "yesno", "value": "no" } },
+      "result": true
+    },
+    {
+      "name": "all of two, one fails",
+      "condition": { "match": "all", "tests": [
+        { "subject": "field", "field": "Severity", "op": "is", "value": "High" },
+        { "subject": "field", "field": "Remote", "op": "no" }
+      ] },
+      "answers": { "Severity": { "kind": "choice", "value": "High" }, "Remote": { "kind": "yesno", "value": "yes" } },
+      "result": false
+    },
+    {
+      "name": "any of two, one holds",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "Severity", "op": "is", "value": "High" },
+        { "subject": "field", "field": "Hours", "op": "gt", "value": "40" }
+      ] },
+      "answers": { "Severity": { "kind": "choice", "value": "Low" }, "Hours": { "kind": "number", "value": "41" } },
+      "result": true
+    },
+    {
+      "name": "any of two, none holds",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "Severity", "op": "is", "value": "High" },
+        { "subject": "field", "field": "Hours", "op": "gt", "value": "40" }
+      ] },
+      "answers": { "Severity": { "kind": "choice", "value": "Low" } },
+      "result": false
+    },
+    {
+      "name": "a question nobody answered is empty",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Notes", "op": "empty" } ] },
+      "answers": {},
+      "result": true
+    },
+    {
+      "name": "the space is one of the chosen spaces",
+      "condition": { "match": "all", "tests": [ { "subject": "space", "op": "one_of", "values": ["01938f2e-7b3a-7cde-8f00-00000000000a", "01938f2e-7b3a-7cde-8f00-00000000000b"] } ] },
+      "answers": {},
+      "space": "01938f2e-7b3a-7cde-8f00-00000000000b",
+      "result": true
+    },
+    {
+      "name": "the space is not one of the chosen spaces",
+      "condition": { "match": "all", "tests": [ { "subject": "space", "op": "one_of", "values": ["01938f2e-7b3a-7cde-8f00-00000000000a"] } ] },
+      "answers": {},
+      "space": "01938f2e-7b3a-7cde-8f00-00000000000b",
+      "result": false
+    },
+    {
+      "name": "the creator is a member of the group",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" } ] },
+      "answers": {},
+      "groups": ["01938f2e-7b3a-7cde-8f00-0000000000a1"],
+      "result": true
+    },
+    {
+      "name": "the creator is not a member of the group",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" } ] },
+      "answers": {},
+      "groups": ["01938f2e-7b3a-7cde-8f00-0000000000a2"],
+      "result": false
+    },
+    {
+      "name": "is not a member of, for a non-member",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "not_member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" } ] },
+      "answers": {},
+      "groups": [],
+      "result": true
+    },
+    {
+      "name": "a deleted group makes is a member of false",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" } ] },
+      "answers": {},
+      "groups": ["01938f2e-7b3a-7cde-8f00-0000000000a1"],
+      "missing_groups": ["01938f2e-7b3a-7cde-8f00-0000000000a1"],
+      "result": false
+    },
+    {
+      "name": "a deleted group makes is not a member of false too",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "not_member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" } ] },
+      "answers": {},
+      "groups": [],
+      "missing_groups": ["01938f2e-7b3a-7cde-8f00-0000000000a1"],
+      "result": false
+    },
+    {
+      "name": "a condition with no test is false",
+      "condition": { "match": "all", "tests": [] },
+      "answers": {},
+      "result": false
+    },
+    {
+      "name": "a condition of eleven tests is false",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "A", "op": "empty" }, { "subject": "field", "field": "A", "op": "empty" },
+        { "subject": "field", "field": "A", "op": "empty" }, { "subject": "field", "field": "A", "op": "empty" },
+        { "subject": "field", "field": "A", "op": "empty" }, { "subject": "field", "field": "A", "op": "empty" },
+        { "subject": "field", "field": "A", "op": "empty" }, { "subject": "field", "field": "A", "op": "empty" },
+        { "subject": "field", "field": "A", "op": "empty" }, { "subject": "field", "field": "A", "op": "empty" },
+        { "subject": "field", "field": "A", "op": "empty" }
+      ] },
+      "answers": {},
+      "result": false
+    },
+    {
+      "name": "an unknown way to combine is false",
+      "condition": { "match": "most", "tests": [ { "subject": "field", "field": "A", "op": "empty" } ] },
+      "answers": {},
+      "result": false
+    },
+    {
+      "name": "an unknown subject is false",
+      "condition": { "match": "all", "tests": [ { "subject": "weather", "op": "empty" } ] },
+      "answers": {},
+      "result": false
+    }
+  ],
+  "validate": [
+    {
+      "name": "a valid condition passes",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "Team", "op": "one_of", "values": ["Red", "Blue"] },
+        { "subject": "field", "field": "Hours", "op": "ge", "value": "40,5" },
+        { "subject": "field", "field": "Start", "op": "before", "today": true },
+        { "subject": "field", "field": "Remote", "op": "yes" },
+        { "subject": "field", "field": "Tools", "op": "includes_all", "values": ["Laptop"] },
+        { "subject": "field", "field": "Area", "op": "is", "value": "fixed-price" },
+        { "subject": "groups", "op": "member", "value": "01938f2e-7b3a-7cde-8f00-0000000000a1" }
+      ] },
+      "problem": ""
+    },
+    {
+      "name": "ten tests pass",
+      "condition": { "match": "all", "tests": "@tests10" },
+      "problem": ""
+    },
+    {
+      "name": "an eleventh test is refused",
+      "condition": { "match": "all", "tests": "@tests11" },
+      "problem": "too_many_tests",
+      "test": 10
+    },
+    { "name": "no test is refused", "condition": { "match": "all", "tests": [] }, "problem": "no_tests", "test": -1 },
+    {
+      "name": "an unknown way to combine is refused",
+      "condition": { "match": "none", "tests": [ { "subject": "field", "field": "Name", "op": "empty" } ] },
+      "problem": "bad_match",
+      "test": -1
+    },
+    {
+      "name": "a group of tests inside a test is refused",
+      "condition": { "match": "all", "tests": [ { "match": "any", "tests": [ { "subject": "field", "field": "Name", "op": "empty" } ] } ] },
+      "problem": "bad_subject",
+      "test": 0
+    },
+    {
+      "name": "a question that does not exist is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "empty" }, { "subject": "field", "field": "Gone", "op": "empty" } ] },
+      "problem": "unknown_field",
+      "test": 1
+    },
+    {
+      "name": "a later question is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Later", "op": "not_empty" } ] },
+      "problem": "later_field",
+      "test": 0
+    },
+    {
+      "name": "an operator the kind does not have is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Hours", "op": "contains", "value": "4" } ] },
+      "problem": "bad_op",
+      "test": 0
+    },
+    {
+      "name": "is empty is refused for a label",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Area", "op": "empty" } ] },
+      "problem": "bad_op",
+      "test": 0
+    },
+    {
+      "name": "a number that does not read is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Hours", "op": "lt", "value": "ten" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "a date that does not exist is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Start", "op": "is", "value": "2027-02-29" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "a date with both a day and today is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Start", "op": "is", "value": "2027-03-01", "today": true } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "today is refused for words",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "is", "today": true } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "words with a line break are refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "is", "value": "a\nb" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "words longer than 200 characters are refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "contains", "value": "@201" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "is without a value is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "is" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "is empty with a value is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Name", "op": "empty", "value": "x" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "a choice option that does not exist is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Team", "op": "is", "value": "Green" } ] },
+      "problem": "not_an_option",
+      "test": 0
+    },
+    {
+      "name": "an option that does not exist, in a list, is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Tools", "op": "includes_all", "values": ["Laptop", "Car"] } ] },
+      "problem": "not_an_option",
+      "test": 0
+    },
+    {
+      "name": "is one of without values is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Team", "op": "one_of", "values": [] } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "an option named twice is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Team", "op": "one_of", "values": ["Red", "Red"] } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "a label that is no label is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Area", "op": "is", "value": "Fixed Price" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "the space is refused for a template of a space",
+      "condition": { "match": "all", "tests": [ { "subject": "space", "op": "one_of", "values": ["01938f2e-7b3a-7cde-8f00-00000000000a"] } ] },
+      "problem": "space_not_offered",
+      "test": 0
+    },
+    {
+      "name": "the space is allowed for a template of all spaces",
+      "condition": { "match": "all", "tests": [ { "subject": "space", "op": "one_of", "values": ["01938f2e-7b3a-7cde-8f00-00000000000a"] } ] },
+      "space": true,
+      "problem": ""
+    },
+    {
+      "name": "a space that is no id is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "space", "op": "one_of", "values": ["engineering"] } ] },
+      "space": true,
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "a group that is no id is refused",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "member", "value": "staff" } ] },
+      "problem": "bad_value",
+      "test": 0
+    },
+    {
+      "name": "is one of is refused for groups",
+      "condition": { "match": "all", "tests": [ { "subject": "groups", "op": "one_of", "values": ["01938f2e-7b3a-7cde-8f00-0000000000a1"] } ] },
+      "problem": "bad_op",
+      "test": 0
+    }
+  ],
+  "schema": {
+    "fields": {
+      "Name": { "kind": "line" },
+      "Team": { "kind": "choice", "options": ["Red", "Blue"] },
+      "Hours": { "kind": "number" },
+      "Start": { "kind": "date" },
+      "Remote": { "kind": "yesno" },
+      "Tools": { "kind": "choices", "options": ["Laptop", "Phone", "Badge"] },
+      "Area": { "kind": "label" }
+    },
+    "later": ["Later"]
+  },
+  "sentences": [
+    {
+      "name": "one test on yes/no",
+      "condition": { "match": "all", "tests": [ { "subject": "field", "field": "Works on site", "op": "no" } ] },
+      "sentence": "Only when Works on site is no"
+    },
+    {
+      "name": "all of two",
+      "condition": { "match": "all", "tests": [
+        { "subject": "field", "field": "Severity", "op": "is", "value": "High" },
+        { "subject": "field", "field": "Notes", "op": "not_empty" }
+      ] },
+      "sentence": "Only when Severity is High and Notes is not empty"
+    },
+    {
+      "name": "any of two",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "Hours", "op": "ge", "value": "40" },
+        { "subject": "field", "field": "Start", "op": "before", "today": true }
+      ] },
+      "sentence": "Only when Hours is at least 40 or Start is before the day the pages are made"
+    },
+    {
+      "name": "lists of options",
+      "condition": { "match": "all", "tests": [
+        { "subject": "field", "field": "Team", "op": "one_of", "values": ["Red", "Blue"] },
+        { "subject": "field", "field": "Tools", "op": "includes_all", "values": ["Laptop", "Phone"] }
+      ] },
+      "sentence": "Only when Team is one of Red, Blue and Tools includes all of Laptop, Phone"
+    },
+    {
+      "name": "every number operator",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "N", "op": "eq", "value": "1" },
+        { "subject": "field", "field": "N", "op": "ne", "value": "2" },
+        { "subject": "field", "field": "N", "op": "lt", "value": "3" },
+        { "subject": "field", "field": "N", "op": "le", "value": "4" },
+        { "subject": "field", "field": "N", "op": "gt", "value": "5" }
+      ] },
+      "sentence": "Only when N is 1 or N is not 2 or N is below 3 or N is at most 4 or N is above 5"
+    },
+    {
+      "name": "every date operator",
+      "condition": { "match": "any", "tests": [
+        { "subject": "field", "field": "D", "op": "is", "value": "2028-02-29" },
+        { "subject": "field", "field": "D", "op": "after", "value": "2028-02-29" },
+        { "subject": "field", "field": "D", "op": "on_or_before", "today": true },
+        { "subject": "field", "field": "D", "op": "on_or_after", "today": true },
+        { "subject": "field", "field": "D", "op": "empty" }
+      ] },
+      "sentence": "Only when D is 2028-02-29 or D is after 2028-02-29 or D is on or before the day the pages are made or D is on or after the day the pages are made or D is empty"
+    },
+    {
+      "name": "words and choices",
+      "condition": { "match": "all", "tests": [
+        { "subject": "field", "field": "Title", "op": "contains", "value": "urgent" },
+        { "subject": "field", "field": "Title", "op": "is_not", "value": "draft" },
+        { "subject": "field", "field": "Tools", "op": "includes", "value": "Badge" },
+        { "subject": "field", "field": "Tools", "op": "excludes", "value": "Car" },
+        { "subject": "field", "field": "Remote", "op": "yes" }
+      ] },
+      "sentence": "Only when Title contains urgent and Title is not draft and Tools includes Badge and Tools does not include Car and Remote is yes"
+    },
+    {
+      "name": "the space and groups",
+      "condition": { "match": "any", "tests": [
+        { "subject": "space", "op": "one_of", "values": ["s1", "s2"] },
+        { "subject": "groups", "op": "member", "value": "g1" },
+        { "subject": "groups", "op": "not_member", "value": "g2" }
+      ] },
+      "names": { "s1": "Engineering", "s2": "Sales", "g1": "Contractors", "g2": "Staff" },
+      "sentence": "Only when the space is one of Engineering, Sales or the creator is a member of Contractors or the creator is not a member of Staff"
+    }
+  ]
+}

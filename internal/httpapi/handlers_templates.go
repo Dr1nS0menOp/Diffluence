@@ -44,6 +44,9 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("PUT /api/v1/templates/{id}/publishing", me, guided(s.handleTemplatePublishing))
 	r.HandleFunc("PUT /api/v1/templates/{id}/fields", me, guided(s.handleTemplateFields))
 	r.HandleFunc("POST /api/v1/templates/{id}/entries/{key}/move", me, guided(s.handleTemplateEntryMove))
+	r.HandleFunc("PUT /api/v1/templates/{id}/entries/{key}/condition", me, guided(s.handleTemplateEntryCondition))
+	r.HandleFunc("PUT /api/v1/templates/{id}/rules", me, guided(s.handleTemplateRules))
+	r.HandleFunc("POST /api/v1/templates/{id}/fields/rename", me, guided(s.handleTemplateFieldRename))
 	// The versions of a template finish a part that exists (ORG-060, TPL-1104), so they are
 	// not behind the switch: every template has versions.
 	r.HandleFunc("GET /api/v1/templates/{id}/versions", me, s.handleTemplateVersions)

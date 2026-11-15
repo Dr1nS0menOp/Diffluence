@@ -1332,6 +1332,129 @@ test.describe('the look of every kind of screen', () => {
     await narrow.close();
   });
 
+  test('TemplateSettingsView: conditions and rules (spec 074, wave GT3)', async ({ browser }) => {
+    const setup = await newReaderPage(browser, 'light');
+    const space = (await (await setup.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };
+    const ask = (name: string) => ({
+      type: 'paragraph',
+      content: [{ type: 'templateField', attrs: { name, kind: 'line' } }],
+    });
+    const words = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+    const onSite = { match: 'all', tests: [{ subject: 'field', field: 'Works on site', op: 'yes' }] };
+    const made = await setup.request.post(`/api/v1/spaces/${space.id}/templates`, {
+      data: {
+        name: 'Site visit',
+        document: { type: 'doc', content: [ask('Works on site'), ask('Badge number'), ask('Kind')] },
+      },
+    });
+    expect(made.status(), await made.text()).toBe(201);
+    const visit = ((await made.json()) as { id: string }).id;
+    const fields = await setup.request.put(`/api/v1/templates/${visit}/fields`, {
+      data: {
+        steps: [],
+        fields: [
+          { name: 'Works on site', kind: 'yesno' },
+          { name: 'Badge number', kind: 'line', required: true, condition: onSite },
+          { name: 'Kind', kind: 'label' },
+        ],
+      },
+    });
+    expect(fields.status(), await fields.text()).toBe(200);
+    const text = await setup.request.patch(`/api/v1/templates/${visit}`, {
+      data: {
+        name: 'Site visit',
+        document: {
+          type: 'doc',
+          content: [
+            ask('Works on site'),
+            ask('Badge number'),
+            ask('Kind'),
+            {
+              type: 'conditional',
+              attrs: { condition: onSite },
+              content: [words('Bring safety shoes and the badge.')],
+            },
+          ],
+        },
+      },
+    });
+    expect(text.status(), await text.text()).toBe(200);
+    const entry = await setup.request.post(`/api/v1/templates/${visit}/entries`, {
+      data: {
+        name: 'Safety plan',
+        parent: 'root',
+        document: { type: 'doc', content: [words('Exits and first aid')] },
+      },
+    });
+    const plan = ((await entry.json()) as { key: string }).key;
+    await setup.request.put(`/api/v1/templates/${visit}/entries/${plan}/condition`, {
+      data: { condition: onSite },
+    });
+    const rules = await setup.request.put(`/api/v1/templates/${visit}/rules`, {
+      data: {
+        label_rules: [
+          { entry: plan, label: 'site-visit', when: onSite },
+          { entry: 'root', field: 'Kind' },
+        ],
+      },
+    });
+    expect(rules.status(), await rules.text()).toBe(200);
+    await setup.context().close();
+
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/templates/${visit}/settings?section=form`);
+    await expect(page.getByText('Only when Works on site is yes').first()).toBeVisible();
+    await picture(page, 'template-conditions-form');
+    await checkAccessibility(page);
+    await page
+      .getByRole('row')
+      .filter({ has: page.getByRole('cell', { name: 'Badge number', exact: true }) })
+      .getByRole('button', { name: 'Change the condition' })
+      .click();
+    const dialog = page.getByRole('dialog', { name: 'Condition: Badge number' });
+    await dialog.getByRole('button', { name: 'Add a test' }).click();
+    await expect(dialog.getByText('Test 2: This question does not exist in the template.')).toHaveCount(0);
+    await picture(page, 'template-condition-dialog');
+    await checkAccessibility(page);
+    await dialog.getByRole('button', { name: 'Cancel' }).click();
+    await page.getByRole('link', { name: 'Pages' }).click();
+    await expect(page.getByRole('cell', { name: /Only when Works on site is yes/ })).toBeVisible();
+    await picture(page, 'template-pages-conditions');
+    await page.getByRole('link', { name: 'Rules' }).click();
+    await expect(page.getByRole('heading', { name: 'Label rules' })).toBeVisible();
+    await picture(page, 'template-rules');
+    await checkAccessibility(page);
+    await page.goto(`/templates/${visit}/edit`);
+    await expect(page.locator('.conditional-section')).toContainText('Only when Works on site is yes');
+    await picture(page, 'template-section');
+    await checkAccessibility(page);
+    await page.context().close();
+
+    // The form: a question a condition shows appears after the one that caused it, at 360 px
+    // and right to left as well (TPL-1023, TPL-1042).
+    const narrow = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { width: 360, height: 800 },
+    });
+    const small = await narrow.newPage();
+    await login(small, READER.email, PASSWORD);
+    await small.goto(`/pages/${pageId}`);
+    await small.getByRole('button', { name: 'More to create' }).click();
+    await small.getByRole('menuitem', { name: 'From a template' }).click();
+    const gallery = small.getByRole('dialog', { name: 'Start from a template' });
+    await gallery.getByRole('combobox', { name: 'Find a template' }).fill('Site visit');
+    await expect(gallery.locator('.prose')).toBeVisible();
+    await gallery.getByRole('combobox', { name: 'Find a template' }).press('Enter');
+    const form = small.getByRole('dialog', { name: 'Site visit' });
+    await form.getByRole('checkbox', { name: 'Works on site' }).check();
+    await expect(form.getByLabel('Badge number (required)')).toBeVisible();
+    await picture(small, 'template-form-condition-narrow');
+    await checkAccessibility(small);
+    await small.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await picture(small, 'template-form-condition-rtl');
+    await narrow.close();
+  });
+
   test('an empty page offers templates beside the editor', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     const created = await page.request.post('/api/v1/pages', {

@@ -520,6 +520,25 @@ fieldset.choices legend {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+/* A condition of a template as a form of native fields (spec 074, TPL-1014): the sentence an
+   approver reads above the rows of tests. */
+.condition-editor {
+  margin-block-end: var(--space-3);
+}
+
+.condition-sentence {
+  margin-block: 0 var(--space-3);
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+  overflow-wrap: anywhere;
+}
+
+.condition-tests {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* The settings of a template are made for a larger screen; a phone gets a note, and every
    function stays (spec 074, TPL-1042). */
 .template-narrow-note {

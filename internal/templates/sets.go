@@ -17,6 +17,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/conditions"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -123,6 +124,9 @@ type plannedEntry struct {
 	entry  Entry
 	parent *uuid.UUID
 	doc    document.Node
+	// skipFiles are the files of the entry's text that only a removed section showed, which
+	// are not copied (TPL-422).
+	skipFiles []uuid.UUID
 }
 
 // refusal is a set refused before anything was made, naming every entry and why (TPL-810).
@@ -168,13 +172,19 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		return nil, err
 	}
 	p.version.Manifest = withTemplateWorkflow(p.version.Manifest, t.WorkflowID)
-	if err := s.checkRights(ctx, c, p.version.Manifest, in.SpaceID); err != nil {
-		return nil, err
-	}
 	if err := s.place(ctx, c, p, in); err != nil {
 		return nil, err
 	}
 	if err := s.fill(ctx, c, p, in); err != nil {
+		return nil, err
+	}
+	// Rights are those of the pages the set makes, once the conditions have decided which
+	// (TPL-810): a condition never changes a right, only whether a page is made (TPL-424).
+	made := Manifest{Entries: make([]Entry, 0, len(p.pages))}
+	for _, pp := range p.pages {
+		made.Entries = append(made.Entries, pp.entry)
+	}
+	if err := s.checkRights(ctx, c, made, in.SpaceID); err != nil {
 		return nil, err
 	}
 	return p, nil
@@ -350,17 +360,30 @@ func (s *Service) fill(ctx context.Context, c identity.Caller, p *plan, in SetIn
 		titleAnswers[name] = got.titles[name]
 	}
 	ordered := m.ordered()
-	pageOf := map[string]uuid.UUID{}
+	// An entry whose condition does not hold is not made, nor anything below it (TPL-420);
+	// the first entry always is. Parents come before their children in ordered.
+	kept := map[string]bool{}
 	for _, e := range ordered {
-		pageOf[e.Key] = ids.New()
+		kept[e.Key] = e.Key == RootKey || (kept[e.Parent] && conditions.Holds(e.Condition, got.facts))
 	}
+	pageOf, titles := map[string]uuid.UUID{}, map[string]string{}
 	for i, e := range ordered {
 		title, err := s.titleOf(e, i == 0, in.Title, spaceName, titleAnswers, today)
 		if err != nil {
 			return err
 		}
+		titles[e.Key] = title
+		if kept[e.Key] {
+			pageOf[e.Key] = ids.New()
+		}
+	}
+	holds := func(cond conditions.Condition) bool { return conditions.Holds(&cond, got.facts) }
+	for i, e := range ordered {
+		if !kept[e.Key] {
+			continue
+		}
 		planned := plannedEntry{entry: e, PlannedPage: PlannedPage{Entry: e.Key, EntryName: e.Name, ParentEntry: e.Parent,
-			ID: pageOf[e.Key], Title: title, Labels: slices.Clone(e.Labels), Restricted: restrictionOf(e)}}
+			ID: pageOf[e.Key], Title: titles[e.Key], Labels: labelsOf(e, m.LabelRules, got.facts), Restricted: restrictionOf(e)}}
 		if i == 0 {
 			planned.parent = p.parent
 		} else {
@@ -368,8 +391,10 @@ func (s *Service) fill(ctx context.Context, c identity.Caller, p *plan, in SetIn
 			planned.parent = &parent
 		}
 		if e.PageID != nil {
-			doc := document.FillFieldsWith(texts[e.Key], got.fills)
-			planned.doc = document.FillValues(doc, valuesOf(c, p.t, spaceName, today, pageOf))
+			doc := document.ResolveConditionals(texts[e.Key], holds)
+			planned.skipFiles = filesLeftOut(texts[e.Key], doc)
+			doc = document.FillFieldsWith(doc, got.fills)
+			planned.doc = document.FillValues(doc, valuesOf(c, p.t, spaceName, today, pageOf, titles))
 		}
 		p.pages = append(p.pages, planned)
 	}
@@ -389,8 +414,9 @@ func (p *plan) summarise() {
 }
 
 // valuesOf gives what a template knows without asking (TPL-201) and the pages of the
-// set its links point to (TPL-110), as of the moment the set is made (TPL-222).
-func valuesOf(c identity.Caller, t Template, spaceName, today string, pageOf map[string]uuid.UUID) func(string) (document.Node, bool) {
+// set its links point to (TPL-110), as of the moment the set is made (TPL-222). A link to
+// an entry a condition left out is the title its page would have had, as text (TPL-420).
+func valuesOf(c identity.Caller, t Template, spaceName, today string, pageOf map[string]uuid.UUID, titles map[string]string) func(string) (document.Node, bool) {
 	link := func(id uuid.UUID) document.Node {
 		return document.Node{Type: document.TypePageLink, Attrs: map[string]any{"page_id": id.String()}}
 	}
@@ -408,8 +434,11 @@ func valuesOf(c identity.Caller, t Template, spaceName, today string, pageOf map
 			return link(pageOf[RootKey]), true
 		}
 		key, _ := strings.CutPrefix(source, "entry:")
-		id, ok := pageOf[key]
-		return link(id), ok
+		if id, ok := pageOf[key]; ok {
+			return link(id), true
+		}
+		title := titles[key]
+		return document.Node{Type: document.TypeText, Text: title}, title != ""
 	}
 }
 
@@ -549,7 +578,7 @@ func (s *Service) makeIn(ctx context.Context, tx pgx.Tx, c identity.Caller, p *p
 			return out, err
 		}
 		made, skipped, err := s.pages.AddSetPage(ctx, tx, c, pages.SetPage{ID: pp.ID, SpaceID: p.spaceID, ParentID: pp.parent, Title: pp.Title,
-			Folder: pp.entry.Kind == EntryFolder, TemplatePage: pp.entry.PageID, Document: pp.doc, Labels: pp.entry.Labels,
+			Folder: pp.entry.Kind == EntryFolder, TemplatePage: pp.entry.PageID, SkipFiles: pp.skipFiles, Document: pp.doc, Labels: pp.Labels,
 			Publish: p.version.Manifest.Publish, WorkflowID: pp.entry.WorkflowID,
 			Before: func(name string) error { return step(ctx, hooks, name, i) }})
 		if err != nil {

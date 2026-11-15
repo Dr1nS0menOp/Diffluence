@@ -440,6 +440,7 @@ var attrCleaners = map[string]func(in, out map[string]any) error{
 	TypeTemplateField:   cleanTemplateField,
 	TypeInstruction:     cleanInstruction,
 	TypeTemplateValue:   cleanTemplateValue,
+	TypeConditional:     cleanConditional,
 	TypeDynamic:         cleanDynamic,
 	TypePageFacts:       cleanPageFacts,
 	TypeExcerpt:         cleanExcerpt,

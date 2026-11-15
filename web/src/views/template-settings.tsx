@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // A template's settings in the Settings frame, one section at a time at its own address
-// (spec 074, TPL-1010): General, Pages, Form and Versions. The text of each page is written
-// in the editor, the Focus frame. Rules and Who can use it come with waves GT3 and GT4.
+// (spec 074, TPL-1010): General, Pages, Form, Rules and Versions. The text of each page is
+// written in the editor, the Focus frame. Who can use it comes with wave GT4.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,8 +19,16 @@ import { Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { fieldSpecOf, type FieldSpec } from '../template-fields';
 import { FieldDialog } from './template-field-dialog';
 import { TemplatePages } from './template-pages';
+import {
+  ConditionCell,
+  formOrder,
+  RenameDialog,
+  RulesSection,
+  scopeWith,
+  useConditionScope,
+} from './template-rules';
 
-export const TEMPLATE_SECTIONS = ['general', 'pages', 'form', 'versions'] as const;
+export const TEMPLATE_SECTIONS = ['general', 'pages', 'form', 'rules', 'versions'] as const;
 export type TemplateSection = (typeof TEMPLATE_SECTIONS)[number];
 
 const BACK_ICON_SIZE = 16;
@@ -229,7 +237,13 @@ function FormSection({
   const [fields, setFields] = useState<FieldSpec[]>((template.fields ?? []).map(fieldSpecOf));
   const [steps, setSteps] = useState<Step[]>(template.steps);
   const [editing, setEditing] = useState<FieldSpec | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [trying, setTrying] = useState(false);
+  // A question may be shown by questions asked before it, a step by the steps before it (TPL-421).
+  const base = useConditionScope(template.id);
+  const order = formOrder(fields, steps);
+  const position = (name: string) => order.findIndex((o) => o.field.name === name);
+  const stepAt = (name: string) => order.find((o) => o.field.name === name)?.step ?? steps.length;
   const save = useMutation({
     mutationFn: () =>
       guidedOn
@@ -266,6 +280,7 @@ function FormSection({
               <thead>
                 <tr>
                   <th>{t('templates.stepTitle')}</th>
+                  {base && <th>{t('templates.conditionColumn')}</th>}
                   <th>{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -282,6 +297,18 @@ function FormSection({
                         }
                       />
                     </td>
+                    {base && (
+                      <td>
+                        <ConditionCell
+                          condition={s.condition}
+                          scope={scopeWith(base, fields, (f) => stepAt(f.name) < i)}
+                          title={s.title || t('templates.stepTitleOf', { at: i + 1 })}
+                          onSave={(condition) =>
+                            setSteps(steps.map((x, j) => (j === i ? { ...x, condition } : x)))
+                          }
+                        />
+                      </td>
+                    )}
                     <td className="row">
                       <button
                         type="button"
@@ -339,6 +366,7 @@ function FormSection({
                   <th>{t('templates.fieldKind')}</th>
                   <th>{t('organise.required')}</th>
                   <th>{t('templates.step')}</th>
+                  {base && <th>{t('templates.conditionColumn')}</th>}
                   {guidedOn && <th>{t('common.actions')}</th>}
                 </tr>
               </thead>
@@ -362,10 +390,25 @@ function FormSection({
                         ))}
                       </select>
                     </td>
-                    {guidedOn && (
+                    {base && (
                       <td>
+                        <ConditionCell
+                          condition={f.condition}
+                          scope={scopeWith(base, fields, (g) => position(g.name) < position(f.name))}
+                          title={f.name}
+                          onSave={(condition) =>
+                            setFields(fields.map((g) => (g.name === f.name ? { ...g, condition } : g)))
+                          }
+                        />
+                      </td>
+                    )}
+                    {guidedOn && (
+                      <td className="row">
                         <button type="button" className="ghost" onClick={() => setEditing(f)}>
                           {t('templates.editQuestion', { name: f.name })}
+                        </button>
+                        <button type="button" className="ghost" onClick={() => setRenaming(f.name)}>
+                          {t('templates.renameQuestion', { name: f.name })}
                         </button>
                       </td>
                     )}
@@ -397,8 +440,22 @@ function FormSection({
           spaceId={template.space_id}
           onClose={() => setEditing(null)}
           onSave={(spec) => {
-            setFields(fields.map((f) => (f.name === spec.name ? spec : f)));
+            // The condition is set in its own column, and the dialog keeps it as it was.
+            setFields(fields.map((f) => (f.name === spec.name ? { ...spec, condition: f.condition } : f)));
             setEditing(null);
+          }}
+        />
+      )}
+      {renaming && (
+        <RenameDialog
+          templateId={template.id}
+          name={renaming}
+          onClose={() => setRenaming(null)}
+          onRenamed={(form) => {
+            setFields(form.fields.map(fieldSpecOf));
+            setSteps(form.steps);
+            setRenaming(null);
+            onSaved();
           }}
         />
       )}
@@ -547,6 +604,7 @@ export function TemplateSettingsView({ templateId }: { templateId: string }) {
       {section === 'form' && (
         <FormSection key={template.id} template={template} space={shownSpace} onSaved={refresh} />
       )}
+      {section === 'rules' && <RulesSection templateId={templateId} />}
       {section === 'versions' && <VersionsSection template={template} />}
     </SettingsFrame>
   );

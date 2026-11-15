@@ -107,6 +107,9 @@ func TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff(t *testing.T) {
 		{"PUT", "/api/v1/templates/" + tpl + "/publishing"},
 		{"PUT", "/api/v1/templates/" + tpl + "/fields"},
 		{"POST", "/api/v1/templates/" + tpl + "/entries/root/move"},
+		{"PUT", "/api/v1/templates/" + tpl + "/entries/root/condition"},
+		{"PUT", "/api/v1/templates/" + tpl + "/rules"},
+		{"POST", "/api/v1/templates/" + tpl + "/fields/rename"},
 		{"POST", "/api/v1/templates/" + tpl + "/sets"},
 		{"POST", "/api/v1/templates/" + tpl + "/sets/check"},
 	}

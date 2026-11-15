@@ -24,6 +24,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/diffluence/diffluence/internal/conditions"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/features"
@@ -50,6 +51,9 @@ const (
 type Step struct {
 	Title  string   `json:"title"`
 	Fields []string `json:"fields"`
+	// Condition shows the step only when it holds, testing the questions of the steps before
+	// it (spec 074, TPL-421). A step it hides hides its questions.
+	Condition *conditions.Condition `json:"condition,omitempty"`
 }
 
 // Template is a way to start a page. SpaceID is nil for templates of all spaces.
@@ -82,8 +86,12 @@ type Template struct {
 	// without the part of guided templates (spec 064, DOC-560).
 	WorkflowID *uuid.UUID      `json:"workflow_id"`
 	Document   json.RawMessage `json:"document,omitempty"`
-	pageID     uuid.UUID
-	ownerID    uuid.UUID
+	// ConditionGroups are the groups the form's conditions test that the reader is in, and
+	// those that are gone, so the form can preview them (spec 074, TPL-402). The server
+	// decides again on submit.
+	ConditionGroups *GroupFacts `json:"condition_groups,omitempty"`
+	pageID          uuid.UUID
+	ownerID         uuid.UUID
 	// today is the database's date when the row was read, for what a set fills in (TPL-857).
 	today string
 }
@@ -316,8 +324,52 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Tem
 		return t, err
 	}
 	t.Fields, t.Pages, t.TemplateVersion = form.Fields, form.Pages, form.Version
+	if t.ConditionGroups, err = s.groupFactsOf(ctx, c, form); err != nil {
+		return t, err
+	}
 	t.Document, err = document.Marshal(doc)
 	return t, err
+}
+
+// GroupFacts are what the form needs to preview tests of the reader's groups.
+type GroupFacts struct {
+	Member  []string `json:"member"`
+	Missing []string `json:"missing"`
+}
+
+// groupFactsOf reads the reader's groups only for a form whose questions or steps test them.
+func (s *Service) groupFactsOf(ctx context.Context, c identity.Caller, form Form) (*GroupFacts, error) {
+	tested := map[string]bool{}
+	note := func(cond *conditions.Condition) {
+		if cond != nil {
+			for _, id := range cond.Groups() {
+				tested[id] = true
+			}
+		}
+	}
+	for _, f := range form.Fields {
+		note(f.Condition)
+	}
+	for _, st := range form.Steps {
+		note(st.Condition)
+	}
+	if len(tested) == 0 {
+		return nil, nil
+	}
+	user, err := s.perms.LoadUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return nil, err
+	}
+	out := &GroupFacts{Member: []string{}}
+	for _, g := range user.Groups {
+		if tested[g.String()] {
+			out.Member = append(out.Member, g.String())
+		}
+	}
+	if out.Missing, err = s.missingGroups(ctx, s.pool, groupIDs(tested)); out.Missing == nil {
+		out.Missing = []string{}
+	}
+	return out, err
 }
 
 func auditTemplate(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, t Template) error {

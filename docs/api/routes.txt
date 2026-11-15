@@ -481,6 +481,7 @@ POST /api/v1/spaces/{id}/workflows/from-template               object:space.work
 POST /api/v1/tasks/{id}/done                                   object:page.edit
 POST /api/v1/templates/{id}/entries                            authenticated
 POST /api/v1/templates/{id}/entries/{key}/move                 authenticated
+POST /api/v1/templates/{id}/fields/rename                      authenticated
 POST /api/v1/templates/{id}/sets                               authenticated
 POST /api/v1/templates/{id}/sets/check                         authenticated
 POST /api/v1/templates/{id}/use                                authenticated
@@ -568,9 +569,11 @@ PUT /api/v1/spaces/{id}/statuses                               object:space.stat
 PUT /api/v1/spaces/{id}/title-align                            object:space.look
 PUT /api/v1/spaces/{id}/watch                                  object:space.view
 PUT /api/v1/spaces/{id}/workflow                               object:space.workflows
+PUT /api/v1/templates/{id}/entries/{key}/condition             authenticated
 PUT /api/v1/templates/{id}/favourite                           authenticated
 PUT /api/v1/templates/{id}/fields                              authenticated
 PUT /api/v1/templates/{id}/publishing                          authenticated
+PUT /api/v1/templates/{id}/rules                               authenticated
 PUT /api/v1/users/{id}/follow                                  authenticated
 PUT /api/v1/workflows/{id}                                     authenticated
 PUT /collab/documents/{id}                                     public

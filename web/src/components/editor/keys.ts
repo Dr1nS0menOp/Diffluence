@@ -30,6 +30,8 @@ export interface EditorActions {
   openTableMenu: () => void;
   openTableSize: () => void;
   openTemplateItem: (what: TemplateItemKind) => void;
+  /** A section a condition shows: a new one around the selection, or the one at pos (TPL-422). */
+  openSection: (pos: number | null) => void;
   publish: () => void;
   save: () => void;
   mentionNoAccess: (name: string) => void;
@@ -53,6 +55,7 @@ export const noActions: EditorActions = {
   openTableMenu: () => undefined,
   openTableSize: () => undefined,
   openTemplateItem: () => undefined,
+  openSection: () => undefined,
   publish: () => undefined,
   save: () => undefined,
   mentionNoAccess: () => undefined,
@@ -93,6 +96,7 @@ export const EditorKeys = Extension.create<{ actions: () => EditorActions }>({
           | 'focusTitle'
           | 'openDrawing'
           | 'openTableSize'
+          | 'openSection'
         >,
       ) =>
       () => {

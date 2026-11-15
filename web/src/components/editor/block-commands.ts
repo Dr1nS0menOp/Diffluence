@@ -249,7 +249,10 @@ export function setColumnCount(editor: Editor, count: number) {
 export const columnCount = (editor: Editor) => ancestor(editor, 'columns')?.node.childCount ?? 0;
 
 /** Takes away the frame of a panel, section or columns, and keeps everything inside it. */
-export function unwrapBlock(editor: Editor, name: 'panel' | 'expand' | 'columns' | 'spotlight') {
+export function unwrapBlock(
+  editor: Editor,
+  name: 'panel' | 'expand' | 'columns' | 'spotlight' | 'conditional',
+) {
   const found = ancestor(editor, name);
   if (!found) return;
   const content =

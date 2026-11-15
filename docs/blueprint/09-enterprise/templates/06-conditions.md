@@ -12,7 +12,7 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
 
 ## 6.1 What a condition is
 
-- **TPL-400** · new · A condition is **"all of"** or **"any of"** a list of at most 10 **tests**. A test has:
+- **TPL-400** · built · A condition is **"all of"** or **"any of"** a list of at most 10 **tests**. A test has:
   - a subject: a field, the space, or the creator's groups;
   - an operator, picked from those allowed for the subject's kind;
   - a value, picked or typed in a field of the subject's kind.
@@ -23,7 +23,7 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   - a structure picked from lists cannot hold a syntax error or an injection.
 
   *Edge cases:* a need for "A and (B or C)" is met by two conditions on two blocks, or by splitting the content. Chapter 14 says nesting is left out (TPL-1201). *Proof:* validator tests that refuse nesting, an 11th test, and an operator not allowed for the kind.
-- **TPL-401** · new · The operators, by the subject's kind:
+- **TPL-401** · built · The operators, by the subject's kind:
 
   | Subject | Operators |
   |---|---|
@@ -39,12 +39,12 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   | the creator's groups | is a member of, is not a member of |
 
   *Why:* each operator is total and cheap, and defined for every value, including an empty one (TPL-403). Person and page tests stop at "is empty". Testing who was chosen would make the template depend on people's identities, which change. *Proof:* a table test per operator and kind, shared by Go and TypeScript (TPL-430).
-- **TPL-402** · new · A test on **the creator's groups** is allowed, and the condition editor says next to it, in words: "This changes the text people get. It does not stop anyone reading the template" (decided, TPL-1421). *Why:* different text for contractors and employees is a real need. But the template's text stays readable by everyone who may edit it, and a person could pick a different template, so this is never a way to protect content. *Edge cases:*
+- **TPL-402** · built · A test on **the creator's groups** is allowed, and the condition editor says next to it, in words: "This changes the text people get. It does not stop anyone reading the template" (decided, TPL-1421). *Why:* different text for contractors and employees is a real need. But the template's text stays readable by everyone who may edit it, and a person could pick a different template, so this is never a way to protect content. *Edge cases:*
   - the groups are those of the creator at submit time, as the permission rule resolves them;
   - a deleted group makes the test false, and the template's managers see a warning in the template list.
 
   *Proof:* a test with a member and a non-member; a test with a deleted group.
-- **TPL-403** · new · **Empty values** are defined for every operator:
+- **TPL-403** · built · **Empty values** are defined for every operator:
   - an unanswered optional field is empty;
   - every test on an empty value is false, except "is empty", "is not" and "does not include", which are true.
 
@@ -52,8 +52,8 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
 
 ## 6.2 What a condition switches
 
-- **TPL-420** · new · An **entry** of a set may have a condition. When it is false, the page is not made, nor any page below it. *Why:* "a severe incident adds a page for the customer statement" (chapter 02). *Edge cases:* the root entry cannot have a condition, because a set needs its root. Links to a left-out entry become plain text (TPL-110). *Proof:* tests of a left-out entry with children and with links to it.
-- **TPL-421** · new · A **step** or a **field** of the form may have a condition. When it is false, the step or field is not shown. Its answer is dropped and never stored or used, and a required field that is hidden is not required (decided, TPL-1407). *Why:* a person cannot be bound by an answer to a question they never saw. SurveyJS and Copier skip a question whose condition is false, and Copier also does not record its answer. *Edge cases:*
+- **TPL-420** · built · An **entry** of a set may have a condition. When it is false, the page is not made, nor any page below it. *Why:* "a severe incident adds a page for the customer statement" (chapter 02). *Edge cases:* the root entry cannot have a condition, because a set needs its root. Links to a left-out entry become plain text (TPL-110). *Proof:* tests of a left-out entry with children and with links to it.
+- **TPL-421** · built · A **step** or a **field** of the form may have a condition. When it is false, the step or field is not shown. Its answer is dropped and never stored or used, and a required field that is hidden is not required (decided, TPL-1407). *Why:* a person cannot be bound by an answer to a question they never saw. SurveyJS and Copier skip a question whose condition is false, and Copier also does not record its answer. *Edge cases:*
   - a condition on a field may only test fields of **earlier** steps, or earlier fields of the same step, so the form never has a cycle and never hides a field the person is typing in;
   - a hidden field's variable is empty everywhere it is used.
 
@@ -61,7 +61,7 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   - validator tests that refuse a test on a later field, and so any cycle;
   - an API test that an answer sent for a hidden field is ignored;
   - a test that a hidden required field does not block.
-- **TPL-422** · new · A **section of text** may have a condition. It is a new block, `conditional`, that holds other blocks. While editing, it shows as a quiet outline with its condition written as a sentence above it, such as "Only when Works on site is no". When a page is made, a true section is unwrapped: its blocks stay and the wrapper goes. A false section is removed with everything in it. *Why:* this is the "content filled in by conditions" of the roadmap. Unwrapping leaves no trace of the template in the page. *Edge cases:*
+- **TPL-422** · built · A **section of text** may have a condition. It is a new block, `conditional`, that holds other blocks. While editing, it shows as a quiet outline with its condition written as a sentence above it, such as "Only when Works on site is no". When a page is made, a true section is unwrapped: its blocks stay and the wrapper goes. A false section is removed with everything in it. *Why:* this is the "content filled in by conditions" of the roadmap. Unwrapping leaves no trace of the template in the page. *Edge cases:*
   - `Normalize` lets `conditional` through only in templates, so it never reaches a reader (as TPL-211);
   - a conditional section may hold another conditional section, up to 3 deep. Each has its own one-level condition, so nesting text is allowed, but nesting logic is not;
   - files inside a removed section are not copied.
@@ -70,12 +70,12 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   - a test of true, false and nested sections;
   - a test that files in a removed section are not copied;
   - a test that publishing a page with `conditional` is refused.
-- **TPL-423** · new · A **label rule** adds a label to an entry's page when its condition holds, or adds the label chosen in a label field. *Why:* "fixed-price projects get the label `fixed-price`", so reports over labels find them. *Edge cases:* a label off the space's fixed list is left out and reported, as today (ORG-043). *Proof:* tests of both rules and of a fixed list.
-- **TPL-424** · new · A condition never changes **rights**, the space, the parent or the workflow of a page. *Why:* conditions shape content. Rights come from the template and the space (TPL-131). *Proof:* nothing to test; the validator offers no such target.
+- **TPL-423** · built · A **label rule** adds a label to an entry's page when its condition holds, or adds the label chosen in a label field. *Why:* "fixed-price projects get the label `fixed-price`", so reports over labels find them. *Edge cases:* a label off the space's fixed list is left out and reported, as today (ORG-043). *Proof:* tests of both rules and of a fixed list.
+- **TPL-424** · built · A condition never changes **rights**, the space, the parent or the workflow of a page. *Why:* conditions shape content. Rights come from the template and the space (TPL-131). *Proof:* nothing to test; the validator offers no such target.
 
 ## 6.3 Evaluating safely
 
-- **TPL-430** · new · Conditions are evaluated by one small Go package, `internal/conditions`. Its input is the condition, the answers and a fixed context (today's date from the database, the space, the creator's groups). Its output is true or false. It never fails at evaluation time, because the validator refused every malformed condition at save. *Why:*
+- **TPL-430** · built · Conditions are evaluated by one small Go package, `internal/conditions`. Its input is the condition, the answers and a fixed context (today's date from the database, the space, the creator's groups). Its output is true or false. It never fails at evaluation time, because the validator refused every malformed condition at save. *Why:*
   - the evaluator is a pure function, with no loops over user data and no calls out;
   - its cost is at most 10 tests per condition times the conditions of a template, a few thousand operations.
 
@@ -83,8 +83,8 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   - unit tests from the shared table;
   - a fuzz target over random conditions and answers that never panics and never takes more than a fixed number of steps;
   - a mutation in each operator must be caught.
-- **TPL-431** · new · The browser runs the **same table** in TypeScript to show and hide steps and fields while the person types. The server evaluates everything again on submit and in the dry run (TPL-341), and its answer is the only one that counts (decided, TPL-1406). *Proof:* the shared table in both suites. An API test sends answers that the browser would have hidden, and they are ignored.
-- **TPL-432** · new · The validator runs when a template is **saved**, and refuses:
+- **TPL-431** · built · The browser runs the **same table** in TypeScript to show and hide steps and fields while the person types. The server evaluates everything again on submit and in the dry run (TPL-341), and its answer is the only one that counts (decided, TPL-1406). *Proof:* the shared table in both suites. An API test sends answers that the browser would have hidden, and they are ignored.
+- **TPL-432** · built · The validator runs when a template is **saved**, and refuses:
   - a test on a field that does not exist;
   - a value of the wrong kind;
   - a choice option that does not exist;
@@ -93,5 +93,5 @@ Diffluence takes the second road, as document control did for transitions (DOC-1
   - a group that does not exist.
 
   The editor shows each problem next to the condition, in words, before saving (WCAG 3.3.1). *Why:* errors belong to the author, never to the person filling in the form. *Edge cases:* a field renamed in the editor renames its tests too (TPL-230). *Proof:* a validator test per rule.
-- **TPL-433** · new · Document control's transition conditions (DOC-120) test pages, not answers, but they share the shape "all or any of tests". Whichever lands first puts the shared part (the all-or-any combinator and the "never fails" rule) in `internal/conditions`, and the other reuses it. *Why:* one way to read and test a condition across the product. *Proof:* a code review note in whichever wave comes second.
+- **TPL-433** · built · Document control's transition conditions (DOC-120) test pages, not answers, but they share the shape "all or any of tests". Whichever lands first puts the shared part (the all-or-any combinator and the "never fails" rule) in `internal/conditions`, and the other reuses it. *Why:* one way to read and test a condition across the product. *Proof:* a code review note in whichever wave comes second.
 - **TPL-434** · later · Conditions that compare **two fields** with each other, such as "end date after start date". *Why:* useful, but it is a cross-field validation more than a condition, and it doubles the editor's choices. For now, a date field's bounds cover the common case (TPL-304).

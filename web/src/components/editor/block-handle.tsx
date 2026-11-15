@@ -13,6 +13,7 @@ import {
   IconMoveDown,
   IconMoveUp,
   IconPlus,
+  IconSliders,
   IconTrash,
   IconUnwrap,
 } from '../icons';
@@ -44,7 +45,7 @@ const TURNABLE = new Set([
   'blockquote',
   'codeBlock',
 ]);
-const FRAMES = new Set(['panel', 'expand', 'spotlight']);
+const FRAMES = new Set(['panel', 'expand', 'spotlight', 'conditional']);
 const LIST_ITEMS = new Set(['listItem', 'taskItem']);
 
 /** The top-level block at this height. The middle of the text avoids the margins. */
@@ -303,11 +304,16 @@ export function BlockHandle({
           {FRAMES.has(node.type.name) && (
             <>
               <MenuSeparator />
+              {node.type.name === 'conditional' && (
+                <MenuItem onClick={() => actions.openSection(pos)}>
+                  <IconSliders size={MENU_ICON_SIZE} /> {t('templates.condition.change')}
+                </MenuItem>
+              )}
               <MenuItem
                 onClick={() =>
                   act(() => {
                     selectBlock(editor, pos);
-                    unwrapBlock(editor, node.type.name as 'panel' | 'expand' | 'spotlight');
+                    unwrapBlock(editor, node.type.name as 'panel' | 'expand' | 'spotlight' | 'conditional');
                   })
                 }
               >

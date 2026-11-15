@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/diffluence/diffluence/internal/conditions"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/labels"
@@ -25,21 +26,52 @@ type answered struct {
 	titles map[string]string
 	// asked names every question of the set once, in the order the form asks them.
 	asked []string
+	// facts are what the conditions of the set's pages, sections and rules are decided on:
+	// every answer as it lands, a hidden question as empty (TPL-421, TPL-430).
+	facts conditions.Facts
 }
 
 // checkAnswers checks every answer of a set on the server, whatever the browser said
 // (TPL-320): the rules of its kind from the shared table, and what only the database
 // knows, such as whether the creator may see a chosen page or person. A question left
 // out takes its default (TPL-316). Every refused answer is named at once (TPL-324).
+//
+// The server decides again which questions were shown, whatever the browser said (TPL-1406):
+// a question whose step or own condition does not hold on the answers before it is hidden,
+// and an answer sent for it is dropped unread (TPL-421, TPL-1407).
 func (s *Service) checkAnswers(ctx context.Context, c identity.Caller, p *plan, given map[string]string) (answered, error) {
-	form, err := s.withGoneDefaults(ctx, s.pool, formOf(p.version.Manifest, p.texts))
+	m := p.version.Manifest
+	order := formOrder(m, p.texts)
+	form := make([]fields.Spec, len(order))
+	for i, a := range order {
+		form[i] = a.spec
+	}
+	form, err := s.withGoneDefaults(ctx, s.pool, form)
+	if err != nil {
+		return answered{}, err
+	}
+	facts, err := s.baseFacts(ctx, c, p)
 	if err != nil {
 		return answered{}, err
 	}
 	out := answered{fills: map[string]document.Filling{}, titles: map[string]string{}}
+	stepShown := map[int]bool{}
 	var problems []apperr.FieldProblem
-	for _, spec := range form {
+	for i, spec := range form {
 		out.asked = append(out.asked, spec.Name)
+		step := order[i].step
+		shown, decided := stepShown[step]
+		if !decided {
+			shown = step >= len(m.Steps) || conditions.Holds(m.Steps[step].Condition, facts)
+			stepShown[step] = shown
+		}
+		kind := conditions.Kind(spec.Kind)
+		if !shown || !conditions.Holds(spec.Condition, facts) {
+			// Never seen, so never answered: empty everywhere it is used.
+			out.fills[spec.Name], out.titles[spec.Name] = document.Filling{}, ""
+			facts.Answers[spec.Name] = conditions.Answer{Kind: kind}
+			continue
+		}
 		raw, present := given[spec.Name]
 		if !present && spec.Default != nil {
 			raw, present = spec.DefaultValue(p.today, c.UserID.String()), true
@@ -54,10 +86,12 @@ func (s *Service) checkAnswers(ctx context.Context, c identity.Caller, p *plan, 
 		}
 		if problem != nil {
 			problems = append(problems, fieldProblem(spec.Name, problem))
+			facts.Answers[spec.Name] = conditions.Answer{Kind: kind}
 			continue
 		}
+		facts.Answers[spec.Name] = conditions.Answer{Kind: kind, Value: value}
 		// A page published at once holds no question left open (TPL-151).
-		if present || p.version.Manifest.Publish {
+		if present || m.Publish {
 			out.fills[spec.Name] = fields.Fill(spec, value)
 			out.titles[spec.Name] = titleWords(spec, value, title)
 		}
@@ -65,6 +99,7 @@ func (s *Service) checkAnswers(ctx context.Context, c identity.Caller, p *plan, 
 	if len(problems) > 0 {
 		return answered{}, apperr.InvalidFields("invalid_answers", problems)
 	}
+	out.facts = facts.Prepared()
 	return out, nil
 }
 

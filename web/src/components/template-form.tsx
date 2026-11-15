@@ -29,6 +29,7 @@ import {
   type FieldSpec,
   type Problem,
 } from '../template-fields';
+import { holds, type Condition, type Facts } from '../template-conditions';
 import { IconLock } from './icons';
 import { PagePicker, SubjectPicker } from './picker';
 import { ConfirmDialog, ErrorNote, Field, fieldErrorId, fieldHelpId, Loading } from './ui';
@@ -37,15 +38,45 @@ import { ConfirmDialog, ErrorNote, Field, fieldErrorId, fieldHelpId, Loading } f
 const RADIO_LIMIT = 6;
 
 /** Groups fields in the steps of a template. Fields outside any step go last. */
-export function stepsOf(template: TemplateSummary): { title: string; fields: TemplateField[] }[] {
+export function stepsOf(
+  template: TemplateSummary,
+): { title: string; fields: TemplateField[]; condition?: Condition }[] {
   const fields = template.fields ?? [];
   const placed = new Set(template.steps.flatMap((s) => s.fields));
   const steps = template.steps.map((s) => ({
     title: s.title,
+    condition: s.condition,
     fields: fields.filter((f) => s.fields.includes(f.name)),
   }));
   const rest = fields.filter((f) => !placed.has(f.name));
   return rest.length > 0 || steps.length === 0 ? [...steps, { title: '', fields: rest }] : steps;
+}
+
+/**
+ * The questions the answers so far show (spec 074, TPL-421): a step's condition and a
+ * question's own, each testing only questions asked before, decided in the order the form
+ * asks them, as the server does. A hidden question counts as unanswered. The server decides
+ * again on submit; this only previews (TPL-1406).
+ */
+export function shownQuestions(
+  template: TemplateSummary,
+  answers: Record<string, string>,
+  base: Omit<Facts, 'answers'>,
+): Set<string> {
+  const facts: Facts = { ...base, answers: {} };
+  const shown = new Set<string>();
+  for (const step of stepsOf(template)) {
+    const stepShown = holds(step.condition, facts);
+    for (const field of step.fields.map(fieldSpecOf)) {
+      const visible = stepShown && holds(field.condition, facts);
+      if (visible) shown.add(field.name);
+      const [value, problem] = visible
+        ? checkAnswer(field, answers[field.name] ?? '', base.today)
+        : ['', null];
+      facts.answers[field.name] = { kind: field.kind, value: problem ? '' : value };
+    }
+  }
+  return shown;
 }
 
 /**
@@ -60,10 +91,15 @@ export type FormStep =
  * one sets where the pages go; the check step follows for a guided template, whose dry run
  * the server works out. A plain template keeps the form it always had (TPL-1104).
  */
-export function formSteps(template: TemplateSummary, withCheck: boolean): FormStep[] {
+export function formSteps(template: TemplateSummary, withCheck: boolean, shown?: Set<string>): FormStep[] {
   const steps: FormStep[] = stepsOf(template)
-    .filter((s) => s.fields.length > 0)
-    .map((s) => ({ kind: 'fields', title: s.title, fields: s.fields.map(fieldSpecOf), place: false }));
+    .map((s) => ({
+      kind: 'fields' as const,
+      title: s.title,
+      fields: s.fields.map(fieldSpecOf).filter((f) => !shown || shown.has(f.name)),
+      place: false,
+    }))
+    .filter((s) => s.fields.length > 0);
   const last = steps[steps.length - 1];
   if (last?.kind === 'fields') last.place = true;
   else steps.push({ kind: 'fields', title: '', fields: [], place: true });
@@ -629,8 +665,6 @@ export function TemplateForm({
   const formId = useId();
   const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
   const fields = useMemo(() => (template.fields ?? []).map(fieldSpecOf), [template.fields]);
-  // The check step is for a guided template, whose dry run the server works out (TPL-340).
-  const steps = useMemo(() => formSteps(template, guidedOn && template.guided), [template, guidedOn]);
   const ids = useMemo(
     () => Object.fromEntries(fields.map((f, i) => [f.name, `${formId}-field-${i}`])),
     [fields, formId],
@@ -656,7 +690,38 @@ export function TemplateForm({
   const current = answers ?? start ?? {};
   // The creator's own name is known without a pick, for a default of "the person filling in".
   const allNames = me.data ? { [me.data.user.id]: me.data.user.display_name, ...names } : names;
+  const shown = useMemo(
+    () =>
+      shownQuestions(template, current, {
+        today,
+        space: space.id,
+        groups: template.condition_groups?.member ?? [],
+        missingGroups: template.condition_groups?.missing ?? [],
+      }),
+    [template, current, today, space.id],
+  );
+  // The check step is for a guided template, whose dry run the server works out (TPL-340).
+  const steps = useMemo(
+    () => formSteps(template, guidedOn && template.guided, shown),
+    [template, guidedOn, shown],
+  );
   const step = steps[at];
+  // A question a condition shows appears after the one that caused it, and is announced in a
+  // polite live region; the focus never moves by itself (TPL-1023).
+  const asked = step?.kind === 'fields' ? step.fields.length : 0;
+  const [counted, setCounted] = useState({ at, asked });
+  const [announced, setAnnounced] = useState('');
+  if (counted.at !== at || counted.asked !== asked) {
+    const more = asked - counted.asked;
+    setAnnounced(
+      counted.at !== at
+        ? ''
+        : more > 0
+          ? t('templates.moreQuestions', { count: more })
+          : t('templates.fewerQuestions', { count: -more }),
+    );
+    setCounted({ at, asked });
+  }
 
   useEffect(() => {
     if (summaryShown > 0) summaryRef.current?.focus();
@@ -669,7 +734,8 @@ export function TemplateForm({
 
   const body = () => ({
     parent_id: placeChanged ? place || null : parent,
-    answers: current,
+    // An answer to a question the person was not shown is not sent (TPL-1407).
+    answers: Object.fromEntries(Object.entries(current).filter(([name]) => shown.has(name))),
     replaces: replaces ?? null,
   });
   const showServerProblems = (error: unknown) => {
@@ -771,6 +837,9 @@ export function TemplateForm({
       : step?.title || (step?.fields.length === 0 ? t('templates.placeTitle') : '');
   return (
     <form noValidate onSubmit={next} className="template-form">
+      <p className="visually-hidden" aria-live="polite">
+        {announced}
+      </p>
       {heading && <h3>{heading}</h3>}
       {steps.length > 1 && (
         <p role="status" className="muted">

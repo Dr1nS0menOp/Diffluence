@@ -12,6 +12,8 @@ package fields
 import (
 	"strings"
 	"time"
+
+	"github.com/diffluence/diffluence/internal/conditions"
 )
 
 // Kind is what a field asks for.
@@ -115,6 +117,9 @@ type Spec struct {
 	// DefaultGone says the suggested person is no longer active, so the form shows the field
 	// empty with a note (TPL-316). The server sets it when it hands out a form; it is never stored.
 	DefaultGone bool `json:"default_gone,omitempty"`
+	// Condition shows the question only when it holds, testing questions asked before it
+	// (spec 074, TPL-421). The templates module checks it, because only it knows the form.
+	Condition *conditions.Condition `json:"condition,omitempty"`
 }
 
 // Problem is why an answer or a field is refused, as a code the browser translates and

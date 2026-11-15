@@ -41,6 +41,10 @@ func checkDocumentKind(kind string, doc document.Node) error {
 	if kind != KindTemplate && document.HasTemplateValues(doc) {
 		return apperr.Invalid("A value of a template cannot be part of a page. Remove it first.")
 	}
+	// A section a condition shows is decided when a page is made (TPL-422).
+	if kind != KindTemplate && document.HasConditionals(doc) {
+		return apperr.Invalid("A section of a template that a condition shows cannot be part of a page. Remove it first.")
+	}
 	return nil
 }
 

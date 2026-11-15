@@ -5,6 +5,7 @@
  * cases, internal/templates/fields/testdata/cases.json. The server decides; this only
  * helps the person before they send.
  */
+import type { Condition } from './template-conditions';
 
 export type FieldKind =
   | 'line'
@@ -75,6 +76,8 @@ export interface FieldSpec {
   default?: FieldDefault;
   /** The suggested person is no longer active (TPL-316). */
   default_gone?: boolean;
+  /** The question is asked only when this holds (spec 074, TPL-421). */
+  condition?: Condition;
 }
 
 /** Why an answer or a field is refused: a code under templates.problem, and its values. */

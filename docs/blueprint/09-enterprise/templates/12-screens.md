@@ -50,7 +50,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
   - **Section shown when…** (TPL-422).
 
   A field has a dashed border and instruction text is muted and italic, as today (design standard, "Fields and instruction text"). A conditional section has a quiet outline in `--color-guide`, with its condition as a sentence on its first line. Its settings come from the block's menu in the margin, like every block. *Proof:* e2e pictures of a template with each.
-- **TPL-1014** · new · A **condition** is edited as a form of native fields, like a rule's When, If and Then (design standard, "Insight and automation"):
+- **TPL-1014** · built · A **condition** is edited as a form of native fields, like a rule's When, If and Then (design standard, "Insight and automation"):
   - "All of" or "Any of";
   - then rows of subject, operator and value, each a native select or input of the right kind;
   - Add test, and Remove on each row.
@@ -68,7 +68,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
   - Back as a `quiet` button and Next or Create as the `primary` one.
 
   Inputs use `Field`, with the label, "required" in words where it applies, the help text, and the error. A person field uses `SubjectPicker`. *Why:* the components of the standard, so the form feels like the rest of the product. *Proof:* pictures of every field kind, empty, filled and in error.
-- **TPL-1023** · new · A field or step that a condition shows **appears after** the field that caused it. The change is announced in a polite live region ("1 more question"), and the focus never moves by itself. *Why:* WCAG 3.2.2 (on input) and 4.1.3. A change of context while typing disorients. *Proof:* an accessibility test with a screen-reader query.
+- **TPL-1023** · built · A field or step that a condition shows **appears after** the field that caused it. The change is announced in a polite live region ("1 more question"), and the focus never moves by itself. *Why:* WCAG 3.2.2 (on input) and 4.1.3. A change of context while typing disorients. *Proof:* an accessibility test with a screen-reader query.
 - **TPL-1024** · built · The **check step** (TPL-340) shows the answers as a description list with Change links, and the pages as an indented list with titles, labels as plain `#` words and restrictions as the lock icon with its words. The primary button names the action: "Create 7 pages" or "Create 7 drafts". *Why:* the design standard's rule that a button says what it does. *Proof:* a picture.
 - **TPL-1025** · partly · A **background set** (TPL-121) shows a status line with progress in words ("Making 64 pages…"), and the person can close the dialog. A `useToast` and the bell tell them when it is ready, with a link to the root page. *Proof:* an e2e test with a slowed set.
 - **TPL-1026** · built · Errors from the server after Create show in an `ErrorNote` at the top of the check step, with the list of TPL-810 when rights are missing. The answers stay. *Proof:* an e2e test.

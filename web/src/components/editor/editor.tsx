@@ -57,6 +57,7 @@ import {
   MentionSuggestions,
   SlashCommands,
   TEMPLATE_ITEMS,
+  TEMPLATE_SECTION_ITEM,
   TEMPLATE_VALUE_ITEM,
   type InsertItem,
 } from './insert';
@@ -66,6 +67,9 @@ import { keepSharedClean } from './shared-clean';
 import { renderCaret, type Together } from './together';
 import { LinkDialog } from './link-dialog';
 import { TemplateItemDialog, type TemplateValueChoice } from './template-item';
+import { changeSection, SectionContext, wrapInSection } from './conditional';
+import { ConditionDialog, type ConditionScope } from '../condition-editor';
+import type { Condition } from '../../template-conditions';
 import { HeadingAnchors } from './outline';
 import { TaskDates } from './people';
 import { ReaderTables } from './reader-tables';
@@ -391,6 +395,7 @@ export function DocumentEditor({
   onComment,
   language,
   templateValues,
+  templateConditions,
 }: {
   pageId: string;
   initial: Json;
@@ -417,6 +422,8 @@ export function DocumentEditor({
   language?: string;
   /** In a guided template: the values / can insert, built-in ones and the pages of the set. */
   templateValues?: TemplateValueChoice[];
+  /** In a guided template: what the condition of a section may test (spec 074, TPL-422). */
+  templateConditions?: ConditionScope;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -459,6 +466,9 @@ export function DocumentEditor({
   const [templateItem, setTemplateItem] = useState<TemplateItemKind | null>(null);
   const valueChoices = useRef(templateValues);
   valueChoices.current = templateValues;
+  const conditionScope = useRef(templateConditions);
+  conditionScope.current = templateConditions;
+  const [section, setSection] = useState<{ pos: number | null } | null>(null);
   const fileInput = useRef<HTMLInputElement>(null);
   const plainPaste = useRef(false);
   const change = useRef(onChange);
@@ -566,6 +576,7 @@ export function DocumentEditor({
           ...offered(INSERT_ITEMS, offeredNow.current),
           ...(inTemplate ? TEMPLATE_ITEMS : []),
           ...(inTemplate && valueChoices.current ? [TEMPLATE_VALUE_ITEM] : []),
+          ...(inTemplate && conditionScope.current ? [TEMPLATE_SECTION_ITEM] : []),
           ...savedItems.current,
         ],
         recent: () => readRecentItems(person),
@@ -659,6 +670,7 @@ export function DocumentEditor({
       else setSizingTable(true);
     },
     openTemplateItem: setTemplateItem,
+    openSection: (pos) => setSection({ pos }),
     copyBlockLink: (anchor) => {
       const address = `${window.location.origin}/pages/${pageId}#${anchor}`;
       void copy(address, t('editor.blockLinkCopied'));
@@ -796,7 +808,9 @@ export function DocumentEditor({
           />
         )}
         {header}
-        <EditorContent editor={editor} />
+        <SectionContext.Provider value={{ scope: templateConditions, edit: (pos) => setSection({ pos }) }}>
+          <EditorContent editor={editor} />
+        </SectionContext.Provider>
         <ImagesHint editor={editor} />
         <WordCount editor={editor} />
         {footer}
@@ -815,6 +829,24 @@ export function DocumentEditor({
               .run();
           }}
           onClose={() => setPickingFile(false)}
+        />
+      )}
+      {section && templateConditions && (
+        <ConditionDialog
+          title={t('insert.conditional.name')}
+          start={
+            section.pos === null
+              ? undefined
+              : ((editor.state.doc.nodeAt(section.pos)?.attrs.condition as Condition | null) ?? undefined)
+          }
+          scope={templateConditions}
+          onClose={() => setSection(null)}
+          onSave={(condition) => {
+            const at = section.pos;
+            setSection(null);
+            if (at !== null) changeSection(editor, at, condition);
+            else if (condition) wrapInSection(editor, condition);
+          }}
         />
       )}
       {templateItem && (

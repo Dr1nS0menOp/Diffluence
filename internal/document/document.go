@@ -78,6 +78,7 @@ const (
 	TypeTemplateField  = "templateField"
 	TypeInstruction    = "instruction"
 	TypeTemplateValue  = "templateValue"
+	TypeConditional    = "conditional"
 	TypeMention        = "mention"
 	TypeTable          = "table"
 	TypeTableRow       = "tableRow"
@@ -101,7 +102,7 @@ const (
 )
 
 var (
-	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard, TypeSpotlight, TypeUnknownBlock}
+	blockTypes  = []string{TypeParagraph, TypeHeading, TypeBulletList, TypeOrderedList, TypeTaskList, TypeBlockquote, TypeCodeBlock, TypeHorizontalRule, TypeImage, TypeFile, TypeTable, TypePanel, TypeExpand, TypeColumns, TypeDecision, TypeDynamic, TypePageFacts, TypeExcerpt, TypeChart, TypeMedia, TypePageCard, TypeSpotlight, TypeUnknownBlock, TypeConditional}
 	inlineTypes = []string{TypeText, TypeHardBreak, TypeStatus, TypeDate, TypeMention, TypeTemplateField, TypeTemplateValue, TypeInstruction, TypeAnchor, TypePageLink, TypePlaceholderLink, TypeInlineImage}
 )
 
@@ -134,6 +135,7 @@ var children = map[string][]string{
 	TypeTemplateField:   {},
 	TypeInstruction:     {},
 	TypeTemplateValue:   {},
+	TypeConditional:     blockTypes,
 	TypeMention:         {},
 	TypeDynamic:         {},
 	TypePageFacts:       {TypeTable},
@@ -193,6 +195,9 @@ func Normalize(raw []byte) (Node, error) {
 		return Node{}, apperr.Invalid(err.Error())
 	}
 	liftNestedTables(&n, false)
+	if err := checkConditionalDepth(n, 0); err != nil {
+		return Node{}, apperr.Invalid(err.Error())
+	}
 	if len(n.Content) == 0 {
 		n.Content = []Node{{Type: TypeParagraph}}
 	}
@@ -216,6 +221,9 @@ func clean(n *Node, depth int) error {
 	}
 	if err := cleanAttrs(n); err != nil {
 		return err
+	}
+	if n.Type == TypeConditional && len(n.Content) == 0 {
+		return errors.New("a section shown when a condition holds needs some text")
 	}
 	if n.Type == TypeColumns && (len(n.Content) < minColumns || len(n.Content) > maxColumns) {
 		return fmt.Errorf("columns need %d to %d columns", minColumns, maxColumns)

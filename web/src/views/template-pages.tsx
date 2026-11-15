@@ -15,6 +15,8 @@ import { IconArrowDown, IconArrowUp, IconIndent, IconOutdent } from '../componen
 import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
+import type { Condition } from '../template-conditions';
+import { ConditionCell, useConditionScope } from './template-rules';
 
 /** The ways a page of a template moves, as the server takes them. */
 type MoveTo = 'up' | 'down' | 'in' | 'out';
@@ -73,6 +75,7 @@ function EntryText({
   const [pattern, setPattern] = useState(entry.title_pattern);
   const doc = useRef<Json | null>(null);
   const values = useTemplateValues(templateId);
+  const conditions = useConditionScope(templateId);
   const save = useMutation({
     mutationFn: () =>
       api.patch(`/templates/${templateId}/entries/${entry.key}`, {
@@ -107,6 +110,7 @@ function EntryText({
         canAttach={false}
         inTemplate
         templateValues={values}
+        templateConditions={conditions}
         fileAddress={templateFileAddress(templateId)}
         onChange={(next) => {
           doc.current = next;
@@ -156,6 +160,13 @@ export function TemplatePages({ templateId }: { templateId: string }) {
       api.post(`/templates/${templateId}/entries/${key}/move`, { to }),
     onSettled: refresh,
   });
+  // A page is made only when its condition holds, and the pages below it with it (TPL-420).
+  const scope = useConditionScope(templateId);
+  const setCondition = useMutation({
+    mutationFn: ({ key, condition }: { key: string; condition: Condition | undefined }) =>
+      api.put(`/templates/${templateId}/entries/${key}/condition`, { condition: condition ?? null }),
+    onSettled: refresh,
+  });
   const entries = list.data?.entries ?? [];
   const nameOf = (entry: TemplateEntry) => entry.name || t('templates.firstPage');
   return (
@@ -163,7 +174,7 @@ export function TemplatePages({ templateId }: { templateId: string }) {
       <h2 id="template-pages-title">{t('templates.pages')}</h2>
       <p className="muted">{t('templates.pagesHelp')}</p>
       {list.isPending && <Loading />}
-      <ErrorNote error={list.error ?? add.error ?? remove.error ?? move.error} />
+      <ErrorNote error={list.error ?? add.error ?? remove.error ?? move.error ?? setCondition.error} />
       {list.data && (
         <>
           <p role="status">
@@ -179,6 +190,7 @@ export function TemplatePages({ templateId }: { templateId: string }) {
                   <th>{t('common.name')}</th>
                   <th>{t('templates.below')}</th>
                   <th>{t('templates.entryKind')}</th>
+                  {scope && <th>{t('templates.conditionColumn')}</th>}
                   <th>{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -202,6 +214,21 @@ export function TemplatePages({ templateId }: { templateId: string }) {
                       <td data-depth={depthOf(entry, entries)}>{nameOf(entry)}</td>
                       <td>{parent ? nameOf(parent) : ''}</td>
                       <td>{t(`templates.entry_${entry.kind}`)}</td>
+                      {scope && (
+                        <td>
+                          {entry.key === 'root' ? (
+                            <span className="muted">{t('templates.condition.always')}</span>
+                          ) : (
+                            <ConditionCell
+                              condition={entry.condition}
+                              scope={scope}
+                              title={nameOf(entry)}
+                              disabled={setCondition.isPending}
+                              onSave={(condition) => setCondition.mutate({ key: entry.key, condition })}
+                            />
+                          )}
+                        </td>
+                      )}
                       <td className="row">
                         {entry.key === 'root' ? (
                           <button

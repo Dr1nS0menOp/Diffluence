@@ -680,12 +680,21 @@ func QueueDeletionForPages(ctx context.Context, tx pgx.Tx, pageIDs []uuid.UUID) 
 // CopyAll gives a new page its own attachment rows pointing at new copies of
 // the current files. It returns the mapping from old to new ids.
 func (s *Service) CopyAll(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to, spaceID uuid.UUID) (map[uuid.UUID]uuid.UUID, error) {
+	return s.CopyAllExcept(ctx, tx, c, from, to, spaceID, nil)
+}
+
+// CopyAllExcept copies the current files of a page as CopyAll does, leaving out the files
+// skip names, such as those only a removed section of a template showed (spec 074, TPL-422).
+func (s *Service) CopyAllExcept(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to, spaceID uuid.UUID, skip []uuid.UUID) (map[uuid.UUID]uuid.UUID, error) {
 	if err := requireRoomForCopy(ctx, tx, from, spaceID); err != nil {
 		return nil, err
 	}
+	if skip == nil {
+		skip = []uuid.UUID{}
+	}
 	rows, err := tx.Query(ctx, `SELECT a.id, a.filename, v.object_key, v.content_type FROM attachments a
 		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
-		WHERE a.page_id = $1 AND a.status = 'active'`, from)
+		WHERE a.page_id = $1 AND a.status = 'active' AND NOT (a.id = ANY($2))`, from, skip)
 	if err != nil {
 		return nil, err
 	}

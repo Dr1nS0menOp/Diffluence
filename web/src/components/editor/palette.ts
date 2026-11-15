@@ -64,6 +64,7 @@ export const KNOWN_NODE_TYPES = [
   'date',
   'templateField',
   'templateValue',
+  'conditional',
   'instruction',
   'mention',
   'table',

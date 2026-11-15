@@ -96,6 +96,9 @@ var idRoutes = map[string]idRoute{
 	"GET /api/v1/templates/{id}/versions/{number}/changes": {owner: "a manager of the template's space"},
 	"PUT /api/v1/templates/{id}/fields":                    {owner: "a manager of the template's space"},
 	"POST /api/v1/templates/{id}/entries/{key}/move":       {owner: "a manager of the template's space"},
+	"PUT /api/v1/templates/{id}/entries/{key}/condition":   {owner: "a manager of the template's space"},
+	"PUT /api/v1/templates/{id}/rules":                     {owner: "a manager of the template's space"},
+	"POST /api/v1/templates/{id}/fields/rename":            {owner: "a manager of the template's space"},
 	"POST /api/v1/templates/{id}/sets":                     {owner: "whoever may create pages in the space"},
 	"POST /api/v1/templates/{id}/sets/check":               {owner: "whoever may create pages in the space"},
 }

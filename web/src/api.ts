@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // The frontend uses only the public API, like any other client (blueprint 01).
+import type { Condition } from './template-conditions';
 import type { FieldSpec } from './template-fields';
 
 /** One field of a form the server refused, with why (spec 074, TPL-324). */
@@ -567,7 +568,7 @@ export interface TemplateSummary {
   category: string;
   labels: string[];
   title_pattern: string;
-  steps: { title: string; fields: string[] }[];
+  steps: TemplateStep[];
   default_parent: string | null;
   hidden: boolean;
   promoted: boolean;
@@ -584,6 +585,23 @@ export interface TemplateSummary {
   /** How many pages the template makes (TPL-1021). */
   pages?: number;
   document?: Json;
+  /** The groups the form's conditions test that the reader is in, and those gone (TPL-402). */
+  condition_groups?: { member: string[]; missing: string[] };
+}
+
+/** A step of a template's form, which a condition may hide (spec 074, TPL-330, TPL-421). */
+export interface TemplateStep {
+  title: string;
+  fields: string[];
+  condition?: Condition;
+}
+
+/** A rule that adds a label to the page of an entry (spec 074, TPL-423). */
+export interface LabelRule {
+  entry: string;
+  label?: string;
+  field?: string;
+  when?: Condition;
 }
 
 /** One page a set will make, as the check step shows it (TPL-340). */
@@ -647,6 +665,8 @@ export interface TemplateEntry {
   labels: string[];
   restrictions: EntryRestrictions;
   workflow_id: string | null;
+  /** The page is made only when this holds (TPL-420). */
+  condition?: Condition;
   document?: Json;
 }
 
@@ -656,6 +676,9 @@ export interface TemplateEntries {
   publish: boolean;
   default_parent: string | null;
   entries: TemplateEntry[];
+  label_rules: LabelRule[];
+  /** Today's names of the groups and spaces its conditions test, by id. */
+  names: Record<string, string>;
 }
 
 /** What making pages from a template answers: the set, or the job that makes a large one. */

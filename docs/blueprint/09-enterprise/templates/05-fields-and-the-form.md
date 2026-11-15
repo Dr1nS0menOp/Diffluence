@@ -57,7 +57,7 @@ Today there are three kinds: `line`, `text` and `choice` (TPL-002). This feature
 
 ## 5.4 Steps
 
-- **TPL-330** · partly · Fields are grouped into **steps**, at most 10, each with a title (ORG-061). New: writing steps on the template screen; a step may have a condition (TPL-421); a step with no visible field is skipped. *Proof:* tests for each.
+- **TPL-330** · built · Fields are grouped into **steps**, at most 10, each with a title (ORG-061). New: writing steps on the template screen; a step may have a condition (TPL-421); a step with no visible field is skipped. *Proof:* tests for each.
 - **TPL-331** · built · The form says where the person is ("Step 2 of 4") in a status line. The count changes when a condition shows or hides a step, and the change is announced. *Why:* WCAG 4.1.3. *Proof:* an accessibility check.
 - **TPL-332** · built · Back keeps every answer. Closing the dialog asks first when anything was typed, with `ConfirmDialog`. *Why:* nothing typed is lost (TPL-014). *Proof:* an e2e test.
 - **TPL-333** · built · The **last step** sets the parent of the root page and shows the labels the set will get (ORG-061, still open today). *Proof:* an e2e test.

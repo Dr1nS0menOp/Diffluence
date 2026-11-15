@@ -13,10 +13,13 @@ export function SubjectPicker({
   onPick,
   label,
   usersOnly,
+  groupsOnly,
 }: {
   onPick: (e: DirectoryEntry) => void;
   label: string;
   usersOnly?: boolean;
+  /** Only groups, for a condition on the groups of the person making pages (spec 074). */
+  groupsOnly?: boolean;
 }) {
   const { t } = useTranslation();
   const listId = useId();
@@ -29,7 +32,9 @@ export function SubjectPicker({
     enabled: open,
     placeholderData: (previous) => previous,
   });
-  const entries = (q.data?.entries ?? []).filter((e) => !usersOnly || e.type === 'user');
+  const entries = (q.data?.entries ?? []).filter(
+    (e) => (!usersOnly || e.type === 'user') && (!groupsOnly || e.type === 'group'),
+  );
   const refused = q.error instanceof ApiError && q.error.status === 403;
   const showList = open && !refused;
 

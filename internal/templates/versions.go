@@ -162,6 +162,9 @@ func (s *Service) saveVersion(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	if err := s.checkSpecs(ctx, tx, m, texts, t.today); err != nil {
 		return 0, err
 	}
+	if err := s.checkConditions(ctx, tx, t, m, texts); err != nil {
+		return 0, err
+	}
 	latest, found, err := latestVersion(ctx, tx, t.ID)
 	if err != nil {
 		return 0, err

@@ -190,6 +190,31 @@
   margin-block-start: var(--space-2);
 }
 
+/* A section of a template that a condition shows (spec 074, TPL-1013): a quiet outline, with
+   its condition as a sentence on its first line. It never reaches a reader. */
+.conditional-section {
+  margin-block: 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-guide);
+  border-radius: var(--radius-card);
+}
+
+.conditional-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  user-select: none;
+}
+
+.conditional-body > :last-child {
+  margin-block-end: 0;
+}
+
 .expand-body > div > :last-child {
   margin-block-end: 0;
 }

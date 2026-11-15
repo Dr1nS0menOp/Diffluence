@@ -298,3 +298,85 @@ test('an empty page offers templates beside the editor (ORG-045)', async ({ page
   await page.keyboard.type('Notes');
   await expect(panel).toHaveCount(0);
 });
+
+// Spec 074, wave GT3: conditions.
+
+test('a question a condition shows appears after its cause, is announced, and the focus stays (TPL-1023)', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Form conditions');
+  const name = unique('Site visit');
+  await makeTemplate(page, space.id, name, [
+    { name: 'Works on site', kind: 'yesno' },
+    {
+      name: 'Badge number',
+      kind: 'line',
+      required: true,
+      condition: { match: 'all', tests: [{ subject: 'field', field: 'Works on site', op: 'yes' }] },
+    },
+  ]);
+  const form = await openForm(page, space.key, name);
+  const cause = form.getByRole('checkbox', { name: 'Works on site' });
+  const badge = form.getByLabel('Badge number (required)');
+  await expect(badge).toHaveCount(0);
+  await cause.focus();
+  await page.keyboard.press('Space');
+  await expect(badge).toBeVisible();
+  await expect(form.locator('[aria-live="polite"]')).toHaveText('1 more question');
+  await expect(cause).toBeFocused();
+  await checkAccessibility(page);
+  // The new question comes after the one that caused it, in the order of the Tab key.
+  await page.keyboard.press('Tab');
+  await expect(badge).toBeFocused();
+  await page.keyboard.type('B-12');
+  await page.keyboard.press('Shift+Tab');
+  await page.keyboard.press('Space');
+  await expect(badge).toHaveCount(0);
+  await expect(form.locator('[aria-live="polite"]')).toHaveText('1 question fewer');
+  // Hidden, the required question does not block, and its answer is not sent.
+  const sent = page.waitForRequest((r) => r.url().includes('/sets/check'));
+  await page.keyboard.press('Enter');
+  expect((await sent).postData() ?? '').not.toContain('B-12');
+  await expect(form.getByRole('heading', { name: 'Check before making' })).toBeVisible();
+});
+
+test('a condition is edited by keyboard, and its sentence says what it means (TPL-1014)', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Condition editor');
+  const name = unique('Incident');
+  const id = await makeTemplate(page, space.id, name, [
+    { name: 'Severity', kind: 'choice', options: ['Low', 'High'] },
+    { name: 'Statement', kind: 'text' },
+  ]);
+  await page.goto(`/templates/${id}/settings?section=form`);
+  const statementRow = page
+    .getByRole('row')
+    .filter({ has: page.getByRole('cell', { name: 'Statement', exact: true }) });
+  await statementRow.getByRole('button', { name: 'Add a condition' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Condition: Statement' });
+  // The first test starts on the only earlier question; the value is chosen by keyboard.
+  await expect(dialog.getByLabel('Test 1: what is tested')).toHaveValue('Severity');
+  await dialog.getByLabel('Test 1: how').selectOption('is');
+  await dialog.getByLabel('Test 1: how').focus();
+  await page.keyboard.press('Tab');
+  await expect(dialog.getByLabel('Test 1: value')).toBeFocused();
+  await dialog.getByLabel('Test 1: value').selectOption('High');
+  await expect(dialog.getByText('Only when Severity is High')).toBeVisible();
+  // A second test of a question that is not earlier is not offered; any of turns the sentence.
+  await dialog.getByRole('button', { name: 'Add a test' }).press('Enter');
+  await dialog.getByLabel('Test 2: how').selectOption('empty');
+  await dialog.getByLabel('Applies when').selectOption('any');
+  await expect(dialog.getByText('Only when Severity is High or Severity is empty')).toBeVisible();
+  await expect(
+    dialog.getByLabel('Test 2: what is tested').locator('option', { hasText: 'Statement' }),
+  ).toHaveCount(0);
+  await checkAccessibility(page);
+  await dialog.getByRole('button', { name: 'Remove test 2' }).press('Enter');
+  await dialog.getByRole('button', { name: 'Keep this condition' }).press('Enter');
+  await expect(page.getByRole('cell', { name: /Only when Severity is High/ })).toBeVisible();
+  await page.getByRole('button', { name: 'Save' }).press('Enter');
+  await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('cell', { name: /Only when Severity is High/ })).toBeVisible();
+});
