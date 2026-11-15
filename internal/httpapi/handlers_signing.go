@@ -159,6 +159,9 @@ func (s *Server) handleSigningAtProvider(w http.ResponseWriter, r *http.Request)
 	// nosemgrep: go.lang.security.audit.net.cookie-missing-secure.cookie-missing-secure
 	http.SetCookie(w, &http.Cookie{Name: s.flowCookie, Value: binding, Path: "/api/v1/auth/oidc", HttpOnly: true,
 		Secure: s.deps.Config.SecureCookies(), SameSite: http.SameSiteLaxMode, MaxAge: 600})
+	// The address is the provider's own login page from its discovery document; the token of
+	// the request is kept in the stored flow and never becomes part of it, as at login.
+	// nosemgrep: go.lang.security.injection.open-redirect.open-redirect
 	http.Redirect(w, r, to, http.StatusFound)
 }
 
