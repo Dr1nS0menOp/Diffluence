@@ -69,11 +69,11 @@ A guided template touches many parts at once: the tree, rights, files, labels, w
 - **TPL-850** · built · **Moving** a page of a set keeps its origin record. Moving it to another space keeps the record too, but the set's root link in Details shows only what the reader may see. *Proof:* a test.
 - **TPL-851** · built · **Copying** a page of a set does not copy the origin record: the copy was not made from a template. *Proof:* a test.
 - **TPL-852** · new · **Exporting** a template (ORG-059) includes all entries, fields, steps, conditions and rules of its approved version, and their files. The audience lists, the state and the history are left out, because people and groups differ between installations. **Importing** makes a template in **draft**, owned by the importer, which follows the approval rule of its scope (TPL-511). *Why:* an imported template has not been checked here. *Edge cases:* an import naming groups that do not exist here keeps the restriction but refuses approval until the groups are chosen again (TPL-525). *Proof:* a round-trip test; a test of the missing group.
-- **TPL-853** · new · A **template's owner who leaves** keeps ownership on record. Their drafts stay, visible to the managers of the scope, who can delete or take them over (audited). *Proof:* a test.
+- **TPL-853** · built · A **template's owner who leaves** keeps ownership on record. Their drafts stay, visible to the managers of the scope, who can delete or take them over (audited). *Proof:* a test.
 - **TPL-854** · new · A **full restore** returns templates, versions, approvals and origin records to the moment of the backup. Background sets that were waiting are lost, because the jobs table is restored with them. The creators see nothing, and the set does not exist. *Proof:* a restore drill step with a waiting set.
 
 ## 10.7 Several nodes and concurrency
 
-- **TPL-855** · new · Two approvers decide on the **same version** at the same moment. The version row is locked (`SELECT … FOR UPDATE`), so one decision wins. The other sees "already decided by *person*". *Proof:* a concurrency test.
-- **TPL-856** · new · An author saves a new version **while** it is being approved. Whichever commits first wins. An approval of a version that is no longer the newest proposed one is refused. *Proof:* a concurrency test.
+- **TPL-855** · built · Two approvers decide on the **same version** at the same moment. The version row is locked (`SELECT … FOR UPDATE`), so one decision wins. The other sees "already decided by *person*". *Proof:* a concurrency test.
+- **TPL-856** · built · An author saves a new version **while** it is being approved. Whichever commits first wins. An approval of a version that is no longer the newest proposed one is refused. *Proof:* a concurrency test.
 - **TPL-857** · built · All times are the database's (`now()`), as in DOC-1240. *Proof:* covered by TPL-201.

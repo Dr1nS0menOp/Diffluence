@@ -2,7 +2,21 @@
 // Spec 074, wave GT2 in the browser: the form of a template, its check step, and the
 // sections of the template editor, by keyboard where a person would use one.
 import type { Page } from '@playwright/test';
-import { ADMIN, checkAccessibility, editorSettled, expect, login, newSpace, test, unique } from './helpers';
+import {
+  ADMIN,
+  checkAccessibility,
+  createUser,
+  EDITOR,
+  editorSettled,
+  expect,
+  grant,
+  login,
+  newSpace,
+  paragraph,
+  PASSWORD,
+  test,
+  unique,
+} from './helpers';
 
 test.beforeEach(async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
@@ -379,4 +393,75 @@ test('a condition is edited by keyboard, and its sentence says what it means (TP
   await expect(page.getByRole('status').filter({ hasText: 'Saved' })).toBeVisible();
   await page.reload();
   await expect(page.getByRole('cell', { name: /Only when Severity is High/ })).toBeVisible();
+});
+
+test('approval by keyboard: propose, send back with a reason, approve, withdraw (spec 074, TPL-1030)', async ({
+  page,
+  browser,
+}) => {
+  const space = await newSpace(page, 'Approval');
+  const email = `${unique('proposer')}@example.com`;
+  const proposerId = await createUser(browser, email);
+  await grant(page, space.id, { type: 'user', id: proposerId }, [...EDITOR, 'template.propose']);
+  const context = await browser.newContext({ baseURL: process.env.BASE_URL ?? 'http://localhost:8080' });
+  const proposer = await context.newPage();
+  await login(proposer, email, PASSWORD);
+  const name = unique('Visitor badge');
+
+  // My templates: the proposer writes a draft, and proposes it from its Versions section.
+  await proposer.goto(`/spaces/${space.key}/templates`);
+  await expect(proposer.getByRole('heading', { name: 'My templates' })).toBeVisible();
+  await proposer.getByRole('textbox', { name: 'New template name' }).fill(name);
+  await proposer.getByRole('button', { name: 'Start a draft template' }).press('Enter');
+  await expect(proposer).toHaveURL(/\/templates\/.+\/edit/);
+  const id = proposer.url().split('/templates/')[1]?.split('/')[0] ?? '';
+  await proposer.goto(`/templates/${id}/settings?section=versions`);
+  await expect(proposer.getByRole('cell', { name: 'Draft' })).toBeVisible();
+  await proposer.getByRole('button', { name: 'Propose version 1' }).press('Enter');
+  await expect(
+    proposer.getByText('Version 1 waits for a decision by someone who manages templates here.'),
+  ).toBeVisible();
+  await expect(proposer.getByRole('button', { name: 'Approve version 1' })).toHaveCount(0);
+
+  // The manager finds it waiting, sends it back by keyboard with a reason the author reads.
+  await page.goto(`/spaces/${space.key}/templates`);
+  const waiting = page.getByRole('region', { name: 'Waiting for approval' });
+  await expect(waiting.getByRole('link', { name })).toBeVisible();
+  await waiting.getByRole('link', { name }).press('Enter');
+  const decision = page.getByRole('group', { name: 'Decision on version 1' });
+  await expect(decision).toBeVisible();
+  await checkAccessibility(page);
+  await decision.getByRole('button', { name: 'Send back' }).press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Send version 1 back' });
+  await dialog.getByLabel('What should change').focus();
+  await page.keyboard.type('Add the front desk number');
+  await dialog.getByRole('button', { name: 'Send back' }).press('Enter');
+  await expect(page.getByText('Sent back by')).toBeVisible();
+  await proposer.reload();
+  await expect(proposer.getByText('Add the front desk number')).toBeVisible();
+
+  // Proposed again, the manager approves it by keyboard, and it is offered to everyone.
+  const changed = await proposer.request.patch(`/api/v1/templates/${id}`, {
+    data: { name, document: paragraph('Front desk: 0') },
+  });
+  expect(changed.ok(), await changed.text()).toBeTruthy();
+  await proposer.reload();
+  await proposer.getByRole('button', { name: 'Propose version 2' }).press('Enter');
+  await page.reload();
+  await page.getByRole('button', { name: 'Approve version 2' }).press('Enter');
+  await expect(page.getByText('Approved by')).toBeVisible();
+  const gallery = await proposer.request.get(`/api/v1/spaces/${space.id}/templates`);
+  expect(JSON.stringify(await gallery.json())).toContain(name);
+
+  // Withdrawn by keyboard, with a reason, behind a dialog that names the action.
+  await page.getByRole('button', { name: 'Withdraw…' }).press('Enter');
+  const withdraw = page.getByRole('dialog', { name: 'Withdraw the template' });
+  await withdraw.getByLabel('Why it is withdrawn').focus();
+  await page.keyboard.type('Replaced by the new badge process');
+  await expect(withdraw.getByRole('button', { name: 'Withdraw the template' })).toBeEnabled();
+  await withdraw.getByRole('button', { name: 'Withdraw the template' }).press('Enter');
+  await expect(page.getByText('Withdrawn by')).toBeVisible();
+  const after = await proposer.request.get(`/api/v1/spaces/${space.id}/templates`);
+  expect(JSON.stringify(await after.json())).not.toContain(name);
+  await context.close();
 });

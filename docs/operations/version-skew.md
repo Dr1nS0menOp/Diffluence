@@ -14,7 +14,7 @@ During an upgrade, two releases share one database, one queue and one storage fo
 | Events in the outbox and the queue | One release | Every listener ignores a type or a field it does not know | `TestEveryListenerLetsAnEventOfANewerReleasePass`; the upgrade test checks that no event is set aside |
 | Settings | One release | Saving a section keeps the fields a newer release stored | `TestSavingSettingsKeepsFieldsOfANewerRelease` |
 | Page documents | Any older version | A document is upgraded step by step when read, never rewritten; a newer one is left as it is | `internal/document/upgrade.go` and its tests |
-| Export bundles | Any older format (1 to 8 today; this release writes 8) | A newer bundle is refused with a reason | the bundle tests in `internal/exchange` |
+| Export bundles | Any older format (1 to 9 today; this release writes 9) | A newer bundle is refused with a reason | the bundle tests in `internal/exchange` |
 | Files | Any | The store keeps bytes and a version per file; nothing in the format depends on the release | the storage tests |
 | The editing service (`collab`) | Same release as the nodes; one behind only during an upgrade | It never writes a page version itself: it asks the API who may do what and hands the shared document to the API to save | Not tested across releases yet |
 

@@ -74,7 +74,8 @@ func TestEveryOlderBundleGivesAdministratorsTheEightOfSpec040(t *testing.T) {
 
 func TestABundleOfVersionThreeGivesWhoeverCreatesPagesPostsAndDatabases(t *testing.T) {
 	got := permissionsOfGrant(versionOfSpec040, permissions.PageCreate)
-	want := []string{permissions.PageCreate, permissions.PostCreate, permissions.DatabaseCreate}
+	// It knew nothing of proposing templates either, which spec 074 split off later.
+	want := []string{permissions.PageCreate, permissions.PostCreate, permissions.DatabaseCreate, permissions.TemplatePropose}
 	if !slices.Equal(slices.Sorted(slices.Values(got)), slices.Sorted(slices.Values(want))) {
 		t.Fatalf("a version 3 bundle knew nothing of posts and databases apart from pages: %v", got)
 	}
@@ -129,5 +130,19 @@ func TestABundleOfVersionSixGivesAdministratorsRelease(t *testing.T) {
 	}
 	if got := permissionsOfGrant(bundleVersion, permissions.SpaceAdminister); !slices.Equal(got, []string{permissions.SpaceAdminister}) {
 		t.Fatalf("a current bundle holds space.release itself: %v", got)
+	}
+}
+
+// versionOfSpec073 is the bundle version that first held space.release, the last before
+// template.propose of spec 074.
+const versionOfSpec073 = 8
+
+func TestABundleOfVersionEightGivesWhoeverCreatesPagesTheRightToProposeTemplates(t *testing.T) {
+	if got := permissionsOfGrant(versionOfSpec073, permissions.PageCreate); !slices.Equal(got,
+		[]string{permissions.PageCreate, permissions.TemplatePropose}) {
+		t.Fatalf("creating pages in a version 8 bundle let one propose templates, and must still: %v", got)
+	}
+	if got := permissionsOfGrant(bundleVersion, permissions.PageCreate); !slices.Equal(got, []string{permissions.PageCreate}) {
+		t.Fatalf("a current bundle holds template.propose itself: %v", got)
 	}
 }

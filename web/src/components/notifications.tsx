@@ -25,6 +25,9 @@ export function bellNumber(count: number): string {
 export function notificationLink(n: Notification): string {
   if (n.type === 'access_request') return `/pages/${n.page_id}?share=1`;
   if (n.type === 'export_ready') return `/exports/${n.data.export_id}`;
+  if ((n.type === 'template_proposed' || n.type === 'template_decided') && n.data.template_id) {
+    return `/templates/${n.data.template_id}/settings?section=versions`;
+  }
   return n.comment_id ? `/pages/${n.page_id}#comment-${n.comment_id}` : `/pages/${n.page_id}`;
 }
 
@@ -43,11 +46,22 @@ export function useNotificationSentence() {
       // The page itself says why: its band names the reason in words (PUB-820).
       return t('notifications.approval_release_not', { page: pageTitle(t, n.page_title) });
     }
-    return t(`notifications.type_${n.type}`, {
-      name,
-      page: pageTitle(t, n.page_title),
-      file: n.data.filename,
-    });
+    const page = pageTitle(t, n.page_title);
+    if (n.type === 'template_decided') {
+      return t(`notifications.template_${n.data.decision ?? 'approved'}`, { name, page });
+    }
+    if (n.type === 'template_set') {
+      const count = typeof n.data.pages === 'number' ? n.data.pages : 1;
+      return n.data.ready
+        ? t('notifications.template_set_ready', { page, count })
+        : t('notifications.type_template_set', { name, page, count: count - 1 });
+    }
+    const words = t(`notifications.type_${n.type}`, { name, page, file: n.data.filename });
+    // One mention for a whole set of pages says how many more of them mention the person (TPL-721).
+    if (n.type === 'mention' && Array.isArray(n.data.pages) && n.data.pages.length > 1) {
+      return t('notifications.mentionInSet', { words, count: n.data.pages.length - 1 });
+    }
+    return words;
   };
 }
 

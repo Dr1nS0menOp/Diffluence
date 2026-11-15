@@ -49,10 +49,12 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("POST /api/v1/templates/{id}/fields/rename", me, guided(s.handleTemplateFieldRename))
 	// The versions of a template finish a part that exists (ORG-060, TPL-1104), so they are
 	// not behind the switch: every template has versions.
+	r.HandleFunc("GET /api/v1/templates/{id}/newest", me, s.handleTemplateNewest)
 	r.HandleFunc("GET /api/v1/templates/{id}/versions", me, s.handleTemplateVersions)
 	r.HandleFunc("GET /api/v1/templates/{id}/versions/{number}/changes", me, s.handleTemplateVersionChanges)
 	r.HandleFunc("POST /api/v1/templates/{id}/sets", me, guided(s.handleTemplateSet))
 	r.HandleFunc("POST /api/v1/templates/{id}/sets/check", me, guided(s.handleTemplateSetCheck))
+	s.registerTemplateApprovalRoutes(guided)
 	r.HandleFunc("GET /api/v1/templates/{id}/files/{file}", me, s.handleTemplateFile)
 	r.HandleFunc("PUT /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOn)
 	r.HandleFunc("DELETE /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOff)

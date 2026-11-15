@@ -64,10 +64,11 @@ func (s *Service) runSetJob(ctx context.Context, j jobs.Job) (any, error) {
 }
 
 func (s *Service) runQueuedSet(ctx context.Context, c identity.Caller, in setJob) (SetResult, error) {
-	p, err := s.prepare(ctx, c, in.TemplateID, in.Input)
+	p, err := s.prepare(ctx, c, in.TemplateID, in.Input, realRun)
 	if err != nil {
 		return SetResult{}, err
 	}
+	p.background = true
 	release, err := s.takeTurn(ctx, c.UserID, p.spaceID)
 	if err != nil {
 		return SetResult{}, err

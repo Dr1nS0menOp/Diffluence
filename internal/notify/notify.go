@@ -82,7 +82,10 @@ type Row struct {
 	// NeedsReview reaches a reviewer through the reading being asked gives them (DOC-203).
 	NeedsReview bool
 	NoCheck     bool // the answer to someone who asked for access
-	ForceMail   bool // a rule sends an e-mail: mail unless the person turned this type off
+	// AboutTemplate reaches a person while they own the template whose hidden page the row
+	// hangs on, or look after it (spec 074, TPL-722).
+	AboutTemplate bool
+	ForceMail     bool // a rule sends an e-mail: mail unless the person turned this type off
 }
 
 // groupKey puts rows on one line. Each answer to an invitation has its own address and
@@ -97,6 +100,12 @@ func groupKey(r Row) string {
 func (s *Service) mayHear(ctx context.Context, q db.Querier, r Row) (bool, error) {
 	if r.NoCheck {
 		return true, nil
+	}
+	if r.AboutTemplate {
+		var may bool
+		err := q.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM perm_template_notice_pages($1) t WHERE t.page_id = $2)`,
+			r.UserID, r.PageID).Scan(&may)
+		return may, err
 	}
 	action := permissions.ActionPageView
 	switch {

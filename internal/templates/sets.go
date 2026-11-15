@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
@@ -103,7 +104,9 @@ type SetCheck struct {
 
 // plan is a set worked out in full before a page exists.
 type plan struct {
-	t       Template
+	t Template
+	// st is what the creator is to the template, read when the set was worked out.
+	st      standing
 	version Version
 	spaceID uuid.UUID
 	parent  *uuid.UUID
@@ -117,6 +120,9 @@ type plan struct {
 	replaces         *uuid.UUID
 	key              string
 	check            SetCheck
+	// background says the set is made as background work, whose creator the bell tells when
+	// it is ready (TPL-1433, TPL-720).
+	background bool
 }
 
 type plannedEntry struct {
@@ -138,8 +144,9 @@ var errSpaceGone = &apperr.Error{Kind: apperr.KindNotFound, Code: "space_gone",
 	Message: "This space no longer exists, or you cannot add pages to it."}
 
 // prepare works out a set and checks every right it needs, writing nothing but the
-// version a plain template may be owed (TPL-1103).
-func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (*plan, error) {
+// version a plain template may be owed (TPL-1103). A dry run may also be run on a version
+// nobody uses yet, by a person who looks after the template, to see what it would make.
+func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput, run setRun) (*plan, error) {
 	if len(in.RequestKey) > maxKeyBytes {
 		return nil, apperr.Invalid("The request key is too long.")
 	}
@@ -150,17 +157,36 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	if t.Hidden || (t.SpaceID != nil && *t.SpaceID != in.SpaceID) {
 		return nil, apperr.NotFound()
 	}
+	st, err := s.mayUseIn(ctx, s.pool, c, t, in.SpaceID)
+	if err != nil {
+		return nil, err
+	}
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {
 		if e, ok := apperr.As(err); ok && e.Kind == apperr.KindNotFound {
 			return nil, errSpaceGone
 		}
 		return nil, err
 	}
-	v, err := s.versionFor(ctx, c, t, in.Version)
+	v, err := s.versionFor(ctx, c, st, in.Version)
 	if err != nil {
 		return nil, err
 	}
-	p := &plan{t: t, version: v, spaceID: in.SpaceID, replaces: in.Replaces, key: in.RequestKey}
+	if err := usableFor(st, v, time.Now()); err != nil && !(run == dryRun && st.mayLook()) {
+		// Who may not know of the template is not told what became of it (TPL-504). A version
+		// that was withdrawn was offered to whoever reads the space and is on the users list, so
+		// they are told why their open form makes nothing (TPL-524).
+		if errors.Is(err, errWithdrawn) && st.reader && st.useListed {
+			return nil, err
+		}
+		if seen, seenErr := s.maySee(ctx, s.pool, st); seenErr != nil || !seen {
+			return nil, errOr(seenErr, errNoTemplate)
+		}
+		return nil, err
+	}
+	p := &plan{t: t, st: st, version: v, spaceID: in.SpaceID, replaces: in.Replaces, key: in.RequestKey}
+	if tried(v) {
+		p.version.Manifest.Publish = false
+	}
 	if p.spaceName, err = spaces.Name(ctx, s.pool, in.SpaceID); err != nil {
 		return nil, errSpaceGone
 	}
@@ -190,36 +216,36 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	return p, nil
 }
 
-// versionFor is the version a form is bound to, or the one the template offers now. Only a
-// template that is owed a version (TPL-1103) takes the lock of its row, to make it.
-func (s *Service) versionFor(ctx context.Context, c identity.Caller, t Template, number int) (Version, error) {
-	if number > 0 {
-		return versionAt(ctx, s.pool, t.ID, number)
-	}
-	latest, found, err := latestVersion(ctx, s.pool, t.ID)
+// setRun says whether a set is made for real or only worked out for the check step.
+type setRun int
+
+const (
+	realRun setRun = iota
+	dryRun
+)
+
+// mayUseIn reads what a person is to a template they want to use in a space, and answers "not
+// found" when its users list leaves them out, or when a template of all spaces is not offered
+// in that space (TPL-501, TPL-502, TPL-504). The list only narrows: page.create in the space is
+// asked as well.
+func (s *Service) mayUseIn(ctx context.Context, q db.Querier, c identity.Caller, t Template, spaceID uuid.UUID) (standing, error) {
+	st, err := s.standingOf(ctx, q, c, t)
 	if err != nil {
-		return latest, err
+		return st, err
 	}
-	if found {
-		if t.Guided {
-			return latest, nil
-		}
-		same, err := sameManifest(withRow(latest.Manifest, t, t.Version), latest.Manifest)
-		if err != nil || same {
-			return latest, err
-		}
+	if !st.useListed {
+		return st, errNoTemplate
 	}
-	var v Version
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		locked, err := lockTemplate(ctx, tx, c.UserID, t.ID)
-		if err != nil {
-			return err
-		}
-		v, err = s.currentVersion(ctx, tx, c, locked)
-		return err
-	})
-	return v, err
+	if t.SpaceID != nil || !st.rights.Chosen || slices.Contains(st.rights.Spaces, spaceID) {
+		return st, nil
+	}
+	return st, errNoTemplate
 }
+
+// errNoTemplate answers a person a template is not for as if it did not exist, in words that
+// also tell the history of an automation rule why its run made nothing (TPL-504, TPL-505).
+var errNoTemplate = &apperr.Error{Kind: apperr.KindNotFound, Code: "not_found",
+	Message: "This template does not exist, or it is not offered to whoever uses it here."}
 
 // withTemplateWorkflow gives the first page of a set the workflow its template names, when
 // the entry names none (spec 064, DOC-560). It comes after the check of the guided part, as
@@ -498,7 +524,7 @@ func (s *Service) markTaken(ctx context.Context, p *plan) error {
 // CheckSet runs every check of a set and makes nothing: the dry run of the check step,
 // which refuses exactly as the real run would (TPL-811).
 func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetCheck, error) {
-	p, err := s.prepare(ctx, c, id, in)
+	p, err := s.prepare(ctx, c, id, in, dryRun)
 	if err != nil {
 		return SetCheck{}, err
 	}
@@ -509,7 +535,7 @@ func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID,
 // record in one transaction, or nothing (TPL-120). A set of more than 25 pages is
 // queued as background work, still one transaction (TPL-121); a rule runs it at once.
 func (s *Service) MakeSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetResult, error) {
-	p, err := s.prepare(ctx, c, id, in)
+	p, err := s.prepare(ctx, c, id, in, realRun)
 	if err != nil {
 		return SetResult{}, err
 	}
@@ -557,8 +583,20 @@ func step(ctx context.Context, hooks *SetHooks, name string, entry int) error {
 // makeIn is the transaction of a set. Rights were checked for the whole set in prepare;
 // the space and the parent are checked again here, under the tree lock.
 func (s *Service) makeIn(ctx context.Context, tx pgx.Tx, c identity.Caller, p *plan, hooks *SetHooks) (SetResult, error) {
+	if err := step(ctx, hooks, "start", -1); err != nil {
+		return SetResult{}, err
+	}
 	if err := s.perms.RequireSpace(ctx, tx, c.UserID, p.spaceID, permissions.PageCreate); err != nil {
 		return SetResult{}, errSpaceGone
+	}
+	// Who may use the template, and whether its version may still be used, are asked again
+	// here: either can change while a form is open (TPL-503, TPL-524).
+	st, err := s.mayUseIn(ctx, tx, c, p.t, p.spaceID)
+	if err != nil {
+		return SetResult{}, err
+	}
+	if err := lockVersionToUse(ctx, tx, st, p.version.Number); err != nil {
+		return SetResult{}, err
 	}
 	if err := s.pages.LockTree(ctx, tx, p.spaceID); err != nil {
 		return SetResult{}, err
@@ -579,7 +617,7 @@ func (s *Service) makeIn(ctx context.Context, tx pgx.Tx, c identity.Caller, p *p
 		}
 		made, skipped, err := s.pages.AddSetPage(ctx, tx, c, pages.SetPage{ID: pp.ID, SpaceID: p.spaceID, ParentID: pp.parent, Title: pp.Title,
 			Folder: pp.entry.Kind == EntryFolder, TemplatePage: pp.entry.PageID, SkipFiles: pp.skipFiles, Document: pp.doc, Labels: pp.Labels,
-			Publish: p.version.Manifest.Publish, WorkflowID: pp.entry.WorkflowID,
+			Publish: p.version.Manifest.Publish, WorkflowID: pp.entry.WorkflowID, SetID: &setID,
 			Before: func(name string) error { return step(ctx, hooks, name, i) }})
 		if err != nil {
 			return out, err
@@ -690,8 +728,15 @@ func (s *Service) auditSet(ctx context.Context, tx pgx.Tx, c identity.Caller, p 
 	if _, err := audit.Record(ctx, tx, c.Event("template.set_created", "template", p.t.ID.String(), p.spaceID.String(), details)); err != nil {
 		return err
 	}
+	pageIDs := make([]uuid.UUID, len(p.pages))
+	for i, pp := range p.pages {
+		pageIDs[i] = pp.ID
+	}
+	// Ids and counts only: the words are found when the notification is shown, by those who
+	// may see the pages, and no answer travels (TPL-720, TPL-723).
 	_, err := outbox.Enqueue(ctx, tx, "template.set_created", map[string]any{"template_id": p.t.ID, "set_id": setID,
-		"space_id": p.spaceID, "page_id": p.pages[0].ID, "actor_id": c.UserID, "pages": len(p.pages)})
+		"space_id": p.spaceID, "page_id": p.pages[0].ID, "actor_id": c.UserID, "pages": len(p.pages),
+		"page_ids": pageIDs, "published": p.version.Manifest.Publish, "background": p.background})
 	return err
 }
 

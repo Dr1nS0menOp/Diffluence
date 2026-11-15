@@ -2317,6 +2317,40 @@
         "x-access": "session-only permission:administrator"
       }
     },
+    "/api/v1/admin/template-review": {
+      "get": {
+        "operationId": "get /api/v1/admin/template-review",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "permission:administrator"
+      },
+      "put": {
+        "operationId": "put /api/v1/admin/template-review",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "permission:administrator"
+      }
+    },
     "/api/v1/admin/templates": {
       "get": {
         "operationId": "get /api/v1/admin/templates",
@@ -10783,6 +10817,58 @@
         "x-access": "object:space.templates"
       }
     },
+    "/api/v1/spaces/{id}/my-templates": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/my-templates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:template.propose"
+      },
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/my-templates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:template.propose"
+      }
+    },
     "/api/v1/spaces/{id}/old-keys": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/old-keys",
@@ -11943,6 +12029,58 @@
         "x-access": "object:space.statuses"
       }
     },
+    "/api/v1/spaces/{id}/template-review": {
+      "get": {
+        "operationId": "get /api/v1/spaces/{id}/template-review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.templates"
+      },
+      "put": {
+        "operationId": "put /api/v1/spaces/{id}/template-review",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
     "/api/v1/spaces/{id}/templates": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/templates",
@@ -13074,9 +13212,88 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/newest": {
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/newest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/publishing": {
       "put": {
         "operationId": "put /api/v1/templates/{id}/publishing",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/rights": {
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/rights",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      },
+      "put": {
+        "operationId": "put /api/v1/templates/{id}/rights",
         "parameters": [
           {
             "in": "path",
@@ -13236,6 +13453,41 @@
         "x-access": "authenticated"
       }
     },
+    "/api/v1/templates/{id}/versions/{number}/approve": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/versions/{number}/approve",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
     "/api/v1/templates/{id}/versions/{number}/changes": {
       "get": {
         "operationId": "get /api/v1/templates/{id}/versions/{number}/changes",
@@ -13251,6 +13503,103 @@
           {
             "in": "path",
             "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/versions/{number}/propose": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/versions/{number}/propose",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/versions/{number}/send-back": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/versions/{number}/send-back",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/withdraw": {
+      "post": {
+        "operationId": "post /api/v1/templates/{id}/withdraw",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
             "required": true,
             "schema": {
               "type": "string"

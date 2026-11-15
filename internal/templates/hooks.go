@@ -12,8 +12,8 @@ import (
 // sets them.
 type SetHooks struct {
 	// Step runs inside the transaction before each step of a set made for real. The steps
-	// are page, file, label, restriction and origin, each with the index of its entry, and
-	// audit with -1. An error it returns fails the set at that step.
+	// are start, before the rights are asked again, with -1; page, file, label, restriction
+	// and origin, each with the index of its entry; and audit with -1. An error it returns fails the set at that step.
 	Step func(ctx context.Context, step string, entry int) error
 	// Deadline replaces the hard stop of TPL-826 when it is above zero.
 	Deadline time.Duration

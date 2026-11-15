@@ -88,6 +88,10 @@ const (
 	// SpaceRelease releases pages of a draft space into its published space, and sees what
 	// is out of step (spec 073, PUB-010). It is held in the draft space.
 	SpaceRelease = "space.release"
+
+	// TemplatePropose writes templates of the space in draft, tries them alone and proposes
+	// them for approval, without managing the templates of others (spec 074, TPL-061).
+	TemplatePropose = "template.propose"
 )
 
 // Sides of a pair of spaces (spec 073). A space in no pair has no side.
@@ -125,7 +129,7 @@ var AllSpacePermissions = []string{
 	SitePublish, SpaceAutomation, SpaceTemplates, SpaceAudit,
 	SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceBundle, SpaceLook, PageWatchers,
 	PageMoveOut, SpaceInviteGuests, PostCreate, DatabaseCreate, DatabaseEdit,
-	SpaceWorkflows, PageWorkflow, SpaceRelease,
+	SpaceWorkflows, PageWorkflow, SpaceRelease, TemplatePropose,
 }
 
 // SplitFrom names, for each permission split off a broader one (specs 036 and 040), that
@@ -150,6 +154,7 @@ var SplitFrom = map[string]string{
 	SpaceWorkflows:    SpaceAdminister,
 	PageWorkflow:      PageEdit,
 	SpaceRelease:      SpaceAdminister,
+	TemplatePropose:   PageCreate,
 }
 
 // splitOffAdminister reports whether a permission was split off space administration, so
@@ -217,7 +222,7 @@ func writesContent(action string) bool {
 	switch action {
 	case PageCreate, PostCreate, DatabaseCreate, PageEdit, DatabaseEdit, PageArchive, ActionPageDelete,
 		AttachmentAdd, ActionAttachmentDelete, PageMoveOut, PageWorkflow, SpaceWorkflows, SpaceTemplates,
-		SpaceAutomation, SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceRelease:
+		SpaceAutomation, SpaceLabels, SpaceStatuses, SpaceApprovals, SpaceRelease, TemplatePropose:
 		return true
 	}
 	return false

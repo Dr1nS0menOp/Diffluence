@@ -268,5 +268,12 @@ export function OrganisingTab() {
 }
 
 export function TemplatesTab() {
-  return <TemplateManager listPath="/admin/templates" base="/admin/templates" />;
+  return (
+    <TemplateManager
+      listPath="/admin/templates"
+      base="/admin/templates"
+      reviewPath="/admin/template-review"
+      canSetReview
+    />
+  );
 }

@@ -347,11 +347,16 @@ export function SpaceSettingsView({ spaceKey }: { spaceKey: string }) {
     },
   ];
   // Each part shows to whoever holds the permission it needs, so a role with only
-  // publishing or automation still finds its way here.
+  // publishing or automation still finds its way here. While guided templates are on, one who
+  // may propose templates finds My templates, and nothing else (TPL-1002).
+  const needsOf = (id: string) =>
+    id === 'templates' && capabilities.guided_templates
+      ? ['space.templates', 'template.propose']
+      : (SECTION_NEEDS[id] ?? ['space.administer']);
   const groups = allGroups
     .map((g) => ({
       ...g,
-      items: g.items.filter((i) => (SECTION_NEEDS[i.id] ?? ['space.administer']).some((p) => space.can?.[p])),
+      items: g.items.filter((i) => needsOf(i.id).some((p) => space.can?.[p])),
     }))
     .filter((g) => g.items.length > 0);
   const allowed = groups.flatMap((g) => g.items).map((i) => i.id);

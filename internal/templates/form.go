@@ -249,24 +249,24 @@ func beyondTexts(specs []fields.Spec, texts map[string]document.Node) ([]fields.
 	return kept, nil
 }
 
-// FormOf gives the form a template shows now, for its managers.
+// FormOf gives the form of the newest version of a template, for those who look after it.
 func (s *Service) FormOf(ctx context.Context, c identity.Caller, id uuid.UUID) (Form, error) {
 	t, err := load(ctx, s.pool, c.UserID, id)
 	if err != nil {
 		return Form{}, err
 	}
-	if err := s.requireManager(ctx, s.pool, c, t.SpaceID); err != nil {
+	if _, err := s.requireTo(ctx, s.pool, c, t, standing.mayLook); err != nil {
 		return Form{}, err
 	}
-	return s.formAt(ctx, c, t, 0)
-}
-
-// formAt gives the form of one version of a template, or of the one it offers.
-func (s *Service) formAt(ctx context.Context, c identity.Caller, t Template, number int) (Form, error) {
-	v, err := s.versionFor(ctx, c, t, number)
+	v, err := s.newestVersion(ctx, c, t)
 	if err != nil {
 		return Form{}, err
 	}
+	return s.formAt(ctx, v)
+}
+
+// formAt gives the form of one version of a template.
+func (s *Service) formAt(ctx context.Context, v Version) (Form, error) {
 	texts, _, err := s.textsOf(ctx, s.pool, v.Manifest)
 	if err != nil {
 		return Form{}, err

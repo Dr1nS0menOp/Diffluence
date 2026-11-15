@@ -61,11 +61,13 @@ type stored struct {
 // visibleRows reads through perm_visible_pages: a row about a page the person may no
 // longer see simply does not come back, and returns if access does (COL-072). A row about a
 // working version, or a thread for editors, comes back only while the person may edit the
-// page (spec 064, DOC-603, DOC-604).
+// page (spec 064, DOC-603, DOC-604). A row about a template hangs on its hidden page, and
+// comes back while the person owns the template or looks after it (spec 074, TPL-722).
 const visibleRows = `SELECT n.id, n.type, n.reason, COALESCE(u.display_name, ''), n.page_id, p.title, n.space_id, sp.name,
 		n.comment_id, n.read_at IS NOT NULL, n.created_at, n.data, n.group_key
 	FROM notifications n
-	JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id
+	JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)
+		UNION SELECT page_id FROM perm_template_notice_pages($1)) v ON v.page_id = n.page_id
 	JOIN pages p ON p.id = n.page_id
 	JOIN spaces sp ON sp.id = n.space_id
 	LEFT JOIN users u ON u.id = n.actor_id
@@ -177,7 +179,8 @@ func (s *Service) Count(ctx context.Context, c identity.Caller) (int, error) {
 			  AND (NOT n.needs_edit OR n.page_id IN (SELECT e.page_id FROM perm_editable_pages($1) e WHERE e.page_id = n.page_id)))
 		SELECT count(DISTINCT r.group_key) FROM unread r
 		WHERE r.page_id IN (SELECT v.page_id FROM perm_visible_pages($1) v
-			WHERE v.page_id = ANY (ARRAY(SELECT DISTINCT page_id FROM unread WHERE page_id IS NOT NULL)))`, c.UserID).Scan(&n)
+			WHERE v.page_id = ANY (ARRAY(SELECT DISTINCT page_id FROM unread WHERE page_id IS NOT NULL)))
+		   OR r.page_id IN (SELECT tp.page_id FROM perm_template_notice_pages($1) tp)`, c.UserID).Scan(&n)
 	return n, err
 }
 

@@ -103,6 +103,24 @@ func (s *Service) refuseWhileOlderReleaseRuns(ctx context.Context, on []string) 
 	return nil
 }
 
+// RefuseWhileOlderReleaseRuns refuses a change that a node of an older release would misread,
+// while one is alive, for a part held for older releases (spec 074, TPL-1103). A part that is
+// not held needs no wait.
+func (s *Service) RefuseWhileOlderReleaseRuns(ctx context.Context, part string) error {
+	if s.olderReleaseRuns == nil || !slices.Contains(partsHeldForOlderReleases, part) {
+		return nil
+	}
+	older, err := s.olderReleaseRuns(ctx)
+	if err != nil {
+		return err
+	}
+	if older {
+		return apperr.Conflict("older_release_running", "A node of this installation still runs the previous release. "+
+			"Try again once every node runs this release; a node that stopped counts after a minute.")
+	}
+	return nil
+}
+
 // HoldWhileOlderReleaseRuns gives the check that tells whether a node of an older release
 // is still alive. The wiring sets it, because the nodes are the installation's own table.
 func (s *Service) HoldWhileOlderReleaseRuns(check func(context.Context) (bool, error)) {

@@ -385,7 +385,7 @@ mutate "a copy can lose a restriction from above" internal/pages/tree.go \
 mutate "any file comes through a template" internal/attachments/attachments.go \
   's.replace("if !slices.Contains(pageIDs, a.PageID) {", "if !slices.Contains(pageIDs, a.PageID) && len(a.Filename) < 0 {")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
 mutate "template files ignore who may read the template" internal/templates/templates.go \
-  's.replace("if err := s.mayRead(ctx, s.pool, c, t); err != nil {\n\t\treturn attachments.Attachment{}, nil, err\n\t}\n\tpageIDs, err", "pageIDs, err")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
+  's.replace("if err := s.requireSeen(ctx, c, t); err != nil {\n\t\treturn attachments.Attachment{}, nil, err\n\t}\n\tpageIDs, err", "pageIDs, err")' $app -run TestTemplateFilesFollowTheRuleOfTheTemplate
 # Guided templates (spec 074, wave GT1): a set is whole or not made at all.
 mutate "a set is committed page by page instead of once" internal/templates/sets.go \
   's.replace("made, skipped, err := s.pages.AddSetPage(ctx, tx, c, pages.SetPage{", "made, skipped, err := func() (pages.Page, []string, error) { var made pages.Page; var skipped []string; err := pgx.BeginFunc(ctx, s.pool, func(own pgx.Tx) error { var err error; made, skipped, err = s.pages.AddSetPage(ctx, own, c, pages.SetPage{").replace("Before: func(name string) error { return step(ctx, hooks, name, i) }})", "Before: func(name string) error { return step(ctx, hooks, name, i) }}); return err }); return made, skipped, err }()")' $app -run TestAFailureAtAnyStepOfASetLeavesNoTrace
@@ -400,7 +400,7 @@ mutate "a link of a set points to the wrong page" internal/templates/sets.go \
 mutate "a request sent twice makes two sets" internal/templates/sets.go \
   's.replace("if p.key != \"\" {", "if p.key == \"never\" {")' $app -run TestADoubleSubmitMakesOneSet
 mutate "a guided template is offered while its part is off" internal/templates/templates.go \
-  's.replace("AND (NOT t.guided OR $3)", "AND (t.guided OR NOT t.guided OR $3)")' $app -run TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff
+  's.replace("AND (NOT ` + guidedOf + ` OR $3)", "AND (true OR $3)")' $app -run TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff
 mutate "a guided template is used while its part is off" internal/templates/sets.go \
   's.replace("if !p.version.Manifest.usesGuidedParts(p.texts) && !p.t.Guided {", "if true {")' $app -run TestEveryRouteOfGuidedTemplatesIsOffWhileThePartIsOff
 mutate "a set is made in another space than its template's" internal/templates/sets.go \
@@ -453,7 +453,7 @@ mutate "the settings of a question are saved without their check" internal/templ
   's.replace("\tif len(problems) > 0 {", "\tif len(problems) < 0 {")' $app -run TestTheSettingsOfAQuestionAreCheckedBeforeTheyAreSaved
 mutate "saving plain questions turns a template guided" internal/templates/form.go \
   's.replace("\t\t\tif string(a) == string(b) {", "\t\t\tif string(a) == string(b) && false {")' $app -run TestSavingPlainQuestionsKeepsATemplatePlain
-mutate "a form bound to an older version gets the newest" internal/templates/sets.go \
+mutate "a form bound to an older version gets the newest" internal/templates/offer.go \
   's.replace("\tif number > 0 {", "\tif number > 0 && false {")' $app -run TestAFormBoundToAnOlderVersionMakesThatVersion
 mutate "the dry run checks other answers than the real run" internal/templates/sets.go \
   's.replace("func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetCheck, error) {", "func (s *Service) CheckSet(ctx context.Context, c identity.Caller, id uuid.UUID, in SetInput) (SetCheck, error) {\n\tdelete(in.Answers, \"Size\")")' $app -run TestTheDryRunAndTheRealRunAgree
@@ -528,7 +528,7 @@ mutate "a link to an entry left out leaves nothing" internal/templates/sets.go \
 mutate "a file of a removed section is copied" internal/templates/sets.go \
   's.replace("planned.skipFiles = filesLeftOut(texts[e.Key], doc)", "planned.skipFiles = nil")' $app -run TestSectionsOfTextAreKeptOrRemovedWithTheirFiles
 mutate "conditions are saved without their check" internal/templates/versions.go \
-  's.replace("if err := s.checkConditions(ctx, tx, t, m, texts); err != nil {", "if err := s.checkConditions(ctx, tx, t, m, texts); err != nil && false {")' $app -run 'TestAConditionOnAQuestionThatNoLongerExistsIsRefusedAtSave|TestACycleOrASelfReferenceIsRefusedAtSave'
+  's.replace("return texts, s.checkConditions(ctx, tx, t, m, texts)", "return texts, nil")' $app -run 'TestAConditionOnAQuestionThatNoLongerExistsIsRefusedAtSave|TestACycleOrASelfReferenceIsRefusedAtSave'
 mutate "a deleted group is saved in a condition" internal/templates/rules.go \
   's.replace("for _, id := range gone {", "for _, id := range gone[:0] {")' $app -run TestTheValidatorHoldsAConditionToItsShape
 mutate "the first page takes a condition" internal/templates/rules.go \
@@ -537,6 +537,59 @@ mutate "a label rule adds its label whatever its condition" internal/templates/r
   's.replace("if r.Entry != e.Key || !conditions.Holds(r.When, facts) {", "if r.Entry != e.Key {")' $app -run TestLabelRulesAddLabelsAndFollowTheFixedList
 mutate "a rename leaves the conditions of questions behind" internal/templates/rules.go \
   's.replace("\t\tout[i].Condition = renamedCondition(out[i].Condition, from, to)\n\t}\n\treturn out\n}\n\nfunc renameInSteps", "\t}\n\treturn out\n}\n\nfunc renameInSteps")' $app -run TestARenameOfAQuestionIsCarriedIntoItsConditions
+# Rights per template and approval (spec 074, wave GT4).
+mutate "a users list is ignored" internal/templates/access.go \
+  's.replace("st.useListed = len(st.rights.Use) == 0 || matches(c.UserID, user.Groups, st.rights.Use)", "st.useListed = true")' $app -run TestAUsersListOnlyNarrowsWhoMayUseATemplate
+mutate "a users list grants what page.create would" internal/templates/sets.go \
+  's.replace("if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, in.SpaceID, permissions.PageCreate); err != nil {", "if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, in.SpaceID, permissions.PageCreate); err != nil \x26\x26 len(st.rights.Use) == 0 {").replace("if err := s.perms.RequireSpace(ctx, tx, c.UserID, p.spaceID, permissions.PageCreate); err != nil {", "if err := s.perms.RequireSpace(ctx, tx, c.UserID, p.spaceID, permissions.PageCreate); err != nil \x26\x26 len(p.st.rights.Use) == 0 {")' $app -run TestAUsersListOnlyNarrowsWhoMayUseATemplate
+mutate "an editors list grants what space.templates would" internal/templates/access.go \
+  's.replace("return st.manager \x26\x26 (st.editListed || st.t.SpaceID == nil)", "return (st.manager || len(st.rights.Edit) > 0) \x26\x26 (st.editListed || st.t.SpaceID == nil)")' $app -run TestAnEditorsListOnlyNarrowsWhoOfTheManagersMayChangeATemplate
+mutate "an editors list may leave out who sets it" internal/templates/rights.go \
+  's.replace("if len(edit) > 0 \x26\x26 !matches(c.UserID, st.groups, edit) {", "if false {")' $app -run TestAnEditorsListOnlyNarrowsWhoOfTheManagersMayChangeATemplate
+mutate "whoever runs the space sets the lists, not only clears them" internal/templates/rights.go \
+  's.replace("return st.manages() || (clearing \x26\x26 st.administer)", "return st.manages() || ((clearing || true) \x26\x26 st.administer)")' $app -run TestAnEditorsListOnlyNarrowsWhoOfTheManagersMayChangeATemplate
+mutate "an outsider is told forbidden instead of not found" internal/templates/access.go \
+  's.replace("\t\treturn apperr.Forbidden()\n\t}\n\treturn apperr.NotFound()", "\t\treturn apperr.Forbidden()\n\t}\n\treturn apperr.Forbidden()")' $app -run TestAUsersListOnlyNarrowsWhoMayUseATemplate
+mutate "an outsider learns a draft is not in use" internal/templates/sets.go \
+  's.replace("if seen, seenErr := s.maySee(ctx, s.pool, st); seenErr != nil || !seen {", "if seen, seenErr := s.maySee(ctx, s.pool, st); seenErr != nil || (!seen \x26\x26 false) {")' $app -run TestAWaitingOrWithdrawnVersionNeverMakesPages
+mutate "a template of all spaces goes past its chosen spaces" internal/templates/sets.go \
+  's.replace("slices.Contains(st.rights.Spaces, spaceID)", "true")' $app -run TestATemplateOfAllSpacesIsOfferedOnlyInItsChosenSpaces
+mutate "the gallery ignores the users list" internal/templates/templates.go \
+  's.replace("AND (NOT EXISTS (SELECT 1 FROM template_rights r WHERE r.template_id = t.id AND r.kind = \x27use\x27)", "AND (true")' $app -run TestAUsersListOnlyNarrowsWhoMayUseATemplate
+mutate "the gallery offers a draft to everyone" internal/templates/templates.go \
+  's.replace("(COALESCE(t.owner_id, t.created_by) = $1 AND t.state IN", "(t.state IN")' $app -run TestAWaitingOrWithdrawnVersionNeverMakesPages
+mutate "a waiting version is offered before approval" internal/templates/offer.go \
+  's.replace("\tcase StateApproved:\n", "\tcase StateApproved, StateWaiting:\n")' $app -run TestAWaitingOrWithdrawnVersionNeverMakesPages
+mutate "a withdrawn version makes pages" internal/templates/offer.go \
+  's.replace("\tcase StateWithdrawn:\n\t\treturn errWithdrawn", "\tcase StateWithdrawn:\n\t\treturn nil")' $app -run TestAWaitingOrWithdrawnVersionNeverMakesPages
+mutate "a replaced version keeps working for ever" internal/templates/offer.go \
+  's.replace("now.Sub(*v.SupersededAt) < formLifetime", "now.Sub(*v.SupersededAt) > -formLifetime")' $app -run TestTheApprovedVersionStaysInUseWhileANewOneWaits
+mutate "a withdrawal leaves the replaced version in use" internal/templates/approval.go \
+  's.replace("state IN (\x27approved\x27, \x27superseded\x27)", "state IN (\x27approved\x27)")' $app -run TestTheApprovedVersionStaysInUseWhileANewOneWaits
+mutate "a set is not checked again in its transaction" internal/templates/offer.go \
+  's.replace("\treturn usableFor(st, v, now)\n}", "\t_ = v\n\treturn nil\n}")' $app -run TestAWithdrawalWhileASetIsMadeRefusesTheSet
+mutate "an owner tries a draft that publishes at once" internal/templates/sets.go \
+  's.replace("\t\tp.version.Manifest.Publish = false\n", "")' $app -run TestAWaitingOrWithdrawnVersionNeverMakesPages
+mutate "self-approval with four eyes on" internal/templates/approval.go \
+  's.replace("\ton, err := fourEyesOn(ctx, q, st.t.SpaceID)\n\treturn !on, err", "\t_, err := fourEyesOn(ctx, q, st.t.SpaceID)\n\treturn true, err")' $app -run TestNobodyApprovesTheirOwnVersionWhenFourEyesAreOn
+mutate "a manager publishes directly with four eyes on" internal/templates/access.go \
+  's.replace("\ton, err := fourEyesOn(ctx, q, st.t.SpaceID)\n\treturn !on, err", "\t_, err := fourEyesOn(ctx, q, st.t.SpaceID)\n\treturn true, err")' $app -run TestNobodyApprovesTheirOwnVersionWhenFourEyesAreOn
+mutate "a manager of templates turns four eyes off" internal/templates/approval.go \
+  's.replace("return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceAdminister)", "return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceTemplates)")' $app -run TestNobodyApprovesTheirOwnVersionWhenFourEyesAreOn
+mutate "a version is decided on twice" internal/templates/approval.go \
+  's.replace("\t\tif v.State != StateWaiting {\n\t\t\treturn s.alreadyDecided", "\t\tif false {\n\t\t\treturn s.alreadyDecided")' $app -run TestTwoApproversAtOnceMakeOneDecision
+mutate "approval does not check the template again" internal/templates/approval.go \
+  's.replace("if _, err := s.checkVersion(ctx, tx, t, v.Manifest); err != nil {", "if _, err := s.checkVersion(ctx, tx, t, v.Manifest); err != nil \x26\x26 false {")' $app -run TestApprovalChecksTheTemplateAgain
+mutate "an older draft is proposed" internal/templates/approval.go \
+  's.replace("\t\tif err := requireNewest(ctx, tx, id, v); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif !slices.Contains", "\t\tif !slices.Contains")' $app -run TestOnlyTheNewestVersionIsProposed
+mutate "a proposer hides a template" internal/templates/templates.go \
+  's.replace("\t\t\tin.Hidden, in.Promoted = t.Hidden, t.Promoted\n", "")' $app -run TestAProposerNeitherApprovesNorPublishes
+mutate "an owner who left the space reads the template" internal/templates/access.go \
+  's.replace("return st.mayEdit() || (st.owner \x26\x26 st.reader)", "return st.mayEdit() || st.owner")' $app -run TestWhoSeesATemplateInEachState
+mutate "template.propose is not split off page.create in SQL" internal/db/migrations/0070_template_rights.sql \
+  's.replace("\x27database.create\x27, \x27template.propose\x27]", "\x27database.create\x27]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "managers see a draft nobody proposed" internal/templates/access.go \
+  's.replace("return st.t.TemplateVersion > 0 || st.t.State != StateDraft || proposed || !ownerActive", "return true || proposed || !ownerActive")' $app -run TestWhoSeesATemplateInEachState
 mutate_web "the form: below takes the bound itself" src/template-conditions.ts \
   's.replace("    case \x27lt\x27:\n      return a < b;", "    case \x27lt\x27:\n      return a <= b;")' src/template-conditions.test.ts
 mutate_web "the form: an empty value is treated as not empty" src/template-conditions.ts \
@@ -650,9 +703,9 @@ mutate "a rotated token keeps its full life" internal/scim/scim.go \
 mutate "a notification reaches someone who cannot see the page" internal/notify/notify.go \
   's.replace("if err != nil || !allowed {\n\t\treturn err\n\t}\n\tdata, err :=", "if err != nil || (!allowed && len(r.Type) < 0) {\n\t\treturn err\n\t}\n\tdata, err :=")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "the bell shows a page you lost" internal/notify/list.go \
-  's.replaceAll("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
+  's.replaceAll("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)\n\t\tUNION SELECT page_id FROM perm_template_notice_pages($1)) v ON v.page_id = n.page_id", "JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id")' $app -run TestWatchersHearOnceAndLosingAccessEndsIt
 mutate "mail about a page you lost still goes out" internal/notify/render.go \
-  's.replace("s.pool.Query(ctx, visibleRows+", "s.pool.Query(ctx, strings.Replace(visibleRows, \"JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id\", \"JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id\", 1)+")' $app -run TestMailIsWrittenWhenSentAndChecksAccessAgain
+  's.replace("s.pool.Query(ctx, visibleRows+", "s.pool.Query(ctx, strings.Replace(visibleRows, \"JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)\\n\\t\\tUNION SELECT page_id FROM perm_template_notice_pages($1)) v ON v.page_id = n.page_id\", \"JOIN (SELECT id AS page_id FROM pages, (SELECT $1::uuid) x) v ON v.page_id = n.page_id\", 1)+")' $app -run TestMailIsWrittenWhenSentAndChecksAccessAgain
 mutate "people hear about their own actions" internal/notify/notify.go \
   's.replace("(r.UserID == r.ActorID && !choices.NotifyOwn)", "(len(r.Type) < 0 && !choices.NotifyOwn)")' $app -run TestOwnActionsOnlyWhenAskedFor
 mutate "a forged unsubscribe token works" internal/notify/unsubscribe.go \
@@ -719,7 +772,7 @@ mutate "added text in a mail is not escaped" internal/document/changes.go \
 mutate "a mail shows changes without the setting" internal/notify/render.go \
   's.replace("if !allowed || (i.Type != TypePageChanged \x26\x26 i.Type != TypeVersionApproved) || from \x3c 1 {", "if (i.Type != TypePageChanged \x26\x26 i.Type != TypeVersionApproved) || from \x3c 1 {")' $app -run TestAMailShowsNoChanges
 mutate "a mail of changes reads through access" internal/notify/list.go \
-  's.replace("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
+  's.replace("JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)\n\t\tUNION SELECT page_id FROM perm_template_notice_pages($1)) v ON v.page_id = n.page_id\n\tJOIN pages p", "JOIN (SELECT $1::uuid AS u) v ON true\n\tJOIN pages p")' $app -run TestAMailAboutAChangeGoesNowhere
 
 mutate "a move leaves comments behind" internal/pages/move.go \
   's.replace("var tablesWithSpace = []string{\"comments\", ", "var tablesWithSpace = []string{")' $app -run TestAMoveTakesEveryRowOfTheBranchAlong
@@ -1399,7 +1452,7 @@ mutate "asking for guests stops in an archived space" internal/permissions/evalu
   's.replace("AnalyticsView,\n\t\tSpaceInviteGuests:", "AnalyticsView:")' $perms -run TestMatrixEvaluate
 # Migration 0051 holds the latest rbac_split_off, so the mutations of the split aim there.
 # rbac_split_off is defined last in migration 0061 since spec 073.
-mutate "the migration gives editors no move out" internal/db/migrations/0061_publishing.sql \
+mutate "the migration gives editors no move out" internal/db/migrations/0070_template_rights.sql \
   's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"'", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'database.edit'"'"'")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves existing roles as they were" internal/db/migrations/0040_finer_permissions.sql \
   's.replace("WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions);", "WHERE scope = '"'"'space'"'"' AND permissions IS DISTINCT FROM rbac_with_split_off(permissions) AND false;")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -1542,8 +1595,8 @@ mutate "a copied item asks for nothing of its kind" internal/pages/tree.go \
   's.replace("\tif err := s.perms.RequireSpace(ctx, tx, c.UserID, plan.spaceID, permissions.CreatePermission(p.Kind)); err != nil {\n\t\treturn Page{}, err\n\t}\n", "")' $app -run TestCopyingADatabaseAsksForDatabasesWhereTheCopyGoes
 mutate "a branch moves out without the kinds in it" internal/pages/move.go \
   's.replace("append([]string{permissions.SpaceView}, needed...)", "append([]string{permissions.SpaceView, permissions.PageCreate}, needed[:0]...)")' $app -run TestMovingADatabaseToAnotherSpaceAsksForDatabasesThere
-mutate "the migration gives page creators no posts" internal/db/migrations/0061_publishing.sql \
-  's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"']", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"']")' $perms -run TestTheSplitIsTheSameInGoAndSQL
+mutate "the migration gives page creators no posts" internal/db/migrations/0070_template_rights.sql \
+  's.replace("WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'post.create'"'"', '"'"'database.create'"'"', ", "WHEN '"'"'page.create'"'"' THEN ARRAY['"'"'database.create'"'"', ")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration leaves roles without posts and databases" internal/db/migrations/0041_posts_and_databases.sql \
   's.replace("\nSELECT rbac_split_roles();", "\nSELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "an older bundle gives page creators no databases" internal/exchange/bundlein.go \
@@ -1663,10 +1716,10 @@ mutate "an edit restriction does not stop editing a database" internal/permissio
 mutate "database.edit is not split off page.edit in Go" internal/permissions/evaluate.go \
   's.replace("\tDatabaseEdit:      PageEdit,\n", "")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the built-in editor cannot edit databases" internal/permissions/manage.go \
-  's.replace("PostCreate, DatabaseCreate,\n\t\tDatabaseEdit},", "PostCreate, DatabaseCreate},")' $perms -run TestBuiltInRolesMatchTheTemplates
+  's.replace("PostCreate, DatabaseCreate,\n\t\tDatabaseEdit, TemplatePropose},", "PostCreate, DatabaseCreate, TemplatePropose},")' $perms -run TestBuiltInRolesMatchTheTemplates
 mutate "the editable list ignores the kind" internal/db/migrations/0061_publishing.sql \
   's.replace("AND CASE WHEN p.kind = '"'"'database'"'"'", "AND CASE WHEN false")' $perms -run TestDatabasesAndPagesAreEditedApart
-mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0061_publishing.sql \
+mutate "database.edit is not split off page.edit in SQL" internal/db/migrations/0070_template_rights.sql \
   's.replace("WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', '"'"'database.edit'"'"', ", "WHEN '"'"'page.edit'"'"' THEN ARRAY['"'"'page.move_out'"'"', ")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration gives editors no database editing" internal/db/migrations/0044_database_edit_and_role_names.sql \
   's.replace("\nSELECT rbac_split_roles_from(", "\nSELECT 1, (")' $perms -run TestBuiltInRolesMatchTheTemplates
@@ -2232,7 +2285,7 @@ mutate "a workflow may lack a way to approval" internal/workflow/workflow.go \
   's.replace("\t\tif !leadsToApproval(s.ID, next, states) {", "\t\tif false {")' ./internal/workflow/ -run TestNoAcceptedWorkflowLacksAWayToApproval
 mutate "a state may be unreachable" internal/workflow/workflow.go \
   's.replace("\t\tif !reached[s.ID] {", "\t\tif !reached[s.ID] \x26\x26 false {")' ./internal/workflow/ -run TestEachRuleOfAWorkflowIsChecked
-mutate "page.workflow is not split off page.edit in SQL" internal/db/migrations/0061_publishing.sql \
+mutate "page.workflow is not split off page.edit in SQL" internal/db/migrations/0070_template_rights.sql \
   's.replace(", \x27database.edit\x27, \x27page.workflow\x27]", ", \x27database.edit\x27]")' $perms -run TestTheSplitIsTheSameInGoAndSQL
 mutate "the migration gives administrators no workflows" internal/db/migrations/0051_document_control.sql \
   's.replace("SELECT rbac_split_roles_from(\x27space.administer\x27, ARRAY[\x27space.workflows\x27]);", "SELECT 1;")' $perms -run TestBuiltInRolesMatchTheTemplates

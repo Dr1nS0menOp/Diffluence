@@ -14,7 +14,8 @@ var splitInSpec = map[string]int{
 	PostCreate: 45, DatabaseCreate: 45,
 	DatabaseEdit:   49,
 	SpaceWorkflows: 64, PageWorkflow: 64,
-	SpaceRelease: 73,
+	SpaceRelease:    73,
+	TemplatePropose: 74,
 }
 
 // WithSplitOff completes a list of single permissions that may have been written before a

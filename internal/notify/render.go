@@ -52,7 +52,23 @@ var sentences = map[string]string{
 	TypeReviewReminder:   "The review of %[2]s waits for your answer",
 	TypeReadRequested:    "Please confirm you read %[2]s",
 	TypePeriodicReview:   "%[2]s comes up for its periodic review",
+	TypeTemplateProposed: "%s asks you to approve the template %s",
+	TypeTemplateDecided:  "%s decided on the template %s",
+	TypeTemplateSet:      "%s added %s and pages below it",
 }
+
+// templateDecisions are the words of TypeTemplateDecided, by what was decided (TPL-722). A
+// reason is not in them: the author reads it in the template's history.
+var templateDecisions = map[string]string{
+	"approved":  "%s approved the template %s",
+	"sent_back": "%s sent the template %s back, and said why",
+	"withdrawn": "%s withdrew the template %s",
+}
+
+const (
+	setMorePages = " and %d more pages of the same set"
+	setReady     = "The pages from a template below %[2]s are ready"
+)
 
 const (
 	someone        = "Someone"
@@ -102,10 +118,30 @@ func sentence(i Item) string {
 	if len(i.Actors) > 0 {
 		actor = strings.Join(i.Actors, ", ")
 	}
-	return fmt.Sprintf(sentences[i.Type], actor, i.PageTitle)
+	words := sentences[i.Type]
+	switch i.Type {
+	case TypeTemplateDecided:
+		decision, _ := i.Data["decision"].(string)
+		if w, ok := templateDecisions[decision]; ok {
+			words = w
+		}
+	case TypeTemplateSet:
+		if ready, _ := i.Data["ready"].(bool); ready {
+			words = setReady
+		}
+	}
+	out := fmt.Sprintf(words, actor, i.PageTitle)
+	// One mention for a whole set names how many more of its pages mention the person (TPL-721).
+	if pages, _ := i.Data["pages"].([]any); i.Type == TypeMention && len(pages) > 1 {
+		out += fmt.Sprintf(setMorePages, len(pages)-1)
+	}
+	return out
 }
 
 func (s *Service) link(i Item) string {
+	if id, ok := i.Data["template_id"].(string); ok && (i.Type == TypeTemplateProposed || i.Type == TypeTemplateDecided) {
+		return fmt.Sprintf("%s/templates/%s/settings?section=versions", s.options.PublicOrigin, id)
+	}
 	address := fmt.Sprintf("%s/pages/%s", s.options.PublicOrigin, i.PageID)
 	if i.CommentID != nil {
 		address += "#comment-" + i.CommentID.String()

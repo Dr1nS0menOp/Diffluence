@@ -66,6 +66,15 @@ const (
 	// TypePeriodicReview tells the page owner, or the space owners when the owner left, that
 	// a controlled page comes up for its periodic review (DOC-802, DOC-805).
 	TypePeriodicReview = "periodic_review"
+	// TypeTemplateProposed asks those who may approve a template for a decision (spec 074,
+	// TPL-722).
+	TypeTemplateProposed = "template_proposed"
+	// TypeTemplateDecided tells the author what became of a proposed template, and the author
+	// and the managers that an approved one was withdrawn (TPL-722).
+	TypeTemplateDecided = "template_decided"
+	// TypeTemplateSet tells the watchers once that a template made a set of published pages,
+	// and the creator that a set made in the background is ready (TPL-720, TPL-1433).
+	TypeTemplateSet = "template_set"
 )
 
 // Where a type of notification goes.
@@ -88,7 +97,8 @@ const defaultDigestHour = 8
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
 	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
 	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished, TypeVersionApproved,
-	TypeApprovalRelease, TypeReviewReminder, TypeReadRequested, TypePeriodicReview}
+	TypeApprovalRelease, TypeReviewReminder, TypeReadRequested, TypePeriodicReview,
+	TypeTemplateProposed, TypeTemplateDecided, TypeTemplateSet}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -121,6 +131,7 @@ func defaultChannels() map[string]string {
 		TypePagesReleased: ChannelDigest, TypeReleaseFinished: ChannelApp,
 		TypeVersionApproved: ChannelDigest, TypeApprovalRelease: ChannelApp,
 		TypeReviewReminder: ChannelMail, TypeReadRequested: ChannelMail, TypePeriodicReview: ChannelMail,
+		TypeTemplateProposed: ChannelMail, TypeTemplateDecided: ChannelMail, TypeTemplateSet: ChannelDigest,
 	}
 }
 

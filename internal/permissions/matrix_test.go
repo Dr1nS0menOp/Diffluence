@@ -236,7 +236,7 @@ var actions = []string{
 	permissions.SpaceLabels, permissions.SpaceStatuses, permissions.SpaceApprovals, permissions.SpaceBundle,
 	permissions.SpaceLook, permissions.PageWatchers, permissions.PageMoveOut, permissions.SpaceInviteGuests,
 	permissions.PostCreate, permissions.DatabaseCreate, permissions.DatabaseEdit,
-	permissions.SpaceWorkflows, permissions.PageWorkflow, permissions.SpaceRelease,
+	permissions.SpaceWorkflows, permissions.PageWorkflow, permissions.SpaceRelease, permissions.TemplatePropose,
 }
 
 // isDeleteAction says whether the creator of the object decides, through "delete own".
@@ -345,7 +345,7 @@ func literalRule(u userCase, g grantCase, r restrictionCase, ps pageState, space
 		permissions.DatabaseEdit, permissions.PageArchive, permissions.ActionPageDelete, permissions.AttachmentAdd,
 		permissions.ActionAttachmentDelete, permissions.PageMoveOut, permissions.PageWorkflow, permissions.SpaceWorkflows,
 		permissions.SpaceTemplates, permissions.SpaceAutomation, permissions.SpaceLabels, permissions.SpaceStatuses,
-		permissions.SpaceApprovals, permissions.SpaceRelease:
+		permissions.SpaceApprovals, permissions.SpaceRelease, permissions.TemplatePropose:
 		if spaceStatus == permissions.PairPublished {
 			return false
 		}

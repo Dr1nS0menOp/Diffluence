@@ -591,6 +591,7 @@ var heldSince = map[string]int{
 	permissions.SpaceWorkflows:    6,
 	permissions.PageWorkflow:      6,
 	permissions.SpaceRelease:      7,
+	permissions.TemplatePropose:   9,
 }
 
 // permissionsOfGrant is what one grant in a bundle stands for here. In a bundle from before

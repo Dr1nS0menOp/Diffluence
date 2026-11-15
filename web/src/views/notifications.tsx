@@ -7,6 +7,12 @@ import { Link } from '../router';
 import { NotificationRow } from '../components/notifications';
 import { ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
 import { pageTitle } from '../page-name';
+import { useCapabilities } from '../capabilities';
+
+/** The types a person can choose and filter by. */
+function useTypes(): string[] {
+  return useCapabilities().guided_templates ? [...TYPES, ...GUIDED_TYPES] : TYPES;
+}
 
 const PAGE_SIZE = 50;
 const TYPES = [
@@ -33,12 +39,15 @@ const TYPES = [
   'approval_release',
   'rule',
 ];
+/** The types of guided templates, shown while that experimental part is on (spec 074, TPL-722). */
+const GUIDED_TYPES = ['template_proposed', 'template_decided', 'template_set'];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];
 const HOURS = Array.from({ length: 24 }, (_, hour) => hour);
 const DAYS = [0, 1, 2, 3, 4, 5, 6];
 
 export function NotificationsView() {
   const { t } = useTranslation();
+  const types = useTypes();
   const [type, setType] = useState('');
   const [spaceId, setSpaceId] = useState('');
   const spaces = useQuery({ queryKey: ['spaces'], queryFn: () => api.get<{ spaces: Space[] }>('/spaces') });
@@ -64,7 +73,7 @@ export function NotificationsView() {
         <Field label={t('notifications.filterType')}>
           <select value={type} onChange={(e) => setType(e.target.value)}>
             <option value="">{t('notifications.allTypes')}</option>
-            {TYPES.map((name) => (
+            {types.map((name) => (
               <option key={name} value={name}>
                 {t(`notifications.channel_${name}`)}
               </option>
@@ -118,6 +127,7 @@ function Check({
 
 export function NotificationSettingsView() {
   const { t } = useTranslation();
+  const types = useTypes();
   const client = useQueryClient();
   const q = useQuery({
     queryKey: ['notification-settings'],
@@ -158,7 +168,7 @@ export function NotificationSettingsView() {
           </p>
         )}
         <h2>{t('notifications.perType')}</h2>
-        {TYPES.map((name) => (
+        {types.map((name) => (
           <Field key={name} label={t(`notifications.channel_${name}`)}>
             <select
               value={form.channels[name] ?? 'app'}

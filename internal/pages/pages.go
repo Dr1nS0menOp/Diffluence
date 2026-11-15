@@ -413,6 +413,9 @@ type newVersion struct {
 	// Run is the bulk run that wrote it, whose watchers hear of the run once instead of each
 	// page (PUB-813).
 	Run *uuid.UUID
+	// Set is the template set that made the page, whose watchers hear of the set once
+	// (spec 074, TPL-720).
+	Set *uuid.UUID
 }
 
 // syncMentions keeps the list of people and groups a page mentions, and returns those
@@ -577,6 +580,9 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		"mentions": mentions, "mentioned_groups": mentionedGroups, "assigned": assigned, "approval": in.approval}
 	if in.version.Run != nil {
 		payload["release_run_id"] = *in.version.Run
+	}
+	if in.version.Set != nil {
+		payload["set_id"] = *in.version.Set
 	}
 	return p, recordEvent(ctx, tx, c, "page.published", p, details, payload)
 }

@@ -33,14 +33,15 @@ const JobKindBundle = "bundle_export"
 
 const (
 	bundleFormat = "diffluence-bundle"
-	// bundleVersion 8 carries the record of document control and the version readers see of
+	// bundleVersion 9 holds template.propose, which spec 074 split off page.create; version 8
+	// carries the record of document control and the version readers see of
 	// each page (spec 064, DOC-532); version 7 holds space.release, which spec 073 split off
 	// space.administer; version 6 space.workflows and page.workflow, which spec 064 split off
 	// space.administer and page.edit; version 5 database.edit, which spec 049 split off
 	// page.edit; version 4 the create permissions spec 045 split off page.create, version 3
 	// the permissions spec 040 split off broader ones, and version 2 those of spec 036. Older
 	// versions are still read: see heldSince.
-	bundleVersion = 8
+	bundleVersion = 9
 	// bundleVersionBeforeSplit is the oldest version read: its grants of a broader
 	// permission bring every finer one with them, as migrations 0036, 0040, 0041, 0044 and
 	// 0051 did.

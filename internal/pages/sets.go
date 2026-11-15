@@ -162,6 +162,9 @@ type SetPage struct {
 	Publish bool
 	// WorkflowID puts the page under a workflow of the space, unless the space has one.
 	WorkflowID *uuid.UUID
+	// SetID is the set the page belongs to: its watchers and the people it mentions hear of
+	// the set once, not of each page (spec 074, TPL-720, TPL-721).
+	SetID *uuid.UUID
 	// Before runs before each step (file, label), so a test can break a set there.
 	Before func(step string) error
 }
@@ -227,7 +230,7 @@ func (s *Service) AddSetPage(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 // get their first version, any other page a draft of its creator.
 func (s *Service) writeSetText(ctx context.Context, tx pgx.Tx, c identity.Caller, p Page, doc document.Node, in SetPage) (Page, error) {
 	if in.Folder {
-		return s.appendVersion(ctx, tx, c, p, newVersion{Title: in.Title, Doc: document.Empty(), Author: c.UserID})
+		return s.appendVersion(ctx, tx, c, p, newVersion{Title: in.Title, Doc: document.Empty(), Author: c.UserID, Set: in.SetID})
 	}
 	if in.Publish {
 		ready, err := document.ForPublish(doc)
@@ -237,7 +240,7 @@ func (s *Service) writeSetText(ctx context.Context, tx pgx.Tx, c identity.Caller
 		if strings.TrimSpace(in.Title) == "" {
 			return p, apperr.Invalid("A page published at once needs a title.")
 		}
-		return s.appendVersion(ctx, tx, c, p, newVersion{Title: in.Title, Doc: ready, Author: c.UserID})
+		return s.appendVersion(ctx, tx, c, p, newVersion{Title: in.Title, Doc: ready, Author: c.UserID, Set: in.SetID})
 	}
 	if err := checkDocumentKind(p.Kind, doc); err != nil {
 		return p, err

@@ -47,7 +47,7 @@ type Entries struct {
 	Names map[string]string `json:"names"`
 }
 
-// editTemplate runs change on the newest manifest of a template that the caller manages,
+// editTemplate runs change on the newest manifest of a template that the caller may edit,
 // and saves what it returns as the next version, all in one transaction.
 func (s *Service) editTemplate(ctx context.Context, c identity.Caller, id uuid.UUID,
 	change func(tx pgx.Tx, t Template, m Manifest) (Manifest, error)) (Manifest, error) {
@@ -57,7 +57,12 @@ func (s *Service) editTemplate(ctx context.Context, c identity.Caller, id uuid.U
 		if err != nil {
 			return err
 		}
-		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+		st, err := s.requireTo(ctx, tx, c, t, standing.mayEdit)
+		if err != nil {
+			return err
+		}
+		outcome, err := outcomeFor(ctx, tx, st)
+		if err != nil {
 			return err
 		}
 		current, err := s.currentVersion(ctx, tx, c, t)
@@ -68,7 +73,7 @@ func (s *Service) editTemplate(ctx context.Context, c identity.Caller, id uuid.U
 		if err != nil {
 			return err
 		}
-		if _, err := s.saveVersion(ctx, tx, c, t, next); err != nil {
+		if _, err := s.saveVersion(ctx, tx, c, t, next, outcome); err != nil {
 			return err
 		}
 		out = next
@@ -86,7 +91,7 @@ func syncRow(ctx context.Context, tx pgx.Tx, id uuid.UUID, m Manifest) error {
 	return err
 }
 
-// Entries lists the pages a template makes, for its managers.
+// Entries lists the pages the newest version of a template makes, for those who look after it.
 func (s *Service) Entries(ctx context.Context, c identity.Caller, id uuid.UUID) (Entries, error) {
 	var out Entries
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -94,7 +99,7 @@ func (s *Service) Entries(ctx context.Context, c identity.Caller, id uuid.UUID) 
 		if err != nil {
 			return err
 		}
-		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+		if _, err := s.requireTo(ctx, tx, c, t, standing.mayLook); err != nil {
 			return err
 		}
 		v, err := s.currentVersion(ctx, tx, c, t)
@@ -116,7 +121,7 @@ func (s *Service) Entries(ctx context.Context, c identity.Caller, id uuid.UUID) 
 	return out, err
 }
 
-// Entry gives one entry of a template with its current text, for its managers.
+// Entry gives one entry of a template with its current text, for those who look after it.
 func (s *Service) Entry(ctx context.Context, c identity.Caller, id uuid.UUID, key string) (EntryView, error) {
 	list, err := s.Entries(ctx, c, id)
 	if err != nil {

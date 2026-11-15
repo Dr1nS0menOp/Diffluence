@@ -90,8 +90,16 @@ type Template struct {
 	// those that are gone, so the form can preview them (spec 074, TPL-402). The server
 	// decides again on submit.
 	ConditionGroups *GroupFacts `json:"condition_groups,omitempty"`
-	pageID          uuid.UUID
-	ownerID         uuid.UUID
+	// State is the state of the newest version: draft, waiting, approved, sent back or
+	// withdrawn (TPL-510). What is offered is TemplateVersion, the approved one.
+	State string `json:"state"`
+	// Mine says the person asking owns it.
+	Mine bool `json:"mine"`
+	// GroupsGone says a condition of the newest version tests a group that was deleted, for the
+	// list's warning (TPL-402, TPL-1468).
+	GroupsGone bool `json:"groups_gone,omitempty"`
+	pageID     uuid.UUID
+	ownerID    uuid.UUID
 	// today is the database's date when the row was read, for what a set fills in (TPL-857).
 	today string
 }
@@ -187,9 +195,15 @@ func NewService(d Deps) *Service {
 	return s
 }
 
+// guidedOf says a template uses a part of guided templates: in what it makes, or in who has it,
+// so that a template with a list is hidden while the part is off, never opened to all (TPL-050).
+const guidedOf = `(t.guided OR t.offered_in_chosen OR EXISTS (SELECT 1 FROM template_rights r WHERE r.template_id = t.id))`
+
 const columns = `t.id, t.page_id, t.space_id, t.name, t.description, t.category, t.labels, t.title_pattern, t.steps,
 	t.default_parent, t.hidden, t.promoted, t.starter_key IS NOT NULL, f.user_id IS NOT NULL, u.used_at, p.current_version,
-	t.guided, COALESCE(t.approved_version, 0), COALESCE(t.owner_id, t.created_by), to_char(now(), 'YYYY-MM-DD'), t.workflow_id`
+	` + guidedOf + `,
+	COALESCE(t.approved_version, 0), COALESCE(t.owner_id, t.created_by), to_char(now(), 'YYYY-MM-DD'), t.workflow_id, t.state,
+	COALESCE(t.owner_id, t.created_by) = $1`
 
 const joins = `FROM templates t
 	JOIN pages p ON p.id = t.page_id
@@ -200,7 +214,7 @@ func scan(r pgx.Row) (Template, error) {
 	var t Template
 	err := r.Scan(&t.ID, &t.pageID, &t.SpaceID, &t.Name, &t.Description, &t.Category, &t.Labels, &t.TitlePattern, &t.Steps,
 		&t.DefaultParent, &t.Hidden, &t.Promoted, &t.Starter, &t.Favourite, &t.UsedAt, &t.Version,
-		&t.Guided, &t.TemplateVersion, &t.ownerID, &t.today, &t.WorkflowID)
+		&t.Guided, &t.TemplateVersion, &t.ownerID, &t.today, &t.WorkflowID, &t.State, &t.Mine)
 	return t, err
 }
 
@@ -223,15 +237,8 @@ func load(ctx context.Context, q db.Querier, userID, id uuid.UUID) (Template, er
 	return t, err
 }
 
-// mayRead: a template of all spaces is for everyone who uses the product, and one
-// of a space for those who may view that space.
-func (s *Service) mayRead(ctx context.Context, q db.Querier, c identity.Caller, t Template) error {
-	if t.SpaceID != nil {
-		return s.perms.RequireSpace(ctx, q, c.UserID, *t.SpaceID, permissions.SpaceView)
-	}
-	return nil
-}
-
+// requireManager refuses a person who does not manage the templates of a scope: a space, or
+// all spaces when spaceID is nil.
 func (s *Service) requireManager(ctx context.Context, q db.Querier, c identity.Caller, spaceID *uuid.UUID) error {
 	if spaceID != nil {
 		return s.perms.RequireSpace(ctx, q, c.UserID, *spaceID, permissions.SpaceTemplates)
@@ -246,14 +253,14 @@ func (s *Service) requireManager(ctx context.Context, q db.Querier, c identity.C
 	return nil
 }
 
-// File opens a file of a template for whoever may read that template. A file of any
-// other page does not come through here, whatever its id.
+// File opens a file of a template for whoever may see that template. A file of any other
+// page does not come through here, whatever its id.
 func (s *Service) File(ctx context.Context, c identity.Caller, id, fileID uuid.UUID) (attachments.Attachment, io.ReadSeekCloser, error) {
 	t, err := load(ctx, s.pool, c.UserID, id)
 	if err != nil {
 		return attachments.Attachment{}, nil, err
 	}
-	if err := s.mayRead(ctx, s.pool, c, t); err != nil {
+	if err := s.requireSeen(ctx, c, t); err != nil {
 		return attachments.Attachment{}, nil, err
 	}
 	pageIDs, err := s.entryPages(ctx, t)
@@ -261,6 +268,19 @@ func (s *Service) File(ctx context.Context, c identity.Caller, id, fileID uuid.U
 		return attachments.Attachment{}, nil, err
 	}
 	return s.files.OpenOfPages(ctx, pageIDs, fileID)
+}
+
+// requireSeen answers "not found" to whoever may not know the template exists (TPL-504).
+func (s *Service) requireSeen(ctx context.Context, c identity.Caller, t Template) error {
+	st, err := s.standingOf(ctx, s.pool, c, t)
+	if err != nil {
+		return err
+	}
+	seen, err := s.maySee(ctx, s.pool, st)
+	if err != nil || seen {
+		return err
+	}
+	return apperr.NotFound()
 }
 
 // entryPages lists the hidden pages of a template: its own and those of its entries.
@@ -272,6 +292,20 @@ func (s *Service) entryPages(ctx context.Context, t Template) ([]uuid.UUID, erro
 	more, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 	return append([]uuid.UUID{t.pageID}, more...), err
 }
+
+// galleryFilter is who is offered a template in a space, as one query with the lists joined
+// (TPL-900): $1 is the person, $2 the space, $3 whether guided templates are on and $4 the
+// person's groups. A template of all spaces is offered in its chosen spaces only when it has
+// them (TPL-502). Only an approved version is offered, or a draft to its own owner, to try it
+// (TPL-510). The users list only narrows: page.create in the space is asked before (TPL-501).
+const galleryFilter = `WHERE NOT t.hidden
+	AND (t.space_id = $2 OR (t.space_id IS NULL AND (NOT t.offered_in_chosen
+		OR EXISTS (SELECT 1 FROM template_spaces ts WHERE ts.template_id = t.id AND ts.space_id = $2))))
+	AND (NOT ` + guidedOf + ` OR $3)
+	AND (t.approved_version IS NOT NULL OR (COALESCE(t.owner_id, t.created_by) = $1 AND t.state IN ('draft', 'sent_back')))
+	AND (NOT EXISTS (SELECT 1 FROM template_rights r WHERE r.template_id = t.id AND r.kind = 'use')
+		OR EXISTS (SELECT 1 FROM template_rights r WHERE r.template_id = t.id AND r.kind = 'use'
+			AND ((r.subject_type = 'user' AND r.subject_id = $1) OR (r.subject_type = 'group' AND r.subject_id = ANY ($4)))))`
 
 // Gallery lists what a person can start a page from in a space: favourites and
 // recently used first, then promoted ones.
@@ -287,13 +321,19 @@ func (s *Service) Gallery(ctx context.Context, c identity.Caller, spaceID uuid.U
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+` WHERE NOT t.hidden AND (t.space_id = $2 OR t.space_id IS NULL)
-		AND (NOT t.guided OR $3)
-		ORDER BY f.user_id IS NOT NULL DESC, u.used_at DESC NULLS LAST, t.promoted DESC, lower(t.name), t.id`, c.UserID, spaceID, guidedOn)
+	user, err := s.perms.LoadUser(ctx, s.pool, c.UserID)
+	if err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+" "+galleryFilter+`
+		ORDER BY f.user_id IS NOT NULL DESC, u.used_at DESC NULLS LAST, t.promoted DESC, lower(t.name), t.id`,
+		c.UserID, spaceID, guidedOn, user.Groups)
 	return collect(rows, err)
 }
 
-// Manage lists templates for their managers, hidden ones as well.
+// Manage lists templates for their managers, hidden ones as well, with the state of each and
+// a warning for a condition that tests a deleted group (TPL-1001, TPL-1468). A draft that was
+// never proposed stays its owner's own while the owner is active (TPL-510, TPL-853).
 func (s *Service) Manage(ctx context.Context, c identity.Caller, spaceID *uuid.UUID) ([]Template, error) {
 	if err := s.requireManager(ctx, s.pool, c, spaceID); err != nil {
 		return nil, err
@@ -303,32 +343,98 @@ func (s *Service) Manage(ctx context.Context, c identity.Caller, spaceID *uuid.U
 	}
 	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+` WHERE t.space_id IS NOT DISTINCT FROM $2
 		ORDER BY lower(t.name), t.id`, c.UserID, spaceID)
-	return collect(rows, err)
+	list, err := collect(rows, err)
+	if err != nil {
+		return nil, err
+	}
+	if list, err = s.withoutUnproposedDrafts(ctx, list); err != nil {
+		return nil, err
+	}
+	return list, s.markGroupsGone(ctx, list)
 }
 
-// Get returns a template with its text and questions.
+// Mine lists the templates a person owns in a space, for one who may propose templates there
+// and need not manage them: My templates (TPL-1002).
+func (s *Service) Mine(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]Template, error) {
+	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.TemplatePropose); err != nil {
+		return nil, err
+	}
+	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+` WHERE t.space_id = $2 AND COALESCE(t.owner_id, t.created_by) = $1
+		ORDER BY lower(t.name), t.id`, c.UserID, spaceID)
+	list, err := collect(rows, err)
+	if err != nil {
+		return nil, err
+	}
+	return list, s.markGroupsGone(ctx, list)
+}
+
+// Get returns a template as a form opened now by this person shows it: the version offered
+// to them, with its text and questions (TPL-523, TPL-603). Who manages it, or owns it, sees
+// the newest version when none is approved yet.
 func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Template, error) {
 	t, err := load(ctx, s.pool, c.UserID, id)
 	if err != nil {
 		return t, err
 	}
-	if err := s.mayRead(ctx, s.pool, c, t); err != nil {
-		return t, err
-	}
-	doc, err := s.pages.TemplateDocument(ctx, s.pool, t.pageID)
+	st, err := s.standingOf(ctx, s.pool, c, t)
 	if err != nil {
 		return t, err
 	}
-	form, err := s.formAt(ctx, c, t, 0)
+	if seen, err := s.maySee(ctx, s.pool, st); err != nil || !seen {
+		return t, errOr(err, apperr.NotFound())
+	}
+	v, err := s.offeredVersion(ctx, c, st)
 	if err != nil {
 		return t, err
 	}
-	t.Fields, t.Pages, t.TemplateVersion = form.Fields, form.Pages, form.Version
-	if t.ConditionGroups, err = s.groupFactsOf(ctx, c, form); err != nil {
+	return s.withVersion(ctx, c, t, v)
+}
+
+// Newest returns a template as its newest version holds it, for its editor and for those who
+// review it (TPL-1010).
+func (s *Service) Newest(ctx context.Context, c identity.Caller, id uuid.UUID) (Template, error) {
+	t, err := load(ctx, s.pool, c.UserID, id)
+	if err != nil {
 		return t, err
 	}
-	t.Document, err = document.Marshal(doc)
+	if _, err := s.requireTo(ctx, s.pool, c, t, standing.mayLook); err != nil {
+		return t, err
+	}
+	v, err := s.newestVersion(ctx, c, t)
+	if err != nil {
+		return t, err
+	}
+	return s.withVersion(ctx, c, t, v)
+}
+
+// withVersion fills in what one version of a template holds: the text of its first page, its
+// questions, steps, title pattern and labels.
+func (s *Service) withVersion(ctx context.Context, c identity.Caller, t Template, v Version) (Template, error) {
+	docs, _, err := s.textsOf(ctx, s.pool, v.Manifest)
+	if err != nil {
+		return t, err
+	}
+	form, err := s.withGoneDefaults(ctx, s.pool, formOf(v.Manifest, docs))
+	if err != nil {
+		return t, err
+	}
+	t.Fields, t.Pages, t.TemplateVersion, t.Steps = form, len(v.Manifest.Entries), v.Number, v.Manifest.Steps
+	if root, _, ok := v.Manifest.entry(RootKey); ok {
+		t.TitlePattern, t.Labels = root.TitlePattern, root.Labels
+	}
+	if t.ConditionGroups, err = s.groupFactsOf(ctx, c, Form{Fields: form, Steps: v.Manifest.Steps}); err != nil {
+		return t, err
+	}
+	t.Document, err = document.Marshal(texts(docs, RootKey))
 	return t, err
+}
+
+// errOr gives err when there is one, and otherwise the refusal.
+func errOr(err, refusal error) error {
+	if err != nil {
+		return err
+	}
+	return refusal
 }
 
 // GroupFacts are what the form needs to preview tests of the reader's groups.
@@ -398,7 +504,9 @@ func (s *Service) homeOf(ctx context.Context, tx pgx.Tx, spaceID *uuid.UUID) (uu
 	return s.spaces.SystemSpace(ctx, tx)
 }
 
-func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID *uuid.UUID, in Input, doc document.Node, starter *string) (Template, error) {
+// insert makes a template and its version 1, which becomes what outcome says.
+func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID *uuid.UUID, in Input, doc document.Node, starter *string,
+	outcome versionOutcome) (Template, error) {
 	home, err := s.homeOf(ctx, tx, spaceID)
 	if err != nil {
 		return Template{}, err
@@ -425,26 +533,67 @@ func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spac
 	t := Template{ID: id, SpaceID: spaceID, Name: in.Name, TitlePattern: in.TitlePattern, Labels: in.Labels, Steps: in.Steps,
 		DefaultParent: in.DefaultParent, pageID: p.ID, ownerID: c.UserID}
 	// Version 1, as every template that existed before versions got one (TPL-620).
-	_, err = s.saveVersion(ctx, tx, c, t, rowManifest(t, p.CurrentVersion))
+	_, err = s.saveVersion(ctx, tx, c, t, rowManifest(t, p.CurrentVersion), outcome)
 	return t, err
 }
 
-// Create makes a template, of a space or of all spaces.
+// Create makes a template, of a space or of all spaces, for one who manages the templates
+// there. Its first version is approved at once, unless the scope asks for a second person
+// (TPL-511).
 func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID *uuid.UUID, in Input) (Template, error) {
-	if err := in.validate(); err != nil {
-		return Template{}, err
-	}
-	doc, err := in.document()
-	if err != nil {
-		return Template{}, err
-	}
-	var out Template
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	return s.create(ctx, c, spaceID, in, func(tx pgx.Tx) (versionOutcome, error) {
 		if err := s.requireManager(ctx, tx, c, spaceID); err != nil {
+			return approveAtOnce, err
+		}
+		on, err := fourEyesOn(ctx, tx, spaceID)
+		if err != nil || !on {
+			return approveAtOnce, err
+		}
+		return keepAsDraft, nil
+	})
+}
+
+// CreateDraft makes a template of a space for one who may propose templates there, in draft:
+// its owner tries it alone and proposes it when it is ready (TPL-061, TPL-512). A person who
+// also manages the templates of the space publishes it as Create does.
+func (s *Service) CreateDraft(ctx context.Context, c identity.Caller, spaceID uuid.UUID, in Input) (Template, error) {
+	return s.create(ctx, c, &spaceID, in, func(tx pgx.Tx) (versionOutcome, error) {
+		if err := s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.TemplatePropose); err != nil {
+			return keepAsDraft, err
+		}
+		manager, err := s.perms.CheckSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceTemplates)
+		if err != nil || !manager.Allowed {
+			return keepAsDraft, err
+		}
+		on, err := fourEyesOn(ctx, tx, &spaceID)
+		if err != nil || on {
+			return keepAsDraft, err
+		}
+		return approveAtOnce, nil
+	})
+}
+
+// create makes a template once allowed has said who may and what its first version becomes.
+func (s *Service) create(ctx context.Context, c identity.Caller, spaceID *uuid.UUID, in Input,
+	allowed func(tx pgx.Tx) (versionOutcome, error)) (Template, error) {
+	var out Template
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		// Who may comes first, so whoever may not learns nothing from what they sent.
+		outcome, err := allowed(tx)
+		if err != nil {
 			return err
 		}
-		var err error
-		if out, err = s.insert(ctx, tx, c, spaceID, in, doc, nil); err != nil {
+		if err := in.validate(); err != nil {
+			return err
+		}
+		doc, err := in.document()
+		if err != nil {
+			return err
+		}
+		if outcome == keepAsDraft {
+			in.Hidden, in.Promoted = false, false
+		}
+		if out, err = s.insert(ctx, tx, c, spaceID, in, doc, nil, outcome); err != nil {
 			return err
 		}
 		return auditTemplate(ctx, tx, c, "template.created", out)
@@ -452,7 +601,7 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID *uuid.U
 	if err != nil {
 		return out, err
 	}
-	return s.Get(ctx, c, out.ID)
+	return s.Newest(ctx, c, out.ID)
 }
 
 // Update changes a template. New text makes a new version, and changes no page
@@ -466,7 +615,16 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		if err != nil {
 			return err
 		}
-		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+		st, err := s.requireTo(ctx, tx, c, t, standing.mayEdit)
+		if err != nil {
+			return err
+		}
+		if !st.manages() {
+			// Hiding and promoting are for those who manage templates (TPL-060).
+			in.Hidden, in.Promoted = t.Hidden, t.Promoted
+		}
+		outcome, err := outcomeFor(ctx, tx, st)
+		if err != nil {
 			return err
 		}
 		before, err := s.currentVersion(ctx, tx, c, t)
@@ -506,13 +664,13 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		if err != nil {
 			return err
 		}
-		_, err = s.saveVersion(ctx, tx, c, changed, withRow(before.Manifest, changed, heads[t.pageID]))
+		_, err = s.saveVersion(ctx, tx, c, changed, withRow(before.Manifest, changed, heads[t.pageID]), outcome)
 		return err
 	})
 	if err != nil {
 		return Template{}, err
 	}
-	return s.Get(ctx, c, id)
+	return s.Newest(ctx, c, id)
 }
 
 // Delete removes a template. Pages made from it stay as they are.
@@ -522,7 +680,10 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 		if err != nil {
 			return err
 		}
-		if err := s.requireManager(ctx, tx, c, t.SpaceID); err != nil {
+		// Its managers delete it, and its owner a draft that was never approved (TPL-853).
+		if _, err := s.requireTo(ctx, tx, c, t, func(st standing) bool {
+			return st.manages() || (st.owner && st.proposer && st.t.TemplateVersion == 0)
+		}); err != nil {
 			return err
 		}
 		// The hidden pages of the entries go with it; the pages made from it stay (TPL-601).
@@ -550,7 +711,7 @@ func (s *Service) SetFavourite(ctx context.Context, c identity.Caller, id uuid.U
 	if err != nil {
 		return err
 	}
-	if err := s.mayRead(ctx, s.pool, c, t); err != nil {
+	if err := s.requireSeen(ctx, c, t); err != nil {
 		return err
 	}
 	if on {
@@ -637,7 +798,7 @@ func (s *Service) Export(ctx context.Context, c identity.Caller, id uuid.UUID) (
 	if err != nil {
 		return Bundle{}, err
 	}
-	if err := s.requireManager(ctx, s.pool, c, t.SpaceID); err != nil {
+	if _, err := s.requireTo(ctx, s.pool, c, t, standing.manages); err != nil {
 		return Bundle{}, err
 	}
 	return Bundle{Name: t.Name, Description: t.Description, Category: t.Category, Labels: t.Labels,

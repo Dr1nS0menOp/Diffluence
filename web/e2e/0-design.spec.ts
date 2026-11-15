@@ -1228,6 +1228,79 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  test('TemplatesView: states, waiting for approval and who can use it (spec 074, wave GT4)', async ({
+    browser,
+  }) => {
+    const setup = await newReaderPage(browser, 'light');
+    const space = (await (await setup.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };
+    const proposerId = await createNamedUser(browser, 'proposer@example.com', 'Robin Proposer');
+    const { api: admin, close } = await adminRequest(browser);
+    const granted = await admin.put(`/api/v1/spaces/${space.id}/grants`, {
+      data: { subject: { type: 'user', id: proposerId }, permissions: [...EDITOR, 'template.propose'] },
+    });
+    expect(granted.status(), await granted.text()).toBe(204);
+    await close();
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme: 'light' });
+    const proposer = await context.newPage();
+    await login(proposer, 'proposer@example.com', PASSWORD);
+    const drafted = await proposer.request.post(`/api/v1/spaces/${space.id}/my-templates`, {
+      data: { name: 'Visitor badge', document: paragraph('Name of the visitor and who they meet.') },
+    });
+    expect(drafted.status(), await drafted.text()).toBe(201);
+    const badge = ((await drafted.json()) as { id: string }).id;
+    const proposed = await proposer.request.post(`/api/v1/templates/${badge}/versions/1/propose`);
+    expect(proposed.status(), await proposed.text()).toBe(200);
+    await proposer.request.post(`/api/v1/spaces/${space.id}/my-templates`, {
+      data: { name: 'Room booking', document: paragraph('Which room, and when.') },
+    });
+
+    const listed = await setup.request.post(`/api/v1/spaces/${space.id}/templates`, {
+      data: {
+        name: 'Contractor onboarding',
+        category: 'People',
+        document: paragraph('Access and equipment.'),
+      },
+    });
+    const contractor = ((await listed.json()) as { id: string }).id;
+    const rights = await setup.request.put(`/api/v1/templates/${contractor}/rights`, {
+      data: {
+        use: [
+          { type: 'user', id: readerId },
+          { type: 'user', id: proposerId },
+        ],
+        edit: [{ type: 'user', id: readerId }],
+      },
+    });
+    expect(rights.status(), await rights.text()).toBe(200);
+    await setup.context().close();
+
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/spaces/HANDBOOK/templates');
+    await expect(page.getByRole('region', { name: 'Waiting for approval' })).toBeVisible();
+    await expect(page.getByRole('cell', { name: 'Waiting' })).toBeVisible();
+    await picture(page, 'templates-states');
+    await checkAccessibility(page);
+    await page.goto(`/templates/${contractor}/settings?section=access`);
+    await expect(page.getByRole('heading', { name: 'Who may use it' })).toBeVisible();
+    await picture(page, 'template-access');
+    await checkAccessibility(page);
+    await page.goto(`/templates/${badge}/settings?section=versions`);
+    await expect(page.getByRole('group', { name: 'Decision on version 1' })).toBeVisible();
+    await expect(page.getByRole('region', { name: /What version 1/ })).toBeVisible();
+    await picture(page, 'template-decision', [page.locator('time')]);
+    await checkAccessibility(page);
+    await page.getByRole('button', { name: 'Send back' }).click();
+    await expect(page.getByRole('dialog', { name: 'Send version 1 back' })).toBeVisible();
+    await picture(page, 'template-send-back', [page.locator('time')]);
+    await checkAccessibility(page);
+    await page.context().close();
+
+    await proposer.goto('/spaces/HANDBOOK/templates');
+    await expect(proposer.getByRole('heading', { name: 'My templates' })).toBeVisible();
+    await picture(proposer, 'my-templates');
+    await checkAccessibility(proposer);
+    await context.close();
+  });
   test('the form of a template, with every kind of field, and its check step', async ({ browser }) => {
     const setup = await newReaderPage(browser, 'light');
     const space = (await (await setup.request.get('/api/v1/space-keys/HANDBOOK')).json()) as { id: string };

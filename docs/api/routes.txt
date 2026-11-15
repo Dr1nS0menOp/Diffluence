@@ -101,6 +101,7 @@ GET /api/v1/admin/spaces                                       session-only perm
 GET /api/v1/admin/storage/unused                               session-only permission:administrator
 GET /api/v1/admin/summary                                      session-only permission:administrator
 GET /api/v1/admin/system                                       session-only permission:administrator
+GET /api/v1/admin/template-review                              permission:administrator
 GET /api/v1/admin/templates                                    permission:administrator
 GET /api/v1/admin/trash/spaces                                 session-only permission:administrator
 GET /api/v1/admin/upgrades                                     session-only permission:administrator
@@ -246,6 +247,7 @@ GET /api/v1/spaces/{id}/insights/content                       object:analytics.
 GET /api/v1/spaces/{id}/insights/people                        object:analytics.view
 GET /api/v1/spaces/{id}/labels                                 object:space.view
 GET /api/v1/spaces/{id}/manage-templates                       object:space.templates
+GET /api/v1/spaces/{id}/my-templates                           object:template.propose
 GET /api/v1/spaces/{id}/old-keys                               object:space.administer
 GET /api/v1/spaces/{id}/overview                               object:space.view
 GET /api/v1/spaces/{id}/pdf-design                             object:space.administer
@@ -267,6 +269,7 @@ GET /api/v1/spaces/{id}/shortcuts                              object:space.view
 GET /api/v1/spaces/{id}/signature-meanings                     object:space.view
 GET /api/v1/spaces/{id}/sites                                  object:site.publish
 GET /api/v1/spaces/{id}/statuses                               object:space.view
+GET /api/v1/spaces/{id}/template-review                        object:space.templates
 GET /api/v1/spaces/{id}/templates                              object:page.create
 GET /api/v1/spaces/{id}/trash                                  object:space.administer
 GET /api/v1/spaces/{id}/tree                                   object:space.view
@@ -284,6 +287,8 @@ GET /api/v1/templates/{id}/entries                             authenticated
 GET /api/v1/templates/{id}/entries/{key}                       authenticated
 GET /api/v1/templates/{id}/export                              authenticated
 GET /api/v1/templates/{id}/files/{file}                        authenticated
+GET /api/v1/templates/{id}/newest                              authenticated
+GET /api/v1/templates/{id}/rights                              authenticated
 GET /api/v1/templates/{id}/versions                            authenticated
 GET /api/v1/templates/{id}/versions/{number}/changes           authenticated
 GET /api/v1/webhooks/{id}                                      object:space.automation
@@ -467,6 +472,7 @@ POST /api/v1/spaces/{id}/guests                                object:space.invi
 POST /api/v1/spaces/{id}/icon                                  object:space.look
 POST /api/v1/spaces/{id}/imports                               object:page.create
 POST /api/v1/spaces/{id}/labels/rename                         object:space.labels
+POST /api/v1/spaces/{id}/my-templates                          object:template.propose
 POST /api/v1/spaces/{id}/preset                                object:space.administer
 POST /api/v1/spaces/{id}/publishing/end                        object:space.administer
 POST /api/v1/spaces/{id}/publishing/link                       object:space.administer
@@ -496,6 +502,10 @@ POST /api/v1/templates/{id}/fields/rename                      authenticated
 POST /api/v1/templates/{id}/sets                               authenticated
 POST /api/v1/templates/{id}/sets/check                         authenticated
 POST /api/v1/templates/{id}/use                                authenticated
+POST /api/v1/templates/{id}/versions/{number}/approve          authenticated
+POST /api/v1/templates/{id}/versions/{number}/propose          authenticated
+POST /api/v1/templates/{id}/versions/{number}/send-back        authenticated
+POST /api/v1/templates/{id}/withdraw                           authenticated
 POST /api/v1/trash/{id}/restore                                object:space.administer
 POST /api/v1/webhooks/{id}/deliveries/{delivery}/resend        object:space.automation
 POST /api/v1/webhooks/{id}/rotate                              session-only object:space.automation
@@ -528,6 +538,7 @@ PUT /api/v1/admin/settings                                     session-only perm
 PUT /api/v1/admin/settings/{section}                           session-only permission:administrator
 PUT /api/v1/admin/settings/{section}/confirmed                 sensitive permission:system_administrator
 PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
+PUT /api/v1/admin/template-review                              permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator
 PUT /api/v1/admin/users/{id}/signing                           sensitive permission:administrator
@@ -579,6 +590,7 @@ PUT /api/v1/spaces/{id}/review                                 object:space.stat
 PUT /api/v1/spaces/{id}/role-assignments                       object:space.manage_access
 PUT /api/v1/spaces/{id}/shortcuts                              object:space.look
 PUT /api/v1/spaces/{id}/statuses                               object:space.statuses
+PUT /api/v1/spaces/{id}/template-review                        object:space.administer
 PUT /api/v1/spaces/{id}/title-align                            object:space.look
 PUT /api/v1/spaces/{id}/watch                                  object:space.view
 PUT /api/v1/spaces/{id}/workflow                               object:space.workflows
@@ -586,6 +598,7 @@ PUT /api/v1/templates/{id}/entries/{key}/condition             authenticated
 PUT /api/v1/templates/{id}/favourite                           authenticated
 PUT /api/v1/templates/{id}/fields                              authenticated
 PUT /api/v1/templates/{id}/publishing                          authenticated
+PUT /api/v1/templates/{id}/rights                              authenticated
 PUT /api/v1/templates/{id}/rules                               authenticated
 PUT /api/v1/users/{id}/follow                                  authenticated
 PUT /api/v1/workflows/{id}                                     authenticated

@@ -14,6 +14,13 @@ import { TableBox } from '../components/table-box';
 import { useCapabilities } from '../capabilities';
 import { TemplatePages, useTemplateValues } from './template-pages';
 import { useConditionScope } from './template-rules';
+import {
+  FourEyesSetting,
+  LIST_STATES,
+  MyTemplates,
+  TemplateStateMark,
+  WaitingForApproval,
+} from './template-access';
 
 function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged: () => void }) {
   const { t } = useTranslation();
@@ -38,26 +45,51 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
     mutationFn: (id: string) => api.del(`/templates/${id}`),
     onSettled: onChanged,
   });
+  // The state of each template, and a filter of states, come with approval (TPL-1001).
+  const [state, setState] = useState('');
+  const shown = state ? list.filter((x) => x.state === state) : list;
   return (
     <>
       <ErrorNote error={update.error ?? remove.error} />
+      {guidedOn && list.length > 0 && (
+        <Field label={t('templates.filterState')}>
+          <select value={state} onChange={(e) => setState(e.target.value)}>
+            <option value="">{t('templates.anyState')}</option>
+            {LIST_STATES.map((s) => (
+              <option key={s} value={s}>
+                {t(`templates.state_${s}`)}
+              </option>
+            ))}
+          </select>
+        </Field>
+      )}
+      {guidedOn && shown.length === 0 && list.length > 0 && (
+        <p className="muted">{t('templates.noneInState')}</p>
+      )}
       <TableBox>
         <table>
           <thead>
             <tr>
               <th>{t('common.name')}</th>
+              {guidedOn && <th>{t('templates.stateColumn')}</th>}
               <th>{t('templates.category')}</th>
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
           <tbody>
-            {list.map((x) => (
+            {shown.map((x) => (
               <tr key={x.id}>
                 <td>
                   <Link href={`/templates/${x.id}/settings`}>{x.name}</Link>
                   {x.hidden && <span className="muted"> {t('templates.hidden')}</span>}
                   {x.guided && !guidedOn && <span className="muted"> ({t('templates.needsGuided')})</span>}
+                  {x.groups_gone && <p className="note-error">{t('templates.groupsGone')}</p>}
                 </td>
+                {guidedOn && (
+                  <td>
+                    <TemplateStateMark state={x.state} />
+                  </td>
+                )}
                 <td>{x.category}</td>
                 <td className="row">
                   <button
@@ -92,9 +124,23 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
   );
 }
 
-/** The list and the ways to add one. `base` is where new ones go on the server. */
-export function TemplateManager({ listPath, base }: { listPath: string; base: string }) {
+/**
+ * The list and the ways to add one. `base` is where new ones go on the server, and
+ * `reviewPath` the setting of a second person for the scope (spec 074, TPL-511).
+ */
+export function TemplateManager({
+  listPath,
+  base,
+  reviewPath,
+  canSetReview,
+}: {
+  listPath: string;
+  base: string;
+  reviewPath: string;
+  canSetReview: boolean;
+}) {
   const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
   const client = useQueryClient();
   const q = useQuery({
     queryKey: ['templates', listPath],
@@ -116,6 +162,7 @@ export function TemplateManager({ listPath, base }: { listPath: string; base: st
     <>
       {q.isPending && <Loading />}
       <ErrorNote error={q.error ?? create.error ?? upload.error} />
+      {guidedOn && q.data && <WaitingForApproval list={q.data.templates} />}
       {q.data && <TemplateRows list={q.data.templates} onChanged={refresh} />}
       <form
         className="row"
@@ -134,6 +181,7 @@ export function TemplateManager({ listPath, base }: { listPath: string; base: st
         <button type="submit">{t('templates.create')}</button>
         <FilePicker label={t('templates.import')} accept=".json" onPick={(f) => upload.mutate(f)} />
       </form>
+      {guidedOn && <FourEyesSetting path={reviewPath} canChange={canSetReview} />}
     </>
   );
 }
@@ -147,15 +195,24 @@ function InSpace({ spaceKey, children }: { spaceKey: string; children: (space: S
 
 export function TemplatesView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
   return (
     <InSpace spaceKey={spaceKey}>
       {(space) => (
         <>
           <h1>{t('templates.title')}</h1>
-          <TemplateManager
-            listPath={`/spaces/${space.id}/manage-templates`}
-            base={`/spaces/${space.id}/templates`}
-          />
+          {space.can?.['space.templates'] && (
+            <TemplateManager
+              listPath={`/spaces/${space.id}/manage-templates`}
+              base={`/spaces/${space.id}/templates`}
+              reviewPath={`/spaces/${space.id}/template-review`}
+              canSetReview={!!space.can['space.administer']}
+            />
+          )}
+          {/* One who may propose templates and not manage them finds only their own here (TPL-1002). */}
+          {!space.can?.['space.templates'] && guidedOn && space.can?.['template.propose'] && (
+            <MyTemplates space={space} />
+          )}
         </>
       )}
     </InSpace>
@@ -291,7 +348,8 @@ function TemplateWorkflow({
 export function TemplateView({ templateId }: { templateId: string }) {
   const q = useQuery({
     queryKey: ['template', templateId],
-    queryFn: () => api.get<TemplateSummary>(`/templates/${templateId}`),
+    // The editor changes the newest version, which may wait while another is in use (TPL-523).
+    queryFn: () => api.get<TemplateSummary>(`/templates/${templateId}/newest`),
     staleTime: Infinity,
   });
   if (q.isPending) return <Loading />;

@@ -9,7 +9,7 @@ Every feature states what it costs (ARC-238), and the costs are measured on wave
 
 The claim of ADR-043 stands: "one node, a few hundred people, measured on your own hardware". Nothing here claims more. The installation keeps room for four times the database work it measures (the headroom rule of the load budget), so each budget below is a ceiling for one use, and the expected rate is stated beside it.
 
-- **TPL-900** · new · **The gallery** stays one query, as today. The audience lists (TPL-500) and the spaces offered (TPL-502) join as hash joins on small tables indexed by template, not a query per template. *Budget:* the gallery of a space with 100 templates, 10 of them with audience lists, within **30 ms** on the real-data dump, and at most one query more than today. *Proof:* a query-count test (ARC-239), and EXPLAIN on the dump showing hash joins.
+- **TPL-900** · partly · **The gallery** stays one query, as today. The audience lists (TPL-500) and the spaces offered (TPL-502) join as hash joins on small tables indexed by template, not a query per template. *Budget:* the gallery of a space with 100 templates, 10 of them with audience lists, within **30 ms** on the real-data dump, and at most one query more than today. *Proof:* a query-count test (ARC-239), and EXPLAIN on the dump showing hash joins.
 - **TPL-901** · partly · **Making a set** of *n* pages costs, inside one transaction:
   - *n* page rows, *n* drafts or versions, *n* origin rows;
   - the labels and restriction rows;

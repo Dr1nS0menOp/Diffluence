@@ -113,9 +113,9 @@ What is missing is everything in chapters 03 to 13:
 ## 1.3 Permissions
 
 - **TPL-060** · built · `space.templates` keeps its meaning: make, change, hide, promote and delete templates of a space. With this feature it also covers approving templates proposed for the space (TPL-520) and setting rights per template (TPL-500).
-- **TPL-061** · new · `template.propose`: make a template **in draft**, see and test it alone, and propose it for a space. It is a new space permission. The migration gives it to every role that holds `page.create`, so nothing is lost, and an administrator can take it away (decided, TPL-1410). *Why:* the roadmap asks for approval of templates that others may use. That only has meaning if people other than managers can write templates. *Proof:* the adoption test of wave PM, showing that no decision changes except the new permission.
+- **TPL-061** · built · `template.propose`: make a template **in draft**, see and test it alone, and propose it for a space. It is a new space permission. The migration gives it to every role that holds `page.create`, so nothing is lost, and an administrator can take it away (decided, TPL-1410). *Why:* the roadmap asks for approval of templates that others may use. That only has meaning if people other than managers can write templates. *Proof:* the adoption test of wave PM, showing that no decision changes except the new permission.
 - **TPL-062** · built · The instance permission `administrator` covers templates of all spaces, and so approving them (TPL-521).
-- **TPL-063** · new · The permission matrix gains the template actions as a dimension: see, use, edit, propose, approve and set rights. Each is tested against:
+- **TPL-063** · partly · The permission matrix gains the template actions as a dimension: see, use, edit, propose, approve and set rights. Each is tested against:
   - manager, proposer and member;
   - a member outside the template's audience;
   - a guest, an administrator, and a person in no group.

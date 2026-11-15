@@ -118,12 +118,12 @@ func (s *Server) handleTemplateVersions(w http.ResponseWriter, r *http.Request) 
 	if !ok {
 		return
 	}
-	list, err := s.deps.Templates.Versions(r.Context(), s.caller(r), id)
+	history, err := s.deps.Templates.Versions(r.Context(), s.caller(r), id)
 	if err != nil {
 		s.fail(w, r, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"versions": list})
+	writeJSON(w, http.StatusOK, history)
 }
 
 func (s *Server) handleTemplateVersionChanges(w http.ResponseWriter, r *http.Request) {
@@ -136,7 +136,9 @@ func (s *Server) handleTemplateVersionChanges(w http.ResponseWriter, r *http.Req
 		writeError(w, http.StatusNotFound, "not_found", "Not found.")
 		return
 	}
-	changes, err := s.deps.Templates.VersionChanges(r.Context(), s.caller(r), id, number)
+	// against names the version to compare with; without it, the one before (TPL-1030).
+	against, _ := strconv.Atoi(r.URL.Query().Get("against"))
+	changes, err := s.deps.Templates.VersionChanges(r.Context(), s.caller(r), id, number, against)
 	if err != nil {
 		s.fail(w, r, err)
 		return

@@ -230,6 +230,8 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 - a waiting version offered before approval;
 - "forbidden" instead of "not found" for an outsider.
 
+**Status (2026-11-15):** built, with migration `0070_template_rights`. Report: [2026-11-15-wave-gt4.md](../reports/2026-11-15-wave-gt4.md). A template has a users list and an editors list that only narrow, a template of all spaces its chosen spaces, and its versions the states draft, waiting, approved, sent back, superseded and withdrawn. `template.propose` is split off `page.create`; a person with it writes drafts in My templates and proposes them. Managers publish directly unless the scope asks for a second person. Waiting and withdrawn versions make no pages, for anyone. Left for later, each with its reason in the decision table below: the readable change list of TPL-602 (GT5; the decision screen shows the text comparison against the version in use); widening a template of a space to all spaces (TPL-512, TPL-1487); the pictures of a list of fifty templates (TPL-1001); a test of an automation rule whose owner left a users list (TPL-505); the measurements on the real-data dump (TPL-1422).
+
 ## GT5: history, origin, search, export and the rest
 
 **Scope:**
@@ -268,8 +270,8 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 
 | Wave | Migration | What it does |
 |---|---|---|
-| GT1 | `00xx_guided_templates` | `template_versions`, `template_entry_pages`, `template_sets`, `page_template_origin`, pending copies; new columns on `templates`; version 1 of every template, approved |
-| GT4 | `00xx_template_rights` | `template_rights`, `template_spaces`, `template_reviews`; `template.propose` for every role with `page.create`; the four-eyes setting |
+| GT1 | `0060_guided_templates` | `template_versions`, `template_entry_pages`, `template_sets`, `page_template_origin`, pending copies; new columns on `templates`; version 1 of every template, approved |
+| GT4 | `0070_template_rights` | `template_rights`, `template_spaces`, `template_reviews`; `template.propose` for every role with `page.create`; the four-eyes setting |
 
 Numbers are given when each wave lands. Both migrations are expand only. A contract migration may later drop the fallback for templates saved without a manifest (TPL-1108).
 
@@ -388,6 +390,34 @@ Decided on the product owner's behalf on 2026-11-15, may be overruled.
 | TPL-1474 | An answer of more items than a question holds (over 50) | Every test of a list on it is false | Only a tampered answer has that many, and it never adds content |
 | TPL-1475 | A question hidden by a condition, with a suggested answer | The suggestion is not used: the question is empty everywhere | A person cannot be bound by an answer they never saw (TPL-1407) |
 | TPL-1476 | An upgrade from GT2 with the part on | No grace refusal, because GT3 has no migration: the changelog says to finish the upgrade before adding conditions | As TPL-1461; experimental and off by default |
+
+### Decided while building GT4
+
+Decided on the product owner's behalf on 2026-11-15, may be overruled.
+
+| # | Question | Decision | Reason |
+|---|---|---|---|
+| TPL-1477 | Who turns "every template change needs a second person" on and off? | Whoever runs the space (`space.administer`), and an administrator for templates of all spaces; those who manage templates see it | The setting binds the managers of templates, so they should not be the ones to turn it off |
+| TPL-1478 | May an author decide on their own version? | Only where no second person is asked for, and only as one who manages the template: they could publish it directly anyway | TPL-511 lets managers publish their own work; four eyes forbid it (TPL-520) |
+| TPL-1479 | May the owner use a waiting version, as TPL-510's table says? | No: a waiting or withdrawn version makes no pages for anyone. The owner tries a draft, or one sent back, before proposing | What an approver decides on is exactly what the owner tried; a waiting version cannot change, so nothing is lost |
+| TPL-1480 | What does a try of a draft make? | Drafts of the owner, even when the template publishes at once | TPL-510: a test use makes real pages as drafts of the owner only |
+| TPL-1481 | How long does a form opened on a replaced version work? | A day from the approval that replaced it (TPL-603's 24 hours); a withdrawal ends it at once | The form was opened on an approved version; after a day the check step may no longer be true |
+| TPL-1482 | The lock-out of an editors list (TPL-501) | A list that leaves out the person setting it, by name or group, is refused; nobody is added silently | The person sees what the list says; nothing is changed behind their back |
+| TPL-1483 | What can a list hold? | People and groups, at most 50 each; not "all members" or "all guests" | An empty list already means everyone; as page restrictions |
+| TPL-1484 | What holds while the part is off? | A template with a list or chosen spaces is not offered (fail closed); the new routes answer `experimental_off`; a change in a scope with four eyes still waits, and the approved version stays in use | A narrowed template must never open to everyone (TPL-050); turning the part off must not bypass a second person |
+| TPL-1485 | What does a screen read: the newest version or the one in use? | The editor and the settings read the newest (`GET /templates/{id}/newest`); a form, the gallery and the preview the version in use | A new version may wait while another is used (TPL-523) |
+| TPL-1486 | A manager changes a template whose newest version is someone's draft | The change builds on that draft; without four eyes it is published with it | The editor shows the newest text; the manager is the one who checks (TPL-1411) |
+| TPL-1487 | Widening a template of a space to all spaces (TPL-512) | Not in GT4: a template keeps the scope it was made in | No route widens a template today; it needs its own design for the files and the hidden page in the system space |
+| TPL-1488 | Where is Withdraw? | At the end of the Versions section, a `danger` button that opens a dialog for the reason, whose button repeats the action | A template has no More menu yet, and a withdrawal needs a reason (TPL-524) |
+| TPL-1489 | Does a reason travel in a notification or a mail? | No: a row holds ids only; the author reads the reason in the Versions section | A notification never holds a sentence (spec 010, D11); a reason may be personal |
+| TPL-1490 | A person mentioned in several pages of one published set (TPL-721) | One row per person and set, listing the pages; its mail goes once | One action, one notification |
+| TPL-1491 | An upgrade from GT3 with the part on | Lists, drafts and the four-eyes setting are refused while a node of an older release runs (`older_release_running`) | An older node knows no list or state and would offer such a template to everyone |
+| TPL-1492 | Who sees a draft that was never proposed? | Its owner only, until the owner's account is no longer active; then the managers of its scope, who may delete it (TPL-853) | A draft is someone's work in progress until they ask for a look |
+| TPL-1493 | Who deletes a template? | Those who manage it, and its owner while it was never approved | An owner may throw away their own unused draft; an approved one belongs to the space |
+| TPL-1494 | Where does a proposer make a template? | `POST /spaces/{id}/my-templates`, declared for `template.propose`; the managers' route stays declared for `space.templates` | Each route declares the permission it is for |
+| TPL-1495 | Is a withdrawal refused when the template no longer validates (TPL-525)? | No: only approval checks again | Taking a template out of use must never be blocked by what is wrong with it |
+| TPL-1496 | How do bundles carry `template.propose`? | Bundle version 9; a grant of `page.create` in an older bundle brings it, as the migration did | The rule of every earlier split (spec 045, 049, 064, 073) |
+| TPL-1497 | The wider state checks of the migration | Added `NOT VALID`; a later contract migration validates them | No table is read under its lock, and every row passes the narrower check it replaces |
 
 ## What these waves do not cover
 

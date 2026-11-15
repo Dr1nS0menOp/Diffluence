@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: Apache-2.0
 // A template's settings in the Settings frame, one section at a time at its own address
-// (spec 074, TPL-1010): General, Pages, Form, Rules and Versions. The text of each page is
-// written in the editor, the Focus frame. Who can use it comes with wave GT4.
+// (spec 074, TPL-1010): General, Pages, Form, Rules, Who can use it and Versions. The text of
+// each page is written in the editor, the Focus frame.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Space, type TemplateChanges, type TemplateSummary, type TemplateVersionRow } from '../api';
+import {
+  api,
+  type Space,
+  type TemplateChanges,
+  type TemplateHistory,
+  type TemplateSummary,
+  type TemplateVersionRow,
+} from '../api';
 import { useCapabilities } from '../capabilities';
 import { useDates } from '../dates';
 import { Link, useLocation } from '../router';
@@ -19,6 +26,7 @@ import { Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { fieldSpecOf, type FieldSpec } from '../template-fields';
 import { FieldDialog } from './template-field-dialog';
 import { TemplatePages } from './template-pages';
+import { TemplateAccessSection, TemplateStateMark } from './template-access';
 import {
   ConditionCell,
   formOrder,
@@ -28,7 +36,7 @@ import {
   useConditionScope,
 } from './template-rules';
 
-export const TEMPLATE_SECTIONS = ['general', 'pages', 'form', 'rules', 'versions'] as const;
+export const TEMPLATE_SECTIONS = ['general', 'pages', 'form', 'rules', 'access', 'versions'] as const;
 export type TemplateSection = (typeof TEMPLATE_SECTIONS)[number];
 
 const BACK_ICON_SIZE = 16;
@@ -466,18 +474,33 @@ function FormSection({
   );
 }
 
-function VersionChanges({ templateId, number }: { templateId: string; number: number }) {
+function VersionChanges({
+  templateId,
+  number,
+  against,
+}: {
+  templateId: string;
+  number: number;
+  against: number;
+}) {
   const { t } = useTranslation();
   const q = useQuery({
-    queryKey: ['template-changes', templateId, number],
-    queryFn: () => api.get<TemplateChanges>(`/templates/${templateId}/versions/${number}/changes`),
+    queryKey: ['template-changes', templateId, number, against],
+    queryFn: () =>
+      api.get<TemplateChanges>(
+        `/templates/${templateId}/versions/${number}/changes${against > 0 ? `?against=${against}` : ''}`,
+      ),
   });
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
   const changed = q.data.entries.filter((e) => e.change !== 'same');
+  const heading =
+    against > 0 && against !== number - 1
+      ? t('templates.changesAgainst', { number, against })
+      : t('templates.changesOf', { number });
   return (
-    <section aria-label={t('templates.changesOf', { number })} className="template-changes">
-      <h2>{t('templates.changesOf', { number })}</h2>
+    <section aria-label={heading} className="template-changes">
+      <h2>{heading}</h2>
       {q.data.settings && <p className="note">{t('templates.settingsChanged')}</p>}
       {changed.length === 0 && !q.data.settings && <p className="muted">{t('templates.nothingChanged')}</p>}
       {changed.map((e) => (
@@ -493,25 +516,170 @@ function VersionChanges({ templateId, number }: { templateId: string; number: nu
   );
 }
 
-/** The history of a template (ORG-060): each version, and what it changed. */
+/** Who proposed and decided what about a version, and why (TPL-602). */
+function DecisionsOf({ row }: { row: TemplateVersionRow }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  if (row.decisions.length === 0) return null;
+  return (
+    <ul className="plain-list">
+      {row.decisions.map((d) => (
+        <li key={d.id}>
+          {t(`templates.decided_${d.decision}`, { name: d.person_name })}{' '}
+          <time className="muted" dateTime={d.at}>
+            {dates.moment(d.at)}
+          </time>
+          {d.comment && <q className="comment-quote">{d.comment}</q>}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** Send back, with a reason the author reads (TPL-522, TPL-1030). */
+function ReasonDialog({
+  title,
+  label,
+  action,
+  tone,
+  pending,
+  error,
+  onSubmit,
+  onClose,
+}: {
+  title: string;
+  label: string;
+  action: string;
+  tone: 'primary' | 'danger';
+  pending: boolean;
+  error: unknown;
+  onSubmit: (reason: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [reason, setReason] = useState('');
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          onSubmit(reason);
+        }}
+      >
+        <ErrorNote error={error} />
+        <Field label={label}>
+          <textarea required value={reason} onChange={(e) => setReason(e.target.value)} />
+        </Field>
+        <div className="dialog-actions">
+          <button type="button" className="quiet" onClick={onClose}>
+            {t('common.cancel')}
+          </button>
+          <button type="submit" className={tone} disabled={pending || reason.trim() === ''}>
+            {action}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/**
+ * The history of a template (ORG-060, TPL-602): each version with its state and decisions,
+ * what it changed, and the actions of approval. A waiting version opens with the comparison to
+ * the approved one, and Approve and Send back (TPL-1030).
+ */
 function VersionsSection({ template }: { template: TemplateSummary }) {
   const { t } = useTranslation();
   const dates = useDates();
+  const client = useQueryClient();
+  const guidedOn = useCapabilities().guided_templates;
   const [open, setOpen] = useState<number | null>(null);
+  const [dialog, setDialog] = useState<'send_back' | 'withdraw' | null>(null);
+  const key = ['template-versions', template.id];
   const q = useQuery({
-    queryKey: ['template-versions', template.id],
-    queryFn: () => api.get<{ versions: TemplateVersionRow[] }>(`/templates/${template.id}/versions`),
+    queryKey: key,
+    queryFn: () => api.get<TemplateHistory>(`/templates/${template.id}/versions`),
+  });
+  const done = (next: TemplateHistory) => {
+    client.setQueryData(key, next);
+    setDialog(null);
+    void client.invalidateQueries({ queryKey: ['template', template.id] });
+  };
+  const path = (number: number, action: string) => `/templates/${template.id}/versions/${number}/${action}`;
+  const propose = useMutation({
+    mutationFn: (number: number) => api.post<TemplateHistory>(path(number, 'propose')),
+    onSuccess: done,
+  });
+  const approve = useMutation({
+    mutationFn: (number: number) => api.post<TemplateHistory>(path(number, 'approve'), { comment: '' }),
+    onSuccess: done,
+  });
+  const sendBack = useMutation({
+    mutationFn: ({ number, reason }: { number: number; reason: string }) =>
+      api.post<TemplateHistory>(path(number, 'send-back'), { reason }),
+    onSuccess: done,
+  });
+  const withdraw = useMutation({
+    mutationFn: (reason: string) =>
+      api.post<TemplateHistory>(`/templates/${template.id}/withdraw`, { reason }),
+    onSuccess: done,
   });
   if (q.isPending) return <Loading />;
   if (q.error) return <ErrorNote error={q.error} />;
+  const history = q.data;
+  const newest = history.versions[0];
+  const waiting = newest?.state === 'waiting' ? newest : undefined;
+  // A waiting version shows what it changes against the version in use (TPL-1030).
+  const shown = open ?? (waiting && guidedOn ? waiting.number : null);
+  const against = shown !== null && shown === waiting?.number ? history.approved : 0;
+  const busy = propose.isPending || approve.isPending;
   return (
     <>
       <p className="muted">{t('templates.versionsHelp')}</p>
+      <ErrorNote error={propose.error ?? approve.error} />
+      {guidedOn && waiting && history.can.decide && (
+        <div className="note" role="group" aria-label={t('templates.decisionOf', { number: waiting.number })}>
+          <p>{t('templates.waitsForYou', { number: waiting.number, name: waiting.author_name })}</p>
+          <div className="dialog-actions">
+            <button type="button" onClick={() => setDialog('send_back')}>
+              {t('templates.sendBack')}
+            </button>
+            <button
+              type="button"
+              className="primary"
+              disabled={busy}
+              onClick={() => approve.mutate(waiting.number)}
+            >
+              {t('templates.approve', { number: waiting.number })}
+            </button>
+          </div>
+        </div>
+      )}
+      {guidedOn && waiting && !history.can.decide && (
+        <p className="note">
+          {history.can.nobody_else
+            ? t('templates.nobodyElse')
+            : t('templates.waitsForOthers', { number: waiting.number })}
+        </p>
+      )}
+      {guidedOn && newest && history.can.propose && (
+        <p>
+          <button
+            type="button"
+            className="primary"
+            disabled={busy}
+            onClick={() => propose.mutate(newest.number)}
+          >
+            {t('templates.propose', { number: newest.number })}
+          </button>
+        </p>
+      )}
       <TableBox>
         <table>
           <thead>
             <tr>
               <th>{t('templates.version')}</th>
+              {guidedOn && <th>{t('templates.stateColumn')}</th>}
               <th>{t('templates.author')}</th>
               <th>{t('templates.when')}</th>
               <th>{t('templates.pageCount')}</th>
@@ -519,9 +687,15 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
             </tr>
           </thead>
           <tbody>
-            {q.data.versions.map((v) => (
+            {history.versions.map((v) => (
               <tr key={v.number}>
                 <td>{v.number}</td>
+                {guidedOn && (
+                  <td>
+                    <TemplateStateMark state={v.state} />
+                    <DecisionsOf row={v} />
+                  </td>
+                )}
                 <td>{v.author_name}</td>
                 <td>
                   <time dateTime={v.created_at}>{dates.moment(v.created_at)}</time>
@@ -531,8 +705,8 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
                   <button
                     type="button"
                     className="ghost"
-                    aria-pressed={open === v.number}
-                    onClick={() => setOpen(open === v.number ? null : v.number)}
+                    aria-pressed={shown === v.number}
+                    onClick={() => setOpen(shown === v.number ? -1 : v.number)}
                   >
                     {t('templates.showChanges', { number: v.number })}
                   </button>
@@ -542,11 +716,45 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
           </tbody>
         </table>
       </TableBox>
-      {open !== null && <VersionChanges templateId={template.id} number={open} />}
+      {shown !== null && shown > 0 && (
+        <VersionChanges templateId={template.id} number={shown} against={against} />
+      )}
+      {guidedOn && history.can.withdraw && (
+        <section aria-labelledby="withdraw-heading">
+          <h2 id="withdraw-heading">{t('templates.withdrawTitle')}</h2>
+          <p className="muted">{t('templates.withdrawHelp')}</p>
+          <button type="button" className="danger" onClick={() => setDialog('withdraw')}>
+            {t('templates.withdraw')}
+          </button>
+        </section>
+      )}
+      {dialog === 'send_back' && waiting && (
+        <ReasonDialog
+          title={t('templates.sendBackTitle', { number: waiting.number })}
+          label={t('templates.sendBackReason')}
+          action={t('templates.sendBack')}
+          tone="primary"
+          pending={sendBack.isPending}
+          error={sendBack.error}
+          onSubmit={(reason) => sendBack.mutate({ number: waiting.number, reason })}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog === 'withdraw' && (
+        <ReasonDialog
+          title={t('templates.withdrawTitle')}
+          label={t('templates.withdrawReason')}
+          action={t('templates.withdrawConfirm')}
+          tone="danger"
+          pending={withdraw.isPending}
+          error={withdraw.error}
+          onSubmit={(reason) => withdraw.mutate(reason)}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </>
   );
 }
-
 function SettingsHead({ template, space }: { template: TemplateSummary; space: Space | null }) {
   const { t } = useTranslation();
   return (
@@ -568,9 +776,11 @@ export function TemplateSettingsView({ templateId }: { templateId: string }) {
   const client = useQueryClient();
   const asked = useLocation().searchParams.get('section');
   const section: TemplateSection = TEMPLATE_SECTIONS.find((s) => s === asked) ?? 'general';
+  const guidedOn = useCapabilities().guided_templates;
   const q = useQuery({
     queryKey: ['template', templateId],
-    queryFn: () => api.get<TemplateSummary>(`/templates/${templateId}`),
+    // The settings change the newest version, which may wait while another is in use (TPL-523).
+    queryFn: () => api.get<TemplateSummary>(`/templates/${templateId}/newest`),
   });
   const spaceId = q.data?.space_id ?? null;
   const space = useQuery({
@@ -592,7 +802,14 @@ export function TemplateSettingsView({ templateId }: { templateId: string }) {
     <SettingsFrame
       title={t('templates.settingsOf', { name: template.name })}
       head={<SettingsHead template={template} space={shownSpace} />}
-      groups={[{ id: 'template', title: template.name, items: TEMPLATE_SECTIONS.map(item) }]}
+      groups={[
+        {
+          id: 'template',
+          title: template.name,
+          // Who can use it is rights per template, a part of guided templates (TPL-050).
+          items: TEMPLATE_SECTIONS.filter((s) => guidedOn || s !== 'access').map(item),
+        },
+      ]}
       current={section}
     >
       <h1>{t(`templates.section_${section}`)}</h1>
@@ -605,6 +822,7 @@ export function TemplateSettingsView({ templateId }: { templateId: string }) {
         <FormSection key={template.id} template={template} space={shownSpace} onSaved={refresh} />
       )}
       {section === 'rules' && <RulesSection templateId={templateId} />}
+      {section === 'access' && guidedOn && <TemplateAccessSection templateId={templateId} />}
       {section === 'versions' && <VersionsSection template={template} />}
     </SettingsFrame>
   );

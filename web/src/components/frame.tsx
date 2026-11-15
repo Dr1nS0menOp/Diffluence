@@ -87,9 +87,13 @@ const SETTINGS_PERMISSIONS = [
   'space.look',
 ];
 
-function mayOpenSettings(space: Space): boolean {
-  return SETTINGS_PERMISSIONS.some((p) => space.can?.[p]);
+/** `also` are permissions that open a part only while it is on, such as proposing templates. */
+function mayOpenSettings(space: Space, also: readonly string[] = []): boolean {
+  return [...SETTINGS_PERMISSIONS, ...also].some((p) => space.can?.[p]);
 }
+
+/** Proposing templates opens My templates while guided templates are on (spec 074, TPL-1002). */
+const PROPOSING = ['template.propose'];
 
 function firstMatch(patterns: string[], path: string, part: string): string | undefined {
   return patterns.map((pattern) => match(pattern, path)?.[part]).find(Boolean);
@@ -167,6 +171,7 @@ function useApprovalsDigest(space: Space) {
 
 function SpaceMenu({ space }: { space: Space }) {
   const [exporting, setExporting] = useState(false);
+  const guidedOn = useCapabilities().guided_templates;
   const { t } = useTranslation();
   const client = useQueryClient();
   const copy = useCopy();
@@ -205,7 +210,7 @@ function SpaceMenu({ space }: { space: Space }) {
             <IconDownload size={MENU_ICON_SIZE} /> {t('exchange.export')}
           </MenuItem>
         )}
-        {mayOpenSettings(space) && (
+        {mayOpenSettings(space, guidedOn ? PROPOSING : []) && (
           <MenuLink href={`/spaces/${space.key}/settings`}>
             <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
           </MenuLink>

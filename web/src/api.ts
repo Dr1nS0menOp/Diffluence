@@ -587,6 +587,44 @@ export interface TemplateSummary {
   document?: Json;
   /** The groups the form's conditions test that the reader is in, and those gone (TPL-402). */
   condition_groups?: { member: string[]; missing: string[] };
+  /** The state of the newest version (spec 074, TPL-510); template_version is the one in use. */
+  state?: TemplateState;
+  /** The person asking owns it. */
+  mine?: boolean;
+  /** A condition of the newest version tests a group that was deleted (TPL-1468). */
+  groups_gone?: boolean;
+}
+
+/** The states of a template and of its versions (spec 074, TPL-510, TPL-602). */
+export type TemplateState = 'draft' | 'waiting' | 'approved' | 'sent_back' | 'withdrawn' | 'superseded';
+
+/** One proposal or decision about a version of a template (TPL-522). */
+export interface TemplateDecision {
+  id: string;
+  version: number;
+  decision: 'proposed' | 'approved' | 'sent_back' | 'withdrawn';
+  person_id: string;
+  person_name: string;
+  comment: string;
+  at: string;
+}
+
+/** The history of a template, and what the reader may do with it (TPL-602, TPL-1030). */
+export interface TemplateHistory {
+  versions: TemplateVersionRow[];
+  approved: number;
+  state: TemplateState;
+  can: { propose: boolean; decide: boolean; withdraw: boolean; nobody_else: boolean };
+}
+
+/** Who may use and edit a template, and where one of all spaces is offered (TPL-500, TPL-502). */
+export interface TemplateRights {
+  use: { type: 'user' | 'group'; id: string }[];
+  edit: { type: 'user' | 'group'; id: string }[];
+  chosen: boolean;
+  spaces: string[];
+  names: Record<string, string>;
+  all_spaces: boolean;
 }
 
 /** A step of a template's form, which a condition may hide (spec 074, TPL-330, TPL-421). */
@@ -631,9 +669,10 @@ export interface TemplateVersionRow {
   number: number;
   author_id: string;
   author_name: string;
-  state: string;
+  state: TemplateState;
   created_at: string;
   pages: number;
+  decisions: TemplateDecision[];
 }
 
 /** What a version changed, page by page (ORG-060). */
@@ -1359,6 +1398,13 @@ export interface Notification {
     reason?: string;
     /** What became of an approval release (PUB-820). */
     outcome?: string;
+    /** The template a proposal or a decision is about, and what was decided (spec 074, TPL-722). */
+    template_id?: string;
+    decision?: 'proposed' | 'approved' | 'sent_back' | 'withdrawn';
+    /** How many pages of a set the person may see, or the pages of a set that mention them (TPL-720, TPL-721). */
+    pages?: number | string[];
+    /** A set made in the background is ready (TPL-1433). */
+    ready?: boolean;
   };
 }
 

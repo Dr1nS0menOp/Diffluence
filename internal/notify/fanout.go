@@ -67,6 +67,15 @@ type payload struct {
 	PageOutcome string     `json:"page_outcome"`
 	PageReason  string     `json:"page_reason"`
 	StopReason  string     `json:"stop_reason"`
+	// SetID names the template set that made a page, or the set of template.set_created, whose
+	// pages are PageIDs (spec 074, TPL-720, TPL-721).
+	SetID      *uuid.UUID  `json:"set_id"`
+	PageIDs    []uuid.UUID `json:"page_ids"`
+	Published  bool        `json:"published"`
+	Background bool        `json:"background"`
+	TemplateID uuid.UUID   `json:"template_id"`
+	// Decision is what a template event decided: proposed, approved, sent_back or withdrawn.
+	Decision string `json:"decision"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more
@@ -93,6 +102,11 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"release.finished":      s.onReleaseFinished,
 		"page.working_changed":  s.onWorkingChanged,
 		"page.version_approved": s.onVersionApproved,
+		"template.proposed":     s.onTemplateDecision,
+		"template.approved":     s.onTemplateDecision,
+		"template.sent_back":    s.onTemplateDecision,
+		"template.withdrawn":    s.onTemplateDecision,
+		"template.set_created":  s.onSetCreated,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {
@@ -205,6 +219,11 @@ func (s *Service) onPublished(ctx context.Context, event uuid.UUID, p payload) e
 	}
 	if p.Approval {
 		return nil // the approval tells the mentioned and the watchers itself (DOC-603, DOC-606)
+	}
+	if p.SetID != nil {
+		// A page of a template set: its watchers hear of the set once (TPL-720), and a person
+		// it mentions gets one notification for the whole set (TPL-721).
+		return s.tellSetMentions(ctx, base, p)
 	}
 	if err := s.tellMentions(ctx, base, p); err != nil {
 		return err

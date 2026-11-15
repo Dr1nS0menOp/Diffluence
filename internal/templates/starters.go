@@ -111,7 +111,7 @@ func (s *Service) seed(ctx context.Context) error {
 			}
 			key := st.key
 			in := Input{Name: st.name, Description: st.description, Category: st.category, Labels: st.labels, TitlePattern: st.pattern, Steps: []Step{}}
-			if _, err := s.insert(ctx, tx, c, nil, in, st.build(), &key); err != nil {
+			if _, err := s.insert(ctx, tx, c, nil, in, st.build(), &key, approveAtOnce); err != nil {
 				return err
 			}
 		}

@@ -203,7 +203,16 @@ export function TemplateGallery({
                 onMouseMove={() => setMarked(index)}
                 onClick={() => start.mutate()}
               >
-                <span className="quick-title">{x.name}</span>
+                <span className="quick-title">
+                  {x.name}
+                  {/* Only its owner is offered a draft, to try it (spec 074, TPL-510). */}
+                  {x.template_version === 0 && x.state && (
+                    <>
+                      {' '}
+                      <span className="lozenge">{t(`templates.state_${x.state}`)}</span>
+                    </>
+                  )}
+                </span>
                 <span className="quick-detail">{x.category}</span>
               </li>
             ))}

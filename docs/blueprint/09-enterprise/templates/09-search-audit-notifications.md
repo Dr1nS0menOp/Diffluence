@@ -14,7 +14,7 @@ How to read this chapter: see [01-guided-templates.md](01-guided-templates.md).
 Each event goes through the existing audit log: written to `audit_pending` in the same transaction as the change, then sealed into the chain (ADR-041). No event holds an answer's value (TPL-1409).
 
 - **TPL-710** · built · `template.created`, `template.updated` and `template.deleted` exist today. *Proof:* existing tests.
-- **TPL-711** · new · New events:
+- **TPL-711** · partly · New events:
 
   | Event | When | Details kept |
   |---|---|---|
@@ -33,22 +33,22 @@ Each event goes through the existing audit log: written to `audit_pending` in th
   - the set event ties the pages together for an auditor.
 
   *Edge cases:* each page of a set also writes the events a page made from a template writes today. A set of 100 pages therefore writes 101 events or more, all sealed by the normal sealer (budget in TPL-903). *Proof:* an audit test per event; a test that no answer value appears in any event of a set.
-- **TPL-712** · new · `space.audit` ("See the audit") shows the template events of its space, and the instance audit shows those of templates of all spaces. *Proof:* matrix cases.
+- **TPL-712** · partly · `space.audit` ("See the audit") shows the template events of its space, and the instance audit shows those of templates of all spaces. *Proof:* matrix cases.
 
 ## 9.3 Notifications
 
 Notifications go through the existing outbox, so a failing mail sender never blocks a set or an approval (as DOC-1252).
 
-- **TPL-720** · new · When a set is made **as drafts**, nobody is told except the creator: on screen, or by the bell for a background set (TPL-121). When it is **published**, by being made with "publish at once" or by "Publish all" (TPL-150), the watchers of the parent page and of the space get **one** notification for the set: "*Person* added *Root title* and *n* pages below it". They do not get one notification per page. *Why:* a hundred notifications for one action is noise that teaches people to ignore the bell. *Edge cases:*
+- **TPL-720** · built · When a set is made **as drafts**, nobody is told except the creator: on screen, or by the bell for a background set (TPL-121). When it is **published**, by being made with "publish at once" or by "Publish all" (TPL-150), the watchers of the parent page and of the space get **one** notification for the set: "*Person* added *Root title* and *n* pages below it". They do not get one notification per page. *Why:* a hundred notifications for one action is noise that teaches people to ignore the bell. *Edge cases:*
   - a watcher who may not see some pages of the set is told only the number of pages they may see, and is not told at all if they may see none;
   - in a space under document control, the readers' rule of DOC-603 applies.
 
   *Proof:* tests of one notification per set, and of a watcher with partial access.
-- **TPL-721** · new · People **mentioned** through person fields are told as for any mention: when the page is published, not while it is a draft. One person mentioned in several pages of one set gets **one** notification that lists the pages. *Proof:* a test with a person mentioned in three pages.
-- **TPL-722** · new · Approval notifications:
+- **TPL-721** · built · People **mentioned** through person fields are told as for any mention: when the page is published, not while it is a draft. One person mentioned in several pages of one set gets **one** notification that lists the pages. *Proof:* a test with a person mentioned in three pages.
+- **TPL-722** · built · Approval notifications:
   - a proposal tells the people who may approve it (TPL-520, TPL-521), by the bell and by mail according to their preferences;
   - a decision tells the author, with the reason when sent back;
   - a withdrawal tells the author and the managers of the template's scope.
 
   *Edge cases:* a proposal to a scope with many approvers tells each once, and the first decision closes it for all. *Proof:* tests for each, and a test that two approvers deciding at the same moment produce one decision (TPL-855).
-- **TPL-723** · new · No notification and no mail holds an answer's value, except the page titles that people who may see the pages receive. *Why:* answers can hold personal data, and mail leaves the installation. *Proof:* a test that renders each notification kind for a set whose answers are marked.
+- **TPL-723** · built · No notification and no mail holds an answer's value, except the page titles that people who may see the pages receive. *Why:* answers can hold personal data, and mail leaves the installation. *Proof:* a test that renders each notification kind for a set whose answers are marked.
