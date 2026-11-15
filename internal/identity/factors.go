@@ -138,7 +138,7 @@ func (s *Service) BeginTOTP(ctx context.Context, c Caller, email, password strin
 	if s.keyring == nil {
 		return TOTPSetup{}, errors.New("identity: no keyring configured")
 	}
-	if err := s.checkPassword(ctx, s.pool, c.UserID, password); err != nil {
+	if err := s.checkPassword(ctx, c, password); err != nil {
 		return TOTPSetup{}, err
 	}
 	if on, err := s.hasTOTP(ctx, s.pool, c.UserID); err != nil {
@@ -266,7 +266,7 @@ func (s *Service) ConfirmTOTP(ctx context.Context, c Caller, code string) ([]str
 
 // DisableTOTP removes the authenticator after the user confirms their password.
 func (s *Service) DisableTOTP(ctx context.Context, c Caller, password string) error {
-	if err := s.checkPassword(ctx, s.pool, c.UserID, password); err != nil {
+	if err := s.checkPassword(ctx, c, password); err != nil {
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {

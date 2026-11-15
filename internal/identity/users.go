@@ -430,25 +430,69 @@ func (s *Service) LiftPasswordLock(ctx context.Context, c Caller, id uuid.UUID) 
 	})
 }
 
-// checkPassword verifies a user's current password. It returns a forbidden error
-// and not a login error: the user is logged in and is only confirming who they are.
-func (s *Service) checkPassword(ctx context.Context, q db.Querier, userID uuid.UUID, password string) error {
+// checkPassword verifies the current password of the caller. It returns a conflict and not
+// a login error: the caller is logged in and is only confirming who they are. It counts as a
+// password at login does (ADR-038): a wrong one adds to the run of wrong ones, the right one
+// ends that run, and after the stop the right one gets the answer to a wrong one.
+func (s *Service) checkPassword(ctx context.Context, c Caller, password string) error {
 	var hash string
-	err := q.QueryRow(ctx, "SELECT password_hash FROM local_credentials WHERE user_id = $1", userID).Scan(&hash)
+	var locked bool
+	var failedInRow int
+	err := s.pool.QueryRow(ctx, `SELECT password_hash, password_locked_at IS NOT NULL, failed_logins_in_row
+		FROM local_credentials WHERE user_id = $1`, c.UserID).Scan(&hash, &locked, &failedInRow)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return apperr.Conflict("no_password", "This account has no password.")
 	}
 	if err != nil {
 		return err
 	}
+	// The hash runs for a stopped account too, so the stop costs the same time as a wrong
+	// password, as at login.
 	ok, _, err := VerifyPassword(ctx, hash, password, s.params)
 	if err != nil {
 		return err
 	}
+	if locked {
+		return errWrongPassword()
+	}
 	if !ok {
-		return apperr.Conflict("wrong_password", "The current password is not correct.")
+		return s.countWrongPasswordOfCaller(ctx, c)
+	}
+	if failedInRow > 0 {
+		if _, err := s.pool.Exec(ctx, "UPDATE local_credentials SET failed_logins_in_row = 0 WHERE user_id = $1", c.UserID); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+func errWrongPassword() *apperr.Error {
+	return apperr.Conflict("wrong_password", "The current password is not correct.")
+}
+
+// countWrongPasswordOfCaller counts a wrong password given with a session toward the stop
+// after wrong passwords. At the limit, password login stops and the person is told by mail,
+// as after wrong logins. It returns the refusal of the wrong password.
+func (s *Service) countWrongPasswordOfCaller(ctx context.Context, c Caller) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		lockedNow, err := countGuess(ctx, tx, c.UserID)
+		if err != nil || !lockedNow {
+			return err
+		}
+		if _, err := audit.Record(ctx, tx, event(c.Meta, SystemActor("password check"), "auth.password_locked", "user", c.UserID.String(),
+			audit.ResultSuccess, map[string]any{"failed_in_row": PasswordLockAfter})); err != nil {
+			return err
+		}
+		u, err := s.GetUser(ctx, tx, c.UserID)
+		if err != nil {
+			return err
+		}
+		return s.send(ctx, tx, AccountMail{To: u.Email, Kind: MailPasswordLocked})
+	})
+	if err != nil {
+		return err
+	}
+	return errWrongPassword()
 }
 
 // ChangePassword changes a user's own password and ends their other sessions.
@@ -460,7 +504,7 @@ func (s *Service) ChangePassword(ctx context.Context, c Caller, sessionID uuid.U
 	if err := s.validateNewPassword(next, u.Email, u.DisplayName); err != nil {
 		return err
 	}
-	if err := s.checkPassword(ctx, s.pool, c.UserID, current); err != nil {
+	if err := s.checkPassword(ctx, c, current); err != nil {
 		return err
 	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {

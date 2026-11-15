@@ -25,7 +25,7 @@ Phase: the second wave of ADR-038 (security). Wave PM ran at the same time (perm
 | Answers | One message for an unknown address, a wrong password and a disabled account, and a dummy hash so they take the same time (SEC-108) |
 | What NIST asks | SP 800-63B: an authenticator stops after at most 100 failures in a row, kept across restarts (SEC-110) |
 | What ASVS asks | 6.1.1: document how guessing is stopped without letting anyone lock a person out on purpose (SEC-111) |
-| Other password checks | Changing the password, starting TOTP and turning it off check the password behind a session, with their own limit per account |
+| Other password checks | Changing the password, starting TOTP and turning it off check the password behind a session, with their own limit per account; since wave RV8 they count toward the stop of D4, as confirming who you are does |
 | Ways in without a password | Passkeys and OpenID Connect open a session through `OpenSession`, which never reads `local_credentials` |
 | Mail | `notify.AccountMessage` holds the words of each account mail; mail goes through the queue when a mail server is set |
 | Console | Administration, Users opens a dialog per person with disable, reset authenticator and a new password |
@@ -65,7 +65,7 @@ The first disagreement is named with its position and reason, the result is audi
 
 Two columns on `local_credentials` (migration 0042, expand only): `failed_logins_in_row` and `password_locked_at`.
 
-- Only a wrong password on a live account, on the login route, counts. An unknown address, a disabled account and an account already stopped do not. A password checked behind a session never counts, so nothing but guessing this account's password on the login page can stop it.
+- Only a wrong password on a live account counts. An unknown address, a disabled account and an account already stopped do not, so nothing but guessing this account's password can stop it. Since wave RV8 a password checked behind a session counts as one at login does: confirming who you are, changing your own password, and starting or turning off an authenticator app. A wrong one adds to the same run, the right one ends it, and after the stop the right one gets the answer to a wrong one there too. A signing confirmation counts since DOC-732.
 - One `UPDATE … RETURNING` adds one and sets the stop when the run reaches 100, so two guesses at the same moment cannot both miss it. An unknown address runs the same statement on no row, so it costs about the same.
 - The hundredth wrong password records `auth.password_locked`, in the same transaction as the failed login, and the person gets a mail once. More guesses after that write nothing.
 - While stopped, the password still runs through the hash, and every answer, also to the right password, is the one for a wrong password. The stop says nothing to the guesser that a wrong password does not.
@@ -110,7 +110,8 @@ CodeQL ran here with the same bundle (2.27.4) and queries as the CI job; Semgrep
 | `TestAuditVerifyComparesTheChainWithTheWitnessLog`, `TestAuditVerifyRefusesAWitnessLogWithoutCheckpoints` | The command, end to end on a real database |
 | `TestTheHundredthWrongPasswordStopsPasswordLogin` | Through the API: the stop, the same answer to the right password, one audit event, the mail, and an open session that goes on |
 | `TestAHundredWrongPasswordsStopPasswordLoginAcrossARestart` | 100 real wrong passwords, one mail, a new service on the same database still stopped, no second mail, and `OpenSession` (passkeys and OIDC) still opens a session |
-| `TestOnlyWrongPasswordsOnALiveAccountCount` | Unknown address, disabled account, and password checks behind a session do not count |
+| `TestOnlyWrongPasswordsOnALiveAccountCount` | Unknown address and disabled account do not count |
+| `TestAWrongPasswordGivenWithASessionCountsAsAtLogin`, `TestTheHundredthWrongPasswordWhenConfirmingWhoYouAreStopsPasswordLogin`, `TestWrongPasswordsAtLoginAndWhenConfirmingWhoYouAreAddUpToOneStop` | Wave RV8: password checks behind a session count, stop and end a run as at login, and add up with login to one stop |
 | `TestTheRightPasswordEndsARunOfWrongOnes`, `TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo` | What ends a run and a stop; only an administrator can lift it; the console shows it |
 
 Twenty-one new mutations in `scripts/mutation-check.sh`, one for each check above and one for the file-preview fix (`file-preview.test.ts`).

@@ -210,7 +210,7 @@ const ReauthWindow = 10 * time.Minute
 
 // Reauthenticate confirms who is behind a session, with their password.
 func (s *Service) Reauthenticate(ctx context.Context, c Caller, sessionID uuid.UUID, password string) error {
-	if err := s.checkPassword(ctx, s.pool, c.UserID, password); err != nil {
+	if err := s.checkPassword(ctx, c, password); err != nil {
 		return err
 	}
 	return s.confirmSession(ctx, c, sessionID, ConfirmedByPassword)

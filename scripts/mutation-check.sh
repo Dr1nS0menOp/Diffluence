@@ -1597,6 +1597,15 @@ mutate_web "a Word file shows as text" src/components/file-preview.tsx \
   's.replace("const TEXT_FILE = /^(?:text\\/[^;]+|[^/;]+\\/(?:[^;]*\\+)?(?:json|xml|yaml|x-yaml))(?:\\s*;.*)?$/;", "const TEXT_FILE = /^text\\/|json|xml|yaml/;")' src/components/file-preview.test.ts
 mutate "the console does not show the stop" internal/identity/users.go \
   's.replace("WHERE c.user_id = u.id AND c.password_locked_at IS NOT NULL),", "WHERE c.user_id = u.id AND c.password_locked_at IS NULL AND false),")' $app -run TestAnAdministratorLiftsTheStopAndANewPasswordDoesToo
+# Wave RV8: a password checked behind a session counts toward the stop as at login.
+mutate "a wrong password with a session does not count" internal/identity/users.go \
+  's.replace("\t\treturn s.countWrongPasswordOfCaller(ctx, c)\n", "\t\treturn errWrongPassword()\n")' $app -run '^(TestAWrongPasswordGivenWithASessionCountsAsAtLogin|TestWrongPasswordsAtLoginAndWhenConfirmingWhoYouAreAddUpToOneStop)$'
+mutate "the right password with a session passes the stop" internal/identity/users.go \
+  's.replace("\tif locked {\n\t\treturn errWrongPassword()\n", "\tif false {\n\t\treturn errWrongPassword()\n")' $app -run '^(TestTheHundredthWrongPasswordWhenConfirmingWhoYouAreStopsPasswordLogin)$'
+mutate "the right password with a session leaves the run" internal/identity/users.go \
+  's.replace("\tif failedInRow > 0 {\n", "\tif failedInRow < 0 {\n")' $app -run '^(TestAWrongPasswordGivenWithASessionCountsAsAtLogin)$'
+mutate "the person is not told of a stop with a session" internal/identity/users.go \
+  's.replace("\t\tu, err := s.GetUser(ctx, tx, c.UserID)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\treturn s.send(ctx, tx, AccountMail{To: u.Email, Kind: MailPasswordLocked})\n", "\t\treturn nil\n")' $app -run '^(TestTheHundredthWrongPasswordWhenConfirmingWhoYouAreStopsPasswordLogin)$'
 # Spec 047: the storage limit everywhere, near matches for names, and the floating bars.
 mutate "a file in the trash takes no room" internal/attachments/limits.go \
   's.replace("WHERE a.space_id = $1) stored)`", "WHERE a.space_id = $1 AND a.status = \x27active\x27) stored)`")' $app -run TestAFileInTheTrashStillTakesRoomUntilItIsPurged

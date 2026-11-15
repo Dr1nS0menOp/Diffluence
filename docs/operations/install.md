@@ -197,7 +197,7 @@ Guessing is slowed in three layers:
 |---|---|---|
 | 50 tries per address in 15 minutes | Every login from one address | In memory, per node |
 | 10 tries per account and address in 15 minutes, and 100 per account from all addresses | Logins on one account | In memory, per node |
-| 100 wrong passwords in a row stop password login for the account | Only a wrong password on a live account, on the login page | In the database, across restarts and nodes |
+| 100 wrong passwords in a row stop password login for the account | Only a wrong password on a live account, at login or where a session asks for the password again | In the database, across restarts and nodes |
 
 The first two end by themselves after 15 minutes. The third does not: the person gets a mail, and password login for that account answers as if the password were wrong, until the person chooses a new password through "Forgot your password?", or an administrator presses **Allow password login again** in Administration, Users. A passkey and single sign-on keep working, so someone who guesses on purpose cannot keep a person out of their account. The right password ends a run of wrong ones. One address can make at most 10 wrong guesses on an account in 15 minutes, so the stop needs many addresses or many hours.
 
