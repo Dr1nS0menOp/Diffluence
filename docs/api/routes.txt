@@ -415,6 +415,7 @@ POST /api/v1/pages/{id}/placeholders                           object:page.view
 POST /api/v1/pages/{id}/publish                                object:page.edit
 POST /api/v1/pages/{id}/release                                object:space.release
 POST /api/v1/pages/{id}/release/preview                        object:space.release
+POST /api/v1/pages/{id}/release/verify                         object:space.audit
 POST /api/v1/pages/{id}/review/answer                          authenticated
 POST /api/v1/pages/{id}/review/comments                        authenticated
 POST /api/v1/pages/{id}/reviewers                              authenticated

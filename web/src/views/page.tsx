@@ -786,8 +786,13 @@ export function PageView({ pageId }: { pageId: string }) {
         <ErrorNote error={favourite.error} />
         <PageNotes page={page} />
         <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
-        <ControlBand page={page} onReview={openReview} />
-        <ReleaseBand status={release.data} />
+        {page.control ? (
+          <ControlBand page={page} onReview={openReview}>
+            <ReleaseBand status={release.data} pageId={page.id} inBand />
+          </ControlBand>
+        ) : (
+          <ReleaseBand status={release.data} pageId={page.id} />
+        )}
         {page.status === 'draft' && (
           <p role="status" className="note">
             {t('page.unpublished')}

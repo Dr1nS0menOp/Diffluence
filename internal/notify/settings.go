@@ -56,6 +56,9 @@ const (
 	// TypeVersionApproved tells watchers, and those who asked for every approval in a space,
 	// that a new version of a controlled page is the one readers see (DOC-603, DOC-607).
 	TypeVersionApproved = "version_approved"
+	// TypeApprovalRelease tells the approver and the authors that an approved page was released,
+	// or why not (spec 073, PUB-820).
+	TypeApprovalRelease = "approval_release"
 )
 
 // Where a type of notification goes.
@@ -77,7 +80,8 @@ const defaultDigestHour = 8
 // Types lists every type a person can choose a channel for.
 var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, TypeComment, TypeReply, TypeReaction,
 	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
-	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished, TypeVersionApproved}
+	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished, TypeVersionApproved,
+	TypeApprovalRelease}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -108,7 +112,7 @@ func defaultChannels() map[string]string {
 		TypeReviewAsked: ChannelMail, TypeReviewAnswered: ChannelMail, TypeReviewEnded: ChannelMail, TypeReviewerRemoved: ChannelMail,
 		TypeComment: ChannelDigest, TypeReply: ChannelDigest, TypeReaction: ChannelDigest, TypePageChanged: ChannelDigest,
 		TypePagesReleased: ChannelDigest, TypeReleaseFinished: ChannelApp,
-		TypeVersionApproved: ChannelDigest,
+		TypeVersionApproved: ChannelDigest, TypeApprovalRelease: ChannelApp,
 	}
 }
 

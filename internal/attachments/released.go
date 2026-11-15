@@ -25,6 +25,38 @@ type ReleaseCopy struct {
 	Copy *uuid.UUID
 	// TwinPage and SpaceID are the twin and the published space.
 	TwinPage, SpaceID uuid.UUID
+	// Pin is the version and name the released version of a controlled page pinned the file
+	// at; nil copies the file as it is now.
+	Pin *ReleasePin
+}
+
+// ReleasePin is a file as a version of a controlled page pinned it (spec 064, DOC-510).
+type ReleasePin struct {
+	Version  int
+	Filename string
+}
+
+// ReleasePinsOf reads the files a version of a page pinned, by id; empty when that version
+// pins nothing. A release of an approved version copies these, never a newer version an
+// author uploaded for a change still in review (spec 073, PUB-700).
+func ReleasePinsOf(ctx context.Context, q db.Querier, pageID uuid.UUID, version int) (map[uuid.UUID]ReleasePin, error) {
+	rows, err := q.Query(ctx, `SELECT x.id, x.version, x.filename FROM attachment_pins p,
+			unnest(p.attachment_ids, p.versions, p.filenames) AS x(id, version, filename)
+		WHERE p.page_id = $1 AND p.page_version = $2`, pageID, version)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[uuid.UUID]ReleasePin{}
+	for rows.Next() {
+		var id uuid.UUID
+		var p ReleasePin
+		if err := rows.Scan(&id, &p.Version, &p.Filename); err != nil {
+			return nil, err
+		}
+		out[id] = p
+	}
+	return out, rows.Err()
 }
 
 // ReleaseSource is the version of a draft file a release would copy.
@@ -62,7 +94,8 @@ func CountInSpace(ctx context.Context, q db.Querier, spaceID uuid.UUID) (int, er
 	return n, err
 }
 
-// CopyForRelease stores the current version of a draft file as a separate file of the twin,
+// CopyForRelease stores the current version of a draft file, or the version a controlled page
+// pinned it at, as a separate file of the twin,
 // so purging in the draft can never take a reader's file away, and a reader's download can
 // never return a draft file (PUB-320, PUB-624). The first time the twin gets a new file with
 // only that version, and a comment on the file goes with it (PUB-321); after that, the earlier
@@ -73,8 +106,14 @@ func (s *Service) CopyForRelease(ctx context.Context, tx pgx.Tx, c identity.Call
 	var filename, comment, key, contentType string
 	var version int
 	var size int64
-	err := tx.QueryRow(ctx, `SELECT a.filename, a.comment, a.current_version, v.object_key, v.content_type, v.size `+selectFrom+`
-		WHERE a.id = $1 AND a.status = 'active'`, in.From).Scan(&filename, &comment, &version, &key, &contentType, &size)
+	pinned, pinnedName := 0, ""
+	if in.Pin != nil {
+		pinned, pinnedName = in.Pin.Version, in.Pin.Filename
+	}
+	err := tx.QueryRow(ctx, `SELECT COALESCE(NULLIF($3, ''), a.filename), a.comment, v.number, v.object_key, v.content_type, v.size
+		FROM attachments a JOIN attachment_versions v ON v.attachment_id = a.id
+			AND v.number = COALESCE(NULLIF($2, 0), a.current_version)
+		WHERE a.id = $1 AND a.status = 'active'`, in.From, pinned, pinnedName).Scan(&filename, &comment, &version, &key, &contentType, &size)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return uuid.Nil, 0, apperr.NotFound()
 	}

@@ -96,6 +96,31 @@ type runRow struct {
 	silent          bool
 	batches         int
 	cancelAsked     bool
+	// actorType is who started the run: a person, approval or the workflow (PUB-902).
+	actorType string
+	// causedBy is the person whose act started a run of the system: the approver, or the
+	// person who withdrew the page.
+	causedBy *uuid.UUID
+}
+
+// system says the run was started by approval or the workflow, not by a person: it runs with
+// the rights of the release path, which the pair's administrator chose (PUB-711).
+func (r runRow) system() bool { return r.actorType == actorApproval || r.actorType == actorWorkflow }
+
+// caller is who the run acts as: the releaser, or the system with no person.
+func (r runRow) caller(meta identity.RequestMeta) identity.Caller {
+	if r.system() {
+		return identity.Caller{System: r.actorType, Meta: meta}
+	}
+	return identity.Caller{UserID: r.actor, Meta: meta}
+}
+
+// details adds to audit details of the draft space who caused a run of the system (PUB-902).
+func (r runRow) details(d map[string]any) map[string]any {
+	if r.causedBy != nil {
+		d["caused_by"] = *r.causedBy
+	}
+	return d
 }
 
 func (s *Service) runJob(ctx context.Context, j jobs.Job) (any, error) {
@@ -114,7 +139,7 @@ func (s *Service) runJob(ctx context.Context, j jobs.Job) (any, error) {
 	if err != nil || !ok {
 		return nil, err
 	}
-	c := identity.Caller{UserID: r.actor, Meta: identity.RequestMeta{RequestID: "job-" + j.ID.String()}}
+	c := r.caller(identity.RequestMeta{RequestID: "job-" + j.ID.String()})
 	if err := s.carryOut(ctx, c, r); err != nil {
 		return map[string]any{"run_id": r.id}, errors.Join(err, s.stop(ctx, c, r, err))
 	}
@@ -128,9 +153,11 @@ func (s *Service) takeTurn(ctx context.Context, runID uuid.UUID) (runRow, bool, 
 		var r runRow
 		var mine bool
 		err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-			err := tx.QueryRow(ctx, `SELECT r.id, r.pair_id, r.actor_id, r.scope, r.status, r.note, r.silent, r.batches, r.cancel_asked,
-					sp.draft_space_id FROM release_runs r JOIN space_pairs sp ON sp.id = r.pair_id WHERE r.id = $1`, runID).
-				Scan(&r.id, &r.pair, &r.actor, &r.scope, &r.status, &r.note, &r.silent, &r.batches, &r.cancelAsked, &r.draftSpace)
+			err := tx.QueryRow(ctx, `SELECT r.id, r.pair_id, COALESCE(r.actor_id, $2), r.scope, r.status, r.note, r.silent, r.batches,
+					r.cancel_asked, sp.draft_space_id, r.actor_type, r.caused_by
+				FROM release_runs r JOIN space_pairs sp ON sp.id = r.pair_id WHERE r.id = $1`, runID, uuid.Nil).
+				Scan(&r.id, &r.pair, &r.actor, &r.scope, &r.status, &r.note, &r.silent, &r.batches, &r.cancelAsked, &r.draftSpace,
+					&r.actorType, &r.causedBy)
 			if err != nil {
 				return err
 			}
@@ -213,14 +240,24 @@ func (s *Service) openBatch(ctx context.Context, tx pgx.Tx, r runRow) (batchStat
 		}
 		return st, err
 	}
-	if err := s.runRights(ctx, tx, r.actor, p); err != nil {
+	return st, s.checkRunRights(ctx, tx, r, &st)
+}
+
+// checkRunRights stops a run whose releaser lost a right (PUB-454). A run of the system has the
+// rights of the release path, never those of the person who caused it: approving needs no right
+// to release, because the pair's administrator chose approval releases (PUB-711).
+func (s *Service) checkRunRights(ctx context.Context, tx pgx.Tx, r runRow, st *batchState) error {
+	if r.system() {
+		return nil
+	}
+	if err := s.runRights(ctx, tx, r.actor, st.pair); err != nil {
 		if _, ok := apperr.As(err); ok {
 			st.stopped = stopRights
-			return st, nil
+			return nil
 		}
-		return st, err
+		return err
 	}
-	return st, nil
+	return nil
 }
 
 // carryOut writes a run: in one transaction when it is small, in batches past that.
@@ -310,12 +347,40 @@ func (s *Service) closeRun(ctx context.Context, tx pgx.Tx, c identity.Caller, r 
 		return err
 	}
 	if _, err := audit.Record(ctx, tx, c.Event("release."+status, "release_run", r.id.String(), draft.String(),
-		map[string]any{"pair_id": r.pair, "reason": reason})); err != nil {
+		r.details(map[string]any{"pair_id": r.pair, "reason": reason}))); err != nil {
 		return err
 	}
-	_, err = outbox.Enqueue(ctx, tx, "release.finished", map[string]any{"run_id": r.id, "space_id": published, "draft_space_id": draft,
-		"actor_id": r.actor, "silent": true, "outcome": status})
+	finished := map[string]any{"run_id": r.id, "space_id": published, "draft_space_id": draft,
+		"actor_id": r.actor, "silent": true, "outcome": status, "stop_reason": reason}
+	if err := addApprovalTelling(ctx, tx, r, finished); err != nil {
+		return err
+	}
+	_, err = outbox.Enqueue(ctx, tx, "release.finished", finished)
 	return err
+}
+
+// addApprovalTelling adds to the end of an approval release who is told and what became of the
+// page, so the approver and the authors hear that it was released, or why not (PUB-820). The
+// event holds ids and codes only.
+func addApprovalTelling(ctx context.Context, tx pgx.Tx, r runRow, payload map[string]any) error {
+	if r.actorType != actorApproval || r.causedBy == nil {
+		return nil
+	}
+	var page uuid.UUID
+	var outcome, reason string
+	var authors []uuid.UUID
+	err := tx.QueryRow(ctx, `SELECT rp.draft_page_id, rp.outcome, rp.reason,
+			ARRAY(SELECT jsonb_array_elements_text(COALESCE(r.options->'authors', '[]'::jsonb))::uuid)
+		FROM release_runs r JOIN release_run_pages rp ON rp.run_id = r.id WHERE r.id = $1 LIMIT 1`, r.id).Scan(&page, &outcome, &reason, &authors)
+	if noRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	payload["caused_by"], payload["draft_page_id"], payload["user_ids"] = *r.causedBy, page, authors
+	payload["page_outcome"], payload["page_reason"] = outcome, reason
+	return nil
 }
 
 // stop marks a run stopped after a transaction of it failed: each batch is done or untouched,
@@ -382,7 +447,7 @@ func (s *Service) makeTwins(ctx context.Context, tx pgx.Tx, c identity.Caller, s
 			known[draft] = twin
 		}
 		place := placeTwin(src.Ancestors, known)
-		twin, err := s.pages.MakeTwin(ctx, tx, c, st.published.ID, place.Parent, src.Page)
+		twin, err := s.makeTwin(ctx, tx, c, st.pair, st.published.ID, place.Parent, src.Page)
 		if err != nil {
 			return nil, err
 		}
@@ -489,11 +554,15 @@ type batchGate struct {
 	hidden     map[uuid.UUID]bool
 	excluded   map[uuid.UUID]bool // left out, the page itself
 	branches   map[uuid.UUID]bool // left out with every page below
+	// restricted are pages with a view restriction in the draft, which a run of the system
+	// leaves to a person (PUB-422).
+	restricted map[uuid.UUID]bool
 }
 
 // readBatch reads the pages of a batch, and what decides whether each may still go.
 func (s *Service) readBatch(ctx context.Context, tx pgx.Tx, r runRow, list []runPageRow) (map[uuid.UUID]pages.ReleaseSource, batchGate, error) {
-	gate := batchGate{hidden: map[uuid.UUID]bool{}, excluded: map[uuid.UUID]bool{}, branches: map[uuid.UUID]bool{}}
+	gate := batchGate{hidden: map[uuid.UUID]bool{}, excluded: map[uuid.UUID]bool{}, branches: map[uuid.UUID]bool{},
+		restricted: map[uuid.UUID]bool{}}
 	sources := map[uuid.UUID]pages.ReleaseSource{}
 	var ids, around []uuid.UUID
 	for _, p := range list {
@@ -508,22 +577,8 @@ func (s *Service) readBatch(ctx context.Context, tx pgx.Tx, r runRow, list []run
 		ids = append(ids, p.draft)
 		around = append(append(around, p.draft), src.Ancestors...)
 	}
-	d, err := s.perms.CheckSpace(ctx, tx, r.actor, r.draftSpace, permissions.SpaceView)
-	if err != nil && !apperr.IsNotFound(err) {
+	if err := s.readHidden(ctx, tx, r, ids, &gate); err != nil {
 		return nil, gate, err
-	}
-	gate.viewsDraft = err == nil && d.Allowed
-	hidden, err := tx.Query(ctx, `SELECT h.page_id FROM perm_hidden_pages($1) h WHERE h.page_id = ANY($2)
-		UNION SELECT ch.page_id FROM perm_control_hidden_pages($1) ch WHERE ch.page_id = ANY($2)`, r.actor, ids)
-	if err != nil {
-		return nil, gate, err
-	}
-	hiddenList, err := pgx.CollectRows(hidden, pgx.RowTo[uuid.UUID])
-	if err != nil {
-		return nil, gate, err
-	}
-	for _, id := range hiddenList {
-		gate.hidden[id] = true
 	}
 	marks, err := tx.Query(ctx, "SELECT draft_page_id, with_children FROM release_exclusions WHERE draft_page_id = ANY($1)", around)
 	if err != nil {
@@ -542,6 +597,43 @@ func (s *Service) readBatch(ctx context.Context, tx pgx.Tx, r runRow, list []run
 	return sources, gate, marks.Err()
 }
 
+// readHidden reads which pages of a batch the run may not take. A person's run takes what the
+// releaser sees (PUB-413). A run of the system sees the draft space as the release path does,
+// and leaves out a page with a view restriction in the draft, which only a person who sees it
+// releases by naming it (PUB-422).
+func (s *Service) readHidden(ctx context.Context, tx pgx.Tx, r runRow, list []uuid.UUID, gate *batchGate) error {
+	var hidden pgx.Rows
+	var err error
+	if r.system() {
+		gate.viewsDraft = true
+		hidden, err = tx.Query(ctx, `SELECT DISTINCT t.descendant_id FROM page_tree t
+			JOIN page_restrictions pr ON pr.page_id = t.ancestor_id AND pr.kind = 'view' WHERE t.descendant_id = ANY($1)`, list)
+		if err != nil {
+			return err
+		}
+		restricted, err := pgx.CollectRows(hidden, pgx.RowTo[uuid.UUID])
+		for _, id := range restricted {
+			gate.restricted[id] = true
+		}
+		return err
+	}
+	d, err := s.perms.CheckSpace(ctx, tx, r.actor, r.draftSpace, permissions.SpaceView)
+	if err != nil && !apperr.IsNotFound(err) {
+		return err
+	}
+	gate.viewsDraft = err == nil && d.Allowed
+	hidden, err = tx.Query(ctx, `SELECT h.page_id FROM perm_hidden_pages($1) h WHERE h.page_id = ANY($2)
+		UNION SELECT ch.page_id FROM perm_control_hidden_pages($1) ch WHERE ch.page_id = ANY($2)`, r.actor, list)
+	if err != nil {
+		return err
+	}
+	hiddenList, err := pgx.CollectRows(hidden, pgx.RowTo[uuid.UUID])
+	for _, id := range hiddenList {
+		gate.hidden[id] = true
+	}
+	return err
+}
+
 // why says why a page of a run is skipped now, or "" when it goes: deleted or moved away since
 // the preview, below a page whose file was missing, left out, or hidden from the releaser
 // (PUB-431, PUB-1065, PUB-420, PUB-454).
@@ -555,6 +647,8 @@ func (g batchGate) why(src pages.ReleaseSource, st batchState, failed map[uuid.U
 		return skipLeftOut
 	case !g.viewsDraft || g.hidden[src.ID]:
 		return skipHidden
+	case g.restricted[src.ID]:
+		return skipRestricted
 	}
 	return ""
 }
@@ -606,7 +700,7 @@ func (s *Service) writeRunPage(ctx context.Context, tx pgx.Tx, c identity.Caller
 	}
 	twin := w.twin
 	if err := s.recordPage(ctx, q, c, pl, pageRecord{runID: r.id, note: r.note, silent: r.silent, outcome: "released",
-		twin: &twin, twinVersion: w.twinVersion, twinHash: v.Hash, links: w.res.linkMap, hash: pl.version.Hash}); err != nil {
+		twin: &twin, twinVersion: w.twinVersion, twinHash: v.Hash, links: w.res.linkMap, hash: pl.version.Hash, causedBy: r.causedBy}); err != nil {
 		return nil, err
 	}
 	if q != tx {
@@ -642,7 +736,7 @@ func (s *Service) finish(ctx context.Context, tx pgx.Tx, c identity.Caller, st b
 		return err
 	}
 	if _, err := audit.Record(ctx, tx, c.Event("release.run", "release_run", r.id.String(), st.pair.Draft.String(),
-		map[string]any{"pair_id": st.pair.ID, "scope": r.scope, "outcomes": counts, "note": r.note, "silent": r.silent})); err != nil {
+		r.details(map[string]any{"pair_id": st.pair.ID, "scope": r.scope, "outcomes": counts, "note": r.note, "silent": r.silent}))); err != nil {
 		return err
 	}
 	// The published space learns that a run landed, with numbers only (PUB-901).
@@ -650,8 +744,12 @@ func (s *Service) finish(ctx context.Context, tx pgx.Tx, c identity.Caller, st b
 		map[string]any{"run_id": r.id, "outcomes": counts, "note": r.note})); err != nil {
 		return err
 	}
-	_, err = outbox.Enqueue(ctx, tx, "release.finished", map[string]any{"run_id": r.id, "space_id": st.published.ID, "draft_space_id": st.pair.Draft,
-		"actor_id": r.actor, "silent": r.silent || !st.pair.Settings.NotifyWatchers, "outcome": "done"})
+	finished := map[string]any{"run_id": r.id, "space_id": st.published.ID, "draft_space_id": st.pair.Draft,
+		"actor_id": r.actor, "silent": r.silent || !st.pair.Settings.NotifyWatchers, "outcome": "done"}
+	if err := addApprovalTelling(ctx, tx, r, finished); err != nil {
+		return err
+	}
+	_, err = outbox.Enqueue(ctx, tx, "release.finished", finished)
 	return err
 }
 
@@ -710,7 +808,7 @@ func (s *Service) applyRemovals(ctx context.Context, tx pgx.Tx, c identity.Calle
 			return err
 		}
 		if _, err := audit.Record(ctx, tx, c.Event("release."+outcome, "page", m.draft.String(), st.pair.Draft.String(),
-			map[string]any{"pair_id": st.pair.ID, "run_id": r.id, "twin_page_id": m.twin})); err != nil {
+			r.details(map[string]any{"pair_id": st.pair.ID, "run_id": r.id, "twin_page_id": m.twin}))); err != nil {
 			return err
 		}
 	}

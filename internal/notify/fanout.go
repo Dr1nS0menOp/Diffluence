@@ -60,6 +60,13 @@ type payload struct {
 	Approval bool `json:"approval"`
 	// Previous is the version approved before a new approval, or 0 for the first.
 	Previous int `json:"previous"`
+	// CausedBy is the approver of an approval release, and DraftPageID its page in the draft
+	// space; PageOutcome and PageReason say what became of it (spec 073, PUB-820).
+	CausedBy    *uuid.UUID `json:"caused_by"`
+	DraftPageID uuid.UUID  `json:"draft_page_id"`
+	PageOutcome string     `json:"page_outcome"`
+	PageReason  string     `json:"page_reason"`
+	StopReason  string     `json:"stop_reason"`
 }
 
 // Handle turns one event into notifications. It runs in the worker, and may run more

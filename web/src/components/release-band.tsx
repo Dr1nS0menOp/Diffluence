@@ -5,7 +5,13 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type PageDetail, type ReleasePreview, type ReleaseStatus } from '../api';
+import {
+  api,
+  type PageDetail,
+  type ReleasePreview,
+  type ReleaseStatus,
+  type ReleaseVerification,
+} from '../api';
 import { useCapabilities } from '../capabilities';
 import { Link } from '../router';
 import { Dialog, ErrorNote, Field, formatSize, Loading, RelativeTime } from './ui';
@@ -26,18 +32,63 @@ function aspectWords(t: (key: string) => string, aspects: string[]): string {
   return aspects.map((a) => t(`publishing.aspect_${a}`)).join(', ');
 }
 
+/** The line of a twin of a controlled page: when it was approved and its version, so a reader
+ * can cite it, and who approved it when the pair shows that (PUB-730). */
+function ApprovedLine({ approval }: { approval: NonNullable<ReleaseStatus['approval']> }) {
+  const { t } = useTranslation();
+  return (
+    <>
+      {t('publishing.approvedLine')} <RelativeTime value={approval.approved_at} />
+      {approval.approved_by ? ` ${t('publishing.approvedBy', { name: approval.approved_by })}` : ''}
+      {` · ${t('publishing.twinVersion', { number: approval.version })}`}
+    </>
+  );
+}
+
+/** Verifies the twin of a draft page against the draft version it came from (PUB-732). */
+function VerifyButton({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const verify = useMutation({
+    mutationFn: () => api.post<ReleaseVerification>(`/pages/${pageId}/release/verify`),
+  });
+  return (
+    <>
+      <button type="button" className="ghost" disabled={verify.isPending} onClick={() => verify.mutate()}>
+        {t('publishing.verify')}
+      </button>
+      {verify.data && <span role="status">{t(`publishing.verify_${verify.data.outcome}`)}</span>}
+      <ErrorNote error={verify.error} />
+    </>
+  );
+}
+
 /** The band under the byline: on a draft page its release status, for writers and release
  * managers; on a twin a quiet line that it was released, and for whoever may see the draft a
- * link to it. Never colour alone: every state is words. */
-export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
+ * link to it. Never colour alone: every state is words. Inside the band of a controlled page
+ * it adds its lines to that band, control first and then release (PUB-1225). */
+export function ReleaseBand({
+  status,
+  pageId,
+  inBand = false,
+}: {
+  status: ReleaseStatus | undefined;
+  pageId: string;
+  inBand?: boolean;
+}) {
   const { t } = useTranslation();
   if (!status || status.side === '') return null;
   if (status.side === 'published') {
     if (!status.released_at) return null;
     return (
-      <p className="muted release-line">
-        {t('publishing.twinLine')} <RelativeTime value={status.released_at} />
-        {status.twin_version ? ` · ${t('publishing.twinVersion', { number: status.twin_version })}` : ''}
+      <p className={inBand ? 'release-line' : 'muted release-line'}>
+        {status.approval ? (
+          <ApprovedLine approval={status.approval} />
+        ) : (
+          <>
+            {t('publishing.twinLine')} <RelativeTime value={status.released_at} />
+            {status.twin_version ? ` · ${t('publishing.twinVersion', { number: status.twin_version })}` : ''}
+          </>
+        )}
         {status.draft_page_id && (
           <>
             {' · '}
@@ -51,7 +102,7 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
   switch (status.status) {
     case 'released':
       return (
-        <p className="muted release-line">
+        <p className={inBand ? 'release-line' : 'muted release-line'}>
           {t('publishing.statusReleased')}
           {status.twin_page_id && (
             <>
@@ -59,8 +110,17 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
               <Link href={`/pages/${status.twin_page_id}`}>{t('publishing.openTwin')}</Link>
             </>
           )}
+          {status.can_verify && status.twin_page_id && (
+            <>
+              {' · '}
+              <VerifyButton pageId={pageId} />
+            </>
+          )}
         </p>
       );
+    case 'waiting_approval':
+      line = t('publishing.statusWaiting');
+      break;
     case 'changed':
       line = t('publishing.statusChanged', { aspects: aspectWords(t, status.aspects) });
       break;
@@ -76,8 +136,9 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
     default:
       line = t('publishing.statusNotReleased');
   }
-  return (
-    <div role="status" className="note release-band">
+  const failed = status.approval_release;
+  const lines = (
+    <>
       <p>
         {status.released_version ? `${t('publishing.releasedAs', { number: status.twin_version })} · ` : ''}
         {status.released_at && (
@@ -88,6 +149,13 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
         )}
         {line}
       </p>
+      {failed && (
+        <p>
+          {t('publishing.approvalFailed', {
+            why: t(`publishing.why_${failed.reason || 'other'}`, { defaultValue: t('publishing.why_other') }),
+          })}
+        </p>
+      )}
       {status.twin_page_id && (
         <p>
           <Link href={`/pages/${status.twin_page_id}`}>{t('publishing.openTwin')}</Link>
@@ -99,8 +167,20 @@ export function ReleaseBand({ status }: { status: ReleaseStatus | undefined }) {
               </Link>
             </>
           )}
+          {status.can_verify && (
+            <>
+              {' · '}
+              <VerifyButton pageId={pageId} />
+            </>
+          )}
         </p>
       )}
+    </>
+  );
+  if (inBand) return lines;
+  return (
+    <div role="status" className="note release-band">
+      {lines}
     </div>
   );
 }

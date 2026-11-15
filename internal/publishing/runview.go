@@ -25,21 +25,25 @@ const historyPage = 50
 
 // Run is a run as those who may release from the draft space see it.
 type Run struct {
-	ID          uuid.UUID       `json:"id"`
-	Scope       string          `json:"scope"`
-	Status      string          `json:"status"`
-	Note        string          `json:"note"`
-	Silent      bool            `json:"silent"`
-	ActorName   string          `json:"actor_name"`
-	Total       int             `json:"total"`
-	Done        int             `json:"done"`
-	Batches     int             `json:"batches"`
-	BatchesDone int             `json:"batches_done"`
-	StopReason  string          `json:"stop_reason,omitempty"`
-	PreviewedAt time.Time       `json:"previewed_at"`
-	StartedAt   *time.Time      `json:"started_at"`
-	FinishedAt  *time.Time      `json:"finished_at"`
-	Counts      json.RawMessage `json:"counts"`
+	ID        uuid.UUID `json:"id"`
+	Scope     string    `json:"scope"`
+	Status    string    `json:"status"`
+	Note      string    `json:"note"`
+	Silent    bool      `json:"silent"`
+	ActorName string    `json:"actor_name"`
+	// ActorType says who started the run: user, approval or workflow (PUB-902).
+	ActorType string `json:"actor_type"`
+	// CausedByName is the person whose act started a run of the system.
+	CausedByName string          `json:"caused_by_name"`
+	Total        int             `json:"total"`
+	Done         int             `json:"done"`
+	Batches      int             `json:"batches"`
+	BatchesDone  int             `json:"batches_done"`
+	StopReason   string          `json:"stop_reason,omitempty"`
+	PreviewedAt  time.Time       `json:"previewed_at"`
+	StartedAt    *time.Time      `json:"started_at"`
+	FinishedAt   *time.Time      `json:"finished_at"`
+	Counts       json.RawMessage `json:"counts"`
 	// Pages is the report: what became of each page (PUB-453). The history leaves it out.
 	Pages []RunPage `json:"pages,omitempty"`
 }
@@ -48,13 +52,13 @@ type Run struct {
 // can be resumed after its node died or the database was restored (PUB-1032, PUB-1061).
 const runColumns = `r.id, r.scope, CASE WHEN r.status = 'running' AND (r.heartbeat_at IS NULL OR r.heartbeat_at < now() - $3::interval)
 		THEN 'stopped' ELSE r.status END, r.note, r.silent, COALESCE(u.display_name, ''), r.total, r.done, r.batches, r.batches_done,
-		r.stop_reason, r.previewed_at, r.started_at, r.finished_at, r.counts
-	FROM release_runs r LEFT JOIN users u ON u.id = r.actor_id`
+		r.stop_reason, r.previewed_at, r.started_at, r.finished_at, r.counts, r.actor_type, COALESCE(cu.display_name, '')
+	FROM release_runs r LEFT JOIN users u ON u.id = r.actor_id LEFT JOIN users cu ON cu.id = r.caused_by`
 
 func scanRun(row pgx.Row) (Run, error) {
 	var r Run
 	err := row.Scan(&r.ID, &r.Scope, &r.Status, &r.Note, &r.Silent, &r.ActorName, &r.Total, &r.Done, &r.Batches, &r.BatchesDone,
-		&r.StopReason, &r.PreviewedAt, &r.StartedAt, &r.FinishedAt, &r.Counts)
+		&r.StopReason, &r.PreviewedAt, &r.StartedAt, &r.FinishedAt, &r.Counts, &r.ActorType, &r.CausedByName)
 	return r, err
 }
 
@@ -175,8 +179,9 @@ func (s *Service) Resume(ctx context.Context, c identity.Caller, spaceID, runID 
 		if status != "stopped" {
 			return apperr.Conflict("run_not_stopped", "Only a run that stopped can be resumed.")
 		}
+		// The person who resumes releases the rest as theirs, also of a run the system started (D27).
 		if _, err := tx.Exec(ctx, `UPDATE release_runs SET status = 'queued', stop_reason = '', cancel_asked = false, actor_id = $2,
-			heartbeat_at = NULL WHERE id = $1`, runID, c.UserID); err != nil {
+			actor_type = $3, heartbeat_at = NULL WHERE id = $1`, runID, c.UserID, actorUser); err != nil {
 			return err
 		}
 		if _, err := s.jobs.Enqueue(ctx, tx, JobKindRun, runPayload{RunID: runID}, c.UserID); err != nil {
@@ -236,10 +241,11 @@ func (s *Service) RunPages(ctx context.Context, runID uuid.UUID) (RunPages, erro
 func loadRunForChange(ctx context.Context, tx pgx.Tx, p pair, runID uuid.UUID, staleAfter time.Duration) (runRow, string, error) {
 	var r runRow
 	var status string
-	err := tx.QueryRow(ctx, `SELECT id, pair_id, actor_id, scope, note, silent, batches,
-			CASE WHEN status = 'running' AND (heartbeat_at IS NULL OR heartbeat_at < now() - $3::interval) THEN 'stopped' ELSE status END
-		FROM release_runs WHERE id = $1 AND pair_id = $2 AND scope <> 'page' FOR UPDATE`, runID, p.ID, staleAfter.String()).
-		Scan(&r.id, &r.pair, &r.actor, &r.scope, &r.note, &r.silent, &r.batches, &status)
+	err := tx.QueryRow(ctx, `SELECT id, pair_id, COALESCE(actor_id, $4), scope, note, silent, batches,
+			CASE WHEN status = 'running' AND (heartbeat_at IS NULL OR heartbeat_at < now() - $3::interval) THEN 'stopped' ELSE status END,
+			actor_type, caused_by
+		FROM release_runs WHERE id = $1 AND pair_id = $2 AND scope <> 'page' FOR UPDATE`, runID, p.ID, staleAfter.String(), uuid.Nil).
+		Scan(&r.id, &r.pair, &r.actor, &r.scope, &r.note, &r.silent, &r.batches, &status, &r.actorType, &r.causedBy)
 	if noRows(err) {
 		return r, "", apperr.NotFound()
 	}

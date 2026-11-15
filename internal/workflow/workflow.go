@@ -53,6 +53,9 @@ type State struct {
 	// Review names who is asked in a state of kind in review, and how many must agree. A
 	// review state without it is taken through by its authors, as in wave DC1.
 	Review *Review `json:"review,omitempty"`
+	// ReleaseWhenApproved marks an approved state whose pages go to the published space when
+	// they enter it, in a draft space of a pair (spec 073, PUB-710). Elsewhere it does nothing.
+	ReleaseWhenApproved bool `json:"release_when_approved,omitempty"`
 }
 
 // Transition is a named step from one state to another (DOC-104).
@@ -148,6 +151,9 @@ func Validate(d Definition) error {
 		}
 		if s.Timed && s.Kind != KindApproved {
 			return problem("timed_not_approved", s.ID, "Only an approved state can come up for periodic review.")
+		}
+		if s.ReleaseWhenApproved && s.Kind != KindApproved {
+			return problem("release_not_approved", s.ID, "Only an approved state can release its pages when they enter it.")
 		}
 		if s.Start {
 			starts++
@@ -364,6 +370,30 @@ func Diff(before, after Definition) []Change {
 		out = []Change{}
 	}
 	return out
+}
+
+// ReleaseMarksDiffer says whether two versions of a workflow release on approval from
+// different states. A new workflow compares with the zero Definition.
+func ReleaseMarksDiffer(before, after Definition) bool {
+	marked := func(d Definition) map[string]bool {
+		out := map[string]bool{}
+		for _, s := range d.States {
+			if s.ReleaseWhenApproved {
+				out[s.ID] = true
+			}
+		}
+		return out
+	}
+	a, b := marked(before), marked(after)
+	if len(a) != len(b) {
+		return true
+	}
+	for id := range a {
+		if !b[id] {
+			return true
+		}
+	}
+	return false
 }
 
 // sameApartFromReview says two versions of a state differ in their review only.

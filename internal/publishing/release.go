@@ -4,6 +4,7 @@ package publishing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -26,11 +27,13 @@ import (
 	"github.com/diffluence/diffluence/internal/spaces"
 )
 
-// The release status of a draft page, in words (PUB-330, PUB-331, PUB-421). Waiting for
-// approval comes with PB3.
+// The release status of a draft page, in words (PUB-330, PUB-331, PUB-421, PUB-702).
 const (
-	StatusNotReleased     = "not_released"
-	StatusReleased        = "released"
+	StatusNotReleased = "not_released"
+	StatusReleased    = "released"
+	// StatusWaiting is a released controlled page with a newer version under review: releasing
+	// it now would change nothing (PUB-702).
+	StatusWaiting         = "waiting_approval"
 	StatusChanged         = "changed"
 	StatusCannot          = "cannot_release"
 	StatusLeftOut         = "left_out"
@@ -129,6 +132,29 @@ type PageStatus struct {
 	// ReaderComments counts the comments readers left on the twin, for those who may view it
 	// (PUB-223, PUB-1232). No comment text crosses.
 	ReaderComments int `json:"reader_comments"`
+	// ApprovalRelease says why the last approval release of the approved version did not go,
+	// on a draft page; nil when it went or there was none (PUB-711).
+	ApprovalRelease *ApprovalRelease `json:"approval_release,omitempty"`
+	// Approval is what readers of a twin see of the approval of what they read (PUB-730).
+	Approval *TwinApproval `json:"approval,omitempty"`
+	// CanVerify offers verifying the twin, to those who see the draft space's audit (PUB-732).
+	CanVerify bool `json:"can_verify"`
+}
+
+// ApprovalRelease is an approval release that did not go: stopped, cancelled or skipped, with
+// its reason as a code.
+type ApprovalRelease struct {
+	Outcome string    `json:"outcome"`
+	Reason  string    `json:"reason"`
+	At      time.Time `json:"at"`
+}
+
+// TwinApproval is when the version on a twin was approved, its number on the twin so a reader
+// can cite it, and the approver when the pair shows approvers (PUB-730).
+type TwinApproval struct {
+	ApprovedAt time.Time `json:"approved_at"`
+	Version    int       `json:"version"`
+	ApprovedBy string    `json:"approved_by,omitempty"`
 }
 
 // Exclusion is the mark that leaves a page out: on the page itself, or on a page above it
@@ -236,16 +262,63 @@ func (s *Service) draftStatus(ctx context.Context, c identity.Caller, src pages.
 		return out, err
 	}
 	out.CanRelease = releases && viewsPublished
+	if err := s.addApprovalStatus(ctx, p, src, &out); err != nil {
+		return out, err
+	}
+	if out.TwinPageID != nil {
+		if out.CanVerify, err = s.maySpace(ctx, c, src.SpaceID, permissions.SpaceAudit); err != nil {
+			return out, err
+		}
+	}
 	return out, nil
+}
+
+// addApprovalStatus adds what document control changes in the status of a controlled draft
+// page: Waiting for approval while a newer version is under review and nothing else differs
+// (PUB-702), and why the approval release of the approved version did not go (PUB-711).
+func (s *Service) addApprovalStatus(ctx context.Context, p pair, src pages.ReleaseSource, out *PageStatus) error {
+	ctl, err := controlOf(ctx, s.pool, src.ID)
+	if err != nil || ctl == nil {
+		return err
+	}
+	if out.Status == StatusReleased && ctl.head > src.CurrentVersion {
+		out.Status = StatusWaiting
+	}
+	if out.Status != StatusChanged && out.Status != StatusNotReleased {
+		return nil
+	}
+	var a ApprovalRelease
+	var status string
+	err = s.pool.QueryRow(ctx, `SELECT r.status, rp.outcome, COALESCE(NULLIF(r.stop_reason, ''), rp.reason), COALESCE(r.finished_at, r.previewed_at)
+		FROM release_runs r JOIN release_run_pages rp ON rp.run_id = r.id
+		WHERE r.pair_id = $1 AND r.actor_type = $2 AND r.root_page_id = $3 AND rp.draft_version = $4
+		ORDER BY r.previewed_at DESC LIMIT 1`, p.ID, actorApproval, src.ID, releaseVersion(src.CurrentVersion, ctl)).
+		Scan(&status, &a.Outcome, &a.Reason, &a.At)
+	if noRows(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	switch {
+	case status == "stopped" || status == "cancelled":
+		a.Outcome = status
+	case a.Outcome != "skipped":
+		return nil // it went, or it waits for its turn
+	}
+	out.ApprovalRelease = &a
+	return nil
 }
 
 func (s *Service) twinStatus(ctx context.Context, c identity.Caller, src pages.ReleaseSource) (PageStatus, error) {
 	out := PageStatus{Aspects: []string{}, Side: permissions.PairPublished}
 	var draft, draftSpace uuid.UUID
 	var releasedAt *time.Time
-	err := s.pool.QueryRow(ctx, `SELECT pp.draft_page_id, sp.draft_space_id, pp.released_at FROM page_pairs pp
-		JOIN space_pairs sp ON sp.id = pp.pair_id AND sp.ended_at IS NULL
-		WHERE pp.twin_page_id = $1 AND pp.released_version > 0`, src.ID).Scan(&draft, &draftSpace, &releasedAt)
+	var releasedVersion int
+	var rawSettings []byte
+	err := s.pool.QueryRow(ctx, `SELECT pp.draft_page_id, sp.draft_space_id, pp.released_at, pp.released_version, sp.settings
+		FROM page_pairs pp JOIN space_pairs sp ON sp.id = pp.pair_id AND sp.ended_at IS NULL
+		WHERE pp.twin_page_id = $1 AND pp.released_version > 0`, src.ID).Scan(&draft, &draftSpace, &releasedAt, &releasedVersion, &rawSettings)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, nil // a home page that waits for its first release
 	}
@@ -253,6 +326,9 @@ func (s *Service) twinStatus(ctx context.Context, c identity.Caller, src pages.R
 		return out, err
 	}
 	out.ReleasedAt, out.TwinVersion = releasedAt, src.CurrentVersion
+	if out.Approval, err = twinApproval(ctx, s.pool, draft, releasedVersion, src.CurrentVersion, rawSettings); err != nil {
+		return out, err
+	}
 	seen, err := s.mayPage(ctx, c, draft, permissions.ActionPageView)
 	if err != nil {
 		return out, err
@@ -270,6 +346,25 @@ func (s *Service) twinStatus(ctx context.Context, c identity.Caller, src pages.R
 			return out, err
 		}
 		out.DraftSpace = &SpaceRef{ID: sp.ID, Key: sp.Key, Name: sp.Name}
+	}
+	return out, nil
+}
+
+// twinApproval is the approved-on line of a twin of a controlled page: when the released
+// version was approved, the twin's version number, and the approver only when the pair shows
+// approvers, since who approved is often confidential to the team (PUB-730).
+func twinApproval(ctx context.Context, q db.Querier, draft uuid.UUID, released, twinVersion int, rawSettings []byte) (*TwinApproval, error) {
+	a, err := pages.ApprovalOfVersion(ctx, q, draft, released)
+	if err != nil || a == nil {
+		return nil, err
+	}
+	settings := defaultSettings()
+	if err := json.Unmarshal(rawSettings, &settings); err != nil {
+		return nil, fmt.Errorf("publishing: read the settings of a pair: %v", err)
+	}
+	out := &TwinApproval{ApprovedAt: a.At, Version: twinVersion}
+	if settings.ShowApprovers {
+		out.ApprovedBy = a.ByName
 	}
 	return out, nil
 }
@@ -317,6 +412,8 @@ type fileStep struct {
 	version int
 	size    int64
 	copied  int // the version of the draft file the copy holds, 0 for none
+	// pin is the version a controlled page's released version pinned the file at (DC3).
+	pin *attachments.ReleasePin
 }
 
 func (f fileStep) needed() bool { return f.copy == nil || f.copied != f.version }
@@ -391,7 +488,11 @@ func (s *Service) planPageWith(ctx context.Context, q db.Querier, in planInput) 
 	if src.HeaderAttachmentID != nil && !slices.Contains(shown, *src.HeaderAttachmentID) {
 		shown = append(shown, *src.HeaderAttachmentID)
 	}
-	pl.files, pl.foreign, err = filesOf(ctx, q, p.Draft, pl.existing, shown)
+	pins, err := attachments.ReleasePinsOf(ctx, q, src.ID, in.number)
+	if err != nil {
+		return pl, err
+	}
+	pl.files, pl.foreign, err = filesOf(ctx, q, p.Draft, pl.existing, shown, pins)
 	if err != nil {
 		return pl, err
 	}
@@ -474,8 +575,10 @@ func referencedPages(doc document.Node) []uuid.UUID {
 }
 
 // filesOf works out the files a release copies: those of the draft space that the document
-// shows, with what their twin holds already. Files of other spaces stay as they are.
-func filesOf(ctx context.Context, q db.Querier, draftSpace uuid.UUID, existing *pagePair, shown []uuid.UUID) ([]fileStep, map[uuid.UUID]bool, error) {
+// shows, with what their twin holds already. Files of other spaces stay as they are. A file
+// the released version pinned goes at its pinned version, never a newer one under review.
+func filesOf(ctx context.Context, q db.Querier, draftSpace uuid.UUID, existing *pagePair, shown []uuid.UUID,
+	pins map[uuid.UUID]attachments.ReleasePin) ([]fileStep, map[uuid.UUID]bool, error) {
 	sources, err := attachments.SourcesForRelease(ctx, q, shown)
 	if err != nil {
 		return nil, nil, err
@@ -514,6 +617,9 @@ func filesOf(ctx context.Context, q db.Querier, draftSpace uuid.UUID, existing *
 		}
 		step := copies[id]
 		step.from, step.version, step.size = id, src.Version, src.Size
+		if pin, ok := pins[id]; ok {
+			step.version, step.pin = pin.Version, &pin
+		}
 		steps = append(steps, step)
 	}
 	return steps, foreign, nil
@@ -528,7 +634,11 @@ func (s *Service) Preview(ctx context.Context, c identity.Caller, pageID uuid.UU
 		if err != nil {
 			return err
 		}
-		pl, err := s.planPage(ctx, tx, p, src, src.CurrentVersion)
+		ctl, err := controlOf(ctx, tx, pageID)
+		if err != nil {
+			return err
+		}
+		pl, err := s.planPage(ctx, tx, p, src, releaseVersion(src.CurrentVersion, ctl))
 		if err != nil {
 			return err
 		}
@@ -604,7 +714,28 @@ func (s *Service) draftPage(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 	if out {
 		return src, p, apperr.Conflict(codeLeftOut, "This page is left out of releases. Include it again to release it.")
 	}
-	return src, p, nil
+	return src, p, s.requireManualAllowed(ctx, tx, p, src)
+}
+
+// requireManualAllowed refuses releasing a controlled page by hand when the pair leaves those
+// to approval (PUB-714). The one exception is an approved version whose approval release did
+// not go: releasing it by hand is still that approval's release.
+func (s *Service) requireManualAllowed(ctx context.Context, tx pgx.Tx, p pair, src pages.ReleaseSource) error {
+	if !p.Settings.OnlyApprovalReleases {
+		return nil
+	}
+	ctl, err := controlOf(ctx, tx, src.ID)
+	if err != nil || ctl == nil {
+		return err
+	}
+	var missed bool
+	if err := tx.QueryRow(ctx, `SELECT EXISTS (SELECT 1 FROM release_runs r JOIN release_run_pages rp ON rp.run_id = r.id
+		WHERE r.pair_id = $1 AND r.actor_type = $2 AND r.root_page_id = $3 AND rp.draft_version = $4
+		  AND (r.status IN ('stopped', 'cancelled') OR rp.outcome = 'skipped'))`,
+		p.ID, actorApproval, src.ID, releaseVersion(src.CurrentVersion, ctl)).Scan(&missed); err != nil || missed {
+		return err
+	}
+	return apperr.Conflict(reasonApprovalOnly, "This space releases controlled pages only by their approval.")
 }
 
 var cannotReleaseWords = map[string]string{
@@ -749,7 +880,7 @@ func (s *Service) writePage(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 		pl.existing = &pagePair{Twin: *pl.made}
 	}
 	if twin == nil {
-		made, err := s.pages.MakeTwin(ctx, tx, c, pl.published.ID, pl.place.Parent, pl.src.Page)
+		made, err := s.makeTwin(ctx, tx, c, pl.pair, pl.published.ID, pl.place.Parent, pl.src.Page)
 		if err != nil {
 			return out, err
 		}
@@ -763,7 +894,7 @@ func (s *Service) writePage(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 			files[f.from] = *f.copy
 			continue
 		}
-		copied, version, err := s.attachments.CopyForRelease(ctx, tx, c, attachments.ReleaseCopy{From: f.from, Copy: f.copy, TwinPage: *twin, SpaceID: pl.published.ID})
+		copied, version, err := s.attachments.CopyForRelease(ctx, tx, c, attachments.ReleaseCopy{From: f.from, Copy: f.copy, TwinPage: *twin, SpaceID: pl.published.ID, Pin: f.pin})
 		if err != nil {
 			return out, err
 		}
@@ -807,6 +938,17 @@ func (s *Service) writePage(ctx context.Context, tx pgx.Tx, c identity.Caller, p
 		return out, err
 	}
 	return out, s.keepFiles(ctx, tx, c, *pl)
+}
+
+// makeTwin makes the twin of a draft page. A twin a run of the system makes has no person as its
+// maker, so the person who made the pair answers for it, as the owner readers see in its byline;
+// its versions keep no person as author (decision D41).
+func (s *Service) makeTwin(ctx context.Context, tx pgx.Tx, c identity.Caller, p pair, space uuid.UUID, parent *uuid.UUID, src pages.Page) (pages.Page, error) {
+	made, err := s.pages.MakeTwin(ctx, tx, c, space, parent, src)
+	if err != nil || c.System == "" {
+		return made, err
+	}
+	return made, pages.SetTwinOwner(ctx, tx, made.ID, p.CreatedBy)
 }
 
 // twinTitle is the title a twin gets. A home page is named after its space until someone
@@ -913,6 +1055,8 @@ type pageRecord struct {
 	links       map[string]string
 	// hash is the content hash of the draft version released (PUB-732, D9).
 	hash string
+	// causedBy is the person whose act started a run of the system (PUB-902).
+	causedBy *uuid.UUID
 }
 
 // recordPage keeps what a run did to one page, and audits it: in the draft space with both
@@ -928,6 +1072,9 @@ func (s *Service) recordPage(ctx context.Context, tx pgx.Tx, c identity.Caller, 
 		"run_id": r.runID}
 	if r.twin != nil {
 		details["twin_page_id"], details["twin_version"], details["twin_hash"] = *r.twin, r.twinVersion, r.twinHash
+	}
+	if r.causedBy != nil {
+		details["caused_by"] = *r.causedBy
 	}
 	if _, err := audit.Record(ctx, tx, c.Event("release.page", "page", pl.src.ID.String(), pl.pair.Draft.String(), details)); err != nil {
 		return err

@@ -154,6 +154,34 @@ type scopeRow struct {
 	LeftOut         bool
 	TwinArchived    bool
 	Header          *uuid.UUID
+	// Control is the document control of the page, nil for an ordinary page.
+	Control *controlFacts
+}
+
+// controlFacts are the versions of a controlled page that decide what a release takes.
+type controlFacts struct {
+	approved *int
+	head     int
+}
+
+// releaseVersion is the version a release takes of a draft page: of a controlled page always
+// its approved version, never the working version under review (PUB-700, PUB-1414). The pages
+// row holds the approved version already (DC1); this reads the control row anyway, so a later
+// change of that storage cannot release a working version.
+func releaseVersion(current int, c *controlFacts) int {
+	if c != nil && c.approved != nil {
+		return *c.approved
+	}
+	return current
+}
+
+// controlOf reads the control facts of a page, nil when it follows no workflow.
+func controlOf(ctx context.Context, q db.Querier, pageID uuid.UUID) (*controlFacts, error) {
+	c, ok, err := pages.ReleaseControlOf(ctx, q, pageID)
+	if err != nil || !ok {
+		return nil, err
+	}
+	return &controlFacts{approved: c.ApprovedVersion, head: c.HeadVersion}, nil
 }
 
 func (r scopeRow) released() bool { return r.ReleasedVersion > 0 }
@@ -164,12 +192,14 @@ const scopeSQL = `SELECT p.id, p.parent_id, p.title, p.kind, p.status, p.current
 		EXISTS (SELECT 1 FROM page_tree t JOIN page_restrictions r ON r.page_id = t.ancestor_id AND r.kind = 'view'
 			WHERE t.descendant_id = p.id),
 		p.id NOT IN (SELECT h.page_id FROM perm_hidden_pages($2) h) AND p.id NOT IN (SELECT ch.page_id FROM perm_control_hidden_pages($2) ch),
-		EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete')),
+		pc.page_id IS NOT NULL AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'),
 		COALESCE(pp.released_version, 0), pp.twin_page_id, COALESCE(pp.changed, '{}'),
 		EXISTS (SELECT 1 FROM page_tree t JOIN release_exclusions e ON e.draft_page_id = t.ancestor_id
 			WHERE t.descendant_id = p.id AND (t.depth = 0 OR e.with_children)),
-		COALESCE(tw.archived_at IS NOT NULL, false), p.header_attachment_id
+		COALESCE(tw.archived_at IS NOT NULL, false), p.header_attachment_id, pc.page_id IS NOT NULL, pc.approved_version,
+		COALESCE(pc.head_version, 0)
 	FROM pages p
+	LEFT JOIN page_control pc ON pc.page_id = p.id
 	LEFT JOIN page_pairs pp ON pp.draft_page_id = p.id AND pp.pair_id = $3
 	LEFT JOIN pages tw ON tw.id = pp.twin_page_id
 	WHERE p.space_id = $1 AND p.kind = ANY($4) AND (p.status = 'published' OR (p.status = 'trashed' AND pp.released_version > 0))
@@ -192,8 +222,13 @@ func readScope(ctx context.Context, q db.Querier, user uuid.UUID, p pair, root *
 	}
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (scopeRow, error) {
 		var s scopeRow
+		var controlled bool
+		var c controlFacts
 		err := r.Scan(&s.ID, &s.ParentID, &s.Title, &s.Kind, &s.Status, &s.CurrentVersion, &s.Archived, &s.Restricted, &s.Visible,
-			&s.NeverApproved, &s.ReleasedVersion, &s.Twin, &s.Changed, &s.LeftOut, &s.TwinArchived, &s.Header)
+			&s.NeverApproved, &s.ReleasedVersion, &s.Twin, &s.Changed, &s.LeftOut, &s.TwinArchived, &s.Header, &controlled, &c.approved, &c.head)
+		if controlled {
+			s.Control = &c
+		}
 		return s, err
 	})
 }
@@ -213,6 +248,8 @@ type scopeRules struct {
 	named map[uuid.UUID]bool
 	// chosen says every page was chosen one by one, which names them all.
 	chosen bool
+	// approvalOnly leaves controlled pages to approval releases (PUB-714).
+	approvalOnly bool
 }
 
 // decide says what a run does with a page (PUB-401 to PUB-403, PUB-420 to PUB-422, PUB-1010,
@@ -242,6 +279,8 @@ func decide(r scopeRow, rules scopeRules, skippedAbove map[uuid.UUID]bool) decis
 		return decision{action: actionSkip, reason: reasonArchived}
 	case r.NeverApproved:
 		return decision{action: actionSkip, reason: reasonNotApproved}
+	case r.Control != nil && rules.approvalOnly:
+		return decision{action: actionSkip, reason: reasonApprovalOnly}
 	case r.Restricted && !r.released() && !rules.chosen && !rules.named[r.ID]:
 		return decision{action: actionSkip, reason: skipRestricted}
 	case !r.released():
@@ -376,7 +415,7 @@ func (s *Service) planRelease(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		return nil, err
 	}
 	rules := scopeRules{mirror: in.Scope == ScopeSpace && p.Settings.MirrorRemovals && !in.KeepRemovals, named: map[uuid.UUID]bool{},
-		chosen: in.Scope == ScopePages}
+		chosen: in.Scope == ScopePages, approvalOnly: p.Settings.OnlyApprovalReleases}
 	for _, id := range in.Named {
 		rules.named[id] = true
 	}
@@ -408,7 +447,7 @@ func (s *Service) planRelease(ctx context.Context, tx pgx.Tx, c identity.Caller,
 			default:
 				out.Counts.Cannot++
 			}
-			if !r.released() {
+			if !r.released() && hidesBelow(d.reason) {
 				skippedAbove[r.ID] = true
 			}
 			plan = append(plan, runPagePlan{draft: r.ID, twin: r.Twin, action: actionSkip, reason: d.reason, title: r.Title})
@@ -425,7 +464,7 @@ func (s *Service) planRelease(ctx context.Context, tx pgx.Tx, c identity.Caller,
 			out.Counts.Archive++
 		}
 		out.Pages = append(out.Pages, page)
-		plan = append(plan, runPagePlan{draft: r.ID, version: r.CurrentVersion, twin: r.Twin, action: d.action, reason: d.reason,
+		plan = append(plan, runPagePlan{draft: r.ID, version: releaseVersion(r.CurrentVersion, r.Control), twin: r.Twin, action: d.action, reason: d.reason,
 			title: r.Title, aspects: page.Aspects})
 		if d.action == actionMake || d.action == actionChange || d.action == actionUpdate {
 			writing = append(writing, r.ID)
@@ -444,6 +483,14 @@ func (s *Service) planRelease(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		}
 	}
 	return plan, s.measureWrites(ctx, tx, p, rows, writing, out)
+}
+
+// hidesBelow says whether a page skipped for this reason keeps the pages below it out too: a page
+// left out, or restricted, whose children readers should not find where the draft has them
+// (PUB-401, decision D26). Below a page that cannot be released for itself, such as one never
+// approved, the pages go, placed under the nearest twin above (PUB-411, PUB-713).
+func hidesBelow(reason string) bool {
+	return reason == skipLeftOut || reason == skipBelowLeft || reason == skipRestricted
 }
 
 func nonNilAspects(list []string) []string {

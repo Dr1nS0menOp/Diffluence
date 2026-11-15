@@ -27,7 +27,7 @@ The screens follow the design standard of Diffluence (`docs/design/README.md`): 
 - **PUB-1222** · partly · **Release this page…**, **Leave out of releases** and **Take off the published space** are in the page's **More** menu, for those with `space.release`. *Why:* rarely used actions live in More, never as a row of buttons. *Proof:* an e2e test.
 - **PUB-1223** · new · The page's history marks released versions (PUB-911) with a word, not only an icon. *Proof:* a picture.
 - **PUB-1224** · new · The tree of a draft space gains one choice in its filter: **Changed since release**, listing those pages flat, like the other flat views. The tree has no per-row release marks. *Why:* marks on every row would clutter the tree (ADR-034 took away its guide lines for the same reason). *Proof:* an e2e test.
-- **PUB-1225** · new · A controlled page's band (DOC-901) and the release note are one band: control first, then release. *Why:* two bands under a title would push the text down. *Proof:* a picture of a controlled page in a draft space.
+- **PUB-1225** · built · A controlled page's band (DOC-901) and the release note are one band: control first, then release. *Why:* two bands under a title would push the text down. *Proof:* a picture of a controlled page in a draft space.
 
 ## 13.4 On a published page
 

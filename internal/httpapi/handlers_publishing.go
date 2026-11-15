@@ -28,6 +28,22 @@ func (s *Server) registerPublishingRoutes() {
 	r.HandleFunc("GET "+pagesPath, Object(permissions.ActionPageView), on(s.handleReleaseStatus))
 	r.HandleFunc("POST "+pagesPath+"/preview", Object(permissions.SpaceRelease), on(s.handleReleasePreview))
 	r.HandleFunc("POST "+pagesPath, Object(permissions.SpaceRelease), on(s.handleRelease))
+	r.HandleFunc("POST "+pagesPath+"/verify", Object(permissions.SpaceAudit), on(s.handleReleaseVerify))
+}
+
+// handleReleaseVerify checks the twin of a draft page against the draft version it came from
+// (spec 073, PUB-732).
+func (s *Server) handleReleaseVerify(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	out, err := s.deps.Publishing.Verify(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, out)
 }
 
 func (s *Server) handlePublishingState(w http.ResponseWriter, r *http.Request) {

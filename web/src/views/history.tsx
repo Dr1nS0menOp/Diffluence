@@ -83,7 +83,7 @@ function VersionDialog({ pageId, number, onClose }: { pageId: string; number: nu
           <p role="status" className="note">
             {t('history.oldVersion', {
               number: shown.number,
-              name: shown.author_name,
+              name: shown.author_name || t('history.bySystem'),
               date: dates.moment(shown.created_at),
             })}{' '}
             <Link href={`/pages/${pageId}`}>{t('history.toCurrent')}</Link>
@@ -203,7 +203,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
                 )}
                 <td>
                   <strong>{t('history.version', { number: v.number })}</strong>{' '}
-                  {t('history.by', { name: v.author_name })}{' '}
+                  {t('history.by', { name: v.author_name || t('history.bySystem') })}{' '}
                   <span className="muted">{dates.moment(v.created_at)}</span>{' '}
                   {i === 0 && <span className="lozenge">{t('history.current')}</span>}
                   {v.restored_from !== null && (

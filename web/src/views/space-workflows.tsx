@@ -14,6 +14,7 @@ import {
   type WorkflowExample,
   type WorkflowTemplate,
 } from '../api';
+import { useCapabilities } from '../capabilities';
 import { TableBox } from '../components/table-box';
 import { Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
 import { WorkflowEditor, type WorkflowDraft } from '../components/workflow-editor';
@@ -85,6 +86,9 @@ export function WorkflowsSection({ space }: { space: Space }) {
       setEditing({ kind: 'edit', workflow: made });
     },
   });
+  const capabilities = useCapabilities();
+  // "Release when approved" acts only in a draft space while publishing is on (PUB-710).
+  const releases = capabilities.publishing && space.pair_role === 'draft';
   if (q.isPending) return <Loading />;
   if (editing) {
     const initial =
@@ -107,6 +111,7 @@ export function WorkflowsSection({ space }: { space: Space }) {
           initial={initial}
           existing={editing.kind === 'edit' ? editing.workflow.definition : undefined}
           names={editing.kind === 'edit' ? editing.workflow.names : undefined}
+          releases={releases}
           busy={save.isPending}
           error={save.error}
           onSave={(draft) => save.mutate(draft)}

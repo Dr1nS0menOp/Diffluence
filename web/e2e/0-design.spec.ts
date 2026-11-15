@@ -2163,3 +2163,91 @@ test.describe('the console that runs the installation', () => {
     await page.context().close();
   });
 });
+
+// Approval releases (spec 073, wave PB3): the band of a controlled page in a draft space, where
+// control and release are one band (PUB-1225), and the line of a twin with the date it was
+// approved and its version (PUB-730). Its spaces are made last, so no earlier picture lists them.
+test.describe('approval releases', () => {
+  test.describe.configure({ mode: 'serial' });
+  let draftPage = '';
+  let twin = '';
+
+  test.beforeAll(async ({ browser }) => {
+    const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(setup, ADMIN.email, ADMIN.password);
+    const created = await setup.request.post('/api/v1/spaces', {
+      data: { key: 'PROCEDURES', name: 'Procedures' },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const draft = (await created.json()) as { id: string; home_page_id: string };
+    const linked = await setup.request.post(`/api/v1/spaces/${draft.id}/publishing/link`, {
+      data: { new_space: { key: 'PROCEDURESREAD', name: 'Procedures for everyone' } },
+    });
+    expect(linked.ok(), await linked.text()).toBeTruthy();
+    const made = await setup.request.post(`/api/v1/spaces/${draft.id}/workflows`, {
+      data: {
+        name: 'Review',
+        definition: {
+          states: [
+            { id: 'draft', name: 'Draft', kind: 'draft', start: true },
+            { id: 'review', name: 'In review', kind: 'in_review' },
+            { id: 'approved', name: 'Approved', kind: 'approved', release_when_approved: true },
+          ],
+          transitions: [
+            { id: 'submit', name: 'Send for review', from: 'draft', to: 'review' },
+            { id: 'approve', name: 'Approve', from: 'review', to: 'approved' },
+            { id: 'change', name: 'Back to draft', from: 'approved', to: 'draft' },
+          ],
+        },
+      },
+    });
+    expect(made.ok(), await made.text()).toBeTruthy();
+    draftPage = await publishedPage(
+      setup,
+      draft.id,
+      'Lifting procedure',
+      'Lift with both hands.',
+      draft.home_page_id,
+    );
+    const set = await setup.request.put(`/api/v1/pages/${draftPage}/workflow`, {
+      data: { workflow_id: ((await made.json()) as { id: string }).id },
+    });
+    expect(set.ok(), await set.text()).toBeTruthy();
+    for (const step of ['submit', 'approve']) {
+      const taken = await setup.request.post(`/api/v1/pages/${draftPage}/transitions`, {
+        data: { transition: step, version: 1 },
+      });
+      expect(taken.ok(), await taken.text()).toBeTruthy();
+    }
+    await expect
+      .poll(
+        async () => {
+          const status = await setup.request.get(`/api/v1/pages/${draftPage}/release`);
+          twin = ((await status.json()) as { twin_page_id?: string }).twin_page_id ?? '';
+          return twin;
+        },
+        { timeout: 20000 },
+      )
+      .not.toBe('');
+    await setup.context().close();
+  });
+
+  test('ControlBand: a controlled page in a draft space is one band', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/pages/${draftPage}`);
+    await expect(page.locator('.control-band .release-line')).toContainText('Released');
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-controlled-page', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+  });
+
+  test('ReleaseBand: a twin says when it was approved and its version', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/pages/${twin}`);
+    await expect(page.locator('.release-line')).toContainText('Approved');
+    await expect(page.locator('.release-line')).toContainText('version 1');
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-approved-twin', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+  });
+});

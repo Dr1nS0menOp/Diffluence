@@ -261,6 +261,9 @@ func (s *Service) createWorkflow(ctx context.Context, c identity.Caller, spaceID
 		if err != nil {
 			return err
 		}
+		if err := s.requireReleaseMarkRight(ctx, tx, c, spaceID, workflow.Definition{}, in.Definition); err != nil {
+			return err
+		}
 		raw, err := json.Marshal(in.Definition)
 		if err != nil {
 			return err
@@ -325,6 +328,9 @@ func (s *Service) saveWorkflow(ctx context.Context, c identity.Caller, id uuid.U
 		if err != nil {
 			return err
 		}
+		if err := s.requireReleaseMarkRight(ctx, tx, c, w.SpaceID, w.Definition, in.Definition); err != nil {
+			return err
+		}
 		raw, err := json.Marshal(in.Definition)
 		if err != nil {
 			return err
@@ -362,6 +368,16 @@ func (s *Service) saveWorkflow(ctx context.Context, c identity.Caller, id uuid.U
 		return Workflow{}, err
 	}
 	return loadWorkflow(ctx, s.pool, id)
+}
+
+// requireReleaseMarkRight lets only someone who also runs the space turn "release when
+// approved" on or off, so the person who chooses approval releases could set up the pair
+// (spec 073, PUB-710).
+func (s *Service) requireReleaseMarkRight(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID uuid.UUID, before, after workflow.Definition) error {
+	if !workflow.ReleaseMarksDiffer(before, after) {
+		return nil
+	}
+	return s.perms.RequireSpace(ctx, tx, c.UserID, spaceID, permissions.SpaceAdminister)
 }
 
 // CheckDefinition runs the validator for the editor while a person types, so each problem

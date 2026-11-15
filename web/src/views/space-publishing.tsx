@@ -163,6 +163,30 @@ function PairSettingsForm({
         />{' '}
         {t('publishing.mirrorRemovals')}
       </label>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={form.only_approval_releases}
+          aria-describedby="only-approval-help"
+          onChange={(e) => setForm({ ...form, only_approval_releases: e.target.checked })}
+        />{' '}
+        {t('publishing.onlyApprovalReleases')}
+      </label>
+      <small id="only-approval-help" className="muted">
+        {t('publishing.onlyApprovalReleasesHelp')}
+      </small>
+      <label className="check">
+        <input
+          type="checkbox"
+          checked={form.show_approvers}
+          aria-describedby="show-approvers-help"
+          onChange={(e) => setForm({ ...form, show_approvers: e.target.checked })}
+        />{' '}
+        {t('publishing.showApprovers')}
+      </label>
+      <small id="show-approvers-help" className="muted">
+        {t('publishing.showApproversHelp')}
+      </small>
       <Field label={t('publishing.defaultNote')}>
         <textarea
           value={form.default_note}

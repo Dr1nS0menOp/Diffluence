@@ -34,6 +34,8 @@ function statusWords(t: (key: string) => string, row: ReleaseRow): string {
       return t('publishing.tileChanged');
     case 'cannot_release':
       return t('publishing.tileCannot');
+    case 'waiting_approval':
+      return t('publishing.tileWaiting');
     case 'left_out':
       return t('publishing.statusLeftOut');
     case 'left_out_released':
@@ -119,7 +121,7 @@ function ReleaseScreenOf({ space }: { space: Space }) {
           </div>
           <div>
             <dt>{t('publishing.tileWaiting')}</dt>
-            <dd>0</dd>
+            <dd>{tiles.waiting_approval}</dd>
           </div>
           <div>
             <dt>{t('publishing.tileCannot')}</dt>
@@ -419,7 +421,14 @@ function RunHistory({ space }: { space: Space }) {
       value: (r) => r.finished_at ?? r.started_at ?? r.previewed_at,
       show: (r) => <RelativeTime value={r.finished_at ?? r.started_at ?? r.previewed_at} />,
     },
-    { key: 'who', label: t('publishing.colWho'), value: (r) => r.actor_name },
+    {
+      key: 'who',
+      label: t('publishing.colWho'),
+      value: (r) =>
+        r.actor_type === 'user'
+          ? r.actor_name
+          : t(`publishing.actor_${r.actor_type}`, { name: r.caused_by_name || t('publishing.someone') }),
+    },
     { key: 'scope', label: t('publishing.colScope'), value: (r) => t(`publishing.scope_${r.scope}`) },
     {
       key: 'outcome',

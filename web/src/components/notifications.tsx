@@ -38,6 +38,10 @@ export function useNotificationSentence() {
     if (n.type === 'invitation_answer') {
       return t(`notifications.invitation_${n.data.answer ?? 'refused'}`, { name, email: n.data.email });
     }
+    if (n.type === 'approval_release' && n.data.outcome !== 'released' && n.data.outcome !== 'unchanged') {
+      // The page itself says why: its band names the reason in words (PUB-820).
+      return t('notifications.approval_release_not', { page: n.page_title });
+    }
     return t(`notifications.type_${n.type}`, { name, page: n.page_title, file: n.data.filename });
   };
 }

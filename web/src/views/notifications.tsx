@@ -29,6 +29,7 @@ const TYPES = [
   'pages_released',
   'release_finished',
   'version_approved',
+  'approval_release',
   'rule',
 ];
 const CHANNELS = ['off', 'app', 'app_mail', 'app_digest'];

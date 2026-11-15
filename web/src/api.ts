@@ -289,6 +289,10 @@ export interface PairSettings {
   notify_watchers: boolean;
   mirror_removals: boolean;
   default_note: string;
+  /** Controlled pages go only by their approval (PUB-714). */
+  only_approval_releases: boolean;
+  /** Readers of a twin see who approved it (PUB-730). */
+  show_approvers: boolean;
 }
 
 /** A space's side of a pair, for the settings section (PUB-1200). */
@@ -340,10 +344,30 @@ export interface ReleaseStatus {
   can_release: boolean;
   left_out?: Exclusion;
   reader_comments: number;
+  /** The approval release of the approved version that did not go (PUB-711). */
+  approval_release?: { outcome: 'stopped' | 'cancelled' | 'skipped'; reason: string; at: string };
+  /** When what a twin shows was approved, and by whom when the pair shows approvers (PUB-730). */
+  approval?: { approved_at: string; version: number; approved_by?: string };
+  can_verify: boolean;
+}
+
+/** What verifying a twin found (PUB-732). */
+export interface ReleaseVerification {
+  outcome: 'verified' | 'differs' | 'draft_changed' | 'not_released' | 'cannot_verify';
+  twin_page_id?: string;
+  draft_version?: number;
+  twin_version?: number;
 }
 
 export type ReleaseStatusWord =
-  'not_released' | 'released' | 'changed' | 'cannot_release' | 'left_out' | 'left_out_released' | 'removed';
+  | 'not_released'
+  | 'released'
+  | 'waiting_approval'
+  | 'changed'
+  | 'cannot_release'
+  | 'left_out'
+  | 'left_out_released'
+  | 'removed';
 
 /** One row of the release screen (PUB-1211). */
 export interface ReleaseRow {
@@ -371,6 +395,10 @@ export interface ReleaseRun {
   note: string;
   silent: boolean;
   actor_name: string;
+  /** Who started the run: a person, approval or the workflow (PUB-902). */
+  actor_type: 'user' | 'approval' | 'workflow';
+  /** The person whose act started a run of the system. */
+  caused_by_name: string;
   total: number;
   done: number;
   batches: number;
@@ -395,7 +423,14 @@ export interface RunPage {
 
 /** One part of the release screen (PUB-1210). */
 export interface ReleaseScreen {
-  tiles: { not_released: number; changed: number; cannot_release: number; removed: number; left_out: number };
+  tiles: {
+    not_released: number;
+    changed: number;
+    cannot_release: number;
+    removed: number;
+    left_out: number;
+    waiting_approval: number;
+  };
   rows: ReleaseRow[];
   more: boolean;
   going: ReleaseRun | null;
@@ -810,6 +845,8 @@ export interface WorkflowState {
   start: boolean;
   timed: boolean;
   review?: WorkflowReview;
+  /** An approved state that releases its pages to the published space (spec 073, PUB-710). */
+  release_when_approved?: boolean;
 }
 
 export interface WorkflowDefinition {
@@ -1207,6 +1244,8 @@ export interface Notification {
     email?: string;
     answer?: 'approved' | 'refused';
     reason?: string;
+    /** What became of an approval release (PUB-820). */
+    outcome?: string;
   };
 }
 

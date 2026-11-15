@@ -251,7 +251,8 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	a.sites = sites.NewService(a.pool, a.perms, a.pages, a.attach, a.exchange, a.jobs,
 		sites.Options{PublishDir: cfg.PublishDir, Origin: cfg.PublicOrigin(), Log: log})
 	// Runs of more than one page are work of the worker, so every role knows them (spec 073).
-	a.publishing = publishing.NewService(a.pool, a.perms, a.pages, a.spaces, a.attach, a.jobs)
+	a.publishing = publishing.NewService(a.pool, a.perms, publishing.Deps{Pages: a.pages, Spaces: a.spaces, Attachments: a.attach,
+		Jobs: a.jobs, Features: a.features})
 	a.notify.SetReleasedPages(func(ctx context.Context, run uuid.UUID) (notify.ReleasedRun, error) {
 		r, err := a.publishing.RunPages(ctx, run)
 		return notify.ReleasedRun{Released: r.Released, TakenOff: r.TakenOff, PublishedHome: r.PublishedHome, DraftHome: r.DraftHome}, err
@@ -557,7 +558,13 @@ func (a *App) handleEvent(ctx context.Context, data []byte) error {
 	if err := a.notify.Handle(ctx, m); err != nil {
 		return err
 	}
-	return a.sites.Handle(ctx, m)
+	if err := a.sites.Handle(ctx, m); err != nil {
+		return err
+	}
+	// Approval and withdrawal in a draft space release or take off, after they committed
+	// (spec 073, PUB-711, PUB-720). Notifications are kept once per person and event, so a
+	// retry of this event tells nobody twice.
+	return a.publishing.FollowWorkflow(ctx, m)
 }
 
 // Notify exposes notifications (used by tests).

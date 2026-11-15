@@ -164,6 +164,14 @@ func (s *Service) MakeTwin(ctx context.Context, tx pgx.Tx, c identity.Caller, sp
 	return s.insert(ctx, tx, c, newPage{spaceID: spaceID, parent: parent, title: src.Title, author: c.UserID, kind: src.Kind, link: src.LinkTarget})
 }
 
+// SetTwinOwner names the person who answers for a twin that a run of the system made, which
+// has no person as its maker. The owner is not content, so the trigger of a published space
+// lets it through (PUB-221).
+func SetTwinOwner(ctx context.Context, tx pgx.Tx, id, owner uuid.UUID) error {
+	_, err := tx.Exec(ctx, "UPDATE pages SET owner_id = $2 WHERE id = $1", id, owner)
+	return err
+}
+
 // TwinVersion is the version a release writes on a twin: the releaser is its author and the
 // release note its summary, never the draft's (PUB-332, PUB-1408).
 type TwinVersion struct {

@@ -46,9 +46,25 @@ type rewritten struct {
 	// textLinks are the draft pages whose links became text, because they had no twin.
 	textLinks []uuid.UUID
 	// linkMap maps each draft id that was rewritten to the id it became, for verification
-	// (PUB-732, decision D9).
+	// (PUB-732, decision D9). Beside those it keeps, under the keys below, everything else the
+	// rewrite decided, so verification can do the same rewrite again from the map alone.
 	linkMap map[string]string
 }
+
+// The keys of the link map besides plain draft page ids (PUB-732). A map without mapDraftID
+// was written before verification existed.
+const (
+	mapDraftID      = "space:draft_id"
+	mapDraftKey     = "space:draft_key"
+	mapPublishedKey = "space:published_key"
+	// mapText names a draft page whose references became words, with its kind and title then.
+	mapText = "text:"
+	// mapKeep names a page of another space, which stayed as it was.
+	mapKeep = "keep:"
+	// mapFile names a draft file and its copy on the twin; mapForeign a file of another space.
+	mapFile    = "file:"
+	mapForeign = "foreign:"
+)
 
 // pageOutcome is what becomes of a reference to a page.
 type pageOutcome int
@@ -74,7 +90,8 @@ type rewriter struct {
 // and what belongs to drafting is gone (PUB-500 to PUB-534). It never fails: what cannot be
 // mapped becomes words.
 func rewrite(doc document.Node, in rewriteInput) rewritten {
-	r := &rewriter{in: in, textLinks: map[uuid.UUID]bool{}, linkMap: map[string]string{}}
+	r := &rewriter{in: in, textLinks: map[uuid.UUID]bool{}, linkMap: map[string]string{
+		mapDraftID: in.draft.ID.String(), mapDraftKey: in.draft.Key, mapPublishedKey: in.published.Key}}
 	out := doc
 	out.Content = r.nodes(doc.Content)
 	if len(out.Content) == 0 {
@@ -90,6 +107,7 @@ func rewrite(doc document.Node, in rewriteInput) rewritten {
 func (r *rewriter) resolve(id uuid.UUID) (uuid.UUID, pageOutcome) {
 	target, known := r.in.targets[id]
 	if known && target.SpaceID != r.in.draft.ID {
+		r.linkMap[mapKeep+id.String()] = ""
 		return id, keepPage
 	}
 	if twin, ok := r.in.twins[id]; ok && known && target.Kind != pages.KindDatabase {
@@ -98,6 +116,7 @@ func (r *rewriter) resolve(id uuid.UUID) (uuid.UUID, pageOutcome) {
 	}
 	if known {
 		r.textLinks[id] = true
+		r.linkMap[mapText+id.String()] = target.Kind + ":" + target.Title
 	}
 	return uuid.Nil, asText
 }
@@ -246,9 +265,11 @@ func (r *rewriter) file(n document.Node) []document.Node {
 	s, _ := n.Attrs[document.FileAttribute].(string)
 	id, err := uuid.Parse(s)
 	if err == nil && r.in.foreign[id] {
+		r.linkMap[mapForeign+id.String()] = ""
 		return []document.Node{n}
 	}
 	if copied, ok := r.in.files[id]; ok && err == nil {
+		r.linkMap[mapFile+id.String()] = copied.String()
 		n.Attrs = maps.Clone(n.Attrs)
 		n.Attrs[document.FileAttribute] = copied.String()
 		return []document.Node{n}

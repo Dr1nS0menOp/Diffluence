@@ -2,7 +2,7 @@
 // The band of a controlled page, under the byline (spec 064, DOC-302, DOC-303, DOC-422):
 // readers see the state and the approved version; authors also see that what they look at
 // is not approved yet, and the steps they can take.
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api, type ControlInfo, type PageDetail, type WorkflowTransition } from '../api';
@@ -17,8 +17,17 @@ export function mayOpenReview(page: PageDetail): boolean {
   return !!c && (c.reviewing || (c.in_review && page.can['page.edit'] === true));
 }
 
-/** The band near the title of a controlled page. An ordinary page has none. */
-export function ControlBand({ page, onReview }: { page: PageDetail; onReview: () => void }) {
+/** The band near the title of a controlled page. An ordinary page has none. What follows it,
+ * such as the release status of a page in a draft space, joins the same band (PUB-1225). */
+export function ControlBand({
+  page,
+  onReview,
+  children,
+}: {
+  page: PageDetail;
+  onReview: () => void;
+  children?: ReactNode;
+}) {
   const { t } = useTranslation();
   const [step, setStep] = useState<WorkflowTransition | null>(null);
   const c = page.control;
@@ -51,6 +60,7 @@ export function ControlBand({ page, onReview }: { page: PageDetail; onReview: ()
       {c.shows_working && <p>{t('control.working', { number: c.head_version })}</p>}
       {c.state_kind === 'obsolete' && <p>{t('control.withdrawn')}</p>}
       <p className="control-governed">{governed}</p>
+      {children}
       {c.reviewing && <p>{t('review.youAreAsked')}</p>}
       {(c.transitions.length > 0 || mayOpenReview(page)) && (
         <p className="control-steps">

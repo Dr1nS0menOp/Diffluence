@@ -48,6 +48,7 @@ var sentences = map[string]string{
 	TypePagesReleased:    "%s released pages you watch in the space of %s",
 	TypeReleaseFinished:  "Your release from %[2]s has ended",
 	TypeVersionApproved:  "A new version of %[2]s was approved",
+	TypeApprovalRelease:  "The release of the approved %[2]s has ended",
 }
 
 const (

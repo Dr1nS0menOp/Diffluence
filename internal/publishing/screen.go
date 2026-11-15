@@ -61,6 +61,9 @@ type Tiles struct {
 	Cannot      int `json:"cannot_release"`
 	Removed     int `json:"removed"`
 	LeftOut     int `json:"left_out"`
+	// WaitingApproval counts released pages whose newer version is under review: no tab lists
+	// them, since a release would change nothing (PUB-702, decision D33).
+	WaitingApproval int `json:"waiting_approval"`
 }
 
 // Screen is one part of the release screen.
@@ -89,6 +92,8 @@ const screenFacts = `WITH facts AS (
 				THEN 'cannot_release'
 			WHEN COALESCE(pp.released_version, 0) = 0 THEN 'not_released'
 			WHEN cardinality(pp.changed) > 0 THEN 'changed'
+			WHEN EXISTS (SELECT 1 FROM page_control pc WHERE pc.page_id = p.id AND pc.head_version > p.current_version)
+				THEN 'waiting_approval'
 			ELSE 'released' END AS status,
 		CASE WHEN p.status = 'trashed' THEN 'deleted' WHEN p.archived_at IS NOT NULL THEN 'archived'
 			WHEN p.kind NOT IN ('page', 'folder', 'link') THEN 'kind'
@@ -174,6 +179,8 @@ func (t *Tiles) add(status string, n int) {
 		t.Removed += n
 	case StatusLeftOut, StatusLeftOutReleased:
 		t.LeftOut += n
+	case StatusWaiting:
+		t.WaitingApproval += n
 	}
 }
 

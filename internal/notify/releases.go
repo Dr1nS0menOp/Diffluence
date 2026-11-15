@@ -42,7 +42,10 @@ func (s *Service) onReleaseFinished(ctx context.Context, event uuid.UUID, p payl
 	if err != nil {
 		return err
 	}
-	if run.DraftHome != nil {
+	if err := s.tellApproval(ctx, event, p); err != nil {
+		return err
+	}
+	if run.DraftHome != nil && p.ActorID != uuid.Nil {
 		// No actor: the releaser is told of their own run whatever they chose for their own work.
 		if err := s.Deliver(ctx, s.pool, Row{UserID: p.ActorID, Type: TypeReleaseFinished, Reason: ReasonAuthor, PageID: *run.DraftHome,
 			SpaceID: p.DraftSpaceID, Event: event, Data: map[string]any{"run_id": p.RunID, "outcome": p.Outcome,
@@ -75,6 +78,32 @@ func (s *Service) onReleaseFinished(ctx context.Context, event uuid.UUID, p payl
 		if err := s.Deliver(ctx, s.pool, Row{UserID: person, Type: TypePagesReleased, Reason: ReasonWatching, ActorID: p.ActorID,
 			PageID: *run.PublishedHome, SpaceID: p.SpaceID, Event: event,
 			Data: map[string]any{"run_id": p.RunID, "released": released[person], "taken_off": takenOff[person]}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// tellApproval tells the approver and the authors of an approval release, on the draft page,
+// that it was released, or that it was not and why, as a code the screen puts in words
+// (PUB-820). A run of a person has no approver, and tells nobody here.
+func (s *Service) tellApproval(ctx context.Context, event uuid.UUID, p payload) error {
+	if p.CausedBy == nil || p.DraftPageID == uuid.Nil {
+		return nil
+	}
+	outcome, reason := p.PageOutcome, p.PageReason
+	if p.Outcome != "done" {
+		outcome, reason = p.Outcome, p.StopReason
+	}
+	people := append([]uuid.UUID{*p.CausedBy}, p.UserIDs...)
+	told := map[uuid.UUID]bool{}
+	for _, person := range people {
+		if person == uuid.Nil || told[person] {
+			continue
+		}
+		told[person] = true
+		if err := s.Deliver(ctx, s.pool, Row{UserID: person, Type: TypeApprovalRelease, Reason: ReasonAuthor, PageID: p.DraftPageID,
+			SpaceID: p.DraftSpaceID, Event: event, Data: map[string]any{"run_id": p.RunID, "outcome": outcome, "why": reason}}); err != nil {
 			return err
 		}
 	}

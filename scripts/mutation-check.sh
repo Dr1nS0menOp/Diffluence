@@ -2633,7 +2633,7 @@ mutate "take-off purges" internal/pages/release_bulk.go \
 mutate "a batch commits half" internal/publishing/runexec.go \
   's.replace("\tif slices.ContainsFunc(pl.files, fileStep.needed) {", "\tif true {").replace("\t\tif errors.Is(err, storage.ErrNotFound) {\n\t\t\tfailed[p.draft] = true", "\t\tif err != nil || errors.Is(err, storage.ErrNotFound) {\n\t\t\tfailed[p.draft] = true")' $app -run '^TestABatchedRunStopsInsideABatchAndResumesWithTheSameVersions$'
 mutate "a run ignores lost rights" internal/publishing/runexec.go \
-  's.replace("\tif err := s.runRights(ctx, tx, r.actor, p); err != nil {", "\tif err := s.runRights(ctx, tx, r.actor, p); false \x26\x26 err != nil {")' $app -run '^TestARunStopsWhenItsReleaserLosesTheRightAndCanBeCancelled$'
+  's.replace("\tif err := s.runRights(ctx, tx, r.actor, st.pair); err != nil {", "\tif err := s.runRights(ctx, tx, r.actor, st.pair); false \x26\x26 err != nil {")' $app -run '^TestARunStopsWhenItsReleaserLosesTheRightAndCanBeCancelled$'
 mutate "a single release goes while a larger run goes" internal/publishing/runs.go \
   's.replace("\tif going {\n\t\treturn errRunGoing()", "\tif false \x26\x26 going {\n\t\treturn errRunGoing()")' $app -run '^TestARunStopsWhenItsReleaserLosesTheRightAndCanBeCancelled$'
 mutate "watchers get one notification per page" internal/notify/fanout.go \
@@ -2666,6 +2666,37 @@ mutate "a page hidden from the releaser goes in a bulk run" internal/publishing/
   's.replace("\t\tif !r.Visible {\n", "\t\tif false \x26\x26 !r.Visible {\n")' $app -run '^TestRestrictedDraftPagesStayOutOfBulkRunsUnlessNamed$'
 mutate "the home page of the draft names the draft space to readers" internal/publishing/release.go \
   's.replace("\t\treturn pl.published.Name\n", "\t\treturn pl.version.Title\n")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraftAfterABulkRun$'
+# Spec 073 (wave PB3): approval releases, withdrawal and verification.
+mutate "a release takes the head version of a controlled page" internal/publishing/runs.go \
+  's.replace("\t\treturn *c.approved\n", "\t\treturn c.head\n")' $pub -run '^TestAReleaseTakesTheApprovedVersionOfAControlledPage$'
+mutate "withdrawal leaves the twin" internal/publishing/approval.go \
+  's.replace("\t\treturn s.takeOffWithdrawn(ctx, e)\n", "\t\treturn nil\n")' $app -run '^TestWithdrawalTakesTheTwinOffAtOnce$'
+mutate "an approval release runs with the approver's rights instead of the release path" internal/publishing/runexec.go \
+  's.replace("\tif r.system() {\n\t\treturn nil\n\t}\n\tif err := s.runRights(", "\tif r.system() \x26\x26 r.causedBy != nil {\n\t\tr.actor = *r.causedBy\n\t}\n\tif err := s.runRights(")' $app -run '^TestApprovalReleasesTheApprovedVersionThroughTheReleasePath$'
+mutate "verification ignores the link mapping" internal/publishing/verify.go \
+  's.replace("\t\t\tin.twins[id] = to\n", "\t\t\t_ = to\n")' $pub -run '^TestTheRewriteIsDoneAgainFromItsLinkMapAlone$'
+mutate "the release mark is set without running the space" internal/pages/workflows.go \
+  's.replace("\tif !workflow.ReleaseMarksDiffer(before, after) {", "\tif true {")' $app -run '^TestTheMarkIsSetByWhoeverRunsTheSpaceAndIgnoredOutsideAPair$'
+mutate "a state of another kind releases when approved" internal/workflow/workflow.go \
+  's.replace("\t\tif s.ReleaseWhenApproved \x26\x26 s.Kind != KindApproved {", "\t\tif false {")' ./internal/workflow/ -run '^TestOnlyAnApprovedStateReleasesWhenApproved$'
+mutate "a run takes controlled pages under only approval releases" internal/publishing/runs.go \
+  's.replace("\tcase r.Control != nil \x26\x26 rules.approvalOnly:", "\tcase false \x26\x26 r.Control != nil \x26\x26 rules.approvalOnly:")' $pub -run '^TestControlledPagesAreLeftToApprovalWhenThePairAsks$'
+mutate "a person releases a controlled page by hand under only approval releases" internal/publishing/release.go \
+  's.replace("\tif !p.Settings.OnlyApprovalReleases {\n\t\treturn nil", "\tif true {\n\t\treturn nil")' $app -run '^TestOnlyApprovalReleasesControlledPages$'
+mutate "a version in review is not Waiting for approval" internal/publishing/release.go \
+  's.replace("\tif out.Status == StatusReleased \x26\x26 ctl.head > src.CurrentVersion {", "\tif false {")' $app -run '^TestApprovalReleasesTheApprovedVersionThroughTheReleasePath$'
+mutate "returning to the approved text releases again" internal/publishing/approval.go \
+  's.replace(" || a.released == a.version || a.inStep {", " || a.released == a.version {")' $app -run '^TestApprovalReleasesTheApprovedVersionThroughTheReleasePath$'
+mutate "readers see the approver without the setting" internal/publishing/release.go \
+  's.replace("\tif settings.ShowApprovers {\n", "\tif true {\n")' $app -run '^TestAReaderOfThePublishedSpaceNeverReachesTheDraftAfterAnApprovalRelease$'
+mutate "an approval release tells nobody" internal/notify/releases.go \
+  's.replace("\tif p.CausedBy == nil || p.DraftPageID == uuid.Nil {", "\tif true {")' $app -run '^TestAReviewThatPassesReleasesAndTellsTheApproverAndTheAuthors$'
+mutate "approval releases a page restricted in the draft" internal/publishing/runexec.go \
+  's.replace("\tcase g.restricted[src.ID]:\n", "\tcase false \x26\x26 g.restricted[src.ID]:\n")' $app -run '^TestAnApprovalReleaseLeavesARestrictedPageToAPerson$'
+mutate "a release copies a file as it is now instead of as the approved version pinned it" internal/publishing/release.go \
+  's.replace("\t\t\tstep.version, step.pin = pin.Version, \x26pin\n", "\t\t\t_ = pin\n")' $app -run '^TestAReleaseOfTheApprovedVersionCopiesTheFileItPinned$'
+mutate "a failed approval release says nothing on its page" internal/publishing/release.go \
+  's.replace("\tout.ApprovalRelease = \x26a\n", "\t_ = a\n")' $app -run '^TestAFailingApprovalReleaseLeavesThePageApproved$'
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

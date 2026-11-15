@@ -30,7 +30,7 @@ Search is where people spend much of their time (ADR-035), and notifications are
 
 ## 9.4 Who is told about runs
 
-- **PUB-820** · new · An approval release (08) tells the approver and the page's authors in the draft space that the page was released, or why it was not. *Proof:* a test.
+- **PUB-820** · built · An approval release (08) tells the approver and the page's authors in the draft space that the page was released, or why it was not. *Proof:* a test.
 - **PUB-821** · built · A run can be **silent**: no notifications to watchers or mentioned people, as a silent publish today; the feed still shows it. *Why:* a typo fix should not call everyone; silent only affects notifications, as DOC-311 says for control. *Proof:* a test.
 - **PUB-822** · partly · The person who started a background run is told when it ends, in the app and by mail when they chose mail, with a link to the report (PUB-453). A run that stopped (PUB-454, PUB-1061) is told as well, to the releaser and to those with `space.release` who watch the draft space. *Proof:* tests.
 - **PUB-823** · built · Notifications of this feature use the existing channels, outbox and rate limits; they add no new channel (as DOC-609). *Proof:* no new sender (review).

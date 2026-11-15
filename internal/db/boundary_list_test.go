@@ -379,7 +379,7 @@ var crossings = map[crossing]int{
 	{"internal/pages", "page_restrictions"}: 8,
 	{"internal/pages", "spaces"}:            29,
 	{"internal/pages", "trash_items"}:       1,
-	{"internal/pages", "users"}:             31,
+	{"internal/pages", "users"}:             32,
 	// Document control resolves the people, groups and roles a review state names when a
 	// round starts, inside the transaction of the step, and names them on the panel and in
 	// the editor (spec 064, DOC-200, DOC-201).
@@ -411,12 +411,15 @@ var crossings = map[crossing]int{
 	// the pages of the draft space, their places, restrictions and approval, and the twins'
 	// versions and who released, in one query each, as a list joins its display columns; a call
 	// per page would be thousands at 5,000 pages (spec 073, PUB-1103, PUB-1104, PUB-912).
-	{"internal/publishing", "page_control"}:      3,
-	{"internal/publishing", "page_restrictions"}: 2,
-	{"internal/publishing", "page_tree"}:         8,
+	// Wave PB3 adds: the release screen counts pages Waiting for approval in the same query; a
+	// run of the system leaves out pages with a view restriction, read once per batch; and the
+	// history names who caused a run of the system, as it names who released.
+	{"internal/publishing", "page_control"}:      4,
+	{"internal/publishing", "page_restrictions"}: 3,
+	{"internal/publishing", "page_tree"}:         9,
 	{"internal/publishing", "page_versions"}:     5,
 	{"internal/publishing", "pages"}:             12,
-	{"internal/publishing", "users"}:             2,
+	{"internal/publishing", "users"}:             3,
 
 	// presence: one stamp of what changed on a page, read on every poll.
 	{"internal/presence", "comments"}:    3,

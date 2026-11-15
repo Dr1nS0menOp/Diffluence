@@ -113,3 +113,70 @@ test('the whole space is released from the release screen, and a page left out s
   const status = await page.request.get(`/api/v1/pages/${notes}/release`);
   expect(((await status.json()) as { status: string }).status).toBe('left_out');
 });
+
+// Wave PB3 (spec 073, PUB-710, PUB-711, PUB-720, PUB-1225): the mark is set in the workflow
+// editor of a draft space; approving from the band releases the page, its release status sits
+// in the same band, and withdrawing it takes the published page off.
+test('approval releases a page, and withdrawal takes it off', async ({ page }) => {
+  const space = await newSpace(page, 'Procedure drafts');
+  const id = await publishedPage(page, space.id, 'Ladder safety', 'Face the ladder.', space.home_page_id);
+  const linked = await page.request.post(`/api/v1/spaces/${space.id}/publishing/link`, {
+    data: { new_space: { key: unique('PRC'), name: 'Procedures' } },
+  });
+  expect(linked.ok(), await linked.text()).toBeTruthy();
+  const made = await page.request.post(`/api/v1/spaces/${space.id}/workflows`, {
+    data: {
+      name: 'Review',
+      definition: {
+        states: [
+          { id: 'draft', name: 'Draft', kind: 'draft', start: true },
+          { id: 'review', name: 'In review', kind: 'in_review' },
+          { id: 'approved', name: 'Approved', kind: 'approved' },
+          { id: 'withdrawn', name: 'Withdrawn', kind: 'obsolete' },
+        ],
+        transitions: [
+          { id: 'submit', name: 'Send for review', from: 'draft', to: 'review' },
+          { id: 'approve', name: 'Approve', from: 'review', to: 'approved' },
+          { id: 'withdraw', name: 'Withdraw', from: 'approved', to: 'withdrawn' },
+        ],
+      },
+    },
+  });
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const workflow = ((await made.json()) as { id: string }).id;
+
+  await page.goto(`/spaces/${space.key}/settings?section=workflows`);
+  await page.getByRole('button', { name: 'Change Review' }).click();
+  const mark = page.getByLabel('Release to the published space when a page is approved here');
+  await mark.check();
+  await checkAccessibility(page);
+  await page.getByRole('button', { name: 'Save workflow' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Save new version' }).click();
+  await expect(mark).toHaveCount(0);
+
+  const set = await page.request.put(`/api/v1/pages/${id}/workflow`, { data: { workflow_id: workflow } });
+  expect(set.ok(), await set.text()).toBeTruthy();
+  await page.goto(`/pages/${id}`);
+  await page.getByRole('button', { name: 'Send for review' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Send for review' }).click();
+  await expect(page.getByText('In review', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Approve' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
+  await expect(async () => {
+    await page.reload();
+    await expect(page.locator('.control-band .release-line')).toContainText('Released', { timeout: 1000 });
+  }).toPass({ timeout: 20000 });
+  await checkAccessibility(page);
+
+  const status = await page.request.get(`/api/v1/pages/${id}/release`);
+  const twin = ((await status.json()) as { twin_page_id: string }).twin_page_id;
+  await page.goto(`/pages/${twin}`);
+  await expect(page.locator('.release-line')).toContainText('Approved');
+
+  await page.goto(`/pages/${id}`);
+  await page.getByRole('button', { name: 'Withdraw' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Withdraw' }).click();
+  await expect
+    .poll(async () => (await page.request.get(`/api/v1/pages/${twin}`)).status(), { timeout: 20000 })
+    .toBe(404);
+});

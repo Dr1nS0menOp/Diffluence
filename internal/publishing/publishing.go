@@ -25,6 +25,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/jobs"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -47,6 +48,7 @@ type Service struct {
 	spaces      *spaces.Service
 	attachments *attachments.Service
 	jobs        *jobs.Service
+	features    *features.Service
 	limits      Limits
 	// slots bounds the runs this node carries out at once (PUB-1105).
 	slots chan struct{}
@@ -55,9 +57,20 @@ type Service struct {
 // JobKindRun is the background work of a run of more than one page.
 const JobKindRun = "release.run"
 
-// NewService creates the service, and registers the background work of runs with jb.
-func NewService(pool *pgxpool.Pool, perms *permissions.Service, pg *pages.Service, sp *spaces.Service, att *attachments.Service, jb *jobs.Service) *Service {
-	s := &Service{pool: pool, perms: perms, pages: pg, spaces: sp, attachments: att, jobs: jb}
+// Deps are the modules the service writes through and asks.
+type Deps struct {
+	Pages       *pages.Service
+	Spaces      *spaces.Service
+	Attachments *attachments.Service
+	Jobs        *jobs.Service
+	// Features says whether the part is on, which approval releases ask (PUB-1303).
+	Features *features.Service
+}
+
+// NewService creates the service, and registers the background work of runs with the jobs.
+func NewService(pool *pgxpool.Pool, perms *permissions.Service, d Deps) *Service {
+	s := &Service{pool: pool, perms: perms, pages: d.Pages, spaces: d.Spaces, attachments: d.Attachments, jobs: d.Jobs, features: d.Features}
+	jb := d.Jobs
 	s.SetLimits(DefaultLimits())
 	jb.RegisterLong(JobKindRun, s.runJob)
 	return s
@@ -79,6 +92,11 @@ type Settings struct {
 	MirrorRemovals bool `json:"mirror_removals"`
 	// DefaultNote is the note a release starts with.
 	DefaultNote string `json:"default_note"`
+	// OnlyApprovalReleases leaves controlled pages to approval: nobody releases them by hand,
+	// and runs skip them (PUB-714). Taking off stays manual.
+	OnlyApprovalReleases bool `json:"only_approval_releases"`
+	// ShowApprovers names the approver to readers of a twin, beside the date (PUB-730).
+	ShowApprovers bool `json:"show_approvers"`
 }
 
 // defaultSettings are those of a new pair: watchers are told, removals are mirrored.

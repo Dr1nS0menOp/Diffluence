@@ -94,6 +94,7 @@ export function WorkflowEditor({
   initial,
   names: knownNames = {},
   existing,
+  releases = false,
   busy,
   error,
   onSave,
@@ -101,6 +102,8 @@ export function WorkflowEditor({
 }: {
   initial: WorkflowDraft;
   names?: Names;
+  /** The space is a draft space of a pair, where "release when approved" acts (PUB-710). */
+  releases?: boolean;
   /** The saved definition, when this changes a workflow that exists; saving then shows what changes. */
   existing?: WorkflowDefinition;
   busy: boolean;
@@ -129,7 +132,19 @@ export function WorkflowEditor({
     placeholderData: (previous) => previous,
   });
   const problem = check.data?.problem ?? null;
-  const editing: Editing = { def, setDef, fresh, setFresh, names, setNames, problem, keyOf, rekey, keyNew };
+  const editing: Editing = {
+    def,
+    setDef,
+    fresh,
+    setFresh,
+    names,
+    setNames,
+    problem,
+    keyOf,
+    rekey,
+    keyNew,
+    releases,
+  };
   const save = () => (existing ? setConfirming(true) : onSave({ name, description, definition: def }));
   return (
     <form
@@ -189,6 +204,8 @@ interface Editing {
   rekey: (from: string, to: string) => void;
   /** Gives a new state or transition a key of its own, before its id starts to follow its name. */
   keyNew: (id: string) => void;
+  /** "Release when approved" acts here, in a draft space of a pair. */
+  releases: boolean;
 }
 
 /** The validator's message, beside what it is about (DOC-912, WCAG 3.3.1). */
@@ -308,7 +325,13 @@ function StateFields({ editing, state, index }: { editing: Editing; state: Workf
           value={state.kind}
           onChange={(e) => {
             const kind = e.target.value as WorkflowStateKind;
-            update({ ...state, kind, review: kind === 'in_review' ? state.review : undefined, timed: false });
+            update({
+              ...state,
+              kind,
+              review: kind === 'in_review' ? state.review : undefined,
+              timed: false,
+              release_when_approved: undefined,
+            });
           }}
         >
           {KINDS.map((k) => (
@@ -335,6 +358,22 @@ function StateFields({ editing, state, index }: { editing: Editing; state: Workf
       </label>
       {state.kind === 'in_review' && (
         <ReviewFields editing={editing} state={state} onChange={(review) => update({ ...state, review })} />
+      )}
+      {state.kind === 'approved' && (editing.releases || state.release_when_approved) && (
+        <>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={!!state.release_when_approved}
+              aria-describedby={`release-help-${editing.keyOf(state.id)}`}
+              onChange={(e) => update({ ...state, release_when_approved: e.target.checked || undefined })}
+            />
+            {t('workflowEditor.releaseWhenApproved')}
+          </label>
+          <small id={`release-help-${editing.keyOf(state.id)}`} className="muted">
+            {editing.releases ? t('workflowEditor.releaseHelp') : t('workflowEditor.releaseIgnored')}
+          </small>
+        </>
       )}
       <Row
         index={index}

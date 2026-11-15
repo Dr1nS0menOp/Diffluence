@@ -7148,6 +7148,33 @@
         "x-access": "object:space.release"
       }
     },
+    "/api/v1/pages/{id}/release/verify": {
+      "post": {
+        "operationId": "post /api/v1/pages/{id}/release/verify",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:space.audit"
+      }
+    },
     "/api/v1/pages/{id}/restrictions": {
       "get": {
         "operationId": "get /api/v1/pages/{id}/restrictions",
