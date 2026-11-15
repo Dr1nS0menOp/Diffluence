@@ -180,3 +180,54 @@ test('approval releases a page, and withdrawal takes it off', async ({ page }) =
     .poll(async () => (await page.request.get(`/api/v1/pages/${twin}`)).status(), { timeout: 20000 })
     .toBe(404);
 });
+
+// Wave PB4 (spec 073, PUB-1302, PUB-1224): a draft space started from a space that has content,
+// its copies in step, and the tree of the draft space listing what changed since its release.
+test('a draft space is started from a space with content, and its tree lists what changed', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Safety manuals');
+  const forklift = await publishedPage(page, space.id, 'Forklift', 'Check the brakes.', space.home_page_id);
+  await publishedPage(page, space.id, 'Crane', 'Never lift over people.', space.home_page_id);
+
+  await page.goto(`/spaces/${space.key}/settings?section=published`);
+  await page.getByRole('button', { name: 'Start a draft space from this space…' }).click();
+  const starting = page.getByRole('dialog', { name: 'Start a draft space' });
+  const key = unique('SAF');
+  await starting.getByLabel('Name of the draft space').fill('Safety manuals in progress');
+  await starting.getByLabel('Key of the draft space').fill(key);
+  await starting.getByRole('button', { name: 'See what changes' }).click();
+  await expect(starting.getByText('Readers of this space keep reading it', { exact: false })).toBeVisible();
+  await starting.getByRole('button', { name: 'Start the draft space' }).click();
+  await expect(starting.getByText('The draft space is ready.')).toBeVisible({ timeout: 30000 });
+  await starting.getByRole('link', { name: 'Open the draft space' }).click();
+
+  const status = (await (await page.request.get(`/api/v1/pages/${forklift}/release`)).json()) as {
+    draft_page_id: string;
+  };
+  const copy = status.draft_page_id;
+  const copied = (await (await page.request.get(`/api/v1/pages/${copy}/release`)).json()) as {
+    status: string;
+  };
+  expect(copied.status).toBe('released');
+  const edited = await page.request.post(`/api/v1/pages/${copy}/publish`, {
+    data: {
+      title: 'Forklift',
+      document: {
+        type: 'doc',
+        content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Check the brakes and the horn.' }] }],
+      },
+      base_version: 1,
+    },
+  });
+  expect(edited.ok(), await edited.text()).toBeTruthy();
+
+  await page.goto(`/pages/${copy}`);
+  await page.getByRole('button', { name: 'Filter the tree' }).click();
+  await page.getByLabel('Order of the pages').selectOption({ label: 'Changed since release' });
+  const tree = page.getByRole('region', { name: 'Pages' });
+  await expect(tree.getByRole('link', { name: 'Forklift' })).toBeVisible();
+  await expect(tree.getByRole('link', { name: 'Crane' })).toHaveCount(0);
+  await checkAccessibility(page);
+  await page.getByLabel('Order of the pages').selectOption({ label: 'Tree' });
+});

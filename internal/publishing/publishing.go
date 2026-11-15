@@ -52,6 +52,8 @@ type Service struct {
 	limits      Limits
 	// slots bounds the runs this node carries out at once (PUB-1105).
 	slots chan struct{}
+	// afterCheck is told when a consistency check of every pair is done (PUB-343).
+	afterCheck func()
 }
 
 // JobKindRun is the background work of a run of more than one page.
@@ -73,6 +75,8 @@ func NewService(pool *pgxpool.Pool, perms *permissions.Service, d Deps) *Service
 	jb := d.Jobs
 	s.SetLimits(DefaultLimits())
 	jb.RegisterLong(JobKindRun, s.runJob)
+	jb.RegisterLong(JobKindStart, s.startJob)
+	jb.RegisterLong(JobKindVerify, s.verifyJob)
 	return s
 }
 

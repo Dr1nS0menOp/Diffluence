@@ -306,14 +306,12 @@ func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 	}
 	document.RemapAttachments(&doc, mapping)
 	if plan.keepRestrictions() {
-		if _, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
-			SELECT $2::uuid, kind, subject_type, subject_id FROM page_restrictions WHERE page_id = $1`, p.ID, n.ID); err != nil {
+		if err := copyRestrictions(ctx, tx, p.ID, n.ID); err != nil {
 			return Page{}, err
 		}
 	}
 	if plan.KeepLabels {
-		if _, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)
-			SELECT $2::uuid, label, $3 FROM page_labels WHERE page_id = $1`, p.ID, n.ID, c.UserID); err != nil {
+		if err := copyLabels(ctx, tx, c, p.ID, n.ID); err != nil {
 			return Page{}, err
 		}
 		// An exempt label of the target comes along only for someone who may set it there,
@@ -330,6 +328,20 @@ func (s *Service) copyOne(ctx context.Context, tx pgx.Tx, c identity.Caller, p P
 		return Page{}, err
 	}
 	return n, record(ctx, tx, c, "page.copied", n, map[string]any{"copied_from": p.ID})
+}
+
+// copyRestrictions gives a copy the restrictions of the page it was copied from.
+func copyRestrictions(ctx context.Context, tx pgx.Tx, from, to uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO page_restrictions (page_id, kind, subject_type, subject_id)
+		SELECT $2::uuid, kind, subject_type, subject_id FROM page_restrictions WHERE page_id = $1`, from, to)
+	return err
+}
+
+// copyLabels gives a copy the labels of the page it was copied from.
+func copyLabels(ctx context.Context, tx pgx.Tx, c identity.Caller, from, to uuid.UUID) error {
+	_, err := tx.Exec(ctx, `INSERT INTO page_labels (page_id, label, created_by)
+		SELECT $2::uuid, label, $3 FROM page_labels WHERE page_id = $1`, from, to, c.UserID)
+	return err
 }
 
 // childrenToCopy lists what the user can see; hidden pages stay behind.

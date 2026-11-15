@@ -342,6 +342,7 @@ POST /api/v1/admin/jobs/{id}/cancel                            session-only perm
 POST /api/v1/admin/jobs/{id}/retry                             session-only permission:administrator
 POST /api/v1/admin/mail/test                                   permission:administrator
 POST /api/v1/admin/pages/{id}/recover                          sensitive permission:administrator
+POST /api/v1/admin/publishing/check                            session-only permission:administrator
 POST /api/v1/admin/roles                                       session-only permission:administrator
 POST /api/v1/admin/roles/{id}/preview                          session-only permission:administrator
 POST /api/v1/admin/rules                                       permission:administrator
@@ -477,8 +478,12 @@ POST /api/v1/spaces/{id}/preset                                object:space.admi
 POST /api/v1/spaces/{id}/publishing/end                        object:space.administer
 POST /api/v1/spaces/{id}/publishing/link                       object:space.administer
 POST /api/v1/spaces/{id}/publishing/link-preview               object:space.administer
+POST /api/v1/spaces/{id}/publishing/start                      object:space.administer
+POST /api/v1/spaces/{id}/publishing/start-preview              object:space.administer
+POST /api/v1/spaces/{id}/publishing/undo-start                 object:space.administer
 POST /api/v1/spaces/{id}/releases/check                        object:space.administer
 POST /api/v1/spaces/{id}/releases/preview                      object:space.release
+POST /api/v1/spaces/{id}/releases/verify                       object:space.audit
 POST /api/v1/spaces/{id}/releases/{run}/cancel                 object:space.release
 POST /api/v1/spaces/{id}/releases/{run}/resume                 object:space.release
 POST /api/v1/spaces/{id}/releases/{run}/start                  object:space.release

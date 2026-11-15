@@ -2526,3 +2526,130 @@ test.describe('approval releases', () => {
     await checkAccessibility(page);
   });
 });
+
+// Draft and published spaces, wave PB4 (spec 073): a draft space started from a space that has
+// content, the history of a released draft page, and the note a twin shows to those who would
+// otherwise edit it, with and without the draft space's name.
+test.describe('a draft space started from a space with content', () => {
+  test.describe.configure({ mode: 'serial' });
+  const editorPermissions = [
+    'space.view',
+    'space.export',
+    'page.create',
+    'page.edit',
+    'page.workflow',
+    'page.archive',
+    'page.delete_own',
+    'comment.add',
+    'comment.delete_own',
+    'attachment.add',
+    'attachment.delete_own',
+    'page.move_out',
+    'post.create',
+    'database.create',
+    'database.edit',
+  ];
+  let spaceId = '';
+  let guide = '';
+  let draftKey = '';
+  let draftGuide = '';
+
+  test.beforeAll(async ({ browser }) => {
+    const setup = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(setup, ADMIN.email, ADMIN.password);
+    const created = await setup.request.post('/api/v1/spaces', { data: { key: 'MANUALS', name: 'Manuals' } });
+    expect(created.status(), await created.text()).toBe(201);
+    const space = (await created.json()) as { id: string; home_page_id: string };
+    spaceId = space.id;
+    guide = await publishedPage(
+      setup,
+      space.id,
+      'Forklift manual',
+      'Check the brakes every morning.',
+      space.home_page_id,
+    );
+    await publishedPage(setup, space.id, 'Crane manual', 'Never lift over people.', space.home_page_id);
+    await setup.context().close();
+  });
+
+  test('StartDialog: what starting a draft space changes, in numbers', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto('/spaces/MANUALS/settings?section=published');
+    await page.getByRole('button', { name: 'Start a draft space from this space…' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Start a draft space' });
+    await dialog.getByLabel('Name of the draft space').fill('Manuals in progress');
+    await dialog.getByLabel('Key of the draft space').fill('MANUALSDRAFT');
+    await dialog.getByRole('button', { name: 'See what changes' }).click();
+    await expect(dialog.getByText('pages, folders and links are copied', { exact: false })).toBeVisible();
+    await picture(page, 'publishing-start');
+    await checkAccessibility(page);
+    await dialog.getByRole('button', { name: 'Start the draft space' }).click();
+    await expect(dialog.getByText('The draft space is ready.')).toBeVisible({ timeout: 30000 });
+    draftKey = 'MANUALSDRAFT';
+    const status = await page.request.get(`/api/v1/pages/${guide}/release`);
+    draftGuide = ((await status.json()) as { draft_page_id: string }).draft_page_id;
+    expect(draftGuide).toBeTruthy();
+  });
+
+  test('HistoryView: a released draft page names the version readers got', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    const edited = await page.request.post(`/api/v1/pages/${draftGuide}/publish`, {
+      data: {
+        title: 'Forklift manual',
+        document: paragraph('Check the brakes and the horn every morning.'),
+        base_version: 1,
+      },
+    });
+    expect(edited.ok(), await edited.text()).toBeTruthy();
+    const preview = await page.request.post(`/api/v1/pages/${draftGuide}/release/preview`);
+    const released = await page.request.post(`/api/v1/pages/${draftGuide}/release`, {
+      data: { preview_id: ((await preview.json()) as { id: string }).id },
+    });
+    expect(released.ok(), await released.text()).toBeTruthy();
+    await page.goto(`/pages/${draftGuide}/history`);
+    await expect(page.getByText('Released as version 2 of the published page')).toBeVisible();
+    await expect(page.getByText('Released as version 1 of the published page')).toBeVisible();
+    await picture(page, 'publishing-draft-history', [page.locator('td .muted')]);
+    await checkAccessibility(page);
+  });
+
+  test('ReleaseBand: a twin tells someone who would edit it why they cannot', async ({ browser, page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/pages/${guide}`);
+    await expect(
+      page.getByText(`This page is changed by releases from the draft space Manuals in progress.`),
+    ).toBeVisible();
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-twin-editor-named', [page.getByTestId('last-updated')]);
+    await checkAccessibility(page);
+    // The reader edits the published space from now on, and may not see the draft space: their
+    // note names no space. Granted after the start, which takes writers along.
+    const listed = await page.request.get(`/api/v1/admin/users?q=${encodeURIComponent(READER.email)}`);
+    const users = (await listed.json()) as { users: { id: string; email: string }[] };
+    const readerId = users.users.find((u) => u.email === READER.email)?.id;
+    expect(readerId).toBeTruthy();
+    const granted = await page.request.put(`/api/v1/spaces/${spaceId}/grants`, {
+      data: { subject: { type: 'user', id: readerId }, permissions: editorPermissions },
+    });
+    expect(granted.ok(), await granted.text()).toBeTruthy();
+    // The administrator leaves the page, so the reader's picture shows nobody else on it.
+    await page.goto('/');
+    const reader = await newReaderPage(browser, 'light');
+    await reader.goto(`/pages/${guide}`);
+    await expect(reader.getByText('This page is changed only by releases.')).toBeVisible();
+    await fixText(reader.locator('main time'), 'just now');
+    await picture(reader, 'publishing-twin-editor', [reader.getByTestId('last-updated')]);
+    await checkAccessibility(reader);
+    await reader.context().close();
+  });
+
+  test('PublishingSection: verifying every published page of a started draft space', async ({ page }) => {
+    await login(page, ADMIN.email, ADMIN.password);
+    await page.goto(`/spaces/${draftKey}/settings?section=published`);
+    await page.getByRole('button', { name: 'Verify every published page' }).click();
+    await expect(page.getByText('Verified 3, differ 0', { exact: false })).toBeVisible({ timeout: 30000 });
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'publishing-verified');
+    await checkAccessibility(page);
+  });
+});

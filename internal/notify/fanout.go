@@ -107,6 +107,7 @@ func (s *Service) Handle(ctx context.Context, m outbox.Message) error {
 		"template.sent_back":    s.onTemplateDecision,
 		"template.withdrawn":    s.onTemplateDecision,
 		"template.set_created":  s.onSetCreated,
+		"space.trashed":         s.onSpaceTrashed,
 	}
 	handle, ok := handlers[m.Type]
 	if !ok {

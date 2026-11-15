@@ -40,6 +40,9 @@ const (
 	// WitnessWarnAfter is how long the audit line waits for the next witness report, once
 	// one was ever reported (spec 075, CSL-533).
 	WitnessWarnAfter = 8 * 24 * time.Hour
+	// PublishingWarnAfter is how old the last check of draft and published spaces may be: it runs
+	// once a week by itself, and a day more is late (spec 073, PUB-343).
+	PublishingWarnAfter = 8 * 24 * time.Hour
 	// ContractWaitWarnAfter is how long a contract migration may wait for every node, on top
 	// of the grace it waits on purpose.
 	ContractWaitWarnAfter = 24 * time.Hour
@@ -63,7 +66,7 @@ const (
 )
 
 // Names are the checks, in the order the console shows them.
-var Names = []string{"disk", "database", "backup", "migrations", "work", "audit", "mail", "login", "version"}
+var Names = []string{"disk", "database", "backup", "migrations", "work", "audit", "mail", "login", "version", "publishing"}
 
 // Facts is what an installation knows about itself. A zero value means "not known" and
 // never warns, except where nothing known is itself the news (no backup noted).
@@ -128,6 +131,14 @@ type Facts struct {
 	WitnessReported bool
 	WitnessAt       time.Time
 	WitnessOK       bool
+	// PublishingOn says the experimental part of draft and published spaces is on; the rest is
+	// the last consistency check of its pairs (spec 073, PUB-343): whether one ran, when, of how
+	// many pairs, and how many differences it found.
+	PublishingOn      bool
+	PublishingChecked bool
+	PublishingAt      time.Time
+	PublishingPairs   int
+	PublishingFound   int
 }
 
 // Thresholds are the levels of free disk space the checks and the store use. A zero value
@@ -173,8 +184,29 @@ func check(name string, state State, code string, values map[string]any) Check {
 // Evaluate judges the facts. It returns one check per name in Names.
 func Evaluate(f Facts) []Check {
 	return []Check{
-		disk(f), database(f), backup(f), migrations(f), work(f), auditSealing(f), mail(f), login(f), release(f),
+		disk(f), database(f), backup(f), migrations(f), work(f), auditSealing(f), mail(f), login(f), release(f), publishing(f),
 	}
+}
+
+// publishing says what the last consistency check of draft and published spaces found. It runs
+// by itself once a week, so a check older than PublishingWarnAfter means no worker ran it.
+func publishing(f Facts) Check {
+	if !f.PublishingOn {
+		return check("publishing", OK, "publishing_off", nil)
+	}
+	values := map[string]any{"on": true}
+	if !f.PublishingChecked {
+		return check("publishing", OK, "publishing_new", values)
+	}
+	values["count"], values["pairs"] = f.PublishingFound, f.PublishingPairs
+	values["at"], values["days"] = f.PublishingAt.UTC().Format(time.RFC3339), int(f.Now.Sub(f.PublishingAt).Hours()/24)
+	switch {
+	case f.PublishingFound > 0:
+		return check("publishing", Warn, "publishing_drift", values)
+	case f.Now.Sub(f.PublishingAt) > PublishingWarnAfter:
+		return check("publishing", Warn, "publishing_old", values)
+	}
+	return check("publishing", OK, "publishing_ok", values)
 }
 
 // auditSealing says whether the worker keeps the audit chain up to date. Events that wait
@@ -391,6 +423,11 @@ var Sentences = map[string]string{
 	"version_unknown":   "This build has no build date, so its age is not known.",
 	"version_ok":        "Release {version} is {days} days old.",
 	"version_old":       "Release {version} is {days} days old. A newer release probably exists; see the release notes.",
+	"publishing_off":    "Draft and published spaces are off.",
+	"publishing_new":    "The check of draft and published spaces has not run yet; the worker runs it within the hour.",
+	"publishing_ok":     "The check of {pairs} pair(s) of draft and published spaces found every status as stored.",
+	"publishing_drift":  "The check of draft and published spaces found {count} difference(s) between the stored statuses and the versions. Fix them on System health, or run diffluence check publishing --fix.",
+	"publishing_old":    "The check of draft and published spaces last ran {days} days ago. Check that a worker runs.",
 }
 
 // Codes lists every code a check can give.

@@ -71,6 +71,8 @@ const ROW_ICON_SIZE = 16;
 const MARK_ICON_SIZE = 14;
 const MENU_ICON_SIZE = 18;
 const TREE_VIEWS: TreeView[] = ['tree', 'visited', 'updated', 'alphabet'];
+/** A draft space lists its pages changed since their release too (spec 073, PUB-1224). */
+const DRAFT_TREE_VIEWS: TreeView[] = [...TREE_VIEWS, 'changed'];
 const OPEN_WHILE_DRAGGING_MS = 700;
 const CARD_DELAY_MS = 600;
 const CARD_LEAVE_MS = 200;
@@ -774,6 +776,7 @@ export function PagesSection({
   onAddRoot,
   onAddLink,
   onDialog,
+  draftSpace = false,
 }: {
   spaceId: string;
   /** The home page has its own row above the tree. */
@@ -784,6 +787,8 @@ export function PagesSection({
   onAddRoot?: () => void;
   onAddLink?: () => void;
   onDialog: (page: PageSummary, dialog: RowDialog) => void;
+  /** The space is the draft space of a pair, whose tree offers Changed since release. */
+  draftSpace?: boolean;
 }) {
   const { t } = useTranslation();
   const { preferences, update } = usePreferences();
@@ -792,7 +797,8 @@ export function PagesSection({
   // The filters stay out of sight until asked for, and stay open while they do something.
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [selection, setSelection] = useState<string[] | null>(null);
-  const view = TREE_VIEWS.find((v) => v === preferences.tree_view) ?? 'tree';
+  const views = draftSpace ? DRAFT_TREE_VIEWS : TREE_VIEWS;
+  const view = views.find((v) => v === preferences.tree_view) ?? 'tree';
   const showFilters = filtersOpen || filter !== '' || view !== 'tree';
   const parts = useTreeParts(spaceId, current, memory.opened);
   const nodes = useMemo(() => parts.nodes.filter((n) => n.id !== home), [parts.nodes, home]);
@@ -909,7 +915,7 @@ export function PagesSection({
             value={view}
             onChange={(e) => update({ tree_view: e.target.value })}
           >
-            {TREE_VIEWS.map((v) => (
+            {views.map((v) => (
               <option key={v} value={v}>
                 {t(`tree.view_${v}`)}
               </option>

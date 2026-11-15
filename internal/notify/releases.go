@@ -30,6 +30,45 @@ func (s *Service) SetReleasedPages(read func(context.Context, uuid.UUID) (Releas
 	s.releasedPages = read
 }
 
+// EndedPair is a pair that deleting one of its spaces ended: the space that stays, its home page
+// and the people who run it. Ids only.
+type EndedPair struct {
+	SpaceID uuid.UUID
+	Home    uuid.UUID
+	Admins  []uuid.UUID
+	// Side is the side of the space that was deleted: draft or published.
+	Side string
+}
+
+// SetEndedPairs gives the module the reader of pairs that a deleted space ended, which the
+// publishing module owns.
+func (s *Service) SetEndedPairs(read func(context.Context, uuid.UUID) (*EndedPair, error)) {
+	s.endedPair = read
+}
+
+// onSpaceTrashed tells the people who run the space that stays when deleting the other space of
+// a pair ended it: their space is ordinary again, or no longer has drafts (PUB-1046, PUB-1047).
+// The person who deleted it knows.
+func (s *Service) onSpaceTrashed(ctx context.Context, event uuid.UUID, p payload) error {
+	if s.endedPair == nil {
+		return nil
+	}
+	ended, err := s.endedPair(ctx, p.SpaceID)
+	if err != nil || ended == nil {
+		return err
+	}
+	for _, person := range ended.Admins {
+		if person == p.ActorID {
+			continue
+		}
+		if err := s.Deliver(ctx, s.pool, Row{UserID: person, Type: TypePairEnded, Reason: ReasonAuthor, ActorID: p.ActorID,
+			PageID: ended.Home, SpaceID: ended.SpaceID, Event: event, Data: map[string]any{"deleted_side": ended.Side}}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // onReleaseFinished tells the releaser that the run ended, with a link to its report (PUB-822),
 // and every watcher of the pages it changed or took off once, with how many of the pages they
 // watch and may see it changed (PUB-813, PUB-818). A silent run tells only the releaser

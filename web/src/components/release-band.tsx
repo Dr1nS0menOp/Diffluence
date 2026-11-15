@@ -79,7 +79,15 @@ export function ReleaseBand({
   const { t } = useTranslation();
   if (!status || status.side === '') return null;
   if (status.side === 'published') {
-    if (!status.released_at) return null;
+    // Someone used to editing learns why Edit is missing (PUB-1231).
+    const editorNote = status.would_edit && (
+      <p className="note">
+        {status.draft_space
+          ? t('publishing.editorNoteNamed', { name: status.draft_space.name })
+          : t('publishing.editorNote')}
+      </p>
+    );
+    if (!status.released_at) return editorNote || null;
     return (
       <>
         <p className={inBand ? 'release-line' : 'muted release-line'}>
@@ -102,6 +110,7 @@ export function ReleaseBand({
         </p>
         {/* A twin of a signed version shows its signatures; the records stay in the draft (PUB-731). */}
         <Signatures list={status.approval?.signatures ?? []} />
+        {editorNote}
       </>
     );
   }

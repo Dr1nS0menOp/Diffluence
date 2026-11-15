@@ -63,6 +63,20 @@ echo 'attached file contents' >"$work/note.txt"
 curl -sf -b "$jar" -H 'Content-Type: application/octet-stream' --data-binary "@$work/note.txt" "$url/api/v1/pages/$page/attachments?filename=note.txt" >"$work/att.json"
 attachment=$(first_id <"$work/att.json")
 
+echo "1p. a pair of draft and published spaces, a release, and a run going at the backup (spec 073, PUB-1032)"
+api -X PUT -d '{"on":["publishing"]}' "$url/api/v1/admin/experimental" >/dev/null
+api -d '{"new_space":{"key":"ENGREAD","name":"Engineering for readers"}}' "$url/api/v1/spaces/$space/publishing/link" >/dev/null
+release_preview=$(api -X POST "$url/api/v1/pages/$page/release/preview" | first_id)
+api -d "{\"preview_id\":\"$release_preview\",\"note\":\"first edition\"}" "$url/api/v1/pages/$page/release" >/dev/null
+twin=$(api "$url/api/v1/pages/$page/release" | grep -o '"twin_page_id":"[^"]*"' | cut -d'"' -f4)
+waiting=$(api -d "{\"space_id\":\"$space\",\"title\":\"Waiting for its run\"}" "$url/api/v1/pages" | first_id)
+api -d "{\"title\":\"Waiting for its run\",\"base_version\":0,\"document\":$doc}" "$url/api/v1/pages/$waiting/publish" >/dev/null
+run=$(api -d '{"scope":"space"}' "$url/api/v1/spaces/$space/releases/preview" | first_id)
+# A run that goes while the backup is made: its node keeps a sign of life, which the restored
+# database holds as it was. No job carries it, so it stays as the backup finds it.
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc \
+  "UPDATE release_runs SET status = 'running', started_at = now(), heartbeat_at = now() WHERE id = '$run'"
+
 echo "1b. start replacing master.key, and back up halfway (spec 034)"
 # A restart after each step loads the keys, as an operator does on every node.
 docker compose exec -T diffluence diffluence key add >/dev/null
@@ -150,6 +164,22 @@ api -d '{"email":"admin@example.com","password":"correct horse battery staple"}'
 api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
 [ "$(curl -sf -b "$jar" "$url/api/v1/attachments/$attachment/content?download=1")" = "attached file contents" ]
 api "$url/api/v1/search?q=survive" | grep -q '"title":"Important"'
+# The pair came back with both spaces, the twin is still changed only by releases, and the run
+# that went at the backup shows as stopped once its sign of life is old; resumed, it releases
+# the page it held, with the version of its preview (PUB-1032, PUB-1061).
+api "$url/api/v1/spaces/$space/publishing" | grep -q '"side":"draft"'
+api "$url/api/v1/pages/$twin" | grep -q 'the words that must survive'
+if api -d "{\"title\":\"Important\",\"base_version\":1,\"document\":$doc}" "$url/api/v1/pages/$twin/publish" >/dev/null 2>&1; then
+  echo "the published space could be edited by hand after the restore"
+  exit 1
+fi
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc \
+  "UPDATE release_runs SET heartbeat_at = now() - interval '10 minutes' WHERE id = '$run'"
+api "$url/api/v1/spaces/$space/releases/$run" | grep -q '"status":"stopped"' || { echo "the run that went at the backup does not show as stopped"; exit 1; }
+api -X POST "$url/api/v1/spaces/$space/releases/$run/resume" >/dev/null
+for _ in $(seq 1 30); do api "$url/api/v1/spaces/$space/releases/$run" | grep -q '"status":"done"' && break; sleep 2; done
+api "$url/api/v1/spaces/$space/releases/$run" | grep -q '"status":"done"' || { echo "the resumed run did not finish"; exit 1; }
+api "$url/api/v1/pages/$waiting/release" | grep -q '"status":"released"' || { echo "the resumed run did not release its page"; exit 1; }
 after=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc 'SELECT count(*) FROM audit_events')
 [ "$after" -ge "$before" ]
 # The dump does not carry the defaults of the database, so the node that started on the
@@ -312,4 +342,4 @@ api -d '{"email":"admin@example.com","password":"correct horse battery staple"}'
 api "$url/api/v1/pages/$page" | grep -q 'the words that must survive'
 docker compose exec -T diffluence diffluence audit verify >/dev/null
 docker compose stop backup >/dev/null 2>&1
-echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a key change finished after the restore, a backup noted while the node was down, the backup service, a restore from the console with its safety backup, and the way back from a restore that stopped halfway; migrations, checkpoints and the confirmation code of a restore in the backup service (spec 070)"
+echo "restore drill passed in ${took}s: page, attachment, search, login, audit chain, role separation, a pair with a run going at the backup resumed after the restore, a key change finished after the restore, a backup noted while the node was down, the backup service, a restore from the console with its safety backup, and the way back from a restore that stopped halfway; migrations, checkpoints and the confirmation code of a restore in the backup service (spec 070)"

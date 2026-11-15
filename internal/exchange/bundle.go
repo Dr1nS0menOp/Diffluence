@@ -114,6 +114,9 @@ type bundleSpace struct {
 	Restrictions []bundleRestriction `json:"restrictions"`
 	Labels       []bundleLabel       `json:"labels"`
 	Groups       []bundleGroup       `json:"groups"`
+	// LeftOut are the pages left out of releases, which a bundle of a draft space carries; a
+	// bundle never carries a pair (spec 073, PUB-1042, PUB-1043).
+	LeftOut []LeftOutMark `json:"left_out,omitempty"`
 }
 
 type bundleComment struct {
@@ -417,6 +420,15 @@ func (s *Service) buildBundle(ctx context.Context, c identity.Caller, run *Expor
 	sp, err := s.bundleSpaceOf(ctx, run.SpaceID)
 	if err != nil {
 		return err
+	}
+	if s.leftOut != nil {
+		bundled := make([]uuid.UUID, len(list))
+		for i, p := range list {
+			bundled[i] = p.ID
+		}
+		if sp.LeftOut, err = s.leftOut.Read(ctx, bundled); err != nil {
+			return err
+		}
 	}
 	comments, err := s.bundleComments(ctx, run.SpaceID)
 	if err != nil {

@@ -102,6 +102,16 @@ Afterwards, look under Administration, Organising, Experimental parts, and turn 
 
 Two experimental parts came later and leave no trace before they exist, so they are off after the upgrade that brings them: draft and published spaces (`publishing`, spec 073) and guided templates (`guided_templates`, spec 074). Guided templates cannot be turned on while a node of the previous release still runs: finish the upgrade of every node first.
 
+## Draft and published spaces during an upgrade
+
+Draft and published spaces (`publishing`, spec 073) stay off after an upgrade until an administrator turns them on; [published-spaces.md](published-spaces.md) is the operator guide. What an upgrade must take care of once pairs exist:
+
+- **Expand only.** Migrations 0061, 0064 and 0072 add tables, columns with defaults, wider checks and triggers that do nothing outside a pair. No contract migration belongs to this part, so a rollback finds every table the previous release reads.
+- **An older node cannot write into a published space.** A trigger in the database refuses every write of page content in a published space that is not a release, so a node of the previous release, which does not know the rule, shows its user an ordinary error and changes nothing. Readers keep reading.
+- **Background work needs the newer release.** Runs of more than one page, approval releases, starting a draft space from a space with content, the space-wide verification and the weekly check are work of the worker. A worker of the previous release leaves a job kind it does not know for one that does, so finish upgrading every node that runs the worker before you start such work. A run going during the upgrade shows as stopped once its node stops, and is resumed from the release screen with the versions of its preview.
+- **Rolling back** after pairs exist leaves published spaces read-only through the trigger, and the previous release has no screen for them. Roll forward again to change them, or end the pairs first (Space settings, Published space, End the link), which works while the part is off.
+- **After the upgrade**, the health page shows the line Published spaces: the consistency check of every pair runs once a week by itself, and once after the part is turned on again. `diffluence check publishing` runs it from the command line, and `--fix` recomputes what differs.
+
 ## Single sign-on after an upgrade
 
 Since spec 071, single sign-on makes no account at a first login unless `DIFFLUENCE_OIDC_AUTO_CREATE=true` is set, and then only for an address the provider marks as verified. An installation that relied on accounts being made at the first login sets `DIFFLUENCE_OIDC_AUTO_CREATE=true` before upgrading. When its provider does not mark addresses as verified (Authentik by default, Entra ID), it also marks them there, or sets `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only the organisation can set an address at the provider (`docs/operations/identity-providers.md`). People who already have an account log in as before.

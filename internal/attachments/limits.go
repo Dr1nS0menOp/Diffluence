@@ -120,6 +120,18 @@ func RefuseCopiesThatDoNotFit(ctx context.Context, q db.Querier, from []uuid.UUI
 	return nil
 }
 
+// CopiedSizeOf says how many files, and how many bytes, copying the files of several pages would
+// store anew, as CopyAll copies them: for the preview of a draft space started from a space with
+// content (spec 073, PUB-1309).
+func CopiedSizeOf(ctx context.Context, q db.Querier, pages []uuid.UUID) (int, int64, error) {
+	var files int
+	var size int64
+	err := q.QueryRow(ctx, `SELECT count(*), COALESCE(sum(v.size), 0)::bigint FROM attachments a
+		JOIN attachment_versions v ON v.attachment_id = a.id AND v.number = a.current_version
+		WHERE a.page_id = ANY($1) AND a.status = 'active'`, pages).Scan(&files, &size)
+	return files, size, err
+}
+
 // FitsMove says, without locking, whether the files of moved pages would fit in a space.
 func FitsMove(ctx context.Context, q db.Querier, pageIDs []uuid.UUID, spaceID uuid.UUID) (bool, error) {
 	var size int64

@@ -60,6 +60,8 @@ type Service struct {
 	now      func() time.Time
 	// releasedPages reads a run of a release for its notifications (spec 073).
 	releasedPages func(context.Context, uuid.UUID) (ReleasedRun, error)
+	// endedPair reads the pair that deleting a space ended (spec 073, PUB-1046, PUB-1047).
+	endedPair func(context.Context, uuid.UUID) (*EndedPair, error)
 }
 
 // NewService creates the service.

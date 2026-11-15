@@ -543,6 +543,9 @@ func (in *bundleImport) write(ctx context.Context, tx pgx.Tx, m ImportMapping) e
 	if err := in.comments(ctx, tx); err != nil {
 		return err
 	}
+	if err := in.leftOut(ctx, tx); err != nil {
+		return err
+	}
 	// Document control comes last: it pins the files of the pages it governs.
 	people := pages.People{Importer: in.c.UserID, Find: func(id uuid.UUID) (uuid.UUID, bool) {
 		to, ok := in.people.known[id]
@@ -552,6 +555,21 @@ func (in *bundleImport) write(ctx context.Context, tx pgx.Tx, m ImportMapping) e
 		return err
 	}
 	return recordBundle(ctx, tx, in.c, in.b.manifest, in.spaceID, in.b.signer, in.result)
+}
+
+// leftOut gives the pages the marks that left them out of releases where the bundle came from,
+// so a pair made here later starts with the same choice; the pair itself never travels (spec
+// 073, PUB-1042).
+func (in *bundleImport) leftOut(ctx context.Context, tx pgx.Tx) error {
+	marks := in.content.space.LeftOut
+	if in.s.leftOut == nil || len(marks) == 0 {
+		return nil
+	}
+	here := make([]LeftOutMark, len(marks))
+	for i, m := range marks {
+		here[i] = LeftOutMark{PageID: in.ids.id(m.PageID), WithChildren: m.WithChildren, Reason: m.Reason}
+	}
+	return in.s.leftOut.Write(ctx, tx, here, in.c.UserID)
 }
 
 func (in *bundleImport) grants(ctx context.Context, tx pgx.Tx) error {

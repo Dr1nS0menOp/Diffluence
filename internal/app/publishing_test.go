@@ -153,6 +153,11 @@ func TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair(t *testing.T) {
 		{"GET", "/api/v1/pages/" + home + "/release"},
 		{"POST", "/api/v1/pages/" + home + "/release/preview"},
 		{"POST", "/api/v1/pages/" + home + "/release"},
+		// Wave PB4: starting a draft space, and the space-wide verification.
+		{"POST", "/api/v1/spaces/" + space + "/publishing/start-preview"},
+		{"POST", "/api/v1/spaces/" + space + "/publishing/start"},
+		{"POST", "/api/v1/spaces/" + space + "/releases/verify"},
+		{"POST", "/api/v1/admin/publishing/check"},
 	}
 	for _, r := range refused {
 		if out := root.want(http.StatusNotFound, r.method, r.path, map[string]any{}); !strings.Contains(out, "experimental_off") {
@@ -161,6 +166,10 @@ func TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair(t *testing.T) {
 	}
 	if out := root.want(http.StatusConflict, "POST", "/api/v1/spaces/"+space+"/publishing/end", nil); !strings.Contains(out, "not_paired") {
 		t.Fatalf("ending a pair is not open while the part is off: %s", out)
+	}
+	// Undoing a start is a way of ending, and stays open as ending does (PUB-1311).
+	if out := root.want(http.StatusConflict, "POST", "/api/v1/spaces/"+space+"/publishing/undo-start", nil); !strings.Contains(out, "not_paired") {
+		t.Fatalf("undoing a start is not open while the part is off: %s", out)
 	}
 	if capabilities := root.ok("GET", "/api/v1/system/capabilities", nil); capabilities["publishing"] != false {
 		t.Fatalf("the screens are offered publishing while it is off: %v", capabilities)

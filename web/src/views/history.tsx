@@ -19,6 +19,7 @@ import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
 import { pageTitle } from '../page-name';
+import { useReleaseStatus } from '../components/release-band';
 
 /** For a leaked secret. The number stays, and the audit log keeps who, when and why. */
 function RemoveVersionDialog({
@@ -256,6 +257,10 @@ export function HistoryView({ pageId }: { pageId: string }) {
   });
   const me = useQuery({ queryKey: ['me'], queryFn: () => api.get<Me>('/me') });
   const isAdministrator = me.data?.global_permissions.includes('administrator') ?? false;
+  // A draft page names, beside each version that was released, the version of the published
+  // page it became, for those who see the release screen (spec 073, PUB-911, PUB-1223).
+  const release = useReleaseStatus(page.data, page.data ? 'draft' : undefined);
+  const releasedAs = new Map((release.data?.released_as ?? []).map((r) => [r.draft_version, r]));
   const [removing, setRemoving] = useState<number | null>(null);
   const toggle = (n: number) =>
     setPicked((p) => (p.includes(n) ? p.filter((x) => x !== n) : [...p.slice(-1), n]));
@@ -301,6 +306,19 @@ export function HistoryView({ pageId }: { pageId: string }) {
                   )}
                   {v.removed && <span className="lozenge">{t('history.removed')}</span>}
                   {v.imported && <span className="muted"> · {t('history.imported')}</span>}
+                  {releasedAs.has(v.number) && (
+                    <>
+                      {' '}
+                      <span className="lozenge">
+                        {t('publishing.historyReleasedAs', {
+                          number: releasedAs.get(v.number)?.twin_version,
+                        })}
+                      </span>{' '}
+                      <span className="muted">
+                        {dates.moment(releasedAs.get(v.number)?.released_at ?? '')}
+                      </span>
+                    </>
+                  )}
                   {v.summary && <div>{v.summary}</div>}
                   {v.signatures && v.signatures.length > 0 && (
                     <VersionSignatures pageId={pageId} version={v} />

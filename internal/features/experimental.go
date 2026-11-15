@@ -5,10 +5,12 @@ package features
 import (
 	"context"
 	"slices"
+	"time"
 
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 // The parts that are experimental for 1.0 (ADR-043, spec 069). Each is off on a new
@@ -40,6 +42,18 @@ const experimentalKey = "experimental"
 // Experimental is what an administrator turned on.
 type Experimental struct {
 	On []string `json:"on"`
+	// OnSince says when each part that is on was last turned on, so a part can do once what
+	// turning it on again asks, such as the check of draft and published spaces (spec 073,
+	// PUB-1305). A value written before it existed has none, which counts as long ago.
+	OnSince map[string]time.Time `json:"on_since,omitempty"`
+}
+
+// ExperimentalIn reads which experimental parts are on, through q, for a reader that has no
+// service, such as the health facts.
+func ExperimentalIn(ctx context.Context, q db.Querier) (Experimental, error) {
+	v := Experimental{On: []string{}}
+	err := settings.Load(ctx, q, experimentalKey, &v)
+	return v, err
 }
 
 // experimentalOff answers a route of a part that is off. It is a 404, because for this
@@ -74,7 +88,20 @@ func (s *Service) SetExperimental(ctx context.Context, c identity.Caller, v Expe
 	if err := s.refuseWhileOlderReleaseRuns(ctx, on); err != nil {
 		return err
 	}
-	return s.settings.Write(ctx, c, experimentalKey, Experimental{On: on})
+	before, err := s.Experimental(ctx)
+	if err != nil {
+		return err
+	}
+	// Only parts that are on keep a moment, so a part turned off and on again gets a new one.
+	since := map[string]time.Time{}
+	for _, part := range on {
+		at, kept := before.OnSince[part]
+		if !kept {
+			at = time.Now().UTC()
+		}
+		since[part] = at
+	}
+	return s.settings.Write(ctx, c, experimentalKey, Experimental{On: on, OnSince: since})
 }
 
 // refuseWhileOlderReleaseRuns refuses to turn on a part held for older releases while a

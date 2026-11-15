@@ -59,6 +59,34 @@ type Service struct {
 	pdfPassword string
 	// collaboraURL is an office service that an administrator configured. Empty = none.
 	collaboraURL string
+	// leftOut reads and writes the marks that leave pages out of releases, which a bundle carries
+	// (spec 073, PUB-1042). The publishing module owns them; nil carries none.
+	leftOut *LeftOutMarks
+	// twinControl reads the control block of a published page whose draft page is controlled.
+	twinControl func(ctx context.Context, pageID uuid.UUID) (*pages.ExportControl, error)
+}
+
+// LeftOutMark is a page left out of releases, as a bundle carries it (spec 073, PUB-1042).
+type LeftOutMark struct {
+	PageID       uuid.UUID `json:"page_id"`
+	WithChildren bool      `json:"with_children"`
+	Reason       string    `json:"reason"`
+}
+
+// LeftOutMarks reads the marks of the pages a bundle holds, and writes them onto the pages an
+// import made, inside its transaction.
+type LeftOutMarks struct {
+	Read  func(ctx context.Context, pages []uuid.UUID) ([]LeftOutMark, error)
+	Write func(ctx context.Context, tx pgx.Tx, marks []LeftOutMark, by uuid.UUID) error
+}
+
+// SetLeftOutMarks gives the module what it needs to carry the left-out marks of a draft space.
+func (s *Service) SetLeftOutMarks(m LeftOutMarks) { s.leftOut = &m }
+
+// SetTwinControl gives the module the reader of what a file of a published page of a controlled
+// page says of its approval (spec 073, PUB-731). The publishing module owns it; nil says nothing.
+func (s *Service) SetTwinControl(read func(ctx context.Context, pageID uuid.UUID) (*pages.ExportControl, error)) {
+	s.twinControl = read
 }
 
 // Options are the parts of the service that are not other modules.

@@ -2938,6 +2938,52 @@ mutate "a release copies a file as it is now instead of as the approved version 
   's.replace("\t\t\tstep.version, step.pin = pin.Version, \x26pin\n", "\t\t\t_ = pin\n")' $app -run '^TestAReleaseOfTheApprovedVersionCopiesTheFileItPinned$'
 mutate "a failed approval release says nothing on its page" internal/publishing/release.go \
   's.replace("\tout.ApprovalRelease = \x26a\n", "\t_ = a\n")' $app -run '^TestAFailingApprovalReleaseLeavesThePageApproved$'
+# Spec 073 (wave PB4): a draft space started from a space with content, the space-wide
+# verification, the weekly check and what PB2 and PB3 left for it.
+mutate "the draft space receives a view-only grant" internal/permissions/start.go \
+  's.replace("\t\tif !slices.ContainsFunc(perms, ", "\t\tif false \x26\x26 !slices.ContainsFunc(perms, ")' $app -run '^TestAReaderOfTheOldSpaceNeverReachesTheDraftsAfterAStart$'
+mutate "a copy loses the restriction of its page" internal/pages/start_copy.go \
+  's.replace("\tif err := copyRestrictions(ctx, tx, src.ID, target.ID); err != nil {", "\tif err := error(nil); err != nil {")' $app -run '^TestAReaderOfTheOldSpaceNeverReachesTheDraftsAfterAStart$'
+mutate "a page is paired out of step after the start" internal/publishing/start.go \
+  's.replace("written.Title, made.ParentID,", "written.Title, src.ParentID,")' $app -run '^TestAStartPairsEveryPageInStepAndItsLinksLeadToTheCopies$'
+mutate "a start refused by the database" internal/db/migrations/0072_draft_space_from_existing.sql \
+  's.replace("\x27take_off\x27, \x27start\x27", "\x27take_off\x27")' $app -run '^TestAStartPairsEveryPageInStepAndItsLinksLeadToTheCopies$'
+mutate "a copy links to the published pages" internal/publishing/start_rewrite.go \
+  's.replace("\tto, ok := r.m.pages[id]\n", "\tto, ok := id, false\n")' $pub -run '^TestAStartLeadsEveryReferenceToTheCopiesAndTakesNothingAway$'
+mutate "a start is undone after a release" internal/publishing/start.go \
+  's.replace("\t\tif !ok {\n\t\t\treturn apperr.Conflict(\"released_since_start\"", "\t\tif false \x26\x26 !ok {\n\t\t\treturn apperr.Conflict(\"released_since_start\"")' $app -run '^TestAStartIsUndoneUntilTheFirstRelease$'
+mutate "the start routes are served while the part is off" internal/httpapi/handlers_publishing.go \
+  's.replace("on(s.handlePublishingStart))", "s.handlePublishingStart)")' $app -run '^TestEveryPublishingRouteIsOffUntilTurnedOnExceptEndingAPair$'
+mutate "verification finds every twin the same" internal/publishing/verify.go \
+  's.replace("\tif hash == want {\n", "\tif hash == want || true {\n")' $app -run '^TestTheSpaceWideVerificationReportsEachOutcome$'
+mutate "a purged draft is counted as verified" internal/publishing/verify_space.go \
+  's.replace("\t\tout.Counts[VerifyDraftPurged]++\n", "\t\tout.Counts[VerifyOK]++\n")' $app -run '^TestTheSpaceWideVerificationReportsEachOutcome$'
+mutate "the weekly check runs every hour" internal/publishing/selfcheck.go \
+  's.replace("\tif ran \x26\x26 last.At.After(since) \x26\x26 time.Since(last.At) < SelfCheckEvery {", "\tif ran \x26\x26 last.At.After(since) \x26\x26 false {")' $app -run '^TestTurningThePartOffAndOnAgainKeepsThePairsAndChecksThemOnce$'
+mutate "turning the part on again runs no check" internal/features/experimental.go \
+  's.replace("\t\tif !kept {\n\t\t\tat = time.Now().UTC()", "\t\tif false \x26\x26 !kept {\n\t\t\tat = time.Now().UTC()")' $app -run '^TestTurningThePartOffAndOnAgainKeepsThePairsAndChecksThemOnce$'
+mutate "the health page hides what the check found" internal/health/health.go \
+  's.replace("\tcase f.PublishingFound > 0:\n", "\tcase false:\n")' ./internal/health/ -run '^TestTheCheckOfDraftAndPublishedSpacesWarnsOfWhatItFoundAndOfItsAge$'
+mutate "a writer sees what each release became" internal/publishing/release.go \
+  's.replace("\tif releases {\n\t\tif out.ReleasedAs, err", "\tif true {\n\t\tif out.ReleasedAs, err")' $app -run '^TestADraftPagesHistoryNamesWhatEachReleaseBecame$'
+mutate "a reader is told why Edit is missing" internal/publishing/release.go \
+  's.replace("\tout.WouldEdit = !d.Allowed \x26\x26 permissions.RefusedOnlyAsManaged(d)", "\tout.WouldEdit = !d.Allowed")' $app -run '^TestATwinTellsWouldBeEditorsWhyEditIsMissing$'
+mutate "the tree lists pages in step as changed" internal/publishing/tree.go \
+  's.replace("released_version > 0 AND cardinality(changed) > 0", "released_version > 0")' $app -run '^TestTheTreeOfADraftSpaceListsThePagesChangedSinceTheirRelease$'
+mutate "a reader of the draft space sees what changed" internal/publishing/tree.go \
+  's.replace("\tif err != nil || (!edits \x26\x26 !releases) {", "\tif err != nil || (false \x26\x26 !edits \x26\x26 !releases) {")' $app -run '^TestTheTreeOfADraftSpaceListsThePagesChangedSinceTheirRelease$'
+mutate "the person who deleted a space is told" internal/notify/releases.go \
+  's.replace("\t\tif person == p.ActorID {\n", "\t\tif false {\n")' $app -run '^TestDeletingASpaceOfAPairTellsTheOtherSidesAdministrators$'
+mutate "a space event names no actor" internal/spaces/spaces.go \
+  's.replace("map[string]any{\"space_id\": s.ID, \"actor_id\": c.UserID}", "map[string]any{\"space_id\": s.ID}")' $app -run '^TestDeletingASpaceOfAPairTellsTheOtherSidesAdministrators$'
+mutate "a bundle drops the left-out marks" internal/exchange/bundlein.go \
+  's.replace("\treturn in.s.leftOut.Write(ctx, tx, here, in.c.UserID)\n", "\treturn nil\n")' $app -run '^TestABundleOfADraftSpaceCarriesItsLeftOutMarksAndNotThePair$'
+mutate "a stopped approval release is not on the release screen" internal/publishing/screen.go \
+  's.replace("(scope <> \x27page\x27 OR actor_type <> $2)", "(scope <> \x27page\x27 AND actor_type <> $2)")' $app -run '^TestAStoppedApprovalReleaseIsResumedFromTheReleaseScreen$'
+mutate "a file of a twin carries no control block" internal/exchange/export.go \
+  's.replace("\t\tif p.Control == nil \x26\x26 s.twinControl != nil {", "\t\tif false \x26\x26 p.Control == nil \x26\x26 s.twinControl != nil {")' $app -run '^TestAnExportOfATwinCarriesTheControlBlockOfItsApproval$'
+mutate "a start copies an archived page" internal/publishing/start.go \
+  's.replace("p.Status == \"published\" \x26\x26 p.ArchivedAt == nil \x26\x26", "p.Status == \"published\" \x26\x26")' $pub -run '^TestAStartCopiesParentsFirstAndCountsWhatStays$'
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"slices"
 	"sync"
 	"time"
 
@@ -13,7 +14,9 @@ import (
 	"github.com/diffluence/diffluence/internal/backups"
 	"github.com/diffluence/diffluence/internal/db"
 	"github.com/diffluence/diffluence/internal/events"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/health"
+	"github.com/diffluence/diffluence/internal/publishing"
 	"github.com/diffluence/diffluence/internal/settings"
 	"github.com/diffluence/diffluence/internal/storage"
 	"github.com/diffluence/diffluence/internal/version"
@@ -152,10 +155,28 @@ func readConsoleFacts(ctx context.Context, src HealthSource, f *health.Facts) er
 		}
 	}
 	w, err := audit.LatestWitnessCheck(ctx, src.Pool)
-	if err != nil || w == nil {
+	if err != nil {
 		return err
 	}
-	f.WitnessReported, f.WitnessAt, f.WitnessOK = true, w.CheckedAt, w.OK
+	if w != nil {
+		f.WitnessReported, f.WitnessAt, f.WitnessOK = true, w.CheckedAt, w.OK
+	}
+	return readPublishingFacts(ctx, src, f)
+}
+
+// readPublishingFacts adds whether draft and published spaces are on, and what their last
+// consistency check found (spec 073, PUB-343).
+func readPublishingFacts(ctx context.Context, src HealthSource, f *health.Facts) error {
+	on, err := features.ExperimentalIn(ctx, src.Pool)
+	if err != nil {
+		return err
+	}
+	f.PublishingOn = slices.Contains(on.On, features.ExperimentalPublishing)
+	rec, ran, err := publishing.LastCheck(ctx, src.Pool)
+	if err != nil || !ran {
+		return err
+	}
+	f.PublishingChecked, f.PublishingAt, f.PublishingPairs, f.PublishingFound = true, rec.At, rec.Pairs, rec.Found
 	return nil
 }
 
@@ -181,6 +202,13 @@ func (a *App) HealthFacts(ctx context.Context) (health.Facts, error) {
 	}
 	a.healthCache.readAt, a.healthCache.facts = now, facts
 	return facts, nil
+}
+
+// ReadFreshHealthFacts reads the facts of this installation past the cache of HealthFacts (used
+// by tests).
+func (a *App) ReadFreshHealthFacts(ctx context.Context) (health.Facts, error) {
+	return ReadHealthFacts(ctx, HealthSource{Pool: a.pool, Store: a.store, Migrations: a.migrations,
+		MailConfigured: a.mail.Configured(), OIDCConfigured: a.sso != nil, ContractGrace: a.cfg.ContractGrace, Backups: a.backups}, time.Now())
 }
 
 // HealthChecks judges the facts of this installation, for the console.

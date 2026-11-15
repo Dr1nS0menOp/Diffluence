@@ -272,6 +272,10 @@ func refusal(d Decision, denied apperr.Denied) error {
 	return e
 }
 
+// RefusedOnlyAsManaged says that the managed rule of a published space is the one check that
+// refused: the person could otherwise write (spec 073, PUB-220, PUB-1231).
+func RefusedOnlyAsManaged(d Decision) bool { return refusedOnlyAsManaged(d) }
+
 // refusedOnlyAsManaged says that the managed rule is the one check that failed.
 func refusedOnlyAsManaged(d Decision) bool {
 	managed := false

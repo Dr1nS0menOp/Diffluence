@@ -331,6 +331,40 @@ func (s *Service) ancestors(ctx context.Context, ids []uuid.UUID) ([]uuid.UUID, 
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
+// TreeOf lists chosen pages of a space flat, in the order given, with the way to each: a view of
+// the tree whose pages another module picks, such as Changed since release of a draft space
+// (spec 073, PUB-1224). A page the person may not see neither shows nor counts.
+func (s *Service) TreeOf(ctx context.Context, c identity.Caller, spaceID uuid.UUID, ids []uuid.UUID) (Found, error) {
+	t, err := s.startRead(ctx, c, spaceID)
+	if err != nil {
+		return Found{}, err
+	}
+	way, err := s.ancestors(ctx, ids)
+	if err != nil {
+		return Found{}, err
+	}
+	rows, err := t.rows(ctx, append(way, ids...))
+	if err != nil {
+		return Found{}, err
+	}
+	seen := map[uuid.UUID]bool{}
+	for _, n := range rows {
+		seen[n.ID] = true
+	}
+	out := Found{Pages: rows, Matches: []uuid.UUID{}}
+	for _, id := range ids {
+		if !seen[id] {
+			continue
+		}
+		if len(out.Matches) == foundRows {
+			out.Capped = true
+			break
+		}
+		out.Matches = append(out.Matches, id)
+	}
+	return out, nil
+}
+
 // TreeFind filters the pages of a space on their title, or lists them in another
 // order. Matches are worked out here because the tree may hold only a part of the
 // space. A hidden title neither shows nor counts.

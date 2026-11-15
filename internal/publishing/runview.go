@@ -237,14 +237,17 @@ func (s *Service) RunPages(ctx context.Context, runID uuid.UUID) (RunPages, erro
 	return out, nil
 }
 
-// loadRunForChange locks a run of a pair and reads its status as the screen shows it.
+// loadRunForChange locks a run of a pair and reads its status as the screen shows it. A release of
+// one page by a person runs in its request and is never changed later; a run of approval or
+// withdrawal runs in the background, and can be cancelled or resumed as a larger run can.
 func loadRunForChange(ctx context.Context, tx pgx.Tx, p pair, runID uuid.UUID, staleAfter time.Duration) (runRow, string, error) {
 	var r runRow
 	var status string
 	err := tx.QueryRow(ctx, `SELECT id, pair_id, COALESCE(actor_id, $4), scope, note, silent, batches,
 			CASE WHEN status = 'running' AND (heartbeat_at IS NULL OR heartbeat_at < now() - $3::interval) THEN 'stopped' ELSE status END,
 			actor_type, caused_by
-		FROM release_runs WHERE id = $1 AND pair_id = $2 AND scope <> 'page' FOR UPDATE`, runID, p.ID, staleAfter.String(), uuid.Nil).
+		FROM release_runs WHERE id = $1 AND pair_id = $2 AND (scope <> 'page' OR actor_type <> $5) AND scope <> $6 FOR UPDATE`,
+		runID, p.ID, staleAfter.String(), uuid.Nil, actorUser, scopeStart).
 		Scan(&r.id, &r.pair, &r.actor, &r.scope, &r.note, &r.silent, &r.batches, &status, &r.actorType, &r.causedBy)
 	if noRows(err) {
 		return r, "", apperr.NotFound()

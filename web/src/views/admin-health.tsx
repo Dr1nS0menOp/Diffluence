@@ -3,7 +3,7 @@
 // the disk on every page of the console, and the lines on the summary.
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Link } from '../router';
 import { ErrorNote, formatSize, Loading } from '../components/ui';
@@ -74,13 +74,55 @@ export function HealthChecks() {
               <tr key={check.name} data-state={check.state}>
                 <th scope="row">{t(`health.name_${check.name}`)}</th>
                 <td>{t(`health.state_${check.state}`)}</td>
-                <td>{healthText(t, check)}</td>
+                <td>
+                  {healthText(t, check)}
+                  {check.name === 'publishing' && check.values.on === true && (
+                    <PublishingCheck drift={check.code === 'publishing_drift'} />
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </TableBox>
     </>
+  );
+}
+
+interface CheckRecord {
+  found: number;
+  fixed: boolean;
+}
+
+/**
+ * The buttons of the line of draft and published spaces (spec 073, PUB-343): check every pair
+ * now, and fix what a check found by recomputing every status from the versions.
+ */
+function PublishingCheck({ drift }: { drift: boolean }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const run = useMutation({
+    mutationFn: (fix: boolean) => api.post<CheckRecord>('/admin/publishing/check', { fix }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['admin-health'] }),
+  });
+  const done = run.data;
+  return (
+    <div className="row">
+      <button type="button" className="quiet" disabled={run.isPending} onClick={() => run.mutate(false)}>
+        {t('health.publishingCheck')}
+      </button>
+      {(drift || (done && !done.fixed && done.found > 0)) && (
+        <button type="button" disabled={run.isPending} onClick={() => run.mutate(true)}>
+          {t('health.publishingFix')}
+        </button>
+      )}
+      <ErrorNote error={run.error} />
+      {done && (
+        <span role="status" className="muted">
+          {done.fixed ? t('health.publishingFixed') : t('health.publishingChecked', { count: done.found })}
+        </span>
+      )}
+    </div>
   );
 }
 

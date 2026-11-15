@@ -432,6 +432,13 @@ func (s *Service) prepare(ctx context.Context, c identity.Caller, list []pages.E
 			}
 		}
 		depths[p.ID] = depth
+		// A published page of a controlled page carries the block of its approval, as the
+		// controlled page does (spec 073, PUB-731).
+		if p.Control == nil && s.twinControl != nil {
+			if p.Control, err = s.twinControl(ctx, p.ID); err != nil {
+				return nil, err
+			}
+		}
 		items = append(items, exportItem{page: p, doc: doc, depth: depth, name: unique(used, safeName(p.Title)), files: files})
 	}
 	report.Pages = len(items)

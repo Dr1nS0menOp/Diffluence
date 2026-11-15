@@ -127,7 +127,8 @@ export function matchParts(title: string, text: string): TitlePart[] {
   return parts;
 }
 
-export type TreeView = 'tree' | 'visited' | 'updated' | 'alphabet';
+/** The ways the tree lists pages; `changed` is offered in a draft space only (spec 073, PUB-1224). */
+export type TreeView = 'tree' | 'visited' | 'updated' | 'alphabet' | 'changed';
 
 /** Lets a dragged row reach the Spaces menu in the top bar. */
 export const PAGE_DRAG_TYPE = 'application/x-diffluence-page';

@@ -424,7 +424,9 @@ var crossings = map[crossing]int{
 	// permissions: the access rule reads the facts it decides from, and names who holds a
 	// permission in a space, for the preview of a pair (spec 073, PUB-210).
 	{"internal/permissions", "global_grants"}: 3,
-	{"internal/permissions", "group_members"}: 6,
+	// Wave PB4 of spec 073 adds one: the people who run a space, directly or through a group, are
+	// told when deleting the other space ended its pair (PUB-1046, PUB-1047).
+	{"internal/permissions", "group_members"}: 7,
 	{"internal/permissions", "groups"}:        8,
 	{"internal/permissions", "page_control"}:  2,
 	// Being asked to review opens a page for the round only, so the rule reads the open
@@ -443,11 +445,13 @@ var crossings = map[crossing]int{
 	// Wave PB3 adds: the release screen counts pages Waiting for approval in the same query; a
 	// run of the system leaves out pages with a view restriction, read once per batch; and the
 	// history names who caused a run of the system, as it names who released.
+	// Wave PB4 adds two: the space-wide verification lists every twin and every twin whose draft
+	// page was purged with its title, in one query each (PUB-920).
 	{"internal/publishing", "page_control"}:      4,
 	{"internal/publishing", "page_restrictions"}: 3,
 	{"internal/publishing", "page_tree"}:         9,
 	{"internal/publishing", "page_versions"}:     5,
-	{"internal/publishing", "pages"}:             12,
+	{"internal/publishing", "pages"}:             14,
 	{"internal/publishing", "users"}:             3,
 
 	// presence: one stamp of what changed on a page, read on every poll.

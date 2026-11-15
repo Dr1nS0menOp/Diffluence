@@ -32,6 +32,7 @@ func (s *Server) registerReleaseRoutes() {
 	r.HandleFunc("GET "+base+"/as-of", Object(permissions.SpaceRelease), on(s.handleReleasedAsOf))
 	r.HandleFunc("GET "+base+"/export", Object(permissions.SpaceAudit), on(s.handleReleaseExport))
 	r.HandleFunc("POST "+base+"/check", Object(permissions.SpaceAdminister), on(s.handleReleaseCheck))
+	r.HandleFunc("POST "+base+"/verify", Object(permissions.SpaceAudit), on(s.handleReleaseVerifySpace))
 	r.HandleFunc("GET "+base+"/{run}", Object(permissions.SpaceRelease), on(s.handleRunView))
 	r.HandleFunc("POST "+base+"/{run}/start", Object(permissions.SpaceRelease), on(s.handleRunStart))
 	r.HandleFunc("POST "+base+"/{run}/cancel", Object(permissions.SpaceRelease), on(s.handleRunCancel))
@@ -179,6 +180,21 @@ func (s *Server) handleReleaseCheck(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, res)
+}
+
+// handleReleaseVerifySpace queues the verification of every twin of a pair (spec 073, PUB-920);
+// the report is the result of its job.
+func (s *Server) handleReleaseVerifySpace(w http.ResponseWriter, r *http.Request) {
+	id, ok := pathID(w, r, "id")
+	if !ok {
+		return
+	}
+	job, err := s.deps.Publishing.VerifySpace(r.Context(), s.caller(r), id)
+	if err != nil {
+		s.fail(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, job)
 }
 
 func (s *Server) handleRunView(w http.ResponseWriter, r *http.Request) {

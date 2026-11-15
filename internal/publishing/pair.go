@@ -159,6 +159,9 @@ func checkSides(draft spaces.Space, published *spaces.Space) error {
 	return nil
 }
 
+// codePublishedNotEmpty refuses a link to a space with content (PUB-211, PUB-1404).
+const codePublishedNotEmpty = "published_space_not_empty"
+
 // checkEmpty refuses a published space with content, and says what is in it (PUB-211).
 func checkEmpty(ctx context.Context, q db.Querier, space spaces.Space) error {
 	found, err := pages.ContentInTheWay(ctx, q, space.ID, space.HomePageID)
@@ -186,8 +189,8 @@ func checkEmpty(ctx context.Context, q db.Querier, space spaces.Space) error {
 	for _, key := range keys {
 		parts = append(parts, fmt.Sprintf("%d %s", found[key], words[key]))
 	}
-	return apperr.Conflict("published_space_not_empty", "The published space must be empty. It holds "+strings.Join(parts, ", ")+
-		". Choose an empty space, or make a new one.")
+	return apperr.Conflict(codePublishedNotEmpty, "The published space must be empty. It holds "+strings.Join(parts, ", ")+
+		". Choose an empty space, or make a new one. A space with content becomes a published space by starting a draft space from it.")
 }
 
 // PreviewLink says what linking would do, and refuses as Link would (PUB-210).
@@ -425,29 +428,34 @@ func (s *Service) End(ctx context.Context, c identity.Caller, spaceID uuid.UUID)
 				return err
 			}
 		}
-		// A pair is not ended under a run that writes into it (PUB-244).
-		if err := s.refuseWhileRunning(ctx, tx, p.ID); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "UPDATE space_pairs SET ended_at = now(), ended_by = $2 WHERE id = $1", p.ID, c.UserID); err != nil {
-			return err
-		}
-		for _, side := range []uuid.UUID{p.Draft, p.Published} {
-			if err := spaces.SetPairRole(ctx, tx, side, ""); err != nil {
-				return err
-			}
-		}
-		if _, err := audit.Record(ctx, tx, c.Event("space.unpaired", "space", p.Draft.String(), p.Draft.String(),
-			map[string]any{"pair_id": p.ID, "draft_space_id": p.Draft, "published_space_id": p.Published})); err != nil {
-			return err
-		}
-		if _, err := audit.Record(ctx, tx, c.Event("space.unmanaged", "space", p.Published.String(), p.Published.String(),
-			map[string]any{"pair_id": p.ID})); err != nil {
-			return err
-		}
-		_, err = outbox.Enqueue(ctx, tx, "space.unpaired", map[string]any{"space_id": p.Draft, "pair_id": p.ID})
-		return err
+		return s.endPair(ctx, tx, c, p)
 	})
+}
+
+// endPair ends a pair inside tx, after the rights were checked.
+func (s *Service) endPair(ctx context.Context, tx pgx.Tx, c identity.Caller, p pair) error {
+	// A pair is not ended under a run that writes into it (PUB-244).
+	if err := s.refuseWhileRunning(ctx, tx, p.ID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE space_pairs SET ended_at = now(), ended_by = $2 WHERE id = $1", p.ID, c.UserID); err != nil {
+		return err
+	}
+	for _, side := range []uuid.UUID{p.Draft, p.Published} {
+		if err := spaces.SetPairRole(ctx, tx, side, ""); err != nil {
+			return err
+		}
+	}
+	if _, err := audit.Record(ctx, tx, c.Event("space.unpaired", "space", p.Draft.String(), p.Draft.String(),
+		map[string]any{"pair_id": p.ID, "draft_space_id": p.Draft, "published_space_id": p.Published})); err != nil {
+		return err
+	}
+	if _, err := audit.Record(ctx, tx, c.Event("space.unmanaged", "space", p.Published.String(), p.Published.String(),
+		map[string]any{"pair_id": p.ID})); err != nil {
+		return err
+	}
+	_, err := outbox.Enqueue(ctx, tx, "space.unpaired", map[string]any{"space_id": p.Draft, "pair_id": p.ID})
+	return err
 }
 
 // EndPreview says what ending a pair would leave: the pages out of step that stay so, and
@@ -455,6 +463,9 @@ func (s *Service) End(ctx context.Context, c identity.Caller, spaceID uuid.UUID)
 type EndPreview struct {
 	OutOfStep int  `json:"out_of_step"`
 	Going     bool `json:"going"`
+	// Undo says the draft space was started from the published space and nothing was released
+	// since, so ending can also delete the draft space (PUB-1311).
+	Undo bool `json:"undo"`
 }
 
 // PreviewEnd says what ending the pair of a space would leave, for those who may end it.
@@ -475,7 +486,10 @@ func (s *Service) PreviewEnd(ctx context.Context, c identity.Caller, spaceID uui
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM page_pairs WHERE pair_id = $1 AND cardinality(changed) > 0`, p.ID).Scan(&out.OutOfStep); err != nil {
 		return out, err
 	}
-	out.Going, err = runGoing(ctx, s.pool, p.ID, s.limits.StaleAfter)
+	if out.Going, err = runGoing(ctx, s.pool, p.ID, s.limits.StaleAfter); err != nil {
+		return out, err
+	}
+	out.Undo, err = undoable(ctx, s.pool, p.ID)
 	return out, err
 }
 
@@ -548,6 +562,10 @@ type StateCan struct {
 	End      bool `json:"end"`
 	Settings bool `json:"settings"`
 	Release  bool `json:"release"`
+	// Start offers starting a draft space from this space, which has content (PUB-1302).
+	Start bool `json:"start"`
+	// Verify offers the space-wide verification to those who see the draft space's audit (PUB-920).
+	Verify bool `json:"verify"`
 }
 
 // PairState is a pair as one person may see it.
@@ -588,7 +606,11 @@ func (s *Service) State(ctx context.Context, c identity.Caller, spaceID uuid.UUI
 	p, err := activePairOf(ctx, s.pool, spaceID, false)
 	if hasCode(err, codeNotPaired) {
 		out.Can.Link = administers
-		return out, nil
+		if administers {
+			// A space with content becomes a published space by a start, not by a link (PUB-1404).
+			out.Can.Start, err = s.startOffered(ctx, spaceID)
+		}
+		return out, err
 	}
 	if err != nil {
 		return out, err
@@ -636,9 +658,29 @@ func (s *Service) State(ctx context.Context, c identity.Caller, spaceID uuid.UUI
 				return out, err
 			}
 		}
+		if out.Can.Verify, err = may(spaceID, permissions.SpaceAudit); err != nil {
+			return out, err
+		}
 	}
 	out.Pair = view
 	return out, nil
+}
+
+// startOffered says whether a space can become a published space by a start: it may be in a pair
+// and holds more than an empty space does, pages, files or versions of its home page.
+func (s *Service) startOffered(ctx context.Context, spaceID uuid.UUID) (bool, error) {
+	sp, err := spaces.LoadIn(ctx, s.pool, spaceID)
+	if err != nil {
+		return false, err
+	}
+	if checkSides(sp, nil) != nil {
+		return false, nil
+	}
+	err = checkEmpty(ctx, s.pool, sp)
+	if hasCode(err, codePublishedNotEmpty) {
+		return true, nil
+	}
+	return false, err
 }
 
 func otherSide(p pair, spaceID uuid.UUID) uuid.UUID {

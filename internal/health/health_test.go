@@ -224,6 +224,23 @@ func TestAnInstallationThatNeverReportedAWitnessIsNotWarned(t *testing.T) {
 	expect(t, f, "audit", OK, "audit_ok")
 }
 
+// The check of draft and published spaces (spec 073, PUB-343): a difference it found warns, and
+// so does a check more than eight days old, as it runs weekly; an off part says so and warns not.
+func TestTheCheckOfDraftAndPublishedSpacesWarnsOfWhatItFoundAndOfItsAge(t *testing.T) {
+	f := healthy()
+	expect(t, f, "publishing", OK, "publishing_off")
+	f.PublishingOn = true
+	expect(t, f, "publishing", OK, "publishing_new")
+	f.PublishingChecked, f.PublishingAt, f.PublishingPairs = true, now.Add(-PublishingWarnAfter), 2
+	expect(t, f, "publishing", OK, "publishing_ok")
+	f.PublishingAt = now.Add(-PublishingWarnAfter - time.Second)
+	expect(t, f, "publishing", Warn, "publishing_old")
+	f.PublishingAt, f.PublishingFound = now.Add(-time.Hour), 3
+	if c := expect(t, f, "publishing", Warn, "publishing_drift"); c.Values["count"] != 3 || c.Values["on"] != true {
+		t.Fatalf("values %+v", c.Values)
+	}
+}
+
 // A contract migration waits for its grace period on purpose (spec 048 D1); only a day on
 // top of that is news.
 func TestAContractMigrationWarnsADayAfterItsGrace(t *testing.T) {

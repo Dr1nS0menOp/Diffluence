@@ -342,6 +342,7 @@ function Sidebar({
   const [addingLink, setAddingLink] = useState(false);
   const [rowDialog, setRowDialog] = useState<{ page: PageSummary; dialog: RowDialog } | null>(null);
   const canCreate = space.can?.['page.create'] ?? false;
+  const { publishing } = useCapabilities();
   // The home page has its own row above the tree, so its children are the top rows.
   const home = space.home_page_id;
   return (
@@ -375,6 +376,7 @@ function Sidebar({
         onAddRoot={canCreate ? () => setAdding({ parent: parent ?? home }) : undefined}
         onAddLink={canCreate ? () => setAddingLink(true) : undefined}
         onDialog={(page, dialog) => setRowDialog({ page, dialog })}
+        draftSpace={publishing && space.pair_role === 'draft'}
       />
       {space.can?.['space.manage_access'] && (
         <nav className="sidebar-foot" aria-label={t('space.settings')}>

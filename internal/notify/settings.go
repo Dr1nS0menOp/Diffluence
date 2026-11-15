@@ -75,6 +75,9 @@ const (
 	// TypeTemplateSet tells the watchers once that a template made a set of published pages,
 	// and the creator that a set made in the background is ready (TPL-720, TPL-1433).
 	TypeTemplateSet = "template_set"
+	// TypePairEnded tells the people who run a space that deleting the other space of its pair
+	// ended the pair (spec 073, PUB-1046, PUB-1047).
+	TypePairEnded = "pair_ended"
 )
 
 // Where a type of notification goes.
@@ -98,7 +101,7 @@ var Types = []string{TypeMention, TypeTaskAssigned, TypeTaskDue, TypeShare, Type
 	TypePageChanged, TypeAccessRequest, TypeAccessAnswer, TypeRule, TypeAccessRecovered, TypeDraftExpiring, TypeInvitationAnswer,
 	TypeReviewAsked, TypeReviewAnswered, TypeReviewEnded, TypeReviewerRemoved, TypePagesReleased, TypeReleaseFinished, TypeVersionApproved,
 	TypeApprovalRelease, TypeReviewReminder, TypeReadRequested, TypePeriodicReview,
-	TypeTemplateProposed, TypeTemplateDecided, TypeTemplateSet}
+	TypeTemplateProposed, TypeTemplateDecided, TypeTemplateSet, TypePairEnded}
 
 var channels = []string{ChannelOff, ChannelApp, ChannelMail, ChannelDigest}
 
@@ -132,6 +135,7 @@ func defaultChannels() map[string]string {
 		TypeVersionApproved: ChannelDigest, TypeApprovalRelease: ChannelApp,
 		TypeReviewReminder: ChannelMail, TypeReadRequested: ChannelMail, TypePeriodicReview: ChannelMail,
 		TypeTemplateProposed: ChannelMail, TypeTemplateDecided: ChannelMail, TypeTemplateSet: ChannelDigest,
+		TypePairEnded: ChannelMail,
 	}
 }
 

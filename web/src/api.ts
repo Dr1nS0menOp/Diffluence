@@ -308,7 +308,7 @@ export interface PublishingState {
     releasers: { type: string; id: string; name: string }[] | null;
     health: { drafts_readable: boolean; out_of_step: number; since: string | null } | null;
   } | null;
-  can: { link: boolean; end: boolean; settings: boolean; release: boolean };
+  can: { link: boolean; end: boolean; settings: boolean; release: boolean; start: boolean; verify: boolean };
 }
 
 /** What linking two spaces would change (PUB-210). */
@@ -350,14 +350,69 @@ export interface ReleaseStatus {
   /** When what a twin shows was approved, and by whom when the pair shows approvers (PUB-730). */
   approval?: { approved_at: string; version: number; approved_by?: string; signatures?: SignatureView[] };
   can_verify: boolean;
+  /** On a draft page, for those who release: what each released version became (PUB-911). */
+  released_as?: ReleasedAs[];
+  /** On a twin: the person would edit it, were it not for the pair (PUB-1231). */
+  would_edit?: boolean;
 }
+
+/** A version of a draft page and the version of the published page it became (PUB-911). */
+export interface ReleasedAs {
+  draft_version: number;
+  twin_version: number;
+  released_at: string;
+  run_id: string;
+}
+
+/** What verifying a twin found (PUB-732, PUB-920). */
+export type VerifyOutcome =
+  'verified' | 'differs' | 'draft_changed' | 'not_released' | 'cannot_verify' | 'draft_purged';
 
 /** What verifying a twin found (PUB-732). */
 export interface ReleaseVerification {
-  outcome: 'verified' | 'differs' | 'draft_changed' | 'not_released' | 'cannot_verify';
+  outcome: VerifyOutcome;
   twin_page_id?: string;
   draft_version?: number;
   twin_version?: number;
+}
+
+/** One twin in the report of a space-wide verification (PUB-920). */
+export interface VerifiedPage {
+  twin_page_id: string;
+  draft_page_id?: string;
+  title: string;
+  outcome: VerifyOutcome;
+  draft_version?: number;
+}
+
+/** The report of a space-wide verification, the result of its job (PUB-920). */
+export interface SpaceVerification {
+  counts: Partial<Record<VerifyOutcome, number>>;
+  pages: VerifiedPage[];
+  hidden: number;
+}
+
+/** What starting a draft space from a space with content changes, in numbers (PUB-1309). */
+export interface StartPreview {
+  pages: number;
+  hidden: number;
+  restricted: number;
+  files: number;
+  bytes: number;
+  posts: number;
+  databases: number;
+  archived: number;
+  unpublished: number;
+  move_to_draft: { people: number; groups: number; everyone: boolean; names: string[] | null };
+  seconds: number;
+}
+
+/** A background job as its maker follows it: when done its result is the job's own, when
+ * failed it holds the error. */
+export interface JobState {
+  id: string;
+  status: 'queued' | 'running' | 'done' | 'failed';
+  result: unknown;
 }
 
 export type ReleaseStatusWord =

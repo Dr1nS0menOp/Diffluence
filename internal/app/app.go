@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/diffluence/diffluence/internal/analytics"
@@ -254,6 +255,37 @@ func New(ctx context.Context, cfg config.Config, log *slog.Logger) (*App, error)
 	// Runs of more than one page are work of the worker, so every role knows them (spec 073).
 	a.publishing = publishing.NewService(a.pool, a.perms, publishing.Deps{Pages: a.pages, Spaces: a.spaces, Attachments: a.attach,
 		Jobs: a.jobs, Features: a.features})
+	// The health page shows a new check at once, not after the 30 seconds it keeps its facts.
+	a.publishing.SetAfterCheck(func() {
+		a.healthCache.mu.Lock()
+		a.healthCache.readAt = time.Time{}
+		a.healthCache.mu.Unlock()
+	})
+	a.exchange.SetTwinControl(a.publishing.TwinExportControl)
+	a.exchange.SetLeftOutMarks(exchange.LeftOutMarks{
+		Read: func(ctx context.Context, list []uuid.UUID) ([]exchange.LeftOutMark, error) {
+			marks, err := publishing.LeftOutAmong(ctx, a.pool, list)
+			out := make([]exchange.LeftOutMark, len(marks))
+			for i, m := range marks {
+				out[i] = exchange.LeftOutMark{PageID: m.PageID, WithChildren: m.WithChildren, Reason: m.Reason}
+			}
+			return out, err
+		},
+		Write: func(ctx context.Context, tx pgx.Tx, marks []exchange.LeftOutMark, by uuid.UUID) error {
+			in := make([]publishing.LeftOutMark, len(marks))
+			for i, m := range marks {
+				in[i] = publishing.LeftOutMark{PageID: m.PageID, WithChildren: m.WithChildren, Reason: m.Reason}
+			}
+			return publishing.RestoreLeftOut(ctx, tx, in, by)
+		},
+	})
+	a.notify.SetEndedPairs(func(ctx context.Context, space uuid.UUID) (*notify.EndedPair, error) {
+		ended, err := a.publishing.EndedByTrash(ctx, space)
+		if err != nil || ended == nil {
+			return nil, err
+		}
+		return &notify.EndedPair{SpaceID: ended.SpaceID, Home: ended.Home, Admins: ended.Admins, Side: ended.Side}, nil
+	})
 	a.notify.SetReleasedPages(func(ctx context.Context, run uuid.UUID) (notify.ReleasedRun, error) {
 		r, err := a.publishing.RunPages(ctx, run)
 		return notify.ReleasedRun{Released: r.Released, TakenOff: r.TakenOff, PublishedHome: r.PublishedHome, DraftHome: r.DraftHome}, err
@@ -609,6 +641,9 @@ func (a *App) DeliverEvents(ctx context.Context) error {
 // Jobs exposes the job runner (used by tests).
 func (a *App) Jobs() *jobs.Service { return a.jobs }
 
+// Publishing exposes draft and published spaces (used by tests).
+func (a *App) Publishing() *publishing.Service { return a.publishing }
+
 // Trash exposes the trash (used by tests).
 func (a *App) Trash() *trash.Service { return a.trash }
 
@@ -710,6 +745,9 @@ func (a *App) PeriodicTasks() []jobs.Task {
 		{Name: "sample-database-size", Every: time.Hour, Run: a.sampleDatabaseSize},
 		{Name: "purge-finished-work", Every: 24 * time.Hour, Run: a.purgeFinishedWork},
 		{Name: "mail-backup-failures", Every: 5 * time.Minute, Run: a.backups.MailFailures},
+		// The check of draft and published spaces runs once a week, and once after the part
+		// was turned on again; asking every hour finds both (spec 073, PUB-343, PUB-1305).
+		{Name: "check-publishing", Every: time.Hour, Run: a.publishing.SelfCheck},
 	}
 	if a.cfg.ExampleSpace {
 		tasks = append(tasks, jobs.Task{Name: "example-space", Every: exampleSpaceCheck, Run: a.example.OnNewInstance})

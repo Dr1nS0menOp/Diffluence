@@ -102,9 +102,10 @@ var changesSQL = `WITH changes AS (
 	)` + changesTail
 
 // byRun asks whether a run of a release of many pages wrote a version. Such a run is one item
-// of its own, so its pages do not show one by one (spec 073, PUB-810).
+// of its own, so its pages do not show one by one (spec 073, PUB-810). The start of a draft space
+// wrote no version readers have, so it hides none and is no item (PUB-1302).
 func byRun(version string) string {
-	return `EXISTS (SELECT 1 FROM release_run_pages rp JOIN release_runs rr ON rr.id = rp.run_id AND rr.scope <> 'page'
+	return `EXISTS (SELECT 1 FROM release_run_pages rp JOIN release_runs rr ON rr.id = rp.run_id AND rr.scope NOT IN ('page', 'start')
 		WHERE rp.twin_page_id = ` + version + `.page_id AND rp.twin_version = ` + version + `.number)`
 }
 
@@ -115,7 +116,7 @@ var runItems = `SELECT pub.home_page_id, r.actor_id, r.finished_at, 'released', 
 			(SELECT count(*)::int FROM release_run_pages rp WHERE rp.run_id = r.id AND rp.outcome = 'released'
 				AND ` + visible("rp.twin_page_id") + `)
 		FROM release_runs r JOIN space_pairs sp ON sp.id = r.pair_id JOIN spaces pub ON pub.id = sp.published_space_id
-		WHERE r.scope <> 'page' AND r.status = 'done' AND pub.home_page_id IS NOT NULL AND ` + visible("pub.home_page_id")
+		WHERE r.scope NOT IN ('page', 'start') AND r.status = 'done' AND pub.home_page_id IS NOT NULL AND ` + visible("pub.home_page_id")
 
 // "For you" holds only pages a person watches, pages below a branch they watch, pages
 // of spaces they watch, and pages of people they follow. Walking every version newest

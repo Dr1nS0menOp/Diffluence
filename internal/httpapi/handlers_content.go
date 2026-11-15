@@ -332,13 +332,28 @@ func (s *Server) handleTreeBranches(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, part)
 }
 
+// treeViewChanged is the view of a draft space's tree that lists the pages changed since their
+// release (spec 073, PUB-1224).
+const treeViewChanged = "changed"
+
 func (s *Server) handleTreeFind(w http.ResponseWriter, r *http.Request) {
 	id, ok := pathID(w, r, "id")
 	if !ok {
 		return
 	}
 	q := r.URL.Query()
-	found, err := s.deps.Pages.TreeFind(r.Context(), s.caller(r), id, q.Get("q"), q.Get("view"))
+	var found pages.Found
+	var err error
+	if q.Get("view") == treeViewChanged {
+		// The pages of a draft space changed since their release are the publishing module's
+		// to pick; the tree shows them as any flat view (spec 073, PUB-1224).
+		var list []uuid.UUID
+		if list, err = s.deps.Publishing.ChangedSinceRelease(r.Context(), s.caller(r), id); err == nil {
+			found, err = s.deps.Pages.TreeOf(r.Context(), s.caller(r), id, list)
+		}
+	} else {
+		found, err = s.deps.Pages.TreeFind(r.Context(), s.caller(r), id, q.Get("q"), q.Get("view"))
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return

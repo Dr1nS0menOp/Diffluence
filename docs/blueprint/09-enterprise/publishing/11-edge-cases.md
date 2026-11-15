@@ -34,7 +34,7 @@ Each line here is a situation where the two spaces could disagree without anyone
 
 - **PUB-1030** · built · **Restoring an older version** of a draft page makes a new version (spec 001); the page is Changed since release, unless the restored version equals the released one (PUB-342). Releasing it gives readers that text as a new twin version. *Proof:* tests.
 - **PUB-1031** · built · A twin's history cannot be restored from the published space (PUB-220). *Proof:* a test.
-- **PUB-1032** · partly · **A full restore** of the installation (wave RS) returns both spaces, the pair, the page pairs and runs to the moment of the backup together, because they are in one database. A run that was going at the backup is shown as stopped, and can be resumed with the same versions if they still exist (PUB-1061). *Proof:* a step in the restore drill with a pair and a run in progress.
+- **PUB-1032** · built · **A full restore** of the installation (wave RS) returns both spaces, the pair, the page pairs and runs to the moment of the backup together, because they are in one database. A run that was going at the backup is shown as stopped, and can be resumed with the same versions if they still exist (PUB-1061). *Proof:* a step in the restore drill with a pair and a run in progress.
 - **PUB-1033** · new · **Restoring one space from a backup** (roadmap, spec 059 and later) into a paired space is refused while the pair is active, and the screen says to end the pair first. *Why:* a space brought back alone would no longer match its page pairs. *Proof:* a test once that feature exists.
 - **PUB-1034** · partly · **Restoring a space from the trash** (a deleted space brought back): an ended pair is not brought back by itself; the administrator can link again (PUB-245). *Proof:* a test.
 
@@ -42,15 +42,15 @@ Each line here is a situation where the two spaces could disagree without anyone
 
 - **PUB-1040** · partly · **Importing into the draft space** (Markdown, HTML, Word, a bundle, an export of another wiki) makes ordinary draft pages, Not released yet. *Proof:* a test.
 - **PUB-1041** · new · **Importing into the published space** is refused (PUB-220). *Proof:* a test.
-- **PUB-1042** · new · **Exporting the draft space** as a bundle (an experimental part, ADR-043) carries the left-out marks with their reasons, and not the pair: a pair is between two spaces of one installation. Imported elsewhere, the bundle makes an ordinary space whose pages remember which were left out, so a pair made there later starts with the same choice. *Proof:* a round-trip test.
-- **PUB-1043** · new · **Exporting the published space** as a bundle makes an ordinary bundle; imported elsewhere, it is an ordinary space, not managed. *Why:* the managed rule belongs to the pair, which does not travel. *Proof:* a test.
+- **PUB-1042** · built · **Exporting the draft space** as a bundle (an experimental part, ADR-043) carries the left-out marks with their reasons, and not the pair: a pair is between two spaces of one installation. Imported elsewhere, the bundle makes an ordinary space whose pages remember which were left out, so a pair made there later starts with the same choice. *Proof:* a round-trip test.
+- **PUB-1043** · built · **Exporting the published space** as a bundle makes an ordinary bundle; imported elsewhere, it is an ordinary space, not managed. *Why:* the managed rule belongs to the pair, which does not travel. *Proof:* a test.
 - **PUB-1044** · new · Exports of every other format of either space are those of an ordinary space (PUB-625). *Proof:* covered by PUB-625.
 - **PUB-1045** · new · **Copying a whole space** (if offered later) of either side makes an ordinary space. *Proof:* a test when the feature exists.
 
 ## 11.6 Spaces of a pair
 
 - **PUB-1046** · built · **Deleting the published space** (by its administrator, with the existing delete of a space, which needs no write of pages) ends the pair, and the draft space's administrators are told. The draft space keeps everything, and its pages become ordinary. *Proof:* a test.
-- **PUB-1047** · partly · **Deleting the draft space** ends the pair; the published space becomes an ordinary space, which its editors can change again, and its administrators are told. *Why:* the alternative, a published space nobody can ever change, would be a trap. *Proof:* a test.
+- **PUB-1047** · built · **Deleting the draft space** ends the pair; the published space becomes an ordinary space, which its editors can change again, and its administrators are told. *Why:* the alternative, a published space nobody can ever change, would be a trap. *Proof:* a test.
 - **PUB-1048** · built · **Archiving the draft space** stops releases (archived spaces are read-only) and keeps the pair; unarchiving lets them go on. **Archiving the published space** keeps it read-only to readers as any archived space, and refuses runs until unarchived. *Proof:* tests.
 - **PUB-1049** · built · A space that is in a pair cannot be made a **personal space**, and a personal space cannot be in a pair. *Why:* a personal space has one writer and no audience to separate. *Proof:* a test.
 

@@ -29,6 +29,9 @@ const (
 	VerifyDiffers      = "differs"
 	VerifyDraftChanged = "draft_changed"
 	VerifyNotReleased  = "not_released"
+	// VerifyDraftPurged is a twin whose draft page or version was purged: there is nothing left to
+	// compare it with (PUB-920, PUB-1012).
+	VerifyDraftPurged = "draft_purged"
 	// VerifyCannot is a twin released before releases kept what verification needs; its next
 	// release can be verified.
 	VerifyCannot = "cannot_verify"
@@ -111,11 +114,15 @@ func (s *Service) verify(ctx context.Context, tx pgx.Tx, p pair, pageID uuid.UUI
 		return out, nil
 	}
 	out.DraftVersion, out.TwinVersion = f.draftVersion, f.twinVersion
-	if f.links[mapDraftID] == "" {
+	if f.links[mapDraftID] == "" && f.links[mapStart] == "" {
 		out.Outcome = VerifyCannot
 		return out, nil
 	}
 	draft, err := pages.VersionForRelease(ctx, tx, pageID, f.draftVersion)
+	if apperr.IsNotFound(err) {
+		out.Outcome = VerifyDraftPurged
+		return out, nil
+	}
 	if err != nil {
 		return out, err
 	}
@@ -123,11 +130,18 @@ func (s *Service) verify(ctx context.Context, tx pgx.Tx, p pair, pageID uuid.UUI
 		out.Outcome = VerifyDraftChanged
 		return out, nil
 	}
-	again, err := rewriteFromMap(draft.Doc, f.links)
+	held, err := pages.VersionForRelease(ctx, tx, f.twin, f.twinVersion)
 	if err != nil {
 		return out, err
 	}
-	held, err := pages.VersionForRelease(ctx, tx, f.twin, f.twinVersion)
+	// A release made the twin from the draft; a start made the draft from the twin. Either change
+	// is done again from its map, in its own direction, and compared with what the other side holds.
+	from, want := draft.Doc, held.Hash
+	redo := rewriteFromMap
+	if f.links[mapStart] != "" {
+		from, want, redo = held.Doc, draft.Hash, startFromMap
+	}
+	again, err := redo(from, f.links)
 	if err != nil {
 		return out, err
 	}
@@ -136,10 +150,24 @@ func (s *Service) verify(ctx context.Context, tx pgx.Tx, p pair, pageID uuid.UUI
 		return out, err
 	}
 	out.Outcome = VerifyDiffers
-	if hash == held.Hash {
+	if hash == want {
 		out.Outcome = VerifyOK
 	}
 	return out, nil
+}
+
+// startFromMap does the change of a start again from the map it kept, and gives the document as
+// the copy in the draft space would hold it.
+func startFromMap(doc document.Node, links map[string]string) ([]byte, error) {
+	m, err := startMapFrom(links)
+	if err != nil {
+		return nil, err
+	}
+	again, _, err := startDocument(doc, m)
+	if err != nil {
+		return nil, err
+	}
+	return document.Marshal(again)
 }
 
 // releasedNow reads the release that wrote the version a twin shows now.
@@ -148,7 +176,7 @@ func releasedNow(ctx context.Context, tx pgx.Tx, p pair, pageID, twin uuid.UUID,
 	var raw []byte
 	err := tx.QueryRow(ctx, `SELECT rp.twin_page_id, rp.draft_version, rp.twin_version, rp.content_hash, rp.link_map
 		FROM release_run_pages rp JOIN release_runs r ON r.id = rp.run_id
-		WHERE r.pair_id = $1 AND rp.draft_page_id = $2 AND rp.twin_page_id = $3 AND rp.outcome = 'released' AND rp.twin_version = $4
+		WHERE r.pair_id = $1 AND rp.draft_page_id = $2 AND rp.twin_page_id = $3 AND rp.outcome IN ('released', 'started') AND rp.twin_version = $4
 		ORDER BY r.finished_at DESC NULLS LAST LIMIT 1`, p.ID, pageID, twin, twinVersion).Scan(&f.twin, &f.draftVersion, &f.twinVersion, &f.hash, &raw)
 	if noRows(err) {
 		return f, false, nil

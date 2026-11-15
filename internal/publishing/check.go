@@ -54,6 +54,11 @@ func (s *Service) Check(ctx context.Context, c identity.Caller, spaceID uuid.UUI
 
 // CheckAll runs the check of every active pair, for `diffluence check publishing`.
 func CheckAll(ctx context.Context, pool *pgxpool.Pool, fix bool) ([]CheckResult, error) {
+	return checkAllAs(ctx, pool, identity.Caller{System: "cli"}, fix)
+}
+
+// checkAllAs runs the check of every active pair, audited as c.
+func checkAllAs(ctx context.Context, pool *pgxpool.Pool, c identity.Caller, fix bool) ([]CheckResult, error) {
 	rows, err := pool.Query(ctx, `SELECT `+pairColumns+` FROM space_pairs WHERE ended_at IS NULL ORDER BY created_at`)
 	if err != nil {
 		return nil, err
@@ -64,7 +69,7 @@ func CheckAll(ctx context.Context, pool *pgxpool.Pool, fix bool) ([]CheckResult,
 	}
 	out := []CheckResult{}
 	for _, p := range pairs {
-		res, err := checkPair(ctx, pool, identity.Caller{System: "cli"}, p, fix)
+		res, err := checkPair(ctx, pool, c, p, fix)
 		if err != nil {
 			return out, err
 		}

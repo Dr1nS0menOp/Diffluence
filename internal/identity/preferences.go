@@ -29,7 +29,7 @@ const (
 
 var (
 	themes      = []string{"system", "light", "dark"}
-	treeViews   = []string{"tree", "visited", "updated", "alphabet"}
+	treeViews   = []string{"tree", "visited", "updated", "alphabet", "changed"} // changed: of a draft space, spec 073
 	languages   = []string{"en"}
 	dateFormats = []string{"short", "medium", "long", "iso"}
 	// Empty is what a client sends that does not know this setting yet.

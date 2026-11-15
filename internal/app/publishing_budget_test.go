@@ -102,6 +102,40 @@ func TestAWholeSpaceReleaseFitsItsBudget(t *testing.T) {
 	t.Logf("whole space, %d pages in one transaction: preview %v, run %v, %.0f pages a second", count, preview, run, float64(count)/run.Seconds())
 }
 
+// TestAStartAndASpaceWideVerificationFitTheirBudget measures wave PB4 (spec 073, PUB-1309,
+// PUB-920) on generated data: a draft space started from a space of about 1,000 pages, and the
+// verification of every published page after it. The bounds are wide; the numbers go in the report.
+func TestAStartAndASpaceWideVerificationFitTheirBudget(t *testing.T) {
+	if testing.Short() {
+		t.Skip("a measurement")
+	}
+	e := newEnv(t)
+	s := newStartWorld(e, "SLOAD")
+	pubWorld{e: e, draftHome: s.home}.manyDraftPages("Chapter", 20, 49) // 1,000 pages more
+	pages := e.count("SELECT count(*) FROM pages WHERE space_id = $1 AND kind = 'page' AND status = 'published'", s.space)
+	start := time.Now()
+	preview := s.admin.ok("POST", "/api/v1/spaces/"+s.space+"/publishing/start-preview", s.startBody())
+	previewed := time.Since(start)
+	start = time.Now()
+	s.start()
+	started := time.Since(start)
+	t.Logf("a start of %d pages: preview %v (estimated %v s), start %v, %.0f pages a second", pages, previewed, preview["seconds"],
+		started, float64(pages)/started.Seconds())
+	if rate := float64(pages) / started.Seconds(); rate < 5 {
+		t.Fatalf("a start ran at %.0f pages a second", rate)
+	}
+	start = time.Now()
+	job := s.admin.want(http.StatusAccepted, "POST", "/api/v1/spaces/"+s.draft+"/releases/verify", nil)
+	e.runJobs()
+	verified := time.Since(start)
+	id := job[len(`{"job_id":"`) : len(`{"job_id":"`)+36]
+	report := s.admin.ok("GET", "/api/v1/jobs/"+id, nil)["result"].(map[string]any)["counts"].(map[string]any)
+	t.Logf("the verification of every published page: %v for %v", verified, report)
+	if report["verified"] != float64(pages) {
+		t.Fatalf("after a start, %v of %d pages verified", report["verified"], pages)
+	}
+}
+
 func minDuration(list []time.Duration) time.Duration {
 	best := list[0]
 	for _, d := range list[1:] {

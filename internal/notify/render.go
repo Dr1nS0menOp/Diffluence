@@ -55,6 +55,7 @@ var sentences = map[string]string{
 	TypeTemplateProposed: "%s asks you to approve the template %s",
 	TypeTemplateDecided:  "%s decided on the template %s",
 	TypeTemplateSet:      "%s added %s and pages below it",
+	TypePairEnded:        "%s deleted the other space of the pair of %s, so the pair has ended",
 }
 
 // templateDecisions are the words of TypeTemplateDecided, by what was decided (TPL-722). A

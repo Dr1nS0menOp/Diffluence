@@ -138,7 +138,9 @@ func record(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, s 
 	if _, err := audit.Record(ctx, tx, c.Event(action, "space", s.ID.String(), s.ID.String(), details)); err != nil {
 		return err
 	}
-	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"space_id": s.ID})
+	// The actor lets a listener leave out the person who acted, such as who deleted a space of
+	// a pair (spec 073, PUB-1046).
+	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"space_id": s.ID, "actor_id": c.UserID})
 	return err
 }
 
@@ -359,27 +361,47 @@ func (s *Service) Unarchive(ctx context.Context, c identity.Caller, id uuid.UUID
 
 // Delete sends a space to the trash.
 func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) error {
-	retention, err := s.settings.TrashRetention(ctx)
-	if err != nil {
-		return err
-	}
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := s.perms.RequireSpace(ctx, tx, c.UserID, id, permissions.SpaceAdminister); err != nil {
 			return err
 		}
-		sp, err := load(ctx, tx, id)
-		if err != nil {
-			return err
-		}
-		if _, err := trash.Add(ctx, tx, trash.Item{SpaceID: id, ObjectType: trash.TypeSpace, ObjectID: id,
-			Title: sp.Name, DeletedBy: c.UserID}, retention); err != nil {
-			return err
-		}
-		if _, err := tx.Exec(ctx, "UPDATE spaces SET status = 'trashed', updated_at = now() WHERE id = $1", id); err != nil {
-			return err
-		}
-		return record(ctx, tx, c, "space.trashed", sp, nil)
+		return s.TrashIn(ctx, tx, c, id)
 	})
+}
+
+// TrashIn sends a space to the trash inside tx. The caller has checked space.administer.
+func (s *Service) TrashIn(ctx context.Context, tx pgx.Tx, c identity.Caller, id uuid.UUID) error {
+	retention, err := s.settings.TrashRetention(ctx)
+	if err != nil {
+		return err
+	}
+	sp, err := load(ctx, tx, id)
+	if err != nil {
+		return err
+	}
+	if _, err := trash.Add(ctx, tx, trash.Item{SpaceID: id, ObjectType: trash.TypeSpace, ObjectID: id,
+		Title: sp.Name, DeletedBy: c.UserID}, retention); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(ctx, "UPDATE spaces SET status = 'trashed', updated_at = now() WHERE id = $1", id); err != nil {
+		return err
+	}
+	return record(ctx, tx, c, "space.trashed", sp, nil)
+}
+
+// CheckNew checks the key and name of a space to be made, as CreateIn does, before any work.
+func CheckNew(in Input) error {
+	if !keyPattern.MatchString(in.Key) {
+		return apperr.Invalid("A key has 2 to 32 letters, digits, dashes or underscores.")
+	}
+	return in.validate()
+}
+
+// KeyFreeIn says, through q, whether a new space may take a key. The old keys of a space stay
+// taken.
+func KeyFreeIn(ctx context.Context, q db.Querier, key string) (bool, error) {
+	taken, err := keyTaken(ctx, q, key, uuid.Nil)
+	return !taken, err
 }
 
 // Restore implements trash.Handler.

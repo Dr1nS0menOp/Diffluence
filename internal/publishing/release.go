@@ -139,6 +139,41 @@ type PageStatus struct {
 	Approval *TwinApproval `json:"approval,omitempty"`
 	// CanVerify offers verifying the twin, to those who see the draft space's audit (PUB-732).
 	CanVerify bool `json:"can_verify"`
+	// ReleasedAs names, on a draft page and for those who may see the release screen, the
+	// version of the published page each released version became (PUB-911).
+	ReleasedAs []ReleasedAs `json:"released_as,omitempty"`
+	// WouldEdit says, on a twin, that the person holds editing in the published space and only
+	// the pair keeps them from it, so the page tells them why (PUB-1231).
+	WouldEdit bool `json:"would_edit,omitempty"`
+}
+
+// ReleasedAs is one release of a draft page: the draft version, the version of the published
+// page it became, when, and by which run.
+type ReleasedAs struct {
+	DraftVersion int       `json:"draft_version"`
+	TwinVersion  int       `json:"twin_version"`
+	ReleasedAt   time.Time `json:"released_at"`
+	RunID        uuid.UUID `json:"run_id"`
+}
+
+// maxReleasedAs bounds the releases a draft page's history names.
+const maxReleasedAs = 200
+
+// releasedAs lists the releases of a draft page in a pair, newest first: each version that
+// became a version of the published page, as the history shows it (PUB-911, PUB-1223).
+func releasedAs(ctx context.Context, q db.Querier, p pair, pageID uuid.UUID) ([]ReleasedAs, error) {
+	rows, err := q.Query(ctx, `SELECT rp.draft_version, rp.twin_version, COALESCE(r.finished_at, r.previewed_at), r.id
+		FROM release_run_pages rp JOIN release_runs r ON r.id = rp.run_id
+		WHERE r.pair_id = $1 AND rp.draft_page_id = $2 AND rp.outcome IN ('released', 'started') AND rp.twin_version IS NOT NULL
+		ORDER BY rp.draft_version DESC, 3 DESC LIMIT $3`, p.ID, pageID, maxReleasedAs)
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ReleasedAs, error) {
+		var a ReleasedAs
+		err := r.Scan(&a.DraftVersion, &a.TwinVersion, &a.ReleasedAt, &a.RunID)
+		return a, err
+	})
 }
 
 // ApprovalRelease is an approval release that did not go: stopped, cancelled or skipped, with
@@ -269,6 +304,11 @@ func (s *Service) draftStatus(ctx context.Context, c identity.Caller, src pages.
 	if err := s.addApprovalStatus(ctx, p, src, &out); err != nil {
 		return out, err
 	}
+	if releases {
+		if out.ReleasedAs, err = releasedAs(ctx, s.pool, p, src.ID); err != nil {
+			return out, err
+		}
+	}
 	if out.TwinPageID != nil {
 		if out.CanVerify, err = s.maySpace(ctx, c, src.SpaceID, permissions.SpaceAudit); err != nil {
 			return out, err
@@ -316,11 +356,18 @@ func (s *Service) addApprovalStatus(ctx context.Context, p pair, src pages.Relea
 
 func (s *Service) twinStatus(ctx context.Context, c identity.Caller, src pages.ReleaseSource) (PageStatus, error) {
 	out := PageStatus{Aspects: []string{}, Side: permissions.PairPublished}
+	// Someone used to editing learns why Edit is missing: the pair is the one thing that keeps
+	// them from it (PUB-1231).
+	d, err := s.perms.CheckPage(ctx, s.pool, c.UserID, src.ID, permissions.PageEdit, uuid.Nil)
+	if err != nil {
+		return out, err
+	}
+	out.WouldEdit = !d.Allowed && permissions.RefusedOnlyAsManaged(d)
 	var draft, draftSpace uuid.UUID
 	var releasedAt *time.Time
 	var releasedVersion int
 	var rawSettings []byte
-	err := s.pool.QueryRow(ctx, `SELECT pp.draft_page_id, sp.draft_space_id, pp.released_at, pp.released_version, sp.settings
+	err = s.pool.QueryRow(ctx, `SELECT pp.draft_page_id, sp.draft_space_id, pp.released_at, pp.released_version, sp.settings
 		FROM page_pairs pp JOIN space_pairs sp ON sp.id = pp.pair_id AND sp.ended_at IS NULL
 		WHERE pp.twin_page_id = $1 AND pp.released_version > 0`, src.ID).Scan(&draft, &draftSpace, &releasedAt, &releasedVersion, &rawSettings)
 	if errors.Is(err, pgx.ErrNoRows) {

@@ -37,6 +37,7 @@ const TYPES = [
   'release_finished',
   'version_approved',
   'approval_release',
+  'pair_ended',
   'rule',
 ];
 /** The types of guided templates, shown while that experimental part is on (spec 074, TPL-722). */

@@ -1620,6 +1620,24 @@
         "x-access": "permission:administrator"
       }
     },
+    "/api/v1/admin/publishing/check": {
+      "post": {
+        "operationId": "post /api/v1/admin/publishing/check",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "admin"
+        ],
+        "x-access": "session-only permission:administrator"
+      }
+    },
     "/api/v1/admin/reports/largest": {
       "get": {
         "operationId": "get /api/v1/admin/reports/largest",
@@ -11361,6 +11379,87 @@
         "x-access": "object:space.administer"
       }
     },
+    "/api/v1/spaces/{id}/publishing/start": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/start",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/start-preview": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/start-preview",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
+    "/api/v1/spaces/{id}/publishing/undo-start": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/publishing/undo-start",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.administer"
+      }
+    },
     "/api/v1/spaces/{id}/releases": {
       "get": {
         "operationId": "get /api/v1/spaces/{id}/releases",
@@ -11521,6 +11620,33 @@
           "spaces"
         ],
         "x-access": "object:space.release"
+      }
+    },
+    "/api/v1/spaces/{id}/releases/verify": {
+      "post": {
+        "operationId": "post /api/v1/spaces/{id}/releases/verify",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "spaces"
+        ],
+        "x-access": "object:space.audit"
       }
     },
     "/api/v1/spaces/{id}/releases/{run}": {

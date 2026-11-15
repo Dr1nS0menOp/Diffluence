@@ -224,11 +224,13 @@ func (s *Service) addPaths(ctx context.Context, c identity.Caller, p pair, rows 
 	return nil
 }
 
-// goingRun is the newest run of a pair that waits, goes or stopped, for the line of progress.
+// goingRun is the newest run of a pair that waits, goes or stopped, for the line of progress: a
+// run of more than one page, or a run of approval or withdrawal, which is one page but runs in
+// the background and can stop (PUB-1061).
 func (s *Service) goingRun(ctx context.Context, c identity.Caller, spaceID uuid.UUID, p pair) (*Run, error) {
 	var id uuid.UUID
-	err := s.pool.QueryRow(ctx, `SELECT id FROM release_runs WHERE pair_id = $1 AND scope <> 'page'
-		AND status IN ('queued', 'running', 'stopped') ORDER BY previewed_at DESC LIMIT 1`, p.ID).Scan(&id)
+	err := s.pool.QueryRow(ctx, `SELECT id FROM release_runs WHERE pair_id = $1 AND (scope <> 'page' OR actor_type <> $2)
+		AND status IN ('queued', 'running', 'stopped') ORDER BY previewed_at DESC LIMIT 1`, p.ID, actorUser).Scan(&id)
 	if noRows(err) {
 		return nil, nil
 	}
@@ -263,7 +265,7 @@ func (s *Service) AsOf(ctx context.Context, c identity.Caller, spaceID uuid.UUID
 	}
 	rows, err := s.pool.Query(ctx, `WITH twins AS (
 			SELECT DISTINCT rp.twin_page_id AS id FROM release_run_pages rp JOIN release_runs r ON r.id = rp.run_id
-			WHERE r.pair_id = $1 AND rp.outcome = 'released' AND rp.twin_page_id IS NOT NULL
+			WHERE r.pair_id = $1 AND rp.outcome IN ('released', 'started') AND rp.twin_page_id IS NOT NULL
 			  AND ($3::uuid IS NULL OR rp.draft_page_id = $3 OR rp.twin_page_id = $3)
 		)
 		SELECT v.page_id, v.title, v.number, rp.draft_page_id, rp.draft_version, v.created_at
