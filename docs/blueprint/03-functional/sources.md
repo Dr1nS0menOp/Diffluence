@@ -32,6 +32,23 @@ Read on 2026-11-06 for behaviour only, through a tool that returns a summary, to
 - **Draft and published spaces:** `https://appfire.atlassian.net/wiki/spaces/AHP/pages/649954539` and `https://marketplace.atlassian.com/apps/143/comala-publishing`.
 - **Guided templates:** `https://marketplace.atlassian.com/apps/1224664/templating-app-project-templates-issue-templates-for-jira`.
 
+## Pictures of another product's screens (ADR-045)
+
+On 2026-11-13 and 2026-11-14 the chapters were checked against 154 pictures of the screens of a running instance of another wiki product, provided by the product owner, under the exception and the conditions in `02-clean-room-and-licensing.md` ("One exception"). The pictures show pages and the page tree, the editor and its catalogue of insertable blocks, the settings of a space, the administration of the instance, an organisation-level console of a vendor of several products, personal account settings, and an automation builder.
+
+How the study ran: one analyst described every element of every picture in a run of eleven (regions, items in order, states, formatting as roles); a second analyst checked each run again with enlarged halves of every wide picture; a third compared each run with this blueprint and proposed lines; one writer per chapter turned the proposals into lines; a last pass removed duplicates across chapters and checked numbers, contradictions and the clean-room rules. The pictures, the inventories and the comparisons stay outside the repository. Every line the study added has the status **new** or **later**.
+
+Screens of the organisation-level console that only a vendor of several products or organisations needs (billing, a switcher between products, proving a domain to the vendor, choosing where the vendor stores data, deleting the organisation) were left out, under ADR-008.
+
+Where a picture showed only the name of an entry or setting, the writers read these public help pages on 2026-11-15, for behaviour only, through a tool that returns a summary:
+
+- `https://support.atlassian.com/confluence-cloud/docs/` followed by `improved-confluence-navigation`, `configure-the-administrator-contact-page`, `configure-the-site-homepage`, `customize-a-sites-color-schemes`, `apply-watermarks` and `export-content-to-word-pdf-html-and-xml`.
+- `https://support.atlassian.com/navigation/docs/what-is-the-new-navigation-in-confluence/`
+- `https://confluence.atlassian.com/doc/code-block-macro-139390.html`
+- `https://support.atlassian.com/cloud-automation/docs/what-is-the-automation-audit-log/`
+
+A few web searches limited to those help sites were used to find these pages. Where a page gave a number, ours stays our own choice (for example the run log keeps 30 days, spec 015).
+
 ## What came from elsewhere
 
 Names, numbers and defaults in chapters 1 to 13 are our own choices unless the behaviour itself required them. Standards are cited where used: WCAG 2.2, RFC 6238, OpenID Connect, SCIM 2.0, WebAuthn, CommonMark, iCalendar and WebDAV. The chapters on identity, permissions, audit and operations come from our own blueprint and specs.

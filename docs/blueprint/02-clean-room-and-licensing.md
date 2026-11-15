@@ -18,11 +18,21 @@ We want behaviour that users recognise from Confluence (proprietary) and Docmost
 
 - Reading or copying source code of Docmost, Plane, OpenProject, Huly or any copyleft or proprietary wiki or issue tracker
 - Including anything from Docmost's enterprise folders (`ee/`), which are under a separate proprietary licence
-- Using an Atlassian product or account to develop Diffluence, including the Confluence of an employer and its exports
+- Using an Atlassian product or account to develop Diffluence, including the Confluence of an employer and its exports (one exception, decided by the product owner: see "One exception" below)
 - Non-public APIs, decompiling, or capturing network traffic of Atlassian products
 - Copying documentation text, UI copy, icons, illustrations, templates or pixel-exact layouts
 - Using "Confluence", "Atlassian" or "Jira" in our product name, logo or domain. Descriptive use ("Import from Confluence") is fine.
 - Copyleft dependencies (GPL, AGPL, LGPL linked into our code). Calling a GPL tool as a **separate process** (for example Pandoc for exports) is allowed, documented, and optional.
+
+## One exception: pictures of another product's screens (ADR-045)
+
+On 2026-11-14 the product owner decided to use a set of 154 pictures of the screens of a running instance of another wiki product as a source for blueprint 03, and accepted the risk that this goes against the third rule under "Forbidden". The pictures were read for behaviour and for the arrangement of the screens only. These conditions hold for that study and for any later use of the pictures:
+
+- The pictures, the inventories written from them and their file names never enter this repository, its history, its issues or its pull requests.
+- Requirements say what a screen does and how it is arranged, in our own words: its regions, the order and grouping of its items, what stays in view and how a state is marked, as roles. Never literal on-screen text, icons, illustrations, colours, sizes, fonts or logos, and never the names of the other product, its vendor or its add-ons.
+- No person, organisation, site, page title or figure from the pictures is named anywhere.
+- The look stays our own: colours, icons, fonts and every value come from `web/src/design/tokens.css` (ADR-021). The behaviour decisions of 03 ("Where we deliberately differ") and of the decision log stand.
+- The study is recorded in `03-functional/sources.md`. Every line it added has the status **new** or **later**, and a line that changes the design standard ends with "(changes the design standard, decided 2026-11-14)".
 
 ## The process
 

@@ -39,6 +39,8 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-028** · built · A page can be previewed before publishing, in the reading layout, without leaving the editor.
 - **PAG-029** · built · Space settings can require approval before publishing (PAG-062).
 - **PAG-030** · built · After publishing, a short message offers to share the page, with a link that undoes nothing but opens the share dialog. Built for the first publish, so a later edit stays quiet.
+- **PAG-129** · new · Beyond PAG-030, every publish, a later edit included, shows the publisher the short message of NAV-148 with a success mark: its heading confirms the publish, its sentence names the page and its space, and its action is Copy link. After the first publish it also offers to share, as PAG-030 says.
+- **PAG-130** · new · The message of PAG-129 goes by itself after a while, but never while it has the focus or the pointer, so its link can still be used (WCAG 2.2.1), and screen readers hear it without being interrupted (NAV-080). Only the publisher sees it.
 
 ## 3.4 Editing a published page
 
@@ -64,6 +66,7 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-048** · built · The Copy dialog picks a target space and parent, and whether to keep labels and restrictions. Comments, versions, favourites and watchers are never copied.
 - **PAG-049** · built · When several pages are copied, their titles can be changed together with a prefix, a suffix or find and replace.
 - **PAG-050** · built · A copy of a large branch runs in the background and reports when it is finished.
+- **PAG-131** · new · More holds **Convert**, with a sub-menu that gathers the changes of kind this page allows: to a blog post before it is first published (ORG-067), to a folder (ORG-071), and to a live document once those exist (OTH-004). A change the page does not allow is left out, and with none left Convert is absent (NAV-004).
 
 ## 3.6 Status, owner and review
 
@@ -78,6 +81,11 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-059** · built · **Verified:** a person with the right permission marks a page as verified until a chosen date. Readers see who verified it and when. A later edit does not remove the mark, but the page shows that it changed after verification.
 - **PAG-060** · built · **Review date:** a page can have a date on which the owner is reminded to check it. Spaces can set a default, such as every 12 months.
 - **PAG-061** · built · A page past its review date shows a quiet note to editors and is listed in the Content screen.
+- **PAG-132** · new · **Statuses and approvals** is one section of space settings. At its top a chooser as wide as the column sets the mode of the space: statuses off, statuses only, or statuses with approval before publishing (PAG-068). The chooser has a label, at least for screen readers, and once a workflow exists in the space it says that the workflow decides instead (DOC-900).
+- **PAG-133** · new · Under one heading for statuses, a row with a title in medium weight and a switch at the column's end turns the suggested statuses on or off. A muted hint under the title states the limit of PAG-055, with a small information button after it.
+- **PAG-134** · new · The suggested statuses follow as a plain list, with no card and no borders: each row a colour mark, chosen from the named colours (decision 10), and the name in normal weight, with a quiet remove button at the row's end, in line with the switch above and named after its status for screen readers. An outlined add button with a plus sits right under the list, start-aligned with the marks, while the limit is not reached.
+- **PAG-135** · new · After a gap, a last row with a small icon tile, a title, a muted hint and a switch at its end decides whether authors may type a status of their own (PAG-056).
+- **PAG-136** · new · Every change in the Statuses and approvals section applies at once (NAV-161): it has no Save and no primary button.
 
 ## 3.7 Approvals
 
@@ -111,6 +119,9 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-083** · built · After the retention period (default 30 days) a job purges expired items.
 - **PAG-084** · built · The trash can be searched and sorted, shows who deleted what, and offers bulk restore and bulk purge.
 - **PAG-085** · built · A person gets a short **Undo** right after deleting a page, also without *administer*, for as long as the message shows.
+- **PAG-137** · new · Beyond PAG-084, the trash of a space holds every kind of item deleted in it together: pages, blog posts, folders, databases and later kinds. Each row shows the icon of its kind and its title as plain text, not a link, with Restore and Purge at the row's end.
+- **PAG-138** · new · A space administrator **empties the whole trash** in one action. It asks first, says how many items it removes for good, removes every item the person may purge, and then says how many it had to leave.
+- **PAG-139** · new · The Trash section of space settings shows, from the top: its name, one line that says items can be restored or purged here, the action that empties the trash as a link with its explanation on the same line, and then the table, with the title first and widest and the actions last at the far end. Purge and emptying keep the danger role and ask first, so they never look like Restore.
 
 ## 3.10 Versions
 
@@ -156,6 +167,27 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-120** · built · Readers can see who else is on the page right now, as small pictures by the actions. Administrators can turn it off.
 - **PAG-121** · built · **Reader mode:** a person can hide the sidebar and top bar with one key, to read without distraction.
 - **PAG-122** · built · Stored documents are only ever rendered by the editor, so no HTML from a document reaches the browser.
+- **PAG-140** · new · **The header row** of a page has the breadcrumbs at its start. At its end, outside the reading column and in this order, sit the publishing state with its date, the pictures of who else is reading (PAG-120), Edit, Share joined to Copy link as one control, and More (changes the design standard, decided 2026-11-14).
+- **PAG-141** · new · Share carries the state of the lock (ACC-066): a closed padlock when the page has restrictions of its own, an open one when it has none. The header row has no separate lock and no star: the favourite is in More (PAG-148), and restrictions open from Share (COL-046). This takes the star and the lock of PAG-101 out of the row (changes the design standard, decided 2026-11-14).
+- **PAG-142** · new · The publishing state in the header row says in words that the page is published, and on which date, in the person's date format (NAV-077). The date of the last update moves here from the byline of PAG-103.
+- **PAG-143** · new · On the home page of a space the breadcrumbs hold only the space's name, without a last step for the home page (changes the design standard, decided 2026-11-14).
+- **PAG-144** · new · **The byline** is one line of small muted parts, in this order: the owner's small picture and name, the view count with its mark where the person may see it (PAG-105), the action to add a reaction (COL-099), the document-control state where document control is on (PAG-145), and the page status at its end. It holds no date and no version: the date sits in the header row (PAG-142) and the version in the history. This replaces the date and version of PAG-103.
+- **PAG-145** · new · In a space where document control is on, the byline names the page's control state with a small mark and words (DOC-920), and a page that no workflow governs says so plainly. Selecting the state opens the review panel (DOC-901) for a person who may see it. The byline never tells a reader that a working version exists (DOC-300, DOC-301), and in a space without document control the part is absent.
+- **PAG-146** · new · The home page of a personal space has no byline, and its header row shows no publishing state.
+- **PAG-147** · new · **Page tools:** three openers sit together as a small vertical group of icon buttons, fixed in the bottom end corner over the page, from top to bottom: the contents of the page, shown only when the page has headings; comments (COL-020); and Details (PAG-116). Each opens its panel on the far side, one at a time. The contents become a list that its button opens, instead of standing beside the column (PAG-108) (changes the design standard, decided 2026-11-14).
+- **PAG-148** · new · **More** opens a card under its button, aligned to the button's end, in four groups divided by lines and without headings: (1) favourite (NAV-039), Watch with a sub-menu (PAG-151), presentation mode (PAG-114); (2) the history of versions (PAG-087), more details with a sub-menu (PAG-150), apps with a sub-menu (PLT-041); (3) copy (PAG-046), move (PAG-039), Convert (PAG-131), export with a sub-menu of formats (chapter 11), one entry for archiving and deleting with a sub-menu (PAG-149); (4) report (COL-132). Each row is an icon and words, with a sub-menu arrow or the keys of its shortcut at the row's end, and an entry a person cannot use is absent (NAV-004).
+- **PAG-149** · new · Archiving and deleting share one entry of More, whose sub-menu holds Archive (PAG-070) and Delete (PAG-076). Unlike the rule of NAV-147, no entry of More is in the danger colour: the dialog that asks first carries the danger action (changes the design standard, decided 2026-11-14).
+- **PAG-150** · new · The entry for more details in More opens a sub-menu with the rarely used views of the page: Page information (PAG-115), incoming links (PAG-117) and the list of files (FIL-031) (needs its own study).
+- **PAG-151** · new · Beyond PAG-102, Watch in More opens a sub-menu of three choices, each shown as on or off: this page (COL-054), this page and everything below it (COL-056), and the whole space (COL-055). The entry's mark is filled while the person watches the page in any of these ways, and `w` still toggles watching the page (NAV-063).
+- **PAG-152** · new · Beyond PAG-107, a page has one of three widths: **normal**, the scaling column of PAG-098 and ADR-030; **wide**, a step between normal and full; and **full**. A writer chooses it per page in the editor, as EDT-008 does today.
+- **PAG-153** · new · An administrator sets the width that new pages start with, normal by default, as three stacked choices under a hint that a writer can still change the width per page.
+- **PAG-154** · new · Beyond PAG-120, a space administrator can turn off, for one space, the pictures that show readers of a published page or blog post who else is reading it now. The switch does not touch the pictures of people editing together (COL-089), and when the instance has turned the pictures off, the space cannot turn them on.
+- **PAG-155** · new · The section of space settings for PAG-154 holds one line that says what the pictures show, with a help link at its end, and one switch before its label (NAV-166), which applies at once without Save (NAV-161).
+- **PAG-156** · new · A page is shown in **standard** or **compact** density: compact uses smaller text and tighter spacing, so more fits on the screen, and still keeps text large enough for WCAG 2.2 AA. Like page width, density is page data, not part of a version (ADR-025).
+- **PAG-157** · new · A space administrator sets the density that new pages and live documents of the space start with, in the Layout section of space settings: a sub-heading with one line under it, then the two choices, each with a muted line under its name, standard chosen by default. This part has its own Save and Reset changes (NAV-162, NAV-163).
+- **PAG-158** · new · A writer sets one page to the other density from the page's header, without changing the default of the space.
+- **PAG-159** · later · A page can end with a short list of related pages, such as pages with the same labels, holding only pages the reader may see (NAV-006); relatedness is never worked out from who read what (decision 7). A space administrator turns the list on or off for the space, in a section of space settings for related pages (needs its own study).
+- **PAG-164** · new · On the home page of a space a thin line runs under the header row; other pages have no line there (changes the design standard, decided 2026-11-14).
 
 ## 3.12 The page header
 
@@ -163,3 +195,13 @@ A page goes through a simple life: a private draft, a published page, new versio
 - **PAG-124** · built · A page can have a **header image** above the title. It is chosen by upload, repositioned by dragging up or down or with a range field, and can be changed or removed.
 - **PAG-125** · built · The header image is an attachment of the page, and follows its rules. External image libraries are not used, because they would tell a third party who is reading.
 - **PAG-126** · built · The title can be left-aligned or centred, and a space administrator can set a default.
+
+## 3.13 Classification
+
+A classification level says how sensitive a page is, in the organisation's own words, so readers and rules can act on it.
+
+- **PAG-160** · later · An administrator defines a short list of **classification levels**, in order from least to most sensitive, each with a name, a colour chosen from the named colours (decision 10) and one line on its meaning.
+- **PAG-161** · later · A space has a level, which its new pages and blog posts take by default, and a writer can give a page or blog post a stricter level than its space. The level shows as a word with its colour, like a status, in the byline beside the status, and the level of a page a person may not see stays hidden, as its title does.
+- **PAG-162** · later · For each level, an administrator chooses what it switches off for content that carries it: export, public sites, single shared pages (EXC-044), access by guests, and excerpts in mail (COL-076). Exports that stay allowed print the level on every page.
+- **PAG-163** · later · A level never grants access (ACC-051). Apart from keeping guests out where its level says so, restrictions stay the way to limit who reads a page.
+- **PAG-165** · later · Setting or changing the level of a space, page or blog post needs access to it, so administrators still do not read content by default (deliberate difference 2), and every change of level is audited.

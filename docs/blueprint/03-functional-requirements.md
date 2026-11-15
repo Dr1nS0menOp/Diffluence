@@ -4,6 +4,8 @@ This is the full functional description of Diffluence: what the product does, sc
 
 It came from a clean-room study on 2026-11-05 (ADR-023). Public help pages of other wikis were read for behaviour only. Everything here is in our own words, and the look stays ours (`docs/design/README.md`). `03-functional/sources.md` lists every source, as the clean-room process demands.
 
+On 2026-11-14 the chapters were checked against 154 pictures of another product's screens and completed, under the exception in `02-clean-room-and-licensing.md` (ADR-045). That study added 762 lines, each with the status **new** or **later**: every function, setting, menu item, column and state the pictures show, and how each screen is arranged. For arrangement the pictures win over the design standard; a line that changes it ends with "(changes the design standard, decided 2026-11-14)", and `docs/design/README.md` lists those changes. Colours, icons and fonts stay ours.
+
 ## How to read it
 
 Every requirement has a number that never changes and is never reused, and one status:
@@ -22,21 +24,21 @@ A line describes the end result, not the code. A requirement becomes a spec in `
 
 | Chapter | Covers | Requirements |
 |---|---|---|
-| [1. The frame and getting around](03-functional/01-frame-and-navigation.md) | Top bar, start screen, personal lists, directories, shortcuts, accessibility | 87 |
-| [2. Spaces](03-functional/02-spaces.md) | Creating, overview, sidebar, tree, features, permissions, clearing up, archive, personal spaces | 86 |
-| [3. Pages: life cycle and reading](03-functional/03-pages.md) | Drafts, publishing, moving, status, owner, approvals, archive, trash, versions, reading | 126 |
-| [4. The editor](03-functional/04-editor.md) | Slash menu, blocks, text, links, images, tables, code, columns, charts, paste, find | 164 |
-| [5. Dynamic blocks](03-functional/05-dynamic-blocks.md) | Blocks that show something by themselves, with every setting | 69 |
-| [6. Files](03-functional/06-files.md) | Dropping files in, tiles, previews, the list, versions | 51 |
-| [7. Working together](03-functional/07-collaboration.md) | Comments, reactions, mentions, tasks, sharing, watching, notifications, e-mail, editing together | 97 |
-| [8. Finding and organising](03-functional/08-finding-and-organising.md) | Search, labels, templates, blog posts, folders | 74 |
-| [9. People and access](03-functional/09-people-and-access.md) | Login, profile, groups, guests, permissions, restrictions | 73 |
-| [10. Administration](03-functional/10-administration.md) | Console, look, rules, e-mail, audit, health | 58 |
-| [11. Import, export and publishing](03-functional/11-import-export-publishing.md) | Formats, importers, public websites | 48 |
-| [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules, API, AI, linked instances | 50 |
-| [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile | 24 |
+| [1. The frame and getting around](03-functional/01-frame-and-navigation.md) | Top bar, the sidebar outside a space, start screen, personal lists, directories, shortcuts, help, shared conventions of every screen, accessibility | 178 |
+| [2. Spaces](03-functional/02-spaces.md) | Creating, overview, sidebar, tree, features, permissions, clearing up, archive, personal spaces, the settings and the look of a space | 160 |
+| [3. Pages: life cycle and reading](03-functional/03-pages.md) | Drafts, publishing, moving, status, owner, approvals, archive, trash, versions, reading, the page header, classification | 164 |
+| [4. The editor](03-functional/04-editor.md) | Slash menu, the insert dialog, blocks, text, links, images, tables, code, columns, charts, paste, find | 223 |
+| [5. Dynamic blocks](03-functional/05-dynamic-blocks.md) | Blocks that show something by themselves, with every setting, and blocks of document control | 90 |
+| [6. Files](03-functional/06-files.md) | Dropping files in, tiles, previews, the list, versions, watermarks | 69 |
+| [7. Working together](03-functional/07-collaboration.md) | Comments, reactions, mentions, tasks, sharing, watching, notifications, e-mail, editing together, chat messages, reporting content | 133 |
+| [8. Finding and organising](03-functional/08-finding-and-organising.md) | Search, labels, templates, blog posts, folders | 86 |
+| [9. People and access](03-functional/09-people-and-access.md) | Login, your account, profile, groups, guests, service accounts, permissions, restrictions, where people may connect from | 171 |
+| [10. Administration](03-functional/10-administration.md) | The arrangement of the administration, users, look, rules, e-mail, spaces, audit, health, data care, security and data protection | 206 |
+| [11. Import, export and publishing](03-functional/11-import-export-publishing.md) | Formats, importers, PDF design, public websites, shared pages | 89 |
+| [12. Analytics, automation and the platform](03-functional/12-analytics-automation-platform.md) | Insights, rules and their screens, the rule builder, API, apps, connections to other tools, AI, linked instances | 160 |
+| [13. Other kinds of content](03-functional/13-other-content-types.md) | Live documents, whiteboards, databases, calendars, the work module, mobile, asset registers, questions and answers | 43 |
 
-In total 1003 requirements: 889 built, 48 partly, 27 on the roadmap, 12 new and 27 for later.
+In total 1772 requirements: 899 built, 45 partly, 27 on the roadmap, 600 new and 201 for later. Of these, 762 came from the study of 2026-11-14.
 
 ## Words we use
 

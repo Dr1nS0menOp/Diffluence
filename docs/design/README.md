@@ -19,6 +19,112 @@ Rail kept the global navigation visible while editing. In Helder that means: **t
 
 The intuition of a familiar wiki is the aim, never a copy. The clean-room rules (`docs/blueprint/02`) apply to design as well: no logos, icons, copy or pixel-exact layouts from any other product. The logo and every icon are ours.
 
+## The arrangement decided on 2026-11-14 (ADR-045)
+
+On 2026-11-14 the product owner decided that, for the arrangement of a screen, a study of pictures of another wiki product wins over this document: which regions a screen has, where they sit, what each holds, their order and grouping, what stays in view and how a state is marked. The look does not change: colours, icons, fonts and every token value stay as this document and `tokens.css` set them. Each change below replaces the named rule of this document when its screen is rebuilt, in a wave with its own study and new design pictures; until then the existing rule describes the built screen, and the pictures in `web/e2e/design-baselines/` keep guarding it. The requirement lines of blueprint 03 that end with "(changes the design standard, decided 2026-11-14)" are the source of truth for the detail; this list only names what changes and which rule it touches.
+
+### Lines, cards and outlines
+
+- Thin lines mark the regions of the frame, and nothing else: under the top bar, beside the sidebar, between the global part of the sidebar and the block of a space, and above the links to other tools. Replaces "hardly any lines or boxes" (The decision) for the frame. NAV-089.
+- Some screens hold their content in outlined cards or rows: the login policies, your own profile, the choice between the two permission exports, the security overview, the list of new features, System health and the compliance cards. Replaces "hardly any lines or boxes" (The decision) on those screens. ACC-097, ACC-114, ACC-159, ADM-128, ADM-156, ADM-187, ADM-206.
+
+### The current item
+
+- The current item, in the tree, a sidebar or the sections of the settings, keeps the accent tint across its row, now with rounded corners, normal weight and a short accent bar on its start edge. Replaces the tint alone, "Background of the current item" (Tokens). NAV-144.
+
+### The frames
+
+- The start screen is one centred column: what the person last worked on as cards, the choice of feed as a row of pill buttons, then the feed. The greeting, the grid of spaces and the side column leave it. Replaces the start screen as built (Home in the Personal frame), and `Tabs` for "Switching between lists" (Components) on this screen. NAV-102, NAV-103, NAV-106.
+- Your account has a bar of its own in place of the top bar, with its sections as text tabs, and one narrow centred column under it. Replaces the Plain frame and the top bar for "your account" (The frame of a screen), and `AccountNav` (Components). ACC-102, ACC-104.
+
+### The sidebar outside a space
+
+- On the Personal, Space and Focus frames the sidebar starts with one global part in a fixed order; the Settings frame keeps its own sidebar of sections without it. Replaces "a sidebar with your own places and your spaces" (Personal frame) and the top of "The sidebar from top to bottom" (The page tree). NAV-125.
+- Recent, Favourites and Spaces open a panel beside the sidebar: a card with a filter field, groups, and its actions at the foot. Replaces the menus they open from the top bar today ("A menu in something that scrolls", Components). NAV-131.
+- The Spaces panel does the work of the strip of spaces, which leaves the sidebar. Replaces "The strip of spaces scrolls sideways on its own" (The page tree). NAV-135.
+
+### The top bar
+
+- Three groups: at the start the button that shows or hides the sidebar, then the logo and name; in the middle search with Create directly after it; at the end the bell, help, a settings button and the account menu. Replaces "logo and name, Home, Spaces, Recent, Favourites and Create, then search in the middle" (Top bar). NAV-090, NAV-093.
+- Home, Spaces, Recent and Favourites leave the bar for the global part of the sidebar. Same rule. NAV-091.
+- The button that puts the sidebar away moves from the sidebar to the start of the bar. Replaces the place of the button behind "The sidebar itself can be put away" (The page tree). NAV-092.
+- The settings button opens the administration, which leaves the account menu; only people who may use the administration see it. Adds to "the bell, help and the account menu on the far side" (Top bar). NAV-095, ADM-059.
+
+### The page header
+
+- The header row has the breadcrumbs at its start and, at its end outside the reading column, the publishing state, who else is reading, Edit, Share joined to Copy link, and More. There is no star and no lock: Share shows the lock's state, and the favourite moves into More. Replaces "breadcrumbs with Edit, Share, star, lock and More on one line" (A page). PAG-140, PAG-141.
+- On the home page of a space the breadcrumbs hold only the space's name, and a thin line runs under the header row. Replaces "On the home page the breadcrumbs end in Home" (The page tree) and, for that line, "hardly any lines or boxes" (The decision). PAG-143, PAG-164.
+- Contents, comments and Details open from a small vertical group of buttons in the bottom end corner, one panel at a time, and the contents no longer stand beside the column. Replaces "The contents list stands beside the column when there is room" (A page). PAG-147.
+- Archive and Delete share one entry of More, and no entry of More is in the danger colour: the dialog that asks first carries it. Narrows "Destructive action" (Components) for this menu. PAG-149.
+
+### The Settings frame and the administration
+
+- Space settings: a sidebar of sections about a quarter wide, with a thin line beside it, in the place of the space's sidebar; a head that stays in place with a way back, the space's badge and name, and the jump field; four sections on their own, a divider, then five groups that fold. Replaces "the sections in the sidebar in groups that fold, with a way to jump to one" (Settings frame) and "The sidebar holds the sections in groups that fold" (Settings and lists). SPC-134, SPC-136, SPC-138.
+- Within those groups: sections indented as plain text, a chevron in its own column, every group open at first, the scroll position kept, and a set reach for the band of the current section. Same rules. SPC-146, SPC-147.
+- The administration's sidebar: a header row with a way back that stays in place, tool sections with icons that are always open, then a settings heading with the jump field and the groups that fold, their state kept per person; a thin line beside it. Same rules. ADM-060, ADM-061, ADM-062.
+- The administration's sections regroup into three tool sections and five settings groups, with each section in exactly one. Replaces "The administration has these groups: Overview; People and access; Content; Automation; Look; System" (Settings and lists). ADM-068 to ADM-075, ADM-077.
+- The large area holds forms and short lists in one column of reading width, centred between the sidebar and the far edge, and wide lists and builders at full width beside the sidebar. Replaces "It starts beside the sidebar, not in the middle of the room" (Settings and lists) and the Look item of ADR-038. ADM-078, SPC-150.
+- A section from top to bottom: its name as the largest heading with More or its primary action on that line, the description with its help link, notes, a row of tools, then the content, with no breadcrumb and no save bar. Its parts get visible sub-headings, set apart by space. Replaces "The large area shows one section, with its name as the page title" (Settings and lists) and spec 033 D7. SPC-148, SPC-149.
+
+### Settings forms
+
+- One column of reading width, small bold labels above narrow fields of one width, and facts that cannot change below the fields; tiles for a choice among a few, a slider for a number on a scale, and a preview beside the form. Replaces "A labelled input" with `Field` (Components) as the whole rule for a form. NAV-160, SPC-151.
+- Save and Reset changes as one unit at the start side, directly under its fields and inactive until something changes, with one Save per group that saves apart. Replaces "Main action, one per view" (Components), which now counts per group, and adds an inactive state beside "Busy" (States). NAV-162, NAV-163.
+- A list of switches is one bordered card with headed groups and lines between rows, and settings that belong together may be rows in one outlined card with their controls in one column. Replaces "hardly any lines or boxes" (The decision) for these lists. NAV-167, ADM-096.
+- A section that starts an action: heading, explanation, choices, then one primary button at the foot and no Cancel. Sets where the "Main action, one per view" (Components) goes in such a section. SPC-153.
+
+### Lists and tables
+
+- Tables of the app have a quiet heading row with a line under it, rows set apart by space without lines between them, a line after the last row, a hover tint and one sort mark; rows are compact in the administration and up to two lines for tokens and sessions. Replaces "a line under each row" (Settings and lists). NAV-157, ADM-107, ACC-085, SPC-154.
+- Several rows of one item form a group under one spanning cell, and a two-level list shows its levels by weight. Same rule. SPC-155.
+- A long list has one row of tools above it: search first, a button per filter that shows its value in words, more filters, and the screen's own action at the end; a filter applies at once. Replaces "Long lists filter with dropdowns above them" (Settings and lists). ADM-103.
+- Lists of people have a checkbox column, the picture and name with a second line, the role chosen in the row with a button that explains it and how the holder got it, and More at the end; the list of users shows status and last login. Replaces "Lists of people show a picture, the name, how they got in and the role" (Settings and lists). SPC-118, ADM-131.
+- The roles screen is three headed sections, with no search, sort, filter or heading row. Replaces "Tables of the app show rows, not boxes" for that screen. ACC-152.
+- Every list and report shows an icon of the item's kind before its title, or the page's emoji. Replaces "A page in a list" with `PageMark` (Components). NAV-156.
+
+### The sidebar of a space and the page tree
+
+- Inside a space the block of the space follows the global part after a line: the space's header row, then groups for shortcuts, content with its filter and the tree, blogs, calendars and space apps, each under a heading of an icon and a word with its buttons in one shared column. Replaces "The sidebar from top to bottom: the strip of spaces, the name of the space, the part This space" and "The part folds shut from its heading" (The page tree). SPC-097, SPC-099.
+- The space's header row leads to the home page, is marked while it is open, and always shows its More. Replaces "It has the fixed Home row" (The page tree). SPC-098.
+- The fixed entries, the links at the bottom, the Home row and the strip of spaces leave the sidebar, and Overview, People, Files, archived pages and the settings move to the space menu. Replaces the part This space and the strip of spaces (The page tree). SPC-106.
+- The heading of the content carries add and a menu of views and tools, the title filter is always shown under it, and the row of icons above the tree goes. Replaces "are a quiet row of icons above it" (The page tree). SPC-101.
+- A Create row and that add button open a menu of the kinds of item, a line, then folder. Replaces "new page, link" among the tools of the tree (The page tree). SPC-112.
+- Every row of the tree has a lead column with a chevron or a dot, the icon of the item's kind or its emoji, then the title and its marks, at one even height. Replaces "a page without children has a page icon" (The page tree). SPC-109.
+- No row shows its buttons at rest, the current one included. Replaces "The current page has the tint, and shows the add button" (The page tree). SPC-110.
+
+### The editor
+
+- The top strip has the page's icon and bold title at the start, and the save status, the people editing, Publish and Close at the end; the summary and Discard draft move into the step that Publish opens. Replaces "Close on the left with the save status beside it; on the right the summary, Discard draft and Publish" (The editor). EDT-165, EDT-166.
+- The row of tools gets a new order, with direct buttons for common blocks, History after undo and redo, and Find and Full width in a last group; highlight moves into More formatting and indent into the list choices. Replaces the order of "Below it one row of tools" (The editor). EDT-168, EDT-169.
+- An active tool is an accent icon on the accent tint. Replaces "An active tool is solid accent" (The editor). EDT-171.
+- A reduced byline sits between the title and the body, followed by a wide gap. Adds to "The title is a large plain input" (The editor). EDT-174.
+- Insert opens one large dialog over the dimmed editor: a column of categories, a grid of entries in three columns that alone scrolls, the title and search on one line, and the actions at the end. Replaces "Insert opens the same list in a dialog" (The editor). EDT-175, EDT-176.
+- The chosen entry in that dialog has the tint and a bar on its start edge, without a checkbox, because only one is chosen. Replaces "Selected rows have the accent tint and a real checkbox" (What organises a page) for this one choice. EDT-180.
+- Entries of the slash menu and of that dialog have icon tiles, one icon per family, and an app's entry shows the app's own picture inside our tile. Adds to "Icons are our own line drawings" (Icons and logo). EDT-191.
+- A table gets a button in the cell with the cursor and a small floating bar under it, in place of the one button on its outline; the row of tools still shows nothing for tables. Replaces "A table has one button on its outline" (The editor), and the table bar is an exception to "never a tool the row lacks". EDT-209, EDT-213.
+
+### Insight and automation
+
+- A card on the administration's summary has a bold title, a small action, a large figure, a caption, then its chart; a chart of parts may hold several named parts, and the chart of spaces has two series that differ by shape. Replaces "has one series, so nothing rests on colour" (Insight and automation). ADM-122, ADM-123.
+- Templates of rules are a grid of equal cards, and the figures of use are two framed tiles. A new kind of card and a framed form of `.tiles`, in place of "Reuse beats a new variant" and "Numbers on a summary" (Components). PLT-123, PLT-126.
+- A rule opens in the large area of the Settings frame: a header strip, a canvas with the steps as a chain of cards joined by lines, and a settings panel over the end side of the canvas. Replaces "A rule is a form of native fields in When, If and Then" (Insight and automation). PLT-129, PLT-134.
+- A step's card holds an icon tile, a title and a second line, with its kind shown by icon and colour and in words; a small add button after every step asks for the kind first and shows a placeholder card. Same rule. PLT-135, PLT-137.
+- The panel shows the rule's summary and a card of details while no step is selected, and a step's settings with Back and Next while one is; saving happens only in the header, by a split button that stays unavailable until a trigger is chosen. Replaces "a summary at the top" (Insight and automation) and "Busy" (States) for that button. PLT-131, PLT-144, PLT-148.
+- A step that may not fit starts with a tinted warning without a close button; matching all or any conditions is a pair of toggle buttons, and an empty list of conditions shows only its add button. Replaces "with each message beside its field" (Insight and automation) and the muted sentence of "Empty" (States) there. PLT-143, PLT-150.
+
+### Working together
+
+- A mention shows the person's small picture or initials before the name, without `@`. Replaces "A person mentioned is a soft box with `@`" (Working together). COL-100.
+- The panel of the bell hangs under it with its own scrolling, and the bell looks pressed with its count hidden while it is open. Adds to "The bell carries a number capped at 99+" (Working together). COL-113.
+- The share dialog is a card near the top: a title row with More and close, the field for recipients, suggestions, one row about access, a line, and its actions at the start side. Replaces "`Dialog`, with buttons in `.dialog-actions`" (Components) for sharing. COL-102.
+
+### Notices and states
+
+- An empty section that the person may fill shows a centred block with a bold heading, a few lines, the primary button and a guide link, and no create button in its heading. Replaces "A muted sentence that says what will appear here" (States, Empty) for such a section. NAV-173.
+- A part that is still loading shows a framed box with a sentence and a placeholder in the shape of the result, and a figure that loads is a pale bar. Replaces `Loading` (States, Loading). NAV-177, PLT-128.
+- Three states join Busy and No permission: a button that starts something stays inactive until its form is complete, with a line that says what is missing; a read-only setting keeps its control in view, muted; a section whose optional service is missing says what it needs. Adds to "Every screen handles all of these" (States). ADM-094, ADM-102, ADM-115.
+- Before an export, a warning panel with a bold title names what the chosen format cannot hold. Adds a kind to "A message in the flow" (Components). EXC-052.
+
 ## How the standard holds
 
 Words alone do not keep a design together, so the rules are checks. A failing check blocks the change.
@@ -264,4 +370,4 @@ Never update a picture just to get past a failure. A failing picture means the s
 
 ## Changing the standard
 
-The look is the product owner's decision. Changing a token value, a frame or a rule in this document needs their agreement and a new ADR. Ask them with the before and after pictures.
+The look is the product owner's decision. Changing a token value, a frame or a rule in this document needs their agreement and a new ADR. Ask them with the before and after pictures. ADR-045 is that agreement for the changes listed under "The arrangement decided on 2026-11-14 (ADR-045)", and each wave that builds one still shows the product owner the before and after pictures.
