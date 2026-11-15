@@ -20,6 +20,7 @@ import { offeredNames, useCapabilities } from '../capabilities';
 import { ExperimentalOff } from '../components/experimental-off';
 import { Link } from '../router';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 const POLL_MS = 1500;
 const ENDED = ['done', 'failed', 'expired'];
@@ -53,6 +54,7 @@ function ParentBox({
   chosen: Set<string>;
   onChange: (ids: string[], on: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const ref = useRef<HTMLInputElement>(null);
   const below = useMemo(() => descendantsOf(nodes, node.id), [nodes, node.id]);
   const some = below.some((id) => chosen.has(id));
@@ -68,7 +70,7 @@ function ParentBox({
         checked={chosen.has(node.id)}
         onChange={(e) => onChange([node.id, ...below], e.target.checked)}
       />{' '}
-      {node.title}
+      {pageTitle(t, node.title)}
     </label>
   );
 }
@@ -769,7 +771,7 @@ export function ExportTab() {
         <ul>
           {links.data?.links.map((l) => (
             <li key={l.id}>
-              <Link href={`/pages/${l.page_id}`}>{l.page_title}</Link>{' '}
+              <Link href={`/pages/${l.page_id}`}>{pageTitle(t, l.page_title)}</Link>{' '}
               <span className="muted">{t('exchange.madeBy', { name: l.created_by })}</span>
             </li>
           ))}

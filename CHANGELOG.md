@@ -3,6 +3,9 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Fixed: a page without a title
+- A page whose title is empty, such as one a guided template left without one, now shows as "Untitled" wherever a page is named: lists, the tree, menus, search, links in pages, dialogs and its own heading. Before, it became a link without words that a screen reader could not name
+- Upgrade impact: none
 ### Changed: a password given with a session counts toward the password stop (wave RV8)
 - A wrong password given to confirm who you are again, to change your own password, or to start or turn off an authenticator app now counts toward the stop after 100 wrong passwords in a row, as it does at login. Wrong passwords at login and in these places add up to one run. The right password ends the run, as at login, and after the stop the right password gets the same answer as a wrong one there too, until the person sets a new password through a reset link or an administrator lifts the stop. A code of the authenticator app or a recovery code counts as it does at login: toward the tries of that step, not toward the stop
 - Upgrade impact: no migration. A run of wrong passwords already in the database counts on. Someone whose password login is stopped can no longer confirm who they are, change their password or change their authenticator app with that password until the stop is lifted; their session goes on, and passkeys and single sign-on still work

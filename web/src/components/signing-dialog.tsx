@@ -8,6 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { api, type SignatureMeaning, type SignaturePrompt } from '../api';
 import { Dialog, ErrorNote, Field, Loading } from './ui';
+import { pageTitle } from '../page-name';
 
 /** The step a person signs: an author's own step, or their approval as a reviewer. */
 export interface SigningStep {
@@ -113,7 +114,7 @@ export function SigningDialog({
 
   const meaning = data ? meaningName(t, data.meaning) : '';
   const title = data
-    ? t('signing.heading', { meaning, version: data.version, title: data.title })
+    ? t('signing.heading', { meaning, version: data.version, title: pageTitle(t, data.title) })
     : t('signing.loading');
   const signLabel = t('signing.signAs', { meaning });
   const toProvider = () => {
@@ -134,7 +135,7 @@ export function SigningDialog({
       {data && (
         <>
           <p>
-            {t('signing.statement', { meaning, version: data.version, title: data.title })}{' '}
+            {t('signing.statement', { meaning, version: data.version, title: pageTitle(t, data.title) })}{' '}
             <a href={`/pages/${pageId}/history?version=${data.version}`} target="_blank" rel="noreferrer">
               {t('signing.exactText')}
             </a>

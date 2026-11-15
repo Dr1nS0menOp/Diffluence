@@ -8,6 +8,7 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { SortTable, type SortColumn } from '../components/sort-table';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { Link } from '../router';
+import { pageTitle } from '../page-name';
 
 const DAY_MS = 86_400_000;
 const PERIODS = ['7', '30', '90', 'year'] as const;
@@ -116,7 +117,7 @@ function LinkList({ title, rows }: { title: string; rows: LinkCount[] }) {
       <ul className="page-list">
         {rows.map((r) => (
           <li key={r.id}>
-            <Link href={`/pages/${r.id}`}>{r.title}</Link>
+            <Link href={`/pages/${r.id}`}>{pageTitle(t, r.title)}</Link>
             {r.count > 0 && <span className="muted">{r.count}</span>}
           </li>
         ))}
@@ -236,7 +237,7 @@ function ContentTable({ space, query }: { space: Space; query: string }) {
         key: 'title',
         label: t('insights.page'),
         value: (r) => r.title,
-        show: (r) => <Link href={`/pages/${r.id}`}>{r.title}</Link>,
+        show: (r) => <Link href={`/pages/${r.id}`}>{pageTitle(t, r.title)}</Link>,
       },
       { key: 'views', label: t('insights.views'), value: (r) => r.views },
       { key: 'readers', label: t('insights.readerDays'), value: (r) => r.readers },

@@ -12,6 +12,7 @@ import { SearchFilterBar } from './search-filter-bar';
 import { NO_FILTERS, queryWith, resultsAddress, type SearchFilters } from './search-filters';
 import { useDates } from '../dates';
 import { appearanceQuery } from '../appearance';
+import { pageTitle } from '../page-name';
 
 const MAX_SEARCHES = 8;
 const PAUSE_MS = 200;
@@ -44,15 +45,16 @@ export function addSearch(searches: string[], text: string): string[] {
 /** What the panel shows, in the order of the arrow keys. */
 export function rowsOf(
   results: QuickResults | undefined,
-  labels: { pages: string; posts: string; spaces: string; files: string; people: string },
+  labels: { pages: string; posts: string; spaces: string; files: string; people: string; untitled: string },
   day: (value: string) => string,
 ): QuickRow[] {
   if (!results) return [];
+  const untitled = () => labels.untitled;
   return [
     ...results.pages.map((p) => ({
       id: `page-${p.page_id}`,
       group: labels.pages,
-      title: p.title,
+      title: pageTitle(untitled, p.title),
       detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
@@ -60,7 +62,7 @@ export function rowsOf(
     ...(results.posts ?? []).map((p) => ({
       id: `post-${p.page_id}`,
       group: labels.posts,
-      title: p.title,
+      title: pageTitle(untitled, p.title),
       detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
@@ -77,7 +79,7 @@ export function rowsOf(
       id: `file-${f.id}`,
       group: labels.files,
       title: f.filename,
-      detail: `${f.page_title} · ${f.space_name}`,
+      detail: `${pageTitle(untitled, f.page_title)} · ${f.space_name}`,
       run: 'open' as const,
       target: `/pages/${f.page_id}`,
     })),
@@ -140,12 +142,13 @@ export function QuickSearch() {
     spaces: t('search.groupSpaces'),
     files: t('search.groupFiles'),
     people: t('search.groupPeople'),
+    untitled: t('page.untitled'),
   };
   const emptyRows: QuickRow[] = [
     ...(recent.data?.pages ?? []).slice(0, RECENT_PAGES_SHOWN).map((p) => ({
       id: `page-${p.id}`,
       group: t('search.recentPages'),
-      title: p.title,
+      title: pageTitle(t, p.title),
       detail: p.space_name,
       run: 'open' as const,
       target: `/pages/${p.id}`,

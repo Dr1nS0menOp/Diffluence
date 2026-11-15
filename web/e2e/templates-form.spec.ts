@@ -105,7 +105,7 @@ test('the form by keyboard: errors beside the field and in a summary, never whil
   await expect(hours).toHaveValue('8');
   await hours.press('Enter');
   await form.getByRole('button', { name: 'Create 1 draft' }).click();
-  await expect(page.getByLabel('Title')).toBeVisible();
+  await expect(page.getByLabel('Title', { exact: true })).toBeVisible();
   await expect(page.locator('.prose.editing')).toContainText('Ada');
 });
 

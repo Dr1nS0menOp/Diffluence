@@ -8,6 +8,7 @@ import { StageMark } from '../components/page-marks';
 import { SubjectPicker } from '../components/picker';
 import { ErrorNote, Loading } from '../components/ui';
 import { NO_FILTERS, queryWith, splitQuery } from '../components/search-filters';
+import { pageTitle } from '../page-name';
 
 const RESULTS_PER_LOAD = 25;
 const TABS = ['content', 'people', 'spaces'] as const;
@@ -48,7 +49,7 @@ function ResultRow({ result }: { result: SearchResult }) {
   return (
     <li>
       <Link href={`/pages/${result.page_id}${result.comment_id ? `#comment-${result.comment_id}` : ''}`}>
-        {result.title}
+        {pageTitle(t, result.title)}
       </Link>{' '}
       <span className="muted">{result.space_name}</span>{' '}
       {result.draft && <span className="lozenge">{t('publishing.draftMark')}</span>}{' '}
@@ -58,7 +59,7 @@ function ResultRow({ result }: { result: SearchResult }) {
         <nav aria-label={t('page.breadcrumbs')} className="result-crumbs">
           {result.breadcrumbs?.map((c) => (
             <Link key={c.id} href={`/pages/${c.id}`}>
-              {c.title}
+              {pageTitle(t, c.title)}
             </Link>
           ))}
         </nav>

@@ -16,6 +16,7 @@ import {
 import { navigate } from '../router';
 import { useToast } from '../components/toast';
 import { Dialog, ErrorNote, Field } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const TITLES_IN_PREVIEW = 5;
 const MAX_MATCHES = 20;
@@ -77,7 +78,7 @@ function ParentByTree({
         <option value="">{t('page.topLevel')}</option>
         {targets.map((n) => (
           <option key={n.id} value={n.id}>
-            {n.title}
+            {pageTitle(t, n.title)}
           </option>
         ))}
       </select>
@@ -113,7 +114,7 @@ function ParentBySearch({
         {found.map((n) => (
           <label key={n.id} className="check">
             <input type="radio" name="parent" checked={value === n.id} onChange={() => onChange(n.id)} />
-            {n.title}
+            {pageTitle(t, n.title)}
           </label>
         ))}
       </fieldset>
@@ -334,8 +335,11 @@ export function CopyDialog({ page, onClose }: { page: PageSummary; onClose: () =
   const target = useTargets(spaceId);
   const source = useTargets(page.space_id);
   const targets = (target.data?.pages ?? []).filter((n) => n.status === 'published');
-  const below = (source.data?.pages ?? []).filter((n) => n.parent_id === page.id).map((n) => n.title);
-  const titles = (children ? [page.title, ...below] : [page.title]).slice(0, TITLES_IN_PREVIEW);
+  const below = (source.data?.pages ?? [])
+    .filter((n) => n.parent_id === page.id)
+    .map((n) => pageTitle(t, n.title));
+  const named = pageTitle(t, page.title);
+  const titles = (children ? [named, ...below] : [named]).slice(0, TITLES_IN_PREVIEW);
   const impact = useQuery({
     queryKey: ['copy-impact', page.id, spaceId, parent],
     queryFn: () => {

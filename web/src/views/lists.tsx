@@ -7,6 +7,7 @@ import { api, type ListedPage, type Space } from '../api';
 import { Link } from '../router';
 import { IconArrowDown, IconArrowUp, IconGrip } from '../components/icons';
 import { PageMark } from '../components/topbar';
+import { pageTitle } from '../page-name';
 import { ConfirmButton, ErrorNote, Loading, RelativeTime, SpaceBadge } from '../components/ui';
 
 const TABS = ['visited', 'worked', 'drafts'] as const;
@@ -63,7 +64,7 @@ function RecentList({ tab, filter }: { tab: Tab; filter: string }) {
           <li key={p.id}>
             <PageMark page={p} />
             <Link href={tab === 'drafts' ? `/pages/${p.id}/edit` : `/pages/${p.id}`}>
-              {p.title || t('page.untitled')}
+              {pageTitle(t, p.title)}
             </Link>
             <span className="muted">
               {p.space_name} · <RelativeTime value={p.at} />
@@ -162,6 +163,7 @@ function FavouritePages({ filter }: { filter: string }) {
       <ul className="page-list">
         {pages.map((p) => {
           const at = all.indexOf(p);
+          const title = pageTitle(t, p.title);
           return (
             <li
               key={p.id}
@@ -178,20 +180,20 @@ function FavouritePages({ filter }: { filter: string }) {
             >
               <input
                 type="checkbox"
-                aria-label={t('favourites.pick', { title: p.title })}
+                aria-label={t('favourites.pick', { title })}
                 checked={picked.includes(p.id)}
                 onChange={() => toggle(p.id)}
               />
               {!filtering && <IconGrip size={MOVE_ICON_SIZE} />}
               <PageMark page={p} />
-              <Link href={`/pages/${p.id}`}>{p.title}</Link>
+              <Link href={`/pages/${p.id}`}>{title}</Link>
               <span className="muted">{p.space_name}</span>
               {!filtering && (
                 <>
                   <button
                     type="button"
                     className="icon"
-                    aria-label={t('favourites.moveUp', { title: p.title })}
+                    aria-label={t('favourites.moveUp', { title })}
                     disabled={at === 0}
                     onClick={() => order.mutate(moved(all, at, -1))}
                   >
@@ -200,7 +202,7 @@ function FavouritePages({ filter }: { filter: string }) {
                   <button
                     type="button"
                     className="icon"
-                    aria-label={t('favourites.moveDown', { title: p.title })}
+                    aria-label={t('favourites.moveDown', { title })}
                     disabled={at === all.length - 1}
                     onClick={() => order.mutate(moved(all, at, 1))}
                   >

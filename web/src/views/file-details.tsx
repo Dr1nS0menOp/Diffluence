@@ -11,6 +11,7 @@ import { useCopy } from '../components/toast';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
 import { useCapabilities } from '../capabilities';
 import { useDates } from '../dates';
+import { pageTitle } from '../page-name';
 
 const REMOVE_ICON_SIZE = 12;
 
@@ -219,7 +220,7 @@ function MoveOrCopy({
     mutationFn: (how: 'move' | 'copy') =>
       api.post(`/attachments/${file.id}/${how}`, { page_id: target?.page_id }),
     onSuccess: async (_answer, how) => {
-      setCopied(how === 'copy' ? (target?.title ?? '') : '');
+      setCopied(how === 'copy' ? pageTitle(t, target?.title) : '');
       setTarget(null);
       setSearch('');
       await onChanged();
@@ -237,7 +238,7 @@ function MoveOrCopy({
       )}
       {target ? (
         <div className="row">
-          <span>{target.title}</span>
+          <span>{pageTitle(t, target.title)}</span>
           {canMove && (
             <button type="button" onClick={() => send.mutate('move')}>
               {t('files.move')}
@@ -259,7 +260,7 @@ function MoveOrCopy({
             {results.map((result) => (
               <li key={result.page_id}>
                 <button type="button" className="ghost" onClick={() => setTarget(result)}>
-                  {result.title}
+                  {pageTitle(t, result.title)}
                 </button>
               </li>
             ))}

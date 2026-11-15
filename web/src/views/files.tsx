@@ -9,6 +9,7 @@ import { Link } from '../router';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ConfirmButton, ErrorNote, formatSize, Loading } from '../components/ui';
 import { useDates } from '../dates';
+import { pageTitle } from '../page-name';
 
 const FILES_PAGE_SIZE = 50;
 const FILE_KINDS = ['image', 'media', 'pdf', 'text', 'office', 'other'] as const;
@@ -84,7 +85,7 @@ function FileTable({
                 <a href={`/api/v1/attachments/${file.id}/content?download=1`}>{file.filename}</a>
               </td>
               <td>
-                <Link href={`/pages/${file.page_id}`}>{file.page_title}</Link>
+                <Link href={`/pages/${file.page_id}`}>{pageTitle(t, file.page_title)}</Link>
               </td>
               <td>{formatSize(file.size)}</td>
               <td>{file.uploader}</td>

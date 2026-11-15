@@ -25,6 +25,7 @@ import { useDates } from '../dates';
 import { FileDetailsDialog } from './file-details';
 import { arrangedFiles, FILE_ORDERS, type FileOrder } from './file-list';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 /** Every file of a page. Files are added in the editor, by dropping them into the document. */
 export function AttachmentsDialog({ page, onClose }: { page: PageSummary; onClose: () => void }) {
@@ -348,7 +349,7 @@ export function RestrictionsDialog({ page, onClose }: { page: PageSummary; onClo
               <ul className="plain-list">
                 {q.data.inherited.map((i) => (
                   <li key={i.page_id}>
-                    <Link href={`/pages/${i.page_id}`}>{i.title}</Link>
+                    <Link href={`/pages/${i.page_id}`}>{pageTitle(t, i.title)}</Link>
                   </li>
                 ))}
               </ul>
@@ -444,7 +445,7 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
       onClose();
       navigate(page.parent_id ? `/pages/${page.parent_id}` : '/');
       toast({
-        message: t('page.deleted', { title: page.title }),
+        message: t('page.deleted', { title: pageTitle(t, page.title) }),
         action: { label: t('page.undo'), run: () => void undo() },
       });
     },
@@ -462,7 +463,7 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
           <ul className="plain-list">
             {links.map((l) => (
               <li key={l.id}>
-                <Link href={`/pages/${l.id}`}>{l.title}</Link>
+                <Link href={`/pages/${l.id}`}>{pageTitle(t, l.title)}</Link>
               </li>
             ))}
           </ul>
@@ -475,7 +476,7 @@ export function DeleteDialog({ page, onClose }: { page: PageSummary; onClose: ()
           <ul className="plain-list">
             {usedBy.data?.pages.map((l) => (
               <li key={l.id}>
-                <Link href={`/pages/${l.id}`}>{l.title}</Link>
+                <Link href={`/pages/${l.id}`}>{pageTitle(t, l.title)}</Link>
               </li>
             ))}
           </ul>

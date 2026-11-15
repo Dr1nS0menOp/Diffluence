@@ -419,6 +419,21 @@ test('favourites can be ordered without dragging, and removed together', async (
   await expect(rows).toHaveCount(before - 2);
 });
 
+test('a page without a title is listed as Untitled on the home page', async ({ page }) => {
+  // A guided template may leave a title empty (spec 074); a link still needs a name.
+  const space = await newSpace(page, 'Untitled space');
+  const created = await page.request.post('/api/v1/pages', {
+    data: { space_id: space.id, parent_id: null, title: '', untitled: true },
+  });
+  expect(created.ok(), await created.text()).toBeTruthy();
+  const { id } = (await created.json()) as { id: string };
+  expect((await page.request.put(`/api/v1/pages/${id}/favourite`, { data: {} })).status()).toBe(204);
+  await page.goto('/?personal=1');
+  const yours = page.getByRole('complementary', { name: 'Your pages and tasks' });
+  await expect(yours.locator(`a[href="/pages/${id}"]`)).toHaveText('Untitled');
+  await checkAccessibility(page);
+});
+
 test('the look of a page: emoji, width, title and header image', async ({ page }) => {
   const space = await newSpace(page, 'Look space');
   const id = await publishedPage(page, space.id, 'Looks', 'text');

@@ -8,6 +8,7 @@ import { api, type PublicSite, type SiteBuild, type SiteChoice, type SiteReport,
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 // A build runs in the background, and this is how it shows up.
 const POLL_MS = 2000;
@@ -156,7 +157,7 @@ function ChoosePages({ site, onSaved }: { site: PublicSite; onSaved: () => void 
                   checked={chosen.has(p.id)}
                   onChange={(e) => toggle(p.id, e.target.checked)}
                 />{' '}
-                {p.title}
+                {pageTitle(t, p.title)}
               </label>
               {p.blocked && <span className="muted"> {t('sites.blocked')}</span>}
             </li>

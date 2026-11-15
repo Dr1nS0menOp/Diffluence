@@ -8,6 +8,7 @@ import { Link, navigate, useLocation } from '../router';
 import { PersonMark, PersonPicture } from '../components/person';
 import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const PEOPLE_PER_LOAD = 50;
 
@@ -150,7 +151,7 @@ function PersonPages({ id }: { id: string }) {
         {q.data?.pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
             <span className="muted">{p.space_name}</span>
           </li>
         ))}
@@ -173,7 +174,7 @@ function PersonMentions({ id }: { id: string }) {
         {q.data?.pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
             <span className="muted">{p.space_name}</span>
           </li>
         ))}

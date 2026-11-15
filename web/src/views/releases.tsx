@@ -16,6 +16,7 @@ import { Tabs } from '../components/tabs';
 import { PageMark } from '../components/topbar';
 import { Dialog, ErrorNote, Loading, RelativeTime } from '../components/ui';
 import { MissingPage } from './organise';
+import { pageTitle } from '../page-name';
 
 const TABS = ['to_release', 'left_out', 'removed', 'history'] as const;
 type Tab = (typeof TABS)[number];
@@ -273,7 +274,7 @@ function ReleaseTable({
       show: (row) => (
         <input
           type="checkbox"
-          aria-label={t('publishing.pickPage', { title: row.title })}
+          aria-label={t('publishing.pickPage', { title: pageTitle(t, row.title) })}
           checked={picked.includes(idOf(row))}
           onChange={() => onPick(idOf(row))}
         />
@@ -287,9 +288,9 @@ function ReleaseTable({
         <>
           <PageMark page={row} />{' '}
           {tab === 'removed' && row.twin_page_id ? (
-            <Link href={`/pages/${row.twin_page_id}`}>{row.title}</Link>
+            <Link href={`/pages/${row.twin_page_id}`}>{pageTitle(t, row.title)}</Link>
           ) : (
-            <Link href={`/pages/${row.page_id}`}>{row.title}</Link>
+            <Link href={`/pages/${row.page_id}`}>{pageTitle(t, row.title)}</Link>
           )}
           {row.path.length > 0 && <span className="muted"> · {row.path.join(' / ')}</span>}
         </>
@@ -476,7 +477,7 @@ function RunReport({ space, runId, onClose }: { space: Space; runId: string; onC
         <ul className="plain-list">
           {pages.map((p) => (
             <li key={p.page_id}>
-              {p.title}{' '}
+              {pageTitle(t, p.title)}{' '}
               <span className="muted">
                 {t(`publishing.outcome_${p.outcome ?? 'waiting'}`)}
                 {p.reason ? ` · ${t(`publishing.skip_${p.reason}`)}` : ''}

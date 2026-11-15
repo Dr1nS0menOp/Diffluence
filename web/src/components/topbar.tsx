@@ -14,6 +14,7 @@ import { ShortcutsDialog } from './shortcuts';
 import { useOrderedSpaces } from './space-strip';
 import { PAGE_DRAG_TYPE } from './tree-model';
 import { Avatar, Dialog, ErrorNote, Loading, RelativeTime, SpaceBadge } from './ui';
+import { pageTitle } from '../page-name';
 
 const RECENT_IN_MENU = 8;
 const FAVOURITES_IN_MENU = 12;
@@ -82,6 +83,7 @@ function PageEntries({
   more: string;
   moreLabel: string;
 }) {
+  const { t } = useTranslation();
   const q = useQuery({ queryKey: [path], queryFn: () => api.get<{ pages: ListedPage[] }>(path) });
   const pages = (q.data?.pages ?? []).slice(0, limit);
   return (
@@ -93,7 +95,7 @@ function PageEntries({
         <MenuLink key={p.id} href={`/pages/${p.id}`}>
           <PageMark page={p} />
           <span className="menu-page">
-            <span>{p.title}</span>
+            <span>{pageTitle(t, p.title)}</span>
             <span className="muted">
               {p.space_name} · <RelativeTime value={p.at} />
             </span>

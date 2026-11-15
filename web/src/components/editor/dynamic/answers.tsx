@@ -9,6 +9,7 @@ import { Link } from '../../../router';
 import { IconChevronDown, IconChevronLeft, IconChevronRight } from '../../icons';
 import { Avatar } from '../../ui';
 import { DocumentView } from '../editor';
+import { pageTitle } from '../../../page-name';
 
 const CARD_TURN_MS = 6000;
 const CLOUD_WEIGHTS = 4;
@@ -50,10 +51,11 @@ export interface BlockAnswer {
 }
 
 function RowLink({ row }: { row: BlockRow }) {
+  const { t } = useTranslation();
   return (
     <Link href={`/pages/${row.id}`}>
       {row.emoji && <span aria-hidden="true">{row.emoji} </span>}
-      {row.title}
+      {pageTitle(t, row.title)}
     </Link>
   );
 }
@@ -364,7 +366,9 @@ function TreeBranch({
           type="button"
           className="ghost"
           aria-expanded={isOpen}
-          aria-label={t(isOpen ? 'blocks.collapse' : 'blocks.expand', { title: node.row.title })}
+          aria-label={t(isOpen ? 'blocks.collapse' : 'blocks.expand', {
+            title: pageTitle(t, node.row.title),
+          })}
           onClick={() => onToggle(node.row.id)}
         >
           {isOpen ? <IconChevronDown size={NAV_ICON_SIZE} /> : <IconChevronRight size={NAV_ICON_SIZE} />}
@@ -464,7 +468,7 @@ function PlainRows({ answer, kind }: { answer: BlockAnswer; kind: string }) {
           {kind === 'attachments_here' || kind === 'space_files' ? (
             <a href={`/api/v1/attachments/${row.id}/content?download=1`}>{row.title}</a>
           ) : kind === 'decision_report' || kind === 'popular_pages' ? (
-            <Link href={`/pages/${row.id}`}>{row.title}</Link>
+            <Link href={`/pages/${row.id}`}>{pageTitle(t, row.title)}</Link>
           ) : kind === 'task_report' || kind === 'my_tasks' ? (
             <Link href={`/pages/${row.parent_id}`}>{row.title}</Link>
           ) : kind === 'spaces_list' ? (

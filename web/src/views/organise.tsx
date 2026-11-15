@@ -17,6 +17,7 @@ import { Frame, spaceByKeyQuery } from '../components/frame';
 import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading, RelativeTime } from '../components/ui';
 import { useDates } from '../dates';
+import { pageTitle } from '../page-name';
 
 const POSTS_PER_LOAD = 20;
 
@@ -109,7 +110,7 @@ export function LabelView({ label }: { label: string }) {
         {q.data?.pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
             <span className="muted">{p.space_name}</span>
           </li>
         ))}
@@ -156,7 +157,7 @@ function PostList({ path }: { path: string }) {
               .filter((p) => monthOf(p.published_at) === month)
               .map((p) => (
                 <li key={p.id}>
-                  <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                  <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
                   <span className="muted">
                     {t('page.byline', { name: p.author_name })} · {dates.day(p.published_at)} · {p.space_name}
                   </span>
@@ -216,7 +217,7 @@ function ArchiveList({ space }: { space: Space }) {
       <ul className="page-list">
         {pages.map((p) => (
           <li key={p.id}>
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
             <span className="muted">
               {p.archived_by_name} · <RelativeTime value={p.archived_at} />
             </span>

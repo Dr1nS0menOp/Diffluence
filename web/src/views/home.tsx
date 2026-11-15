@@ -18,6 +18,7 @@ import { FirstUseCard, WelcomePage } from '../components/first-use';
 import { DocumentView } from '../components/editor/editor';
 import { IconPlus } from '../components/icons';
 import { PageMark } from '../components/topbar';
+import { pageTitle } from '../page-name';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge, Tabs } from '../components/ui';
 
 const TABS = ['for_you', 'recent', 'popular'] as const;
@@ -37,7 +38,7 @@ function PageList({ title, path }: { title: string; path: string }) {
         {q.data?.pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
             <span className="muted">{p.space_name}</span>
           </li>
         ))}
@@ -56,7 +57,7 @@ function CompanyHome({ pageId }: { pageId: string }) {
       <p>
         <Link href="/?personal=1">{t('home.yourStart')}</Link>
       </p>
-      <h1>{q.data.title}</h1>
+      <h1>{pageTitle(t, q.data.title)}</h1>
       <DocumentView document={q.data.document} />
     </>
   );
@@ -108,10 +109,10 @@ function FeedEntry({ item, at, total }: { item: FeedItem; at: number; total: num
       tabIndex={0}
       aria-posinset={at}
       aria-setsize={total}
-      aria-label={item.title}
+      aria-label={pageTitle(t, item.title)}
     >
       <h3>
-        <PageMark page={item} /> <Link href={`/pages/${item.page_id}`}>{item.title}</Link>
+        <PageMark page={item} /> <Link href={`/pages/${item.page_id}`}>{pageTitle(t, item.title)}</Link>
       </h3>
       <p className="muted">
         {item.space_name} ·{' '}

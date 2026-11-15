@@ -80,6 +80,7 @@ import { CopyDialog, MoveDialog } from './move-dialogs';
 import { ArchiveDialog, KindDialog, SaveTemplateDialog } from './page-actions';
 import { PresencePeople, usePresence, useViewCount } from '../components/presence';
 import { AttachmentsDialog, DeleteDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
+import { pageTitle } from '../page-name';
 
 type PageDialog =
   | 'attachments'
@@ -117,10 +118,11 @@ const ATTACHMENT_ADDRESS = /\/attachments\/([0-9a-f-]+)\//;
 const THREADS_CLOSED = { open: false, thread: null };
 
 function Crumb({ page }: { page: { id: string; title: string; emoji: string } }) {
+  const { t } = useTranslation();
   return (
     <Link href={`/pages/${page.id}`}>
       {page.emoji && <span aria-hidden="true">{page.emoji} </span>}
-      {page.title}
+      {pageTitle(t, page.title)}
     </Link>
   );
 }
@@ -147,7 +149,7 @@ function Breadcrumbs({ page }: { page: PageDetail }) {
             <Menu label={t('page.moreCrumbs')} align="start" className="crumb-fold" trigger="…">
               {folded.map((c) => (
                 <MenuLink key={c.id} href={`/pages/${c.id}`}>
-                  {c.title}
+                  {pageTitle(t, c.title)}
                 </MenuLink>
               ))}
             </Menu>
@@ -686,7 +688,7 @@ export function PageView({ pageId }: { pageId: string }) {
   useThreadInAddress(inlineIds, openComments);
   const headings = useMemo(() => (page ? contentsOf(page.document) : []), [page]);
 
-  useDocumentTitle(page ? `${page.emoji ? `${page.emoji} ` : ''}${page.title}` : undefined);
+  useDocumentTitle(page ? `${page.emoji ? `${page.emoji} ` : ''}${pageTitle(t, page.title)}` : undefined);
   useJumpToAddress(pageId, !!page);
   useScrollMemory(!!page);
   useShortcut('edit', () => {
@@ -774,7 +776,7 @@ export function PageView({ pageId }: { pageId: string }) {
               {page.emoji}{' '}
             </span>
           )}
-          {page.title}
+          {pageTitle(t, page.title)}
         </h1>
         <Byline
           page={page}
@@ -911,7 +913,11 @@ export function PageView({ pageId }: { pageId: string }) {
         />
       )}
       {presenting && (
-        <Presentation title={page.title} document={page.document} onClose={() => setPresenting(false)} />
+        <Presentation
+          title={pageTitle(t, page.title)}
+          document={page.document}
+          onClose={() => setPresenting(false)}
+        />
       )}
     </div>
   );
@@ -929,7 +935,7 @@ function ReviewOnlyPage({ page }: { page: PageDetail }) {
   return (
     <div className="page-layout">
       <article className="page">
-        <h1>{page.title}</h1>
+        <h1>{pageTitle(t, page.title)}</h1>
         <p role="status" className="note">
           {t('review.onlyForReview')}
         </p>

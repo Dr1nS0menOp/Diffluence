@@ -33,6 +33,7 @@ import { holds, type Condition, type Facts } from '../template-conditions';
 import { IconLock } from './icons';
 import { PagePicker, SubjectPicker } from './picker';
 import { ConfirmDialog, ErrorNote, Field, fieldErrorId, fieldHelpId, Loading } from './ui';
+import { pageTitle } from '../page-name';
 
 /** Up to this many options show as radio buttons; more become a list (TPL-302). */
 const RADIO_LIMIT = 6;
@@ -516,7 +517,7 @@ function PlannedPages({ pages, parent }: { pages: PlannedPage[]; parent: string 
     <ul className="planned-pages">
       {below.map((p) => (
         <li key={p.entry}>
-          <span className="planned-title">{p.title || t('page.untitled')}</span>
+          <span className="planned-title">{pageTitle(t, p.title)}</span>
           {p.labels.map((label) => (
             <span key={label} className="planned-label">
               #{label}

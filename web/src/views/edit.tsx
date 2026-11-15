@@ -44,6 +44,7 @@ import { ConfirmButton, Dialog, ErrorNote, Loading } from '../components/ui';
 import { MoveDialog } from './move-dialogs';
 import { EditingTogether } from '../components/presence';
 import { PublicMark } from './exchange';
+import { pageTitle } from '../page-name';
 
 const AUTOSAVE_MS = 1500;
 const EDITORS_CHECK_MS = 60_000;
@@ -145,7 +146,8 @@ function EditorNotes({ page, title }: { page: PageDetail; title: string }) {
       )}
       {same.data?.page && (
         <p role="status" className="note">
-          {t('editor.sameTitle')} <Link href={`/pages/${same.data.page.id}`}>{same.data.page.title}</Link>
+          {t('editor.sameTitle')}{' '}
+          <Link href={`/pages/${same.data.page.id}`}>{pageTitle(t, same.data.page.title)}</Link>
         </p>
       )}
     </>

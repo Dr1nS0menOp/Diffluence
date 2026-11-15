@@ -162,7 +162,14 @@ describe('the tree', () => {
 });
 
 describe('quick search', () => {
-  const labels = { pages: 'Pages', posts: 'Blog posts', spaces: 'Spaces', files: 'Files', people: 'People' };
+  const labels = {
+    pages: 'Pages',
+    posts: 'Blog posts',
+    spaces: 'Spaces',
+    files: 'Files',
+    people: 'People',
+    untitled: 'Untitled',
+  };
 
   it('puts the groups in order, so arrows follow what is on screen', () => {
     const results: QuickResults = {

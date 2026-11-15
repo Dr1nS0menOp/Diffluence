@@ -6,6 +6,7 @@ import { api, type Notification, type NotificationSettings, type Space, type Wat
 import { Link } from '../router';
 import { NotificationRow } from '../components/notifications';
 import { ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const PAGE_SIZE = 50;
 const TYPES = [
@@ -293,7 +294,7 @@ export function WatchingView() {
       <ul className="page-list">
         {rows.map((w) => (
           <li key={w.type + w.id}>
-            <Link href={hrefOf(w)}>{w.title}</Link>
+            <Link href={hrefOf(w)}>{pageTitle(t, w.title)}</Link>
             <span className="muted">
               {t(`watching.kind_${w.type}`)} · <RelativeTime value={w.since} />
             </span>

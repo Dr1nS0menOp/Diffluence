@@ -113,7 +113,7 @@ test('a page from a template: the gallery by keyboard, then the form', async ({ 
     await form.getByRole('button', { name: 'Next' }).click();
   }
   await form.getByRole('button', { name: 'Start the page' }).click();
-  await expect(page.getByLabel('Title')).toBeVisible();
+  await expect(page.getByLabel('Title', { exact: true })).toBeVisible();
   await expect(page.locator('.prose.editing')).toContainText('Team <b>sync</b>');
   await expect(page.locator('.prose.editing b')).toHaveCount(0);
 });
@@ -153,7 +153,7 @@ test('writing a template with a field and instruction text', async ({ page }) =>
   await page.getByRole('button', { name: 'Start the page' }).click();
   await expect(page.locator('.prose.editing')).toContainText('Roadmap');
 
-  await page.getByLabel('Title').fill('From the template');
+  await page.getByLabel('Title', { exact: true }).fill('From the template');
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'From the template', level: 1 })).toBeVisible();
   await expect(page.locator('.prose')).toContainText('Roadmap');
@@ -205,7 +205,7 @@ test('a template that makes a set: the Pages list, then one action makes every p
   await form.getByRole('button', { name: 'Next' }).click();
   await expect(form.getByText('Laptop')).toBeVisible();
   await form.getByRole('button', { name: 'Create 3 drafts' }).click();
-  await expect(page.getByLabel('Title')).toBeVisible();
+  await expect(page.getByLabel('Title', { exact: true })).toBeVisible();
   const root = new URL(page.url()).pathname.split('/')[2];
 
   // All three pages exist at once, as drafts of their maker, below each other.
@@ -227,7 +227,7 @@ test('a blog post stays out of the tree, and a silent publish still makes a vers
   await page.goto(`/spaces/${space.key}/overview`);
   await page.getByRole('button', { name: 'More to create' }).click();
   await page.getByRole('menuitem', { name: 'Blog post' }).click();
-  await page.getByRole('dialog').getByLabel('Title').fill('Launch day');
+  await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Launch day');
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
   await page.locator('.prose.editing').click();
   await page.keyboard.type('We shipped.');
@@ -276,7 +276,7 @@ test('a folder shows its pages, a link entry leaves the space', async ({ page })
 
   await page.getByRole('button', { name: 'Add a link' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a link' });
-  await dialog.getByLabel('Title').fill('Our shop');
+  await dialog.getByLabel('Title', { exact: true }).fill('Our shop');
   await dialog.getByLabel('Address').fill('https://example.com/shop');
   await dialog.getByRole('button', { name: 'Create' }).click();
   const tree = page.getByRole('navigation', { name: 'Pages' });
@@ -569,7 +569,7 @@ test('text survives a failed save, and Close waits or asks', async ({ page }) =>
 test('a link to a page that does not exist yet starts it', async ({ page }) => {
   const space = await newSpace(page, 'New from a link');
   await page.goto(`/spaces/${space.key}/new?title=Wanted+page`);
-  await expect(page.getByLabel('Title')).toHaveValue('Wanted page');
+  await expect(page.getByLabel('Title', { exact: true })).toHaveValue('Wanted page');
 });
 
 test('a new space stays with the person who makes it, unless they choose otherwise', async ({ page }) => {

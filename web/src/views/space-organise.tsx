@@ -15,6 +15,7 @@ import {
 import { Link, navigate } from '../router';
 import { SubjectPicker } from '../components/picker';
 import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const FEATURES = [
   'blog',
@@ -179,7 +180,7 @@ export function PeopleSection({ space }: { space: Space }) {
             >
               {pages.data?.pages.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.title}
+                  {pageTitle(t, p.title)}
                 </option>
               ))}
             </select>

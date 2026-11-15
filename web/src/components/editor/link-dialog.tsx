@@ -17,6 +17,7 @@ import {
   type LinkDisplay,
   type LinkTarget,
 } from './link-commands';
+import { pageTitle } from '../../page-name';
 
 const MAX_PAGE_RESULTS = 8;
 const ALLOWED_ADDRESS = /^(https?:\/\/\S+|mailto:\S+|\/\S*|#\S*)$/i;
@@ -169,7 +170,7 @@ export function LinkDialog({ editor, onClose }: { editor: Editor; onClose: () =>
               {choices.map((choice) => (
                 <li key={choice.id}>
                   <button type="button" className="suggestion" onClick={() => pick(choice)}>
-                    <span className="suggestion-name">{choice.title}</span>
+                    <span className="suggestion-name">{pageTitle(t, choice.title)}</span>
                   </button>
                 </li>
               ))}

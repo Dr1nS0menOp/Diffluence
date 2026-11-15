@@ -17,8 +17,10 @@ import { SubjectPicker } from './picker';
 import { PageMark } from './topbar';
 import { useDates } from '../dates';
 import { ErrorNote, formatSize, Loading } from './ui';
+import { pageTitle } from '../page-name';
 
 function PageLinks({ title, pages, empty }: { title: string; pages: PageRef[]; empty: string }) {
+  const { t } = useTranslation();
   return (
     <section>
       <h3>{title}</h3>
@@ -27,7 +29,7 @@ function PageLinks({ title, pages, empty }: { title: string; pages: PageRef[]; e
         {pages.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
           </li>
         ))}
       </ul>
@@ -259,7 +261,7 @@ export function ChildPages({ pageId }: { pageId: string }) {
         {q.data.map((p) => (
           <li key={p.id}>
             <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{p.title}</Link>
+            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
           </li>
         ))}
       </ul>

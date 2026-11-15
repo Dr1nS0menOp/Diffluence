@@ -7,6 +7,7 @@ import { Frame, spaceByKeyQuery, useSpaceWatch } from '../components/frame';
 import { IconEye, IconStar } from '../components/icons';
 import { PageMark } from '../components/topbar';
 import { ErrorNote, Loading, RelativeTime, SpaceBadge } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 function WatchButton({ space }: { space: Space }) {
   const { t } = useTranslation();
@@ -108,7 +109,7 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               {facts.recent.map((p) => (
                 <li key={p.id}>
                   <PageMark page={p} />
-                  <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                  <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
                   <span className="muted">
                     <RelativeTime value={p.at} />
                   </span>
@@ -122,7 +123,7 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               <ul className="page-list">
                 {popular.data?.pages.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                    <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
                   </li>
                 ))}
               </ul>
@@ -134,7 +135,7 @@ export function SpaceOverviewView({ spaceKey }: { spaceKey: string }) {
               <ul className="page-list">
                 {facts.posts.map((p) => (
                   <li key={p.id}>
-                    <Link href={`/pages/${p.id}`}>{p.title}</Link>
+                    <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
                     <span className="muted">
                       <RelativeTime value={p.published_at} />
                     </span>

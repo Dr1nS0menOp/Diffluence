@@ -12,6 +12,7 @@ import { IconPage } from '../icons';
 import { useToast } from '../toast';
 import { RelativeTime } from '../ui';
 import { dataAttribute } from './dynamic/nodes';
+import { pageTitle } from '../../page-name';
 
 const TAG_ICON_SIZE = 14;
 const FACT_FRESH_MS = 60_000;
@@ -96,6 +97,7 @@ function PageLinkView({ node, editor }: ReactNodeViewProps) {
     fragment: string | null;
     display: string | null;
   };
+  const { t } = useTranslation();
   const { fact, isPending } = useLinkFact(id);
   const className = display === 'tag' ? 'page-tag' : undefined;
   return (
@@ -111,7 +113,7 @@ function PageLinkView({ node, editor }: ReactNodeViewProps) {
           }}
         >
           {display === 'tag' && <IconPage size={TAG_ICON_SIZE} />}
-          {fact.title}
+          {pageTitle(t, fact.title)}
         </a>
       ) : (
         <HiddenPage />
@@ -144,6 +146,7 @@ export const PageLink = DocumentNode.create({
 });
 
 function PageCardView({ node, editor }: ReactNodeViewProps) {
+  const { t } = useTranslation();
   const id = node.attrs.page_id as string;
   const { fact, isPending } = useLinkFact(id);
   if (isPending) return <NodeViewWrapper className="page-card" contentEditable={false} />;
@@ -164,7 +167,7 @@ function PageCardView({ node, editor }: ReactNodeViewProps) {
         }}
       >
         <IconPage size={TAG_ICON_SIZE} />
-        {fact.title}
+        {pageTitle(t, fact.title)}
       </a>
       {fact.excerpt && <p className="page-card-excerpt">{fact.excerpt}</p>}
       <p className="muted page-card-facts">

@@ -6,6 +6,7 @@ import { api, type TaskItem } from '../api';
 import { Link } from '../router';
 import { formatStoredDate, today } from '../components/editor/inline';
 import { ErrorNote, Field, Loading, Tabs } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const TABS = ['assigned', 'created'] as const;
 type Tab = (typeof TABS)[number];
@@ -36,7 +37,7 @@ function Row({ task, onDone }: { task: TaskItem; onDone: (done: boolean) => void
       />
       <Link href={`/pages/${task.page_id}`}>{title}</Link>
       <span className="muted">
-        {task.page_title} · {task.space_name}
+        {pageTitle(t, task.page_title)} · {task.space_name}
         {task.due && ` · ${formatStoredDate(task.due)}`}
       </span>
     </li>

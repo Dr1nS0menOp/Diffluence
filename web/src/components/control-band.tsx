@@ -10,6 +10,7 @@ import { IconArchive, IconClock, IconPencil, IconVerified } from './icons';
 import { Signatures } from './signatures';
 import { pendingSigning, SigningDialog } from './signing-dialog';
 import { Dialog, ErrorNote, Field, RelativeTime } from './ui';
+import { pageTitle } from '../page-name';
 
 const MARK_ICON_SIZE = 16;
 
@@ -61,7 +62,10 @@ export function ControlBand({
     c.governed_by === 'space'
       ? t('control.governedSpace', { workflow: c.workflow_name })
       : c.governed_by === 'branch'
-        ? t('control.governedBranch', { workflow: c.workflow_name, page: c.governed_from_title })
+        ? t('control.governedBranch', {
+            workflow: c.workflow_name,
+            page: pageTitle(t, c.governed_from_title),
+          })
         : t('control.governedPage', { workflow: c.workflow_name });
   return (
     <div role="status" className="note control-band" data-kind={c.state_kind}>

@@ -1220,6 +1220,9 @@ test.describe('the look of every kind of screen', () => {
     await page.getByRole('link', { name: 'Versions' }).click();
     await page.getByRole('button', { name: 'Changes in version 2' }).click();
     await expect(page.getByRole('region', { name: 'What version 2 changed' })).toBeVisible();
+    // The time of a version is the clock of this run: masked alone, its width still moved
+    // the columns beside it.
+    await fixText(page.locator('main time'), 'just now');
     await picture(page, 'template-versions', [page.locator('time')]);
     await checkAccessibility(page);
     await page.context().close();

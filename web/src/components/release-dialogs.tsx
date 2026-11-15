@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type ReleaseRun, type ReleaseStatus, type RunPage, type RunPreview } from '../api';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from './ui';
 import { useToast } from './toast';
+import { pageTitle } from '../page-name';
 
 /** What a run takes, as the API asks for it. */
 export interface RunScope {
@@ -23,7 +24,7 @@ function PageList({ pages, reasons }: { pages: RunPage[]; reasons: boolean }) {
     <ul className="plain-list">
       {pages.map((p) => (
         <li key={`${p.page_id}-${p.twin_page_id ?? ''}`}>
-          {p.title}{' '}
+          {pageTitle(t, p.title)}{' '}
           <span className="muted">
             {reasons && p.reason ? t(`publishing.skip_${p.reason}`) : t(`publishing.runAction_${p.action}`)}
           </span>
@@ -142,7 +143,7 @@ export function RunDialog({
                       )
                     }
                   />{' '}
-                  {r.title} · {t('publishing.runName')}
+                  {pageTitle(t, r.title)} · {t('publishing.runName')}
                 </label>
               ))}
             </fieldset>

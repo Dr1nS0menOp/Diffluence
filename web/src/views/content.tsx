@@ -10,6 +10,7 @@ import { SubjectPicker } from '../components/picker';
 import { StageMark } from '../components/page-marks';
 import { Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 const FLAGS = ['owner_disabled', 'restricted', 'broken_links', 'orphaned', 'past_review', 'with_parents'];
 const ACTIONS = ['archive', 'delete', 'owner', 'stage', 'label_add', 'label_remove', 'move'] as const;
@@ -129,7 +130,7 @@ function ActionDialog({
               .filter((n) => !ids.includes(n.id) && n.status === 'published')
               .map((n) => (
                 <option key={n.id} value={n.id}>
-                  {n.title}
+                  {pageTitle(t, n.title)}
                 </option>
               ))}
           </select>
@@ -315,13 +316,13 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
                     <td>
                       <input
                         type="checkbox"
-                        aria-label={t('favourites.pick', { title: r.title })}
+                        aria-label={t('favourites.pick', { title: pageTitle(t, r.title) })}
                         checked={picked.includes(r.id)}
                         onChange={() => setPicked(selectWithChildren(list, picked, r.id))}
                       />
                     </td>
                     <td>
-                      <Link href={`/pages/${r.id}`}>{r.title}</Link>
+                      <Link href={`/pages/${r.id}`}>{pageTitle(t, r.title)}</Link>
                     </td>
                     <td>
                       {r.owner_name}

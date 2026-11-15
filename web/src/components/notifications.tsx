@@ -10,6 +10,7 @@ import { Link } from '../router';
 import { IconBell } from './icons';
 import { useShortcut } from './shortcuts';
 import { Avatar, ErrorNote, Loading, RelativeTime } from './ui';
+import { pageTitle } from '../page-name';
 
 const POLL_MS = 30_000;
 const SHOWN_IN_PANEL = 20;
@@ -40,9 +41,13 @@ export function useNotificationSentence() {
     }
     if (n.type === 'approval_release' && n.data.outcome !== 'released' && n.data.outcome !== 'unchanged') {
       // The page itself says why: its band names the reason in words (PUB-820).
-      return t('notifications.approval_release_not', { page: n.page_title });
+      return t('notifications.approval_release_not', { page: pageTitle(t, n.page_title) });
     }
-    return t(`notifications.type_${n.type}`, { name, page: n.page_title, file: n.data.filename });
+    return t(`notifications.type_${n.type}`, {
+      name,
+      page: pageTitle(t, n.page_title),
+      file: n.data.filename,
+    });
   };
 }
 

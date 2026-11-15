@@ -43,7 +43,7 @@ test('writing a page with Markdown shortcuts and publishing it', async ({ page }
   const space = await newSpace(page, 'Editor space');
   await page.goto(`/spaces/${space.key}`);
   await page.getByRole('button', { name: 'New page' }).click();
-  await page.getByRole('dialog').getByLabel('Title').fill('Shortcuts');
+  await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Shortcuts');
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
 
   await page.getByRole('textbox', { name: 'Page content' }).click();
@@ -369,7 +369,7 @@ test('Create adds a page below the one you are reading', async ({ page }) => {
   await expect(page.getByRole('heading', { name: 'Reading', level: 1 })).toBeVisible();
   await page.getByRole('button', { name: 'Create', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'New page' });
-  await dialog.getByLabel('Title').fill('Below');
+  await dialog.getByLabel('Title', { exact: true }).fill('Below');
   await dialog.getByRole('button', { name: 'Create' }).click();
   await page.getByRole('textbox', { name: 'Page content' }).click();
   await editorSettled(page);

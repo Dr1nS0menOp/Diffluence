@@ -11,6 +11,7 @@ import { usePreferences } from '../preferences';
 import { Link } from '../router';
 import { DocumentView } from './editor/editor';
 import { Dialog } from './ui';
+import { pageTitle } from '../page-name';
 
 const TOUR_STEPS = ['spaces', 'pages', 'people'] as const;
 const PAGE_ADDRESS = /\/pages\/([0-9a-f-]{36})/;
@@ -69,6 +70,7 @@ export function FirstUseCard() {
 
 /** Shows for those who may read the page: the check is the normal one (NAV-038). */
 export function WelcomePage() {
+  const { t } = useTranslation();
   const address = useQuery(appearanceQuery).data?.welcome_page ?? '';
   const id = PAGE_ADDRESS.exec(address)?.[1];
   const page = useQuery({
@@ -81,7 +83,7 @@ export function WelcomePage() {
   return (
     <section className="first-use">
       <h2>
-        <Link href={`/pages/${page.data.id}`}>{page.data.title}</Link>
+        <Link href={`/pages/${page.data.id}`}>{pageTitle(t, page.data.title)}</Link>
       </h2>
       <DocumentView document={page.data.document} plain />
     </section>

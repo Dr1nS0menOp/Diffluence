@@ -18,6 +18,7 @@ import { DocumentView } from '../components/editor/editor';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 /** For a leaked secret. The number stays, and the audit log keeps who, when and why. */
 function RemoveVersionDialog({
@@ -265,7 +266,7 @@ export function HistoryView({ pageId }: { pageId: string }) {
     <>
       <h1>{t('history.title')}</h1>
       <p>
-        <Link href={`/pages/${pageId}`}>{page.data?.title}</Link>
+        <Link href={`/pages/${pageId}`}>{page.data ? pageTitle(t, page.data.title) : null}</Link>
       </p>
       <ErrorNote error={q.error ?? restore.error} />
       <TableBox>
@@ -401,7 +402,9 @@ function Changes({ comparison }: { comparison: Comparison }) {
   return (
     <>
       {!changed && <p className="muted">{t('history.unchanged')}</p>}
-      {from.title !== to.title && <p>{t('history.titleChanged', { from: from.title, to: to.title })}</p>}
+      {from.title !== to.title && (
+        <p>{t('history.titleChanged', { from: pageTitle(t, from.title), to: pageTitle(t, to.title) })}</p>
+      )}
       {foldUnchanged(blocks).map((run, i) =>
         run.folded ? <FoldedRun key={i} blocks={run.blocks} /> : <DiffDocument key={i} blocks={run.blocks} />,
       )}

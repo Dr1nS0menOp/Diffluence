@@ -167,7 +167,7 @@ test('a double click on Create makes one page', async ({ page }) => {
     .getByRole('button', { name: 'Create', exact: true })
     .click();
   const dialog = page.getByRole('dialog', { name: 'New page' });
-  await dialog.getByLabel('Title').fill('Only once');
+  await dialog.getByLabel('Title', { exact: true }).fill('Only once');
   await dialog.getByRole('button', { name: 'Create', exact: true }).dblclick();
   await expect(page.locator('.prose.editing')).toBeVisible();
   expect(posts).toHaveLength(1);

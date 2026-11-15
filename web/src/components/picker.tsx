@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, ApiError, type DirectoryEntry, type SearchResult } from '../api';
 import { Field } from './ui';
+import { pageTitle } from '../page-name';
 
 /**
  * Finds a user or group. A combobox with a list: people show as soon as the field
@@ -181,7 +182,7 @@ export function PagePicker({
                 setSearch('');
               }}
             >
-              {result.title}
+              {pageTitle(t, result.title)}
             </button>
           </li>
         ))}

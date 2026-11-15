@@ -53,6 +53,7 @@ import {
 import { SettingsFrame } from '../components/settings-frame';
 import { ControlTab } from './admin-control';
 import { TableBox } from '../components/table-box';
+import { pageTitle } from '../page-name';
 
 const TABS = [
   'summary',
@@ -1051,7 +1052,13 @@ function PageNoteFacts({ id }: { id: string }) {
   return (
     <dl className="facts">
       <dt>{t('page.title')}</dt>
-      <dd>{note.readable ? <Link href={`/pages/${id}`}>{note.title}</Link> : note.title}</dd>
+      <dd>
+        {note.readable ? (
+          <Link href={`/pages/${id}`}>{pageTitle(t, note.title)}</Link>
+        ) : (
+          pageTitle(t, note.title)
+        )}
+      </dd>
       <dt>{t('admin.spaces')}</dt>
       <dd>{note.space_name}</dd>
       <dt>{t('common.status')}</dt>

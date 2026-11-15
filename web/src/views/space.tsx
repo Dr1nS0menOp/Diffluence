@@ -28,6 +28,7 @@ import { TableBox } from '../components/table-box';
 import { WorkflowsSection } from './space-workflows';
 import { PublishingSection } from './space-publishing';
 import { useCapabilities } from '../capabilities';
+import { pageTitle } from '../page-name';
 
 const SPACE_SECTIONS = [
   'details',
@@ -92,7 +93,7 @@ function PlaceholdersSection({ space }: { space: Space }) {
       <ul className="plain-list">
         {list.map((one) => (
           <li key={`${one.source.id}-${one.title}`}>
-            {one.title} · <Link href={`/pages/${one.source.id}`}>{one.source.title}</Link>
+            {one.title} · <Link href={`/pages/${one.source.id}`}>{pageTitle(t, one.source.title)}</Link>
           </li>
         ))}
       </ul>

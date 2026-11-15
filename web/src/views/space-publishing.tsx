@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type LinkPreview, type PairSettings, type PublishingState, type Space } from '../api';
 import { Link } from '../router';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
+import { pageTitle } from '../page-name';
 
 const NAMES_SHOWN = 50;
 
@@ -352,7 +353,7 @@ function LinkingIn({ space }: { space: Space }) {
         <ul className="plain-list">
           {q.data.pages.map((p) => (
             <li key={p.page_id}>
-              <Link href={`/pages/${p.page_id}`}>{p.title}</Link>{' '}
+              <Link href={`/pages/${p.page_id}`}>{pageTitle(t, p.title)}</Link>{' '}
               <span className="muted">· {p.space_name}</span>
             </li>
           ))}

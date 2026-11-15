@@ -69,7 +69,7 @@ test('a database is made from Create and used with the keys of a spreadsheet', a
   await page.goto(`/spaces/${space.key}`);
   await page.getByRole('button', { name: 'More to create' }).click();
   await page.getByRole('menuitem', { name: 'New database' }).click();
-  await page.getByRole('dialog').getByLabel('Title').fill('Budget');
+  await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Budget');
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
   await expect(grid(page)).toBeVisible();
 

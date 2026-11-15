@@ -65,6 +65,7 @@ import {
 import { useDelayed } from './quick-search';
 import { useTreeParts, type MoreRows } from './tree-data';
 import { ErrorNote, Loading, RelativeTime } from './ui';
+import { pageTitle } from '../page-name';
 
 const ROW_ICON_SIZE = 16;
 const MARK_ICON_SIZE = 14;
@@ -189,9 +190,10 @@ function RowActions({
 }
 
 function RowTitle({ node, filter }: { node: TreeNode; filter: string }) {
+  const { t } = useTranslation();
   return (
     <>
-      {matchParts(node.title, filter).map((part, i) =>
+      {matchParts(pageTitle(t, node.title), filter).map((part, i) =>
         part.hit ? <mark key={i}>{part.text}</mark> : <span key={i}>{part.text}</span>,
       )}
     </>
@@ -278,7 +280,7 @@ function RowCard({
   }, [top, left]);
   return (
     <div ref={box} role="tooltip" className="row-card" onMouseEnter={onEnter} onMouseLeave={onLeave}>
-      <strong>{node.title}</strong>
+      <strong>{pageTitle(t, node.title)}</strong>
       <span className="muted">
         {t('tree.changedBy', { name: node.updated_by_name || t('common.unknown') })}{' '}
         <RelativeTime value={node.updated_at} />
@@ -349,7 +351,7 @@ function RowCheck({ node, picked, onPick }: RowProps) {
       type="checkbox"
       className="row-check"
       tabIndex={-1}
-      aria-label={t('favourites.pick', { title: node.title })}
+      aria-label={t('favourites.pick', { title: pageTitle(t, node.title) })}
       checked={picked}
       onChange={(e) => onPick(node.id, (e.nativeEvent as MouseEvent).shiftKey)}
     />
@@ -363,7 +365,7 @@ function RowTools({ node, tabStop, onAdd, onDialog }: RowProps) {
       <span className="node-tools">
         <Menu
           tabIndex={tabStop ? 0 : -1}
-          label={t('tree.rowMenu', { title: node.title })}
+          label={t('tree.rowMenu', { title: pageTitle(t, node.title) })}
           className="node-add"
           trigger={<IconMore size={ROW_ICON_SIZE} />}
           floating
@@ -376,8 +378,8 @@ function RowTools({ node, tabStop, onAdd, onDialog }: RowProps) {
           type="button"
           className="node-add"
           tabIndex={tabStop ? 0 : -1}
-          aria-label={t('space.addChild', { title: node.title })}
-          title={t('space.addChild', { title: node.title })}
+          aria-label={t('space.addChild', { title: pageTitle(t, node.title) })}
+          title={t('space.addChild', { title: pageTitle(t, node.title) })}
           onClick={() => onAdd(node.id)}
         >
           <IconPlus size={ROW_ICON_SIZE} />
@@ -664,7 +666,7 @@ export function PageTree({
                   type="button"
                   className="twist"
                   tabIndex={-1}
-                  aria-label={b.title}
+                  aria-label={pageTitle(t, b.title)}
                   aria-expanded={expanded}
                   onClick={() => onMemory((expanded ? collapseBranch : openBranch)(memory, b.id))}
                 >
