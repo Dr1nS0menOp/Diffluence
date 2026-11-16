@@ -54,10 +54,10 @@ On 2026-11-14 the product owner decided that, for the arrangement of a screen, a
 
 ### The page header
 
-- The header row has the breadcrumbs at its start and, at its end outside the reading column, the publishing state, who else is reading, Edit, Share joined to Copy link, and More. There is no star and no lock: Share shows the lock's state, and the favourite moves into More. Replaces "breadcrumbs with Edit, Share, star, lock and More on one line" (A page). PAG-140, PAG-141.
-- On the home page of a space the breadcrumbs hold only the space's name, and a thin line runs under the header row. Replaces "On the home page the breadcrumbs end in Home" (The page tree) and, for that line, "hardly any lines or boxes" (The decision). PAG-143, PAG-164.
+- The header row has the breadcrumbs at its start and, at its end outside the reading column, the publishing state, who else is reading, Edit, Share joined to Copy link, and More. There is no star and no lock: Share shows the lock's state, and the favourite moves into More. Replaces "breadcrumbs with Edit, Share, star, lock and More on one line" (A page). PAG-140, PAG-141. Built in spec 079.
+- On the home page of a space the breadcrumbs hold only the space's name, and a thin line runs under the header row. Replaces "On the home page the breadcrumbs end in Home" (The page tree) and, for that line, "hardly any lines or boxes" (The decision). PAG-143, PAG-164. Built in spec 079.
 - Contents, comments and Details open from a small vertical group of buttons in the bottom end corner, one panel at a time, and the contents no longer stand beside the column. Replaces "The contents list stands beside the column when there is room" (A page). PAG-147.
-- Archive and Delete share one entry of More, and no entry of More is in the danger colour: the dialog that asks first carries it. Narrows "Destructive action" (Components) for this menu. PAG-149.
+- Archive and Delete share one entry of More, and no entry of More is in the danger colour: the dialog that asks first carries it. Narrows "Destructive action" (Components) for this menu. PAG-149. Built in spec 079.
 
 ### The Settings frame and the administration
 
@@ -117,8 +117,8 @@ On 2026-11-14 the product owner decided that, for the arrangement of a screen, a
 ### Working together
 
 - A mention shows the person's small picture or initials before the name, without `@`. Replaces "A person mentioned is a soft box with `@`" (Working together). COL-100.
-- The panel of the bell hangs under it with its own scrolling, and the bell looks pressed with its count hidden while it is open. Adds to "The bell carries a number capped at 99+" (Working together). COL-113.
-- The share dialog is a card near the top: a title row with More and close, the field for recipients, suggestions, one row about access, a line, and its actions at the start side. Replaces "`Dialog`, with buttons in `.dialog-actions`" (Components) for sharing. COL-102.
+- The panel of the bell hangs under it with its own scrolling, and the bell looks pressed with its count hidden while it is open. Adds to "The bell carries a number capped at 99+" (Working together). COL-113. Built in spec 079.
+- The share dialog is a card near the top: a title row with More and close, the field for recipients, suggestions, one row about access, a line, and its actions at the start side. Replaces "`Dialog`, with buttons in `.dialog-actions`" (Components) for sharing. COL-102. Built in spec 079.
 
 ### Notices and states
 
@@ -196,7 +196,7 @@ The login page stands alone: one card on the sidebar colour.
 
 **Top bar (spec 078):** three groups. At the start the button that shows or hides the sidebar (`SidebarToggle`, which a frame with such a sidebar places into the bar, so the Plain and Settings frames have none), then the logo and name. In the middle search with Create directly after it. At the end the bell, help, the settings button to the administration (administrators only) and the account menu: round buttons with only an icon, a neutral square on hover and focus, framed while their menu is open. The account menu starts with who you are, then Profile, Your account and Theme (a sub-menu), then a group headed with the instance name, then Log out. Search is the main element of the bar, because people spend much of their time there (ADR-035): it takes the room there is, up to `--size-search-main`, and is never pushed to a corner. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox, and it always searches every space: there is no chip that keeps it inside one (spec 033). Clicking it unfolds one panel: first the filters as buttons (Spaces, Type, Labels, People, Date), each with a small chooser below the row, then the results; the space chooser has a field that finds any space by name. Chosen spaces, labels and people become words of the search syntax (`space:`, `label:`, `author:`), so a typed query and the buttons mean the same thing; type and date travel as the parameters the results page reads. The results page shows those words as chips that take a word out again.
 
-**A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. The column scales: `--size-page` is at least `--size-reading`, 64 percent of the room, and at most `--size-reading-max`. Full width takes all the room. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
+**A page:** a header row with the breadcrumbs at its start and, at its end outside the reading column, the publishing state, who else is reading, Edit, Share with the lock on it joined to Copy link, and More (spec 079); the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. The column scales: `--size-page` is at least `--size-reading`, 64 percent of the room, and at most `--size-reading-max`. Full width takes all the room. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
 
 ## Components
 
@@ -212,7 +212,8 @@ Use these. Reuse beats a new variant.
 | Icon only | `className="icon"` with `aria-label` and `title` |
 | Asking before something hard to undo | `ConfirmButton`, or `ConfirmDialog` from a menu |
 | A form or detail on top of a screen | `Dialog`, with buttons in `.dialog-actions` |
-| A list of less used actions | `Menu`, `MenuItem`, `MenuLink`, `MenuDownload`, `MenuSeparator` |
+| A list of less used actions | `Menu`, `MenuItem`, `MenuLink`, `MenuDownload`, `MenuSeparator`, and `MenuSub` for an entry with choices of its own, which opens beside its menu or over it on a phone |
+| A setting that is on or off at once | `.switch` around a checkbox with `role="switch"`, its label before it |
 | A labelled input | `Field` |
 | Choosing a file outside the editor | `FilePicker` |
 | A file in a document | `.file-tile`, through the `file` block in `components/editor.tsx` |
@@ -263,7 +264,7 @@ Use these. Reuse beats a new variant.
 - The sidebar itself can be put away from the button at the start of the top bar, or with `[`, and starts hidden on narrow screens. Its width is a preference. A thin line sets it apart from the main area.
 - The sidebar from top to bottom (spec 078): the global part (`GlobalPart`: the start screen, then the person's own entries in their order, then More or Customise sidebar); inside a space, after a line, the space's block (`SpaceBlock`): the header row with the badge, the name and More, then Shortcuts, Content, Blogs and Space apps, each under a heading of an icon and a word with its buttons at the end. The heading of Content carries add and order and view; the filter is always shown under it, then the tree. On the personal screens the favourite spaces follow the global part instead. The whole sidebar scrolls as one; Back to top floats over it once it has scrolled. The flat views say that the tree is where pages are arranged.
 - Recent, Favourites and Spaces open a panel beside the sidebar (`components/sidebar-panels.tsx`): a card with a title and Close, a filter field with the focus, groups under small muted headings, and its actions at the foot under a line. Escape and Close give the focus back to the entry.
-- The home page is not a row of the tree. The space's header row leads to it and is marked while it is open, and its children are the top rows. On the home page the breadcrumbs end in Home.
+- The home page is not a row of the tree. The space's header row leads to it and is marked while it is open, and its children are the top rows. On the home page the breadcrumbs hold only the space, as the current place, and a thin line runs under the header row (spec 079).
 - The space menu holds the space's tools (Overview, People, Files, Archived pages), Export, Automation and Space settings, then Archive and Delete.
 - The tree is a `nav` with links and the keys of the tree pattern, so it is one Tab stop plus the buttons of the focused row.
 
@@ -300,6 +301,7 @@ Use these. Reuse beats a new variant.
 A comparison looks like the page. What was added sits on green, what was removed on red and struck through, and new words are underlined. Each changed block has the word Added, Removed or Changed beside it, so colour never stands alone. Words can be marked in paragraphs and headings. Other blocks show as they were and as they are.
 ## What organises a page
 
+- **The byline** is one line of small muted parts: the owner, the view count, Add a reaction, the state of a controlled page, the marks, and the status at its end. It has no date and no version (spec 079).
 - **Status** is always a word and a colour, in the style of a status mark in a document. It sits at the end of the byline.
 - **Verified and Approved** have an icon and a word.
 - **Labels** sit at the bottom of a page as plain links with a quiet `#`, without a box (ADR-034). Each has its own remove button, of at least 24 pixels. Adding one reads as quiet words until hovered or used, and then it is a field.
@@ -320,7 +322,7 @@ Every chart stands beside a sentence with its total and trend, and has one serie
 - A comment on words is a soft tint with an underline, so it does not rest on colour alone. It is a `button`, and its name says who wrote what.
 - A selection in a page shows one small floating row, because a reader has no row of tools. The floating bars of the editor share its look.
 - A person mentioned is a soft box with `@`. An overdue task date is red and says "overdue" in words.
-- The bell carries a number capped at 99+. A hidden `role="status"` line only changes when the number goes up.
+- The bell carries a number capped at 99+. A hidden `role="status"` line only changes when the number goes up. While its panel is open the bell looks pressed and hides the number; the panel has a fixed height, the tabs For me and Watched, and a heading per day (spec 079).
 - Six common reactions come from `components/comments/common-reactions.json`. They are content, not icons.
 
 ## States

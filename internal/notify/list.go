@@ -30,6 +30,42 @@ type Query struct {
 	Before     time.Time
 	// BeforeID is the id of the last item seen; with Before it makes the cursor exact.
 	BeforeID uuid.UUID
+	// Tab is TabForMe, TabWatched or empty for both (COL-115).
+	Tab string
+	// Excerpts asks for the start of each comment, for the panel (COL-118).
+	Excerpts bool
+}
+
+// The two tabs of the panel. A notification belongs to Watched when it came from
+// watching a page, a branch or a space, and to For me otherwise (COL-115).
+const (
+	TabForMe   = "for_me"
+	TabWatched = "watched"
+)
+
+// aimedAtOwner are the kinds that belong to For me on the person's own page, even when the
+// person also watches it: comments and reactions on what they own (COL-115).
+var aimedAtOwner = []string{TypeComment, TypeReaction}
+
+// watchedRow is the condition of the tab Watched on a row `n`. Its arguments are the
+// placeholders that hold the person, the reason of watching and aimedAtOwner in the query
+// that uses it; the values themselves always travel as parameters.
+func watchedRow(person, reason, kinds string) string {
+	return "(n.reason = " + reason + " AND NOT (n.type = ANY(" + kinds +
+		") AND n.page_id IN (SELECT pg.id FROM pages pg WHERE pg.owner_id = " + person + ")))"
+}
+
+// watchedOnly turns a tab into a condition on watching: nil for both tabs, true for
+// Watched, false for For me. A tab that does not exist is refused.
+func watchedOnly(tab string) (*bool, error) {
+	switch tab {
+	case "":
+		return nil, nil
+	case TabWatched, TabForMe:
+		watched := tab == TabWatched
+		return &watched, nil
+	}
+	return nil, apperr.Invalid("That is not a tab of notifications.")
 }
 
 // Item is one line in the panel: one notification, or a group of them.
@@ -47,6 +83,10 @@ type Item struct {
 	Read      bool           `json:"read"`
 	At        time.Time      `json:"at"`
 	Data      map[string]any `json:"data"`
+	// PageKind is the kind of content the notification is about, for its icon.
+	PageKind string `json:"page_kind"`
+	// Excerpt is the start of the comment, only when asked for and allowed (COL-118).
+	Excerpt string `json:"excerpt,omitempty"`
 
 	// firstVersion is the oldest version in a group, so a mail can show all of it.
 	firstVersion int
@@ -64,7 +104,7 @@ type stored struct {
 // page (spec 064, DOC-603, DOC-604). A row about a template hangs on its hidden page, and
 // comes back while the person owns the template or looks after it (spec 074, TPL-722).
 const visibleRows = `SELECT n.id, n.type, n.reason, COALESCE(u.display_name, ''), n.page_id, p.title, n.space_id, sp.name,
-		n.comment_id, n.read_at IS NOT NULL, n.created_at, n.data, n.group_key
+		n.comment_id, n.read_at IS NOT NULL, n.created_at, n.data, n.group_key, p.kind
 	FROM notifications n
 	JOIN (SELECT page_id FROM perm_visible_pages($1) UNION SELECT page_id FROM perm_review_pages($1)
 		UNION SELECT page_id FROM perm_template_notice_pages($1)) v ON v.page_id = n.page_id
@@ -78,7 +118,7 @@ func scanStored(r pgx.CollectableRow) (stored, error) {
 	var v stored
 	var data []byte
 	err := r.Scan(&v.ID, &v.Type, &v.Reason, &v.actor, &v.PageID, &v.PageTitle, &v.SpaceID, &v.SpaceName,
-		&v.CommentID, &v.Read, &v.At, &data, &v.groupKey)
+		&v.CommentID, &v.Read, &v.At, &data, &v.groupKey, &v.PageKind)
 	if err != nil {
 		return v, err
 	}
@@ -151,12 +191,18 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 	if q.Type != "" && !slices.Contains(Types, q.Type) {
 		return nil, apperr.Invalid("That is not a type of notification.")
 	}
+	watched, err := watchedOnly(q.Tab)
+	if err != nil {
+		return nil, err
+	}
 	rows, err := s.pool.Query(ctx, visibleRows+`
 		AND (NOT $2 OR n.read_at IS NULL)
 		AND ($3 = '' OR n.type = $3)
 		AND ($4::uuid IS NULL OR n.space_id = $4)
 		AND ($5::timestamptz IS NULL OR n.created_at < $5 OR (n.created_at = $5 AND $7::uuid IS NOT NULL AND n.id > $7))
-		ORDER BY n.created_at DESC, n.id LIMIT $6`, c.UserID, q.UnreadOnly, q.Type, space, before, limit*2, beforeID)
+		AND ($8::boolean IS NULL OR `+watchedRow("$1", "$9", "$10")+` = $8)
+		ORDER BY n.created_at DESC, n.id LIMIT $6`, c.UserID, q.UnreadOnly, q.Type, space, before, limit*2, beforeID,
+		watched, ReasonWatching, aimedAtOwner)
 	if err != nil {
 		return nil, err
 	}
@@ -165,7 +211,13 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Item,
 		return nil, err
 	}
 	items := grouped(found)
-	return items[:min(len(items), limit)], nil
+	items = items[:min(len(items), limit)]
+	if q.Excerpts {
+		if err := s.addExcerpts(ctx, c.UserID, items); err != nil {
+			return nil, err
+		}
+	}
+	return items, nil
 }
 
 // Count says how many lines are unread, by the same rule as the list.
@@ -204,8 +256,13 @@ func (s *Service) SetRead(ctx context.Context, c identity.Caller, id uuid.UUID, 
 	return nil
 }
 
-// ReadAll marks everything as read.
-func (s *Service) ReadAll(ctx context.Context, c identity.Caller) error {
-	_, err := s.pool.Exec(ctx, "UPDATE notifications SET read_at = now() WHERE user_id = $1 AND read_at IS NULL", c.UserID)
+// ReadAll marks everything in a tab as read, or everything when the tab is empty.
+func (s *Service) ReadAll(ctx context.Context, c identity.Caller, tab string) error {
+	watched, err := watchedOnly(tab)
+	if err != nil {
+		return err
+	}
+	_, err = s.pool.Exec(ctx, `UPDATE notifications n SET read_at = now() WHERE n.user_id = $1 AND n.read_at IS NULL
+		AND ($2::boolean IS NULL OR `+watchedRow("$1", "$3", "$4")+` = $2)`, c.UserID, watched, ReasonWatching, aimedAtOwner)
 	return err
 }

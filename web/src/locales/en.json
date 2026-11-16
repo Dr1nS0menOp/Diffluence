@@ -494,7 +494,16 @@
     "channel_template_decided": "Decisions about templates you wrote or look after",
     "channel_template_set": "Pages from a template, added where you watch",
     "type_pair_ended": "A space linked with {{page}} was deleted, so the link has ended",
-    "channel_pair_ended": "The link of a space you run ending when the other space is deleted"
+    "channel_pair_ended": "The link of a space you run ending when the other space is deleted",
+    "more": "More",
+    "tab_for_me": "For me",
+    "tab_watched": "Watched",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "kind_page": "Page",
+    "kind_post": "Blog post",
+    "kind_comment": "Comment",
+    "kind_task": "Task"
   },
   "watching": {
     "title": "Watching",
@@ -513,7 +522,11 @@
     "stopped": "You no longer watch this.",
     "kind_page": "Page",
     "kind_branch": "Page and those below it",
-    "kind_space": "Space"
+    "kind_space": "Space",
+    "watch": "Watch",
+    "choice_page": "This page",
+    "choice_branch": "This page and everything below it",
+    "choice_space": "The whole space"
   },
   "tasks": {
     "title": "Your tasks",
@@ -567,7 +580,22 @@
     "effect_space_editor": "Allowing makes them an editor of the whole space.",
     "asked": "Your request was sent.",
     "askForAccess": "Ask for access",
-    "askToEdit": "Ask to edit"
+    "askToEdit": "Ask to edit",
+    "recipients": "Add people or groups",
+    "recipientsWithEmail": "Add people, groups or e-mail addresses",
+    "inviteAddress": "Invite {{email}}",
+    "removeRecipient": "Remove {{name}}",
+    "generalAccess": "General access",
+    "reachLabel": "Who can reach this page",
+    "reach_space": "Everyone in the space",
+    "reach_chosen": "Only the people chosen",
+    "reachHelp_space": "everyone who can open this space can find the page.",
+    "reachHelp_chosen": "only the people and groups on its list can see the page.",
+    "abilityLabel": "What everyone may do",
+    "ability_view": "Can view",
+    "ability_edit": "Can view and edit",
+    "more": "More about sharing",
+    "restrictionsInDetail": "Restrictions in detail"
   },
   "unsubscribe": {
     "title": "Stop this mail",
@@ -928,7 +956,15 @@
     "byline": "By {{name}}",
     "lastUpdated": "Last updated {{date}}",
     "linkHidden": "A page you cannot open",
-    "placeholderHelp": "This page does not exist yet. Select it to start it here."
+    "placeholderHelp": "This page does not exist yet. Select it to start it here.",
+    "published": "Published",
+    "notPublished": "Not published",
+    "favouriteEntry": "Favourite",
+    "favouriteAdded": "Added to your favourites.",
+    "favouriteRemoved": "Removed from your favourites.",
+    "moreDetails": "More details",
+    "information": "Page information",
+    "archiveOrDelete": "Archive or delete"
   },
   "editor": {
     "moreTools": "More tools",
@@ -3060,7 +3096,11 @@
     "favouriteTemplate": "Favourite",
     "readFrozen": "Read what was sent for approval",
     "closeRound": "End this round",
-    "alsoLabel": "Also with label"
+    "alsoLabel": "Also with label",
+    "convert": "Convert",
+    "convertTo_folder": "To a folder",
+    "convertTo_page": "To a page",
+    "convertTo_post": "To a blog post"
   },
   "blog": {
     "title": "Blog",
@@ -3881,7 +3921,8 @@
     "action_set_status": "Set the status",
     "note_would_set_status": "Set the status would run",
     "action_webhook": "Call a webhook",
-    "note_would_webhook": "Call a webhook would run"
+    "note_would_webhook": "Call a webhook would run",
+    "runRule": "Run a rule"
   },
   "insights": {
     "title": "Page insights",

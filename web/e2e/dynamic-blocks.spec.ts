@@ -11,6 +11,7 @@ import {
   paragraph,
   publishedPage,
   test,
+  pageMenu,
 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -127,8 +128,7 @@ test('the files of a space are in one list, and versions can go back', async ({ 
   await checkAccessibility(page);
 
   await page.goto(`/pages/${id}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Attachments' }).click();
+  await pageMenu(page, 'More details', 'Attachments');
   await page.getByRole('button', { name: 'Details' }).click();
   const dialog = page.getByRole('dialog', { name: 'notes.txt' });
   await expect(dialog.getByText('second')).toBeVisible();

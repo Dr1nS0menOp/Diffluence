@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Notification, type NotificationSettings, type Space, type WatchEntry } from '../api';
 import { Link } from '../router';
-import { NotificationRow } from '../components/notifications';
+import { NOTIFICATION_TABS, NotificationItem, type NotificationTab } from '../components/notifications';
+import { Tabs } from '../components/tabs';
 import { ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
 import { pageTitle } from '../page-name';
 import { useCapabilities } from '../capabilities';
@@ -51,12 +52,13 @@ export function NotificationsView() {
   const types = useTypes();
   const [type, setType] = useState('');
   const [spaceId, setSpaceId] = useState('');
+  const [tab, setTab] = useState<NotificationTab>('for_me');
   const spaces = useQuery({ queryKey: ['spaces'], queryFn: () => api.get<{ spaces: Space[] }>('/spaces') });
   const q = useInfiniteQuery({
-    queryKey: ['notifications', 'all', type, spaceId],
+    queryKey: ['notifications', 'all', tab, type, spaceId],
     initialPageParam: '',
     queryFn: ({ pageParam }) => {
-      const params = new URLSearchParams({ limit: String(PAGE_SIZE), type });
+      const params = new URLSearchParams({ limit: String(PAGE_SIZE), type, tab, excerpts: 'true' });
       if (pageParam) params.set('before', pageParam);
       if (spaceId) params.set('space_id', spaceId);
       return api.get<{ notifications: Notification[] }>(`/me/notifications?${params.toString()}`);
@@ -70,7 +72,15 @@ export function NotificationsView() {
   return (
     <>
       <h1>{t('notifications.title')}</h1>
-      <div className="row">
+      <Tabs
+        label={t('notifications.title')}
+        panel="notification-list"
+        tabs={NOTIFICATION_TABS}
+        current={tab}
+        name={(name) => t(`notifications.tab_${name}`)}
+        onChange={setTab}
+      />
+      <div className="row tabs-filter">
         <Field label={t('notifications.filterType')}>
           <select value={type} onChange={(e) => setType(e.target.value)}>
             <option value="">{t('notifications.allTypes')}</option>
@@ -92,14 +102,16 @@ export function NotificationsView() {
           </select>
         </Field>
       </div>
-      {q.isPending && <Loading />}
-      <ErrorNote error={q.error} />
-      {q.data && rows.length === 0 && <p className="muted">{t('notifications.none')}</p>}
-      <ul className="plain-list">
-        {rows.map((n) => (
-          <NotificationRow key={n.id} n={n} />
-        ))}
-      </ul>
+      <div id="notification-list" role="tabpanel" aria-labelledby={`notification-list-tab-${tab}`}>
+        {q.isPending && <Loading />}
+        <ErrorNote error={q.error} />
+        {q.data && rows.length === 0 && <p className="muted">{t('notifications.none')}</p>}
+        <ul className="plain-list">
+          {rows.map((n) => (
+            <NotificationItem key={n.id} n={n} />
+          ))}
+        </ul>
+      </div>
       {q.hasNextPage && (
         <button type="button" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
           {t('common.more')}

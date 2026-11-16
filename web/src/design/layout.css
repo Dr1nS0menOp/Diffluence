@@ -699,6 +699,7 @@
   content: '';
 }
 
+:dir(rtl) .menu-sub-arrow svg,
 :dir(rtl) .twist svg,
 :dir(rtl) .edit-close svg {
   transform: scaleX(-1);
@@ -999,19 +1000,81 @@ span.twist {
   z-index: var(--layer-bar);
 }
 
+/* The header row of a page runs past the reading column to the edges of the room, so its end
+   stands outside the column (PAG-140). The column is centred in the room, so this centres too. */
 .page-top {
   display: flex;
   flex-wrap: wrap;
+  grid-column: 1 / -1;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-2);
+  margin-inline: calc((100% - 100cqi) / 2);
+  margin-block-end: var(--space-3-5);
+}
+
+/* Only the home page of a space has a line under its header row (PAG-164). */
+.page-top.home {
+  padding-block-end: var(--space-2);
+  border-block-end: 1px solid var(--color-line);
 }
 
 .page-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-1);
   margin-inline-start: auto;
+}
+
+.publish-state {
+  margin-inline-end: var(--space-1);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  white-space: nowrap;
+}
+
+.publish-date {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Share and Copy link are one control: two buttons joined, the lock on Share (PAG-141). */
+.share-control {
+  display: inline-flex;
+}
+
+.share-button {
+  border-start-end-radius: 0;
+  border-end-end-radius: 0;
+}
+
+.share-link {
+  inline-size: var(--size-control);
+  padding: 0;
+  border-inline-start-color: var(--color-line);
+  border-start-start-radius: 0;
+  border-end-start-radius: 0;
+}
+
+.byline-part {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: inherit;
+}
+
+a.byline-part {
+  text-decoration: none;
+}
+
+a.byline-part:hover {
+  color: var(--color-accent);
+  text-decoration: underline;
+}
+
+.byline-react {
+  position: relative;
+  display: inline-flex;
 }
 
 .byline {

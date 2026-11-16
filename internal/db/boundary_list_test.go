@@ -382,10 +382,13 @@ var crossings = map[crossing]int{
 	{"internal/labels", "space_fixed_labels"}: 1,
 	{"internal/labels", "spaces"}:             1,
 
-	// notify: who is told, and the words of the notice.
-	{"internal/notify", "comments"}:         1,
+	// notify: who is told, and the words of the notice. The panel reads the start of every
+	// comment it shows in one query, under the rule of the mail excerpt, and the tab For me
+	// asks which pages a person owns (spec 079); through comments' API that would be one
+	// permission check and query per item.
+	{"internal/notify", "comments"}:         2,
 	{"internal/notify", "group_members"}:    1,
-	{"internal/notify", "pages"}:            3,
+	{"internal/notify", "pages"}:            4,
 	{"internal/notify", "spaces"}:           1,
 	{"internal/notify", "user_preferences"}: 2,
 	{"internal/notify", "users"}:            2,

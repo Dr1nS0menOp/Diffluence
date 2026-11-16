@@ -230,10 +230,13 @@ const NO_OPTIONS: ExportOptions = {
 export function ExportDialog({
   spaceId,
   page,
+  startFormat = '',
   onClose,
 }: {
   spaceId: string;
   page?: { id: string };
+  /** The format chosen in the sub-menu of More (PAG-148); the dialog can still change it. */
+  startFormat?: string;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
@@ -246,12 +249,12 @@ export function ExportDialog({
     (formats.data?.formats ?? []).filter((f) => f !== 'bundle'),
     useCapabilities(),
   );
-  const [format, setFormat] = useState('');
+  const [format, setFormat] = useState(startFormat);
   const [scope, setScope] = useState<Scope>(page ? 'page' : 'space');
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const [options, setOptions] = useState(NO_OPTIONS);
   const [runId, setRunId] = useState<string | null>(null);
-  const picked = format || offered[0] || '';
+  const picked = offered.includes(format) ? format : (offered[0] ?? '');
   const start = useMutation({
     mutationFn: () => {
       const body: Record<string, unknown> = { space_id: spaceId, format: picked, options };

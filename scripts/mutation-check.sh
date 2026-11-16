@@ -1361,6 +1361,16 @@ mutate "the purge drops previews in use" internal/exchange/previews.go \
   's.replace("\t\tdelete(kept, hex.EncodeToString(raw))\n", "\t\t_ = raw\n")' $app -run TestAnOfficePreviewIsMadeOncePerVersionAndDroppedWhenUnused
 mutate "the notification cursor skips what shares a time" internal/notify/list.go \
   's.replace(" OR (n.created_at = $5 AND $7::uuid IS NOT NULL AND n.id > $7)", "")' $app -run TestPagingNotificationsWithACursorSkipsNothingThatSharesATime
+mutate "the panel shows a thread kept for editors to a reader" internal/notify/excerpts.go \
+  's.replace("AND (NOT c.editors_only OR c.page_id IN", "AND (c.editors_only OR NOT c.editors_only OR c.page_id IN")' $app -run TestThePanelShowsTheStartOfACommentOnlyToWhoMayReadIt
+mutate "the panel shows a removed comment" internal/notify/excerpts.go \
+  's.replace(" AND c.trash_item_id IS NULL", "")' $app -run TestThePanelShowsTheStartOfACommentOnlyToWhoMayReadIt
+mutate "the tabs of the panel do not split" internal/notify/list.go \
+  's.replace("return \"(n.reason = \" + reason + \" AND NOT", "return \"(\" + reason + \" <> \u0027\u0027 AND NOT")' $app -run TestTheTabsSplitWhatIsAimedAtYouFromWhatYouWatch
+mutate "a comment on your own page counts as only watched" internal/notify/list.go \
+  's.replace("var aimedAtOwner = []string{TypeComment, TypeReaction}", "var aimedAtOwner = []string{}")' $app -run TestTheTabsSplitWhatIsAimedAtYouFromWhatYouWatch
+mutate "mark all as read ignores the tab" internal/notify/list.go \
+  's.replace("AND ($2::boolean IS NULL OR `+watchedRow(\"$1\", \"$3\", \"$4\")+` = $2)", "AND ($2::boolean IS NULL OR $3 <> \u0027\u0027 OR $4::text[] IS NULL)")' $app -run TestTheTabsSplitWhatIsAimedAtYouFromWhatYouWatch
 mutate "the old master key is retired while it is still needed" internal/app/keyrotation.go \
   's.replace("\tif !rep.AllCurrent() {\n\t\treturn rep, ErrOldKeyStillNeeded", "\tif false {\n\t\treturn rep, ErrOldKeyStillNeeded")' $app -run TestTheOldKeyCannotBeRetiredBeforeEverythingIsSealedAgain
 mutate "a check counts an older key as current" internal/app/keyrotation.go \
@@ -1625,7 +1635,7 @@ mutate "the backup the operator asked for is never read" internal/app/upgrade.go
 mutate "an upgrade leaves no marker" internal/app/upgrade.go \
   's.replace("return markUpgrade(ctx, owner, st, facts.lastBackup, a.maxMigration())", "return nil")' $app -run TestAnUpgradeLeavesAMarkerNamingTheLastBackup
 mutate "a restart counts as an upgrade" internal/app/upgrade.go \
-  's.replace("if st.PendingExpand == 0 {", "if st.PendingExpand < 0 {")' $app -run TestARestartIsNoUpgrade
+  's.replace("if st.PendingExpand == 0 {\n\t\treturn nil\n\t}\n\tif a.cfg.MigrateDatabaseURL", "if st.PendingExpand < 0 {\n\t\treturn nil\n\t}\n\tif a.cfg.MigrateDatabaseURL")' $app -run TestARestartIsNoUpgrade
 # Spec 045: blog posts and databases have a create permission of their own.
 mutate "a post is made with page creation" internal/permissions/evaluate.go \
   's.replace("\tcase kindPost:\n\t\treturn PostCreate\n", "\tcase kindPost:\n\t\treturn PageCreate\n")' $app -run TestEachKindIsMadeWithItsOwnPermissionAlone
@@ -1805,7 +1815,7 @@ mutate_web "taking one role away takes them all" src/views/access-roles.tsx \
 # request for a connection has a limit, and the feed, the bell and file search ask the
 # permission rule about few pages.
 mutate "a new space reads the instance through a second connection" internal/features/features.go \
-  's.replace("v, err := s.instanceIn(ctx, tx)", "v, err := s.Instance(ctx)")' $app -run TestManySpacesCreatedAtOnceAllFinish
+  's.replace("v, err := s.instanceIn(ctx, tx)", "v, err := s.Instance(ctx)")' ./internal/features/ -run TestStartingASpaceReadsTheDefaultsThroughItsOwnTransaction
 mutate "a wait for a connection has no limit" internal/db/db.go \
   's.replace("bounded, cancel := context.WithTimeoutCause(ctx, watch.limit, errAcquireLimit)", "bounded, cancel := context.WithTimeoutCause(ctx, watch.limit*100000, errAcquireLimit)")' ./internal/db/ -run TestAWaitForAConnectionGivesUpAtTheLimitOfItsRequest
 mutate "a wait that ran out is not noted" internal/db/db.go \
@@ -2016,7 +2026,7 @@ mutate "every upgrade without a backup is waived" internal/app/upgrade.go \
 mutate "the first upgrade without a backup leaves no record" internal/app/upgrade.go \
   's.replace("return maxAge > 0 \x26\x26 f.lastBackup.IsZero() \x26\x26 f.firstWithoutBackup", "return false")' $app -run TestTheFirstUpgradeWithoutAnyBackupGoesOnOnceAndIsRecorded
 mutate "a refusal is a plain error a node cannot wait on" internal/app/upgrade.go \
-  's.replace("return \x26UpgradeRefused{Problems: problems}", "return errors.New(\"upgrade refused before migrating: no backup was noted\")")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
+  's.replace("len(problems) > 0 {\n\t\treturn \x26UpgradeRefused{Problems: problems}", "len(problems) > 0 {\n\t\treturn errors.New(\"upgrade refused before migrating: no backup was noted\")")' $app -run TestAnUpgradeWithoutTheBackupTheOperatorAskedForIsRefusedBeforeMigrating
 mutate "migrate asks for no backup" internal/app/upgrade.go \
   's.replace("if p, refused := backupProblem(facts, time.Now(), maxAge); refused {\n\t\t\treturn", "if p, refused := backupProblem(facts, time.Now(), maxAge); false \x26\x26 refused {\n\t\t\treturn")' $app -run TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo
 mutate "migrate --without-backup leaves no record" internal/app/upgrade.go \

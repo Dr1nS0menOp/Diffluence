@@ -12,6 +12,7 @@ import {
   publishedPage,
   test,
   unique,
+  openRestrictions,
 } from './helpers';
 
 const words = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
@@ -145,7 +146,7 @@ test('a picker shows people as soon as it has focus, and works by keyboard', asy
   const space = await newSpace(page, 'Picker space');
   const id = await publishedPage(page, space.id, 'Picked', 'x');
   await page.goto(`/pages/${id}`);
-  await page.getByRole('button', { name: 'Restrictions' }).click();
+  await openRestrictions(page);
   const dialog = page.getByRole('dialog', { name: 'Page restrictions' });
   await dialog.getByRole('radio', { name: /Private/ }).check();
   const field = dialog.getByRole('combobox', { name: 'Add' }).first();
@@ -184,7 +185,7 @@ test('a person without view profiles sees no people in a picker', async ({ page,
   const visitor = await context.newPage();
   await login(visitor, email);
   await visitor.goto(`/pages/${id}`);
-  await visitor.getByRole('button', { name: 'Restrictions' }).click();
+  await openRestrictions(visitor);
   const dialog = visitor.getByRole('dialog', { name: 'Page restrictions' });
   await dialog.getByRole('radio', { name: /Private/ }).check();
   const field = dialog.getByRole('combobox', { name: 'Add' }).first();

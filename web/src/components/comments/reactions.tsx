@@ -69,7 +69,14 @@ function Counter({
   );
 }
 
-function Picker({ onPick, onClose }: { onPick: (glyph: string) => void; onClose: () => void }) {
+/** The common reactions and a search through every emoji, for a page, a comment or the byline. */
+export function ReactionPicker({
+  onPick,
+  onClose,
+}: {
+  onPick: (glyph: string) => void;
+  onClose: () => void;
+}) {
   const { t } = useTranslation();
   const [filter, setFilter] = useState('');
   const matches = emoji
@@ -166,7 +173,7 @@ export function Reactions({
         </button>
       )}
       {picking && (
-        <Picker
+        <ReactionPicker
           onClose={() => setPicking(false)}
           onPick={(glyph) => {
             setPicking(false);

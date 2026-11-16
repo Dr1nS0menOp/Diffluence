@@ -159,7 +159,7 @@ test('approval releases a page, and withdrawal takes it off', async ({ page }) =
   await page.goto(`/pages/${id}`);
   await page.getByRole('button', { name: 'Send for review' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Send for review' }).click();
-  await expect(page.getByText('In review', { exact: true })).toBeVisible();
+  await expect(page.locator('.byline').getByText('In review', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Approve' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
   await expect(async () => {

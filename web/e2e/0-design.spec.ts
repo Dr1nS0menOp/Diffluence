@@ -23,6 +23,8 @@ import {
   signer,
   test,
   totpCode,
+  pageMenu,
+  openRestrictions,
 } from './helpers';
 
 const READER = { email: 'anna.visser@example.com', name: 'Anna Visser' };
@@ -199,6 +201,8 @@ async function addComment(page: Page, pageId: string, data: object) {
 
 async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
+  // The header row of a page says when it was last published (PAG-142): the day of the run.
+  await fixText(page.getByTestId('last-updated'), 'Published Nov 1, 2026');
   await page.evaluate(() => document.fonts.ready);
   // The favourite spaces of the personal sidebar belong to the reader alone; the strip of spaces,
   // which held every space and needed a mask, left the sidebar in spec 078.
@@ -347,7 +351,7 @@ test.describe('the look of every kind of screen', () => {
       await page.goto(`/pages/${pageId}`);
       await expect(page.locator('.prose pre .hljs-keyword')).toBeVisible();
       await expect(page.getByRole('link', { name: 'Tools we use' })).toBeVisible();
-      await picture(page, `page-${colorScheme}`, [page.getByTestId('last-updated')]);
+      await picture(page, `page-${colorScheme}`);
       await page.context().close();
     });
   }
@@ -357,17 +361,43 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/pages/${pageId}`);
     await page.getByRole('button', { name: 'More actions' }).click();
     await expect(page.getByRole('menuitem', { name: 'History' })).toBeVisible();
-    await picture(page, 'page-menu', [page.getByTestId('last-updated')]);
+    await picture(page, 'page-menu');
     await page.context().close();
+  });
+
+  test('the Watch sub-menu of More', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await pageMenu(page, 'Watch');
+    await expect(page.getByRole('menu', { name: 'Watch' })).toBeVisible();
+    await picture(page, 'page-menu-watch');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('More and its sub-menu at 360 pixels, right to left', async ({ browser }) => {
+    const context = await browser.newContext({
+      baseURL: 'http://localhost:8080',
+      viewport: { width: 360, height: 740 },
+    });
+    const page = await context.newPage();
+    await login(page, READER.email, PASSWORD);
+    await page.goto(`/pages/${pageId}`);
+    await expect(page.getByRole('heading', { name: 'Your first week', level: 1 })).toBeVisible();
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await pageMenu(page, 'Watch');
+    const sub = page.getByRole('menu', { name: 'Watch' });
+    await expect(sub).toBeInViewport({ ratio: 1 });
+    await picture(page, 'page-menu-phone-rtl');
+    await context.close();
   });
 
   test('the attachments of a page', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);
-    await page.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Attachments' }).click();
+    await pageMenu(page, 'More details', 'Attachments');
     await expect(page.getByRole('dialog').getByRole('link', { name: FILE_NAME })).toBeVisible();
-    await picture(page, 'attachments', [page.getByTestId('last-updated')]);
+    await picture(page, 'attachments');
     await page.context().close();
   });
 
@@ -377,7 +407,7 @@ test.describe('the look of every kind of screen', () => {
     const tree = page.getByRole('navigation', { name: 'Pages' });
     await tree.getByRole('button', { name: 'Onboarding', exact: true }).click();
     await expect(tree.getByRole('link', { name: 'Tools we use' })).toHaveCount(0);
-    await picture(page, 'tree-collapsed', [page.getByTestId('last-updated')]);
+    await picture(page, 'tree-collapsed');
     await page.context().close();
   });
 
@@ -398,7 +428,7 @@ test.describe('the look of every kind of screen', () => {
       await page.goto(`/pages/${blocksPageId}`);
       await expect(page.locator('.prose .decision')).toBeVisible();
       await expect(page.locator('.prose details details')).toHaveCount(1);
-      await picture(page, `blocks-${colorScheme}`, [page.getByTestId('last-updated')]);
+      await picture(page, `blocks-${colorScheme}`);
       await checkAccessibility(page);
       await page.context().close();
     });
@@ -413,7 +443,7 @@ test.describe('the look of every kind of screen', () => {
     await login(page, READER.email, PASSWORD);
     await page.goto(`/pages/${blocksPageId}`);
     await expect(page.locator('.prose .decision')).toBeVisible();
-    await picture(page, 'blocks-narrow', [page.getByTestId('last-updated')]);
+    await picture(page, 'blocks-narrow');
     await context.close();
   });
 
@@ -437,6 +467,12 @@ test.describe('the look of every kind of screen', () => {
     await picture(page, 'editor-slash');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Control+z');
+    // Whether autosave kept the typed slash depended on the speed of the machine, and the
+    // pictures after this one showed that draft or not. Leaving saves first; then the draft goes.
+    await page.goto(`/pages/${pageId}`);
+    const discarded = await page.request.delete(`/api/v1/pages/${pageId}/draft`);
+    // No draft at all, when saving had nothing left to keep, is fine too.
+    expect([200, 204, 404], await discarded.text()).toContain(discarded.status());
     await page.context().close();
   });
 
@@ -505,17 +541,16 @@ test.describe('the look of every kind of screen', () => {
     expect(done.ok(), await done.text()).toBeTruthy();
     await page.goto(`/pages/${id}`);
     await expect(page.locator('.prose table')).toBeVisible();
-    await picture(page, 'table-stretched', [page.getByTestId('last-updated')]);
+    await picture(page, 'table-stretched');
     await context.close();
   });
 
   test('a confirmation', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);
-    await page.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Delete' }).click();
+    await pageMenu(page, 'Archive or delete', 'Delete');
     await expect(page.getByRole('dialog', { name: 'Delete' })).toBeVisible();
-    await picture(page, 'confirm', [page.getByTestId('last-updated')]);
+    await picture(page, 'confirm');
     await page.context().close();
   });
 
@@ -605,7 +640,7 @@ test.describe('the look of every kind of screen', () => {
   test('a picker with people', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);
-    await page.getByRole('button', { name: 'Restrictions' }).click();
+    await openRestrictions(page);
     await page.getByRole('dialog').getByRole('combobox', { name: 'Check a person' }).click();
     await expect(page.getByRole('dialog').getByRole('listbox').getByRole('option').first()).toBeVisible();
     await picture(page, 'picker');
@@ -963,13 +998,10 @@ test.describe('the look of every kind of screen', () => {
     expect(done.ok(), await done.text()).toBeTruthy();
     await page.goto(`/pages/${id}`);
     await expect(page.getByRole('navigation', { name: 'On this page' })).toBeVisible();
-    await picture(page, 'page-contents', [page.getByTestId('last-updated')]);
+    await picture(page, 'page-contents');
     await page.keyboard.press('i');
     await expect(page.getByRole('complementary', { name: 'Details' })).toContainText('Contributors');
-    await picture(page, 'page-details', [
-      page.getByTestId('last-updated'),
-      page.locator('.details-facts dd'),
-    ]);
+    await picture(page, 'page-details', [page.locator('.details-facts dd')]);
     await context.close();
   });
 
@@ -982,15 +1014,17 @@ test.describe('the look of every kind of screen', () => {
     await login(page, READER.email, PASSWORD);
     await page.goto(`/pages/${pageId}`);
     await expect(page.getByRole('heading', { name: 'Your first week', level: 1 })).toBeVisible();
-    await picture(page, 'narrow', [page.getByTestId('last-updated')]);
+    await picture(page, 'narrow');
     await context.close();
   });
 
   test('the home of a space', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK');
-    await expect(page.locator('.crumbs [aria-current]')).toHaveText('Home');
-    await picture(page, 'space-home', [page.getByTestId('last-updated')]);
+    // The space alone, as the current place, and a line under the row (PAG-143, PAG-164).
+    await expect(page.locator('.crumbs li')).toHaveCount(1);
+    await expect(page.locator('.page-top.home')).toBeVisible();
+    await picture(page, 'space-home');
     await page.context().close();
   });
 
@@ -1003,11 +1037,11 @@ test.describe('the look of every kind of screen', () => {
     await places.getByRole('button', { name: 'Spaces', exact: true }).click();
     const panel = page.getByRole('dialog', { name: 'Spaces' });
     await expect(panel.getByRole('region', { name: 'Favourites' })).toContainText('Engineering Handbook');
-    await picture(page, 'spaces-panel', [page.getByTestId('last-updated')]);
+    await picture(page, 'spaces-panel');
     await page.keyboard.press('Escape');
     await places.getByRole('button', { name: 'Recent', exact: true }).click();
     await expect(page.getByRole('dialog', { name: 'Recent' })).toContainText('Your first week');
-    await picture(page, 'recent-panel', [page.getByTestId('last-updated')]);
+    await picture(page, 'recent-panel');
     expect((await page.request.delete(`/api/v1/spaces/${spaceId}/favourite`)).ok()).toBeTruthy();
     await page.context().close();
   });
@@ -1018,12 +1052,12 @@ test.describe('the look of every kind of screen', () => {
     await page.getByRole('button', { name: 'Account' }).click();
     await page.getByRole('menuitem', { name: 'Theme' }).click();
     await expect(page.getByRole('menuitemradio', { name: 'Same as my system' })).toBeVisible();
-    await picture(page, 'account-menu', [page.getByTestId('last-updated')]);
+    await picture(page, 'account-menu');
     await page.keyboard.press('Escape');
     await page.keyboard.press('Escape');
     await page.getByRole('button', { name: 'More for this space' }).click();
     await expect(page.getByRole('group', { name: 'Space tools' })).toBeVisible();
-    await picture(page, 'space-menu', [page.getByTestId('last-updated')]);
+    await picture(page, 'space-menu');
     await page.context().close();
   });
 
@@ -1055,7 +1089,7 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/pages/${pageId}`);
     await expect(page.getByRole('heading', { name: 'Your first week', level: 1 })).toBeVisible();
     await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
-    await picture(page, 'right-to-left', [page.getByTestId('last-updated')]);
+    await picture(page, 'right-to-left');
     await page.context().close();
   });
 
@@ -1081,7 +1115,7 @@ test.describe('the look of every kind of screen', () => {
     await page.goto(`/pages/${pageId}`);
     await expect(page.getByText('Waiting for approval')).toBeVisible();
     await expect(page.getByRole('link', { name: 'onboarding', exact: true })).toBeVisible();
-    await picture(page, 'page-organised', [page.getByTestId('last-updated')]);
+    await picture(page, 'page-organised');
     await checkAccessibility(page);
     await page.context().close();
   });
@@ -1235,7 +1269,7 @@ test.describe('the look of every kind of screen', () => {
     const dialog = page.getByRole('dialog', { name: 'Start from a template' });
     await expect(dialog.getByRole('option').first()).toBeVisible();
     await expect(dialog.locator('.prose')).toBeVisible();
-    await picture(page, 'gallery', [page.getByTestId('last-updated')]);
+    await picture(page, 'gallery');
     await checkAccessibility(page);
     await page.context().close();
   });
@@ -1626,7 +1660,7 @@ test.describe('the look of every kind of screen', () => {
     expect(turned.ok(), await turned.text()).toBeTruthy();
     await page.goto(`/pages/${folder}`);
     await expect(page.getByRole('heading', { name: 'Child pages' })).toBeVisible();
-    await picture(page, 'folder', [page.getByTestId('last-updated')]);
+    await picture(page, 'folder');
     await checkAccessibility(page);
     await page.context().close();
   });
@@ -1767,7 +1801,12 @@ test.describe('the look of every kind of screen', () => {
       const panel = page.getByRole('region', { name: 'Notifications' });
       await expect(panel.getByText('Please read this before Monday.')).toBeVisible();
       await fixStartTimes(page);
-      await picture(page, 'bell', [page.locator('time')]);
+      await expect(page.getByRole('button', { name: /^Notifications/ })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+      // The times of the cards behind the panel are fixed; masked, they would draw over it.
+      await picture(page, 'bell', [panel.locator('time')]);
       await page.context().close();
     });
 
@@ -1778,10 +1817,7 @@ test.describe('the look of every kind of screen', () => {
         await page.goto(`/pages/${agreementsId}`);
         await expect(page.getByRole('article', { name: /Comment by/ })).toBeVisible();
         await expect(page.locator('.comment-mark')).toBeVisible();
-        await picture(page, `comments-${colorScheme}`, [
-          page.locator('time'),
-          page.getByTestId('last-updated'),
-        ]);
+        await picture(page, `comments-${colorScheme}`, [page.locator('time')]);
         await checkAccessibility(page);
         await page.context().close();
       });
@@ -1793,7 +1829,7 @@ test.describe('the look of every kind of screen', () => {
       await page.locator('.comment-mark').click();
       const panel = page.getByRole('complementary', { name: 'Comments' });
       await expect(panel).toContainText('This rota is out of date.');
-      await picture(page, 'thread-panel', [page.locator('time'), page.getByTestId('last-updated')]);
+      await picture(page, 'thread-panel', [page.locator('time')]);
       await checkAccessibility(page);
       await page.context().close();
     });
@@ -1804,7 +1840,8 @@ test.describe('the look of every kind of screen', () => {
       await page.getByRole('button', { name: 'Share' }).click();
       const dialog = page.getByRole('dialog', { name: 'Share this page' });
       await expect(dialog.getByText(READER.name)).toBeVisible();
-      await picture(page, 'share', [page.getByTestId('last-updated')]);
+      // No mask: it would lie over the dialog's own title row, and picture() fixes the date.
+      await picture(page, 'share');
       await page.context().close();
     });
 
@@ -1956,8 +1993,7 @@ test.describe('the look of every kind of screen', () => {
   test('ExportView: a finished export, and the dialog', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}`);
-    await page.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Export' }).click();
+    await pageMenu(page, 'Export', 'Plain text');
     await expect(page.getByRole('dialog', { name: 'Export' })).toBeVisible();
     await picture(page, 'export-dialog');
     const run = await page.request.post('/api/v1/exports', {
@@ -2203,7 +2239,7 @@ test.describe('the look of document control', () => {
     await expect(panel.getByText('0 of 1 needed so far.', { exact: false })).toBeVisible();
     await expect(panel.getByRole('cell', { name: 'Rosa Lind' })).toBeVisible();
     await fixText(page.locator('time'), 'now');
-    await picture(page, 'review-panel', [page.getByTestId('last-updated')]);
+    await picture(page, 'review-panel');
     await checkAccessibility(page);
     await page.context().close();
   });
@@ -2216,7 +2252,7 @@ test.describe('the look of document control', () => {
     await page.getByRole('button', { name: 'Review', exact: true }).click();
     await expect(page.getByRole('cell', { name: 'Rosa Lind' })).toBeVisible();
     await fixText(page.locator('time'), 'now');
-    await picture(page, 'review-panel-phone-rtl', [page.getByTestId('last-updated')]);
+    await picture(page, 'review-panel-phone-rtl');
     expect(await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth)).toBe(false);
     await page.context().close();
   });
@@ -2392,13 +2428,13 @@ test.describe('draft and published spaces', () => {
     await page.goto(`/pages/${draftPage}`);
     await expect(page.getByText('Changed since release: text')).toBeVisible();
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-draft-page', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-draft-page');
     await checkAccessibility(page);
     await page.getByRole('button', { name: 'More actions' }).click();
     await page.getByRole('menuitem', { name: 'Release this page…' }).click();
     const dialog = page.getByRole('dialog', { name: 'Release this page' });
     await expect(dialog.getByText('Readers get version 2 of the draft. Changed: text.')).toBeVisible();
-    await picture(page, 'publishing-release', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-release');
     await checkAccessibility(page);
     await page.keyboard.press('Escape');
   });
@@ -2408,7 +2444,7 @@ test.describe('draft and published spaces', () => {
     await page.goto(`/pages/${twin}`);
     await expect(page.getByText('Open the draft')).toBeVisible();
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-twin', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-twin');
     await checkAccessibility(page);
   });
 
@@ -2617,7 +2653,7 @@ test.describe('approval releases', () => {
     await page.goto(`/pages/${draftPage}`);
     await expect(page.locator('.control-band .release-line')).toContainText('Released');
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-controlled-page', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-controlled-page');
     await checkAccessibility(page);
   });
 
@@ -2627,7 +2663,7 @@ test.describe('approval releases', () => {
     await expect(page.locator('.release-line')).toContainText('Approved');
     await expect(page.locator('.release-line')).toContainText('version 1');
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-approved-twin', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-approved-twin');
     await checkAccessibility(page);
   });
 });
@@ -2727,7 +2763,7 @@ test.describe('a draft space started from a space with content', () => {
       page.getByText(`This page is changed by releases from the draft space Manuals in progress.`),
     ).toBeVisible();
     await fixText(page.locator('main time'), 'just now');
-    await picture(page, 'publishing-twin-editor-named', [page.getByTestId('last-updated')]);
+    await picture(page, 'publishing-twin-editor-named');
     await checkAccessibility(page);
     // The reader edits the published space from now on, and may not see the draft space: their
     // note names no space. Granted after the start, which takes writers along.
@@ -2745,7 +2781,7 @@ test.describe('a draft space started from a space with content', () => {
     await reader.goto(`/pages/${guide}`);
     await expect(reader.getByText('This page is changed only by releases.')).toBeVisible();
     await fixText(reader.locator('main time'), 'just now');
-    await picture(reader, 'publishing-twin-editor', [reader.getByTestId('last-updated')]);
+    await picture(reader, 'publishing-twin-editor');
     await checkAccessibility(reader);
     await reader.context().close();
   });
@@ -2838,7 +2874,6 @@ test.describe('the history of guided templates', () => {
     await expect(details).toContainText('A newer version of the template is in use.');
     await fixText(details.locator('time'), 'just now');
     await picture(page, 'page-origin', [
-      page.getByTestId('last-updated'),
       details
         .locator('.details-facts > div')
         .filter({ hasNotText: /Made from|Made with it/ })

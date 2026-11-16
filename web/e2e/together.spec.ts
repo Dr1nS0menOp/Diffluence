@@ -16,6 +16,7 @@ import {
   test,
   unique,
   VIEWER,
+  pageMenu,
 } from './helpers';
 
 const WRITER = [...EDITOR, 'comment.add', 'comment.delete_own'];
@@ -290,7 +291,8 @@ test('a comment on chosen words stays on them until it is resolved', async ({ pa
   await other.reload();
   await expect(other.getByRole('heading', { name: 'Working agreement', level: 1 })).toBeVisible();
   await expect(other.locator('.comment-mark')).toHaveCount(0);
-  await other.getByRole('button', { name: '1 comment', exact: true }).click();
+  // The count of comments left the byline (PAG-144); the panel opens from More.
+  await pageMenu(other, 'Comments');
   await expect(panel.getByText('No longer in the page')).toBeVisible();
 
   await panel.getByRole('button', { name: /Which fox/ }).click();
@@ -538,9 +540,12 @@ test('sharing tells people but gives nobody access', async ({ page, browser }) =
   await expect(dialog.getByRole('heading', { name: 'Who can see this page' })).toBeVisible();
   await checkAccessibility(page);
 
-  await dialog.getByLabel('Who to tell').fill(name);
+  // Without anyone named there is nothing to send (COL-107).
+  await expect(dialog.getByRole('button', { name: 'Send' })).toHaveCount(0);
+  const field = dialog.getByRole('textbox', { name: /^Add people/ });
+  await field.fill(name);
   await dialog.getByRole('button', { name: new RegExp(name) }).click();
-  await dialog.getByLabel('Who to tell').fill(outsider);
+  await field.fill(outsider);
   await dialog.getByRole('button', { name: new RegExp(outsider) }).click();
   await expect(dialog.getByText('Cannot see this page')).toBeVisible();
   await dialog.getByLabel('Message').fill('Have a look at this.');
@@ -676,12 +681,108 @@ test('a comment for editors stays with the editors', async ({ page, browser }) =
   await expect(dialog).toHaveCount(0);
 
   await openPage(page, pageId);
-  await page.getByRole('button', { name: '1 comment', exact: true }).click();
+  await pageMenu(page, 'Comments');
   await expect(page.getByRole('complementary', { name: 'Comments' })).toContainText('Only for editors');
 
   await openPage(other, pageId);
-  await expect(other.getByRole('button', { name: '1 comment', exact: true })).toHaveCount(0);
+  await pageMenu(other, 'Comments');
+  await expect(other.getByRole('complementary', { name: 'Comments' })).toBeVisible();
   await expect(other.getByText('Between us editors.')).toHaveCount(0);
   expect(name).toBeTruthy();
+  await other.context().close();
+});
+
+test('Share: one access row changes the lock, reads as words without the right, and sends only to someone', async ({
+  page,
+  browser,
+}) => {
+  const { other, pageId, name } = await team(page, browser, VIEWER);
+  await openPage(page, pageId);
+  await page.getByRole('button', { name: /^Share\. Restrictions: none/ }).click();
+  const dialog = page.getByRole('dialog', { name: 'Share this page' });
+  await expect(dialog.getByRole('heading', { name: 'General access' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Send' })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Copy link' })).toBeVisible();
+  await checkAccessibility(page);
+
+  // Only the people chosen: the page gets restrictions of its own, and Share shows the closed lock.
+  await dialog.getByRole('button', { name: 'Who can reach this page: Everyone in the space' }).click();
+  await page.getByRole('menuitemradio', { name: 'Only the people chosen' }).click();
+  await expect(
+    dialog.getByRole('button', { name: 'Who can reach this page: Only the people chosen' }),
+  ).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^What everyone may do/ })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByRole('button', { name: /^Share\. .*this page is restricted/ })).toBeVisible();
+
+  // Back to everyone, who may then only view: the state of ACC-064 called view only for most.
+  await page.getByRole('button', { name: /^Share/ }).click();
+  await dialog.getByRole('button', { name: /^Who can reach this page/ }).click();
+  await page.getByRole('menuitemradio', { name: 'Everyone in the space' }).click();
+  await dialog.getByRole('button', { name: 'What everyone may do: Can view and edit' }).click();
+  await page.getByRole('menuitemradio', { name: 'Can view', exact: true }).click();
+  await expect(dialog.getByRole('button', { name: 'What everyone may do: Can view' })).toBeVisible();
+  // The choice shows at once, while its two saves are still on their way.
+  await expect
+    .poll(async () => {
+      const restrictions = await page.request.get(`/api/v1/pages/${pageId}/restrictions`);
+      const listed = (await restrictions.json()) as { view: unknown[]; edit: unknown[] };
+      return { view: listed.view.length, editHasSomeone: listed.edit.length > 0 };
+    })
+    .toEqual({ view: 0, editHasSomeone: true });
+
+  // Someone named makes Send the primary button.
+  await dialog.getByRole('textbox', { name: /^Add people/ }).fill(name);
+  await dialog.getByRole('button', { name: new RegExp(name) }).click();
+  await expect(dialog.getByRole('button', { name: 'Send' })).toHaveClass(/primary/);
+  await dialog.getByRole('button', { name: `Remove ${name}` }).click();
+  await expect(dialog.getByRole('button', { name: 'Send' })).toHaveCount(0);
+
+  // A reader without the right to change restrictions sees the row as words.
+  await openPage(other, pageId);
+  await other.getByRole('button', { name: /^Share/ }).click();
+  const theirs = other.getByRole('dialog', { name: 'Share this page' });
+  await expect(theirs.getByText('Everyone in the space')).toBeVisible();
+  await expect(theirs.getByRole('button', { name: /^Who can reach this page/ })).toHaveCount(0);
+  await checkAccessibility(other);
+  await other.context().close();
+});
+
+test('the panel of the bell has For me and Watched, and marks one tab as read', async ({ page, browser }) => {
+  const { other, pageId } = await team(page, browser);
+  const me = (await (await page.request.get('/api/v1/me')).json()) as { user: { id: string } };
+  const shared = await other.request.post(`/api/v1/pages/${pageId}/share`, {
+    data: { people: [{ type: 'user', id: me.user.id }], message: 'For you to read.', notify: true },
+  });
+  expect(shared.ok(), await shared.text()).toBeTruthy();
+  await publish(other, pageId, 'A change the admin watches.', 1);
+  await waitForNotification(page, 'share', pageId);
+  await waitForNotification(page, 'page_changed', pageId);
+
+  await page.goto('/');
+  const bell = page.getByRole('button', { name: /^Notifications, \d+ unread$/ });
+  await bell.click();
+  await expect(bell).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('.bell-number')).toHaveCount(0);
+  const panel = page.getByRole('region', { name: 'Notifications' });
+  await expect(panel.getByRole('tab', { name: 'For me' })).toHaveAttribute('aria-selected', 'true');
+  await expect(panel.getByRole('link', { name: /shared Working agreement with you/ })).toBeVisible();
+  await expect(panel.getByRole('link', { name: /changed Working agreement/ })).toHaveCount(0);
+  await expect(panel.getByRole('heading', { name: 'Today' })).toBeVisible();
+  await checkAccessibility(page);
+
+  await panel.getByRole('tab', { name: 'Watched' }).click();
+  await expect(panel.getByRole('link', { name: /changed Working agreement/ })).toBeVisible();
+  await panel.getByRole('button', { name: 'More' }).click();
+  await page.getByRole('menuitem', { name: 'Mark all as read' }).click();
+  await panel.getByRole('switch', { name: 'Only unread' }).check();
+  await expect(panel.getByText('Nothing here.')).toBeVisible();
+  await panel.getByRole('tab', { name: 'For me' }).click();
+  await expect(panel.getByRole('link', { name: /shared Working agreement with you/ })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(panel).toHaveCount(0);
+  await expect(bell).toBeFocused();
+  await expect(page.locator('.bell-number')).toBeVisible();
   await other.context().close();
 });

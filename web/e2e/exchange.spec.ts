@@ -2,7 +2,7 @@
 // Everything can leave and come in (spec 014), by a person in a real browser.
 import { inflateRawSync } from 'node:zlib';
 import type { Page } from '@playwright/test';
-import { ADMIN, checkAccessibility, expect, login, newSpace, publishedPage, test } from './helpers';
+import { ADMIN, checkAccessibility, expect, login, newSpace, publishedPage, test, pageMenu } from './helpers';
 
 const SITE_ADDRESS = 'https://site.test';
 const ZIP_LOCAL_HEADER = 0x04034b50;
@@ -59,10 +59,10 @@ test('a page leaves as a file through the dialog, by keyboard', async ({ page })
   const space = await newSpace(page, 'Exports');
   const id = await publishedPage(page, space.id, 'Leaving', 'words to take along');
   await page.goto(`/pages/${id}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await pageMenu(page, 'Export', 'Plain text');
   const dialog = page.getByRole('dialog', { name: 'Export' });
-  await dialog.getByLabel('Format').selectOption('text');
+  // The sub-menu of More chooses the format the dialog starts with.
+  await expect(dialog.getByLabel('Format')).toHaveValue('text');
   await checkAccessibility(page);
   await dialog.getByRole('button', { name: 'Export' }).press('Enter');
   const link = dialog.getByRole('link', { name: 'Download' });
@@ -78,8 +78,7 @@ test('choosing pages says how many, and nothing chosen says why it cannot start'
   const parent = await publishedPage(page, space.id, 'Parent page', 'x');
   await publishedPage(page, space.id, 'Child page', 'y', parent);
   await page.goto(`/pages/${parent}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Export' }).click();
+  await pageMenu(page, 'Export', 'Markdown');
   const dialog = page.getByRole('dialog', { name: 'Export' });
   await dialog.getByLabel('Choose pages').first().check();
   await expect(dialog.getByRole('button', { name: 'Export' })).toBeDisabled();

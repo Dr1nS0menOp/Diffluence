@@ -13,6 +13,7 @@ import {
   publishedPage,
   test,
   unique,
+  pageMenu,
 } from './helpers';
 
 const DESKTOP = { width: 1440, height: 900 };
@@ -118,7 +119,7 @@ test('the menu of a page uses the height of the window', async ({ page }) => {
   const id = await publishedPage(page, space.id, 'Menu', 'text');
   await page.goto(`/pages/${id}`);
   await page.getByRole('button', { name: 'More actions' }).click();
-  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeInViewport({ ratio: 1 });
+  await expect(page.getByRole('menuitem', { name: 'Archive or delete' })).toBeInViewport({ ratio: 1 });
 });
 
 test('an empty list says it is empty, instead of showing only a head', async ({ page }) => {
@@ -150,9 +151,11 @@ test('after publishing, the menu knows that the author watches the page', async 
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
   // The watch starts a moment after the publish, so someone may have to look twice.
   await expect(async () => {
+    // Escape closes the sub-menu, then the menu, when a try before left them open.
     await page.keyboard.press('Escape');
-    await page.getByRole('button', { name: 'More actions' }).click();
-    await expect(page.getByRole('menuitem', { name: 'Stop watching this page', exact: true })).toBeVisible({
+    await page.keyboard.press('Escape');
+    await pageMenu(page, 'Watch');
+    await expect(page.getByRole('menuitemcheckbox', { name: 'This page', exact: true })).toBeChecked({
       timeout: 1000,
     });
   }).toPass();

@@ -15,6 +15,7 @@ import {
   publishedPage,
   test,
   unique,
+  pageMenu,
 } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -23,9 +24,8 @@ test.beforeEach(async ({ page }) => {
 
 const main = (page: Page) => page.locator('#main');
 
-async function moreActions(page: Page, item: string) {
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: item }).click();
+async function moreActions(page: Page, ...items: string[]) {
+  await pageMenu(page, ...items);
 }
 
 test('a status, labels and a label page', async ({ page }) => {
@@ -82,7 +82,7 @@ test('handing over a page, and a verified mark', async ({ page, browser }) => {
   await grant(page, space.id, { type: 'user', id: heir }, EDITOR);
   await page.goto(`/pages/${id}`);
 
-  await moreActions(page, 'Details');
+  await moreActions(page, 'More details', 'Page information');
   await page.getByRole('button', { name: 'Change owner' }).click();
   await page.getByRole('combobox', { name: 'Find the new owner' }).fill(name);
   await page.getByRole('option', { name: new RegExp(name) }).click();
@@ -269,7 +269,7 @@ test('a folder shows its pages, a link entry leaves the space', async ({ page })
   const id = await publishedPage(page, space.id, 'Group', 'Old text', space.home_page_id);
   await publishedPage(page, space.id, 'Inside', 'x', id);
   await page.goto(`/pages/${id}`);
-  await moreActions(page, 'Turn into folder');
+  await moreActions(page, 'Convert', 'To a folder');
   await page.getByRole('dialog').getByRole('button', { name: 'Turn into folder' }).click();
   await expect(main(page).getByRole('link', { name: 'Inside' })).toBeVisible();
   await expect(page.locator('.prose')).toHaveCount(0);
@@ -436,7 +436,7 @@ test('archiving: read-only, out of the tree, and a restore below an archived par
   const parent = await publishedPage(page, space.id, 'Old parent', 'x', space.home_page_id);
   const child = await publishedPage(page, space.id, 'Old child', 'x', parent);
   await page.goto(`/pages/${parent}`);
-  await moreActions(page, 'Archive');
+  await moreActions(page, 'Archive or delete', 'Archive');
   await page.getByRole('dialog').getByRole('button', { name: 'Archive' }).click();
   await expect(page.getByText('This page is archived.')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Edit', exact: true })).toHaveCount(0);

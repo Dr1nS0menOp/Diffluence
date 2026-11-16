@@ -27,6 +27,28 @@ export const test = base.extend<{ expectViolations: boolean; watch: void }>({
 
 export { expect };
 
+/**
+ * Opens More on a page and chooses an entry, following sub-menus: `pageMenu(page, 'Archive
+ * or delete', 'Delete')` (spec 079). Names are exact, so an entry is never mistaken for
+ * another that starts with the same word.
+ */
+export async function pageMenu(page: Page, ...entries: string[]) {
+  await page.getByRole('button', { name: 'More actions' }).click();
+  for (const name of entries) {
+    await page.getByRole('menuitem', { name, exact: true }).click();
+  }
+}
+
+/** Opens the restrictions of a page in detail: the lock is on Share, and they are in its More (COL-108). */
+export async function openRestrictions(page: Page) {
+  await page.getByRole('button', { name: /^Share\. Restrictions/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Share this page' })
+    .getByRole('button', { name: 'More about sharing' })
+    .click();
+  await page.getByRole('menuitem', { name: 'Restrictions in detail' }).click();
+}
+
 export async function login(page: Page, email: string, password = PASSWORD) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);

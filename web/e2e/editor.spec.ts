@@ -12,6 +12,7 @@ import {
   publishedPage,
   test,
   unique,
+  pageMenu,
 } from './helpers';
 
 const PNG = Buffer.from(
@@ -235,8 +236,7 @@ test('a file dragged into the editor becomes part of the page', async ({ page })
   expect((await download).suggestedFilename()).toBe('notes.txt');
   await checkAccessibility(page);
 
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Attachments' }).click();
+  await pageMenu(page, 'More details', 'Attachments');
   const dialog = page.getByRole('dialog', { name: 'Attachments' });
   await expect(dialog.getByRole('link', { name: 'notes.txt' })).toBeVisible();
   await checkAccessibility(page);
@@ -434,8 +434,7 @@ test('trash: delete, restore, and purge', async ({ page }) => {
   const space = await newSpace(page, 'Trash space');
   const id = await publishedPage(page, space.id, 'Doomed', 'x');
   await page.goto(`/pages/${id}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await pageMenu(page, 'Archive or delete', 'Delete');
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
 

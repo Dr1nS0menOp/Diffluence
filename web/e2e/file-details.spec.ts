@@ -10,6 +10,7 @@ import {
   newSpace,
   publishedPage,
   test,
+  pageMenu,
 } from './helpers';
 
 const ADD_FILE = 'input[type=file][aria-label="Add image or file"]';
@@ -47,8 +48,7 @@ async function showFiles(page: Page, pageId: string, tiles: { id: string; name: 
 
 async function openAttachments(page: Page, pageId: string) {
   await page.goto(`/pages/${pageId}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Attachments' }).click();
+  await pageMenu(page, 'More details', 'Attachments');
   return page.getByRole('dialog', { name: 'Attachments' });
 }
 

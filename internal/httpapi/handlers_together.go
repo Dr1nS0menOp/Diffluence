@@ -526,8 +526,9 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 	}
 	q := r.URL.Query()
 	unreadOnly, _ := strconv.ParseBool(q.Get("unread"))
+	excerpts, _ := strconv.ParseBool(q.Get("excerpts"))
 	list, err := s.deps.Notify.List(r.Context(), s.caller(r), notify.Query{UnreadOnly: unreadOnly, Type: q.Get("type"),
-		SpaceID: space, Before: before, BeforeID: beforeID, Limit: queryInt(r, "limit")})
+		SpaceID: space, Before: before, BeforeID: beforeID, Limit: queryInt(r, "limit"), Tab: q.Get("tab"), Excerpts: excerpts})
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -553,7 +554,7 @@ func (s *Server) handleNotificationRead(read bool) http.HandlerFunc {
 }
 
 func (s *Server) handleNotificationsReadAll(w http.ResponseWriter, r *http.Request) {
-	if err := s.deps.Notify.ReadAll(r.Context(), s.caller(r)); err != nil {
+	if err := s.deps.Notify.ReadAll(r.Context(), s.caller(r), r.URL.Query().Get("tab")); err != nil {
 		s.fail(w, r, err)
 		return
 	}

@@ -132,6 +132,24 @@ export const IconColumnDelete = line('M4 4h6v16H4zM15 12h6');
 export const IconUndo = line('M9 7l-5 5 5 5M4 12h10a5 5 0 0 1 5 5');
 export const IconRedo = line('M15 7l5 5-5 5M20 12H10a5 5 0 0 0-5 5');
 
+/** A filled drawing, for a state that is on: the favourite, or watching. */
+const solid = (path: string) => {
+  const Icon = ({ size }: { size?: number }) => (
+    <Svg size={size}>
+      <path d={path} fill="currentColor" fillRule="evenodd" />
+    </Svg>
+  );
+  return Icon;
+};
+
+/** The star of a favourite, filled, so being a favourite does not rest on colour (SPC-108). */
+export const IconStarFilled = solid(
+  'M12 3.6l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z',
+);
+export const IconEyeFilled = solid(
+  'M2 12s4-7 10-7 10 7 10 7-4 7-10 7-10-7-10-7zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+);
+
 export function IconMore({ size }: { size?: number }) {
   return (
     <Svg size={size}>
@@ -206,18 +224,6 @@ export const IconLogout = line('M10 5H5v14h5M14 8l4 4-4 4M18 12H9');
 /** A flash: something that runs by itself, automation (SPC-107). */
 export const IconAutomation = line('M13 3L5 14h6l-1 7 8-11h-6z');
 export const IconPerson = line('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0');
-
-/** The star of a favourite, filled, so being a favourite does not rest on colour (SPC-108). */
-export function IconStarFilled({ size }: { size?: number }) {
-  return (
-    <Svg size={size}>
-      <path
-        d="M12 3.6l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"
-        fill="currentColor"
-      />
-    </Svg>
-  );
-}
 
 /** The same link icon, for the heading marks that ProseMirror builds outside React. */
 export function linkIconElement(): SVGSVGElement {

@@ -64,7 +64,7 @@ test('a controlled page is hidden from readers until an author approves it', asy
   await checkAccessibility(page);
   await page.getByRole('button', { name: 'Send for review' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Send for review' }).click();
-  await expect(page.getByText('In review', { exact: true })).toBeVisible();
+  await expect(page.locator('.byline').getByText('In review', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Approve' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Approve' }).click();
   await expect(page.getByText('Version 1 is approved.')).toBeVisible();

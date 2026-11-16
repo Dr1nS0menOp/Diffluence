@@ -37,12 +37,18 @@ export function Dialog({
   wide,
   full,
   side,
+  nearTop,
+  tools,
   onEscape,
 }: {
   title: string;
   onClose: () => void;
   children: ReactNode;
   wide?: boolean;
+  /** Stands near the top of the screen, so what it adds grows downwards (COL-102). */
+  nearTop?: boolean;
+  /** Buttons in the title row, before Close, such as More. */
+  tools?: ReactNode;
   /** Stands at the side and leaves the page in view, for settings that show at once. */
   side?: boolean;
   /** Fills the window, for something a person works in, such as a viewer. */
@@ -74,10 +80,14 @@ export function Dialog({
           : undefined
       }
       aria-label={title}
-      className={full ? 'full' : side ? 'side' : wide ? 'wide' : undefined}
+      className={
+        [full ? 'full' : side ? 'side' : wide ? 'wide' : '', nearTop ? 'near-top' : ''].join(' ').trim() ||
+        undefined
+      }
     >
       <header className="dialog-head">
         <h2>{title}</h2>
+        {tools}
         {full ? (
           <button type="button" onClick={onClose}>
             <IconClose size={16} /> {t('common.close')}

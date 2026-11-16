@@ -16,6 +16,7 @@ import {
   totpCode,
   unique,
   VIEWER,
+  openRestrictions,
 } from './helpers';
 
 test('the login page is accessible and refuses a wrong password', async ({ page }) => {
@@ -45,14 +46,15 @@ test('a guest cannot find a restricted page by any route', async ({ page, browse
 
   // Set the restriction through the screen, as a space admin would.
   await page.goto(`/pages/${secret}`);
-  await page.getByRole('button', { name: 'Restrictions' }).click();
+  // The lock is on Share; the restrictions in detail are in its More (PAG-141, COL-108).
+  await openRestrictions(page);
   const dialog = page.getByRole('dialog', { name: 'Page restrictions' });
   await dialog.getByRole('radio', { name: /Private/ }).check();
   await expect(dialog.getByRole('listitem').filter({ hasText: 'admin' }).first()).toBeVisible();
   await expect(dialog).toHaveCount(1);
   await checkAccessibility(page);
   await dialog.getByRole('button', { name: 'Close' }).click();
-  await expect(page.getByText('Restricted', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^Share\. .*this page is restricted/ })).toBeVisible();
 
   const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
   const guest = await context.newPage();
@@ -79,8 +81,8 @@ test('a guest cannot find a restricted page by any route', async ({ page, browse
   expect(directory.status()).toBe(403);
   await context.close();
 
-  // "Why can't they?" gives the reason.
-  await page.getByRole('button', { name: 'Restrictions' }).click();
+  // "Why can't they?" gives the reason, in the restrictions in detail that Share holds.
+  await openRestrictions(page);
   await page
     .getByRole('dialog')
     .getByPlaceholder('Check a person')

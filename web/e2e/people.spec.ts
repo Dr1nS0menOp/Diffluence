@@ -725,14 +725,18 @@ test('someone with the role asks for an invitation, an administrator approves, a
   await member.goto(`/pages/${pageId}?share=1`);
   const theirDialog = member.getByRole('dialog', { name: 'Share this page' });
   await expect(theirDialog.getByRole('heading', { name: 'Who can see this page' })).toBeVisible();
-  await expect(theirDialog.getByRole('button', { name: 'Ask an administrator' })).toHaveCount(0);
+  // Without the role, the field takes no e-mail addresses (COL-103).
+  await expect(theirDialog.getByRole('textbox', { name: 'Add people or groups' })).toBeVisible();
+  await theirDialog.getByRole('textbox', { name: 'Add people or groups' }).fill(outsider);
+  await expect(theirDialog.getByRole('button', { name: `Invite ${outsider}` })).toHaveCount(0);
   await member.context().close();
 
   await inviter.goto(`/pages/${pageId}?share=1`);
   const dialog = inviter.getByRole('dialog', { name: 'Share this page' });
-  await dialog.getByLabel('Email').fill(outsider);
-  await dialog.getByLabel('Note for the administrator').fill('Our auditor');
-  await dialog.getByRole('button', { name: 'Ask an administrator' }).click();
+  await dialog.getByRole('textbox', { name: 'Add people, groups or e-mail addresses' }).fill(outsider);
+  await dialog.getByRole('button', { name: `Invite ${outsider}` }).click();
+  await dialog.getByLabel('Message').fill('Our auditor');
+  await dialog.getByRole('button', { name: 'Send' }).click();
   await expect(dialog.getByRole('status')).toContainText('waits for an administrator');
   await checkAccessibility(inviter);
 

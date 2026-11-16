@@ -1495,11 +1495,15 @@ export interface Notification {
   count: number;
   page_id: string;
   page_title: string;
+  /** The kind of content, for its icon (COL-118). */
+  page_kind: string;
   space_id: string;
   space_name: string;
   comment_id: string | null;
   read: boolean;
   at: string;
+  /** The start of the comment, when the panel asked for it and the person may read it. */
+  excerpt?: string;
   data: {
     message?: string;
     request_id?: string;

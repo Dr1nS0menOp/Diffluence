@@ -76,7 +76,7 @@ The first screen after login. Its job is to answer "where was I, and what change
 
 ## 1.4 Personal lists
 
-- **NAV-039** · built · Favourites: a person marks a page with the star at the top of the page. A second press removes it.
+- **NAV-039** · built · Favourites: a person marks a page with Favourite in More (PAG-148), which shows a filled star while it is on. A second press removes it.
 - **NAV-040** · built · A person can also mark a space as a favourite, on the space card and in the sidebar.
 - **NAV-041** · built · A full **Favourites** screen lists pages and spaces, can be filtered by title, and lets a person remove several at once.
 - **NAV-042** · built · Recent pages: the last pages a person viewed are remembered per person. This is a convenience list, not statistics.

@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { MAX_ZOOM, moveCrop, startCrop, zoomCrop } from '../crop';
 import { idleState, needsPing, PING_MS, safeReturnPath, WARNING_MS } from '../idle';
 import { findSettings, SETTINGS_INDEX } from '../views/admin-search';
-import { restrictionState } from '../views/page-dialogs';
+import { restrictionState } from './restriction-state';
 import { countBelow } from './tree-model';
 
 describe('cropping a picture', () => {

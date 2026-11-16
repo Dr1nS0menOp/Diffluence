@@ -296,46 +296,137 @@
   line-height: var(--leading-title);
 }
 
+/* While its panel is open the bell looks pressed and hides its number (COL-113). */
+.bell[aria-expanded='true'] {
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+}
+
 .bell-panel {
   position: absolute;
   inset-block-start: calc(100% + var(--space-1));
   inset-inline-end: 0;
   z-index: var(--layer-menu);
+  display: flex;
+  flex-direction: column;
   inline-size: var(--size-quick-search);
   max-inline-size: 90vw;
-  max-block-size: 70vh;
-  padding: var(--space-3);
-  overflow-y: auto;
+  block-size: min(var(--size-bell-panel), 80vh);
+  overflow: hidden;
   border: 1px solid var(--color-line);
   border-radius: var(--radius-card);
   background: var(--color-surface);
   box-shadow: var(--shadow-menu);
 }
 
-.bell-panel h2 {
+.bell-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-3) var(--space-2);
+}
+
+.bell-head h2 {
+  flex: 1;
   margin: 0;
-  font-size: var(--text-section);
+  font-size: var(--text-heading);
+  font-weight: var(--weight-title);
+}
+
+.bell-tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.bell-panel .tabs {
+  flex: none;
+  padding-inline: var(--space-3);
+}
+
+.bell-list {
+  flex: 1;
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  overflow-y: auto;
+}
+
+.notification-group + .notification-group {
+  margin-block-start: var(--space-3);
+}
+
+.notification-day {
+  margin: 0 0 var(--space-1);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
 }
 
 .notification {
   display: flex;
   align-items: flex-start;
   gap: var(--space-2);
-  padding-block: var(--space-2);
-  border-block-end: 1px solid var(--color-line);
+  padding-block: var(--space-1-5);
 }
 
-.notification.unread a {
+.notification-line {
+  margin: 0;
+}
+
+.notification-line a {
+  color: var(--color-ink);
   font-weight: var(--weight-strong);
+  text-decoration: none;
+}
+
+.notification-line a:hover {
+  text-decoration: underline;
+}
+
+.notification-where {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin: 0;
+  color: var(--color-muted);
+}
+
+.notification-kind {
+  display: inline-flex;
+}
+
+/* The start of a comment, two lines at most, in a quiet frame (COL-118). */
+.notification-excerpt {
+  display: -webkit-box;
+  margin: var(--space-1) 0 0;
+  padding: var(--space-1-5) var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* The unread mark sits in one column at the inner end, and reads or unreads the item. */
+.notification-mark {
+  flex: none;
+  inline-size: var(--size-twist);
+  min-block-size: var(--size-twist);
+  padding: 0;
+  background: none;
 }
 
 .notification-dot {
   flex: none;
   inline-size: var(--space-2);
   block-size: var(--space-2);
-  margin-block-start: var(--space-1-5);
+  border: 1px solid var(--color-accent);
   border-radius: var(--radius-round);
   background: var(--color-accent);
+}
+
+.notification:not(.unread) .notification-dot {
+  border-color: var(--color-muted);
+  background: none;
 }
 
 .notification-main {
@@ -344,6 +435,101 @@
   gap: var(--space-0-5);
   min-inline-size: 0;
   font-size: var(--text-small);
+}
+
+/* Share: one field, chips, one row about access, a line, and its actions (COL-102). */
+.share-recipients {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-end: var(--space-3);
+}
+
+.share-field {
+  inline-size: 100%;
+}
+
+.share-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1-5);
+}
+
+.share-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding-inline-start: var(--space-2);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+.share-section {
+  margin-block-start: var(--space-3);
+}
+
+.share-heading {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+.access-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.access-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-avatar);
+  block-size: var(--size-avatar);
+  border-radius: var(--radius);
+  background: var(--color-subtle);
+  color: var(--color-muted);
+}
+
+.access-reach {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: flex-start;
+  min-inline-size: 0;
+  font-size: var(--text-small);
+}
+
+.access-choice {
+  min-block-size: 0;
+  padding: 0;
+  background: none;
+  color: var(--color-ink);
+  font-weight: var(--weight-regular);
+}
+
+.access-choice:hover {
+  background: none;
+  text-decoration: underline;
+}
+
+.access-reach .access-choice {
+  font-weight: var(--weight-strong);
+}
+
+.share-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+  padding-block-start: var(--space-3);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.share-send {
+  margin-inline-start: auto;
 }
 
 .tabs-filter {

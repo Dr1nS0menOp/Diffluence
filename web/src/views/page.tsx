@@ -1,18 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useDates } from '../dates';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { EditorView } from '@tiptap/pm/view';
-import {
-  api,
-  type CommentAnchor,
-  type NotificationSettings,
-  type PageDetail,
-  type ReleaseStatus,
-  type Space,
-} from '../api';
-import { mayCreate } from '../create-permission';
+import { api, type CommentAnchor, type NotificationSettings, type PageDetail } from '../api';
 import { Link, navigate, useLocation } from '../router';
 import { usePreferences } from '../preferences';
 import type { Highlight } from '../components/comments/anchor';
@@ -21,443 +12,33 @@ import { CommentSection, CommentsPanel, commentsQuery } from '../components/comm
 import { NewThread, SelectionBar } from '../components/comments/selection-bar';
 import { commentsKey } from '../components/comments/thread';
 import { DocumentView } from '../components/editor/editor';
-import {
-  contentsOf,
-  countWords,
-  jumpToComment,
-  jumpToHeading,
-  nextThread,
-  readingMinutes,
-} from '../components/editor/outline';
-import {
-  IconArchive,
-  IconAttach,
-  IconClock,
-  IconComment,
-  IconCopy,
-  IconDownload,
-  IconLink,
-  IconEye,
-  IconFolder,
-  IconInfo,
-  IconLock,
-  IconLockOpen,
-  IconMore,
-  IconMove,
-  IconPage,
-  IconPencil,
-  IconPresent,
-  IconPrint,
-  IconReader,
-  IconRename,
-  IconStar,
-  IconTrash,
-} from '../components/icons';
-import { Menu, MenuItem, MenuLink, MenuSeparator } from '../components/menu';
+import { contentsOf, jumpToComment, jumpToHeading, nextThread } from '../components/editor/outline';
 import { LabelBar } from '../components/page-labels';
 import { ControlBand, mayOpenReview } from '../components/control-band';
 import { ReviewPanel } from '../components/review-panel';
 import { ReleaseBand, ReleaseDialogs, useReleaseStatus } from '../components/release-band';
-import {
-  ApprovalBanner,
-  ApprovalsDialog,
-  PageNotes,
-  StageControl,
-  VerifiedMark,
-  VerifyDialog,
-} from '../components/page-marks';
+import { ApprovalBanner, ApprovalsDialog, PageNotes, VerifyDialog } from '../components/page-marks';
 import { MIN_HEADINGS_FOR_CONTENTS, PageContents } from '../components/page-contents';
 import { ChildPages, DetailsPanel } from '../components/page-details';
 import { SheetReader } from '../components/sheet/editor';
 import { ShareDialog } from '../components/share-dialog';
 import { useShortcut } from '../components/shortcuts';
 import { useToast } from '../components/toast';
-import { Avatar, ErrorNote, Loading } from '../components/ui';
+import { ErrorNote, Loading } from '../components/ui';
 import { Lightbox, Presentation, type ShownImage } from '../components/viewers';
 import { useDocumentTitle, useScrollMemory } from '../page-title';
-import { ExportDialog, PublicLinkDialog, PublicMark } from './exchange';
+import { ExportDialog, PublicLinkDialog } from './exchange';
 import { CopyDialog, MoveDialog } from './move-dialogs';
 import { ArchiveDialog, KindDialog, SaveTemplateDialog } from './page-actions';
-import { PresencePeople, usePresence, useViewCount } from '../components/presence';
+import { usePresence, useViewCount } from '../components/presence';
 import { AttachmentsDialog, DeleteDialog, RenameDialog, RestrictionsDialog } from './page-dialogs';
+import { Byline, PageHeaderRow, useSpaceOf } from './page-head';
+import { PageMenu, usePageWatch, type PageDialog } from './page-menu';
 import { pageTitle } from '../page-name';
-
-type PageDialog =
-  | 'attachments'
-  | 'export'
-  | 'public-link'
-  | 'restrictions'
-  | 'move'
-  | 'rename'
-  | 'copy'
-  | 'delete'
-  | 'share'
-  | 'approvals'
-  | 'verify'
-  | 'archive'
-  | 'template'
-  | 'folder'
-  | 'page'
-  | 'post'
-  | 'release'
-  | 'leave_out'
-  | 'take_off';
-type WatchScope = 'page' | 'branch';
-
-interface WatchState {
-  page: boolean;
-  branch: boolean;
-  space: boolean;
-}
-
-const CRUMBS_BEFORE_FOLDING = 4;
-const MENU_ICON_SIZE = 18;
 // Frames to wait for an address to appear: comments arrive after the document.
 const JUMP_ATTEMPTS = 120;
 const ATTACHMENT_ADDRESS = /\/attachments\/([0-9a-f-]+)\//;
 const THREADS_CLOSED = { open: false, thread: null };
-
-function Crumb({ page }: { page: { id: string; title: string; emoji: string } }) {
-  const { t } = useTranslation();
-  return (
-    <Link href={`/pages/${page.id}`}>
-      {page.emoji && <span aria-hidden="true">{page.emoji} </span>}
-      {pageTitle(t, page.title)}
-    </Link>
-  );
-}
-
-function Breadcrumbs({ page }: { page: PageDetail }) {
-  const { t } = useTranslation();
-  const space = useQuery({
-    queryKey: ['space-id', page.space_id],
-    queryFn: () => api.get<Space>(`/spaces/${page.space_id}`),
-  });
-  const crumbs = page.breadcrumbs.filter((c) => c.id !== space.data?.home_page_id);
-  const folded = crumbs.length > CRUMBS_BEFORE_FOLDING ? crumbs.slice(0, -1) : [];
-  const shown = folded.length > 0 ? crumbs.slice(-1) : crumbs;
-  return (
-    <nav aria-label={t('page.breadcrumbs')} className="crumbs">
-      <ol>
-        {space.data && (
-          <li>
-            <Link href={`/spaces/${space.data.key}`}>{space.data.name}</Link>
-          </li>
-        )}
-        {folded.length > 0 && (
-          <li>
-            <Menu label={t('page.moreCrumbs')} align="start" className="crumb-fold" trigger="…">
-              {folded.map((c) => (
-                <MenuLink key={c.id} href={`/pages/${c.id}`}>
-                  {pageTitle(t, c.title)}
-                </MenuLink>
-              ))}
-            </Menu>
-          </li>
-        )}
-        {shown.map((c) => (
-          <li key={c.id}>
-            <Crumb page={c} />
-          </li>
-        ))}
-        {page.id === space.data?.home_page_id && <li aria-current="page">{t('space.home')}</li>}
-      </ol>
-    </nav>
-  );
-}
-
-function Byline({
-  page,
-  comments,
-  views,
-  onDetails,
-  onComments,
-}: {
-  page: PageDetail;
-  comments: number;
-  views: number | null;
-  onDetails: () => void;
-  onComments: () => void;
-}) {
-  const { t } = useTranslation();
-  const dates = useDates();
-  const author = page.owner_name || page.created_by_name || t('common.unknown');
-  const minutes = useMemo(() => readingMinutes(countWords(page.document)), [page.document]);
-  return (
-    <div className="byline">
-      <Avatar name={author} size="small" />
-      <button type="button" className="byline-author" onClick={onDetails}>
-        {t('page.byline', { name: author })}
-      </button>
-      {page.owner_disabled && <span className="muted">{t('content.noLongerActive')}</span>}
-      <span aria-hidden="true">·</span>
-      <span data-testid="last-updated">{t('page.lastUpdated', { date: dates.day(page.updated_at) })}</span>
-      {page.current_version > 0 && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>{t('history.version', { number: page.current_version })}</span>
-        </>
-      )}
-      {minutes !== null && (
-        <>
-          <span aria-hidden="true">·</span>
-          <span>{t('page.readTime', { minutes })}</span>
-        </>
-      )}
-      {comments > 0 && (
-        <>
-          <span aria-hidden="true">·</span>
-          <button type="button" className="byline-author" onClick={onComments}>
-            {t('comments.count', { count: comments })}
-          </button>
-        </>
-      )}
-      {views !== null && (
-        <>
-          <span aria-hidden="true">·</span>
-          <Link href={`/pages/${page.id}/insights`}>{t('insights.viewCount', { count: views })}</Link>
-        </>
-      )}
-      {page.restricted && <span className="lozenge">{t('page.restricted')}</span>}
-      <PublicMark pageId={page.id} />
-      <StageControl page={page} />
-      <VerifiedMark page={page} />
-    </div>
-  );
-}
-
-/** Rules someone can start by hand, with their names, in More. */
-function ManualRules({ pageId }: { pageId: string }) {
-  const { t } = useTranslation();
-  const toast = useToast();
-  const q = useQuery({
-    queryKey: ['page-rules', pageId],
-    queryFn: () => api.get<{ rules: { id: string; name: string }[] }>(`/pages/${pageId}/rules`),
-  });
-  const run = useMutation({
-    mutationFn: (id: string) => api.post(`/rules/${id}/run`, { page_id: pageId }),
-    onSuccess: () => toast({ message: t('rules2.started') }),
-  });
-  return (
-    <>
-      {q.data?.rules.map((rule) => (
-        <MenuItem key={rule.id} onClick={() => run.mutate(rule.id)}>
-          {t('rules2.runOne', { name: rule.name })}
-        </MenuItem>
-      ))}
-    </>
-  );
-}
-
-function MenuEntry({
-  icon,
-  onClick,
-  className,
-  children,
-}: {
-  icon: ReactNode;
-  onClick: () => void;
-  className?: string;
-  children: ReactNode;
-}) {
-  return (
-    <MenuItem className={className} onClick={onClick}>
-      {icon} {children}
-    </MenuItem>
-  );
-}
-
-/** Sits in the open menu: the server starts a watch a moment after a publish. */
-function FreshWatch({ pageId }: { pageId: string }) {
-  const client = useQueryClient();
-  useEffect(() => {
-    void client.invalidateQueries({ queryKey: ['watch', pageId] });
-  }, [client, pageId]);
-  return null;
-}
-
-function PageMenu({
-  page,
-  watching,
-  onOpen,
-  onDetails,
-  onReader,
-  onPresent,
-  onComments,
-  onWatch,
-  release,
-}: {
-  page: PageDetail;
-  watching: WatchState | undefined;
-  release: ReleaseStatus | undefined;
-  onOpen: (dialog: PageDialog) => void;
-  onDetails: () => void;
-  onReader: () => void;
-  onPresent: () => void;
-  onComments: () => void;
-  onWatch: (scope: WatchScope, on: boolean) => void;
-}) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const toast = useToast();
-  const canEdit = page.can['page.edit'];
-  const published = page.current_version > 0;
-  const ask = useMutation({
-    mutationFn: () => api.post(`/pages/${page.id}/access-requests`, { kind: 'edit' }),
-    onSuccess: () => toast({ message: t('share.asked') }),
-    onError: (e) => toast({ message: e.message }),
-  });
-  const closeComments = useMutation({
-    mutationFn: () => api.patch(`/pages/${page.id}/comments-closed`, { closed: !page.comments_closed }),
-    onError: (e) => toast({ message: e.message }),
-    onSettled: async () => {
-      await client.invalidateQueries({ queryKey: ['page', page.id] });
-      await client.invalidateQueries({ queryKey: commentsKey(page.id) });
-    },
-  });
-  return (
-    <Menu label={t('page.moreActions')} trigger={<IconMore />}>
-      <FreshWatch pageId={page.id} />
-      <ManualRules pageId={page.id} />
-      <MenuLink href={`/pages/${page.id}/history`}>
-        <IconClock size={MENU_ICON_SIZE} /> {t('page.history')}
-      </MenuLink>
-      <MenuEntry icon={<IconInfo size={MENU_ICON_SIZE} />} onClick={onDetails}>
-        {t('details.title')}
-      </MenuEntry>
-      <MenuEntry icon={<IconAttach size={MENU_ICON_SIZE} />} onClick={() => onOpen('attachments')}>
-        {t('attachments.title')}
-      </MenuEntry>
-      {published && (
-        <MenuEntry icon={<IconComment size={MENU_ICON_SIZE} />} onClick={onComments}>
-          {t('comments.title')}
-        </MenuEntry>
-      )}
-      <MenuEntry icon={<IconEye size={MENU_ICON_SIZE} />} onClick={() => onWatch('page', !watching?.page)}>
-        {watching?.page ? t('watching.stopPage') : t('watching.watchPage')}
-      </MenuEntry>
-      <MenuEntry
-        icon={<IconEye size={MENU_ICON_SIZE} />}
-        onClick={() => onWatch('branch', !watching?.branch)}
-      >
-        {watching?.branch ? t('watching.stopBranch') : t('watching.watchBranch')}
-      </MenuEntry>
-      {!canEdit && published && (
-        <MenuEntry icon={<IconPencil size={MENU_ICON_SIZE} />} onClick={() => ask.mutate()}>
-          {t('share.askToEdit')}
-        </MenuEntry>
-      )}
-      {canEdit && (
-        <>
-          {published && (
-            <MenuEntry icon={<IconComment size={MENU_ICON_SIZE} />} onClick={() => closeComments.mutate()}>
-              {page.comments_closed ? t('comments.openAgain') : t('comments.closePage')}
-            </MenuEntry>
-          )}
-          <MenuEntry icon={<IconRename size={MENU_ICON_SIZE} />} onClick={() => onOpen('rename')}>
-            {t('page.rename')}
-          </MenuEntry>
-          <MenuEntry icon={<IconMove size={MENU_ICON_SIZE} />} onClick={() => onOpen('move')}>
-            {t('page.move')}
-          </MenuEntry>
-        </>
-      )}
-      {mayCreate(page.can, page.kind) && published && (
-        <MenuEntry icon={<IconCopy size={MENU_ICON_SIZE} />} onClick={() => onOpen('copy')}>
-          {t('page.copy')}
-        </MenuEntry>
-      )}
-      <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('approvals')}>
-        {t('organise.approvals')}
-      </MenuEntry>
-      {page.can['page.verify'] && !page.verified && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('verify')}>
-          {t('organise.verify')}
-        </MenuEntry>
-      )}
-      {page.can['space.templates'] && published && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('template')}>
-          {t('organise.saveAsTemplate')}
-        </MenuEntry>
-      )}
-      {canEdit && page.kind === 'page' && (
-        <MenuEntry icon={<IconFolder size={MENU_ICON_SIZE} />} onClick={() => onOpen('folder')}>
-          {t('organise.turnInto_folder')}
-        </MenuEntry>
-      )}
-      {canEdit && page.kind === 'folder' && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
-          {t('organise.turnInto_page')}
-        </MenuEntry>
-      )}
-      {canEdit && !published && page.kind === 'page' && mayCreate(page.can, 'post') && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('post')}>
-          {t('organise.turnInto_post')}
-        </MenuEntry>
-      )}
-      {canEdit && !published && page.kind === 'post' && mayCreate(page.can, 'page') && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('page')}>
-          {t('organise.turnInto_page')}
-        </MenuEntry>
-      )}
-      {release?.can_release && !release.left_out && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('release')}>
-          {t('publishing.release')}
-        </MenuEntry>
-      )}
-      {release?.can_release && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('leave_out')}>
-          {release.left_out?.page_id === page.id ? t('publishing.include') : t('publishing.leaveOut')}
-        </MenuEntry>
-      )}
-      {release?.can_release && release.twin_page_id && (
-        <MenuEntry icon={<IconPage size={MENU_ICON_SIZE} />} onClick={() => onOpen('take_off')}>
-          {t('publishing.takeOff')}
-        </MenuEntry>
-      )}
-      {page.can['page.archive'] && !page.archived_at && (
-        <MenuEntry icon={<IconArchive size={MENU_ICON_SIZE} />} onClick={() => onOpen('archive')}>
-          {t('organise.archivePage')}
-        </MenuEntry>
-      )}
-      <MenuSeparator />
-      <MenuEntry icon={<IconReader size={MENU_ICON_SIZE} />} onClick={onReader}>
-        {t('page.readerMode')}
-      </MenuEntry>
-      <MenuEntry icon={<IconPresent size={MENU_ICON_SIZE} />} onClick={onPresent}>
-        {t('page.present')}
-      </MenuEntry>
-      <MenuEntry icon={<IconPrint size={MENU_ICON_SIZE} />} onClick={() => window.print()}>
-        {t('page.print')}
-      </MenuEntry>
-      {page.can['space.export'] && published && (
-        <>
-          <MenuSeparator />
-          <MenuEntry icon={<IconDownload size={MENU_ICON_SIZE} />} onClick={() => onOpen('export')}>
-            {t('exchange.export')}
-          </MenuEntry>
-          {page.can['site.publish'] && (
-            <MenuEntry icon={<IconLink size={MENU_ICON_SIZE} />} onClick={() => onOpen('public-link')}>
-              {t('exchange.publicLink')}
-            </MenuEntry>
-          )}
-        </>
-      )}
-      {page.can['page.delete'] && (
-        <>
-          <MenuSeparator />
-          <MenuEntry
-            className="danger"
-            icon={<IconTrash size={MENU_ICON_SIZE} />}
-            onClick={() => onOpen('delete')}
-          >
-            {t('page.delete')}
-          </MenuEntry>
-        </>
-      )}
-    </Menu>
-  );
-}
 
 /** Hides the bars around a page, to read without distraction. */
 function useReaderMode(): [boolean, (on: boolean) => void] {
@@ -513,31 +94,6 @@ function HeaderImage({ page }: { page: PageDetail }) {
       alt=""
     />
   );
-}
-
-/** Whether you watch a page or its branch, with `w` as the way to change it. */
-function usePageWatch(pageId: string) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const toast = useToast();
-  const state = useQuery({
-    queryKey: ['watch', pageId],
-    queryFn: () => api.get<WatchState>(`/pages/${pageId}/watch`),
-  });
-  const set = useMutation({
-    mutationFn: (v: { scope: WatchScope; on: boolean }) => {
-      const path = `/pages/${pageId}/watch?scope=${v.scope}`;
-      return v.on ? api.put(path) : api.del(path);
-    },
-    onSuccess: (_, v) => toast({ message: v.on ? t('watching.started') : t('watching.stopped') }),
-    onError: (e) => toast({ message: e.message }),
-    onSettled: () => client.invalidateQueries({ queryKey: ['watch', pageId] }),
-  });
-  useShortcut('watch', () => set.mutate({ scope: 'page', on: !state.data?.page }));
-  return {
-    watching: state.data,
-    watch: (scope: WatchScope, on: boolean) => set.mutate({ scope, on }),
-  };
 }
 
 /** What a page does with its threads: highlights, the panel, and `n` and `p`. */
@@ -632,6 +188,7 @@ export function PageView({ pageId }: { pageId: string }) {
   const q = useQuery({ queryKey: ['page', pageId], queryFn: () => api.get<PageDetail>(`/pages/${pageId}`) });
   const wantsShare = searchParams.has('share');
   const [dialog, setDialog] = useState<PageDialog | null>(null);
+  const [exportFormat, setExportFormat] = useState('');
   const [details, setDetails] = useState(false);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [presenting, setPresenting] = useState(false);
@@ -643,23 +200,25 @@ export function PageView({ pageId }: { pageId: string }) {
   const keepView = useCallback((next: EditorView) => {
     view.current = next;
   }, []);
+  const toast = useToast();
+  // The star left the header row (PAG-141), so the change says itself in a short message.
   const favourite = useMutation({
     mutationFn: (on: boolean) =>
       on ? api.put(`/pages/${pageId}/favourite`) : api.del(`/pages/${pageId}/favourite`),
-    onSettled: () => client.invalidateQueries({ queryKey: ['page', pageId] }),
+    // The message waits for the page to be read again, so a second press acts on the new state.
+    onSettled: async (_, error, on) => {
+      await client.invalidateQueries({ queryKey: ['page', pageId] });
+      if (!error) toast({ message: on ? t('page.favouriteAdded') : t('page.favouriteRemoved') });
+    },
   });
   const tick = useMutation({
     mutationFn: (v: { id: string; done: boolean }) => api.post(`/tasks/${v.id}/done`, { done: v.done }),
     onSettled: () => client.invalidateQueries({ queryKey: ['page', pageId] }),
   });
   const page = q.data;
-  const pageSpace = useQuery({
-    queryKey: ['space-id', page?.space_id],
-    queryFn: () => api.get<Space>(`/spaces/${page?.space_id}`),
-    enabled: !!page,
-  });
+  const pageSpace = useSpaceOf(page);
   const release = useReleaseStatus(page, pageSpace.data?.pair_role);
-  const { watching, watch } = usePageWatch(pageId);
+  const { watching, watch } = usePageWatch(pageId, page?.space_id);
   const views = useViewCount(pageId, page?.status === 'published');
   const present = usePresence(pageId, 'reading');
   const { openThread, closeThreads, inline, ...threads } = useThreads(pageId, page?.status === 'published');
@@ -695,7 +254,7 @@ export function PageView({ pageId }: { pageId: string }) {
     if (page?.can['page.edit']) navigate(`/pages/${pageId}/edit`);
   });
   useShortcut('favourite', () => {
-    if (page) favourite.mutate(!page.favourite);
+    if (page && !favourite.isPending) favourite.mutate(!page.favourite);
   });
   useShortcut('details', () => (details ? setDetails(false) : openDetails()));
   useShortcut('reader', () => setReader(!reader));
@@ -716,60 +275,40 @@ export function PageView({ pageId }: { pageId: string }) {
     setDialog(null);
     if (wantsShare) navigate(`/pages/${pageId}`, true);
   };
-  const favouriteLabel = page.favourite ? t('page.unfavourite') : t('page.favourite');
+  // A personal space's home page is its owner's own place: no byline (PAG-146).
+  const personalHome = page.id === pageSpace.data?.home_page_id && pageSpace.data?.kind === 'personal';
   const showContents = preferences.contents && headings.length >= MIN_HEADINGS_FOR_CONTENTS;
   const isPublished = page.status === 'published';
   const canComment =
     isPublished && page.can['comment.add'] && page.features.comments && !page.comments_closed;
   return (
     <div className={`page-layout ${showContents ? 'with-contents' : ''} ${page.full_width ? 'full' : ''}`}>
+      <PageHeaderRow
+        page={page}
+        space={pageSpace.data}
+        present={present}
+        onShare={() => setDialog('share')}
+        more={
+          <PageMenu
+            page={page}
+            watching={watching}
+            release={release.data}
+            onOpen={setDialog}
+            onExport={(format) => {
+              setExportFormat(format);
+              setDialog('export');
+            }}
+            onDetails={openDetails}
+            onReader={() => setReader(true)}
+            onPresent={() => setPresenting(true)}
+            onComments={() => openComments(null)}
+            onWatch={watch}
+            onFavourite={() => favourite.mutate(!page.favourite)}
+          />
+        }
+      />
       <article className="page">
         {page.header_attachment_id && <HeaderImage page={page} />}
-        <div className="page-top">
-          <Breadcrumbs page={page} />
-          <div className="page-actions">
-            <PresencePeople people={present} />
-            {page.can['page.edit'] && (
-              <Link className="button" href={`/pages/${page.id}/edit`}>
-                <IconPencil size={16} /> {t('page.edit')}
-              </Link>
-            )}
-            <button type="button" onClick={() => setDialog('share')}>
-              {t('share.button')}
-            </button>
-            <button
-              type="button"
-              className="icon"
-              aria-label={favouriteLabel}
-              title={favouriteLabel}
-              aria-pressed={page.favourite}
-              onClick={() => favourite.mutate(!page.favourite)}
-            >
-              <IconStar />
-            </button>
-            <button
-              type="button"
-              className="icon"
-              aria-label={t(page.restricted ? 'page.restrictionsClosed' : 'page.restrictionsOpen')}
-              title={t(page.restricted ? 'page.restrictionsClosed' : 'page.restrictionsOpen')}
-              data-restricted={page.restricted}
-              onClick={() => setDialog('restrictions')}
-            >
-              {page.restricted ? <IconLock /> : <IconLockOpen />}
-            </button>
-            <PageMenu
-              page={page}
-              watching={watching}
-              onOpen={setDialog}
-              onDetails={openDetails}
-              onReader={() => setReader(true)}
-              onPresent={() => setPresenting(true)}
-              onComments={() => openComments(null)}
-              onWatch={watch}
-              release={release.data}
-            />
-          </div>
-        </div>
         <h1 className={page.title_align === 'center' ? 'title-center' : undefined}>
           {page.emoji && (
             <span className="title-emoji" aria-hidden="true">
@@ -778,13 +317,7 @@ export function PageView({ pageId }: { pageId: string }) {
           )}
           {pageTitle(t, page.title)}
         </h1>
-        <Byline
-          page={page}
-          comments={threads.count}
-          views={views}
-          onDetails={openDetails}
-          onComments={() => openComments(null)}
-        />
+        {!personalHome && <Byline page={page} views={views} onDetails={openDetails} onReview={openReview} />}
         <ErrorNote error={favourite.error} />
         <PageNotes page={page} />
         <ApprovalBanner page={page} onOpen={() => setDialog('approvals')} />
@@ -855,10 +388,21 @@ export function PageView({ pageId }: { pageId: string }) {
       {showContents && <PageContents headings={headings} />}
       {isPublished && <SelectionBar page={page} view={() => view.current} onCreated={openComments} />}
       {dialog === 'share' && (
-        <ShareDialog page={page} onClose={close} onRestrictions={() => setDialog('restrictions')} />
+        <ShareDialog
+          page={page}
+          onClose={close}
+          onRestrictions={() => setDialog('restrictions')}
+          onSharedPage={
+            page.can['space.export'] && page.can['site.publish'] && page.current_version > 0
+              ? () => setDialog('public-link')
+              : undefined
+          }
+        />
       )}
       {dialog === 'attachments' && <AttachmentsDialog page={page} onClose={close} />}
-      {dialog === 'export' && <ExportDialog spaceId={page.space_id} page={page} onClose={close} />}
+      {dialog === 'export' && (
+        <ExportDialog spaceId={page.space_id} page={page} startFormat={exportFormat} onClose={close} />
+      )}
       {dialog === 'public-link' && <PublicLinkDialog page={page} onClose={close} />}
       {dialog === 'restrictions' && <RestrictionsDialog page={page} onClose={close} />}
       {dialog === 'move' && <MoveDialog page={page} onClose={close} />}

@@ -79,6 +79,11 @@
   --size-panel: 24rem;
   --size-header-image: 16rem;
   --size-quick-search: 30rem;
+  /* The panel of the bell keeps one height and scrolls inside (COL-113). */
+  --size-bell-panel: 36rem;
+  --size-switch: 2rem;
+  --size-switch-height: 1.125rem;
+  --size-switch-knob: 0.875rem;
   --size-card-note: 16rem;
   --size-picture: 5rem;
   --size-tile: 10rem;

@@ -10,10 +10,62 @@ import {
   type ReactNode,
 } from 'react';
 import { Link } from '../router';
+import { IconChevronRight } from './icons';
+
+const SUB_ARROW_SIZE = 16;
 
 const ENABLED_ITEMS = '[role^=menuitem]:not(:disabled)';
 const FLOATING_GAP_PX = 4;
 const ENOUGH_MENU_ROOM_PX = 320;
+/** How far a sub-menu that has no room beside its menu moves in, so both stay readable. */
+const SUBMENU_INDENT_PX = 24;
+
+/** The edges of something on the screen, as `getBoundingClientRect` gives them. */
+export interface ScreenBox {
+  top: number;
+  bottom: number;
+  left: number;
+  right: number;
+}
+
+/**
+ * Where a sub-menu goes: beside its entry on the end side, else on the start side, else over
+ * the menu a little lower and further in, as on a phone. It always stays on the screen.
+ */
+export function submenuPlace(
+  entry: ScreenBox,
+  size: { width: number; height: number },
+  room: { width: number; height: number },
+  rtl: boolean,
+): { top: number; left: number } {
+  const after = entry.right + FLOATING_GAP_PX;
+  const before = entry.left - FLOATING_GAP_PX - size.width;
+  const fitsAfter = after + size.width <= room.width - FLOATING_GAP_PX;
+  const fitsBefore = before >= FLOATING_GAP_PX;
+  const sides = rtl ? [fitsBefore && before, fitsAfter && after] : [fitsAfter && after, fitsBefore && before];
+  const beside = sides.find((left): left is number => typeof left === 'number');
+  const lowest = room.height - size.height - FLOATING_GAP_PX;
+  if (beside !== undefined) {
+    return { top: Math.max(FLOATING_GAP_PX, Math.min(entry.top, lowest)), left: beside };
+  }
+  const inward = rtl ? entry.right - SUBMENU_INDENT_PX - size.width : entry.left + SUBMENU_INDENT_PX;
+  return {
+    top: Math.max(FLOATING_GAP_PX, Math.min(entry.bottom, lowest)),
+    left: Math.max(FLOATING_GAP_PX, Math.min(inward, room.width - size.width - FLOATING_GAP_PX)),
+  };
+}
+
+/** The entries of one list, without those of a sub-menu inside it. */
+function itemsOf(list: Element | null): HTMLElement[] {
+  if (!list) return [];
+  return Array.from(list.querySelectorAll<HTMLElement>(ENABLED_ITEMS)).filter(
+    (item) => item.closest('[role=menu]') === list,
+  );
+}
+
+function isRightToLeft(element: Element): boolean {
+  return getComputedStyle(element).direction === 'rtl';
+}
 /** The bars that stay in place while the page, and any menu in it, slides under them. */
 export const FIXED_BARS = '.top, .edit-bar, .toolbar, .find-bar';
 
@@ -44,8 +96,27 @@ function placeBeside(list: HTMLElement, button: HTMLElement) {
   if (height > room) list.style.maxBlockSize = `${room}px`;
 }
 
+/**
+ * How far a menu moves sideways to stay inside the window: on a phone, and in right-to-left,
+ * a menu that hangs from its button's end can run past an edge.
+ */
+export function sidewaysShift(left: number, right: number, windowWidth: number): number {
+  if (right > windowWidth - FLOATING_GAP_PX)
+    return Math.max(FLOATING_GAP_PX - left, windowWidth - FLOATING_GAP_PX - right);
+  if (left < FLOATING_GAP_PX) return FLOATING_GAP_PX - left;
+  return 0;
+}
+
 /** A long menu stays on the screen: shorter when that leaves enough, or else above its button. */
 function keepOnScreen(list: HTMLElement, button: HTMLElement) {
+  const sides = list.getBoundingClientRect();
+  const shift = sidewaysShift(sides.left, sides.right, window.innerWidth);
+  // Moved by its own left edge, not by a transform: a transform would become the frame of the
+  // sub-menus inside it, which stand on the screen.
+  if (shift !== 0) {
+    list.style.left = `${list.offsetLeft + shift}px`;
+    list.style.right = 'auto';
+  }
   const box = list.getBoundingClientRect();
   if (box.bottom <= window.innerHeight) return;
   const anchor = button.getBoundingClientRect();
@@ -140,10 +211,8 @@ export function Menu({
       onLeave?.();
       return;
     }
-    // The items of a sub-menu move by its own keys, not by those of this menu.
-    const items = Array.from(list.current?.querySelectorAll<HTMLElement>(ENABLED_ITEMS) ?? []).filter(
-      (item) => item.parentElement?.closest('[role="menu"]') === list.current,
-    );
+    // Each list moves among its own entries, so the arrows in a sub-menu stay inside it.
+    const items = itemsOf((e.target as Element).closest('[role=menu]'));
     const target = itemForKey(e.key, items, items.indexOf(document.activeElement as HTMLElement));
     if (!target) return;
     e.preventDefault();
@@ -220,4 +289,108 @@ export function MenuDownload({
 
 export function MenuSeparator() {
   return <div role="separator" className="menu-separator" />;
+}
+
+/**
+ * An entry that opens a sub-menu. A click, Enter, Space or the arrow towards the end side
+ * opens it and focuses its first entry; the arrow towards the start side and Escape close it
+ * and return to the entry. Choosing an entry in it closes the whole menu.
+ */
+export function MenuSub({
+  label,
+  icon,
+  className,
+  children,
+}: {
+  label: string;
+  icon?: ReactNode;
+  className?: string;
+  children: ReactNode;
+}) {
+  const [open, setOpen] = useState(false);
+  const entry = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    const box = list.current;
+    if (!open || !box || !entry.current) return;
+    const place = submenuPlace(
+      entry.current.getBoundingClientRect(),
+      { width: box.offsetWidth, height: box.offsetHeight },
+      { width: window.innerWidth, height: window.innerHeight },
+      isRightToLeft(entry.current),
+    );
+    box.style.top = `${place.top}px`;
+    box.style.left = `${place.left}px`;
+    itemsOf(box)[0]?.focus({ preventScroll: true });
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    // The list stands on the screen, so it would stay behind while the page scrolls. A
+    // scroll inside the menu itself, such as a long menu reaching its entry, leaves it open.
+    const close = (e: Event) => {
+      const menu = entry.current?.closest('.menu-list');
+      if (e.target instanceof Node && menu?.contains(e.target)) return;
+      setOpen(false);
+    };
+    window.addEventListener('scroll', close, { capture: true, passive: true });
+    return () => window.removeEventListener('scroll', close, { capture: true });
+  }, [open]);
+
+  const back = () => {
+    setOpen(false);
+    entry.current?.focus();
+  };
+  const towardsEnd = (key: string) =>
+    key === (isRightToLeft(entry.current ?? document.body) ? 'ArrowLeft' : 'ArrowRight');
+  const towardsStart = (key: string) =>
+    key === (isRightToLeft(entry.current ?? document.body) ? 'ArrowRight' : 'ArrowLeft');
+
+  return (
+    <div className="menu-sub">
+      <button
+        ref={entry}
+        type="button"
+        role="menuitem"
+        className={className}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={(e) => {
+          // The menu around it closes on any click; this one only opens the sub-menu.
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+        onKeyDown={(e) => {
+          if (!towardsEnd(e.key)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
+        {icon}
+        <span className="menu-sub-label">{label}</span>
+        <span className="menu-sub-arrow">
+          <IconChevronRight size={SUB_ARROW_SIZE} />
+        </span>
+      </button>
+      {open && (
+        <div
+          ref={list}
+          role="menu"
+          aria-label={label}
+          className="menu-list menu-sub-list"
+          onKeyDown={(e) => {
+            if (e.key === 'Escape' || towardsStart(e.key)) {
+              e.preventDefault();
+              e.stopPropagation();
+              back();
+            }
+          }}
+        >
+          {children}
+        </div>
+      )}
+    </div>
+  );
 }

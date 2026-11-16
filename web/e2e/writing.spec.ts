@@ -10,6 +10,7 @@ import {
   newSpace,
   publishedPage,
   test,
+  pageMenu,
 } from './helpers';
 
 const paragraph = (text: string) =>
@@ -564,8 +565,7 @@ test.describe('files in the text', () => {
     });
     expect(res.ok(), await res.text()).toBeTruthy();
     await page.goto(`/pages/${from}`);
-    await page.getByRole('button', { name: 'More actions' }).click();
-    await page.getByRole('menuitem', { name: 'Attachments' }).click();
+    await pageMenu(page, 'More details', 'Attachments');
     await page.getByRole('button', { name: 'Details' }).click();
     await page.getByLabel('Find a page').fill('Move target');
     await page.getByRole('dialog').getByRole('button', { name: 'Move target' }).click();

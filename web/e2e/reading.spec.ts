@@ -14,6 +14,7 @@ import {
   test,
   unique,
   VIEWER,
+  pageMenu,
 } from './helpers';
 
 const PNG = Buffer.from(
@@ -83,7 +84,9 @@ test('the panels of the sidebar show where a person has been', async ({ page }) 
   const space = await newSpace(page, 'Menu space');
   const id = await publishedPage(page, space.id, 'Menu page', 'text');
   await page.goto(`/pages/${id}`);
-  await page.getByRole('button', { name: 'Add to favourites' }).click();
+  await page.getByRole('button', { name: 'More actions' }).click();
+  await page.getByRole('menuitemcheckbox', { name: 'Favourite' }).click();
+  await expect(page.getByText('Added to your favourites.')).toBeVisible();
 
   const places = page.getByRole('navigation', { name: 'Your places' });
   await places.getByRole('button', { name: 'Recent', exact: true }).click();
@@ -533,7 +536,7 @@ test('the contents follow the scroll, and can be turned off', async ({ page }) =
   await page.getByLabel('Show the contents beside long pages').check();
 });
 
-test('the byline gives a read time, and the details panel lists links and who worked on it', async ({
+test('the byline holds no date, version or read time, and the details panel has them, with links and who worked on it', async ({
   page,
 }) => {
   const { id, space } = await longPage(page, 'Facts');
@@ -545,9 +548,11 @@ test('the byline gives a read time, and the details panel lists links and who wo
     },
   ]);
   await page.goto(`/pages/${id}`);
-  await expect(page.locator('.byline')).toContainText('min read');
-  await page.locator('.byline-author').click();
+  await expect(page.locator('.byline')).not.toContainText('min read');
+  await expect(page.locator('.byline')).not.toContainText(/Version|Last updated/);
+  await page.locator('.byline-author').first().click();
   const panel = page.getByRole('complementary', { name: 'Details' });
+  await expect(panel).toContainText('min read');
   await expect(page.getByRole('heading', { name: 'Details' })).toBeFocused();
   await expect(panel.getByRole('link', { name: 'Linker page' })).toBeVisible();
   await expect(panel).toContainText('2 versions');
@@ -659,8 +664,7 @@ test('a delete names what it touches, and Undo brings the page back', async ({ p
     },
   ]);
   await page.goto(`/pages/${parent}`);
-  await page.getByRole('button', { name: 'More actions' }).click();
-  await page.getByRole('menuitem', { name: 'Delete' }).click();
+  await pageMenu(page, 'Archive or delete', 'Delete');
   const dialog = page.getByRole('dialog');
   await expect(dialog).toContainText('2 pages in all');
   await expect(dialog).toContainText('those links will stop working');
@@ -713,9 +717,9 @@ test('shortcuts work, never fire while typing, and can be turned off', async ({ 
   await expect(overview).toHaveCount(0);
 
   await page.keyboard.press('s');
-  await expect(page.getByRole('button', { name: 'Remove from favourites' })).toBeVisible();
+  await expect(page.getByText('Added to your favourites.')).toBeVisible();
   await page.keyboard.press('s');
-  await expect(page.getByRole('button', { name: 'Add to favourites' })).toBeVisible();
+  await expect(page.getByText('Removed from your favourites.')).toBeVisible();
 
   await page.keyboard.press('i');
   await expect(page.getByRole('complementary', { name: 'Details' })).toBeVisible();
@@ -761,4 +765,124 @@ test('a new space suggests its key, and says at once when it is taken', async ({
   await expect(dialog.getByRole('alert')).toHaveText('This key is already in use.');
   await dialog.getByLabel('Name').fill('Something else');
   await expect(dialog.getByRole('textbox', { name: /^Key/ })).toHaveValue(taken.key);
+});
+
+test('the header row holds the publishing state, Edit, Share with its lock and More, and no star or lock', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'Header row');
+  const id = await publishedPage(page, space.id, 'Header page', 'text');
+  await page.goto(`/pages/${id}`);
+  const row = page.locator('.page-top');
+  await expect(row.getByText('Published')).toBeVisible();
+  await expect(row.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
+  await expect(row.getByRole('button', { name: /^Share\. Restrictions: none on this page$/ })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'Copy link' })).toBeVisible();
+  await expect(row.getByRole('button', { name: 'More actions' })).toBeVisible();
+  await expect(page.getByRole('button', { name: /favourites/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^Restrictions/ })).toHaveCount(0);
+  // The end of the row stands outside the reading column (PAG-140).
+  const more = await row.getByRole('button', { name: 'More actions' }).boundingBox();
+  const column = await page.locator('article.page').boundingBox();
+  expect((more?.x ?? 0) + (more?.width ?? 0)).toBeGreaterThan((column?.x ?? 0) + (column?.width ?? 0));
+  // The byline holds no date and no version (PAG-144).
+  await expect(page.locator('.byline')).not.toContainText(/Last updated|Version/);
+  await expect(page.locator('.page-top.home')).toHaveCount(0);
+  await checkAccessibility(page);
+
+  // The home page of the space: the space alone in the path, and a line under the row.
+  await page.goto(`/spaces/${space.key}`);
+  const crumbs = page.getByRole('navigation', { name: 'Breadcrumbs' });
+  await expect(crumbs.getByRole('listitem')).toHaveCount(1);
+  await expect(crumbs.getByRole('link', { name: 'Header row' })).toHaveAttribute('aria-current', 'page');
+  await expect(page.locator('.page-top.home')).toBeVisible();
+  await expect(page.locator('.byline')).toBeVisible();
+});
+
+test('Watch is a sub-menu of three choices, which the keyboard opens and leaves', async ({ page }) => {
+  const space = await newSpace(page, 'Watch menu');
+  const id = await publishedPage(page, space.id, 'Watched page', 'text');
+  await page.goto(`/pages/${id}`);
+  const more = page.getByRole('button', { name: 'More actions' });
+  await more.focus();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('menuitemcheckbox', { name: 'Favourite' })).toBeFocused();
+  await page.keyboard.press('ArrowDown');
+  const watch = page.getByRole('menuitem', { name: 'Watch', exact: true });
+  await expect(watch).toBeFocused();
+  await expect(watch).toHaveAttribute('aria-haspopup', 'menu');
+
+  await page.keyboard.press('ArrowRight');
+  const sub = page.getByRole('menu', { name: 'Watch' });
+  await expect(sub.getByRole('menuitemcheckbox')).toHaveText([
+    'This page',
+    'This page and everything below it',
+    'The whole space',
+  ]);
+  await expect(sub.getByRole('menuitemcheckbox', { name: 'This page', exact: true })).toBeFocused();
+  // The arrows stay inside the sub-menu.
+  await page.keyboard.press('ArrowUp');
+  await expect(sub.getByRole('menuitemcheckbox', { name: 'The whole space' })).toBeFocused();
+  await checkAccessibility(page);
+  await page.keyboard.press('ArrowLeft');
+  await expect(sub).toHaveCount(0);
+  await expect(watch).toBeFocused();
+  await page.keyboard.press('ArrowRight');
+  await page.keyboard.press('Escape');
+  await expect(watch).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(more).toBeFocused();
+
+  await pageMenu(page, 'Watch');
+  await page.getByRole('menuitemcheckbox', { name: 'The whole space' }).click();
+  await expect(page.getByText('You now watch this.')).toBeVisible();
+  await pageMenu(page, 'Watch');
+  await expect(page.getByRole('menuitemcheckbox', { name: 'The whole space' })).toBeChecked();
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('Escape');
+
+  // `w` still toggles watching the page itself (NAV-063).
+  const before = await (await page.request.get(`/api/v1/pages/${id}/watch`)).json();
+  await page.keyboard.press('w');
+  await expect
+    .poll(
+      async () =>
+        ((await (await page.request.get(`/api/v1/pages/${id}/watch`)).json()) as { page: boolean }).page,
+    )
+    .toBe(!(before as { page: boolean }).page);
+});
+
+test('More has four groups at most, with Archive and Delete in one sub-menu and nothing in red', async ({
+  page,
+}) => {
+  const space = await newSpace(page, 'More groups');
+  const id = await publishedPage(page, space.id, 'Grouped page', 'text');
+  await page.goto(`/pages/${id}`);
+  await page.getByRole('button', { name: 'More actions' }).click();
+  const menu = page.getByRole('menu', { name: 'More actions' });
+  await expect(menu.getByRole('separator')).toHaveCount(2);
+  await expect(menu.locator('.danger')).toHaveCount(0);
+  await menu.getByRole('menuitem', { name: 'Archive or delete' }).click();
+  await expect(page.getByRole('menu', { name: 'Archive or delete' }).getByRole('menuitem')).toHaveText([
+    'Archive',
+    'Delete',
+  ]);
+  await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Delete' }).locator('button.danger')).toBeVisible();
+});
+
+test('the home page of a personal space has no byline and no publishing state', async ({ browser }) => {
+  const email = `${unique('personal')}@example.com`;
+  await createUser(browser, email);
+  const context = await browser.newContext({ baseURL: 'http://localhost:8080' });
+  const owner = await context.newPage();
+  await login(owner, email);
+  const made = await owner.request.post('/api/v1/me/personal-space');
+  expect(made.ok(), await made.text()).toBeTruthy();
+  const { home_page_id } = (await made.json()) as { home_page_id: string };
+  await owner.goto(`/pages/${home_page_id}`);
+  await expect(owner.locator('.page-top.home')).toBeVisible();
+  await expect(owner.locator('.byline')).toHaveCount(0);
+  await expect(owner.locator('.publish-state')).toHaveCount(0);
+  await context.close();
 });
