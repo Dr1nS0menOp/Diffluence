@@ -83,6 +83,23 @@ func TestALoopOfConditionsHasAnEnd(t *testing.T) {
 	}
 }
 
+func TestConditionsNeedATriggerThatBringsAPage(t *testing.T) {
+	c := Condition{Kind: CondLabel, Value: "x"}
+	actions := []Action{{Type: ActFind}, {Type: ActArchive}}
+	for _, kind := range []string{TriggerSchedule, TriggerIncoming, "group.member_added", "space.created"} {
+		d := Definition{Trigger: Trigger{Kind: kind, Every: EveryHour}, Conditions: &c, Actions: actions}
+		if got := d.Problems(); len(got) != 1 || got[0].Step != stepConditions {
+			t.Errorf("%s: got %+v", kind, got)
+		}
+	}
+	for _, kind := range []string{TriggerManual, "page.commented"} {
+		d := Definition{Trigger: Trigger{Kind: kind}, Conditions: &c, Actions: actions}
+		if got := d.Problems(); len(got) != 0 {
+			t.Errorf("%s: got %+v", kind, got)
+		}
+	}
+}
+
 func TestSchedulesGiveTheNextMoment(t *testing.T) {
 	now := time.Date(2026, 3, 10, 12, 30, 0, 0, time.UTC)
 	cases := []struct {

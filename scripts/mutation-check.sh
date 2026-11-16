@@ -2677,6 +2677,33 @@ mutate "a token cannot read Administration" internal/httpapi/router.go \
   's.replace("|| method == http.MethodGet || method == http.MethodHead {", "|| method == http.MethodOptions {")' $app -run '^TestEveryAdministrationChangeNeedsASession$'
 mutate "a route of Administration without a method takes a token" internal/httpapi/router.go \
   's.replace("\t\tmethod, path = \"\", pattern\n", "\t\treturn a\n")' ./internal/httpapi/ -run '^TestAnAdministrationChangeIsSessionOnlyWhateverRuleItWasGiven$'
+# Spec 092: only the holder of a rule changes it, a test runs as its caller, and conditions need a page.
+mutate "someone who does not hold a rule changes it" internal/automation/service.go \
+  's.replace("\tcase held:\n\t\treturn s.change(", "\tcase held || true:\n\t\treturn s.change(")' $app -run '^TestSomeoneWhoDoesNotHoldARuleCannotChangeWhatItDoes$'
+mutate "an owner holds a rule after losing the right to lend its account" internal/automation/service.go \
+  's.replace("\treturn s.mayLend(ctx, c, r.AccountID)\n", "\treturn true, nil\n")' $app -run '^TestTheAdministratorWhoChoseAServiceAccountHoldsTheRule$'
+mutate "someone who does not hold a rule switches it on" internal/automation/service.go \
+  's.replace("if in.Enabled || !same || name != r.Name || otherAccount {", "if !same || name != r.Name || otherAccount {")' $app -run '^TestSomeoneWhoDoesNotHoldARuleCanSwitchItOffAndDeleteIt$'
+mutate "someone who does not hold a rule renames it" internal/automation/service.go \
+  's.replace("if in.Enabled || !same || name != r.Name || otherAccount {", "if in.Enabled || !same || otherAccount {")' $app -run '^TestSomeoneWhoDoesNotHoldARuleCannotChangeWhatItDoes$'
+mutate "a rule taken over keeps acting as before" internal/automation/service.go \
+  's.replace("name, false, in.Definition, c.UserID, account", "name, false, in.Definition, c.UserID, previous.AccountID\n\t_ = account")' $app -run '^TestATakeOverMakesTheRuleActAsWhoeverTookItOver$'
+mutate "a rule taken over stays on" internal/automation/service.go \
+  's.replace("SET name = $2, enabled = false, definition = $3", "SET name = $2, enabled = true, definition = $3")' $app -run '^TestATakeOverMakesTheRuleActAsWhoeverTookItOver$'
+mutate "a rule taken over keeps its incoming address" internal/automation/service.go \
+  's.replace("\"DELETE FROM automation_hooks WHERE rule_id = $1\"", "\"DELETE FROM automation_hooks WHERE rule_id = $1 AND false\"")' $app -run '^TestATakeOverMakesTheRuleActAsWhoeverTookItOver$'
+mutate "the previous holder is not told of a take-over" internal/automation/service.go \
+  's.replace("\t\treturn s.tellPreviousHolders(ctx, tx, c, previous)\n", "\t\treturn nil\n")' $app -run '^TestATakeOverMakesTheRuleActAsWhoeverTookItOver$'
+mutate "a test run reads pages as the rule's account" internal/automation/run.go \
+  's.replace("\tif !held {\n\t\tr.caller.UserID = c.UserID", "\tif !held \x26\x26 false {\n\t\tr.caller.UserID = c.UserID")' $app -run '^TestATestRunBySomeoneElse'
+mutate "a lookup reads pages as the rule's account" internal/automation/run.go \
+  's.replace("LIMIT $6`, r.caller.UserID, r.rule.SpaceID,", "LIMIT $6`, r.rule.AccountID, r.rule.SpaceID,")' $app -run '^TestATestRunBySomeoneElseReadsPagesAsThem$'
+mutate "a test step asks what the rule's account may do" internal/automation/actions.go \
+  's.replace("s.Perms.CheckPage(ctx, s.Pool, r.caller.UserID, *page, action, uuid.Nil)", "s.Perms.CheckPage(ctx, s.Pool, r.rule.AccountID, *page, action, uuid.Nil)")' $app -run '^TestATestRunBySomeoneElseSaysWhatTheyMayNotDo$'
+mutate "conditions without a page hold" internal/automation/run.go \
+  's.replace("return d.Conditions != nil \x26\x26 pageID == nil", "return false")' $app -run '^TestARunWithoutAPageDoesNothingWhenTheRuleHasConditions$'
+mutate "conditions under a trigger without a page are no problem" internal/automation/definition.go \
+  's.replace("\t\tif !d.Trigger.bringsPage() {\n", "\t\tif false {\n")' ./internal/automation/ -run '^TestConditionsNeedATriggerThatBringsAPage$'
 # Spec 070: migrations, checkpoint signing and restore orders in the backup service.
 mutate "a short backup key is taken" internal/keys/worker.go \
   's.replace("if len(secret) < minWorkerSecret {", "if len(secret) < 0 {")' ./internal/keys/ -run TestAWorkerKeyThatIsMissingOrShortIsRefused

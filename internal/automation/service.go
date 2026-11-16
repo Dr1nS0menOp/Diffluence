@@ -3,6 +3,7 @@
 package automation
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"crypto/sha256"
@@ -106,6 +107,15 @@ type Input struct {
 	Enabled    bool       `json:"enabled"`
 	Definition Definition `json:"definition"`
 	AccountID  *uuid.UUID `json:"account_id"`
+	// TakeOver makes the rule act as whoever saves it, when someone else holds it
+	// (spec 092 D3). The holder never needs it.
+	TakeOver bool `json:"take_over"`
+}
+
+// errHeld answers someone who may manage a rule but does not hold it, and tries to
+// change more than switching it off (spec 092 D1).
+func errHeld() error {
+	return apperr.Conflict("rule_held", "This rule acts as someone else, so only they can change it. You can switch it off, or take it over.")
 }
 
 const ruleColumns = `r.id, r.space_id, r.name, r.enabled, r.definition, r.owner_id, COALESCE(o.display_name, ''), r.account_id,
@@ -251,18 +261,47 @@ func (s *Service) account(ctx context.Context, c identity.Caller, in Input) (uui
 	if in.AccountID == nil || *in.AccountID == c.UserID {
 		return c.UserID, nil
 	}
-	// Choosing another account lends its rights to this rule, so only a service
-	// account, and only by someone who runs them.
-	isAdmin, err := s.Identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
+	allowed, err := s.mayLend(ctx, c, *in.AccountID)
 	if err != nil {
 		return uuid.Nil, err
 	}
-	var kind string
-	err = s.Pool.QueryRow(ctx, "SELECT type FROM users WHERE id = $1", *in.AccountID).Scan(&kind)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && (kind != "service" || !isAdmin)) {
+	if !allowed {
 		return uuid.Nil, apperr.Invalid("A rule acts as you, or as a service account an administrator chose.")
 	}
-	return *in.AccountID, err
+	return *in.AccountID, nil
+}
+
+// mayLend says whether the caller may let a rule act as another account. That lends
+// the account's rights to the rule, so only a service account, and only by someone who
+// runs them.
+func (s *Service) mayLend(ctx context.Context, c identity.Caller, account uuid.UUID) (bool, error) {
+	isAdmin, err := s.Identity.HasGlobalPermission(ctx, c.UserID, identity.PermAdministrator)
+	if err != nil || !isAdmin {
+		return false, err
+	}
+	var kind string
+	err = s.Pool.QueryRow(ctx, "SELECT type FROM users WHERE id = $1", account).Scan(&kind)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return kind == identity.TypeService, nil
+}
+
+// holds says whether the caller holds a rule: the person it acts as, or the
+// administrator who lent it a service account. The steps of a rule use the rights of
+// its account, so only its holder chooses them (spec 092). Both columns are compared,
+// so an owner never holds a rule that acts as another person.
+func (s *Service) holds(ctx context.Context, c identity.Caller, r Rule) (bool, error) {
+	if c.UserID == r.AccountID {
+		return true, nil
+	}
+	if c.UserID != r.OwnerID {
+		return false, nil
+	}
+	return s.mayLend(ctx, c, r.AccountID)
 }
 
 func cleanName(name string) (string, error) {
@@ -310,11 +349,15 @@ func (s *Service) mayEnable(ctx context.Context, r Rule) error {
 }
 
 func (s *Service) recordChange(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, r Rule) error {
+	return s.recordWith(ctx, tx, c, action, r, map[string]any{"name": r.Name, "enabled": r.Enabled})
+}
+
+func (s *Service) recordWith(ctx context.Context, tx pgx.Tx, c identity.Caller, action string, r Rule, details map[string]any) error {
 	space := ""
 	if r.SpaceID != nil {
 		space = r.SpaceID.String()
 	}
-	if _, err := audit.Record(ctx, tx, c.Event(action, "rule", r.ID.String(), space, map[string]any{"name": r.Name, "enabled": r.Enabled})); err != nil {
+	if _, err := audit.Record(ctx, tx, c.Event(action, "rule", r.ID.String(), space, details)); err != nil {
 		return err
 	}
 	_, err := outbox.Enqueue(ctx, tx, action, map[string]any{"rule_id": r.ID, "space_id": r.SpaceID})
@@ -369,26 +412,51 @@ func (s *Service) Create(ctx context.Context, c identity.Caller, spaceID *uuid.U
 	return s.Get(ctx, c, r.ID)
 }
 
-// Update changes a rule. Saving a rule ends a pause: the person looked at it.
+// Update changes a rule. Saving a rule ends a pause: the person looked at it. Only its
+// holder changes it; someone else may switch it off, or take it over (spec 092).
 func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, in Input) (Rule, error) {
 	r, err := s.Get(ctx, c, id)
 	if err != nil {
 		return r, err
 	}
-	if r.Name, err = cleanName(in.Name); err != nil {
-		return r, err
-	}
-	account, err := s.account(ctx, c, in)
+	name, err := cleanName(in.Name)
 	if err != nil {
 		return r, err
-	}
-	if in.AccountID == nil {
-		account = r.AccountID
 	}
 	if err := s.checkSpaces(ctx, r.SpaceID, &in.Definition); err != nil {
 		return r, err
 	}
-	r.Enabled, r.Definition, r.AccountID = in.Enabled, in.Definition, account
+	held, err := s.holds(ctx, c, r)
+	if err != nil {
+		return r, err
+	}
+	switch {
+	case held:
+		return s.change(ctx, c, r, name, in)
+	case in.TakeOver:
+		return s.takeOver(ctx, c, r, name, in)
+	}
+	return s.switchOff(ctx, c, r, name, in)
+}
+
+// errMoved answers a save that lost a race with a take-over: the rule changed hands
+// after it was read.
+func errMoved() error {
+	return apperr.Conflict("rule_changed", "Someone else changed this rule. Open it again.")
+}
+
+// change saves a rule for its holder. The row must still have the owner and account
+// that were read, so a take-over in between is never undone.
+func (s *Service) change(ctx context.Context, c identity.Caller, r Rule, name string, in Input) (Rule, error) {
+	account := r.AccountID
+	if in.AccountID != nil {
+		var err error
+		if account, err = s.account(ctx, c, in); err != nil {
+			return r, err
+		}
+	}
+	read := r
+	r.Name, r.Enabled, r.Definition, r.AccountID = name, in.Enabled, in.Definition, account
 	if r.Enabled {
 		if err := s.mayEnable(ctx, r); err != nil {
 			return r, err
@@ -399,17 +467,116 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, id uuid.UUID, i
 		return r, err
 	}
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		if _, err := tx.Exec(ctx, `UPDATE automation_rules SET name = $2, enabled = $3, definition = $4, trigger = $5, account_id = $6,
-			next_run_at = $7, paused_at = NULL, updated_at = now() WHERE id = $1`, id, r.Name, r.Enabled, raw, in.Definition.Trigger.Kind,
-			r.AccountID, s.scheduleFrom(in.Definition)); err != nil {
+		tag, err := tx.Exec(ctx, `UPDATE automation_rules SET name = $2, enabled = $3, definition = $4, trigger = $5, account_id = $6,
+			next_run_at = $7, paused_at = NULL, updated_at = now() WHERE id = $1 AND owner_id = $8 AND account_id = $9`, r.ID, r.Name, r.Enabled, raw,
+			in.Definition.Trigger.Kind, r.AccountID, s.scheduleFrom(in.Definition), read.OwnerID, read.AccountID)
+		if err != nil {
 			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return errMoved()
 		}
 		return s.recordChange(ctx, tx, c, "rule.changed", r)
 	})
 	if err != nil {
 		return r, err
 	}
-	return s.Get(ctx, c, id)
+	return s.Get(ctx, c, r.ID)
+}
+
+// switchOff lets someone who may manage a rule, but does not hold it, switch it off
+// at once (PLT-083). Anything else would choose what the holder's rights are used for.
+func (s *Service) switchOff(ctx context.Context, c identity.Caller, r Rule, name string, in Input) (Rule, error) {
+	same, err := sameDefinition(r.Definition, in.Definition)
+	if err != nil {
+		return r, err
+	}
+	otherAccount := in.AccountID != nil && *in.AccountID != r.AccountID
+	if in.Enabled || !same || name != r.Name || otherAccount {
+		return r, errHeld()
+	}
+	if !r.Enabled {
+		return r, nil
+	}
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, "UPDATE automation_rules SET enabled = false, updated_at = now() WHERE id = $1", r.ID); err != nil {
+			return err
+		}
+		r.Enabled = false
+		return s.recordChange(ctx, tx, c, "rule.changed", r)
+	})
+	if err != nil {
+		return r, err
+	}
+	return s.Get(ctx, c, r.ID)
+}
+
+// sameDefinition compares two definitions as they are stored.
+func sameDefinition(a, b Definition) (bool, error) {
+	rawA, err := json.Marshal(a)
+	if err != nil {
+		return false, err
+	}
+	rawB, err := json.Marshal(b)
+	if err != nil {
+		return false, err
+	}
+	return bytes.Equal(rawA, rawB), nil
+}
+
+// takeOver makes a rule act as the caller, who may manage it but did not hold it
+// (spec 092 D3). It starts off, so nothing runs before its new holder switches it on,
+// and its incoming address ends, because the previous holder knows it.
+func (s *Service) takeOver(ctx context.Context, c identity.Caller, r Rule, name string, in Input) (Rule, error) {
+	account, err := s.account(ctx, c, in)
+	if err != nil {
+		return r, err
+	}
+	raw, err := json.Marshal(in.Definition)
+	if err != nil {
+		return r, err
+	}
+	previous := r
+	r.Name, r.Enabled, r.Definition, r.OwnerID, r.AccountID = name, false, in.Definition, c.UserID, account
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `UPDATE automation_rules SET name = $2, enabled = false, definition = $3, trigger = $4, owner_id = $5,
+			account_id = $6, next_run_at = $7, paused_at = NULL, updated_at = now() WHERE id = $1 AND owner_id = $8 AND account_id = $9`,
+			r.ID, r.Name, raw, in.Definition.Trigger.Kind, r.OwnerID, r.AccountID, s.scheduleFrom(in.Definition), previous.OwnerID, previous.AccountID)
+		if err != nil {
+			return err
+		}
+		if tag.RowsAffected() == 0 {
+			return errMoved()
+		}
+		if _, err := tx.Exec(ctx, "DELETE FROM automation_hooks WHERE rule_id = $1", r.ID); err != nil {
+			return err
+		}
+		if err := s.recordWith(ctx, tx, c, "rule.taken_over", r, map[string]any{"name": r.Name,
+			"from_owner": previous.OwnerID.String(), "from_account": previous.AccountID.String()}); err != nil {
+			return err
+		}
+		return s.tellPreviousHolders(ctx, tx, c, previous)
+	})
+	if err != nil {
+		return r, err
+	}
+	return s.Get(ctx, c, r.ID)
+}
+
+// tellPreviousHolders tells the owner and the account a rule had, other than whoever
+// took it over, that it is no longer theirs.
+func (s *Service) tellPreviousHolders(ctx context.Context, tx pgx.Tx, c identity.Caller, previous Rule) error {
+	for _, person := range slices.Compact([]uuid.UUID{previous.OwnerID, previous.AccountID}) {
+		if person == c.UserID {
+			continue
+		}
+		told := previous
+		told.OwnerID = person
+		if err := s.tellOwner(ctx, tx, told, "taken_over", nil); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Delete removes a rule with its log.

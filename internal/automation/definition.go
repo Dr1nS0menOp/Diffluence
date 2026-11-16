@@ -310,6 +310,11 @@ func (d Definition) Problems() []Problem {
 		if p := d.Conditions.problem(0, &count); p != "" {
 			out = append(out, Problem{Step: stepConditions, Message: p})
 		}
+		// Conditions are judged once, on the page the run starts with, so a Find pages
+		// step does not help them (spec 092 D5).
+		if !d.Trigger.bringsPage() {
+			out = append(out, Problem{Step: stepConditions, Message: "Conditions look at a page, and this trigger brings none."})
+		}
 	}
 	if len(d.Actions) == 0 {
 		out = append(out, Problem{Step: 0, Message: "A rule needs at least one action."})

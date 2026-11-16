@@ -354,7 +354,7 @@ func TestAGroupThatIsGoneStopsARule(t *testing.T) {
 
 func TestATestRunChangesNothingAndSaysWhatTheAccountMayNotDo(t *testing.T) {
 	e := newEnv(t)
-	owner, reader, space, page := ruleTeam(t, e)
+	owner, _, space, page := ruleTeam(t, e)
 	id := owner.rule(space, "Tag", onComment(map[string]any{"type": "add_label", "label": "x"}, map[string]any{"type": "add_comment", "text": "hi"}))
 	got := owner.ok("POST", "/api/v1/rules/"+id+"/test", map[string]any{"page_id": page})
 	if got["outcome"] != "would_run" || len(got["steps"].([]any)) != 2 || len(got["warnings"].([]any)) != 1 {
@@ -363,7 +363,13 @@ func TestATestRunChangesNothingAndSaysWhatTheAccountMayNotDo(t *testing.T) {
 	if len(labelsOf(owner, page)) != 0 || e.count("SELECT count(*) FROM comments") != 0 {
 		t.Fatal("a test run changed something")
 	}
-	e.sql("UPDATE automation_rules SET account_id = $2 WHERE id = $1", id, reader.id)
+	// The rule acts as a service account that may only read: its holder tests it as that account.
+	robot, err := e.app.Identity().CreateServiceAccount(context.Background(), identity.SystemCaller("test"), "Robot")
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner.grant(space, "user", robot.ID.String(), permissions.TemplateViewer)
+	e.sql("UPDATE automation_rules SET account_id = $2 WHERE id = $1", id, robot.ID)
 	got = owner.ok("POST", "/api/v1/rules/"+id+"/test", map[string]any{"page_id": page})
 	if note := got["steps"].([]any)[0].(map[string]any)["note"]; note != "account_may_not" {
 		t.Fatalf("got %v", got)

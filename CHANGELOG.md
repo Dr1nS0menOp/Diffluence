@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: who a rule runs as, and conditions that need a page (spec 092, wave RV12)
+- A rule runs as the person who last took it over. Only its holder, the person it acts as or the administrator who chose its service account, changes its name, trigger, conditions, actions, spaces or account, or switches it on; anyone else who manages automation there gets `409 rule_held`. They can still switch it off and delete it
+- Someone else who manages a rule takes it over with `take_over: true` on `PUT /api/v1/rules/{id}`. The rule then acts as them, starts switched off, its incoming webhook address ends, the previous holder gets a notification, and the audit log has `rule.taken_over` with who took it over and from whom. Rules of the whole instance follow the same rule among administrators
+- A test run reads pages as the person who runs the test, unless that person holds the rule: conditions, Find pages and what each step would be allowed to do follow their rights
+- Conditions look at a page. A rule with conditions under a trigger that brings no page (a schedule, an incoming webhook, a group or space trigger) shows a problem on its conditions and cannot be switched on. A run without a page whose rule has conditions does nothing, and its log says `conditions_need_page`
+- Upgrade impact: no migration. Conditions that need a page now hold only when the run has a page: a rule of that shape that is on stops acting, and its run log says why; remove its conditions or choose a trigger that brings a page. Someone who changed rules of others must take them over first. A node of the previous release still accepts such changes until it is upgraded; it keeps the owner and account a take-over set, unless a change names another account, and it does not run a rule that is off
 ### Changed: administration changes need a signed-in session (spec 085, wave RV10)
 - Every route under `/api/v1/admin/` that changes something now needs a signed-in session, decided once in the router instead of route by route, so a route added later follows the rule by itself. A personal access token with the Administration scope still reads Administration, and gets `403 session_only` on a change, as on every other session-only route. The scope is now labelled "Administration, read only" on Your account, Tokens
 - `docs/api/routes.txt` and `openapi.json` show these routes as `session-only`

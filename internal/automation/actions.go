@@ -300,7 +300,7 @@ func (s *Service) preview(ctx context.Context, r *run, a Action, page *uuid.UUID
 	if action == "" {
 		return "would_" + a.Type, nil
 	}
-	d, err := s.Perms.CheckPage(ctx, s.Pool, r.rule.AccountID, *page, action, uuid.Nil)
+	d, err := s.Perms.CheckPage(ctx, s.Pool, r.caller.UserID, *page, action, uuid.Nil)
 	if err != nil {
 		return "", err
 	}

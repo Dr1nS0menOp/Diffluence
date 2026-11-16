@@ -39,6 +39,16 @@ const (
 	stepWould   = "would"
 )
 
+// reportNoPage says that a run had conditions and no page to judge them on, so it did
+// nothing (spec 092 D5).
+const reportNoPage = "conditions_need_page"
+
+// cannotJudge says whether the conditions of a rule cannot be judged for a run: they
+// look at a page and the run has none. A condition that cannot be judged does not hold.
+func cannotJudge(d Definition, pageID *uuid.UUID) bool {
+	return d.Conditions != nil && pageID == nil
+}
+
 // run is one execution of a rule.
 type run struct {
 	id      uuid.UUID
@@ -192,6 +202,10 @@ func (s *Service) tellOwner(ctx context.Context, tx pgx.Tx, r Rule, what string,
 func (s *Service) perform(ctx context.Context, r *run) (string, error) {
 	if !r.rule.Enabled {
 		return "rule_off", nil
+	}
+	// Before the problems, which hold the same, so the log says the precise reason.
+	if cannotJudge(r.rule.Definition, r.context.PageID) {
+		return reportNoPage, nil
 	}
 	checked, err := s.withProblems(ctx, r.rule)
 	if err != nil {
@@ -414,7 +428,7 @@ func spacesOf(d Definition) []uuid.UUID {
 	return d.Spaces
 }
 
-// find runs a lookup as the account: pages it cannot see do not exist for it, and a
+// find runs a lookup as the caller of the run: pages it cannot see do not exist for it, and a
 // rule of the instance looks only in its chosen spaces.
 func (s *Service) find(ctx context.Context, r *run, a Action) error {
 	var before *time.Time
@@ -428,7 +442,7 @@ func (s *Service) find(ctx context.Context, r *run, a Action) error {
 			AND ($4 = '' OR p.title ILIKE '%' || $4 || '%')
 			AND ($5::timestamptz IS NULL OR p.updated_at < $5)
 			AND (cardinality($7::uuid[]) = 0 OR p.space_id = ANY($7))
-		ORDER BY p.updated_at, p.id LIMIT $6`, r.rule.AccountID, r.rule.SpaceID, a.Label, a.Title, before, maxLookupPages, spacesOf(r.rule.Definition))
+		ORDER BY p.updated_at, p.id LIMIT $6`, r.caller.UserID, r.rule.SpaceID, a.Label, a.Title, before, maxLookupPages, spacesOf(r.rule.Definition))
 	if err != nil {
 		return err
 	}
@@ -448,19 +462,32 @@ type TestResult struct {
 	Warnings []string `json:"warnings"`
 }
 
-// Test says what a rule would do for a page, and changes nothing.
+// Test says what a rule would do for a page, and changes nothing. It reads pages as the
+// caller, unless the caller holds the rule: a test is a question of whoever asks it, and
+// must not answer with the rights of someone else (spec 092 D4).
 func (s *Service) Test(ctx context.Context, c identity.Caller, id uuid.UUID, pageID *uuid.UUID) (TestResult, error) {
 	rule, err := s.Get(ctx, c, id)
 	out := TestResult{Steps: []Step{}, Warnings: []string{}}
 	if err != nil {
 		return out, err
 	}
+	if cannotJudge(rule.Definition, pageID) {
+		out.Outcome = reportNoPage
+		return out, nil
+	}
 	if len(rule.Problems) > 0 {
 		out.Outcome = "rule_has_problems"
 		return out, nil
 	}
+	held, err := s.holds(ctx, c, rule)
+	if err != nil {
+		return out, err
+	}
 	r := &run{rule: rule, dry: true, context: runContext{PageID: pageID, Chain: nil, Trigger: rule.Definition.Trigger.Kind}}
 	r.caller = r.callerFor()
+	if !held {
+		r.caller.UserID = c.UserID
+	}
 	if pageID != nil {
 		f, reason, err := s.factsFor(ctx, r, *pageID)
 		if err != nil {
