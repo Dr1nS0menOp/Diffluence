@@ -125,7 +125,8 @@ const pageFilters = `
 	AND (@below::uuid IS NULL OR EXISTS (SELECT 1 FROM page_tree t WHERE t.ancestor_id = @below AND t.descendant_id = p.id))
 	AND (@spacekeys::text[] IS NULL OR w.space_id IN (SELECT ks.id FROM spaces ks WHERE lower(ks.key) = ANY(@spacekeys)))
 	AND (@authors::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest(@authors::text[]) a
-	     JOIN users u ON position(lower(a) IN lower(u.display_name)) > 0 WHERE u.id = p.updated_by OR u.id = p.created_by))`
+	     JOIN users u ON position(lower(a) IN lower(u.display_name)) > 0 WHERE u.id = p.updated_by OR u.id = p.created_by))
+	AND (@templates::uuid[] IS NULL OR p.id IN (SELECT o.page_id FROM template_origin_pages(@templates::uuid[]) o))`
 
 const wildcardFilter = `
 	AND NOT EXISTS (SELECT 1 FROM unnest(@patterns::text[]) pt WHERE NOT (d.title || ' ' || d.body) ~* pt)`
@@ -351,13 +352,13 @@ func wordArgs(userID uuid.UUID, q Query, parsed Parsed) pgx.NamedArgs {
 		"contributors": nilIfEmpty(q.Contributors), "stage": q.Stage, "below": optID(q.Below),
 		"spacekeys": nilIfEmpty(parsed.Spaces), "authors": nilIfEmpty(allowedAuthors(q, parsed)),
 		"patterns": nilIfEmpty(parsed.Patterns), "mentionlimit": mentionLimit, "snippets": !q.Quick,
-		"like": LikeOf(q.Text), "plain": parsed.Plain && NearLength(q.Text),
+		"like": LikeOf(q.Text), "plain": parsed.Plain && NearLength(q.Text), "templates": nilIfEmpty(q.Templates),
 	}
 }
 
 func hasPageFilter(q Query, parsed Parsed) bool {
 	return q.AuthorID != uuid.Nil || len(allLabels(q, parsed)) > 0 || len(q.Contributors) > 0 || q.Stage != "" ||
-		q.Below != uuid.Nil || len(parsed.Spaces) > 0 || len(allowedAuthors(q, parsed)) > 0
+		q.Below != uuid.Nil || len(parsed.Spaces) > 0 || len(allowedAuthors(q, parsed)) > 0 || len(q.Templates) > 0
 }
 
 func listOf(ctx context.Context, tx pgx.Tx, sql string, args pgx.NamedArgs) ([]uuid.UUID, error) {

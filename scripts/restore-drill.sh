@@ -62,6 +62,12 @@ api -d "{\"title\":\"Important\",\"base_version\":0,\"document\":$doc}" "$url/ap
 echo 'attached file contents' >"$work/note.txt"
 curl -sf -b "$jar" -H 'Content-Type: application/octet-stream' --data-binary "@$work/note.txt" "$url/api/v1/pages/$page/attachments?filename=note.txt" >"$work/att.json"
 attachment=$(first_id <"$work/att.json")
+# Guided templates (spec 074, TPL-854): one in use, and one withdrawn before the backup.
+api -X PUT -d '{"on":["guided_templates"]}' "$url/api/v1/admin/experimental" >/dev/null
+template=$(api -d "{\"name\":\"Onboarding\",\"document\":$doc}" "$url/api/v1/spaces/$space/templates" | first_id)
+api -X PUT -d '{"publish":true}' "$url/api/v1/templates/$template/publishing" >/dev/null
+retired=$(api -d "{\"name\":\"Retired\",\"document\":$doc}" "$url/api/v1/spaces/$space/templates" | first_id)
+api -d '{"reason":"Out of date"}' "$url/api/v1/templates/$retired/withdraw" >/dev/null
 
 echo "1p. a pair of draft and published spaces, a release, and a run going at the backup (spec 073, PUB-1032)"
 api -X PUT -d '{"on":["publishing"]}' "$url/api/v1/admin/experimental" >/dev/null
@@ -144,6 +150,12 @@ if ls "$service_backup" | grep -qv -e '\.gpg$' -e '^SHA256SUMS$'; then
 fi
 service_backup=$(realpath "$service_backup")
 service_key=$(realpath backup-key/backup.key)
+# A background set asked for after the backup: the restore must not bring it (TPL-854).
+docker compose exec -T postgres psql -U diffluence_owner -d diffluence -qc \
+  "INSERT INTO jobs (id, kind, status, payload, created_by)
+   SELECT gen_random_uuid(), 'template_set', 'queued',
+     jsonb_build_object('template_id', '$template', 'input', jsonb_build_object('space_id', '$space', 'title', 'After the backup')), id
+   FROM users WHERE email = 'admin@example.com'" >/dev/null
 docker compose down -v >/dev/null 2>&1
 
 echo "3. restore the service's backup on a clean installation"
@@ -182,6 +194,20 @@ api "$url/api/v1/spaces/$space/releases/$run" | grep -q '"status":"done"' || { e
 api "$url/api/v1/pages/$waiting/release" | grep -q '"status":"released"' || { echo "the resumed run did not release its page"; exit 1; }
 after=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc 'SELECT count(*) FROM audit_events')
 [ "$after" -ge "$before" ]
+# Templates, versions and approvals are as they were at the backup; the set asked for after
+# it is gone with its job, and the withdrawn template still makes nothing (spec 074, TPL-854).
+sql() { docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tAc "$1"; }
+if [ "$(sql "SELECT state || ' ' || approved_version FROM templates WHERE id = '$template'")" != 'approved 2' ] ||
+  [ "$(sql "SELECT count(*) FROM template_sets") $(sql "SELECT count(*) FROM jobs WHERE kind = 'template_set'")" != '0 0' ]; then
+  echo "the templates did not come back as they were at the backup"
+  exit 1
+fi
+refused=$(curl -s -o /dev/null -w '%{http_code}' -b "$jar" -H 'Content-Type: application/json' \
+  -d "{\"space_id\":\"$space\",\"title\":\"From a withdrawn template\"}" "$url/api/v1/templates/$retired/use")
+if [ "$refused" != 409 ]; then
+  echo "a template withdrawn before the backup made pages after the restore: $refused"
+  exit 1
+fi
 # The dump does not carry the defaults of the database, so the node that started on the
 # restored one set them again: a plain session, which sends nothing at connect, has both (spec 065).
 for want in 'plan_cache_mode force_custom_plan' 'jit off'; do

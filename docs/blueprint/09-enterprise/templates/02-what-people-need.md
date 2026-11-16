@@ -33,7 +33,7 @@ These are typical uses of a wiki in a mid-sized organisation. They are written f
 - **TPL-022** · new · Everything works by **keyboard and screen reader**, on a phone, and right to left, like the rest of Diffluence. *Why:* WCAG 2.2 AA is the goal of the design standard. *Met in:* chapter 12.
 - **TPL-023** · new · Creating a large set must **not slow down** the space for others. *Why:* the load rule of ARC-238, and the headroom the product keeps. *Met in:* chapter 11.
 - **TPL-024** · new · Templates that exist today keep **working unchanged**. *Why:* the upgrade promise of blueprint 07. *Met in:* chapter 13.
-- **TPL-025** · new · A person can tell **where a page came from**: which template, which version, made by whom and when, and which pages were made with it. *Why:* teams that look after templates need to know what an older version produced. *Met in:* TPL-610 to TPL-612.
+- **TPL-025** · built · A person can tell **where a page came from**: which template, which version, made by whom and when, and which pages were made with it. *Why:* teams that look after templates need to know what an older version produced. *Met in:* TPL-610 to TPL-612.
 
 ## 2.3 What people do not need
 

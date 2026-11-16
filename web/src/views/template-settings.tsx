@@ -27,6 +27,7 @@ import { fieldSpecOf, type FieldSpec } from '../template-fields';
 import { FieldDialog } from './template-field-dialog';
 import { TemplatePages } from './template-pages';
 import { TemplateAccessSection, TemplateStateMark } from './template-access';
+import { ChangeList, CompareWith, VersionSetsCell } from './template-history';
 import {
   ConditionCell,
   formOrder,
@@ -501,7 +502,10 @@ function VersionChanges({
   return (
     <section aria-label={heading} className="template-changes">
       <h2>{heading}</h2>
-      {q.data.settings && <p className="note">{t('templates.settingsChanged')}</p>}
+      {q.data.settings && q.data.list.length === 0 && (
+        <p className="note">{t('templates.settingsChanged')}</p>
+      )}
+      <ChangeList templateId={templateId} list={q.data.list} />
       {changed.length === 0 && !q.data.settings && <p className="muted">{t('templates.nothingChanged')}</p>}
       {changed.map((e) => (
         <article key={e.key}>
@@ -594,6 +598,8 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
   const client = useQueryClient();
   const guidedOn = useCapabilities().guided_templates;
   const [open, setOpen] = useState<number | null>(null);
+  // The version the shown one is compared with, 0 for the one before it (TPL-602).
+  const [compare, setCompare] = useState(0);
   const [dialog, setDialog] = useState<'send_back' | 'withdraw' | null>(null);
   const key = ['template-versions', template.id];
   const q = useQuery({
@@ -631,8 +637,11 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
   const waiting = newest?.state === 'waiting' ? newest : undefined;
   // A waiting version shows what it changes against the version in use (TPL-1030).
   const shown = open ?? (waiting && guidedOn ? waiting.number : null);
-  const against = shown !== null && shown === waiting?.number ? history.approved : 0;
+  const decidingOn = shown !== null && shown === waiting?.number;
+  const against = decidingOn ? history.approved : compare;
   const busy = propose.isPending || approve.isPending;
+  // Only those who manage the template are told how many sets each version made (TPL-613).
+  const countsSets = history.versions.some((v) => v.sets !== undefined);
   return (
     <>
       <p className="muted">{t('templates.versionsHelp')}</p>
@@ -640,6 +649,7 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
       {guidedOn && waiting && history.can.decide && (
         <div className="note" role="group" aria-label={t('templates.decisionOf', { number: waiting.number })}>
           <p>{t('templates.waitsForYou', { number: waiting.number, name: waiting.author_name })}</p>
+          <p className="muted">{t('templates.approverReminder')}</p>
           <div className="dialog-actions">
             <button type="button" onClick={() => setDialog('send_back')}>
               {t('templates.sendBack')}
@@ -683,6 +693,7 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
               <th>{t('templates.author')}</th>
               <th>{t('templates.when')}</th>
               <th>{t('templates.pageCount')}</th>
+              {countsSets && <th>{t('templates.history.setsColumn')}</th>}
               <th>{t('common.actions')}</th>
             </tr>
           </thead>
@@ -701,12 +712,20 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
                   <time dateTime={v.created_at}>{dates.moment(v.created_at)}</time>
                 </td>
                 <td>{v.pages}</td>
+                {countsSets && (
+                  <td>
+                    <VersionSetsCell templateId={template.id} number={v.number} sets={v.sets ?? 0} />
+                  </td>
+                )}
                 <td>
                   <button
                     type="button"
                     className="ghost"
                     aria-pressed={shown === v.number}
-                    onClick={() => setOpen(shown === v.number ? -1 : v.number)}
+                    onClick={() => {
+                      setCompare(0);
+                      setOpen(shown === v.number ? -1 : v.number);
+                    }}
                   >
                     {t('templates.showChanges', { number: v.number })}
                   </button>
@@ -716,6 +735,9 @@ function VersionsSection({ template }: { template: TemplateSummary }) {
           </tbody>
         </table>
       </TableBox>
+      {shown !== null && shown > 0 && !decidingOn && (
+        <CompareWith number={shown} against={compare} onChange={setCompare} />
+      )}
       {shown !== null && shown > 0 && (
         <VersionChanges templateId={template.id} number={shown} against={against} />
       )}

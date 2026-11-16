@@ -3,7 +3,14 @@
 import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Json, type Space, type TemplateSummary, type Workflow } from '../api';
+import {
+  api,
+  type Json,
+  type Space,
+  type TemplateImportNotes,
+  type TemplateSummary,
+  type Workflow,
+} from '../api';
 import { Link, navigate } from '../router';
 import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack } from '../components/icons';
@@ -14,6 +21,7 @@ import { TableBox } from '../components/table-box';
 import { useCapabilities } from '../capabilities';
 import { TemplatePages, useTemplateValues } from './template-pages';
 import { useConditionScope } from './template-rules';
+import { ImportNote } from './template-history';
 import {
   FourEyesSetting,
   LIST_STATES,
@@ -48,6 +56,8 @@ function TemplateRows({ list, onChanged }: { list: TemplateSummary[]; onChanged:
   // The state of each template, and a filter of states, come with approval (TPL-1001).
   const [state, setState] = useState('');
   const shown = state ? list.filter((x) => x.state === state) : list;
+  // An empty list says what will appear, not an empty table (design standard, States).
+  if (list.length === 0) return <p className="muted">{t('templates.noneYet')}</p>;
   return (
     <>
       <ErrorNote error={update.error ?? remove.error} />
@@ -155,13 +165,18 @@ export function TemplateManager({
     onSuccess: (x) => navigate(`/templates/${x.id}/edit`),
   });
   const upload = useMutation({
-    mutationFn: async (file: File) => api.post(`${base}/import`, JSON.parse(await file.text())),
+    mutationFn: async (file: File) =>
+      api.post<TemplateSummary & { import_notes?: TemplateImportNotes }>(
+        `${base}/import`,
+        JSON.parse(await file.text()),
+      ),
     onSettled: refresh,
   });
   return (
     <>
       {q.isPending && <Loading />}
       <ErrorNote error={q.error ?? create.error ?? upload.error} />
+      {upload.data?.import_notes && <ImportNote name={upload.data.name} notes={upload.data.import_notes} />}
       {guidedOn && q.data && <WaitingForApproval list={q.data.templates} />}
       {q.data && <TemplateRows list={q.data.templates} onChanged={refresh} />}
       <form

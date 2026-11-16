@@ -24,6 +24,9 @@ type Parsed struct {
 	Labels   []string
 	Spaces   []string
 	Authors  []string
+	// Templates are the names typed after template:, which finds pages by the template they
+	// were made from (spec 074, TPL-703). Only a search that knows the filter reads them.
+	Templates []string
 	// AnyTerm holds each typed word as an alternative, to look for names of people
 	// mentioned. Empty for a search with no words.
 	AnyTerm string
@@ -48,9 +51,11 @@ type token struct {
 	kind  tokenKind
 	text  string
 	field string
+	// quoted says the value of a field was typed in quotes.
+	quoted bool
 }
 
-var fieldPattern = regexp.MustCompile(`^(title|label|space|author):(.*)$`)
+var fieldPattern = regexp.MustCompile(`^(title|label|space|author|template):(.*)$`)
 
 func isTermRune(r rune) bool { return unicode.IsLetter(r) || unicode.IsDigit(r) }
 
@@ -118,13 +123,13 @@ func tokenize(input string) []token {
 				out = append(out, wordToken(text))
 				continue
 			}
-			value := m[2]
+			value, quoted := m[2], false
 			if value == "" && i < len(runes) && runes[i] == '"' {
-				if quoted, after, closed := readQuoted(runes, i+1); closed {
-					value, i = quoted, after
+				if text, after, closed := readQuoted(runes, i+1); closed {
+					value, i, quoted = text, after, true
 				}
 			}
-			out = append(out, token{kind: tokenField, field: m[1], text: value})
+			out = append(out, token{kind: tokenField, field: m[1], text: value, quoted: quoted})
 		}
 	}
 	return out
@@ -262,6 +267,8 @@ func (p *parser) field(t token) string {
 		p.out.Spaces = append(p.out.Spaces, strings.ToLower(value))
 	case "author":
 		p.out.Authors = append(p.out.Authors, value)
+	case "template":
+		p.out.Templates = append(p.out.Templates, value)
 	case "title":
 		before := p.weight
 		p.weight = titleWeight
@@ -368,6 +375,35 @@ func plainWords(input, weight string) string {
 	return strings.Join(plainTerms(fields, weight), " & ")
 }
 
+// templateAsWords gives template: back the meaning it had before it was a filter, for a
+// search without guided templates: the words it was typed as, so nothing changes there.
+func templateAsWords(tokens []token) []token {
+	out := make([]token, 0, len(tokens))
+	for _, t := range tokens {
+		switch {
+		case t.kind != tokenField || t.field != "template":
+			out = append(out, t)
+		case t.quoted:
+			out = append(out, wordToken(t.field+":"), token{kind: tokenPhrase, text: t.text})
+		default:
+			out = append(out, wordToken(t.field+":"+t.text))
+		}
+	}
+	return out
+}
+
+// TemplateNames lists the names typed after template:, for the caller to turn into the
+// templates the reader may see before searching (spec 074, TPL-703).
+func TemplateNames(input string) []string {
+	var out []string
+	for _, t := range tokenize(input) {
+		if value := strings.TrimSpace(t.text); t.kind == tokenField && t.field == "template" && value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
 // Prefixes reads typed text as plain words, for what has no search language of its own.
 func Prefixes(input string) string { return plainWords(input, "") }
 
@@ -394,11 +430,19 @@ func parsedPlain(input, weight string) Parsed {
 // Parse reads the search language. It never fails: what cannot be understood falls
 // back to plain words (ORG-032).
 func Parse(input string, titlesOnly bool) Parsed {
+	return parse(input, titlesOnly, false)
+}
+
+// parse is Parse, with template: as a filter when templates says so.
+func parse(input string, titlesOnly, templates bool) Parsed {
 	weight := ""
 	if titlesOnly {
 		weight = titleWeight
 	}
 	tokens := tokenize(input)
+	if !templates {
+		tokens = templateAsWords(tokens)
+	}
 	if isPlainWords(tokens, input) {
 		return parsedPlain(input, weight)
 	}

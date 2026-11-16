@@ -194,6 +194,7 @@ GET /api/v1/pages/{id}/review                                  authenticated
 GET /api/v1/pages/{id}/rules                                   object:page.view
 GET /api/v1/pages/{id}/summary                                 object:page.view
 GET /api/v1/pages/{id}/targets                                 object:page.view
+GET /api/v1/pages/{id}/template-origin                         object:page.view
 GET /api/v1/pages/{id}/used-by                                 object:page.view
 GET /api/v1/pages/{id}/version-authors                         object:page.view
 GET /api/v1/pages/{id}/versions                                object:page.view
@@ -291,6 +292,7 @@ GET /api/v1/templates/{id}/newest                              authenticated
 GET /api/v1/templates/{id}/rights                              authenticated
 GET /api/v1/templates/{id}/versions                            authenticated
 GET /api/v1/templates/{id}/versions/{number}/changes           authenticated
+GET /api/v1/templates/{id}/versions/{number}/sets              authenticated
 GET /api/v1/webhooks/{id}                                      object:space.automation
 GET /api/v1/webhooks/{id}/deliveries                           object:space.automation
 GET /api/v1/workflow-templates                                 authenticated

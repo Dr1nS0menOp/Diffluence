@@ -146,7 +146,11 @@ func (s *Service) Entry(ctx context.Context, c identity.Caller, id uuid.UUID, ke
 // applyInput puts what the editor said into an entry.
 func applyInput(e *Entry, in EntryInput) {
 	e.Name, e.TitlePattern, e.Labels = in.Name, in.TitlePattern, slices.Clone(in.Labels)
+	// Lists an import asks to choose again stay asked for until they change (TPL-852); the
+	// editor cannot clear the mark by sending it back.
+	again := e.Restrictions.ChooseAgain && e.Restrictions.sameSubjects(in.Restrictions)
 	e.Restrictions, e.WorkflowID = in.Restrictions, in.WorkflowID
+	e.Restrictions.ChooseAgain = again
 	if e.Key != RootKey {
 		e.Parent = in.Parent
 	}

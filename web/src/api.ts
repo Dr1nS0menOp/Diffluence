@@ -728,13 +728,27 @@ export interface TemplateVersionRow {
   created_at: string;
   pages: number;
   decisions: TemplateDecision[];
+  /** How many sets the version made, for those who manage the template (TPL-613). */
+  sets?: number;
 }
 
-/** What a version changed, page by page (ORG-060). */
+/** One readable line of what a version changed besides its texts (TPL-602). */
+export interface TemplateSettingChange {
+  code: string;
+  entry?: string;
+  field?: string;
+  step?: string;
+  value?: string;
+  required?: boolean;
+  condition?: Condition;
+}
+
+/** What a version changed, page by page (ORG-060), and the rest as a list (TPL-602). */
 export interface TemplateChanges {
   number: number;
   previous: number;
   settings: boolean;
+  list: TemplateSettingChange[];
   entries: {
     key: string;
     name: string;
@@ -743,10 +757,42 @@ export interface TemplateChanges {
   }[];
 }
 
+/** The sets one version made, as its managers see them (TPL-613). */
+export interface TemplateVersionSets {
+  version: number;
+  count: number;
+  hidden: number;
+  sets: { id: string; created_at: string; pages: number; root: PageRef }[];
+}
+
+/** Where a page came from, for its Details panel (TPL-611, TPL-612). */
+export interface TemplateOrigin {
+  made: boolean;
+  made_at: string;
+  named: boolean;
+  template_id?: string;
+  name?: string;
+  version?: number;
+  deleted: boolean;
+  history: boolean;
+  newer: boolean;
+  set: PageRef[];
+}
+
+/** What an import left out and asks to choose again (TPL-852). */
+export interface TemplateImportNotes {
+  people_left_out: number;
+  groups_to_choose: string[];
+  condition_groups_to_choose: number;
+  suggestions_left_out: string[];
+}
+
 /** Who a page made from an entry of a template is restricted to (spec 074, TPL-130). */
 export interface EntryRestrictions {
   view: { type: 'user' | 'group'; id: string }[];
   edit: { type: 'user' | 'group'; id: string }[];
+  /** An import asks for the lists to be chosen again before approval (TPL-852). */
+  choose_again?: boolean;
 }
 
 /** One page a guided template makes (spec 074, TPL-100). */

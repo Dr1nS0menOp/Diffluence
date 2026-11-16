@@ -16,6 +16,7 @@ import (
 	"github.com/diffluence/diffluence/internal/apperr"
 	"github.com/diffluence/diffluence/internal/attachments"
 	"github.com/diffluence/diffluence/internal/db"
+	"github.com/diffluence/diffluence/internal/features"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
 	"github.com/diffluence/diffluence/internal/permissions"
@@ -1103,6 +1104,10 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
+	if err := s.templateFilter(r, &query); err != nil {
+		s.fail(w, r, err)
+		return
+	}
 	results, err := s.deps.Search.Search(r.Context(), userID, query)
 	if err != nil {
 		s.fail(w, r, err)
@@ -1113,6 +1118,23 @@ func (s *Server) handleSearch(w http.ResponseWriter, r *http.Request) {
 		s.deps.Log.Error("counting a search failed", "error", err, "request_id", RequestIDFrom(r.Context()))
 	}
 	writeJSON(w, http.StatusOK, results)
+}
+
+// templateFilter turns the names typed after template: into the templates the reader may
+// see, while guided templates are on (spec 074, TPL-703). The templates module decides who
+// sees which, so a name the reader may not see finds nothing.
+func (s *Server) templateFilter(r *http.Request, query *search.Query) error {
+	names := search.TemplateNames(query.Text)
+	if len(names) == 0 {
+		return nil
+	}
+	on, err := s.deps.Features.ExperimentalOn(r.Context(), s.deps.Pool, features.ExperimentalGuidedTemplates)
+	if err != nil || !on {
+		return err
+	}
+	query.FromTemplates = true
+	query.Templates, err = s.deps.Templates.Named(r.Context(), s.caller(r), names)
+	return err
 }
 
 // searchQuery reads the filters from the address, so a search can be shared.

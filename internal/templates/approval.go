@@ -181,7 +181,7 @@ func (s *Service) Approve(ctx context.Context, c identity.Caller, id uuid.UUID, 
 		return History{}, err
 	}
 	err = s.decide(ctx, c, id, number, func(tx pgx.Tx, t Template, v Version) (decisionRecord, error) {
-		if _, err := s.checkVersion(ctx, tx, t, v.Manifest); err != nil {
+		if _, err := s.checkVersion(ctx, tx, t, v.Manifest, forUse); err != nil {
 			return decisionRecord{}, err
 		}
 		if err := supersedeApproved(ctx, tx, id); err != nil {

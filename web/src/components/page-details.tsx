@@ -5,7 +5,16 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Attachment, type Me, type PageDetail, type PageFacts, type PageRef } from '../api';
+import {
+  api,
+  type Attachment,
+  type Me,
+  type PageDetail,
+  type PageFacts,
+  type PageRef,
+  type TemplateOrigin,
+} from '../api';
+import { useCapabilities } from '../capabilities';
 import { Link } from '../router';
 import { countWords, readingMinutes } from './editor/outline';
 import { OwnerDialog, ReviewDialog } from '../views/page-actions';
@@ -57,6 +66,56 @@ function Fact({ name, children }: { name: string; children: ReactNode }) {
       <dt>{name}</dt>
       <dd>{children}</dd>
     </div>
+  );
+}
+
+/**
+ * Where the page came from (spec 074, TPL-611, TPL-1031): one line with the template and its
+ * version, or only that it was made from a template for a reader who may not see which, and
+ * the other pages of its set the reader may see.
+ */
+function MadeFrom({ pageId }: { pageId: string }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const guidedOn = useCapabilities().guided_templates;
+  const q = useQuery({
+    queryKey: ['template-origin', pageId],
+    queryFn: () => api.get<TemplateOrigin>(`/pages/${pageId}/template-origin`),
+    enabled: guidedOn,
+  });
+  const origin = q.data;
+  if (!origin?.made) return <ErrorNote error={q.error} />;
+  const named = t('details.madeFromNamed', { name: origin.name, version: origin.version });
+  const unnamed = origin.deleted ? t('details.madeFromDeleted') : t('details.madeFromTemplate');
+  return (
+    <>
+      <Fact name={t('details.madeFrom')}>
+        {origin.named && origin.history ? (
+          <Link href={`/templates/${origin.template_id}/settings?section=versions`}>{named}</Link>
+        ) : origin.named ? (
+          named
+        ) : (
+          unnamed
+        )}
+        , <time dateTime={origin.made_at}>{dates.moment(origin.made_at)}</time>
+        {origin.newer && <p className="muted">{t('details.newerTemplate')}</p>}
+      </Fact>
+      {origin.set.length > 0 && (
+        <div>
+          <dt>{t('details.sameSet')}</dt>
+          <dd>
+            <ul className="plain-list details-links">
+              {origin.set.map((p) => (
+                <li key={p.id}>
+                  <PageMark page={p} />
+                  <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
+                </li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -212,6 +271,7 @@ export function DetailsPanel({ page, onClose }: { page: PageDetail; onClose: () 
             <Fact name={t('details.changed')}>
               {facts.updated_by_name || t('common.unknown')}, {dates.moment(facts.updated_at)}
             </Fact>
+            <MadeFrom pageId={page.id} />
             <Fact name={t('details.length')}>{t('details.words', { count: words })}</Fact>
             {minutes !== null && <Fact name={t('details.readTime')}>{t('page.readTime', { minutes })}</Fact>}
             <Fact name={t('details.address')}>

@@ -266,12 +266,24 @@ The lines that finish today's templates (ORG-045, ORG-051, ORG-060, ORG-061; TPL
 - the four-eyes setting;
 - what approval does and does not check (TPL-844).
 
+**Status (2026-11-15):** built, with migration `0074_template_origin_search` (its final number is given when it lands). Report: [2026-11-15-wave-gt5.md](../reports/2026-11-15-wave-gt5.md). Guide: [operations/templates.md](../operations/templates.md).
+- **History:** the comparison of two versions gains a readable change list for every kind of change (`internal/templates/changes.go`), which `template.version_saved` also keeps; the Versions section compares a version with any earlier one, counts the sets of each version for its managers and lists them (TPL-602, TPL-613).
+- **Origin:** the Details panel says what a page was made from, by name only to who may see the template, with the other pages of its set and "a newer version is in use" for who may edit the page (TPL-611, TPL-612, TPL-1031).
+- **Search:** the gallery searches on the server above 100 templates, also by the names of the pages a template makes, through the gallery's own filter (TPL-701); `template:` finds pages by their origin (TPL-703).
+- **Export and import:** files carry format 2 and nothing about who has a template; an import is a draft of the importer, people of the other installation never travel, and a restriction to choose again blocks approval (TPL-852, TPL-1106).
+- **Automation:** a rule uses the approved version and says why a run made nothing (TPL-505, TPL-604, TPL-1105).
+- **Restore and switching:** a step of the restore drill, a test of a waiting background set whose version was withdrawn, and a test of turning the part off and on (TPL-854, TPL-1107).
+- Also from GT4: the space audit's template events (TPL-712), the starters after the migration (TPL-531), and the pictures with no template and fifty (TPL-1001).
+
+Left for later, each with its reason in the decision table below: the burst of TPL-907, which belongs to the next stress test on the server (TPL-1512); the files of a template in its file (TPL-1501); a dropdown for `template:` in the filters of search (TPL-1507); the action "new page from a template" in the rule editor of the browser, where the test run warns instead (TPL-1510); widening a template of a space to all spaces (TPL-1487); the measurements on the real-data dump (TPL-1422).
+
 ## Migrations
 
 | Wave | Migration | What it does |
 |---|---|---|
 | GT1 | `0060_guided_templates` | `template_versions`, `template_entry_pages`, `template_sets`, `page_template_origin`, pending copies; new columns on `templates`; version 1 of every template, approved |
 | GT4 | `0070_template_rights` | `template_rights`, `template_spaces`, `template_reviews`; `template.propose` for every role with `page.create`; the four-eyes setting |
+| GT5 | `0074_template_origin_search` | the function `template_origin_pages`, through which search finds the pages made from templates (TPL-703) |
 
 Numbers are given when each wave lands. Both migrations are expand only. A contract migration may later drop the fallback for templates saved without a manifest (TPL-1108).
 
@@ -418,6 +430,32 @@ Decided on the product owner's behalf on 2026-11-15, may be overruled.
 | TPL-1495 | Is a withdrawal refused when the template no longer validates (TPL-525)? | No: only approval checks again | Taking a template out of use must never be blocked by what is wrong with it |
 | TPL-1496 | How do bundles carry `template.propose`? | Bundle version 9; a grant of `page.create` in an older bundle brings it, as the migration did | The rule of every earlier split (spec 045, 049, 064, 073) |
 | TPL-1497 | The wider state checks of the migration | Added `NOT VALID`; a later contract migration validates them | No table is read under its lock, and every row passes the narrower check it replaces |
+
+### Decided while building GT5
+
+Decided on the product owner's behalf on 2026-11-15, may be overruled.
+
+| # | Question | Decision | Reason |
+|---|---|---|---|
+| TPL-1498 | How is the readable change list (TPL-602) kept? | As lines of a code and the names the author typed, in the comparison and in `template.version_saved` (at most 50 lines); the browser words them | One list for the screen and the audit, in every language; it never holds an answer or an id |
+| TPL-1499 | How are steps matched between versions? | By their title; a renamed step reads as one removed and one added | Steps have no key, and their title is how people tell them apart |
+| TPL-1500 | What does a template file carry (TPL-852)? | The version in use, or the newest while none is approved: pages, texts, questions, steps, conditions, label rules, publishing at once, and the groups of restrictions by id and name with a count of the people left out. Never the users or editors list, the chosen spaces, the state, the history, the owner, a reviewer, a person, a workflow or the usual place | Who has a template belongs to one installation; a person's id from another installation must never become a grant here (as DC5-14 for workflows) |
+| TPL-1501 | The files of a template in its file | Not in GT5: the file stays one JSON body, as today's export | A file needs its own transport, as the bundles of a space have; nothing is half carried meanwhile |
+| TPL-1502 | What does an import become? | While guided templates are on: a draft of the importer, whoever imports and whatever the four-eyes setting, which follows the approval rule of its scope. While they are off: a plain file imports as before, and one that needs guided templates is refused (`experimental_off`) | An imported template has not been checked here; today's templates behave as today while the part is off |
+| TPL-1503 | People and groups of a restriction in an imported file | People are left out; a list they leave empty holds the importer, so the page stays restricted; a group that is not here stays and matches nobody. Either way the page is marked to choose again, and no version is approved, at once or by a decision, until its lists change (`choose_again`) | A restricted page must never open to everyone (TPL-1417), and the importer decides who is meant here |
+| TPL-1504 | A group that is gone, in a draft | A draft may keep a condition testing it or a restriction naming it; a version that is approved, at once or by a decision, may not. This narrows TPL-1468 to versions in use | An import must be able to wait for its groups to be chosen; a draft makes pages only for its owner, and then refuses a restriction it cannot set |
+| TPL-1505 | How does the gallery search on the server (TPL-701)? | Name, description, category and the names of the pages of the approved version, ignoring capitals, at most 100 characters, as one more condition of the gallery's own query; the browser asks the server above 100 templates | The same filter decides who sees what, so the search cannot show more than the gallery |
+| TPL-1506 | What does `template:` match (TPL-703)? | The name of a template, whole and ignoring capitals, among those the reader may see; while the part is off, `template:` reads as words, as before | A filter by a name the reader may not see tells nothing; a search that worked before still works |
+| TPL-1507 | A dropdown "made from template" in the filters of search | Not in GT5: the syntax only | The filter bar lists known values; a list of every template a reader may see is its own question to the templates module |
+| TPL-1508 | What does the origin in Details show (TPL-611, TPL-612)? | Name, version and date to who may see the template, a link to its history to who looks after it, "a newer version is in use" to who may also edit the page, and the other pages of the set the reader may see; "made from a template" to others | TPL-504: a name can say too much; the history is for those who look after the template |
+| TPL-1509 | Who sees the sets of a version (TPL-613)? | Who manages the template: the count of all, the 100 newest whose first page they may see, the rest as a number | A manager learns what an older version made without seeing a page closed to them |
+| TPL-1510 | How does an automation rule use a template (TPL-505, TPL-604, TPL-1105)? | Its owner's rights, the version approved when it runs; it refuses with `template_not_approved`, `template_asks` naming the question, or `template_not_offered`. The rule's test run warns about the same; the rule editor of the browser does not offer the action yet | The history of a rule keeps a code, never words that may hold a title; the warning stands where a rule is tried |
+| TPL-1511 | What does a full restore do to sets (TPL-854)? | Templates, versions, approvals and origins return to the backup; a set asked for after it is gone with its job; a waiting set checks its version again when it runs | The restore drill proves it; the check of TPL-503 runs in every set's transaction |
+| TPL-1512 | The burst of 20 sets of 10 pages (TPL-907) | Measured once in the development containers as an indication; judged in the next stress test on the server | The containers share their machine with other builders and run nothing beside the burst, so they cannot judge it against the normal mix |
+| TPL-1513 | The reminder of TPL-844 | One sentence beside Approve | Approval checks that a template works here, not its words |
+| TPL-1514 | A list with no template | Says so in a muted sentence, without an empty table | The design standard's state Empty |
+| TPL-1515 | A test of the space in an imported template of all spaces | Kept as it is; spaces of another installation match nothing here, so the pages it shows are not made until a space is chosen again | Nothing is quietly widened: a page that should show in some spaces shows in none |
+| TPL-1516 | An upgrade from GT4 with the part on | No grace refusal: 0074 adds a function the previous release does not call, and a file of format 2 is refused whole by it | As TPL-1461 |
 
 ## What these waves do not cover
 

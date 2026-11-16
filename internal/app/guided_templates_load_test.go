@@ -125,3 +125,52 @@ func TestTheLoadBudgetOfASet(t *testing.T) {
 		t.Errorf("sealing a 100-page set took %v; with the one-second tick that is over the 5 s budget", sealed)
 	}
 }
+
+// TestTheLoadOfFindingTemplatesAndTheirPages measures wave GT5 on generated data: the gallery
+// searched on the server among 150 templates with users lists (TPL-701, budget of the gallery,
+// 30 ms), the filter template: over the pages of 40 sets (TPL-703), and a burst of 20 sets of 10
+// pages, the case TPL-907 leaves to the stress test of the server. Run it outside the race detector.
+func TestTheLoadOfFindingTemplatesAndTheirPages(t *testing.T) {
+	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
+		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	}
+	tt := newTemplateTeam(t)
+	for i := range 150 {
+		id := tt.owner.guided(tt.space, "Report "+strconv.Itoa(i), "x")
+		if i%10 == 0 {
+			tt.owner.ok("PUT", "/api/v1/templates/"+id+"/rights", map[string]any{"use": []any{userSubject(tt.colleague)}})
+		}
+	}
+	timed := func(n int, call func()) time.Duration {
+		took := make([]time.Duration, 0, n)
+		for range n {
+			started := time.Now()
+			call()
+			took = append(took, time.Since(started))
+		}
+		return p95(took)
+	}
+	search := func() { gallerySearch(tt.editor, tt.space, "report 1") }
+	timed(5, search)
+	t.Logf("the gallery searched on the server, 150 templates: p95 %v", timed(31, search).Round(10*time.Microsecond))
+
+	ten := tt.owner.guided(tt.space, "Ten pages", "Root")
+	for i := range 9 {
+		tt.owner.entry(ten, map[string]any{"name": "Page " + strconv.Itoa(i), "parent": "root", "document": para("x")})
+	}
+	tt.owner.want(204, "PUT", "/api/v1/templates/"+ten+"/publishing", map[string]any{"publish": true})
+	started := time.Now()
+	for i := range 20 {
+		if status, out := tt.owner.makeSet(ten, map[string]any{"space_id": tt.space, "title": "Burst " + strconv.Itoa(i)}); status != 201 {
+			t.Fatalf("a set of the burst: %d %v", status, out)
+		}
+	}
+	t.Logf("a burst of 20 sets of 10 pages, one after the other: %v", time.Since(started).Round(time.Millisecond))
+	for i := range 20 {
+		tt.owner.makeSet(ten, map[string]any{"space_id": tt.space, "title": "More " + strconv.Itoa(i)})
+	}
+	tt.e.settle()
+	filter := func() { foundTitles(tt.viewer, `template:"Ten pages"`) }
+	timed(5, filter)
+	t.Logf("template: over 400 pages of 40 sets: p95 %v", timed(31, filter).Round(10*time.Microsecond))
+}

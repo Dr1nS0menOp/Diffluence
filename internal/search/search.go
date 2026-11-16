@@ -138,6 +138,11 @@ type Query struct {
 	MayNamePeople bool
 	// Quick is the box while typing: titles only, so no snippets, count or spelling.
 	Quick bool
+	// FromTemplates makes template: a filter (spec 074, TPL-703), and Templates are the
+	// templates its names stand for that the reader may see. A name that stands for none
+	// finds nothing, without an error.
+	FromTemplates bool
+	Templates     []uuid.UUID
 }
 
 // Crumb is one step of the way to a result.
@@ -249,7 +254,8 @@ const searchFilters = `
 	  AND ($13::text[] IS NULL OR lower(s.key) = ANY($13))
 	  AND ($14::text[] IS NULL OR EXISTS (SELECT 1 FROM unnest($14::text[]) a
 	       JOIN users u ON position(lower(a) IN lower(u.display_name)) > 0 WHERE u.id = p.updated_by OR u.id = p.created_by))
-	  AND ($15::text[] IS NULL OR NOT EXISTS (SELECT 1 FROM unnest($15::text[]) w WHERE NOT (d.title || ' ' || d.body) ~* w))`
+	  AND ($15::text[] IS NULL OR NOT EXISTS (SELECT 1 FROM unnest($15::text[]) w WHERE NOT (d.title || ' ' || d.body) ~* w))
+	  AND ($16::uuid[] IS NULL OR p.id IN (SELECT o.page_id FROM template_origin_pages($16::uuid[]) o))`
 
 // A search with filters alone has no words to pick by, and is read in one go.
 const (
@@ -260,10 +266,10 @@ const (
 		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', `
 	headlineOptions = `'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'`
 	resultEnd       = `, p.updated_at, p.updated_by `
-	orderByDate     = ` ORDER BY CASE WHEN $16 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $17 OFFSET $18`
+	orderByDate     = ` ORDER BY CASE WHEN $17 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $18 OFFSET $19`
 
 	filtersSQL    = resultColumns + "left(d.body, 200)" + resultEnd + withoutWords + orderByDate
-	filtersCount  = `SELECT count(*) FROM (SELECT 1 ` + withoutWords + ` LIMIT $16) c`
+	filtersCount  = `SELECT count(*) FROM (SELECT 1 ` + withoutWords + ` LIMIT $17) c`
 	statementTime = "SET LOCAL statement_timeout = 3000"
 	// wordSettings go in one round trip. A cached plan cannot know how common a word is,
 	// and the right plan for a word in every page is the wrong one for a word in ten. A
@@ -312,7 +318,13 @@ func nilIfEmpty[T any](list []T) []T {
 func filterArgs(userID uuid.UUID, q Query, parsed Parsed) []any {
 	return []any{userID, parsed.TSQuery, optID(q.SpaceID), optID(q.AuthorID), optTime(q.Since), optTime(q.Until), q.IncludeArchived,
 		nilIfEmpty(q.Kinds), nilIfEmpty(allLabels(q, parsed)), nilIfEmpty(q.Contributors), q.Stage, optID(q.Below),
-		nilIfEmpty(parsed.Spaces), nilIfEmpty(allowedAuthors(q, parsed)), nilIfEmpty(parsed.Patterns)}
+		nilIfEmpty(parsed.Spaces), nilIfEmpty(allowedAuthors(q, parsed)), nilIfEmpty(parsed.Patterns), nilIfEmpty(q.Templates)}
+}
+
+// findsNothing says a search names templates through template: and none of them is one the
+// reader may see: it finds nothing, and says nothing about why (TPL-703, ORG-032).
+func findsNothing(q Query, parsed Parsed) bool {
+	return q.FromTemplates && len(parsed.Templates) > 0 && len(q.Templates) == 0
 }
 
 func allLabels(q Query, parsed Parsed) []string {
@@ -327,7 +339,8 @@ func allowedAuthors(q Query, parsed Parsed) []string {
 }
 
 func hasFilters(q Query, parsed Parsed) bool {
-	return len(q.Labels)+len(parsed.Labels)+len(parsed.Spaces)+len(q.Contributors) > 0 || q.Stage != "" || q.Below != uuid.Nil
+	return len(q.Labels)+len(parsed.Labels)+len(parsed.Spaces)+len(q.Contributors)+len(q.Templates) > 0 || q.Stage != "" ||
+		q.Below != uuid.Nil
 }
 
 func scanResults(rows pgx.Rows) ([]Result, error) {
@@ -417,9 +430,12 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Result
 		return Results{Results: []Result{}}, err
 	}
 	defer s.leave()
-	parsed := Parse(q.Text, q.TitlesOnly)
+	parsed := parse(q.Text, q.TitlesOnly, q.FromTemplates)
 	if q.Limit <= 0 || q.Limit > maxLimit {
 		q.Limit = defaultLimit
+	}
+	if findsNothing(q, parsed) {
+		return Results{Results: []Result{}}, nil
 	}
 	if slices.Contains(q.Kinds, KindComment) {
 		return s.searchComments(ctx, userID, q, parsed)

@@ -151,7 +151,7 @@ func conditionsOf(t Template, m Manifest, texts map[string]document.Node) []plac
 
 // checkConditions refuses a version whose conditions or rules do not fit its form, before it
 // is saved (TPL-432): every problem is named at once, next to the condition that has it.
-func (s *Service) checkConditions(ctx context.Context, q db.Querier, t Template, m Manifest, texts map[string]document.Node) error {
+func (s *Service) checkConditions(ctx context.Context, q db.Querier, t Template, m Manifest, texts map[string]document.Node, use versionUse) error {
 	problems := checkRules(m, texts)
 	if root, _, _ := m.entry(RootKey); root.Condition != nil {
 		problems = append(problems, ruleProblem("entry:"+RootKey, "root_condition"))
@@ -173,9 +173,14 @@ func (s *Service) checkConditions(ctx context.Context, q db.Querier, t Template,
 			}
 		}
 	}
-	gone, err := s.missingGroups(ctx, q, groupIDs(tested))
-	if err != nil {
-		return err
+	// A draft may still test a group that is not here, such as one an import named; a version in
+	// use may not, and its test would be false meanwhile (TPL-852, TPL-1468).
+	var gone []string
+	if use == forUse {
+		var err error
+		if gone, err = s.missingGroups(ctx, q, groupIDs(tested)); err != nil {
+			return err
+		}
 	}
 	for _, id := range gone {
 		for _, g := range tested[id] {

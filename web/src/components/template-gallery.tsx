@@ -19,6 +19,9 @@ export const templateFileAddress = (templateId: string) => (fileId: string) =>
 const asksFirst = (template: TemplateSummary) =>
   (template.fields?.length ?? 0) > 0 || (template.pages ?? 1) > 1;
 
+/** Past this many templates the gallery searches on the server (TPL-701). */
+const SERVER_SEARCH_ABOVE = 100;
+
 function FavouriteButton({ template, spaceId }: { template: TemplateSummary; spaceId: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -97,6 +100,7 @@ export function TemplateGallery({
   initial?: string;
 }) {
   const { t } = useTranslation();
+  const guidedOn = useCapabilities().guided_templates;
   const [filter, setFilter] = useState('');
   const [marked, setMarked] = useState<number | null>(null);
   const [chosen, setChosen] = useState<TemplateSummary | null>(null);
@@ -106,9 +110,22 @@ export function TemplateGallery({
     queryFn: () => api.get<{ templates: TemplateSummary[] }>(`/spaces/${space.id}/templates`),
   });
   const wanted = filter.trim().toLowerCase();
-  const rows = (list.data?.templates ?? []).filter((x) =>
-    `${x.name} ${x.description} ${x.category}`.toLowerCase().includes(wanted),
-  );
+  // A space that offers more than the browser lists well is searched on the server, which also
+  // knows the names of the pages each template makes (spec 074, TPL-701).
+  const onServer = guidedOn && (list.data?.templates.length ?? 0) > SERVER_SEARCH_ABOVE && wanted !== '';
+  const found = useQuery({
+    queryKey: ['gallery-search', space.id, wanted],
+    queryFn: () =>
+      api.get<{ templates: TemplateSummary[] }>(
+        `/spaces/${space.id}/templates?q=${encodeURIComponent(wanted)}`,
+      ),
+    enabled: onServer,
+  });
+  const rows = onServer
+    ? (found.data?.templates ?? [])
+    : (list.data?.templates ?? []).filter((x) =>
+        `${x.name} ${x.description} ${x.category}`.toLowerCase().includes(wanted),
+      );
   const markedIndex =
     marked ??
     Math.max(
@@ -165,7 +182,7 @@ export function TemplateGallery({
   const pages = preview.data?.pages ?? 1;
   return (
     <Dialog title={t('organise.gallery')} onClose={onClose} wide>
-      <ErrorNote error={list.error ?? start.error} />
+      <ErrorNote error={list.error ?? found.error ?? start.error} />
       {queued && (
         <p role="status" className="note">
           {t('templates.setQueued')}

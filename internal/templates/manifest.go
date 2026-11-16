@@ -42,6 +42,21 @@ const (
 type Restrictions struct {
 	View []permissions.Subject `json:"view"`
 	Edit []permissions.Subject `json:"edit"`
+	// ChooseAgain says an import left out the people of another installation, or named groups
+	// that are not here: the page stays restricted, and no version is approved until the lists
+	// are chosen again (spec 074, TPL-852).
+	ChooseAgain bool `json:"choose_again,omitempty"`
+}
+
+// sameSubjects says two restrictions list the same people and groups.
+func (r Restrictions) sameSubjects(other Restrictions) bool {
+	listed := func(l []permissions.Subject) []permissions.Subject {
+		if l == nil {
+			return []permissions.Subject{}
+		}
+		return l
+	}
+	return sameJSON(listed(r.View), listed(other.View)) && sameJSON(listed(r.Edit), listed(other.Edit))
 }
 
 func (r Restrictions) any() bool { return len(r.View) > 0 || len(r.Edit) > 0 }
@@ -101,6 +116,10 @@ func (m Manifest) hasChildren(key string) bool {
 // made after its parent.
 func (m Manifest) ordered() []Entry {
 	out := make([]Entry, 0, len(m.Entries))
+	// Only the empty template that version 1 is compared with has no first page.
+	if len(m.Entries) == 0 {
+		return out
+	}
 	var below func(key string)
 	below = func(key string) {
 		for _, e := range m.Entries {

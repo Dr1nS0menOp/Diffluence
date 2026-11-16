@@ -55,6 +55,7 @@ func (s *Server) registerTemplateRoutes() {
 	r.HandleFunc("POST /api/v1/templates/{id}/sets", me, guided(s.handleTemplateSet))
 	r.HandleFunc("POST /api/v1/templates/{id}/sets/check", me, guided(s.handleTemplateSetCheck))
 	s.registerTemplateApprovalRoutes(guided)
+	s.registerTemplateHistoryRoutes(guided)
 	r.HandleFunc("GET /api/v1/templates/{id}/files/{file}", me, s.handleTemplateFile)
 	r.HandleFunc("PUT /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOn)
 	r.HandleFunc("DELETE /api/v1/templates/{id}/favourite", me, s.handleTemplateFavouriteOff)
@@ -112,7 +113,15 @@ func (s *Server) handleGallery(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	list, err := s.deps.Templates.Gallery(r.Context(), s.caller(r), id)
+	var list []templates.Template
+	var err error
+	// A space with many templates is searched on the server, by the names of its pages too
+	// (spec 074, TPL-701).
+	if text := r.URL.Query().Get("q"); text != "" {
+		list, err = s.deps.Templates.SearchGallery(r.Context(), s.caller(r), id, text)
+	} else {
+		list, err = s.deps.Templates.Gallery(r.Context(), s.caller(r), id)
+	}
 	if err != nil {
 		s.fail(w, r, err)
 		return

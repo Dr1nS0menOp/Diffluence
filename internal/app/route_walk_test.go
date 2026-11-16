@@ -113,6 +113,7 @@ var idRoutes = map[string]idRoute{
 	"POST /api/v1/templates/{id}/versions/{number}/approve":   {owner: "a manager of the template, on its editors list"},
 	"POST /api/v1/templates/{id}/versions/{number}/send-back": {owner: "a manager of the template, on its editors list"},
 	"POST /api/v1/templates/{id}/withdraw":                    {owner: "a manager of the template, on its editors list"},
+	"GET /api/v1/templates/{id}/versions/{number}/sets":       {owner: "a manager of the template, on its editors list"},
 }
 
 // bodyIDRoutes take the ids of the objects they reach in their body, not in the path.

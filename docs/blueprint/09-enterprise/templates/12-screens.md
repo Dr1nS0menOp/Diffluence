@@ -14,7 +14,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
 ## 12.1 Where things live
 
 - **TPL-1000** · built · A space's templates are in **Space settings, Templates**. Templates of all spaces are in **Administration, Content, Templates**. Both are lists of rows with Edit, Hide, Promote, Export and Delete (spec 011). *Proof:* existing pictures.
-- **TPL-1001** · partly · Both lists gain:
+- **TPL-1001** · built · Both lists gain:
   - a **state** column, as a `.lozenge` with a word: Draft, Waiting, Approved, Sent back, Withdrawn;
   - a filter of states by dropdown above the list (design standard, "Long lists filter with dropdowns");
   - a section **Waiting for approval** at the top when anything waits, for those who may approve (decided, TPL-1423).
@@ -80,7 +80,7 @@ WCAG 2.2 AA is the goal. No layout, icon or wording is taken from any other prod
   - **Send back**, which opens a `Dialog` with a required reason.
 
   Withdraw is a `danger` action in the template's More menu, behind a `ConfirmDialog` that repeats the action on its button. *Proof:* pictures, and keyboard tests of each action.
-- **TPL-1031** · new · The page's **Details** panel shows the origin (TPL-611) as one line with a link. *Proof:* a picture.
+- **TPL-1031** · built · The page's **Details** panel shows the origin (TPL-611) as one line with a link. *Proof:* a picture.
 
 ## 12.5 Keyboard, language, small screens
 

@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/diffluence/diffluence/internal/permissions"
 )
 
 // Version is one numbered, unchangeable snapshot of a template (TPL-600).
@@ -178,7 +180,7 @@ func outcomeFor(ctx context.Context, q db.Querier, st standing) (versionOutcome,
 // usable for a form already open; a draft leaves the approved version in use. Either way a
 // proposal that waited is over, because what it proposed changed (TPL-522).
 func (s *Service) saveVersion(ctx context.Context, tx pgx.Tx, c identity.Caller, t Template, m Manifest, outcome versionOutcome) (int, error) {
-	texts, err := s.checkVersion(ctx, tx, t, m)
+	texts, err := s.checkVersion(ctx, tx, t, m, useOf(outcome))
 	if err != nil {
 		return 0, err
 	}
@@ -227,14 +229,20 @@ func (s *Service) saveVersion(ctx context.Context, tx pgx.Tx, c identity.Caller,
 		t.ID, number, guided, state); err != nil {
 		return 0, err
 	}
+	// The event keeps the readable change list, in codes and the author's names (TPL-711).
+	textsBefore, _, err := s.textsOf(ctx, tx, latest.Manifest)
+	if err != nil {
+		return 0, err
+	}
 	return number, auditTemplateDetails(ctx, tx, c, "template.version_saved", t,
-		map[string]any{"version": number, "entries": len(m.Entries), "state": state})
+		map[string]any{"version": number, "entries": len(m.Entries), "state": state,
+			"changes": changeCodes(describeChanges(latest.Manifest, m, textsBefore, texts))})
 }
 
 // checkVersion runs every check a version of a template must pass: its shape, its texts, its
 // questions and its conditions. Approving runs them again, as the world changes under a
 // template (TPL-525). It gives the texts it read.
-func (s *Service) checkVersion(ctx context.Context, tx pgx.Tx, t Template, m Manifest) (map[string]document.Node, error) {
+func (s *Service) checkVersion(ctx context.Context, tx pgx.Tx, t Template, m Manifest, use versionUse) (map[string]document.Node, error) {
 	if err := m.validate(); err != nil {
 		return nil, err
 	}
@@ -248,7 +256,67 @@ func (s *Service) checkVersion(ctx context.Context, tx pgx.Tx, t Template, m Man
 	if err := s.checkSpecs(ctx, tx, m, texts, t.today); err != nil {
 		return nil, err
 	}
-	return texts, s.checkConditions(ctx, tx, t, m, texts)
+	if err := s.checkConditions(ctx, tx, t, m, texts, use); err != nil {
+		return nil, err
+	}
+	return texts, s.checkChosen(ctx, tx, m, use)
+}
+
+// versionUse is what a version is checked for: to wait as a draft, or to make pages.
+type versionUse int
+
+const (
+	// forDraft lets a version keep what its author must still choose: a group that is not
+	// here, or the people an import left out (TPL-852). A draft makes pages only for its owner,
+	// and then refuses a restriction it cannot set.
+	forDraft versionUse = iota
+	// forUse is a version that is approved, at once or by a decision: everything it names must
+	// be here (TPL-525).
+	forUse
+)
+
+// useOf is what a version that becomes outcome is checked for.
+func useOf(outcome versionOutcome) versionUse {
+	if outcome == approveAtOnce {
+		return forUse
+	}
+	return forDraft
+}
+
+// errChooseAgain refuses to approve a version whose restrictions name people or groups that
+// must be chosen again, naming each page (TPL-852).
+func errChooseAgain(labels []string) error {
+	return &apperr.Error{Kind: apperr.KindConflict, Code: "choose_again",
+		Message: "Choose again who may see " + strings.Join(labels, ", ") + " before this version is approved: " +
+			"the template came from another installation, or a group it named is gone."}
+}
+
+// checkChosen refuses a version to be used while a restriction is still to be chosen again or
+// names a group or person that no longer exists (TPL-130, TPL-852).
+func (s *Service) checkChosen(ctx context.Context, q db.Querier, m Manifest, use versionUse) error {
+	if use != forUse {
+		return nil
+	}
+	var named []permissions.Subject
+	for _, e := range m.Entries {
+		named = append(named, slices.Concat(e.Restrictions.View, e.Restrictions.Edit)...)
+	}
+	// One question for every restriction of the version, however many pages it makes.
+	gone, err := s.perms.MissingSubjects(ctx, q, named)
+	if err != nil {
+		return err
+	}
+	var labels []string
+	for _, e := range m.ordered() {
+		names := slices.Concat(e.Restrictions.View, e.Restrictions.Edit)
+		if e.Restrictions.ChooseAgain || slices.ContainsFunc(gone, func(g permissions.Subject) bool { return slices.Contains(names, g) }) {
+			labels = append(labels, entryLabel(e))
+		}
+	}
+	if len(labels) > 0 {
+		return errChooseAgain(labels)
+	}
+	return nil
 }
 
 // supersedeApproved marks the approved version of a template as replaced, from now, so that
@@ -293,9 +361,20 @@ func (s *Service) Versions(ctx context.Context, c identity.Caller, id uuid.UUID)
 	if err != nil {
 		return History{}, err
 	}
+	// Only those who manage the template count what each version made (TPL-613).
+	var counts map[int]int
+	if st.manages() {
+		if counts, err = s.setCounts(ctx, id); err != nil {
+			return History{}, err
+		}
+	}
 	out := History{Versions: make([]VersionRow, 0, len(list)), Approved: t.TemplateVersion, State: t.State}
 	for _, v := range list {
 		row := VersionRow{Version: v, AuthorName: names[v.AuthorID], Pages: len(v.Manifest.Entries), Decisions: []Decision{}}
+		if counts != nil {
+			n := counts[v.Number]
+			row.Sets = &n
+		}
 		for _, d := range decisions {
 			if d.Version == v.Number {
 				d.PersonName = names[d.PersonID]
@@ -356,6 +435,8 @@ type VersionRow struct {
 	// Pages is how many pages the version makes.
 	Pages     int        `json:"pages"`
 	Decisions []Decision `json:"decisions"`
+	// Sets is how many sets the version made, for those who manage the template (TPL-613).
+	Sets *int `json:"sets,omitempty"`
 }
 
 // EntryChange is what one version changed in the text of one page of a template, in the
@@ -376,6 +457,8 @@ type Changes struct {
 	// Settings says that something besides the texts changed: the pages, the questions,
 	// the steps or where the pages go.
 	Settings bool `json:"settings"`
+	// List is what changed besides the texts, one readable line each (TPL-602).
+	List []SettingChange `json:"list"`
 }
 
 // VersionChanges compares a version of a template with an earlier one, page by page, for
@@ -431,6 +514,7 @@ func (s *Service) VersionChanges(ctx context.Context, c identity.Caller, id uuid
 				Blocks: document.Compare(texts(textsBefore, e.Key), document.Empty())})
 		}
 	}
+	out.List = describeChanges(before.Manifest, after.Manifest, textsBefore, textsAfter)
 	out.Settings, err = settingsDiffer(before.Manifest, after.Manifest)
 	return out, err
 }

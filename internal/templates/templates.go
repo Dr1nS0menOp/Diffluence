@@ -98,8 +98,11 @@ type Template struct {
 	// GroupsGone says a condition of the newest version tests a group that was deleted, for the
 	// list's warning (TPL-402, TPL-1468).
 	GroupsGone bool `json:"groups_gone,omitempty"`
-	pageID     uuid.UUID
-	ownerID    uuid.UUID
+	// ImportNotes say what an import left out or asks to choose again, in the answer to the
+	// import only (TPL-852).
+	ImportNotes *ImportNotes `json:"import_notes,omitempty"`
+	pageID      uuid.UUID
+	ownerID     uuid.UUID
 	// today is the database's date when the row was read, for what a set fills in (TPL-857).
 	today string
 }
@@ -310,6 +313,44 @@ const galleryFilter = `WHERE NOT t.hidden
 // Gallery lists what a person can start a page from in a space: favourites and
 // recently used first, then promoted ones.
 func (s *Service) Gallery(ctx context.Context, c identity.Caller, spaceID uuid.UUID) ([]Template, error) {
+	return s.gallery(ctx, c, spaceID, "")
+}
+
+// maxSearchRunes bounds what the gallery's search box sends.
+const maxSearchRunes = 100
+
+// gallerySearch narrows the gallery to templates whose name, description or category holds
+// the typed words, or the name of a page of the version in use (TPL-701). $5 is a LIKE pattern
+// of what was typed, or empty for no search.
+const gallerySearch = `
+	AND ($5 = '' OR lower(t.name) LIKE $5 OR lower(t.description) LIKE $5 OR lower(t.category) LIKE $5
+		OR EXISTS (SELECT 1 FROM template_versions sv, jsonb_array_elements(sv.manifest -> 'entries') se
+			WHERE sv.template_id = t.id AND sv.number = t.approved_version AND lower(se ->> 'name') LIKE $5))`
+
+// SearchGallery finds templates of the gallery on the server, for a space that offers more
+// than the browser lists (TPL-701). It is the gallery with one more condition, so it never
+// returns a template the person may not use (TPL-504).
+func (s *Service) SearchGallery(ctx context.Context, c identity.Caller, spaceID uuid.UUID, text string) ([]Template, error) {
+	if err := s.features.RequireExperimental(ctx, s.pool, features.ExperimentalGuidedTemplates); err != nil {
+		return nil, err
+	}
+	text = strings.TrimSpace(text)
+	if utf8.RuneCountInString(text) > maxSearchRunes {
+		return nil, apperr.Invalid("Search for at most 100 characters.")
+	}
+	return s.gallery(ctx, c, spaceID, text)
+}
+
+// likeOf makes typed text a LIKE pattern that holds it anywhere, with % and _ taken as
+// letters.
+func likeOf(text string) string {
+	if text == "" {
+		return ""
+	}
+	return "%" + strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(strings.ToLower(text)) + "%"
+}
+
+func (s *Service) gallery(ctx context.Context, c identity.Caller, spaceID uuid.UUID, text string) ([]Template, error) {
 	if err := s.perms.RequireSpace(ctx, s.pool, c.UserID, spaceID, permissions.PageCreate); err != nil {
 		return nil, err
 	}
@@ -325,9 +366,9 @@ func (s *Service) Gallery(ctx context.Context, c identity.Caller, spaceID uuid.U
 	if err != nil {
 		return nil, err
 	}
-	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+" "+galleryFilter+`
+	rows, err := s.pool.Query(ctx, "SELECT "+columns+" "+joins+" "+galleryFilter+gallerySearch+`
 		ORDER BY f.user_id IS NOT NULL DESC, u.used_at DESC NULLS LAST, t.promoted DESC, lower(t.name), t.id`,
-		c.UserID, spaceID, guidedOn, user.Groups)
+		c.UserID, spaceID, guidedOn, user.Groups, likeOf(text))
 	return collect(rows, err)
 }
 
@@ -507,34 +548,45 @@ func (s *Service) homeOf(ctx context.Context, tx pgx.Tx, spaceID *uuid.UUID) (uu
 // insert makes a template and its version 1, which becomes what outcome says.
 func (s *Service) insert(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID *uuid.UUID, in Input, doc document.Node, starter *string,
 	outcome versionOutcome) (Template, error) {
+	t, head, err := s.insertRow(ctx, tx, c, spaceID, in, doc, starter)
+	if err != nil {
+		return t, err
+	}
+	// Version 1, as every template that existed before versions got one (TPL-620).
+	_, err = s.saveVersion(ctx, tx, c, t, rowManifest(t, head), outcome)
+	return t, err
+}
+
+// insertRow makes the row of a template and the hidden page of its first entry, with no
+// version yet, and gives the number of that page's text.
+func (s *Service) insertRow(ctx context.Context, tx pgx.Tx, c identity.Caller, spaceID *uuid.UUID, in Input, doc document.Node,
+	starter *string) (Template, int, error) {
 	home, err := s.homeOf(ctx, tx, spaceID)
 	if err != nil {
-		return Template{}, err
+		return Template{}, 0, err
 	}
 	p, err := s.pages.NewTemplatePage(ctx, tx, c, home, in.Name, doc)
 	if err != nil {
-		return Template{}, err
+		return Template{}, 0, err
 	}
 	steps, err := json.Marshal(in.Steps)
 	if err != nil {
-		return Template{}, err
+		return Template{}, 0, err
 	}
 	id := ids.New()
 	if err := s.checkWorkflow(ctx, tx, spaceID, in.WorkflowID); err != nil {
-		return Template{}, err
+		return Template{}, 0, err
 	}
 	if _, err := tx.Exec(ctx, `INSERT INTO templates (id, page_id, space_id, name, description, category, labels, title_pattern,
 			steps, default_parent, hidden, promoted, starter_key, created_by, owner_id, workflow_id)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $14, $15)`,
 		id, p.ID, spaceID, in.Name, in.Description, in.Category, in.Labels, in.TitlePattern, steps, in.DefaultParent,
 		in.Hidden, in.Promoted, starter, c.UserID, in.WorkflowID); err != nil {
-		return Template{}, err
+		return Template{}, 0, err
 	}
 	t := Template{ID: id, SpaceID: spaceID, Name: in.Name, TitlePattern: in.TitlePattern, Labels: in.Labels, Steps: in.Steps,
 		DefaultParent: in.DefaultParent, pageID: p.ID, ownerID: c.UserID}
-	// Version 1, as every template that existed before versions got one (TPL-620).
-	_, err = s.saveVersion(ctx, tx, c, t, rowManifest(t, p.CurrentVersion), outcome)
-	return t, err
+	return t, p.CurrentVersion, nil
 }
 
 // Create makes a template, of a space or of all spaces, for one who manages the templates
@@ -779,37 +831,6 @@ func (s *Service) FromPage(ctx context.Context, c identity.Caller, pageID uuid.U
 		return t, err
 	}
 	return t, s.pages.CopyFilesToTemplate(ctx, c, pageID, stored.pageID, detail.SpaceID)
-}
-
-// Bundle is a template as one file, for moving it between instances.
-type Bundle struct {
-	Name         string          `json:"name"`
-	Description  string          `json:"description"`
-	Category     string          `json:"category"`
-	Labels       []string        `json:"labels"`
-	TitlePattern string          `json:"title_pattern"`
-	Steps        []Step          `json:"steps"`
-	Document     json.RawMessage `json:"document"`
-}
-
-// Export gives a template as one file, to someone who may manage it.
-func (s *Service) Export(ctx context.Context, c identity.Caller, id uuid.UUID) (Bundle, error) {
-	t, err := s.Get(ctx, c, id)
-	if err != nil {
-		return Bundle{}, err
-	}
-	if _, err := s.requireTo(ctx, s.pool, c, t, standing.manages); err != nil {
-		return Bundle{}, err
-	}
-	return Bundle{Name: t.Name, Description: t.Description, Category: t.Category, Labels: t.Labels,
-		TitlePattern: t.TitlePattern, Steps: t.Steps, Document: t.Document}, nil
-}
-
-// Import adds a template from a file. It goes through the same checks as saving,
-// so an unknown block refuses the whole file.
-func (s *Service) Import(ctx context.Context, c identity.Caller, spaceID *uuid.UUID, b Bundle) (Template, error) {
-	return s.Create(ctx, c, spaceID, Input{Name: b.Name, Description: b.Description, Category: b.Category, Labels: b.Labels,
-		TitlePattern: b.TitlePattern, Steps: b.Steps, Document: b.Document})
 }
 
 // checkWorkflow allows a template to name a workflow only of its own space: workflows belong

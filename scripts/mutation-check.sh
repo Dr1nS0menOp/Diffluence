@@ -528,7 +528,7 @@ mutate "a link to an entry left out leaves nothing" internal/templates/sets.go \
 mutate "a file of a removed section is copied" internal/templates/sets.go \
   's.replace("planned.skipFiles = filesLeftOut(texts[e.Key], doc)", "planned.skipFiles = nil")' $app -run TestSectionsOfTextAreKeptOrRemovedWithTheirFiles
 mutate "conditions are saved without their check" internal/templates/versions.go \
-  's.replace("return texts, s.checkConditions(ctx, tx, t, m, texts)", "return texts, nil")' $app -run 'TestAConditionOnAQuestionThatNoLongerExistsIsRefusedAtSave|TestACycleOrASelfReferenceIsRefusedAtSave'
+  's.replace("if err := s.checkConditions(ctx, tx, t, m, texts, use); err != nil {", "if err := s.checkConditions(ctx, tx, t, m, texts, use); err != nil \x26\x26 false {")' $app -run 'TestAConditionOnAQuestionThatNoLongerExistsIsRefusedAtSave|TestACycleOrASelfReferenceIsRefusedAtSave'
 mutate "a deleted group is saved in a condition" internal/templates/rules.go \
   's.replace("for _, id := range gone {", "for _, id := range gone[:0] {")' $app -run TestTheValidatorHoldsAConditionToItsShape
 mutate "the first page takes a condition" internal/templates/rules.go \
@@ -579,7 +579,7 @@ mutate "a manager of templates turns four eyes off" internal/templates/approval.
 mutate "a version is decided on twice" internal/templates/approval.go \
   's.replace("\t\tif v.State != StateWaiting {\n\t\t\treturn s.alreadyDecided", "\t\tif false {\n\t\t\treturn s.alreadyDecided")' $app -run TestTwoApproversAtOnceMakeOneDecision
 mutate "approval does not check the template again" internal/templates/approval.go \
-  's.replace("if _, err := s.checkVersion(ctx, tx, t, v.Manifest); err != nil {", "if _, err := s.checkVersion(ctx, tx, t, v.Manifest); err != nil \x26\x26 false {")' $app -run TestApprovalChecksTheTemplateAgain
+  's.replace("if _, err := s.checkVersion(ctx, tx, t, v.Manifest, forUse); err != nil {", "if _, err := s.checkVersion(ctx, tx, t, v.Manifest, forUse); err != nil \x26\x26 false {")' $app -run TestApprovalChecksTheTemplateAgain
 mutate "an older draft is proposed" internal/templates/approval.go \
   's.replace("\t\tif err := requireNewest(ctx, tx, id, v); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif !slices.Contains", "\t\tif !slices.Contains")' $app -run TestOnlyTheNewestVersionIsProposed
 mutate "a proposer hides a template" internal/templates/templates.go \
@@ -602,7 +602,47 @@ mutate "the link filter tells hidden from gone" internal/pages/content.go \
   's.replace("AND k.target_id NOT IN (SELECT g.page_id FROM perm_visible_pages($1) g)))", "AND k.target_id NOT IN (SELECT g.id FROM pages g WHERE g.status <> \x27trashed\x27 AND $1::uuid IS NOT NULL)))")' $app -run TestABrokenLinkFilterTreatsHiddenPagesAsGone
 mutate "reading a round ignores restrictions" internal/permissions/evaluate.go \
   's.replace("for _, level := range p.ViewChain {", "for _, level := range p.ViewChain {\n\t\tif in.Action == ActionApprovalRead {\n\t\t\tbreak\n\t\t}")' $perms -run TestApprovalReadIsViewWithoutTheDraftRule
-
+# History, origin, search, export and automation of guided templates (spec 074, wave GT5).
+mutate "the origin is copied by a page copy" internal/pages/tree.go \
+  's.replace("\t\tif !in.IncludeChildren {\n\t\t\treturn nil\n\t\t}\n\t\treturn s.copyChildren", "\t\tif _, err := tx.Exec(ctx, `INSERT INTO page_template_origin (page_id, set_id, template_id, version, entry_key, created_by) SELECT $1, set_id, template_id, version, entry_key, created_by FROM page_template_origin WHERE page_id = $2`, out.ID, p.ID); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tif !in.IncludeChildren {\n\t\t\treturn nil\n\t\t}\n\t\treturn s.copyChildren")' $app -run TestMovingKeepsTheOriginAndCopyingDoesNot
+mutate "an import is approved without review" internal/templates/bundle.go \
+  's.replace("if _, err := s.saveVersion(ctx, tx, c, t, m, keepAsDraft); err != nil {", "if _, err := s.saveVersion(ctx, tx, c, t, m, approveAtOnce); err != nil {")' $app -run TestAnImportIsADraftOfTheImporterThatOnlyApprovalPutsInUse
+mutate "an export carries the people of a restriction" internal/templates/bundle.go \
+  's.replace("\t\t\tif sub.Type != permissions.SubjectGroup {\n\t\t\t\tpeople++\n\t\t\t\tcontinue\n\t\t\t}\n", "")' $app -run TestAnExportCarriesNoRightsNoStateAndNoPersonOfItsInstallation
+mutate "an import keeps a person of the file on a restriction" internal/templates/bundle.go \
+  's.replace("\t\t\t\tpeople++\n\t\t\t\tcontinue\n\t\t\t}\n\t\t\tsubjects = append(subjects, permissions.Subject{Type: permissions.SubjectGroup, ID: sub.ID})", "\t\t\t\tsubjects = append(subjects, permissions.Subject{Type: sub.Type, ID: sub.ID})\n\t\t\t\tcontinue\n\t\t\t}\n\t\t\tsubjects = append(subjects, permissions.Subject{Type: permissions.SubjectGroup, ID: sub.ID})")' $app -run TestAnImportNeverPutsAPersonOfTheFileOnARestriction
+mutate "an import opens a restriction it emptied" internal/templates/bundle.go \
+  's.replace("if people > 0 \x26\x26 len(subjects) == 0 {", "if false {")' $app -run TestAnImportNeverPutsAPersonOfTheFileOnARestriction
+mutate "a group that is not here needs no choosing again" internal/templates/bundle.go \
+  's.replace("\t\t\tr.ChooseAgain = true\n", "")' $app -run TestAnImportNamingAGroupThatIsNotHereKeepsTheRestrictionAndWaits
+mutate "sending the lists back clears the mark to choose again" internal/templates/entries.go \
+  's.replace("again := e.Restrictions.ChooseAgain \x26\x26 e.Restrictions.sameSubjects(in.Restrictions)", "again := false \x26\x26 e.Restrictions.sameSubjects(in.Restrictions)")' $app -run TestAnImportIsADraftOfTheImporterThatOnlyApprovalPutsInUse
+mutate "a version in use may still have lists to choose again" internal/templates/versions.go \
+  's.replace("\tif use != forUse {\n\t\treturn nil\n\t}\n\tvar named []permissions.Subject", "\tif use == forUse || true {\n\t\treturn nil\n\t}\n\tvar named []permissions.Subject")' $app -run 'TestAnImportIsADraftOfTheImporterThatOnlyApprovalPutsInUse|TestAnImportNamingAGroupThatIsNotHereKeepsTheRestrictionAndWaits'
+mutate "the gallery search ignores the users list" internal/templates/templates.go \
+  's.replace("\"SELECT \"+columns+\" \"+joins+\" \"+galleryFilter+gallerySearch+", "\"SELECT \"+columns+\" \"+joins+\" WHERE NOT t.hidden AND ($2::uuid IS NOT NULL) AND ($3 OR NOT $3) AND ($4::uuid[] IS NOT NULL OR true)\"+gallerySearch+")' $app -run TestTheGallerySearchNeverReturnsATemplateOutsideItsAudience
+mutate "the search filter stands for a template outside the audience" internal/templates/origin.go \
+  's.replace("\t\tif seen {\n\t\t\tout = append(out, t.ID)", "\t\tif seen || true {\n\t\t\tout = append(out, t.ID)")' $app -run TestTemplateInSearchFindsOnlyPagesFromTemplatesTheReaderMaySee
+mutate "a hidden template name searches without its filter" internal/search/search.go \
+  's.replace("return q.FromTemplates \x26\x26 len(parsed.Templates) \x3e 0 \x26\x26 len(q.Templates) == 0", "return false")' $app -run TestTemplateInSearchFindsOnlyPagesFromTemplatesTheReaderMaySee
+mutate "the origin names the template to whoever reads the page" internal/templates/origin.go \
+  's.replace("\tseen, err := s.maySee(ctx, s.pool, st)\n\tif err != nil || !seen {", "\tseen, err := s.maySee(ctx, s.pool, st)\n\tif err != nil || (!seen \x26\x26 false) {")' $app -run TestTheOriginNamesTheTemplateOnlyToWhoMaySeeIt
+mutate "the sets of a version list a page the manager cannot see" internal/templates/origin.go \
+  's.replace("\t\tif !ok {\n\t\t\tcontinue\n\t\t}\n\t\tf.row.Root = \x26ref", "\t\tif !ok \x26\x26 false {\n\t\t\tcontinue\n\t\t}\n\t\tf.row.Root = \x26ref")' $app -run TestTheSetsOfAVersionNeverShowAPageTheManagerCannotSee
+mutate "anyone who uses a template lists its sets" internal/templates/origin.go \
+  's.replace("if _, err := s.requireTo(ctx, s.pool, c, t, standing.manages); err != nil {\n\t\treturn out, err\n\t}\n\tif _, err := versionAt", "if _, err := s.requireTo(ctx, s.pool, c, t, func(standing) bool { return true }); err != nil {\n\t\treturn out, err\n\t}\n\tif _, err := versionAt")' $app -run TestTheSetsOfAVersionNeverShowAPageTheManagerCannotSee
+mutate "a rule uses a template with nothing approved" internal/templates/rule.go \
+  's.replace("\tif t.TemplateVersion == 0 {\n\t\treturn SetResult{}, errRuleNothingApproved\n\t}\n\tasked", "\tasked")' $app -run TestARuleUsesTheApprovedVersionAndSaysWhyItMadeNothing
+mutate "a rule is let through with a question it cannot answer" internal/templates/rule.go \
+  's.replace("\tif len(asked) \x3e 0 {\n\t\treturn SetResult{}, errRuleAsks(asked[0])", "\tif len(asked) \x3c 0 {\n\t\treturn SetResult{}, errRuleAsks(asked[0])")' $app -run TestARuleUsesTheApprovedVersionAndSaysWhyItMadeNothing
+mutate "a rule uses the newest version" internal/automation/actions.go \
+  's.replace("_, err := s.Templates.UseForRule(ctx, r.caller, *a.TargetID,", "_, err := s.Templates.Use(ctx, r.caller, *a.TargetID,")' $app -run TestARuleUsesTheApprovedVersionAndSaysWhyItMadeNothing
+mutate "the change list misses a removed page" internal/templates/changes.go \
+  's.replace("\t\tif _, _, kept := after.entry(e.Key); !kept {\n\t\t\tout = append(out, SettingChange{Code: ChangeEntryRemoved", "\t\tif _, _, kept := after.entry(e.Key); kept \x26\x26 !kept {\n\t\t\tout = append(out, SettingChange{Code: ChangeEntryRemoved")' ./internal/templates/ -run TestTheChangeListNamesEveryKindOfChange
+mutate "the change list misses a question made required" internal/templates/changes.go \
+  's.replace("\tif old.Required != f.Required {", "\tif old.Required != f.Required \x26\x26 false {")' ./internal/templates/ -run TestTheChangeListNamesEveryKindOfChange
+mutate "the change list misses a changed condition" internal/templates/changes.go \
+  's.replace("\tif !sameJSON(old.Condition, e.Condition) {", "\tif false {")' ./internal/templates/ -run TestTheChangeListNamesEveryKindOfChange
 mutate "a manager reaches administer" internal/permissions/manage.go \
   's.replace("if !d.Allowed && touchesAdminister {", "if !d.Allowed && touchesAdminister && len(after) < 0 {")' $app -run TestManager
 mutate "administer does not imply managing access" internal/permissions/evaluate.go \

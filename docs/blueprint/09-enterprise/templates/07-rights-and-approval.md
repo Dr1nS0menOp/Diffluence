@@ -36,7 +36,7 @@ Its public documentation describes no approval step, so the second answer is Dif
 - **TPL-502** · built · A template **of all spaces** is offered in **every space** or in **chosen spaces**, shown as chips (design standard, "A rule of the instance says where it acts"; decided, TPL-1424). Today it is offered everywhere, and that stays the default. *Edge cases:* a chosen space that is deleted drops off the list. A template whose list becomes empty is offered nowhere and says so in the administration. *Proof:* tests for each case.
 - **TPL-503** · built · Every right is checked **again on submit**, inside the transaction that makes the set (TPL-120): the audience, `page.create`, the parent, restrictions and the workflow. *Why:* rights can change while a form is open. *Proof:* a test that removes a person from the audience between opening the form and submitting it.
 - **TPL-504** · built · A person **outside** a template's audience does not see it anywhere: not in the gallery, not in a search of templates, not in the automation editor. A direct request answers "not found", never "forbidden". *Why:* a name can say more than people should know ("Dismissal procedure"). *Proof:* tests on each route.
-- **TPL-505** · partly · An **automation rule** that uses a template (`new_from_template`) uses it with the rights of its owner, as today, including the audience lists. A rule whose owner leaves the audience fails its next run with a clear message in the rule's history. *Proof:* a test.
+- **TPL-505** · built · An **automation rule** that uses a template (`new_from_template`) uses it with the rights of its owner, as today, including the audience lists. A rule whose owner leaves the audience fails its next run with a clear message in the rule's history. *Proof:* a test.
 
 ## 7.2 Who writes templates
 
@@ -78,4 +78,4 @@ Its public documentation describes no approval step, so the second answer is Dif
 ## 7.4 What approval does not do
 
 - **TPL-530** · built · Approval checks the **template**, not the pages made from it. Those pages follow the space's rules, including document control when the space has it (DOC-560). *Proof:* nothing beyond TPL-151.
-- **TPL-531** · partly · The starter templates (ORG-053) ship approved. An administrator can hide them, as today (ORG-054). *Proof:* a test after the migration.
+- **TPL-531** · built · The starter templates (ORG-053) ship approved. An administrator can hide them, as today (ORG-054). *Proof:* a test after the migration.

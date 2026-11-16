@@ -5,16 +5,16 @@ How to read this chapter: see [01-guided-templates.md](01-guided-templates.md).
 ## 9.1 Search
 
 - **TPL-700** · built · Templates are **never indexed** in the page search (spec 011), and neither is the text of any entry. A word that exists only in a template never finds anything in search. This stays. *Proof:* the existing test, extended to every entry of a set and to `conditional` sections.
-- **TPL-701** · new · The **gallery** searches templates by name, description and category, and by the names of the entries. It searches on the server when a space offers more than 100 templates, and in the browser below that, as today. It only ever returns templates the person may use (TPL-504). *Why:* an instance with many teams can have hundreds of templates; the browser list was built for tens. *Proof:* a test with 150 templates and an audience list; a test that the server search never returns a template outside the audience.
-- **TPL-702** · new · Pages made from a set are indexed like any page, when they are published, and never while they are the creator's drafts. *Proof:* covered by the existing draft tests; one test for a set.
-- **TPL-703** · new · The search box offers a filter **made from template** (`template:` in the search syntax), which finds pages by their origin (TPL-610) among pages the reader may see. *Why:* "all incident reviews" should not depend on everyone using the same label. *Edge cases:* a reader who may not see the template cannot use its name as a filter; the filter by an unknown or hidden name finds nothing and gives no error (ORG-032). *Proof:* tests for both.
+- **TPL-701** · built · The **gallery** searches templates by name, description and category, and by the names of the entries. It searches on the server when a space offers more than 100 templates, and in the browser below that, as today. It only ever returns templates the person may use (TPL-504). *Why:* an instance with many teams can have hundreds of templates; the browser list was built for tens. *Proof:* a test with 150 templates and an audience list; a test that the server search never returns a template outside the audience.
+- **TPL-702** · built · Pages made from a set are indexed like any page, when they are published, and never while they are the creator's drafts. *Proof:* covered by the existing draft tests; one test for a set.
+- **TPL-703** · built · The search box offers a filter **made from template** (`template:` in the search syntax), which finds pages by their origin (TPL-610) among pages the reader may see. *Why:* "all incident reviews" should not depend on everyone using the same label. *Edge cases:* a reader who may not see the template cannot use its name as a filter; the filter by an unknown or hidden name finds nothing and gives no error (ORG-032). *Proof:* tests for both.
 
 ## 9.2 Audit
 
 Each event goes through the existing audit log: written to `audit_pending` in the same transaction as the change, then sealed into the chain (ADR-041). No event holds an answer's value (TPL-1409).
 
 - **TPL-710** · built · `template.created`, `template.updated` and `template.deleted` exist today. *Proof:* existing tests.
-- **TPL-711** · partly · New events:
+- **TPL-711** · built · New events:
 
   | Event | When | Details kept |
   |---|---|---|
@@ -33,7 +33,7 @@ Each event goes through the existing audit log: written to `audit_pending` in th
   - the set event ties the pages together for an auditor.
 
   *Edge cases:* each page of a set also writes the events a page made from a template writes today. A set of 100 pages therefore writes 101 events or more, all sealed by the normal sealer (budget in TPL-903). *Proof:* an audit test per event; a test that no answer value appears in any event of a set.
-- **TPL-712** · partly · `space.audit` ("See the audit") shows the template events of its space, and the instance audit shows those of templates of all spaces. *Proof:* matrix cases.
+- **TPL-712** · built · `space.audit` ("See the audit") shows the template events of its space, and the instance audit shows those of templates of all spaces. *Proof:* matrix cases.
 
 ## 9.3 Notifications
 

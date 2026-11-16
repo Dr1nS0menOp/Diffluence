@@ -8049,6 +8049,33 @@
         "x-access": "object:page.view"
       }
     },
+    "/api/v1/pages/{id}/template-origin": {
+      "get": {
+        "operationId": "get /api/v1/pages/{id}/template-origin",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "pages"
+        ],
+        "x-access": "object:page.view"
+      }
+    },
     "/api/v1/pages/{id}/transitions": {
       "post": {
         "operationId": "post /api/v1/pages/{id}/transitions",
@@ -13687,6 +13714,41 @@
     "/api/v1/templates/{id}/versions/{number}/send-back": {
       "post": {
         "operationId": "post /api/v1/templates/{id}/versions/{number}/send-back",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "number",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Done. Most routes answer with JSON."
+          },
+          "default": {
+            "description": "An error, as {\"error\": {\"code\", \"message\"}}."
+          }
+        },
+        "tags": [
+          "templates"
+        ],
+        "x-access": "authenticated"
+      }
+    },
+    "/api/v1/templates/{id}/versions/{number}/sets": {
+      "get": {
+        "operationId": "get /api/v1/templates/{id}/versions/{number}/sets",
         "parameters": [
           {
             "in": "path",

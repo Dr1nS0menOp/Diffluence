@@ -96,6 +96,18 @@ func (s *Service) Reachable(ctx context.Context, c identity.Caller, ids []uuid.U
 	return pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
 }
 
+// RefsOf gives the pages of ids the caller may see, as references in the order of their
+// titles. A page that is hidden, archived, someone else's draft, or gone is left out, so they
+// cannot be told apart (spec 074, TPL-611, TPL-613).
+func (s *Service) RefsOf(ctx context.Context, c identity.Caller, ids []uuid.UUID) ([]PageRef, error) {
+	if len(ids) > maxReachableIDs {
+		return nil, apperr.Invalid("That is too many pages to ask about at once.")
+	}
+	rows, err := s.pool.Query(ctx, `SELECT `+refColumns+` FROM pages p `+refJoins+`
+		WHERE p.id = ANY($2) ORDER BY lower(p.title), p.id`, c.UserID, ids)
+	return collectRefs(rows, err)
+}
+
 // syncLinks makes page_links follow the current version, in the transaction that
 // publishes it.
 func syncLinks(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, doc document.Node) error {

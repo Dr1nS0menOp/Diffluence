@@ -2667,3 +2667,120 @@ test.describe('a draft space started from a space with content', () => {
     await checkAccessibility(page);
   });
 });
+
+// Spec 074, wave GT5: the history of a template, the sets a version made, where a page came
+// from, an import, and lists with no template and with fifty (TPL-602, TPL-611, TPL-613,
+// TPL-852, TPL-1001, TPL-1031). Its own space, made and deleted here, so no other picture
+// changes with it.
+test.describe('the history of guided templates', () => {
+  test.describe.configure({ mode: 'serial' });
+
+  test('TemplateSettingsView: what a version changed, its sets, and where a page came from', async ({
+    browser,
+  }) => {
+    // The administrator makes the space: by now the reader of the other pictures may not.
+    const context = await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme: 'light' });
+    const page = await context.newPage();
+    await login(page, ADMIN.email, ADMIN.password);
+    const made = await page.request.post('/api/v1/spaces', { data: { key: 'ORIGINS', name: 'Origins' } });
+    expect(made.status(), await made.text()).toBe(201);
+    const space = ((await made.json()) as { id: string }).id;
+    await page.goto('/spaces/ORIGINS/templates');
+    await expect(page.getByText('No templates yet. Create one')).toBeVisible();
+    await picture(page, 'templates-none');
+
+    const created = await page.request.post(`/api/v1/spaces/${space}/templates`, {
+      data: { name: 'Project start', category: 'Projects', document: paragraph('What the project is for.') },
+    });
+    expect(created.status(), await created.text()).toBe(201);
+    const tpl = ((await created.json()) as { id: string }).id;
+    const entry = await page.request.post(`/api/v1/templates/${tpl}/entries`, {
+      data: { name: 'Plan', parent: 'root', kind: 'page', document: paragraph('Milestones and owners.') },
+    });
+    expect(entry.status(), await entry.text()).toBe(201);
+    const key = ((await entry.json()) as { key: string }).key;
+    const publishing = await page.request.put(`/api/v1/templates/${tpl}/publishing`, {
+      data: { publish: true },
+    });
+    expect(publishing.status(), await publishing.text()).toBe(204);
+    const set = await page.request.post(`/api/v1/templates/${tpl}/sets`, {
+      data: { space_id: space, title: 'Kick-off', request_key: 'gt5-design' },
+    });
+    expect(set.status(), await set.text()).toBe(201);
+    const root = ((await set.json()) as { page: { id: string } }).page.id;
+    const renamed = await page.request.patch(`/api/v1/templates/${tpl}/entries/${key}`, {
+      data: {
+        name: 'Project plan',
+        kind: 'page',
+        parent: 'root',
+        title_pattern: '',
+        labels: ['planning'],
+        restrictions: { view: [], edit: [] },
+        workflow_id: null,
+      },
+    });
+    expect(renamed.status(), await renamed.text()).toBe(200);
+
+    await page.goto(`/templates/${tpl}/settings?section=versions`);
+    await page.getByRole('button', { name: 'Changes in version 4' }).click();
+    await expect(page.getByRole('region', { name: 'Besides the texts' })).toContainText(
+      'Page Plan renamed to Project plan',
+    );
+    await fixText(page.locator('main time'), 'just now');
+    await picture(page, 'template-change-list', [page.locator('time')]);
+    await checkAccessibility(page);
+    await page.getByRole('button', { name: '1 set' }).click();
+    const sets = page.getByRole('dialog', { name: 'Sets made from version 3' });
+    await expect(sets.getByRole('link', { name: 'Kick-off' })).toBeVisible();
+    await fixText(sets.locator('.muted'), '2 pages, just now');
+    await picture(page, 'template-version-sets');
+    await checkAccessibility(page);
+    await sets.getByRole('button', { name: 'Close' }).click();
+
+    await page.goto(`/pages/${root}`);
+    await expect(page.getByRole('heading', { name: 'Kick-off', level: 1 })).toBeVisible();
+    await page.keyboard.press('i');
+    const details = page.getByRole('complementary', { name: 'Details' });
+    await expect(details).toContainText('Project start, version 3');
+    await expect(details).toContainText('A newer version of the template is in use.');
+    await fixText(details.locator('time'), 'just now');
+    await picture(page, 'page-origin', [
+      page.getByTestId('last-updated'),
+      details
+        .locator('.details-facts > div')
+        .filter({ hasNotText: /Made from|Made with it/ })
+        .locator('dd'),
+    ]);
+    await checkAccessibility(page);
+
+    const file = await page.request.get(`/api/v1/templates/${tpl}/export`);
+    expect(file.status(), await file.text()).toBe(200);
+    await page.goto('/spaces/ORIGINS/templates');
+    await page.locator('input[type=file]').setInputFiles({
+      name: 'project-start.json',
+      mimeType: 'application/json',
+      buffer: Buffer.from(await file.text()),
+    });
+    await expect(page.getByRole('status').filter({ hasText: 'was imported as a draft' })).toBeVisible();
+    await picture(page, 'template-import-note');
+    await checkAccessibility(page);
+
+    for (let i = 3; i <= 50; i++) {
+      const more = await page.request.post(`/api/v1/spaces/${space}/templates`, {
+        data: {
+          name: `Checklist ${String(i).padStart(2, '0')}`,
+          category: 'Checklists',
+          document: paragraph('Steps.'),
+        },
+      });
+      expect(more.status(), await more.text()).toBe(201);
+    }
+    await page.goto('/spaces/ORIGINS/templates');
+    await expect(page.getByRole('link', { name: 'Checklist 50' })).toBeVisible();
+    await picture(page, 'templates-fifty');
+    await checkAccessibility(page);
+    const gone = await page.request.delete(`/api/v1/spaces/${space}`);
+    expect(gone.ok(), await gone.text()).toBeTruthy();
+    await page.context().close();
+  });
+});

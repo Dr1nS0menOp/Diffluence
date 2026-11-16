@@ -123,8 +123,25 @@ func (s *Service) fromTemplate(ctx context.Context, r *run, a Action, values map
 	if space == nil {
 		return apperr.Invalid("Choose the space of the new page.")
 	}
-	_, err := s.Templates.Use(ctx, r.caller, *a.TargetID, templates.UseInput{SpaceID: *space, ParentID: a.ParentID, Title: expand(a.Title, values)})
+	// A rule uses the version approved when it runs, and answers no question (spec 074, TPL-604).
+	_, err := s.Templates.UseForRule(ctx, r.caller, *a.TargetID, templates.UseInput{SpaceID: *space, ParentID: a.ParentID, Title: expand(a.Title, values)})
 	return err
+}
+
+// previewTemplate warns in a test run about a template the rule could not use: one that asks
+// a question a rule cannot answer, or one not offered to the rule's owner (TPL-1105).
+func (s *Service) previewTemplate(ctx context.Context, r *run, a Action) (string, error) {
+	asked, err := s.Templates.RuleQuestions(ctx, r.caller, *a.TargetID)
+	if e, ok := apperr.As(err); ok {
+		return e.Code, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	if len(asked) > 0 {
+		return "template_asks", nil
+	}
+	return "would_" + a.Type, nil
 }
 
 // recipients resolves who a step is for.
@@ -273,6 +290,9 @@ func (s *Service) callOut(ctx context.Context, a Action, values map[string]strin
 // preview says what a step would do, using the same permission rule the real step
 // meets, and changes nothing.
 func (s *Service) preview(ctx context.Context, r *run, a Action, page *uuid.UUID) (string, error) {
+	if a.Type == ActTemplate && a.TargetID != nil {
+		return s.previewTemplate(ctx, r, a)
+	}
 	if page == nil {
 		return "would_" + a.Type, nil
 	}
