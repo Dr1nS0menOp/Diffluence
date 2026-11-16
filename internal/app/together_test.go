@@ -1402,7 +1402,8 @@ func TestCandidatesMarkWhoCannotSeeThePage(t *testing.T) {
 	owner.grant(space, "user", reader.id, permissions.TemplateViewer)
 	page := owner.page(space, nil, "Page", "x")
 
-	list := threads(owner.ok("GET", "/api/v1/pages/"+page+"/mention-candidates?q=example", nil), "candidates")
+	// "Test" starts every name here; a part inside a word finds nobody since NAV-121.
+	list := threads(owner.ok("GET", "/api/v1/pages/"+page+"/mention-candidates?q=test", nil), "candidates")
 	if len(list) != 3 || list[0]["can_view"] != true || list[2]["can_view"] != false {
 		t.Fatalf("candidates: %v", list)
 	}

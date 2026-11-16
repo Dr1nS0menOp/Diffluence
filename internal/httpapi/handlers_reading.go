@@ -270,7 +270,7 @@ func (s *Server) quickPeople(r *http.Request, c identity.Caller, text string) ([
 	if err != nil || !allowed {
 		return out, err
 	}
-	entries, err := s.deps.Identity.PeopleByName(r.Context(), search.Prefixes(text), quickGroupSize)
+	entries, err := s.deps.Identity.PeopleByName(r.Context(), text, quickGroupSize)
 	if err != nil {
 		return out, err
 	}

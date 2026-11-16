@@ -19,7 +19,10 @@ var queryBudgets = map[string]int64{
 	// Two more since spec 047: titles that hold the typed text, and titles near it, each
 	// asked only when the earlier tiers leave room on the page.
 	// One more since spec 064, wave DC3: the second entry of a working version, for its authors.
-	"search":           20,
+	"search": 20,
+	// Spec 086: tasks are found like comments, in one transaction with the count, and the way
+	// back to each.
+	"search for tasks": 10,
 	"the bell":         3,
 	"a page's summary": 13,
 	"the space":        11,
@@ -47,11 +50,14 @@ func TestTheMainScreensStayWithinTheirQueryBudget(t *testing.T) {
 	parent := owner.page(space, home, "Budget parent", "plan and review")
 	page := owner.page(space, parent, "Budget page", "the release plan and its review")
 	owner.page(space, parent, "Budget sibling", "another plan")
+	tasks := owner.page(space, parent, "Budget tasks", "x")
+	owner.publish(tasks, "Budget tasks", 1, taskDoc(map[string]any{"checked": false}, "Write the plan"))
 
 	paths := map[string]string{
 		"open a page":      "/api/v1/pages/" + page,
 		"the tree":         "/api/v1/spaces/" + space + "/tree/branches",
 		"search":           "/api/v1/search?q=" + url.QueryEscape("plan"),
+		"search for tasks": "/api/v1/search?kind=task&q=" + url.QueryEscape("plan"),
 		"the bell":         "/api/v1/me/notifications/count",
 		"a page's summary": "/api/v1/pages/" + page + "/summary",
 		"the space":        "/api/v1/spaces/" + space,

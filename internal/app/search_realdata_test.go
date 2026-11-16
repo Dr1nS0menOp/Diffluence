@@ -48,6 +48,14 @@ func TestSearchOnRealData(t *testing.T) {
 	people := e.scalar(`SELECT string_agg(a, '&contributor=') FROM (SELECT v.author_id::text AS a FROM page_versions v
 		JOIN pages p ON p.id = v.page_id WHERE p.space_id = $1 GROUP BY v.author_id ORDER BY count(*) DESC LIMIT 2) x`, space)
 	t.Logf("common %q, rare %q, typo %q, label %q", common, rare, swapLastLetters(common), label)
+	// Spec 086: tasks by the most common word of their text, and people by the start of the most
+	// common first word of a name.
+	taskWord := e.scalar(`SELECT COALESCE((SELECT word FROM ts_stat($$SELECT to_tsvector('simple', text) FROM page_tasks$$)
+		WHERE length(word) >= 4 ORDER BY ndoc DESC, word LIMIT 1), 'plan')`)
+	nameStart := e.scalar(`SELECT COALESCE((SELECT left(lower(split_part(display_name, ' ', 1)), 3) FROM users
+		WHERE type <> 'service' GROUP BY 1 ORDER BY count(*) DESC, 1 LIMIT 1), 'a')`)
+	t.Logf("tasks %s, people %s, groups %s; task word %q, name start %q", e.scalar(`SELECT count(*)::text FROM page_tasks`),
+		e.scalar(`SELECT count(*)::text FROM users`), e.scalar(`SELECT count(*)::text FROM groups`), taskWord, nameStart)
 
 	searches := []struct{ name, path string }{
 		{"a common word", "/api/v1/search?q=" + url.QueryEscape(common)},
@@ -60,6 +68,9 @@ func TestSearchOnRealData(t *testing.T) {
 		{"two people", "/api/v1/search?q=" + url.QueryEscape(common) + "&contributor=" + people},
 		{"the box", "/api/v1/search/quick?q=" + url.QueryEscape(common)},
 		{"the box, a typo", "/api/v1/search/quick?q=" + url.QueryEscape(swapLastLetters(common))},
+		{"tasks", "/api/v1/search?kind=task&q=" + url.QueryEscape(taskWord)},
+		{"a field for people", "/api/v1/directory?q=" + url.QueryEscape(nameStart)},
+		{"the People tab", "/api/v1/people?q=" + url.QueryEscape(nameStart)},
 	}
 	for _, s := range searches {
 		took := medianOf(reader, "GET", s.path, nil)

@@ -1,6 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 import { describe, expect, it } from 'vitest';
-import { addValue, emptyWays, highlight, removeValue, suggestionAddress, withValue } from './search';
+import {
+  addValue,
+  contentTabAddress,
+  emptyWays,
+  highlight,
+  removeValue,
+  suggestionAddress,
+  taskParamsFor,
+  withValue,
+} from './search';
 
 describe('a similar spelling (ORG-023)', () => {
   it('replaces the plain words and keeps the filters', () => {
@@ -63,5 +72,22 @@ describe('the ways forward of a search that found nothing (NAV-175)', () => {
     ]);
     expect(emptyWays(new URLSearchParams('q=plan&archived=1&tab=content'))).toEqual([]);
     expect(emptyWays(new URLSearchParams('q=label:hr&archived=1'))).toEqual([]);
+  });
+});
+
+describe('the other tabs of the results (spec 086)', () => {
+  it('ask for tasks with the words, the space and archived pages, and no page filters', () => {
+    const address = new URLSearchParams('q=boat&tab=tasks&space_id=s1&archived=1&label=x&kind=page&titles=1');
+    expect(taskParamsFor(address).toString()).toBe('q=boat&space_id=s1&archived=1&kind=task');
+  });
+  it('leave out what is empty', () => {
+    expect(taskParamsFor(new URLSearchParams('q=boat&tab=tasks&space_id=')).toString()).toBe(
+      'q=boat&kind=task',
+    );
+  });
+  it('offer the content tab with the same words as a way forward', () => {
+    expect(contentTabAddress(new URLSearchParams('q=boat&tab=people&archived=1'))).toBe(
+      '/search?q=boat&archived=1',
+    );
   });
 });

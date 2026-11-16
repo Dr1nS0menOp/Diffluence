@@ -166,16 +166,21 @@ func (s *Service) List(ctx context.Context, c identity.Caller, q Query) ([]Row, 
 	if q.GroupID != uuid.Nil {
 		group = &q.GroupID
 	}
+	// Each typed word is the start of a word of the name (NAV-121), through the index of names.
+	words := identity.NameWords(q.Text)
+	if words == "" && strings.TrimSpace(q.Text) != "" {
+		return []Row{}, 0, nil
+	}
 	const where = ` JOIN perm_visible_people($1) v ON v.user_id = u.id
 		WHERE u.status = 'active' AND u.anonymised_at IS NULL
-		  AND ($2 = '' OR position(lower($2) IN lower(u.display_name)) > 0)
+		  AND ($2 = '' OR to_tsvector('simple', u.display_name) @@ to_tsquery('simple', $2))
 		  AND ($3::uuid IS NULL OR u.id IN (SELECT m.user_id FROM group_members m WHERE m.group_id = $3))`
 	var total int
-	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM users u"+where, c.UserID, q.Text, group).Scan(&total); err != nil {
+	if err := s.pool.QueryRow(ctx, "SELECT count(*) FROM users u"+where, c.UserID, words, group).Scan(&total); err != nil {
 		return nil, 0, err
 	}
 	rows, err := s.pool.Query(ctx, personSQL+where+" ORDER BY lower(u.display_name), u.id LIMIT $4 OFFSET $5",
-		c.UserID, q.Text, group, q.Limit, max(q.Offset, 0))
+		c.UserID, words, group, q.Limit, max(q.Offset, 0))
 	if err != nil {
 		return nil, 0, err
 	}

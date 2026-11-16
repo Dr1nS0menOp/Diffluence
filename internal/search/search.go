@@ -175,6 +175,18 @@ type Result struct {
 	Breadcrumbs []Crumb   `json:"breadcrumbs"`
 	// CommentID is set when a comment was found, and the result links to it.
 	CommentID *uuid.UUID `json:"comment_id,omitempty"`
+	// Task is set when a task was found (COL-040); the result is then about the page it stands on.
+	Task *TaskFacts `json:"task,omitempty"`
+}
+
+// TaskFacts is what a task result says about the task, besides its text in the snippet.
+type TaskFacts struct {
+	ID   uuid.UUID `json:"id"`
+	Done bool      `json:"done"`
+	// Due is the task's date, as YYYY-MM-DD, or nil without one.
+	Due *string `json:"due"`
+	// AssigneeName is the name the page shows for the assigned person, or empty.
+	AssigneeName string `json:"assignee_name"`
 }
 
 // Results is a page of results, with how many there are in all.
@@ -316,6 +328,31 @@ const (
 			'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'),
 		c.created_at, c.author_id ` + commentsFrom + ` ORDER BY c.created_at DESC, c.id LIMIT $8 OFFSET $9`
 	commentsCount = `SELECT count(*) FROM (SELECT 1 ` + commentsFrom + ` LIMIT $8) n`
+)
+
+// KindTask asks for tasks instead of pages (COL-040).
+const KindTask = "task"
+
+// A task is found through perm_visible_pages of its page and nothing else, at the moment of the
+// search. page_tasks holds the tasks of the version readers see, so a task of a working version
+// is found once that version is approved (spec 086, D7). The words are read the way the index
+// on tasks reads them (page_tasks_words_idx). Open tasks come first, then the nearest date.
+const (
+	tasksFrom = `FROM to_tsquery('simple', $2) AS q(query)
+	JOIN page_tasks t ON to_tsvector('simple', t.text) @@ q.query
+	JOIN perm_visible_pages($1) v ON v.page_id = t.page_id
+	JOIN pages p ON p.id = t.page_id AND p.status = 'published'
+	JOIN spaces s ON s.id = p.space_id
+	LEFT JOIN users u ON u.id = t.assignee_id
+	WHERE ($3::uuid IS NULL OR p.space_id = $3)
+	  AND ($4::boolean OR (s.status = 'active' AND p.archived_at IS NULL))
+	  AND ($5::text[] IS NULL OR lower(s.key) = ANY($5))`
+	tasksSQL = `SELECT t.id, t.done, t.due_on::text, COALESCE(u.display_name, ''),
+		p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', s.home_page_id IS NOT DISTINCT FROM p.id,
+		ts_headline('simple', t.text, q.query, ` + headlineOptions + `), t.updated_at, p.updated_by ` + tasksFrom + `
+		ORDER BY t.done, t.due_on NULLS LAST, t.updated_at DESC, t.id LIMIT $6 OFFSET $7`
+	tasksCount = `SELECT count(*) FROM (SELECT 1 ` + tasksFrom + ` LIMIT $6) n`
 )
 
 func nilIfEmpty[T any](list []T) []T {
@@ -496,6 +533,9 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Result
 	if slices.Contains(q.Kinds, KindComment) {
 		return s.searchComments(ctx, userID, q, parsed)
 	}
+	if slices.Contains(q.Kinds, KindTask) {
+		return s.searchTasks(ctx, userID, q)
+	}
 	if hidden, err := s.belowHidden(ctx, userID, q.Below); err != nil || hidden {
 		return Results{Results: []Result{}}, err
 	}
@@ -541,6 +581,33 @@ func (s *Service) searchComments(ctx context.Context, userID uuid.UUID, q Query,
 	}
 	args := []any{userID, parsed.TSQuery, optID(q.SpaceID), optID(q.AuthorID), optTime(q.Since), optTime(q.Until), q.IncludeArchived}
 	out, err := s.run(ctx, commentsSQL, commentsCount, args, []any{q.Limit, max(q.Offset, 0)}, scanComments)
+	if err != nil {
+		return out, err
+	}
+	return out, s.addBreadcrumbs(ctx, userID, out.Results)
+}
+
+func scanTasks(rows pgx.Rows) ([]Result, error) {
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Result, error) {
+		var v Result
+		var task TaskFacts
+		err := r.Scan(&task.ID, &task.Done, &task.Due, &task.AssigneeName,
+			&v.PageID, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.Title, &v.Emoji, &v.Kind, &v.StageText, &v.StageColor,
+			&v.Archived, &v.Draft, &v.Home, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
+		v.Task = &task
+		return v, err
+	})
+}
+
+// searchTasks needs words, like comments: a task has no filters of its own to list it by. A
+// task has no title, so titles only does not narrow it.
+func (s *Service) searchTasks(ctx context.Context, userID uuid.UUID, q Query) (Results, error) {
+	parsed := parse(q.Text, false, false)
+	if parsed.TSQuery == "" {
+		return Results{Results: []Result{}}, nil
+	}
+	args := []any{userID, parsed.TSQuery, optID(q.SpaceID), q.IncludeArchived, nilIfEmpty(parsed.Spaces)}
+	out, err := s.run(ctx, tasksSQL, tasksCount, args, []any{q.Limit, max(q.Offset, 0)}, scanTasks)
 	if err != nil {
 		return out, err
 	}

@@ -1373,6 +1373,8 @@ export interface SearchResult {
   home?: boolean;
   breadcrumbs?: { id: string; title: string }[];
   comment_id?: string;
+  /** Set when a task was found (COL-040); the rest of the result is about its page. */
+  task?: { id: string; done: boolean; due: string | null; assignee_name: string };
 }
 
 export interface SearchAnswer {

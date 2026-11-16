@@ -3111,6 +3111,25 @@ mutate_web "the home page is marked as a page" src/components/kind-mark.tsx \
   's.replace("if (item.home) return \x27home\x27;", "")' src/components/kind-mark.test.ts
 mutate_web "a file in the box has no mark of its kind" src/components/quick-search.tsx \
   's.replace("mark: { type: \x27file\x27 as const, filename: f.filename },", "mark: NO_MARK,")' src/components/reading.test.ts
+
+# Spec 086, wave SR2: a task follows the rule of its page, people are found by the start of a
+# word and only where the reader may see them, and the marks of the other tabs.
+mutate "a task on a page the reader may not see is found" internal/search/search.go \
+  's.replace("JOIN perm_visible_pages($1) v ON v.page_id = t.page_id", "JOIN pages v ON v.id = t.page_id AND $1::uuid IS NOT NULL")' $app -run '^TestTaskSearchFollowsThePageOfTheTask$'
+mutate "a task on an archived page is found" internal/search/search.go \
+  's.replace("AND ($4::boolean OR (s.status = \x27active\x27 AND p.archived_at IS NULL))", "AND ($4::boolean OR true)")' $app -run '^TestTaskSearchFollowsThePageOfTheTask$'
+mutate "a guest is offered people outside the space" internal/sharing/sharing.go \
+  's.replace("\tif mayBrowse {", "\tif mayBrowse || len(text) >= 0 {")' $app -run '^TestFieldsWithoutViewProfilesOfferOnlyPeopleOfTheSpace$'
+mutate "the box offers people without view profiles" internal/httpapi/handlers_reading.go \
+  's.replace("if err != nil || !allowed {", "if err != nil || (false \x26\x26 !allowed) {")' $app -run '^TestFieldsWithoutViewProfilesOfferOnlyPeopleOfTheSpace$'
+mutate "the People tab lists people out of reach" internal/people/people.go \
+  's.replace("JOIN perm_visible_people($1) v ON v.user_id = u.id", "JOIN users v ON v.id = u.id AND $1::uuid IS NOT NULL")' $app -run '^TestThePeopleTabKeepsToWhomTheReaderMaySee$'
+mutate "a field finds a part inside an address" internal/identity/names.go \
+  's.replace("return escaped + \"%\"", "return \"%\" + escaped + \"%\"")' $app -run '^TestPeopleFieldsFindTheStartOfAnyWordOfAName$'
+mutate "a field finds only whole words" internal/identity/names.go \
+  's.replace("terms[i] = \"\x27\" + w + \"\x27:*\"", "terms[i] = \"\x27\" + w + \"\x27\"")' ./internal/identity/ -run '^TestNameWordsAreStartsOfWords$'
+mutate_web "the Tasks tab asks for the filters of pages" src/views/search.tsx \
+  's.replace("for (const key of [\x27q\x27, \x27space_id\x27, \x27archived\x27]) {", "for (const key of [...address.keys()]) {")' src/views/search.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

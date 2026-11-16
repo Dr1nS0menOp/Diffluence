@@ -466,7 +466,8 @@ var crossings = map[crossing]int{
 
 	// search: the index and its answers join pages, spaces, labels, files and people. The way
 	// back to a result marks ancestors under document control by a key lookup, so the rule is
-	// asked only when one is there (spec 080).
+	// asked only when one is there (spec 080). Tasks are found as results of their own, on the
+	// page that holds them, with the name of the assigned person (spec 086).
 	{"internal/search", "attachment_labels"}: 2,
 	{"internal/search", "attachments"}:       2,
 	{"internal/search", "comments"}:          1,
@@ -474,11 +475,12 @@ var crossings = map[crossing]int{
 	{"internal/search", "page_control"}:      1,
 	{"internal/search", "page_labels"}:       2,
 	{"internal/search", "page_mentions"}:     2,
+	{"internal/search", "page_tasks"}:        1,
 	{"internal/search", "page_tree"}:         3,
 	{"internal/search", "page_versions"}:     2,
-	{"internal/search", "pages"}:             6,
-	{"internal/search", "spaces"}:            5,
-	{"internal/search", "users"}:             4,
+	{"internal/search", "pages"}:             7,
+	{"internal/search", "spaces"}:            6,
+	{"internal/search", "users"}:             5,
 
 	// setup: the first setup stays open only while no administrator exists, read in the
 	// transaction that uses the code.

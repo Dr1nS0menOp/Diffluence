@@ -1,6 +1,6 @@
 # 080: Search after the screens study, waves SR1 and onwards
 
-Status: wave SR1 built; SR2 to SR4 planned
+Status: waves SR1 and SR2 built (SR2 in spec 086); SR3 and SR4 planned
 Phase: before 1.0. The feature freeze of ADR-043 keeps new parts for after 1.0; on 2026-11-15 the product owner put search first among the new work and allowed new search features before 1.0. Changes to the built search screens are rebuilds, not new parts.
 
 ## Problem

@@ -76,6 +76,37 @@ var ErrChecksumMismatch = errors.New("db: an applied migration was modified")
 // migrationLockKey is the advisory lock that serialises migration runs across nodes.
 const migrationLockKey int64 = 0x6466_6c75_6d69_6772 // "dflumigr"
 
+// migrationLockPoll is how long a node waits between two attempts at the migration lock.
+const migrationLockPoll = 100 * time.Millisecond
+
+// takeMigrationLock waits for the migration lock of the session.
+func takeMigrationLock(ctx context.Context, q Querier) error {
+	return pollLock(ctx, q, "SELECT pg_try_advisory_lock($1)")
+}
+
+// pollLock waits for the migration lock by asking again and again with tryLock, never in one
+// statement that blocks: a waiting statement holds a snapshot, and CREATE INDEX CONCURRENTLY
+// on the node that holds the lock waits until every older snapshot is gone, so the two waited
+// for each other and PostgreSQL broke the deadlock by failing a node's start (OPS-073, spec 086).
+func pollLock(ctx context.Context, q Querier, tryLock string) error {
+	for {
+		var taken bool
+		if err := q.QueryRow(ctx, tryLock, migrationLockKey).Scan(&taken); err != nil {
+			return err
+		}
+		if taken {
+			return nil
+		}
+		timer := time.NewTimer(migrationLockPoll)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
 var fileName = regexp.MustCompile(`^(\d{4})_([a-z0-9_]+)\.sql$`)
 
 // Migrations returns the migrations embedded in this binary, in order.
@@ -215,7 +246,7 @@ func Migrate(ctx context.Context, pool *pgxpool.Pool, migs []Migration, opts Opt
 	if err := RequirePostgres(ctx, conn); err != nil {
 		return rep, err
 	}
-	if _, err := conn.Exec(ctx, "SELECT pg_advisory_lock($1)", migrationLockKey); err != nil {
+	if err := takeMigrationLock(ctx, conn); err != nil {
 		return rep, fmt.Errorf("db: take migration lock: %w", err)
 	}
 	defer func() {

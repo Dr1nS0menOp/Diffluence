@@ -59,7 +59,7 @@ A wiki becomes useful when people respond to each other. This chapter covers com
 - **COL-037** · built · The person is notified when they are assigned, and on the due date.
 - **COL-038** · built · **My tasks** lists all tasks assigned to a person, grouped by due date. A person can tick them there, and open the page at the task.
 - **COL-039** · built · A person also sees tasks they created for others, in a tab.
-- **COL-040** · new · Tasks are searchable, and can be reported on (BLK-038).
+- **COL-040** · built · Tasks are searchable, and can be reported on (BLK-038). Search has a Tasks tab (spec 086).
 - **COL-041** · built · A task on a page the assigned person cannot see is flagged to the writer, as with mentions.
 
 ## 7.6 Sharing

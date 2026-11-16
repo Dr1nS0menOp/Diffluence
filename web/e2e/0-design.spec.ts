@@ -1649,6 +1649,33 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  test('the People tab of a search', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/search?q=vis&tab=people');
+    await expect(page.locator('.results').getByRole('link', { name: READER.name })).toBeVisible();
+    await picture(page, 'search-people');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('the Spaces tab of a search', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/search?q=handbook&tab=spaces');
+    await expect(page.locator('.results').getByRole('link', { name: 'Engineering Handbook' })).toBeVisible();
+    await picture(page, 'search-spaces');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('another tab of a search that found nothing', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/search?q=zebracrossing&tab=spaces');
+    await expect(page.getByRole('heading', { name: 'No spaces found for “zebracrossing”' })).toBeVisible();
+    await picture(page, 'search-tab-empty');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
   // Last, because from here on the bell of the reader shows a number.
   test.describe('working together', () => {
     const QUOTE = 'the kitchen rota';
@@ -1703,6 +1730,16 @@ test.describe('the look of every kind of screen', () => {
       });
       expect(shared.ok(), await shared.text()).toBeTruthy();
       await setup.context().close();
+    });
+
+    test('the Tasks tab of a search', async ({ browser }) => {
+      const page = await newReaderPage(browser, 'light');
+      await page.goto('/search?q=dishwasher&tab=tasks');
+      await expect(page.locator('.results mark')).toHaveText('dishwasher');
+      // Notifications of this set-up may still arrive: the number on the bell is not the point.
+      await picture(page, 'search-tasks', [page.locator('.bell-number')]);
+      await checkAccessibility(page);
+      await page.context().close();
     });
 
     test('NotificationsView: all notifications', async ({ browser }) => {

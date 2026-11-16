@@ -225,8 +225,9 @@ func GrantApp(ctx context.Context, owner *pgxpool.Pool, role string) error {
 	return pgx.BeginFunc(ctx, owner, func(tx pgx.Tx) error {
 		// GRANT rewrites catalog rows, so two nodes doing it at once would fail with
 		// "tuple concurrently updated". The migration lock makes them take turns, and
-		// makes this wait for a migration that is still running.
-		if _, err := tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", migrationLockKey); err != nil {
+		// makes this wait for a migration that is still running, without blocking an index
+		// that is being built alongside (pollLock).
+		if err := pollLock(ctx, tx, "SELECT pg_try_advisory_xact_lock($1)"); err != nil {
 			return fmt.Errorf("db: take migration lock: %w", err)
 		}
 		for _, stmt := range []string{

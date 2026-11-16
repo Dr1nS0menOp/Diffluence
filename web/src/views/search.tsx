@@ -2,20 +2,22 @@
 import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { api, type DirectoryEntry, type SearchAnswer, type SearchResult, type Space } from '../api';
+import { api, type Person, type SearchAnswer, type SearchResult, type Space } from '../api';
+import { useDates } from '../dates';
 import { Link, navigate, useLocation } from '../router';
 import { GuideLink } from '../components/guide-link';
-import { KindMark } from '../components/kind-mark';
+import { KindMark, TaskMark } from '../components/kind-mark';
 import { LoadingBox } from '../components/loading-box';
 import { StageMark } from '../components/page-marks';
-import { personQuery } from '../components/person';
+import { PersonMark, PersonPicture, personQuery } from '../components/person';
 import { PagePicker, SubjectPicker } from '../components/picker';
-import { ErrorNote } from '../components/ui';
+import { ErrorNote, SpaceBadge } from '../components/ui';
 import { NO_FILTERS, queryWith, splitQuery } from '../components/search-filters';
 import { pageTitle } from '../page-name';
 
 const RESULTS_PER_LOAD = 25;
-const TABS = ['content', 'people', 'spaces'] as const;
+const TABS = ['content', 'people', 'spaces', 'tasks'] as const;
+type OtherTab = Exclude<(typeof TABS)[number], 'content'>;
 const DATE_PRESETS: Record<string, number> = { day: 1, week: 7, month: 31, year: 366 };
 const MILLISECONDS_PER_DAY = 86_400_000;
 
@@ -54,6 +56,25 @@ export function withValue(address: URLSearchParams, key: string, value: string):
   if (value) next.set(key, value);
   else next.delete(key);
   return next;
+}
+
+/**
+ * What the Tasks tab asks the server: the words, the space and archived pages. The filters of
+ * pages do not apply to a task (spec 086).
+ */
+export function taskParamsFor(address: URLSearchParams): URLSearchParams {
+  const params = new URLSearchParams();
+  for (const key of ['q', 'space_id', 'archived']) {
+    const value = address.get(key);
+    if (value) params.set(key, value);
+  }
+  params.set('kind', 'task');
+  return params;
+}
+
+/** The same search on the content tab, as a way forward from another tab that found nothing. */
+export function contentTabAddress(address: URLSearchParams): string {
+  return `/search?${withValue(address, 'tab', '').toString()}`;
 }
 
 /** The address with one more value for a key that may hold several, each once. */
@@ -343,11 +364,9 @@ function EmptyResult({ address, suggestion }: { address: URLSearchParams; sugges
   );
 }
 
-function ContentResults({ params, address }: { params: URLSearchParams; address: URLSearchParams }) {
-  const { t } = useTranslation();
-  const query = params.toString();
-  const hasFilter = [...params.keys()].some((key) => key !== 'q');
-  const q = useInfiniteQuery({
+/** A search loaded a page of results at a time, as long as there are more. */
+function usePagedSearch(query: string, enabled: boolean) {
+  return useInfiniteQuery({
     queryKey: ['search', query],
     initialPageParam: 0,
     queryFn: ({ pageParam }) =>
@@ -358,8 +377,14 @@ function ContentResults({ params, address }: { params: URLSearchParams; address:
         ? loaded
         : undefined;
     },
-    enabled: params.get('q')?.trim() !== undefined || hasFilter,
+    enabled,
   });
+}
+
+function ContentResults({ params, address }: { params: URLSearchParams; address: URLSearchParams }) {
+  const { t } = useTranslation();
+  const hasFilter = [...params.keys()].some((key) => key !== 'q');
+  const q = usePagedSearch(params.toString(), params.get('q')?.trim() !== undefined || hasFilter);
   const first = q.data?.pages[0];
   const results = q.data?.pages.flatMap((p) => p.results) ?? [];
   const empty = first !== undefined && !first.timed_out && results.length === 0;
@@ -421,43 +446,149 @@ function CommentResults({ params }: { params: URLSearchParams }) {
   );
 }
 
-function PeopleResults({ text }: { text: string }) {
+/**
+ * Another tab that found nothing: the screen of NAV-175, with the content tab as the way
+ * forward in the text, and the guide link.
+ */
+function OtherEmpty({ tab, address }: { tab: OtherTab; address: URLSearchParams }) {
+  const { t } = useTranslation();
+  const text = splitQuery(address.get('q') ?? '').text.trim();
+  return (
+    <section className="empty-result" aria-labelledby="empty-result-title">
+      <h2 id="empty-result-title">{t(`search.emptyTitle_${tab}`, { text })}</h2>
+      <p>{tab === 'people' ? t('search.emptyCheckName') : t('search.emptyCheck')}</p>
+      <p>
+        {t('search.emptyWider')} <Link href={contentTabAddress(address)}>{t('search.emptyContent')}</Link>.
+      </p>
+      <p className="empty-result-guide">
+        <GuideLink>{t('search.emptyGuide')}</GuideLink>
+      </p>
+    </section>
+  );
+}
+
+/** People the reader may see, from the directory of colleagues (spec 013, NAV-059). */
+function PeopleResults({ text, address }: { text: string; address: URLSearchParams }) {
   const { t } = useTranslation();
   const q = useQuery({
-    queryKey: ['directory', text],
-    queryFn: () => api.get<{ entries: DirectoryEntry[] }>(`/directory?q=${encodeURIComponent(text)}`),
-    enabled: text !== '',
+    queryKey: ['people', text, ''],
+    queryFn: () =>
+      api.get<{ people: Person[]; total: number }>(`/people?${new URLSearchParams({ q: text }).toString()}`),
   });
-  const people = q.data?.entries.filter((e) => e.type === 'user') ?? [];
+  const people = q.data?.people ?? [];
   return (
     <>
+      {q.isLoading && <LoadingBox sentence={t('search.loading')} />}
       <ErrorNote error={q.error} />
-      {q.data && people.length === 0 && <p>{t('search.noResults')}</p>}
-      <ul className="page-list">
+      {q.data && people.length === 0 && <OtherEmpty tab="people" address={address} />}
+      <ol className="results">
         {people.map((p) => (
           <li key={p.id}>
-            {p.name} <span className="muted">{p.detail}</span>
+            <div className="result-head">
+              <PersonPicture person={p} size="small" />
+              <Link href={`/people/${p.id}`}>{p.name}</Link>
+              <PersonMark person={p} />
+              <span className="muted">{[p.job_title, p.department].filter(Boolean).join(' · ')}</span>
+            </div>
           </li>
         ))}
-      </ul>
+      </ol>
     </>
   );
 }
 
-function SpaceResults({ text, spaces }: { text: string; spaces: Space[] }) {
+/** The spaces the reader may see whose name or key holds the words. */
+function SpaceResults({
+  text,
+  spaces,
+  loading,
+  address,
+}: {
+  text: string;
+  spaces: Space[];
+  loading: boolean;
+  address: URLSearchParams;
+}) {
   const { t } = useTranslation();
   const wanted = text.toLowerCase();
   const found = spaces.filter((s) => `${s.name} ${s.key}`.toLowerCase().includes(wanted));
+  if (loading) return <LoadingBox sentence={t('search.loading')} />;
   return (
     <>
-      {found.length === 0 && <p>{t('search.noResults')}</p>}
-      <ul className="page-list">
+      {found.length === 0 && <OtherEmpty tab="spaces" address={address} />}
+      <ol className="results">
         {found.map((s) => (
           <li key={s.id}>
-            <Link href={`/spaces/${s.key}`}>{s.name}</Link> <span className="muted">{s.key}</span>
+            <div className="result-head">
+              <SpaceBadge space={s} size="small" />
+              <Link href={`/spaces/${s.key}`}>{s.name}</Link>
+              <span className="muted">{s.key}</span>
+            </div>
           </li>
         ))}
-      </ul>
+      </ol>
+    </>
+  );
+}
+
+function TaskRow({ result }: { result: SearchResult }) {
+  const { t } = useTranslation();
+  const dates = useDates();
+  const task = result.task;
+  if (!task) return null;
+  return (
+    <li>
+      <div className="result-head">
+        <TaskMark done={task.done} />
+        <span>
+          {highlight(result.snippet).map((part, i) =>
+            part.hit ? <mark key={i}>{part.text}</mark> : <span key={i}>{part.text}</span>,
+          )}
+        </span>
+      </div>
+      <p className="result-facts muted">
+        {task.due && <span>{t('search.taskDue', { date: dates.day(task.due) })}</span>}
+        {task.assignee_name && <span>{t('search.taskFor', { name: task.assignee_name })}</span>}
+        <Link href={`/pages/${result.page_id}`}>
+          {t('search.taskOn', { title: pageTitle(t, result.title) })}
+        </Link>
+        <span>{result.space_name}</span>
+        {result.archived && <span className="lozenge">{t('search.archived')}</span>}
+      </p>
+    </li>
+  );
+}
+
+/** Tasks whose text holds the words, on pages the reader may see (COL-040). */
+function TaskResults({ address }: { address: URLSearchParams }) {
+  const { t } = useTranslation();
+  const q = usePagedSearch(taskParamsFor(address).toString(), true);
+  const first = q.data?.pages[0];
+  const results = q.data?.pages.flatMap((p) => p.results) ?? [];
+  const empty = first !== undefined && !first.timed_out && results.length === 0;
+  return (
+    <>
+      {q.isLoading && <LoadingBox sentence={t('search.loading')} />}
+      <ErrorNote error={q.error} />
+      {first?.timed_out && <p role="alert">{t('search.timedOut')}</p>}
+      {first && !first.timed_out && !empty && (
+        <p role="status" className="muted">
+          {first.capped
+            ? t('search.totalCapped', { count: first.total })
+            : t('search.total', { count: first.total })}
+        </p>
+      )}
+      {empty && <OtherEmpty tab="tasks" address={address} />}
+      <ol className="results">
+        {results.map((r) => (
+          <TaskRow key={r.task?.id ?? r.page_id} result={r} />
+        ))}
+      </ol>
+      {q.hasNextPage && (
+        <button type="button" disabled={q.isFetchingNextPage} onClick={() => void q.fetchNextPage()}>
+          {t('common.more')}
+        </button>
+      )}
     </>
   );
 }
@@ -524,6 +655,7 @@ export function SearchView() {
   const { t } = useTranslation();
   const { searchParams } = useLocation();
   const text = searchParams.get('q') ?? '';
+  const words = splitQuery(text);
   const tab = TABS.find((name) => name === searchParams.get('tab')) ?? 'content';
   const [input, setInput] = useState(text);
   useEffect(() => setInput(text), [text]);
@@ -572,8 +704,16 @@ export function SearchView() {
       {tab === 'content' && <Filters address={searchParams} onSet={set} onGo={go} />}
       {!searching && <p className="muted">{t('search.hint')}</p>}
       {tab === 'content' && searching && <ContentResults params={params} address={searchParams} />}
-      {tab === 'people' && searching && <PeopleResults text={text} />}
-      {tab === 'spaces' && searching && <SpaceResults text={text} spaces={list} />}
+      {tab === 'people' && searching && <PeopleResults text={words.text.trim()} address={searchParams} />}
+      {tab === 'spaces' && searching && (
+        <SpaceResults
+          text={words.text.trim()}
+          spaces={list}
+          loading={spaces.isLoading}
+          address={searchParams}
+        />
+      )}
+      {tab === 'tasks' && searching && <TaskResults address={searchParams} />}
     </>
   );
 }

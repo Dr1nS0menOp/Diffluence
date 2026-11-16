@@ -17,6 +17,8 @@ import {
   IconPresent,
   IconSheet,
   IconTable,
+  IconTask,
+  IconTick,
 } from './icons';
 
 const MARK_ICON_SIZE = 16;
@@ -111,6 +113,16 @@ export function KindMark({ item }: { item: PageKindFacts }) {
   return (
     <Mark label={label}>
       <Icon size={MARK_ICON_SIZE} />
+    </Mark>
+  );
+}
+
+/** The mark of a task, open or done (COL-040). */
+export function TaskMark({ done }: { done: boolean }) {
+  const { t } = useTranslation();
+  return (
+    <Mark label={t(done ? 'kinds.task_done' : 'kinds.task_open')}>
+      {done ? <IconTick size={MARK_ICON_SIZE} /> : <IconTask size={MARK_ICON_SIZE} />}
     </Mark>
   );
 }

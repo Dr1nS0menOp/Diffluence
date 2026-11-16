@@ -2051,6 +2051,15 @@
     "tab_content": "Content",
     "tab_people": "People",
     "tab_spaces": "Spaces",
+    "tab_tasks": "Tasks",
+    "emptyTitle_people": "No people found for “{{text}}”",
+    "emptyTitle_spaces": "No spaces found for “{{text}}”",
+    "emptyTitle_tasks": "No tasks found for “{{text}}”",
+    "emptyCheckName": "Check the spelling, or type the start of another part of the name.",
+    "emptyContent": "search pages and blog posts",
+    "taskDue": "Due {{date}}",
+    "taskFor": "For {{name}}",
+    "taskOn": "On {{title}}",
     "contributor": "Written or edited by",
     "somePerson": "A person",
     "below": "Below a page",
@@ -2079,7 +2088,9 @@
     "file_document": "Document",
     "file_slides": "Slides",
     "file_sheet": "Spreadsheet",
-    "file_file": "File"
+    "file_file": "File",
+    "task_open": "Open task",
+    "task_done": "Done task"
   },
   "profile": {
     "title": "Your account",

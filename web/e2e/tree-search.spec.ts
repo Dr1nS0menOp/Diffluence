@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // Spec 028: search in the middle of the bar, and a tree that loads what is opened. Spec 080:
-// the rebuilt results screen.
+// the rebuilt results screen. Spec 086: the People, Spaces and Tasks tabs.
 import type { Page } from '@playwright/test';
 import {
   ADMIN,
@@ -165,4 +165,57 @@ test('several people narrow the results, each with a chip of their own', async (
   await expect(chips.getByRole('listitem')).toHaveCount(1);
   await expect(page).toHaveURL(new RegExp(`contributor=${second}`));
   await expect(page).not.toHaveURL(new RegExp(`contributor=${first}`));
+});
+
+test('a task is found on the Tasks tab, with the page it stands on', async ({ page }) => {
+  const space = await newSpace(page, 'Task search space');
+  const word = unique('lanternfish');
+  const pageId = await publishedPage(page, space.id, 'Boat chores', 'x');
+  const task = {
+    type: 'taskList',
+    content: [
+      {
+        type: 'taskItem',
+        attrs: { checked: false },
+        content: [paragraph(`Paint the ${word} hull`).content[0]],
+      },
+    ],
+  };
+  const res = await page.request.post(`/api/v1/pages/${pageId}/publish`, {
+    data: { title: 'Boat chores', base_version: 1, document: { type: 'doc', content: [task] } },
+  });
+  expect(res.ok(), await res.text()).toBeTruthy();
+  await page.goto(`/search?q=${word}`);
+  await page.getByRole('tab', { name: 'Tasks' }).click();
+  await expect(page).toHaveURL(/tab=tasks/);
+  const row = page.getByRole('listitem').filter({ hasText: word });
+  await expect(row.getByRole('img', { name: 'Open task' })).toBeVisible();
+  await expect(row.getByRole('link', { name: 'On Boat chores' })).toHaveAttribute('href', `/pages/${pageId}`);
+  await checkAccessibility(page);
+});
+
+test('the People tab finds the start of any word of a name, and says when it finds nobody', async ({
+  page,
+  browser,
+}) => {
+  const last = unique('saltmarsh');
+  await createNamedUser(browser, `${last}@example.com`, `Wren ${last}`);
+  await page.goto(`/search?q=${last.slice(0, 6)}&tab=people`);
+  await expect(page.getByRole('link', { name: `Wren ${last}` })).toBeVisible();
+  await page.goto(`/search?q=${last.slice(2, 8)}&tab=people`);
+  await expect(
+    page.getByRole('heading', { name: `No people found for “${last.slice(2, 8)}”` }),
+  ).toBeVisible();
+  await checkAccessibility(page);
+  await page.getByRole('link', { name: 'search pages and blog posts' }).click();
+  await expect(page).not.toHaveURL(/tab=/);
+});
+
+test('the Spaces tab shows each space with its badge, or the screen of nothing found', async ({ page }) => {
+  const name = `Harbour ${unique('dock')}`;
+  await newSpace(page, name);
+  await page.goto(`/search?q=${encodeURIComponent(name)}&tab=spaces`);
+  await expect(page.getByRole('listitem').filter({ hasText: name }).locator('.space-badge')).toBeVisible();
+  await page.goto(`/search?q=${unique('nowhere')}&tab=spaces`);
+  await expect(page.getByRole('heading', { name: /No spaces found/ })).toBeVisible();
 });

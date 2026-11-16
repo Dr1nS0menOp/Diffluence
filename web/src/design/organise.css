@@ -277,6 +277,21 @@
   gap: var(--space-1) var(--space-2);
 }
 
+/* What a task result says under its text: the date, the person, the page and its space. */
+.result-facts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-small);
+}
+
+.result-facts > a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--size-twist);
+}
+
 /* The title and the way back are links on lines close together: each gets a target of its
    own height, so neither crowds the other (WCAG 2.5.8). */
 .result-head > a,

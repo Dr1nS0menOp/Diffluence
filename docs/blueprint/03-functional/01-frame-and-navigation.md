@@ -138,7 +138,7 @@ Shortcuts are single keys, only when the focus is not in a text field. A person 
 - **NAV-118** · new · A person can contact the administrators of the instance on a page reached from a link on an error screen and from the help menu. The page shows the administrators' message and, when it is switched on, a contact form. Reaching it never tells whether a page exists (Where we deliberately differ 9).
 - **NAV-119** · new · An administrator writes that message in the general settings of the administration, in a box of several lines with simple formatting, stored in our document format and never as markup or HTML (EDT-152, PAG-122), with hints under it on what the message is for and on what an empty box does. When the box is empty a standard message shows, which asks what the person needs and, for an error, what they were doing and when.
 - **NAV-120** · new · Under the message box, a checkbox, on by default, switches the contact form on, with a hint that the administrators of the instance receive what is sent. The form can only be switched off when an own message exists, so people always learn how to get help. A message goes by mail through the queue, and only when mail is set up (COL-079). A limit against floods needs its own study.
-- **NAV-121** · new · Beyond NAV-088, a field for people or groups finds them by the start of any word of their name, without the person typing a wildcard. Who appears is still limited by NAV-059 and ACC-036.
+- **NAV-121** · built · Beyond NAV-088, a field for people or groups finds them by the start of any word of their name, without the person typing a wildcard. Who appears is still limited by NAV-059 and ACC-036.
 
 ## 1.9 Narrow screens, dark mode, languages, accessibility
 

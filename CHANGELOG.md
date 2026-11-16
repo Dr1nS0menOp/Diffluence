@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Added: tasks in search, people by any part of their name, and the other tabs of the results (spec 086, wave SR2)
+- Every field for people and groups, the @ list, Share, the search box and the People screen find a person when each typed word is the start of a word of their name, in any order: "jan vr" finds Jan de Vries, "marie" finds Anne-Marie. A part from the middle of a word ("ohan" in Johan) no longer finds anyone. Text with an @ in a field for people finds the start of an address. Who appears is decided as before
+- The results of a search have a Tasks tab: tasks whose text holds the words, open ones first, each with its date, the person it is for, and the page and space it stands on. A task is found only where the reader may see the version of the page that holds it, so a task in a version waiting for approval is found once it is approved. `GET /api/v1/search?kind=task` gives them, with `task` on each result
+- The People tab of the results shows the people the reader may see, as on the People screen, so a guest sees the people of their spaces instead of an error, with their picture or initials and no address. The Spaces tab shows each space with its badge. While loading, the People, Spaces and Tasks tabs show the framed loading box, and when they find nothing they say so in a heading with the content tab and the guide as links
+- Nodes that start at the same moment no longer fail when a migration builds an index alongside the tables: a node waits for the migration lock by asking again instead of in one statement that blocked the build
+- Upgrade impact: migration 0075 builds an index of the words of tasks alongside the tables (`CREATE INDEX CONCURRENTLY`), so writing goes on while it builds. The previous release reads nothing of it. Someone used to finding a colleague by letters from the middle of a name types the start of a part of it instead
 ### Changed: only the holder of a rule starts it outside its trigger (spec 093, wave RV13)
 - Only the holder of a rule makes a new incoming webhook address for it. Anyone else who manages automation there gets `409 rule_held`, and the address the holder gave out keeps working; to give the rule an address of their own, they take it over first (spec 092)
 - Only the holder starts a rule by hand when its trigger is not manual; anyone else who manages it gets `409 rule_held`, and nothing runs. A rule with a manual trigger stays open to everyone who can see the page

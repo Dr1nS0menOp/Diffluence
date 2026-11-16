@@ -145,11 +145,14 @@ func (s *Service) directory(ctx context.Context, c identity.Caller, spaceID uuid
 	if mayBrowse {
 		return s.identity.Directory(ctx, text)
 	}
-	// Without "view profiles", only people who have a grant in this space (NAV-059).
+	// Without "view profiles", only people who have a grant in this space (NAV-059), found by
+	// the start of any word of their name (NAV-121). The grants of one space are few, so their
+	// names are read whole.
 	rows, err := s.pool.Query(ctx, `SELECT DISTINCT 'user', u.id, u.display_name, ''
 		FROM space_grants g JOIN users u ON g.subject_type = 'user' AND u.id = g.subject_id
 		WHERE g.space_id = $1 AND u.status = 'active'
-		  AND ($2 = '' OR position(lower($2) IN lower(u.display_name)) > 0) LIMIT $3`, spaceID, text, maxCandidates)
+		  AND ($2 = '' OR to_tsvector('simple', u.display_name) @@ to_tsquery('simple', $3)) LIMIT $4`,
+		spaceID, text, identity.NameWords(text), maxCandidates)
 	if err != nil {
 		return nil, err
 	}

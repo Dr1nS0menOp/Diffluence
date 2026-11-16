@@ -569,17 +569,34 @@ type DirectoryEntry struct {
 	Detail string `json:"detail"`
 }
 
-// Directory searches users and groups, for people pickers. The route requires
-// "view profiles", which guests do not have by default.
-func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry, error) {
-	rows, err := s.pool.Query(ctx, `(SELECT 'user', id, display_name, email FROM users
+// directorySize is how many people, and how many groups, a field for people is offered.
+const directorySize = 20
+
+// The lists of a field for people. Typed text finds a person when each typed word is the start
+// of a word of the name (NAV-121), through users_name_words_idx, and a group by the words of
+// its name; groups are few, so their names are read whole. Text with an @ is the start of an
+// address, read from every person, which is paid only by whoever types one. On 20,000 people
+// the old read of every name and address took 38 ms a search; names now take a few (spec 086).
+const (
+	directoryFirst = `(SELECT 'user', id, display_name, email FROM users
 			WHERE status = 'active' AND type <> 'service' AND anonymised_at IS NULL
-			  AND ($1 = '' OR position(lower($1) IN lower(display_name)) > 0 OR position(lower($1) IN lower(email)) > 0)
-			ORDER BY lower(display_name) LIMIT 20)
+			ORDER BY lower(display_name) LIMIT $1)
 		UNION ALL
-		(SELECT 'group', id, name, '' FROM groups
-			WHERE $1 = '' OR position(lower($1) IN lower(name)) > 0
-			ORDER BY lower(name) LIMIT 20)`, text)
+		(SELECT 'group', id, name, '' FROM groups ORDER BY lower(name) LIMIT $1)`
+	directoryNames = `(SELECT 'user', u.id, u.display_name, u.email FROM users u
+			WHERE to_tsvector('simple', u.display_name) @@ to_tsquery('simple', $1)
+			  AND u.status = 'active' AND u.type <> 'service' AND u.anonymised_at IS NULL
+			ORDER BY lower(u.display_name) LIMIT $2)
+		UNION ALL
+		(SELECT 'group', g.id, g.name, '' FROM groups g
+			WHERE to_tsvector('simple', g.name) @@ to_tsquery('simple', $1)
+			ORDER BY lower(g.name) LIMIT $2)`
+	directoryAddress = `SELECT 'user', id, display_name, email FROM users
+		WHERE lower(email) LIKE $1 AND status = 'active' AND type <> 'service' AND anonymised_at IS NULL
+		ORDER BY lower(display_name) LIMIT $2`
+)
+
+func collectEntries(rows pgx.Rows, err error) ([]DirectoryEntry, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -594,21 +611,32 @@ func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry,
 	return out, err
 }
 
-// PeopleByName finds people by the words of their name, through the index. It is for the
-// search box, which runs on every pause in typing: Directory reads every person.
-func (s *Service) PeopleByName(ctx context.Context, words string, limit int) ([]DirectoryEntry, error) {
-	rows, err := s.pool.Query(ctx, `SELECT 'user', id, display_name, email FROM users
+// Directory searches users and groups, for people pickers. The route requires
+// "view profiles", which guests do not have by default.
+func (s *Service) Directory(ctx context.Context, text string) ([]DirectoryEntry, error) {
+	text = strings.TrimSpace(text)
+	switch {
+	case text == "":
+		return collectEntries(s.pool.Query(ctx, directoryFirst, directorySize))
+	case strings.Contains(text, "@"):
+		return collectEntries(s.pool.Query(ctx, directoryAddress, addressStart(text), directorySize))
+	case NameWords(text) == "":
+		return []DirectoryEntry{}, nil
+	}
+	return collectEntries(s.pool.Query(ctx, directoryNames, NameWords(text), directorySize))
+}
+
+// PeopleByName finds people by the start of any word of their name, through the index, for
+// the search box. It finds nobody for text that holds no word.
+func (s *Service) PeopleByName(ctx context.Context, text string, limit int) ([]DirectoryEntry, error) {
+	words := NameWords(text)
+	if words == "" {
+		return []DirectoryEntry{}, nil
+	}
+	return collectEntries(s.pool.Query(ctx, `SELECT 'user', id, display_name, email FROM users
 		WHERE to_tsvector('simple', display_name) @@ to_tsquery('simple', $1)
 		  AND status = 'active' AND type <> 'service' AND anonymised_at IS NULL
-		ORDER BY lower(display_name) LIMIT $2`, words, limit)
-	if err != nil {
-		return nil, err
-	}
-	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (DirectoryEntry, error) {
-		var e DirectoryEntry
-		err := r.Scan(&e.Type, &e.ID, &e.Name, &e.Detail)
-		return e, err
-	})
+		ORDER BY lower(display_name) LIMIT $2`, words, limit))
 }
 
 // DisplayNames gives today's names of people and groups, for a mention.
