@@ -2632,6 +2632,8 @@ test.describe('a draft space started from a space with content', () => {
     await page.goto(`/pages/${draftGuide}/history`);
     await expect(page.getByText('Released as version 2 of the published page')).toBeVisible();
     await expect(page.getByText('Released as version 1 of the published page')).toBeVisible();
+    // A table takes its widths from its text, so the masked times must not move the columns.
+    await fixText(page.locator('td .muted'), 'a while ago');
     await picture(page, 'publishing-draft-history', [page.locator('td .muted')]);
     await checkAccessibility(page);
   });
