@@ -167,7 +167,8 @@ func RenameField(n Node, from, to string) (Node, bool) {
 
 // withAttr copies attributes with one of them changed, so the document it came from stays.
 func withAttr(attrs map[string]any, key string, value any) map[string]any {
-	out := make(map[string]any, len(attrs)+1)
+	// The size is only a hint: a map grows for the one key that may be new.
+	out := make(map[string]any, len(attrs))
 	for k, v := range attrs {
 		out[k] = v
 	}
