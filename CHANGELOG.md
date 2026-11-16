@@ -3,6 +3,11 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: only the holder of a rule starts it outside its trigger (spec 093, wave RV13)
+- Only the holder of a rule makes a new incoming webhook address for it. Anyone else who manages automation there gets `409 rule_held`, and the address the holder gave out keeps working; to give the rule an address of their own, they take it over first (spec 092)
+- Only the holder starts a rule by hand when its trigger is not manual; anyone else who manages it gets `409 rule_held`, and nothing runs. A rule with a manual trigger stays open to everyone who can see the page
+- A rule of the whole instance starts by hand only on a page in the spaces it was given, as the More menu already showed; elsewhere `POST /api/v1/rules/{id}/run` answers `404`
+- Upgrade impact: no migration, no new route. Someone who made addresses for, or started by hand, rules of others must take them over first. During an upgrade a node of the previous release still does both for someone who manages a rule without holding it, and still starts a manual instance rule by hand outside its spaces, until it is upgraded
 ### Changed: the frame, as blueprint 03 arranges it (spec 078, wave SC1)
 - The top bar has three groups: the button that shows or hides the sidebar and the name; search with Create directly after it; the bell, help, a new settings button that opens the administration (administrators only) and the account. Home, Spaces, People, Recent and Favourites left the bar, and Administration left the account menu. The account menu starts with who you are, then Profile, Your account and Theme (light, dark or system, at once), then your personal space, Tasks and Preferences, then Log out
 - The sidebar starts with your own places on every screen outside the settings: Home, Recent, Favourites, Spaces, Drafts (a new screen of your drafts), Tasks, People and Watching. Recent, Favourites and Spaces open a panel beside the sidebar with a filter; the Spaces panel stars spaces and takes a dragged page to another space. **Customise sidebar** hides entries under More and orders them, for you alone

@@ -244,7 +244,9 @@ func (s *Service) recordSystem(ctx context.Context, tx pgx.Tx, action string, r 
 	return err
 }
 
-// RunByHand starts a rule with a manual trigger, for someone who can see the page.
+// RunByHand starts a rule with a manual trigger, for someone who can see the page. Its
+// holder chose to offer it there. A rule with another trigger runs by hand only for its
+// holder, because the run uses the rights of the rule's account (spec 093).
 func (s *Service) RunByHand(ctx context.Context, c identity.Caller, id, pageID uuid.UUID) error {
 	r, err := s.load(ctx, s.Pool, id)
 	if err != nil {
@@ -258,12 +260,16 @@ func (s *Service) RunByHand(ctx context.Context, c identity.Caller, id, pageID u
 		return err
 	}
 	if r.Definition.Trigger.Kind != TriggerManual {
-		// Any other rule is for those who manage it.
 		if err := s.mayManage(ctx, c, r.SpaceID); err != nil {
 			return err
 		}
+		if err := s.requireHolder(ctx, c, r); err != nil {
+			return err
+		}
 	}
-	if r.SpaceID != nil && *r.SpaceID != space {
+	// A rule of the instance acts only in the spaces its holder chose, as Manual lists it.
+	otherSpace := r.SpaceID != nil && *r.SpaceID != space
+	if otherSpace || !r.Definition.reaches(&space) {
 		return apperr.NotFound()
 	}
 	if !r.Enabled || r.PausedAt != nil {

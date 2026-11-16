@@ -2708,6 +2708,15 @@ mutate "conditions without a page hold" internal/automation/run.go \
   's.replace("return d.Conditions != nil \x26\x26 pageID == nil", "return false")' $app -run '^TestARunWithoutAPageDoesNothingWhenTheRuleHasConditions$'
 mutate "conditions under a trigger without a page are no problem" internal/automation/definition.go \
   's.replace("\t\tif !d.Trigger.bringsPage() {\n", "\t\tif false {\n")' ./internal/automation/ -run '^TestConditionsNeedATriggerThatBringsAPage$'
+# Spec 093: only the holder of a rule gives it an incoming address or starts it by hand.
+mutate "someone who does not hold a rule makes its incoming address" internal/automation/service.go \
+  's.replace("\tif err := s.requireHolder(ctx, c, r); err != nil {\n\t\treturn \"\", err\n\t}\n", "")' $app -run '^TestOnlyTheHolderOfARuleMakesItsIncomingAddress$'
+mutate "someone who does not hold a rule starts it by hand" internal/automation/match.go \
+  's.replace("\t\tif err := s.requireHolder(ctx, c, r); err != nil {\n\t\t\treturn err\n\t\t}\n", "")' $app -run '^TestOnlyTheHolderStarts'
+mutate "the holder check lets everyone through" internal/automation/service.go \
+  's.replace("\tif !held {\n\t\treturn errHeld()\n\t}\n", "\tif !held \x26\x26 false {\n\t\treturn errHeld()\n\t}\n")' $app -run '^TestOnlyTheHolder'
+mutate "by hand an instance rule starts outside its spaces" internal/automation/match.go \
+  's.replace("if otherSpace || !r.Definition.reaches(\x26space) {", "if otherSpace {")' $app -run '^TestByHandAnInstanceRuleStartsOnlyInItsSpaces$'
 # Spec 070: migrations, checkpoint signing and restore orders in the backup service.
 mutate "a short backup key is taken" internal/keys/worker.go \
   's.replace("if len(secret) < minWorkerSecret {", "if len(secret) < 0 {")' ./internal/keys/ -run TestAWorkerKeyThatIsMissingOrShortIsRefused

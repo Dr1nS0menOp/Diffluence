@@ -32,7 +32,7 @@ func (s *Server) registerRuleRoutes() {
 	r.HandleFunc("POST /api/v1/rules/{id}/test", manage, on(s.handleRuleTest))
 	r.HandleFunc("GET /api/v1/rules/{id}/runs", manage, on(s.handleRuleRuns))
 	r.HandleFunc("POST /api/v1/rules/{id}/hook", SessionOnly(manage), on(s.handleRuleHook))
-	// The module decides: page.view for a rule with a manual trigger, otherwise manage.
+	// The module decides: page.view for a rule with a manual trigger, otherwise its holder.
 	r.HandleFunc("POST /api/v1/rules/{id}/run", Object(permissions.ActionPageView), on(s.handleRuleRun))
 	r.HandleFunc("GET /api/v1/pages/{id}/rules", Object(permissions.ActionPageView), s.handlePageRules)
 	r.HandleFunc("GET /api/v1/admin/rules", admin, on(s.handleInstanceRules))

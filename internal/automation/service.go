@@ -593,11 +593,27 @@ func (s *Service) Delete(ctx context.Context, c identity.Caller, id uuid.UUID) e
 	})
 }
 
+// requireHolder refuses someone who does not hold a rule (spec 092, spec 093).
+func (s *Service) requireHolder(ctx context.Context, c identity.Caller, r Rule) error {
+	held, err := s.holds(ctx, c, r)
+	if err != nil {
+		return err
+	}
+	if !held {
+		return errHeld()
+	}
+	return nil
+}
+
 // NewHook makes the secret address of a rule, and ends the old one. The token shows
-// once and is stored hashed, like a personal token.
+// once and is stored hashed, like a personal token. Whoever knows the address starts
+// the rule with its account's rights, so only its holder hands one out (spec 093).
 func (s *Service) NewHook(ctx context.Context, c identity.Caller, id uuid.UUID) (string, error) {
 	r, err := s.Get(ctx, c, id)
 	if err != nil {
+		return "", err
+	}
+	if err := s.requireHolder(ctx, c, r); err != nil {
 		return "", err
 	}
 	if r.Definition.Trigger.Kind != TriggerIncoming {
