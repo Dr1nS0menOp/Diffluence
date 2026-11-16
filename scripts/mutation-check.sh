@@ -261,11 +261,13 @@ mutate "a replaced font file stays on disk" internal/settings/font.go \
 mutate "publishing skips the check" internal/pages/versions.go \
   's.replace("if err := s.perms.RequirePage(ctx, tx, c.UserID, id, permissions.PageEdit, uuid.Nil); err != nil {\n\t\t\treturn err\n\t\t}\n\t\tp, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\thead, err := headVersion(ctx, tx, p)", "p, err := lockPage(ctx, tx, id)\n\t\tif err != nil {\n\t\t\treturn err\n\t\t}\n\t\thead, err := headVersion(ctx, tx, p)")' $app -run '^(TestADatabaseOnlyOpensForThoseWhoMaySeeIt|TestArchivedPagesAreReadOnlyAndLeaveEveryList|TestEditRestrictionDoesNotInherit|TestEveryObjectRouteIsProtected|TestScheduledPublishingStopsWhenTheRightsAreGone)$'
 mutate "search ignores permissions" internal/search/words.go \
-  's.replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id", "")' $app -run TestAWrongRowOfTheSearchTableShowsNothing
+  's.replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = o.id", "")' $app -run TestAWrongRowOfTheSearchTableShowsNothing
+# Since spec 080 the picking narrows by restrictions and spaces for speed only: the rule in
+# pickedRows is asked about every picked row, the total included. So these take away both.
 mutate "a hidden page counts in a search" internal/search/words.go \
-  's.replace("const notHidden = ` AND w.page_id NOT IN (SELECT unnest(@hidden::uuid[]))`", "const notHidden = ``")' $app -run TestARestrictionCountsAtOnceInSearch
+  's.replace("const notHidden = ` AND w.page_id NOT IN (SELECT unnest(@hidden::uuid[]))`", "const notHidden = ``").replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = o.id", "")' $app -run TestARestrictionCountsAtOnceInSearch
 mutate "a space nobody gave counts in a search" internal/search/words.go \
-  's.replace("FROM perm_spaces(@user, \x27space.view\x27) g JOIN spaces s", "FROM (SELECT id AS space_id FROM spaces) g JOIN spaces s")' $app -run TestLosingASpaceCountsAtOnceInSearch
+  's.replace("FROM perm_spaces(@user, \x27space.view\x27) g JOIN spaces s", "FROM (SELECT id AS space_id FROM spaces) g JOIN spaces s").replace("JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = o.id", "")' $app -run TestLosingASpaceCountsAtOnceInSearch
 mutate "the search table misses the archive" internal/db/migrations/0028_search_pages.sql \
   's.replace("published = EXCLUDED.published, archived = EXCLUDED.archived,", "published = EXCLUDED.published,")' $app -run TestTheSearchTableFollowsThePage
 mutate "the search table misses the trash" internal/db/migrations/0028_search_pages.sql \
@@ -3038,6 +3040,28 @@ mutate "a file of a twin carries no control block" internal/exchange/export.go \
   's.replace("\t\tif p.Control == nil \x26\x26 s.twinControl != nil {", "\t\tif false \x26\x26 p.Control == nil \x26\x26 s.twinControl != nil {")' $app -run '^TestAnExportOfATwinCarriesTheControlBlockOfItsApproval$'
 mutate "a start copies an archived page" internal/publishing/start.go \
   's.replace("p.Status == \"published\" \x26\x26 p.ArchivedAt == nil \x26\x26", "p.Status == \"published\" \x26\x26")' $pub -run '^TestAStartCopiesParentsFirstAndCountsWhatStays$'
+# Spec 080, wave SR1: a total counts only what can be shown, the way back to a result and the
+# filter below a page never reveal a hidden page, and the marks and ways forward of the screen.
+mutate "a controlled page the reader may not see counts in a search" internal/search/words.go \
+  's.replace("out.Total = min(len(visible), totalLimit)", "out.Total = min(len(p.ids), totalLimit)")' $app -run '^TestASearchCountsOnlyPagesTheReaderMaySee$'
+mutate "the way back to a result names a hidden page" internal/search/search.go \
+  's.replace("\t\tif !hidden[c.crumb.ID] {", "\t\tif !hidden[c.crumb.ID] || len(hidden) >= 0 {")' $app -run '^TestSearchBreadcrumbsNameOnlyPagesTheReaderMaySee$'
+mutate "the way back marks no ancestor for the rule" internal/search/search.go \
+  's.replace("AND (pc.approved_version IS NULL OR pc.state_kind = \x27obsolete\x27))", "AND false)")' $app -run '^TestSearchBreadcrumbsNameOnlyPagesTheReaderMaySee$'
+mutate "a page names a hidden page in its way back" internal/pages/pages.go \
+  's.replace("\t\tif !slices.Contains(hidden, b.crumb.ID) {", "\t\tif !slices.Contains(hidden, b.crumb.ID) || len(hidden) >= 0 {")' $app -run '^TestSearchBreadcrumbsNameOnlyPagesTheReaderMaySee$'
+mutate "a spelling suggestion spells the filters" internal/search/search.go \
+  's.replace("\t\tcase m == nil:\n", "\t\tcase m == nil || true:\n")' ./internal/search/ -run '^TestWordsToSpellLeaveTheFiltersOutAndKeepATitle$'
+mutate "a hidden page narrows a search to its branch" internal/search/search.go \
+  's.replace("err != nil || hidden {", "err != nil || (false \x26\x26 hidden) {")' $app -run '^TestSearchBelowAPageTheReaderMayNotSeeFindsNothing$'
+mutate "a result does not say it is a home page" internal/search/words.go \
+  's.replace("s.home_page_id IS NOT DISTINCT FROM p.id,", "false,")' $app -run '^TestSearchResultsSayWhichPageIsAHomePage$'
+mutate_web "an empty result offers to remove filters that are not there" src/views/search.tsx \
+  's.replace("if (narrowed \x26\x26 words.text.trim() !== \x27\x27) {", "if (words.text.trim() !== \x27\x27) {")' src/views/search.test.ts
+mutate_web "the home page is marked as a page" src/components/kind-mark.tsx \
+  's.replace("if (item.home) return \x27home\x27;", "")' src/components/kind-mark.test.ts
+mutate_web "a file in the box has no mark of its kind" src/components/quick-search.tsx \
+  's.replace("mark: { type: \x27file\x27 as const, filename: f.filename },", "mark: NO_MARK,")' src/components/reading.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

@@ -201,7 +201,7 @@ func (s sqlOf) every(t tier) string {
 const windowIsFull = `SELECT count(*) >= ` + window + ` FROM (SELECT 1 FROM search_pages w WHERE ` + rowScope + ` LIMIT ` + window + `) c`
 
 // visibleSpaces and hiddenPages only narrow the search. The rule itself is applied to
-// every result, in pickedRows.
+// every picked row, in pickedRows.
 const (
 	visibleSpaces = `SELECT g.space_id FROM perm_spaces(@user, 'space.view') g JOIN spaces s ON s.id = g.space_id
 	WHERE (@archived::boolean OR s.status = 'active') AND (@space::uuid IS NULL OR g.space_id = @space)`
@@ -224,17 +224,25 @@ const mentionHits = `SELECT n.page_id FROM (
 	) n JOIN search_documents x ON x.page_id = n.page_id
 	WHERE (x.tsv || n.tsv) @@ to_tsquery('simple', @words) LIMIT @mentionlimit`
 
-// pickedRows reads what is shown. perm_visible_pages is the rule, for each row on its own
-// and at this moment, so a permission that just changed counts at once. The rows are named
-// inside the subquery, so the rule looks at those rows and not at every page there is. An
-// author of a page with a working version sees its working title and excerpt (DOC-520): the
-// rule of editing is asked only about the shown rows that have a working entry.
+// pickedRows reads every picked row that the rule lets through, in the order of the picking.
+// perm_visible_pages is the rule, for each row on its own and at this moment, so a permission
+// that just changed counts at once. The rows are named inside the subquery, so the rule looks
+// at those rows and not at every page there is. The picking narrows by restrictions alone, so
+// a page the rule hides otherwise, such as a controlled page the reader may not see, can be
+// picked: asking the rule about every picked row keeps it out of the total as well as the page
+// of results, at the cost of one rule for the whole search (spec 080, SR1). Only the rows of
+// this page of results, places @from to @to, get an excerpt, which is what costs. An author of
+// a page with a working version sees its working title and excerpt (DOC-520): the rule of
+// editing is asked only about the picked rows that have a working entry.
 const pickedRows = `SELECT p.id, p.space_id, s.key, s.name, COALESCE(sw.title, p.title), p.emoji, p.kind, p.stage_text, p.stage_color,
-		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft',
-		CASE WHEN @snippets THEN ts_headline('simple', COALESCE(sw.body, d.body), to_tsquery('simple', @words), ` + headlineOptions + `) ELSE '' END` + resultEnd + `
-	FROM unnest(@ids::uuid[]) WITH ORDINALITY o(id, place)
-	JOIN pages p ON p.id = o.id AND p.status = 'published'
-	JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = p.id
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', s.home_page_id IS NOT DISTINCT FROM p.id,
+		CASE WHEN @snippets AND o.place > @from AND o.place <= @to
+			THEN ts_headline('simple', COALESCE(sw.body, d.body), to_tsquery('simple', @words), ` + headlineOptions + `) ELSE '' END` + resultEnd + `
+	FROM (SELECT o.id, row_number() OVER (ORDER BY o.place) AS place
+		FROM unnest(@ids::uuid[]) WITH ORDINALITY o(id, place)
+		JOIN pages q ON q.id = o.id AND q.status = 'published'
+		JOIN (SELECT v.page_id FROM perm_visible_pages(@user) v WHERE v.page_id = ANY(@ids)) v ON v.page_id = o.id) o
+	JOIN pages p ON p.id = o.id
 	JOIN spaces s ON s.id = p.space_id
 	JOIN search_documents d ON d.page_id = p.id
 	LEFT JOIN search_working sw ON sw.page_id = p.id AND p.id IN (SELECT e.page_id FROM perm_editable_pages(@user) e
@@ -471,19 +479,23 @@ func (s *Service) searchWords(ctx context.Context, userID uuid.UUID, q Query, pa
 		}
 		// A page found by its working entry may be found again by the entry readers match.
 		p.ids = firstOfEach(p.ids)
-		out.Total = min(len(p.ids), totalLimit)
-		out.Capped = len(p.ids) > totalLimit || p.stopped
-		shown := p.ids[min(offset, len(p.ids)):min(offset+q.Limit, len(p.ids))]
-		if len(shown) == 0 {
+		if len(p.ids) == 0 {
 			return nil
 		}
-		args["ids"] = shown
+		args["ids"], args["from"], args["to"] = p.ids, offset, offset+q.Limit
 		rows, err := tx.Query(ctx, pickedRows, args)
 		if err != nil {
 			return err
 		}
-		out.Results, err = scanResults(rows)
-		return err
+		// The total counts what the rule lets through, never what was only picked.
+		visible, err := scanResults(rows)
+		if err != nil {
+			return err
+		}
+		out.Total = min(len(visible), totalLimit)
+		out.Capped = len(visible) > totalLimit || p.stopped
+		out.Results = visible[min(offset, len(visible)):min(offset+q.Limit, len(visible))]
+		return nil
 	})
 	if timedOut(err) {
 		return Results{Results: []Result{}, TimedOut: true}, nil

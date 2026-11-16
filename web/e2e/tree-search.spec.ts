@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
-// Spec 028: search in the middle of the bar, and a tree that loads what is opened.
+// Spec 028: search in the middle of the bar, and a tree that loads what is opened. Spec 080:
+// the rebuilt results screen.
 import type { Page } from '@playwright/test';
 import {
   ADMIN,
   checkAccessibility,
+  createNamedUser,
   expect,
   login,
   newSpace,
@@ -114,4 +116,54 @@ test('a word that only a comment holds is still found', async ({ page }) => {
   await page.goto(`/search?q=${word}`);
   await expect(page.getByRole('heading', { name: 'In comments' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Quiet page' })).toBeVisible();
+});
+
+test('a search that finds nothing offers wider searches as links in its text', async ({ page }) => {
+  const space = await newSpace(page, 'Empty search space');
+  const word = unique('lighthouse');
+  await publishedPage(page, space.id, `The ${word} plan`, 'x');
+  await page.goto(`/search?q=${word}+label:nolabelhere`);
+  await expect(page.getByRole('heading', { name: `No pages found for “${word}”` })).toBeVisible();
+  await expect(page.getByRole('region', { name: /No pages found/ }).getByRole('button')).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /How search works/ })).toHaveAttribute('target', '_blank');
+  await checkAccessibility(page);
+  await page.getByRole('link', { name: 'search without the filters' }).click();
+  await expect(page).toHaveURL(new RegExp(`/search\\?q=${word}$`));
+  await expect(page.getByRole('link', { name: `The ${word} plan` })).toBeVisible();
+});
+
+test('each result shows the mark of its kind', async ({ page }) => {
+  const space = await newSpace(page, 'Kinds space');
+  const word = unique('meadow');
+  await publishedPage(page, space.id, `A ${word} page`, 'x');
+  await page.goto(`/search?q=${word}`);
+  const row = page.getByRole('listitem').filter({ hasText: `A ${word} page` });
+  await expect(row.getByRole('img', { name: 'Page' })).toBeVisible();
+});
+
+test('results narrow to the pages below a chosen page', async ({ page }) => {
+  const space = await newSpace(page, 'Branch search space');
+  const word = unique('orchard');
+  const parent = await publishedPage(page, space.id, `Parent ${word}`, 'the parent');
+  await publishedPage(page, space.id, 'Child in the branch', word, parent);
+  await publishedPage(page, space.id, 'Elsewhere in the space', word);
+  await page.goto(`/search?q=${word}`);
+  await expect(page.getByRole('link', { name: 'Elsewhere in the space' })).toBeVisible();
+  await page.getByRole('searchbox', { name: 'Below a page' }).fill(`Parent ${word}`);
+  await page.getByRole('button', { name: `Parent ${word}` }).click();
+  await expect(page).toHaveURL(new RegExp(`below=${parent}`));
+  await expect(page.getByRole('link', { name: 'Child in the branch' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Elsewhere in the space' })).toHaveCount(0);
+});
+
+test('several people narrow the results, each with a chip of their own', async ({ page, browser }) => {
+  const first = await createNamedUser(browser, `${unique('wren')}@example.com`, 'Wren Example');
+  const second = await createNamedUser(browser, `${unique('lark')}@example.com`, 'Lark Example');
+  await page.goto(`/search?q=anything&contributor=${first}&contributor=${second}`);
+  const chips = page.getByRole('list', { name: 'Written or edited by' });
+  await expect(chips.getByRole('listitem')).toHaveCount(2);
+  await chips.getByRole('button', { name: 'Remove Wren Example' }).click();
+  await expect(chips.getByRole('listitem')).toHaveCount(1);
+  await expect(page).toHaveURL(new RegExp(`contributor=${second}`));
+  await expect(page).not.toHaveURL(new RegExp(`contributor=${first}`));
 });

@@ -587,6 +587,55 @@ func (s *Service) makeCurrent(ctx context.Context, tx pgx.Tx, c identity.Caller,
 	return p, recordEvent(ctx, tx, c, "page.published", p, details, payload)
 }
 
+// breadcrumbs is the way back to a page the person may see, through the pages above it that
+// they may see. A restriction to view is inherited, so the only page above it the rule can hide
+// is a controlled page that waits for its first approval or was withdrawn: a key lookup marks
+// those, and the rule is asked only when one is there (NAV-005, spec 080).
+func (s *Service) breadcrumbs(ctx context.Context, userID, id uuid.UUID) ([]Crumb, error) {
+	type row struct {
+		crumb  Crumb
+		marked bool
+	}
+	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji, EXISTS (SELECT 1 FROM page_control pc
+			WHERE pc.page_id = p.id AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'))
+		FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
+		WHERE t.descendant_id = $1 AND t.depth > 0 ORDER BY t.depth DESC`, id)
+	if err != nil {
+		return nil, err
+	}
+	found, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (row, error) {
+		var b row
+		err := r.Scan(&b.crumb.ID, &b.crumb.Title, &b.crumb.Emoji, &b.marked)
+		return b, err
+	})
+	if err != nil {
+		return nil, err
+	}
+	var marked []uuid.UUID
+	for _, b := range found {
+		if b.marked {
+			marked = append(marked, b.crumb.ID)
+		}
+	}
+	hidden := []uuid.UUID{}
+	if len(marked) > 0 {
+		rows, err := s.pool.Query(ctx, "SELECT c.page_id FROM perm_control_hidden_pages($1) c WHERE c.page_id = ANY($2)", userID, marked)
+		if err != nil {
+			return nil, err
+		}
+		if hidden, err = pgx.CollectRows(rows, pgx.RowTo[uuid.UUID]); err != nil {
+			return nil, err
+		}
+	}
+	out := []Crumb{}
+	for _, b := range found {
+		if !slices.Contains(hidden, b.crumb.ID) {
+			out = append(out, b.crumb)
+		}
+	}
+	return out, nil
+}
+
 // Get returns a page for reading, and remembers it in the user's recent list.
 func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Detail, error) {
 	reviewOnly, err := s.readerOrReviewer(ctx, c, id)
@@ -631,17 +680,7 @@ func (s *Service) Get(ctx context.Context, c identity.Caller, id uuid.UUID) (Det
 		d.Document, _ = document.Marshal(document.Empty())
 		d.SchemaVersion = document.SchemaVersion
 	}
-	rows, err := s.pool.Query(ctx, `SELECT p.id, p.title, p.emoji FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
-		WHERE t.descendant_id = $1 AND t.depth > 0 ORDER BY t.depth DESC`, id)
-	if err != nil {
-		return d, err
-	}
-	d.Breadcrumbs, err = pgx.CollectRows(rows, func(r pgx.CollectableRow) (Crumb, error) {
-		var b Crumb
-		err := r.Scan(&b.ID, &b.Title, &b.Emoji)
-		return b, err
-	})
-	if err != nil {
+	if d.Breadcrumbs, err = s.breadcrumbs(ctx, c.UserID, id); err != nil {
 		return d, err
 	}
 	if d.Breadcrumbs == nil || reviewOnly {

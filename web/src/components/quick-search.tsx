@@ -4,10 +4,12 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
-import { api, type ListedPage, type QuickResults } from '../api';
+import { api, type ListedPage, type QuickResults, type SearchResult, type Space } from '../api';
 import { personalKey, usePerson } from '../personal';
 import { navigate } from '../router';
 import { IconSearch } from './icons';
+import { FileMark, KindMark } from './kind-mark';
+import { Avatar, SpaceBadge } from './ui';
 import { SearchFilterBar } from './search-filter-bar';
 import { NO_FILTERS, queryWith, resultsAddress, type SearchFilters } from './search-filters';
 import { useDates } from '../dates';
@@ -18,6 +20,14 @@ const MAX_SEARCHES = 8;
 const PAUSE_MS = 200;
 const RECENT_PAGES_SHOWN = 5;
 
+/** What stands before the title of a row: the mark of its kind (NAV-156). */
+export type RowMark =
+  | { type: 'page'; kind?: string; home?: boolean; emoji?: string }
+  | { type: 'file'; filename: string }
+  | { type: 'space'; space: Space }
+  | { type: 'person'; name: string }
+  | { type: 'none' };
+
 export interface QuickRow {
   id: string;
   group: string;
@@ -25,6 +35,28 @@ export interface QuickRow {
   detail: string;
   run: 'open' | 'search' | 'clear';
   target: string;
+  mark: RowMark;
+}
+
+const NO_MARK: RowMark = { type: 'none' };
+
+function pageMark(p: SearchResult): RowMark {
+  return { type: 'page', kind: p.kind, home: p.home, emoji: p.emoji };
+}
+
+function RowMarkView({ mark }: { mark: RowMark }) {
+  switch (mark.type) {
+    case 'page':
+      return <KindMark item={mark} />;
+    case 'file':
+      return <FileMark filename={mark.filename} />;
+    case 'space':
+      return <SpaceBadge space={mark.space} size="small" />;
+    case 'person':
+      return <Avatar name={mark.name} size="small" />;
+    case 'none':
+      return null;
+  }
 }
 
 export function readSearches(stored: string | null): string[] {
@@ -58,6 +90,7 @@ export function rowsOf(
       detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
+      mark: pageMark(p),
     })),
     ...(results.posts ?? []).map((p) => ({
       id: `post-${p.page_id}`,
@@ -66,6 +99,7 @@ export function rowsOf(
       detail: `${p.space_name} · ${day(p.updated_at)}`,
       run: 'open' as const,
       target: `/pages/${p.page_id}`,
+      mark: pageMark(p),
     })),
     ...results.spaces.map((s) => ({
       id: `space-${s.id}`,
@@ -74,6 +108,7 @@ export function rowsOf(
       detail: s.key,
       run: 'open' as const,
       target: `/spaces/${s.key}`,
+      mark: { type: 'space' as const, space: s },
     })),
     ...results.files.map((f) => ({
       id: `file-${f.id}`,
@@ -82,6 +117,7 @@ export function rowsOf(
       detail: `${pageTitle(untitled, f.page_title)} · ${f.space_name}`,
       run: 'open' as const,
       target: `/pages/${f.page_id}`,
+      mark: { type: 'file' as const, filename: f.filename },
     })),
     ...results.people.map((person) => ({
       id: `person-${person.id}`,
@@ -90,6 +126,7 @@ export function rowsOf(
       detail: '',
       run: 'search' as const,
       target: person.name,
+      mark: { type: 'person' as const, name: person.name },
     })),
   ];
 }
@@ -152,6 +189,7 @@ export function QuickSearch() {
       detail: p.space_name,
       run: 'open' as const,
       target: `/pages/${p.id}`,
+      mark: { type: 'page' as const, emoji: p.emoji },
     })),
     ...searches.map((s) => ({
       id: `search-${s}`,
@@ -160,6 +198,7 @@ export function QuickSearch() {
       detail: '',
       run: 'search' as const,
       target: s,
+      mark: NO_MARK,
     })),
     ...(searches.length > 0
       ? [
@@ -170,6 +209,7 @@ export function QuickSearch() {
             detail: '',
             run: 'clear' as const,
             target: '',
+            mark: NO_MARK,
           },
         ]
       : []),
@@ -181,6 +221,7 @@ export function QuickSearch() {
     detail: '',
     run: 'search',
     target: text.trim(),
+    mark: NO_MARK,
   };
   const rows = text.trim() === '' ? emptyRows : [...rowsOf(results.data, labels, dates.day), allResults];
   const groups = [...new Set(rows.map((r) => r.group))];
@@ -308,13 +349,16 @@ export function QuickSearch() {
                     id={`${listId}-${row.id}`}
                     role="option"
                     aria-selected={index === marked}
-                    className={index === marked ? 'quick-row marked' : 'quick-row'}
+                    className={index === marked ? 'quick-row with-mark marked' : 'quick-row with-mark'}
                     // The input must keep focus, or the panel closes before the click lands.
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => choose(row)}
                   >
-                    <span className="quick-title">{row.title}</span>
-                    {row.detail && <span className="quick-detail">{row.detail}</span>}
+                    <RowMarkView mark={row.mark} />
+                    <span className="quick-text">
+                      <span className="quick-title">{row.title}</span>
+                      {row.detail && <span className="quick-detail">{row.detail}</span>}
+                    </span>
                   </div>
                 ) : null,
               )}

@@ -165,7 +165,10 @@ type Result struct {
 	Archived   bool      `json:"archived"`
 	// Draft marks a result from the draft space of a pair, so a person who sees both copies
 	// knows which one readers have (spec 073, PUB-801).
-	Draft       bool      `json:"draft"`
+	Draft bool `json:"draft"`
+	// Home marks the home page of its space, which a list shows with a mark of its own
+	// (NAV-156).
+	Home        bool      `json:"home"`
 	Snippet     string    `json:"snippet"`
 	UpdatedAt   time.Time `json:"updated_at"`
 	UpdatedBy   uuid.UUID `json:"updated_by"`
@@ -204,6 +207,13 @@ func NewService(pool *pgxpool.Pool) *Service {
 // enter waits a moment for a slot. A queue that grows without end helps nobody: past
 // this the answer is that it is busy, at once, which the person can act on (ARC-234).
 func (s *Service) enter(ctx context.Context) error {
+	// A free slot is taken at once. Without this, a timer that ran out on a busy machine
+	// could win the select below over a slot that was free all along.
+	select {
+	case s.slots <- struct{}{}:
+		return nil
+	default:
+	}
 	timer := time.NewTimer(s.patience)
 	defer timer.Stop()
 	select {
@@ -263,7 +273,7 @@ const (
 	JOIN search_documents d ON true` + searchFilters
 
 	resultColumns = `SELECT p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
-		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', `
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', s.home_page_id IS NOT DISTINCT FROM p.id, `
 	headlineOptions = `'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'`
 	resultEnd       = `, p.updated_at, p.updated_by `
 	orderByDate     = ` ORDER BY CASE WHEN $17 THEN 0 ELSE 0 END, p.updated_at DESC, p.id LIMIT $18 OFFSET $19`
@@ -301,7 +311,7 @@ const (
 	  AND ($6::timestamptz IS NULL OR c.created_at < $6)
 	  AND ($7::boolean OR (s.status = 'active' AND p.archived_at IS NULL))`
 	commentsSQL = `SELECT c.id, p.id, p.space_id, s.key, s.name, p.title, p.emoji, p.kind, p.stage_text, p.stage_color,
-		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft',
+		p.archived_at IS NOT NULL OR s.status <> 'active', s.pair_role IS NOT DISTINCT FROM 'draft', s.home_page_id IS NOT DISTINCT FROM p.id,
 		ts_headline('simple', (SELECT string_agg(w, ' ') FROM jsonb_array_elements_text(` + commentWords + `) AS w), q.query,
 			'StartSel=[[[, StopSel=]]], MaxFragments=2, MaxWords=25, MinWords=8, FragmentDelimiter=" … "'),
 		c.created_at, c.author_id ` + commentsFrom + ` ORDER BY c.created_at DESC, c.id LIMIT $8 OFFSET $9`
@@ -347,7 +357,7 @@ func scanResults(rows pgx.Rows) ([]Result, error) {
 	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (Result, error) {
 		var v Result
 		err := r.Scan(&v.PageID, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.Title, &v.Emoji, &v.Kind, &v.StageText, &v.StageColor,
-			&v.Archived, &v.Draft, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
+			&v.Archived, &v.Draft, &v.Home, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
 		return v, err
 	})
 }
@@ -391,29 +401,51 @@ func (s *Service) run(ctx context.Context, sqlText, countText string, args, page
 	return out, err
 }
 
-func (s *Service) addBreadcrumbs(ctx context.Context, list []Result) error {
+// crumbRows are the ways back to the shown results, each ancestor marked when it is a controlled
+// page that waits for its first approval or was withdrawn. A restriction to view is inherited,
+// so such an ancestor is the only kind the rule can hide above a page the person may see; a key
+// lookup tells them apart, and the rule is asked only when there is one (NAV-005, spec 080).
+const crumbRows = `SELECT t.descendant_id, p.id, p.title, EXISTS (SELECT 1 FROM page_control pc
+		WHERE pc.page_id = p.id AND (pc.approved_version IS NULL OR pc.state_kind = 'obsolete'))
+	FROM page_tree t JOIN pages p ON p.id = t.ancestor_id
+	WHERE t.descendant_id = ANY($1) AND t.depth > 0 ORDER BY t.descendant_id, t.depth DESC`
+
+// hiddenCrumbs are the marked ancestors the person may not see.
+const hiddenCrumbs = `SELECT c.page_id FROM perm_control_hidden_pages($1) c WHERE c.page_id = ANY($2)`
+
+// crumbRow is one ancestor of a result, before the rule has looked at it.
+type crumbRow struct {
+	page   uuid.UUID
+	crumb  Crumb
+	marked bool
+}
+
+func (s *Service) addBreadcrumbs(ctx context.Context, userID uuid.UUID, list []Result) error {
 	ids := make([]uuid.UUID, len(list))
 	for i, r := range list {
 		ids[i] = r.PageID
 	}
-	rows, err := s.pool.Query(ctx, `SELECT t.descendant_id, p.id, p.title FROM page_tree t
-		JOIN pages p ON p.id = t.ancestor_id
-		WHERE t.descendant_id = ANY($1) AND t.depth > 0 ORDER BY t.descendant_id, t.depth DESC`, ids)
+	rows, err := s.pool.Query(ctx, crumbRows, ids)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
-	crumbs := map[uuid.UUID][]Crumb{}
-	for rows.Next() {
-		var page uuid.UUID
-		var c Crumb
-		if err := rows.Scan(&page, &c.ID, &c.Title); err != nil {
-			return err
-		}
-		crumbs[page] = append(crumbs[page], c)
-	}
-	if err := rows.Err(); err != nil {
+	found, err := pgx.CollectRows(rows, func(r pgx.CollectableRow) (crumbRow, error) {
+		var c crumbRow
+		err := r.Scan(&c.page, &c.crumb.ID, &c.crumb.Title, &c.marked)
+		return c, err
+	})
+	if err != nil {
 		return err
+	}
+	hidden, err := s.hiddenAncestors(ctx, userID, found)
+	if err != nil {
+		return err
+	}
+	crumbs := map[uuid.UUID][]Crumb{}
+	for _, c := range found {
+		if !hidden[c.crumb.ID] {
+			crumbs[c.page] = append(crumbs[c.page], c.crumb)
+		}
 	}
 	for i := range list {
 		list[i].Breadcrumbs = crumbs[list[i].PageID]
@@ -422,6 +454,30 @@ func (s *Service) addBreadcrumbs(ctx context.Context, list []Result) error {
 		}
 	}
 	return nil
+}
+
+// hiddenAncestors asks the rule about the marked ancestors, and about nothing when none is
+// marked, which is nearly always.
+func (s *Service) hiddenAncestors(ctx context.Context, userID uuid.UUID, found []crumbRow) (map[uuid.UUID]bool, error) {
+	var marked []uuid.UUID
+	for _, c := range found {
+		if c.marked {
+			marked = append(marked, c.crumb.ID)
+		}
+	}
+	hidden := map[uuid.UUID]bool{}
+	if len(marked) == 0 {
+		return hidden, nil
+	}
+	rows, err := s.pool.Query(ctx, hiddenCrumbs, userID, marked)
+	if err != nil {
+		return nil, err
+	}
+	ids, err := pgx.CollectRows(rows, pgx.RowTo[uuid.UUID])
+	for _, id := range ids {
+		hidden[id] = true
+	}
+	return hidden, err
 }
 
 // Search returns the pages the user may view that match the query.
@@ -440,6 +496,9 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Result
 	if slices.Contains(q.Kinds, KindComment) {
 		return s.searchComments(ctx, userID, q, parsed)
 	}
+	if hidden, err := s.belowHidden(ctx, userID, q.Below); err != nil || hidden {
+		return Results{Results: []Result{}}, err
+	}
 	out, err := s.searchWithoutPicking(ctx, userID, q, parsed)
 	if parsed.TSQuery != "" {
 		out, err = s.searchWords(ctx, userID, q, parsed)
@@ -447,11 +506,11 @@ func (s *Service) Search(ctx context.Context, userID uuid.UUID, q Query) (Result
 	if err != nil {
 		return out, err
 	}
-	if err := s.addBreadcrumbs(ctx, out.Results); err != nil {
+	if err := s.addBreadcrumbs(ctx, userID, out.Results); err != nil {
 		return out, err
 	}
 	if out.Total == 0 && !out.TimedOut && parsed.TSQuery != "" && !q.Quick {
-		out.Suggestion, err = s.spelling(ctx, userID, q.Text)
+		out.Suggestion, err = s.spelling(ctx, userID, wordsToSpell(q.Text))
 	}
 	return out, err
 }
@@ -469,7 +528,7 @@ func scanComments(rows pgx.Rows) ([]Result, error) {
 		var v Result
 		var id uuid.UUID
 		err := r.Scan(&id, &v.PageID, &v.SpaceID, &v.SpaceKey, &v.SpaceName, &v.Title, &v.Emoji, &v.Kind, &v.StageText, &v.StageColor,
-			&v.Archived, &v.Draft, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
+			&v.Archived, &v.Draft, &v.Home, &v.Snippet, &v.UpdatedAt, &v.UpdatedBy)
 		v.CommentID = &id
 		return v, err
 	})
@@ -485,7 +544,19 @@ func (s *Service) searchComments(ctx context.Context, userID uuid.UUID, q Query,
 	if err != nil {
 		return out, err
 	}
-	return out, s.addBreadcrumbs(ctx, out.Results)
+	return out, s.addBreadcrumbs(ctx, userID, out.Results)
+}
+
+// belowHidden says that the page a search is narrowed to is one the person may not see. For
+// them nothing is below it, as if it did not exist (NAV-005, ORG-015), so its branch never
+// shows what lies under a hidden page.
+func (s *Service) belowHidden(ctx context.Context, userID, below uuid.UUID) (bool, error) {
+	if below == uuid.Nil {
+		return false, nil
+	}
+	var visible bool
+	err := s.pool.QueryRow(ctx, "SELECT EXISTS (SELECT 1 FROM perm_visible_pages($1) v WHERE v.page_id = $2)", userID, below).Scan(&visible)
+	return !visible, err
 }
 
 // spelling looks for a similar word in titles the person may see, and nowhere else:
@@ -505,6 +576,23 @@ func (s *Service) spelling(ctx context.Context, userID uuid.UUID, text string) (
 		return "", err
 	}
 	return suggest(text, titles), nil
+}
+
+// wordsToSpell is the typed text without the filters of the syntax (label:, space:, author:),
+// which name what to narrow by, not words to spell; the value of title: is a word to find and
+// stays (spec 080).
+func wordsToSpell(text string) string {
+	kept := []string{}
+	for _, token := range strings.Fields(text) {
+		m := fieldPattern.FindStringSubmatch(token)
+		switch {
+		case m == nil:
+			kept = append(kept, token)
+		case m[1] == "title":
+			kept = append(kept, m[2])
+		}
+	}
+	return strings.Join(kept, " ")
 }
 
 // suggest replaces words that are close to a word in a title. It answers with

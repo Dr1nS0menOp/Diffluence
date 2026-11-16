@@ -1036,3 +1036,55 @@ td.row > * {
 .workflow-sentences {
   margin-block: var(--space-2) 0;
 }
+
+/* The kind of an item before its title in a list (NAV-156). */
+.kind-mark {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  color: var(--color-muted);
+}
+
+/* A link to the documentation, with the mark that it leaves the instance (NAV-158). */
+.guide-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  text-decoration: underline;
+}
+
+/* A part that is still loading: a framed box with a sentence and pale lines in the shape of
+   the result, without a spinner (NAV-177). */
+.loading-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+}
+
+.loading-shape,
+.loading-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.loading-shape {
+  gap: var(--space-4);
+}
+
+.loading-row {
+  gap: var(--space-1-5);
+}
+
+.loading-line {
+  display: block;
+  block-size: var(--space-2-5);
+  border-radius: var(--radius);
+  background: var(--color-side);
+}
+
+.loading-line.short {
+  inline-size: 40%;
+}

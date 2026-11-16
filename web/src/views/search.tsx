@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useState, type FormEvent } from 'react';
+import { Fragment, useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { api, type DirectoryEntry, type SearchAnswer, type SearchResult, type Space } from '../api';
 import { Link, navigate, useLocation } from '../router';
+import { GuideLink } from '../components/guide-link';
+import { KindMark } from '../components/kind-mark';
+import { LoadingBox } from '../components/loading-box';
 import { StageMark } from '../components/page-marks';
-import { SubjectPicker } from '../components/picker';
-import { ErrorNote, Loading } from '../components/ui';
+import { personQuery } from '../components/person';
+import { PagePicker, SubjectPicker } from '../components/picker';
+import { ErrorNote } from '../components/ui';
 import { NO_FILTERS, queryWith, splitQuery } from '../components/search-filters';
 import { pageTitle } from '../page-name';
 
@@ -44,17 +48,78 @@ export function searchParamsFor(address: URLSearchParams, now = Date.now()): URL
   return params;
 }
 
+/** The address with one value for a key, or without the key when the value is empty. */
+export function withValue(address: URLSearchParams, key: string, value: string): URLSearchParams {
+  const next = new URLSearchParams(address);
+  if (value) next.set(key, value);
+  else next.delete(key);
+  return next;
+}
+
+/** The address with one more value for a key that may hold several, each once. */
+export function addValue(address: URLSearchParams, key: string, value: string): URLSearchParams {
+  const next = new URLSearchParams(address);
+  if (!next.getAll(key).includes(value)) next.append(key, value);
+  return next;
+}
+
+/** The address without one of the values of a key. */
+export function removeValue(address: URLSearchParams, key: string, value: string): URLSearchParams {
+  const next = new URLSearchParams(address);
+  const kept = next.getAll(key).filter((v) => v !== value);
+  next.delete(key);
+  for (const v of kept) next.append(key, v);
+  return next;
+}
+
+/** Parts of the address that do not narrow what is found. */
+const WIDE_KEYS = new Set(['q', 'tab', 'archived', 'sort']);
+
+/** A way forward from a search that found nothing, as a link in the text (NAV-175). */
+export interface EmptyWay {
+  kind: 'filters' | 'archived';
+  href: string;
+}
+
+/**
+ * The searches that look wider than this one: the same words without any filter, and with
+ * archived pages. Only those that would change something.
+ */
+export function emptyWays(address: URLSearchParams): EmptyWay[] {
+  const ways: EmptyWay[] = [];
+  const words = splitQuery(address.get('q') ?? '');
+  const narrowed =
+    words.spaces.length + words.labels.length + words.people.length > 0 ||
+    [...address.keys()].some((key) => !WIDE_KEYS.has(key));
+  // Without words, a search without filters would look for nothing at all.
+  if (narrowed && words.text.trim() !== '') {
+    const plain = new URLSearchParams({ q: words.text });
+    for (const key of ['archived', 'sort']) {
+      const value = address.get(key);
+      if (value) plain.set(key, value);
+    }
+    ways.push({ kind: 'filters', href: `/search?${plain.toString()}` });
+  }
+  if (address.get('archived') !== '1') {
+    ways.push({ kind: 'archived', href: `/search?${withValue(address, 'archived', '1').toString()}` });
+  }
+  return ways;
+}
+
 function ResultRow({ result }: { result: SearchResult }) {
   const { t } = useTranslation();
   return (
     <li>
-      <Link href={`/pages/${result.page_id}${result.comment_id ? `#comment-${result.comment_id}` : ''}`}>
-        {pageTitle(t, result.title)}
-      </Link>{' '}
-      <span className="muted">{result.space_name}</span>{' '}
-      {result.draft && <span className="lozenge">{t('publishing.draftMark')}</span>}{' '}
-      <StageMark text={result.stage_text ?? ''} color={result.stage_color ?? ''} />
-      {result.archived && <span className="lozenge">{t('search.archived')}</span>}
+      <div className="result-head">
+        <KindMark item={result} />
+        <Link href={`/pages/${result.page_id}${result.comment_id ? `#comment-${result.comment_id}` : ''}`}>
+          {pageTitle(t, result.title)}
+        </Link>
+        <span className="muted">{result.space_name}</span>
+        {result.draft && <span className="lozenge">{t('publishing.draftMark')}</span>}
+        <StageMark text={result.stage_text ?? ''} color={result.stage_color ?? ''} />
+        {result.archived && <span className="lozenge">{t('search.archived')}</span>}
+      </div>
       {(result.breadcrumbs?.length ?? 0) > 0 && (
         <nav aria-label={t('page.breadcrumbs')} className="result-crumbs">
           {result.breadcrumbs?.map((c) => (
@@ -73,15 +138,38 @@ function ResultRow({ result }: { result: SearchResult }) {
   );
 }
 
+/** One person the results are narrowed to, by name where the reader may know it. */
+function ContributorChip({ id, onRemove }: { id: string; onRemove: () => void }) {
+  const { t } = useTranslation();
+  const person = useQuery({ ...personQuery(id), retry: false });
+  const name = person.data?.name ?? t('search.somePerson');
+  return (
+    <li className="chip">
+      {name}
+      <button
+        type="button"
+        className="ghost"
+        aria-label={t('search.removeWord', { word: name })}
+        onClick={onRemove}
+      >
+        {t('common.remove')}
+      </button>
+    </li>
+  );
+}
+
 /** Spaces are chosen with space: words in the search box and its panel, not here. */
 function Filters({
   address,
   onSet,
+  onGo,
 }: {
   address: URLSearchParams;
   onSet: (key: string, value: string) => void;
+  onGo: (next: URLSearchParams) => void;
 }) {
   const { t } = useTranslation();
+  const contributors = address.getAll('contributor');
   const flag = (key: string, label: string) => (
     <label className="check">
       <input
@@ -150,16 +238,32 @@ function Filters({
           <option value="date">{t('search.sort_date')}</option>
         </select>
       </label>
-      <SubjectPicker
-        label={t('search.contributor')}
-        usersOnly
-        onPick={(person) => onSet('contributor', person.id)}
-      />
-      {address.get('contributor') && (
-        <button type="button" className="ghost" onClick={() => onSet('contributor', '')}>
-          {t('search.clearContributor')}
-        </button>
-      )}
+      <div className="search-people">
+        <SubjectPicker
+          label={t('search.contributor')}
+          usersOnly
+          onPick={(person) => onGo(addValue(address, 'contributor', person.id))}
+        />
+        {contributors.length > 0 && (
+          <ul className="chip-list" aria-label={t('search.contributor')}>
+            {contributors.map((id) => (
+              <ContributorChip
+                key={id}
+                id={id}
+                onRemove={() => onGo(removeValue(address, 'contributor', id))}
+              />
+            ))}
+          </ul>
+        )}
+      </div>
+      <div className="search-below">
+        <PagePicker
+          label={t('search.below')}
+          help={t('search.belowHelp')}
+          value={address.get('below') ?? ''}
+          onChange={(id) => onSet('below', id)}
+        />
+      </div>
       {flag('titles', t('search.titlesOnly'))}
       {flag('archived', t('search.includeArchived'))}
     </form>
@@ -170,7 +274,76 @@ function Filters({
 const COMMENTS_BELOW = 25;
 const COMMENTS_SHOWN = 5;
 
-function ContentResults({ params }: { params: URLSearchParams }) {
+/**
+ * The same search with a similar spelling of its plain words (ORG-023). The suggestion covers
+ * the plain words only, so the filter words of the query are kept as they were.
+ */
+export function suggestionAddress(address: URLSearchParams, suggestion: string): string {
+  const words = splitQuery(address.get('q') ?? '');
+  const q = queryWith(suggestion, {
+    ...NO_FILTERS,
+    spaces: words.spaces,
+    labels: words.labels,
+    people: words.people,
+  });
+  return `/search?${withValue(address, 'q', q).toString()}`;
+}
+
+function SuggestionLink({ address, suggestion }: { address: URLSearchParams; suggestion: string }) {
+  return <Link href={suggestionAddress(address, suggestion)}>{suggestion}</Link>;
+}
+
+function Suggestion({ address, suggestion }: { address: URLSearchParams; suggestion: string }) {
+  const { t } = useTranslation();
+  return (
+    <p>
+      {t('search.didYouMean')} <SuggestionLink address={address} suggestion={suggestion} />?
+    </p>
+  );
+}
+
+/**
+ * A search that found nothing: a heading and short paragraphs in the upper part of the area,
+ * whose ways forward are links in the text, then a guide link, and no button (NAV-175).
+ */
+function EmptyResult({ address, suggestion }: { address: URLSearchParams; suggestion: string }) {
+  const { t } = useTranslation();
+  const text = splitQuery(address.get('q') ?? '').text.trim();
+  const ways = emptyWays(address);
+  return (
+    <section className="empty-result" aria-labelledby="empty-result-title">
+      <h2 id="empty-result-title">
+        {text ? t('search.emptyTitle', { text }) : t('search.emptyTitleNoWords')}
+      </h2>
+      <p>
+        {t('search.emptyCheck')}
+        {suggestion && (
+          <>
+            {' '}
+            {t('search.didYouMean')} <SuggestionLink address={address} suggestion={suggestion} />?
+          </>
+        )}
+      </p>
+      {ways.length > 0 && (
+        <p>
+          {t('search.emptyWider')}{' '}
+          {ways.map((way, i) => (
+            <Fragment key={way.kind}>
+              {i > 0 && ` ${t('search.emptyOr')} `}
+              <Link href={way.href}>{t(`search.emptyWay_${way.kind}`)}</Link>
+            </Fragment>
+          ))}
+          .
+        </p>
+      )}
+      <p className="empty-result-guide">
+        <GuideLink>{t('search.emptyGuide')}</GuideLink>
+      </p>
+    </section>
+  );
+}
+
+function ContentResults({ params, address }: { params: URLSearchParams; address: URLSearchParams }) {
   const { t } = useTranslation();
   const query = params.toString();
   const hasFilter = [...params.keys()].some((key) => key !== 'q');
@@ -189,27 +362,21 @@ function ContentResults({ params }: { params: URLSearchParams }) {
   });
   const first = q.data?.pages[0];
   const results = q.data?.pages.flatMap((p) => p.results) ?? [];
+  const empty = first !== undefined && !first.timed_out && results.length === 0;
   return (
     <>
-      {q.isFetching && <Loading />}
+      {q.isLoading && <LoadingBox sentence={t('search.loading')} />}
       <ErrorNote error={q.error} />
       {first?.timed_out && <p role="alert">{t('search.timedOut')}</p>}
-      {first && !first.timed_out && (
+      {first && !first.timed_out && !empty && (
         <p role="status" className="muted">
           {first.capped
             ? t('search.totalCapped', { count: first.total })
             : t('search.total', { count: first.total })}
         </p>
       )}
-      {first?.suggestion && (
-        <p>
-          {t('search.didYouMean')}{' '}
-          <Link href={`/search?q=${encodeURIComponent(first.suggestion)}`}>{first.suggestion}</Link>
-        </p>
-      )}
-      {first && !first.timed_out && results.length === 0 && (
-        <p>{hasFilter ? t('search.noResultsFiltered') : t('search.noResults')}</p>
-      )}
+      {first?.suggestion && !empty && <Suggestion address={address} suggestion={first.suggestion} />}
+      {empty && <EmptyResult address={address} suggestion={first.suggestion} />}
       <ol className="results">
         {results.map((r) => (
           <ResultRow key={r.comment_id ?? r.page_id} result={r} />
@@ -365,12 +532,8 @@ export function SearchView() {
   const list = spaces.data?.spaces ?? [];
   const params = searchParamsFor(searchParams);
 
-  const set = (key: string, value: string) => {
-    const next = new URLSearchParams(searchParams);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    navigate(`/search?${next.toString()}`, true);
-  };
+  const go = (next: URLSearchParams) => navigate(`/search?${next.toString()}`, true);
+  const set = (key: string, value: string) => go(withValue(searchParams, key, value));
   const submit = (e: FormEvent) => {
     e.preventDefault();
     set('q', input);
@@ -406,9 +569,9 @@ export function SearchView() {
         ))}
       </div>
       <QueryWords text={text} spaces={list} onChange={(next) => set('q', next)} />
-      {tab === 'content' && <Filters address={searchParams} onSet={set} />}
+      {tab === 'content' && <Filters address={searchParams} onSet={set} onGo={go} />}
       {!searching && <p className="muted">{t('search.hint')}</p>}
-      {tab === 'content' && searching && <ContentResults params={params} />}
+      {tab === 'content' && searching && <ContentResults params={params} address={searchParams} />}
       {tab === 'people' && searching && <PeopleResults text={text} />}
       {tab === 'spaces' && searching && <SpaceResults text={text} spaces={list} />}
     </>

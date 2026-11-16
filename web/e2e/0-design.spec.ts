@@ -1596,6 +1596,15 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
+  test('a search that found nothing', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/search?q=handbok+label:nowhere');
+    await expect(page.getByRole('heading', { name: 'No pages found for “handbok”' })).toBeVisible();
+    await picture(page, 'search-empty');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
   // Last, because from here on the bell of the reader shows a number.
   test.describe('working together', () => {
     const QUOTE = 'the kitchen rota';

@@ -5,6 +5,10 @@
 #
 #   bash scripts/stress/real-data.sh /path/to/seeded.dump
 #
+# REALDATA_PACKAGE and REALDATA_RUN choose other checks than those of the feed, such as
+# REALDATA_PACKAGE=./internal/app/ REALDATA_RUN=SearchOnRealData (spec 080), and
+# REALDATA_NAME another name for the database, so builders on one machine keep theirs apart.
+#
 # Make the dump on the app machine of the stress test with
 #   docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc > seeded.dump
 # The dump holds only generated people and pages; still, keep it out of the repository.
@@ -13,7 +17,7 @@
 set -u
 dump=${1:?usage: real-data.sh <seeded.dump>}
 [ -r "$dump" ] || { echo "cannot read $dump" >&2; exit 1; }
-name=diffluence-realdata
+name=${REALDATA_NAME:-diffluence-realdata}
 network=$(docker inspect --format '{{range $k, $v := .NetworkSettings.Networks}}{{$k}}{{end}}' \
   "$(docker compose -f compose.dev.yaml ps -q dev)") || { echo "start the toolbox first: scripts/dev up" >&2; exit 1; }
 
@@ -32,7 +36,7 @@ else
 fi
 
 bash scripts/dev env DIFFLUENCE_REALDATA_URL="postgres://postgres:realdata@$name:5432/diffluence?sslmode=disable" \
-  go test -count=1 -run RealData -v ./internal/feed/
+  go test -count=1 -run "${REALDATA_RUN:-RealData}" -v "${REALDATA_PACKAGE:-./internal/feed/}"
 status=$?
 echo "the database stays as $name for more runs; remove it with: docker rm -f $name"
 exit $status

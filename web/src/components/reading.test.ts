@@ -192,6 +192,45 @@ describe('quick search', () => {
     expect(rows[1]?.target).toBe('/pages/p');
   });
 
+  it('gives each row the mark of its kind (NAV-156)', () => {
+    const results: QuickResults = {
+      pages: [
+        {
+          page_id: 'h',
+          space_key: 'S',
+          space_name: 'Space',
+          title: 'Home',
+          snippet: '',
+          updated_at: '2026-01-01T00:00:00Z',
+          kind: 'page',
+          home: true,
+          emoji: '',
+        },
+      ],
+      posts: [
+        {
+          page_id: 'b',
+          space_key: 'S',
+          space_name: 'Space',
+          title: 'News',
+          snippet: '',
+          updated_at: '2026-01-01T00:00:00Z',
+          kind: 'post',
+          emoji: '🎉',
+        },
+      ],
+      spaces: [],
+      files: [{ id: 'f', filename: 'a.pdf', page_id: 'p', page_title: 'Page', space_name: 'Space' }],
+      people: [{ id: 'u', name: 'Anna' }],
+    };
+    expect(rowsOf(results, labels, () => DAY_TEXT).map((r) => r.mark)).toEqual([
+      { type: 'page', kind: 'page', home: true, emoji: '' },
+      { type: 'page', kind: 'post', home: undefined, emoji: '🎉' },
+      { type: 'file', filename: 'a.pdf' },
+      { type: 'person', name: 'Anna' },
+    ]);
+  });
+
   it('has no rows before an answer', () => {
     expect(rowsOf(undefined, labels, () => DAY_TEXT)).toEqual([]);
   });

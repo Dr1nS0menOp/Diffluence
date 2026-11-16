@@ -464,16 +464,19 @@ var crossings = map[crossing]int{
 	// savedblocks: a shared block is offered to members only.
 	{"internal/savedblocks", "users"}: 1,
 
-	// search: the index and its answers join pages, spaces, labels, files and people.
+	// search: the index and its answers join pages, spaces, labels, files and people. The way
+	// back to a result marks ancestors under document control by a key lookup, so the rule is
+	// asked only when one is there (spec 080).
 	{"internal/search", "attachment_labels"}: 2,
 	{"internal/search", "attachments"}:       2,
 	{"internal/search", "comments"}:          1,
 	{"internal/search", "groups"}:            2,
+	{"internal/search", "page_control"}:      1,
 	{"internal/search", "page_labels"}:       2,
 	{"internal/search", "page_mentions"}:     2,
 	{"internal/search", "page_tree"}:         3,
 	{"internal/search", "page_versions"}:     2,
-	{"internal/search", "pages"}:             5,
+	{"internal/search", "pages"}:             6,
 	{"internal/search", "spaces"}:            5,
 	{"internal/search", "users"}:             4,
 

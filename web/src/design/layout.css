@@ -205,6 +205,19 @@
   cursor: pointer;
 }
 
+/* In the search box, the mark of the item's kind stands before its words (NAV-156). */
+.quick-row.with-mark {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.quick-text {
+  display: flex;
+  flex-direction: column;
+  min-inline-size: 0;
+}
+
 .quick-row:hover,
 .quick-row.marked {
   background: var(--color-accent-tint);

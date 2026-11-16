@@ -1362,6 +1362,8 @@ export interface SearchResult {
   archived?: boolean;
   /** A result from the draft space of a pair (spec 073, PUB-801). */
   draft?: boolean;
+  /** The home page of its space, which a list marks as one (NAV-156). */
+  home?: boolean;
   breadcrumbs?: { id: string; title: string }[];
   comment_id?: string;
 }

@@ -19,9 +19,9 @@
 - **ORG-012** · built · The last word also matches as a prefix.
 - **ORG-013** · built · Publishing updates the search index in the same transaction, so a page is never found with stale content or permissions.
 - **ORG-014** · built · Dutch and English behave alike: a word also finds its common forms, such as `plans` for `plan`, through the same endings in both languages, not a dictionary per language. Quoted words are found as typed (ADR-037, spec 029).
-- **ORG-015** · partly · Filters added: content type, label, contributor (wrote, edited or commented), status, below a page, titles only. Still open: a control for "below a page", which works through the address.
+- **ORG-015** · built · Filters added: content type, label, contributor (wrote, edited or commented), status, below a page, titles only. A page chosen by its title sets "below a page"; a page the person may not see has nothing below it (spec 080, wave SR1).
 - **ORG-016** · built · A filter on date offers last day, week, month, year, or a range.
-- **ORG-017** · partly · Several people or labels in a filter mean **or**. Still open: several people, which work through the address.
+- **ORG-017** · built · Several people or labels in a filter mean **or**. Each chosen person is a chip that takes them out again (spec 080, wave SR1).
 - **ORG-018** · built · Results can be sorted by relevance or by date.
 - **ORG-019** · built · Breadcrumbs under each result show where it lives, and are links.
 - **ORG-020** · built · Archived spaces and pages are left out unless a filter includes them.

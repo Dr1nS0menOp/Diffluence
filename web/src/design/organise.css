@@ -269,6 +269,53 @@
   font-size: var(--text-small);
 }
 
+/* A result's first line: the mark of its kind, the title, its space and its marks. */
+.result-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+/* The title and the way back are links on lines close together: each gets a target of its
+   own height, so neither crowds the other (WCAG 2.5.8). */
+.result-head > a,
+.result-crumbs > a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--size-twist);
+}
+
+.search-people,
+.search-below {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+/* A search that found nothing: in the upper part of the area, links in the text (NAV-175). */
+.empty-result {
+  max-inline-size: var(--size-reading);
+  padding-block: var(--space-8) var(--space-4);
+}
+
+.empty-result h2 {
+  margin-block: 0 var(--space-3);
+  font-size: var(--text-section);
+}
+
+.empty-result p {
+  margin-block: 0 var(--space-2);
+}
+
+.empty-result a {
+  text-decoration: underline;
+}
+
+.empty-result-guide {
+  margin-block-start: var(--space-4);
+}
+
 /* Who else is on a page, and the steps of a rule. */
 .presence {
   display: inline-flex;

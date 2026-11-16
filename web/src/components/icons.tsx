@@ -191,6 +191,9 @@ export const IconFullWidth = line('M3 12h18M3 12l4-4M3 12l4 4M21 12l-4-4M21 12l-
 export const IconTableMenu = line('M4 5h16v14H4zM4 10h16M10 10v9M16 10v9');
 export const IconArrowUp = line('M12 19V5M6 11l6-6 6 6');
 export const IconArrowDown = line('M12 5v14M6 13l6 6 6-6');
+// The kinds of a file in a list (NAV-156): a sheet with lines of text, and one with a P.
+export const IconFileText = line('M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 15h5M10 18h3');
+export const IconFilePdf = line('M7 3h7l4 4v14H7zM14 3v4h4M10 18v-6h2a2 2 0 0 1 0 4h-2');
 
 /** The same link icon, for the heading marks that ProseMirror builds outside React. */
 export function linkIconElement(): SVGSVGElement {

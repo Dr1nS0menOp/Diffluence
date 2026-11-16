@@ -92,10 +92,10 @@ func medianOf(u *user, method, path string, body any) time.Duration {
 	return took[len(took)/2]
 }
 
-// TestDocumentControlOnRealData measures spec 064 on a restored dump of the seeded data
-// (scripts/stress/real-data.sh). It migrates the dump, puts a tenth of the pages under
-// control, and times reads and steps through the whole application.
-func TestDocumentControlOnRealData(t *testing.T) {
+// openRealData starts the whole application on a restored dump of the seeded data
+// (scripts/stress/real-data.sh), migrating it first, or skips the test when there is none.
+func openRealData(t *testing.T) *env {
+	t.Helper()
 	realURL := os.Getenv("DIFFLUENCE_REALDATA_URL")
 	if realURL == "" {
 		t.Skip("DIFFLUENCE_REALDATA_URL is not set; see scripts/stress/real-data.sh")
@@ -109,7 +109,15 @@ func TestDocumentControlOnRealData(t *testing.T) {
 	}
 	srv := httptest.NewServer(a.Handler())
 	t.Cleanup(func() { srv.Close(); a.Close() })
-	e := &env{t: t, app: a, srv: srv}
+	return &env{t: t, app: a, srv: srv}
+}
+
+// TestDocumentControlOnRealData measures spec 064 on a restored dump of the seeded data
+// (scripts/stress/real-data.sh). It migrates the dump, puts a tenth of the pages under
+// control, and times reads and steps through the whole application.
+func TestDocumentControlOnRealData(t *testing.T) {
+	e := openRealData(t)
+	a := e.app
 	markControlled(t, e)
 
 	stamp := time.Now().Format("150405")
