@@ -18,7 +18,7 @@
 - **ARC-137** · built · Every route is registered with an `Access` value, and a route without one panics at start. Public routes carry a comment that says why.
 - **ARC-138** · built · The kinds are `Public`, `Authenticated`, `Permission`, `Object` and `ScimToken`. All routes and rules are listed in `docs/api/routes.txt`, and a test fails on a difference.
 - **ARC-139** · built · `TestEveryObjectRouteIsProtected` walks the real route table: a stranger gets 404, a viewer gets 403, so a new route is covered from its first line.
-- **ARC-140** · built · `Sensitive` asks for a fresh login after 10 minutes, and `SessionOnly` keeps tokens away from passwords, tokens and the console (spec 013).
+- **ARC-140** · built · `Sensitive` asks for a fresh login after 10 minutes, and `SessionOnly` keeps tokens away from passwords, tokens and the console (spec 013). The router makes every route under `/api/v1/admin/` that is not a `GET` or `HEAD` session-only by itself, so a token with the `admin` scope reads Administration and never changes it (spec 085).
 - **ARC-141** · built · Maintenance mode is a check in the middleware, because it concerns every write, also from SCIM and jobs (spec 013 D17).
 - **ARC-142** · built · Tokens have scopes: `read`, `write`, `export`, `admin`. A token never exceeds its owner, because the module's checks still run.
 - **ARC-143** · phase 7 · OAuth for the API waits for the platform phase (ADR-026). Tokens with scopes cover what is needed until then.

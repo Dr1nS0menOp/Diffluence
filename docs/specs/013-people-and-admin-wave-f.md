@@ -59,7 +59,7 @@ A person is still only a name and an e-mail address. Colleagues cannot be found 
 | D9 | Step-up is an access rule, `Sensitive(...)`, valid for 10 minutes | It is visible in `docs/api/routes.txt`, and no route can forget it |
 | D10 | Anonymising cannot change audit rows. The screen says so, and the audit retention period is the limit | The chain must stay intact, and an audit trail has its own legal ground. Backups get the same note |
 | D11 | Audit retention is a setting, and pruning is a command run with the owner's database role, which leaves a signed anchor | The application still cannot delete audit rows |
-| D12 | Tokens work on normal routes within their scope, and never on routes marked `SessionOnly` | A leaked script token must not reach passwords, tokens or the console |
+| D12 | Tokens work on normal routes within their scope, and never on routes marked `SessionOnly`. Spec 085: the router marks every change under `/api/v1/admin/` so by itself | A leaked script token must not reach passwords, tokens or the console |
 | D13 | Names stay `*_name` fields. A name with an id asks `GET /people/{id}`, which answers not found for someone the viewer may not see, so the route tells nothing | Changed while building: the rule that guards a profile already guards this, and a second shape of name in every answer adds nothing |
 | D14 | Group owners are checked in the module, and a group from SCIM stays read-only for them too | The identity provider stays the source of truth |
 | D15 | Space categories are one list kept by administrators, and space administrators pick from it | Free typing gives ten spellings of one word |
@@ -374,7 +374,7 @@ Migration 0010, expand only:
 - [x] AC-9 Reset, invitation and sign-up work, reveal nothing, and work once.
 - [x] AC-10 A second factor can be required, and the idle warning keeps a draft safe.
 - [x] AC-11 An expired guest has no access from that moment, on every list.
-- [x] AC-12 Tokens stay inside their scope, and never reach account security or the console.
+- [x] AC-12 Tokens stay inside their scope, and never reach account security or the console. Since spec 085, no route under `/api/v1/admin/` that changes something takes a token.
 - [x] AC-13 Sensitive actions ask again after 10 minutes.
 - [x] AC-14 Dates follow a person's time zone and format everywhere.
 - [x] AC-15 Group owners manage members, and deleting a group says what it touches.

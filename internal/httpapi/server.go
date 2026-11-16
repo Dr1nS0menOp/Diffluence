@@ -304,7 +304,7 @@ var exportRoutes = []string{
 func scopeFor(r *http.Request) string {
 	_, path, _ := strings.Cut(r.Pattern, " ")
 	switch {
-	case r.Pattern == "" || strings.HasPrefix(path, "/api/v1/admin/"):
+	case r.Pattern == "" || strings.HasPrefix(path, adminPathPrefix):
 		return identity.ScopeAdmin
 	case slices.Contains(exportRoutes, r.Pattern):
 		return identity.ScopeExport

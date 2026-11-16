@@ -2668,6 +2668,15 @@ mutate "a space export needs only the read scope" internal/httpapi/server.go \
   's.replace("\t\"GET /api/v1/spaces/{id}/export.zip\",\n", "")' $app -run TestEveryExportRouteNeedsMoreThanTheReadScope
 mutate "an unrouted request needs no admin scope" internal/httpapi/server.go \
   's.replace("case r.Pattern == \"\" || strings.HasPrefix(path,", "case strings.HasPrefix(path,")' ./internal/httpapi/ -run TestTheScopeOfARequestComesFromItsRoute
+# Spec 085: every change of Administration needs a signed-in session; a token only reads it.
+mutate "a token changes Administration" internal/httpapi/router.go \
+  's.replace("\ta = withAdministrationRule(pattern, a)\n", "")' $app -run '^TestEveryAdministrationChangeNeedsASession$'
+mutate "only a PUT of Administration needs a session" internal/httpapi/router.go \
+  's.replace("|| method == http.MethodGet || method == http.MethodHead {", "|| method != http.MethodPut {")' $app -run '^TestEveryAdministrationChangeNeedsASession$'
+mutate "a token cannot read Administration" internal/httpapi/router.go \
+  's.replace("|| method == http.MethodGet || method == http.MethodHead {", "|| method == http.MethodOptions {")' $app -run '^TestEveryAdministrationChangeNeedsASession$'
+mutate "a route of Administration without a method takes a token" internal/httpapi/router.go \
+  's.replace("\t\tmethod, path = \"\", pattern\n", "\t\treturn a\n")' ./internal/httpapi/ -run '^TestAnAdministrationChangeIsSessionOnlyWhateverRuleItWasGiven$'
 # Spec 070: migrations, checkpoint signing and restore orders in the backup service.
 mutate "a short backup key is taken" internal/keys/worker.go \
   's.replace("if len(secret) < minWorkerSecret {", "if len(secret) < 0 {")' ./internal/keys/ -run TestAWorkerKeyThatIsMissingOrShortIsRefused

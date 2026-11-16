@@ -9,7 +9,7 @@ DELETE /api/v1/admin/groups/{id}                               session-only perm
 DELETE /api/v1/admin/groups/{id}/members/{user}                session-only permission:administrator
 DELETE /api/v1/admin/invitations/{id}                          session-only permission:administrator
 DELETE /api/v1/admin/log-level                                 session-only permission:administrator
-DELETE /api/v1/admin/pages/{id}/versions/{number}              permission:administrator
+DELETE /api/v1/admin/pages/{id}/versions/{number}              session-only permission:administrator
 DELETE /api/v1/admin/permission-sets/{id}                      session-only permission:administrator
 DELETE /api/v1/admin/roles/{id}                                session-only permission:administrator
 DELETE /api/v1/admin/scim-tokens/{id}                          session-only permission:administrator
@@ -334,31 +334,31 @@ POST /api/v1/admin/backups/request                             session-only perm
 POST /api/v1/admin/backups/restore                             sensitive permission:system_administrator
 POST /api/v1/admin/backups/restore/code                        session-only permission:system_administrator
 POST /api/v1/admin/backups/schedule/code                       session-only permission:system_administrator
-POST /api/v1/admin/bundles                                     permission:administrator
+POST /api/v1/admin/bundles                                     session-only permission:administrator
 POST /api/v1/admin/categories                                  session-only permission:administrator
 POST /api/v1/admin/event-failures/{id}/replay                  session-only permission:administrator
-POST /api/v1/admin/example-space                               permission:administrator
+POST /api/v1/admin/example-space                               session-only permission:administrator
 POST /api/v1/admin/groups                                      session-only permission:administrator
 POST /api/v1/admin/invitations                                 session-only permission:administrator
 POST /api/v1/admin/jobs/{id}/cancel                            session-only permission:administrator
 POST /api/v1/admin/jobs/{id}/retry                             session-only permission:administrator
-POST /api/v1/admin/mail/test                                   permission:administrator
+POST /api/v1/admin/mail/test                                   session-only permission:administrator
 POST /api/v1/admin/pages/{id}/recover                          sensitive permission:administrator
 POST /api/v1/admin/publishing/check                            session-only permission:administrator
 POST /api/v1/admin/roles                                       session-only permission:administrator
 POST /api/v1/admin/roles/{id}/preview                          session-only permission:administrator
-POST /api/v1/admin/rules                                       permission:administrator
+POST /api/v1/admin/rules                                       session-only permission:administrator
 POST /api/v1/admin/scim-tokens                                 sensitive permission:administrator
 POST /api/v1/admin/scim-tokens/{id}/rotate                     sensitive permission:administrator
 POST /api/v1/admin/service-accounts                            session-only permission:administrator
 POST /api/v1/admin/service-accounts/{id}/tokens                sensitive permission:administrator
 POST /api/v1/admin/sessions/end                                sensitive permission:administrator
-POST /api/v1/admin/space-templates                             permission:administrator
+POST /api/v1/admin/space-templates                             session-only permission:administrator
 POST /api/v1/admin/spaces/{id}/handover                        session-only permission:administrator
 POST /api/v1/admin/spaces/{id}/recover                         sensitive permission:administrator
 POST /api/v1/admin/storage/unused                              session-only permission:administrator
-POST /api/v1/admin/templates                                   permission:administrator
-POST /api/v1/admin/templates/import                            permission:administrator
+POST /api/v1/admin/templates                                   session-only permission:administrator
+POST /api/v1/admin/templates/import                            session-only permission:administrator
 POST /api/v1/admin/users                                       session-only permission:administrator
 POST /api/v1/admin/users/bulk                                  session-only permission:administrator
 POST /api/v1/admin/users/import                                session-only permission:administrator
@@ -368,7 +368,7 @@ POST /api/v1/admin/users/{id}/enable                           session-only perm
 POST /api/v1/admin/users/{id}/reset-mfa                        sensitive permission:administrator
 POST /api/v1/admin/users/{id}/reset-password                   sensitive permission:administrator
 POST /api/v1/admin/users/{id}/unlock-password                  session-only permission:administrator
-POST /api/v1/admin/webhooks                                    permission:administrator
+POST /api/v1/admin/webhooks                                    session-only permission:administrator
 POST /api/v1/admin/workflow-templates                          session-only permission:administrator
 POST /api/v1/admin/workflow-templates/{id}/archive             session-only permission:administrator
 POST /api/v1/approvals/{id}/close                              authenticated
@@ -528,15 +528,15 @@ PUT /api/v1/admin/appearance/font                              session-only perm
 PUT /api/v1/admin/appearance/logo                              session-only permission:administrator
 PUT /api/v1/admin/automation                                   session-only permission:administrator
 PUT /api/v1/admin/experimental                                 session-only permission:administrator
-PUT /api/v1/admin/export-policy                                permission:administrator
-PUT /api/v1/admin/features                                     permission:administrator
+PUT /api/v1/admin/export-policy                                session-only permission:administrator
+PUT /api/v1/admin/features                                     session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/members/{user}                   session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/owners                           session-only permission:administrator
 PUT /api/v1/admin/groups/{id}/permissions                      session-only permission:administrator
 PUT /api/v1/admin/log-level                                    session-only permission:administrator
 PUT /api/v1/admin/log-level/confirmed                          sensitive permission:system_administrator
 PUT /api/v1/admin/maintenance                                  sensitive permission:system_administrator
-PUT /api/v1/admin/organising                                   permission:administrator
+PUT /api/v1/admin/organising                                   session-only permission:administrator
 PUT /api/v1/admin/outgoing-hosts                               session-only permission:administrator
 PUT /api/v1/admin/permission-sets                              session-only permission:administrator
 PUT /api/v1/admin/role-assignments                             session-only permission:administrator
@@ -545,7 +545,7 @@ PUT /api/v1/admin/settings                                     session-only perm
 PUT /api/v1/admin/settings/{section}                           session-only permission:administrator
 PUT /api/v1/admin/settings/{section}/confirmed                 sensitive permission:system_administrator
 PUT /api/v1/admin/spaces/{id}/storage-limit                    session-only permission:administrator
-PUT /api/v1/admin/template-review                              permission:administrator
+PUT /api/v1/admin/template-review                              session-only permission:administrator
 PUT /api/v1/admin/users/{id}/expiry                            session-only permission:administrator
 PUT /api/v1/admin/users/{id}/permissions                       sensitive permission:administrator
 PUT /api/v1/admin/users/{id}/signing                           sensitive permission:administrator

@@ -23,6 +23,40 @@ func TestRouteWithoutAccessRulePanics(t *testing.T) {
 	r.Handle("GET /x", Access{}, http.NotFoundHandler())
 }
 
+func TestAnAdministrationChangeIsSessionOnlyWhateverRuleItWasGiven(t *testing.T) {
+	cases := []struct {
+		pattern string
+		access  Access
+		want    string
+	}{
+		{"PUT /api/v1/admin/features", Permission("administrator"), "session-only permission:administrator"},
+		{"DELETE /api/v1/admin/pages/{id}/versions/{number}", Permission("administrator"), "session-only permission:administrator"},
+		{"/api/v1/admin/anything", Permission("administrator"), "session-only permission:administrator"},
+		{"POST /api/v1/admin/users", SessionOnly(Permission("administrator")), "session-only permission:administrator"},
+		{"POST /api/v1/admin/maintenance", Sensitive(Permission("administrator")), "sensitive permission:administrator"},
+		{"GET /api/v1/admin/features", Permission("administrator"), "permission:administrator"},
+		{"HEAD /api/v1/admin/features", Permission("administrator"), "permission:administrator"},
+		{"PUT /api/v1/pages/{id}", Authenticated(), "authenticated"},
+		{"POST /api/v1/administrators", Authenticated(), "authenticated"},
+	}
+	for _, c := range cases {
+		r := newRouter(func(_ Access, h http.Handler) http.Handler { return h })
+		r.Handle(c.pattern, c.access, http.NotFoundHandler())
+		if got := r.Routes()[0].Access.String(); got != c.want {
+			t.Errorf("%s: rule %q, want %q", c.pattern, got, c.want)
+		}
+	}
+}
+
+func TestTheRouterEnforcesTheSessionOnlyRuleOfAnAdministrationChange(t *testing.T) {
+	var enforced Access
+	r := newRouter(func(a Access, h http.Handler) http.Handler { enforced = a; return h })
+	r.Handle("POST /api/v1/admin/webhooks", Permission("administrator"), http.NotFoundHandler())
+	if !enforced.sessionOnly {
+		t.Fatal("the rule the router enforces must be the session-only one it lists")
+	}
+}
+
 func TestPermissionNeedsAName(t *testing.T) {
 	defer func() {
 		if recover() == nil {

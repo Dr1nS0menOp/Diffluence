@@ -184,7 +184,7 @@ The view count joins the byline for those who may see it (PAG-105), and opens a 
 
 ### H9. Tokens with scopes
 
-Tokens from wave F gain scopes. The middleware maps a route to a scope: safe methods need `read`, others `write`, exports `export`, admin routes `admin`. The checks of the module still apply, so a token never does more than its owner. Tokens are limited per minute, and failures are audited.
+Tokens from wave F gain scopes. The middleware maps a route to a scope: safe methods need `read`, others `write`, exports `export`, admin routes `admin`. The checks of the module still apply, so a token never does more than its owner. Since spec 085 the `admin` scope only reads: every route under `/api/v1/admin/` that changes something is session-only. Tokens are limited per minute, and failures are audited.
 
 ### H10. Webhooks
 

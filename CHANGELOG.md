@@ -3,6 +3,10 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: administration changes need a signed-in session (spec 085, wave RV10)
+- Every route under `/api/v1/admin/` that changes something now needs a signed-in session, decided once in the router instead of route by route, so a route added later follows the rule by itself. A personal access token with the Administration scope still reads Administration, and gets `403 session_only` on a change, as on every other session-only route. The scope is now labelled "Administration, read only" on Your account, Tokens
+- `docs/api/routes.txt` and `openapi.json` show these routes as `session-only`
+- Upgrade impact: no migration. A script that changed Administration with a token must do that change in the browser instead; scripts that only read Administration keep working
 ### Changed: search results, the search box and what search may count (spec 080, wave SR1)
 - A search no longer counts pages the reader may not see. A controlled page that waits for its first approval or was withdrawn was left out of the results but counted in their total; now the total holds only what the reader can open. The way back under a result, and the breadcrumbs of the page itself, leave out a page the reader may not see, and narrowing to a page the reader may not see finds nothing
 - Each result and each row of the search box starts with the mark of its kind: page, home page, blog post, database, folder or link, or the page's emoji; a file shows its kind from its name (picture, PDF, document, slides, spreadsheet), a space its badge and a person their initials. Screen readers hear the kind

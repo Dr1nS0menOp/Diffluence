@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 
 	"github.com/diffluence/diffluence/internal/tracing"
 )
@@ -122,13 +123,32 @@ func newRouter(enforce func(Access, http.Handler) http.Handler) *Router {
 	return &Router{mux: http.NewServeMux(), enforce: enforce}
 }
 
+// adminPathPrefix starts every route of Administration.
+const adminPathPrefix = "/api/v1/admin/"
+
 // Handle registers pattern (e.g. "GET /api/v1/me") with an access rule.
 func (r *Router) Handle(pattern string, a Access, h http.Handler) {
 	if a.kind == accessUnset {
 		panic(fmt.Sprintf("httpapi: route %q registered without an access rule", pattern))
 	}
+	a = withAdministrationRule(pattern, a)
 	r.routes = append(r.routes, Route{Pattern: pattern, Access: a})
 	r.mux.Handle(pattern, namedSpan(pattern, r.enforce(a, h)))
+}
+
+// withAdministrationRule makes every route of Administration that is not a read
+// session-only, whatever rule it was registered with (spec 085): a token may read
+// Administration, never change it. Deciding it here, not per route, means a new route
+// cannot forget it. A pattern without a method matches every method, so it is a change.
+func withAdministrationRule(pattern string, a Access) Access {
+	method, path, found := strings.Cut(pattern, " ")
+	if !found {
+		method, path = "", pattern
+	}
+	if !strings.HasPrefix(path, adminPathPrefix) || method == http.MethodGet || method == http.MethodHead {
+		return a
+	}
+	return SessionOnly(a)
 }
 
 // namedSpan names the span of a request after its route pattern, before any access rule

@@ -483,7 +483,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/bundles/key": {
@@ -645,7 +645,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/experimental": {
@@ -713,7 +713,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/features": {
@@ -747,7 +747,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/global-permissions": {
@@ -1318,7 +1318,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/maintenance": {
@@ -1415,7 +1415,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/outgoing-hosts": {
@@ -1538,7 +1538,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/permission-sets": {
@@ -1845,7 +1845,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/scim-tokens": {
@@ -2163,7 +2163,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/spaces": {
@@ -2366,7 +2366,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/templates": {
@@ -2400,7 +2400,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/templates/import": {
@@ -2418,7 +2418,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/trash/spaces": {
@@ -2957,7 +2957,7 @@
         "tags": [
           "admin"
         ],
-        "x-access": "permission:administrator"
+        "x-access": "session-only permission:administrator"
       }
     },
     "/api/v1/admin/workflow-templates": {

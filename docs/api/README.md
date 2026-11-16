@@ -19,9 +19,9 @@ A personal access token goes in `Authorization: Bearer dfl_...`. It has scopes:
 | `read` | Reading: `GET`, `HEAD` and `OPTIONS` |
 | `write` | Everything that changes something |
 | `export` | Routes that take content out, such as `export.zip` |
-| `admin` | Routes under `/api/v1/admin/` |
+| `admin` | Reading routes under `/api/v1/admin/` |
 
-A scope only limits a token. A token is its owner, so every check on the owner still applies, and a route marked `session-only` never takes a token.
+A scope only limits a token. A token is its owner, so every check on the owner still applies, and a route marked `session-only` never takes a token. Every route under `/api/v1/admin/` that changes something is `session-only`: Administration is changed in a signed-in session, never by a token (spec 085).
 
 ## Limits
 
