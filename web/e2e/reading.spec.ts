@@ -376,7 +376,14 @@ test('an archived space only shows under Archived', async ({ page }) => {
   await page.getByLabel('Which spaces').selectOption('archived');
   await expect(page.getByRole('link', { name })).toBeVisible();
   await expect(page).toHaveURL(/kind=archived/);
+  // The start screen's cards and feed load after the screen itself (spec 078 D17): wait
+  // until both are done, or a count of zero proves nothing.
   await page.goto('/');
+  for (const part of ['Pick up where you left off', 'Activity']) {
+    const region = page.getByRole('region', { name: part, exact: true });
+    await expect(region).toBeVisible();
+    await expect(region.getByRole('status')).toHaveCount(0);
+  }
   await expect(page.getByRole('link', { name })).toHaveCount(0);
 });
 

@@ -61,7 +61,9 @@ func collectList(rows pgx.Rows, err error) ([]ListItem, error) {
 }
 
 // Recent lists pages for one tab of the Recent screen, as far as the user may
-// still see them. Every tab goes through perm_listed_pages.
+// still see them. Every tab goes through perm_listed_pages. Pages of an archived
+// space stay out, as an archived page does (SPC-069, spec 078 D17); they come
+// back when the space is restored.
 func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([]ListItem, error) {
 	switch kind {
 	case "", RecentVisited:
@@ -69,7 +71,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 			FROM recent_pages r
 			JOIN perm_listed_pages($1) v ON v.page_id = r.page_id
 			JOIN pages p ON p.id = r.page_id
-			JOIN spaces s ON s.id = p.space_id
+			JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
 			WHERE r.user_id = $1 ORDER BY r.viewed_at DESC LIMIT $2`, c.UserID, maxRecentPages)
 		return collectList(rows, err)
 	case RecentWorked:
@@ -81,7 +83,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 				) made GROUP BY page_id) w
 			JOIN perm_listed_pages($1) v ON v.page_id = w.page_id
 			JOIN pages p ON p.id = w.page_id
-			JOIN spaces s ON s.id = p.space_id
+			JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
 			ORDER BY w.at DESC LIMIT $2`, c.UserID, maxRecentPages)
 		return collectList(rows, err)
 	case RecentDrafts:
@@ -89,7 +91,7 @@ func (s *Service) Recent(ctx context.Context, c identity.Caller, kind string) ([
 				COALESCE(d.updated_at, p.updated_at), p.status = 'draft'
 			FROM pages p
 			JOIN perm_listed_pages($1) v ON v.page_id = p.id
-			JOIN spaces s ON s.id = p.space_id
+			JOIN spaces s ON s.id = p.space_id AND s.status = 'active'
 			LEFT JOIN drafts d ON d.page_id = p.id AND d.user_id = $1
 			WHERE d.page_id IS NOT NULL OR (p.status = 'draft' AND p.created_by = $1)
 			ORDER BY COALESCE(d.updated_at, p.updated_at) DESC LIMIT $2`, c.UserID, maxDraftPages)

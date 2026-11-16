@@ -194,6 +194,13 @@ No route of the server changes, so `internal/app/query_budget_test.go` keeps its
 - **D15.** The account menu keeps Tasks, as NAV-096 lists, also though Tasks is an entry of the sidebar.
 - **D16.** The current-row look of NAV-144 is one rule for every sidebar, so the sections of the settings sidebars get it too.
 
+### Addendum, wave FX4: an archived space on the start screen
+
+Decided on the product owner's behalf on 2026-11-16, may be overruled.
+
+- **D17.** The pages of an archived space leave the cards of the start screen (NAV-104), the Recent screen and the Recent panel (D7), in all three groups: Visited, Worked on and Drafts. This carries SPC-069 (an archived space leaves the Spaces menu, the directory and quick search) and ORG-020 to the lists that SC1 put on the start screen, and treats the space as an archived page is already treated there. Nothing is deleted: when the space is restored, its pages come back in those lists. A direct address still opens them, with the banner of SPC-069. The feed already left archived spaces out, and so did the Spaces panel and the sidebar; no line of blueprint 03 asks for an exception.
+- Cause: creating a space publishes its home page, titled after the space, so the person who made it has worked on it. The cards of the start screen load after the screen itself, and the list behind them did not look at the status of the space, so the archived space's home page showed as a card with the space's name. The end-to-end test asserted before the cards had loaded, so it passed or failed by timing.
+
 ## Supersedes
 
 ADR-046 records that this spec supersedes, as built: the strip of spaces and the fixed Home row of ADR-027 and spec 016 (H1); the part **This space**, its handle and the folding parts of the personal sidebar of spec 033; the quiet row of tree tools of spec 033; the top bar of ADR-035's "Top bar" rule apart from search in the middle; Administration in the account menu; the greeting, grid and side column of the start screen.

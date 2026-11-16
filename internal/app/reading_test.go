@@ -217,6 +217,41 @@ func TestRecentListsVisitedWorkedOnAndDrafts(t *testing.T) {
 	reader.want(400, "GET", "/api/v1/me/recent?kind=everything", nil)
 }
 
+// SPC-069 and spec 078 D17: the start screen's cards and the Recent lists leave out the
+// pages of an archived space, as they leave out an archived page, until the space is restored.
+func TestRecentListsLeaveOutAnArchivedSpaceUntilItIsRestored(t *testing.T) {
+	e := newEnv(t)
+	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
+	space, _ := owner.space("OLD")
+	kept, _ := owner.space("ENG")
+	visited := owner.page(space, nil, "Visited", "x")
+	owner.ok("GET", "/api/v1/pages/"+visited, nil)
+	owner.page(kept, nil, "Elsewhere", "x")
+	owner.ok("POST", "/api/v1/pages", map[string]any{"space_id": space, "title": "Unfinished"})
+	lists := map[string]string{"visited": "Visited", "worked": "Visited", "drafts": "Unfinished"}
+	listed := func(kind, title string) bool {
+		t.Helper()
+		return has(titlesIn(owner.ok("GET", "/api/v1/me/recent?kind="+kind, nil), "pages"), title)
+	}
+
+	owner.ok("POST", "/api/v1/spaces/"+space+"/archive", nil)
+	for kind, title := range lists {
+		if listed(kind, title) {
+			t.Fatalf("%s lists a page of an archived space", kind)
+		}
+	}
+	if !listed("worked", "Elsewhere") {
+		t.Fatal("a page of an active space left worked on")
+	}
+
+	owner.ok("POST", "/api/v1/spaces/"+space+"/unarchive", nil)
+	for kind, title := range lists {
+		if !listed(kind, title) {
+			t.Fatalf("%s did not list the page again after the space was restored", kind)
+		}
+	}
+}
+
 func TestDirectoryCountsOnlyWhatThePersonCanSee(t *testing.T) {
 	e := newEnv(t)
 	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)
