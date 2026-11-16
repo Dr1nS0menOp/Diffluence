@@ -194,6 +194,30 @@ export const IconArrowDown = line('M12 5v14M6 13l6 6 6-6');
 // The kinds of a file in a list (NAV-156): a sheet with lines of text, and one with a P.
 export const IconFileText = line('M7 3h7l4 4v14H7zM14 3v4h4M10 12h5M10 15h5M10 18h3');
 export const IconFilePdf = line('M7 3h7l4 4v14H7zM14 3v4h4M10 18v-6h2a2 2 0 0 1 0 4h-2');
+/** The sidebar beside the page: the button that shows or hides it (NAV-092). */
+export const IconSidebar = line('M4 5h16v14H4zM9 5v14');
+/** A wheel with teeth: the administration (NAV-095). */
+export const IconSettings = line(
+  'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 3v2.5M12 18.5V21M3 12h2.5M18.5 12H21M5.6 5.6l1.8 1.8M16.6 16.6l1.8 1.8M5.6 18.4l1.8-1.8M16.6 7.4l1.8-1.8',
+);
+/** Half light, half dark. */
+export const IconTheme = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 3v18M12 8h4M12 12h5M12 16h4');
+export const IconLogout = line('M10 5H5v14h5M14 8l4 4-4 4M18 12H9');
+/** A flash: something that runs by itself, automation (SPC-107). */
+export const IconAutomation = line('M13 3L5 14h6l-1 7 8-11h-6z');
+export const IconPerson = line('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0');
+
+/** The star of a favourite, filled, so being a favourite does not rest on colour (SPC-108). */
+export function IconStarFilled({ size }: { size?: number }) {
+  return (
+    <Svg size={size}>
+      <path
+        d="M12 3.6l2.6 5.3 5.9.9-4.2 4.1 1 5.8-5.3-2.8-5.3 2.8 1-5.8-4.2-4.1 5.9-.9z"
+        fill="currentColor"
+      />
+    </Svg>
+  );
+}
 
 /** The same link icon, for the heading marks that ProseMirror builds outside React. */
 export function linkIconElement(): SVGSVGElement {

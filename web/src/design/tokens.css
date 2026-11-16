@@ -86,14 +86,12 @@
   --size-edge: 6px;
   --size-table-numbers: 2.5rem;
   --size-table-cell: 1.25rem;
-  --size-space-chip: 7rem;
 
   /* A page and the editor scale with the room around them, inside these limits. */
   --size-page: clamp(var(--size-reading), 64cqi, var(--size-reading-max));
 
   /* Set per person, per page or per table at run time. */
   --sidebar-width: var(--size-sidebar);
-  --part-height: auto;
   --header-position: 50%;
   --table-stretch: 0;
 
@@ -109,6 +107,7 @@
   --radius: 4px;
   --radius-card: 6px;
   --radius-round: 50%;
+  --radius-pill: 999px;
   --shadow-menu: 0 4px 16px var(--color-shadow-menu);
   --shadow-dialog: 0 12px 40px var(--color-shadow-dialog);
   --layer-frame: 1;
@@ -146,6 +145,8 @@
   --color-tint-4: #7048c6;
   --color-on-tint: #ffffff;
   --color-backdrop: light-dark(rgb(19 28 43 / 45%), rgb(0 0 0 / 60%));
+  /* A control that floats over a list and lets it show through, such as Back to top (SPC-102). */
+  --color-float: light-dark(#ffffffd9, #11161fd9);
   --color-syntax-keyword: light-dark(#a0359b, #e39ae0);
   --color-syntax-string: light-dark(#24702d, #8fd896);
   --color-syntax-number: light-dark(#8f4f0a, #e8b56a);

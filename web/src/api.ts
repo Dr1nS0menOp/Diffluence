@@ -159,10 +159,17 @@ export interface Preferences {
   show_presence: boolean;
   typing_help: boolean;
   sidebar_width: number;
-  /** Parts of the sidebar folded shut; the server sends null for none. */
+  /**
+   * Parts of the sidebar folded shut before spec 078. Nothing reads it any more; it travels
+   * along because the server keeps the whole document.
+   */
   sidebar_shut: string[] | null;
-  /** Height in rem of the links of a space, or 0 for their own height. */
+  /** Height of the links of a space before spec 078. Kept for the same reason. */
   sidebar_links_height: number;
+  /** The person's order of the entries of their own sidebar, or null for the default (NAV-137). */
+  sidebar_order: string[] | null;
+  /** The entries under More, or null for the default, which hides only Watching (NAV-142). */
+  sidebar_hidden: string[] | null;
   /** Groups of the settings sidebar folded shut; the server sends null for none. */
   settings_shut: string[] | null;
   tree_view: string;

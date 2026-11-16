@@ -413,17 +413,6 @@ fieldset.matrix label {
   color: var(--color-muted);
 }
 
-.menu-page {
-  display: flex;
-  flex-direction: column;
-  min-inline-size: 0;
-  white-space: normal;
-}
-
-.menu-page .muted {
-  font-size: var(--text-caption);
-}
-
 .menu-list.start {
   inset-inline-start: 0;
 }
@@ -468,10 +457,56 @@ fieldset.matrix label {
   border-block-start: 1px solid var(--color-line);
 }
 
-.menu-heading {
+/* Who the account menu belongs to: an inset tinted panel with a large picture (NAV-098). */
+.menu-identity {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-block-end: var(--space-1);
+  padding: var(--space-3);
+  border-radius: var(--radius-card);
+  background: var(--color-side);
+}
+
+.menu-identity-text {
   display: flex;
   flex-direction: column;
-  padding: var(--space-1-5) var(--space-2);
+  min-inline-size: 0;
+}
+
+.menu-identity-text strong {
+  color: var(--color-strong);
+  font-size: var(--text-section);
+}
+
+/* An entry with a sub-menu has an arrow at its row end; its list opens toward the start side. */
+.sub-menu {
+  position: relative;
+}
+
+.menu-list.sub-menu-list {
+  inset-block-start: 0;
+  inset-inline-end: calc(100% + var(--space-1));
+}
+
+.menu-arrow {
+  display: inline-flex;
+  margin-inline-start: auto;
+  color: var(--color-muted);
+}
+
+/* The place of a tick before a choice, kept empty when it is off, so the words line up (NAV-146). */
+.menu-tick {
+  display: inline-flex;
+  flex: none;
+  inline-size: var(--space-4-5);
+}
+
+.lozenge.neutral {
+  border: 1px solid var(--color-line);
+  background: var(--color-subtle);
+  color: var(--color-ink);
+  font-weight: var(--weight-regular);
 }
 
 .toast-region {

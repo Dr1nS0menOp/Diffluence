@@ -34,8 +34,12 @@ var (
 	dateFormats = []string{"short", "medium", "long", "iso"}
 	// Empty is what a client sends that does not know this setting yet.
 	startScreens = []string{"", "company", "personal"}
-	// sidebarParts are the parts of the sidebar that fold: of a space, and of the home page.
+	// sidebarParts are the parts of the sidebar that folded before spec 078. The previous
+	// release still sends them, so they stay accepted until a contract step removes them.
 	sidebarParts = []string{"space", "you", "spaces"}
+	// sidebarEntries are the entries of a person's own sidebar that they may order and hide
+	// (spec 078). The start screen is always first and shown, so it is not one of them.
+	sidebarEntries = []string{"recent", "favourites", "spaces", "drafts", "tasks", "people", "watching"}
 	// settingsGroup is the form of the id of a group of settings. The ids live in the web
 	// app; the server only keeps the list short and plain.
 	settingsGroup = regexp.MustCompile(`^[a-z][a-z0-9-]{0,39}$`)
@@ -77,6 +81,12 @@ type Preferences struct {
 	// SettingsShut names the groups of the settings sidebar this person folded shut, of a
 	// space and of the administration (spec 038).
 	SettingsShut []string `json:"settings_shut"`
+	// SidebarOrder is the order this person gave the entries of their own sidebar, or nil for
+	// the default order (spec 078, NAV-137). The start screen is always first and not in it.
+	SidebarOrder []string `json:"sidebar_order"`
+	// SidebarHidden names the entries this person moved under More, or nil for the default,
+	// in which only Watching is hidden (NAV-142). An empty list hides nothing.
+	SidebarHidden []string `json:"sidebar_hidden"`
 }
 
 // DefaultPreferences is what someone has who never chose anything.
@@ -117,6 +127,9 @@ func (p Preferences) validate() error {
 			return apperr.Invalid("That is not a part of the sidebar.")
 		}
 	}
+	if !knownOnce(p.SidebarOrder, sidebarEntries) || !knownOnce(p.SidebarHidden, sidebarEntries) {
+		return apperr.Invalid("That is not an entry of the sidebar, or it is named twice.")
+	}
 	if p.TimeZone == "" {
 		return nil // the time zone of the browser
 	}
@@ -124,6 +137,19 @@ func (p Preferences) validate() error {
 		return apperr.Invalid("That is not a time zone.")
 	}
 	return nil
+}
+
+// knownOnce reports whether every name is one of the known names, each at most once, which
+// also keeps the list no longer than the known names.
+func knownOnce(names, known []string) bool {
+	seen := make(map[string]bool, len(names))
+	for _, name := range names {
+		if seen[name] || !slices.Contains(known, name) {
+			return false
+		}
+		seen[name] = true
+	}
+	return true
 }
 
 // Preferences reads a person's preferences. What they never set has its default.

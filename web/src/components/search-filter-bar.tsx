@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SubjectPicker } from './picker';
-import { useOrderedSpaces } from './space-strip';
+import { useOrderedSpaces } from './my-spaces';
 import { filterCount, spaceChoices, type SearchFilters } from './search-filters';
 
 const KINDS = ['page', 'post', 'database', 'comment'];

@@ -61,7 +61,6 @@ test('the filter finds a page the tree has not loaded', async ({ page }) => {
   const { one } = await deepTree(page);
   await page.goto(`/pages/${one}`);
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByRole('searchbox', { name: 'Filter pages' }).fill('five');
   await expect(tree(page).getByRole('link', { name: 'Level five' })).toBeVisible();
   await expect(tree(page).getByRole('link', { name: 'Level four' })).toBeVisible();

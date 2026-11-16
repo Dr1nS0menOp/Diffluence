@@ -162,10 +162,7 @@ test('a double click on Create makes one page', async ({ page }) => {
   const space = await newSpace(page, 'Double create');
   await page.goto(`/spaces/${space.key}`);
   const posts = countPosts(page, /\/api\/v1\/pages$/);
-  await page
-    .getByRole('navigation', { name: 'Main' })
-    .getByRole('button', { name: 'Create', exact: true })
-    .click();
+  await page.getByRole('banner').getByRole('button', { name: 'Create', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'New page' });
   await dialog.getByLabel('Title', { exact: true }).fill('Only once');
   await dialog.getByRole('button', { name: 'Create', exact: true }).dblclick();
@@ -210,7 +207,11 @@ test('the colours of a page status have names', async ({ page }) => {
 
 test('the button of a tall dialog stays in reach', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'New space' }).click();
+  await page
+    .getByRole('navigation', { name: 'Your places' })
+    .getByRole('button', { name: 'Spaces', exact: true })
+    .click();
+  await page.getByRole('dialog', { name: 'Spaces' }).getByRole('button', { name: 'Create a space' }).click();
   const dialog = page.getByRole('dialog', { name: 'New space' });
   await expect(dialog.getByRole('button', { name: 'Create', exact: true })).toBeInViewport({ ratio: 1 });
 });

@@ -1,112 +1,35 @@
 // SPDX-License-Identifier: Apache-2.0
-// The menus of the top bar. Their lists load when they open, so the bar costs
-// nothing on each page.
-import { useState } from 'react';
+// The round buttons at the end of the top bar: help, the administration and the account
+// (spec 078, NAV-094 to NAV-098). Their lists load when they open, so the bar costs nothing.
+import { useEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type ListedPage, type Me, type Space, type SystemInfo } from '../api';
+import { api, type Me, type Space, type SystemInfo } from '../api';
 import { appearanceQuery } from '../appearance';
-import { navigate } from '../router';
-import { IconChevronDown, IconHelp, IconPage } from './icons';
+import { usePreferences } from '../preferences';
+import { Link, navigate } from '../router';
+import {
+  IconChevronRight,
+  IconHelp,
+  IconLogout,
+  IconPage,
+  IconPerson,
+  IconSettings,
+  IconSliders,
+  IconTheme,
+  IconTick,
+} from './icons';
+import { DOCUMENTATION_ADDRESS } from './guide-link';
 import { Menu, MenuDownload, MenuItem, MenuLink, MenuSeparator } from './menu';
 import { personQuery, PersonPicture } from './person';
 import { ShortcutsDialog } from './shortcuts';
-import { useOrderedSpaces } from './space-strip';
-import { PAGE_DRAG_TYPE } from './tree-model';
-import { Avatar, Dialog, ErrorNote, Loading, RelativeTime, SpaceBadge } from './ui';
-import { pageTitle } from '../page-name';
+import { Avatar, Dialog, ErrorNote } from './ui';
 
-const RECENT_IN_MENU = 8;
-const FAVOURITES_IN_MENU = 12;
-const SPACES_IN_MENU = 8;
-const SPACE_MENU_ICON_SIZE = 16;
-const DOCUMENTATION = 'https://github.com/Dr1nS0menOp/Diffluence/tree/main/docs';
+const MENU_ICON_SIZE = 18;
+const TOP_ICON_SIZE = 20;
+const PAGE_ICON_SIZE = 16;
+const THEMES = ['light', 'dark', 'system'] as const;
 const THIRD_PARTY_LICENCES = 'https://github.com/Dr1nS0menOp/Diffluence/blob/main/docs/dependencies.md';
-
-function SpaceEntries() {
-  const { t } = useTranslation();
-  const entries = useOrderedSpaces().slice(0, SPACES_IN_MENU);
-  return (
-    <>
-      {entries.map((s) => (
-        <MenuLink
-          key={s.id}
-          href={`/spaces/${s.key}`}
-          onDragOver={(e) => {
-            if (e.dataTransfer.types.includes(PAGE_DRAG_TYPE)) e.preventDefault();
-          }}
-          onDrop={(e) => {
-            const dragged = e.dataTransfer.getData(PAGE_DRAG_TYPE);
-            if (!dragged) return;
-            e.preventDefault();
-            navigate(`/pages/${dragged}?move_to=${s.id}`);
-          }}
-        >
-          <SpaceBadge space={s} size="small" /> {s.name}
-        </MenuLink>
-      ))}
-      {entries.length > 0 && <MenuSeparator />}
-      <MenuLink href="/spaces">{t('nav.allSpaces')}</MenuLink>
-    </>
-  );
-}
-
-export function SpacesMenu() {
-  const { t } = useTranslation();
-  return (
-    <Menu
-      label={t('nav.spaces')}
-      align="start"
-      className="nav-link"
-      opensOnDrag={PAGE_DRAG_TYPE}
-      trigger={
-        <>
-          {t('nav.spaces')} <IconChevronDown size={SPACE_MENU_ICON_SIZE} />
-        </>
-      }
-    >
-      <SpaceEntries />
-    </Menu>
-  );
-}
-
-function PageEntries({
-  path,
-  limit,
-  empty,
-  more,
-  moreLabel,
-}: {
-  path: string;
-  limit: number;
-  empty: string;
-  more: string;
-  moreLabel: string;
-}) {
-  const { t } = useTranslation();
-  const q = useQuery({ queryKey: [path], queryFn: () => api.get<{ pages: ListedPage[] }>(path) });
-  const pages = (q.data?.pages ?? []).slice(0, limit);
-  return (
-    <>
-      {q.isPending && <Loading />}
-      <ErrorNote error={q.error} />
-      {q.data?.pages.length === 0 && <p className="menu-note">{empty}</p>}
-      {pages.map((p) => (
-        <MenuLink key={p.id} href={`/pages/${p.id}`}>
-          <PageMark page={p} />
-          <span className="menu-page">
-            <span>{pageTitle(t, p.title)}</span>
-            <span className="muted">
-              {p.space_name} · <RelativeTime value={p.at} />
-            </span>
-          </span>
-        </MenuLink>
-      ))}
-      {pages.length > 0 && <MenuSeparator />}
-      <MenuLink href={more}>{moreLabel}</MenuLink>
-    </>
-  );
-}
 
 /** A page's own emoji, or the page icon. */
 export function PageMark({ page }: { page: { emoji: string } }) {
@@ -115,55 +38,7 @@ export function PageMark({ page }: { page: { emoji: string } }) {
       {page.emoji}
     </span>
   ) : (
-    <IconPage size={SPACE_MENU_ICON_SIZE} />
-  );
-}
-
-export function RecentMenu() {
-  const { t } = useTranslation();
-  return (
-    <Menu
-      label={t('nav.recent')}
-      align="start"
-      className="nav-link"
-      trigger={
-        <>
-          {t('nav.recent')} <IconChevronDown size={SPACE_MENU_ICON_SIZE} />
-        </>
-      }
-    >
-      <PageEntries
-        path="/me/recent"
-        limit={RECENT_IN_MENU}
-        empty={t('nav.noRecent')}
-        more="/recent"
-        moreLabel={t('nav.allRecent')}
-      />
-    </Menu>
-  );
-}
-
-export function FavouritesMenu() {
-  const { t } = useTranslation();
-  return (
-    <Menu
-      label={t('nav.favourites')}
-      align="start"
-      className="nav-link"
-      trigger={
-        <>
-          {t('nav.favourites')} <IconChevronDown size={SPACE_MENU_ICON_SIZE} />
-        </>
-      }
-    >
-      <PageEntries
-        path="/me/favourites"
-        limit={FAVOURITES_IN_MENU}
-        empty={t('nav.noFavourites')}
-        more="/favourites"
-        moreLabel={t('nav.allFavourites')}
-      />
-    </Menu>
+    <IconPage size={PAGE_ICON_SIZE} />
   );
 }
 
@@ -188,10 +63,10 @@ export function HelpMenu() {
   const { t } = useTranslation();
   const [dialog, setDialog] = useState<'shortcuts' | 'about' | null>(null);
   const close = () => setDialog(null);
-  const helpAddress = useQuery(appearanceQuery).data?.help_url || DOCUMENTATION;
+  const helpAddress = useQuery(appearanceQuery).data?.help_url || DOCUMENTATION_ADDRESS;
   return (
     <>
-      <Menu label={t('help.menu')} trigger={<IconHelp />}>
+      <Menu label={t('help.menu')} className="icon top-icon" trigger={<IconHelp size={TOP_ICON_SIZE} />}>
         <MenuItem onClick={() => setDialog('shortcuts')}>{t('shortcuts.title')}</MenuItem>
         <MenuDownload href={helpAddress} target="_blank" rel="noopener noreferrer">
           {t('help.documentation')}
@@ -201,6 +76,17 @@ export function HelpMenu() {
       {dialog === 'shortcuts' && <ShortcutsDialog onClose={close} />}
       {dialog === 'about' && <AboutDialog onClose={close} />}
     </>
+  );
+}
+
+/** The administration, for those who may open it (NAV-095). */
+export function SettingsButton({ me }: { me: Me }) {
+  const { t } = useTranslation();
+  if (!me.global_permissions.includes('administrator')) return null;
+  return (
+    <Link href="/admin/summary" className="top-icon" aria-label={t('nav.admin')} title={t('nav.admin')}>
+      <IconSettings size={TOP_ICON_SIZE} />
+    </Link>
   );
 }
 
@@ -220,31 +106,146 @@ function PersonalSpaceEntry({ me }: { me: Me }) {
   return <MenuItem onClick={() => create.mutate()}>{t('nav.createMySpace')}</MenuItem>;
 }
 
+/**
+ * Theme: a sub-menu of light, dark and system, with a tick on the choice (NAV-097). It opens
+ * toward the start side, because the account menu stands at the end of the bar.
+ */
+function ThemeEntry() {
+  const { t } = useTranslation();
+  const { preferences, update } = usePreferences();
+  const [open, setOpen] = useState(false);
+  const entry = useRef<HTMLButtonElement>(null);
+  const list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (open) list.current?.querySelector<HTMLElement>('[role="menuitemradio"]')?.focus();
+  }, [open]);
+  const isRtl = () => getComputedStyle(document.documentElement).direction === 'rtl';
+  const inward = () => (isRtl() ? 'ArrowLeft' : 'ArrowRight');
+  const outward = () => (isRtl() ? 'ArrowRight' : 'ArrowLeft');
+  const closeSub = () => {
+    setOpen(false);
+    entry.current?.focus();
+  };
+  const entryKeys = (e: KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key !== inward()) return;
+    e.preventDefault();
+    e.stopPropagation();
+    setOpen(true);
+  };
+  const subKeys = (e: KeyboardEvent<HTMLDivElement>) => {
+    const items = Array.from(list.current?.querySelectorAll<HTMLElement>('[role="menuitemradio"]') ?? []);
+    const at = items.indexOf(document.activeElement as HTMLElement);
+    const step = e.key === 'ArrowDown' ? 1 : e.key === 'ArrowUp' ? -1 : 0;
+    if (step) {
+      items[(at + step + items.length) % items.length]?.focus();
+    } else if (e.key === 'Escape' || e.key === outward()) {
+      closeSub();
+    } else if (e.key === 'Home' || e.key === 'End') {
+      items[e.key === 'Home' ? 0 : items.length - 1]?.focus();
+    } else {
+      return;
+    }
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  return (
+    <div className="sub-menu" role="none">
+      <button
+        ref={entry}
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onKeyDown={entryKeys}
+        onClick={(e: MouseEvent) => {
+          // The account menu closes on a click inside it; this click opens the sub-menu instead.
+          e.stopPropagation();
+          setOpen(!open);
+        }}
+      >
+        <IconTheme size={MENU_ICON_SIZE} />
+        <span className="grow">{t('nav.theme')}</span>
+        <span className="menu-arrow">
+          <IconChevronRight size={MENU_ICON_SIZE} />
+        </span>
+      </button>
+      {open && (
+        <div
+          ref={list}
+          role="menu"
+          aria-label={t('nav.theme')}
+          className="menu-list sub-menu-list"
+          onKeyDown={subKeys}
+        >
+          {THEMES.map((theme) => (
+            <button
+              key={theme}
+              type="button"
+              role="menuitemradio"
+              aria-checked={preferences.theme === theme}
+              onClick={() => update({ theme })}
+            >
+              <span className="menu-tick">
+                {preferences.theme === theme && <IconTick size={MENU_ICON_SIZE} />}
+              </span>
+              {t(`preferences.theme_${theme}`)}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The account menu: who you are, your own places, the theme and Log out (NAV-096). */
 export function AccountMenu({ me, onLogout }: { me: Me; onLogout: () => void }) {
   const { t } = useTranslation();
-  const isAdmin = me.global_permissions.includes('administrator');
   const person = useQuery(personQuery(me.user.id)).data;
+  const instance = useQuery(appearanceQuery).data?.name || t('app.name');
   return (
     <div className="top-account">
       <Menu
         label={t('nav.accountMenu')}
-        className="avatar-button"
-        trigger={person ? <PersonPicture person={person} /> : <Avatar name={me.user.display_name} />}
+        className="avatar-button top-icon"
+        trigger={
+          person ? (
+            <PersonPicture person={person} size="small" />
+          ) : (
+            <Avatar name={me.user.display_name} size="small" />
+          )
+        }
       >
-        <div role="none" className="menu-heading">
-          <strong>{me.user.display_name}</strong>
-          <span className="muted">{me.user.email}</span>
+        <div role="none" className="menu-identity">
+          {person ? (
+            <PersonPicture person={person} size="large" />
+          ) : (
+            <Avatar name={me.user.display_name} size="large" />
+          )}
+          <span className="menu-identity-text">
+            <strong>{me.user.display_name}</strong>
+            <span className="muted">{me.user.email}</span>
+          </span>
+        </div>
+        <MenuLink href={`/people/${me.user.id}`}>
+          <IconPerson size={MENU_ICON_SIZE} /> {t('nav.ownProfile')}
+        </MenuLink>
+        <MenuLink href="/me">
+          <IconSliders size={MENU_ICON_SIZE} /> {t('nav.profile')}
+        </MenuLink>
+        <ThemeEntry />
+        <MenuSeparator />
+        <div role="group" aria-labelledby="account-instance-heading">
+          <div role="presentation" id="account-instance-heading" className="menu-group-title">
+            {instance}
+          </div>
+          <PersonalSpaceEntry me={me} />
+          <MenuLink href="/tasks">{t('nav.tasks')}</MenuLink>
+          <MenuLink href="/me/preferences">{t('nav.preferences')}</MenuLink>
         </div>
         <MenuSeparator />
-        <MenuLink href="/me">{t('nav.profile')}</MenuLink>
-        <MenuLink href="/me/preferences">{t('nav.preferences')}</MenuLink>
-        <PersonalSpaceEntry me={me} />
-        <MenuLink href="/me/notifications">{t('nav.notificationSettings')}</MenuLink>
-        <MenuLink href="/me/watching">{t('nav.watching')}</MenuLink>
-        <MenuLink href="/tasks">{t('nav.tasks')}</MenuLink>
-        {isAdmin && <MenuLink href="/admin/summary">{t('nav.admin')}</MenuLink>}
-        <MenuSeparator />
-        <MenuItem onClick={onLogout}>{t('nav.logout')}</MenuItem>
+        <MenuItem onClick={onLogout}>
+          <IconLogout size={MENU_ICON_SIZE} /> {t('nav.logout')}
+        </MenuItem>
       </Menu>
     </div>
   );

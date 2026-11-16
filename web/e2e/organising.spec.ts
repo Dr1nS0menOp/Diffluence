@@ -242,7 +242,7 @@ test('a blog post stays out of the tree, and a silent publish still makes a vers
   await expect(page.getByRole('heading', { name: 'Launch day', level: 1 })).toBeVisible();
 
   await expect(page.getByRole('navigation', { name: 'Pages' }).getByText('Launch day')).toHaveCount(0);
-  await page.getByRole('link', { name: 'Blog', exact: true }).click();
+  await page.getByRole('link', { name: 'Blogs', exact: true }).click();
   await expect(main(page).getByRole('link', { name: 'Launch day' })).toBeVisible();
   await page.goto('/blog');
   await expect(main(page).getByRole('link', { name: 'Launch day' })).toBeVisible();
@@ -274,7 +274,8 @@ test('a folder shows its pages, a link entry leaves the space', async ({ page })
   await expect(main(page).getByRole('link', { name: 'Inside' })).toBeVisible();
   await expect(page.locator('.prose')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Add a link' }).click();
+  await page.getByRole('button', { name: 'Create in this space' }).click();
+  await page.getByRole('menuitem', { name: 'Add a link' }).click();
   const dialog = page.getByRole('dialog', { name: 'Add a link' });
   await dialog.getByLabel('Title', { exact: true }).fill('Our shop');
   await dialog.getByLabel('Address').fill('https://example.com/shop');
@@ -351,7 +352,8 @@ test('several rows move together, with the keyboard', async ({ page }) => {
   await publishedPage(page, space.id, 'Gamma', 'x', space.home_page_id);
   await page.goto(`/pages/${a}`);
   const tree = page.getByRole('navigation', { name: 'Pages' });
-  await page.getByRole('button', { name: 'Select pages' }).click();
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitem', { name: 'Select pages' }).click();
   await tree.getByRole('link', { name: 'Alpha' }).focus();
   await page.keyboard.press('Space');
   await page.keyboard.press('ArrowDown');
@@ -377,12 +379,14 @@ test('dropping a row on a space opens the Move dialog', async ({ page }) => {
   await expect(page).toHaveURL(new RegExp(`/pages/${id}$`));
 
   const row = page.getByRole('navigation', { name: 'Pages' }).getByText('Dragged');
-  const menu = page.getByRole('button', { name: 'Spaces', exact: true });
+  const entry = page
+    .getByRole('navigation', { name: 'Your places' })
+    .getByRole('button', { name: 'Spaces', exact: true });
   await row.hover();
   await page.mouse.down();
-  await menu.hover();
-  await menu.hover();
-  await page.getByRole('menu', { name: 'Spaces' }).getByRole('menuitem').first().hover();
+  await entry.hover();
+  await entry.hover();
+  await page.getByRole('dialog', { name: 'Spaces' }).locator('.panel-space').first().hover();
   await page.mouse.up();
   await expect(page.getByRole('dialog', { name: 'Move' }).getByLabel('Space')).toHaveValue(/.+/);
   await expect(page).toHaveURL(/move_to=/);
@@ -574,7 +578,11 @@ test('a link to a page that does not exist yet starts it', async ({ page }) => {
 
 test('a new space stays with the person who makes it, unless they choose otherwise', async ({ page }) => {
   await page.goto('/');
-  await page.getByRole('button', { name: 'New space' }).first().click();
+  await page
+    .getByRole('navigation', { name: 'Your places' })
+    .getByRole('button', { name: 'Spaces', exact: true })
+    .click();
+  await page.getByRole('dialog', { name: 'Spaces' }).getByRole('button', { name: 'Create a space' }).click();
   const dialog = page.getByRole('dialog', { name: 'New space' });
   await expect(dialog.getByLabel('Who gets access')).toHaveValue('private');
   await expect(dialog).toContainText('Only you can see it');
@@ -592,7 +600,7 @@ test('the company home shows on Home, with a way to the personal screen', async 
   await page.goto('/');
   await expect(page.getByRole('heading', { name: 'Welcome to us' })).toBeVisible();
   await page.getByRole('link', { name: 'Your start screen' }).click();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
   await page.request.put('/api/v1/admin/organising', {
     data: {
       company_home: '00000000-0000-0000-0000-000000000000',

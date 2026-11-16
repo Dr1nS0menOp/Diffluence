@@ -613,7 +613,10 @@ test('notification settings hold, and comments follow the chosen order', async (
   await other.context().close();
 });
 
-test('the start screen moves between its tabs and articles by keyboard', async ({ page, browser }) => {
+test('the start screen moves between its feed choices and articles by keyboard', async ({
+  page,
+  browser,
+}) => {
   const { other, pageId } = await team(page, browser);
   await publishedPage(
     page,
@@ -623,11 +626,13 @@ test('the start screen moves between its tabs and articles by keyboard', async (
   );
   await other.goto('/');
   const recent = 'Recent activity';
-  const tabs = other.getByRole('tablist', { name: 'Activity' });
-  await tabs.getByRole('tab', { name: 'For you' }).focus();
-  await other.keyboard.press('ArrowRight');
-  await expect(tabs.getByRole('tab', { name: recent })).toBeFocused();
-  await expect(tabs.getByRole('tab', { name: recent })).toHaveAttribute('aria-selected', 'true');
+  // The choices are buttons since spec 078: Tab reaches the next one, Space chooses it.
+  const choices = other.getByRole('group', { name: 'What the feed shows' });
+  await choices.getByRole('button', { name: 'For you' }).focus();
+  await other.keyboard.press('Tab');
+  await expect(choices.getByRole('button', { name: recent })).toBeFocused();
+  await other.keyboard.press('Space');
+  await expect(choices.getByRole('button', { name: recent })).toHaveAttribute('aria-pressed', 'true');
   const feed = other.getByRole('feed', { name: recent });
   const first = feed.getByRole('article').first();
   await expect(first).toBeVisible();

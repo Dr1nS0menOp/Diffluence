@@ -124,6 +124,26 @@ export function RecentView() {
   );
 }
 
+/** The person's drafts as a screen of its own, reached from the sidebar (spec 078, NAV-126). */
+export function DraftsView() {
+  const { t } = useTranslation();
+  const [filter, setFilter] = useState('');
+  return (
+    <>
+      <h1>{t('nav.drafts')}</h1>
+      <input
+        type="search"
+        className="list-filter"
+        value={filter}
+        aria-label={t('recent.filter')}
+        placeholder={t('recent.filter')}
+        onChange={(e) => setFilter(e.target.value)}
+      />
+      <RecentList tab="drafts" filter={filter} />
+    </>
+  );
+}
+
 function FavouritePages({ filter }: { filter: string }) {
   const { t } = useTranslation();
   const client = useQueryClient();

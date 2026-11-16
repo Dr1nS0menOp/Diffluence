@@ -109,14 +109,16 @@ test('a viewer sees no edit controls, and an editor does', async ({ page, browse
   await v.goto(`/pages/${id}`);
   await expect(v.getByRole('heading', { name: 'Roles', level: 1 })).toBeVisible();
   await expect(v.getByRole('link', { name: 'Edit', exact: true })).toHaveCount(0);
-  await expect(v.getByRole('button', { name: 'New page' })).toHaveCount(0);
-  await expect(v.getByRole('link', { name: 'Space settings' })).toHaveCount(0);
+  await expect(v.getByRole('button', { name: 'Create in this space' })).toHaveCount(0);
+  await v.getByRole('button', { name: 'More for this space' }).click();
+  await expect(v.getByRole('menuitem', { name: 'Space settings' })).toHaveCount(0);
 
   const e = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
   await login(e, editorEmail);
   await e.goto(`/pages/${id}`);
   await expect(e.getByRole('link', { name: 'Edit', exact: true })).toBeVisible();
-  await expect(e.getByRole('button', { name: 'New page' })).toBeVisible();
+  await e.getByRole('button', { name: 'Create in this space' }).click();
+  await expect(e.getByRole('menuitem', { name: 'New page' })).toBeVisible();
 });
 
 test('space settings: details, roles, archive', async ({ page }) => {
@@ -166,7 +168,7 @@ test('an authenticator app protects the login', async ({ page, browser }) => {
   await expect(fresh.getByRole('alert')).toHaveText('That code is not correct.');
   await code.fill(totpCode(secret, Date.now() + 30_000));
   await fresh.getByRole('button', { name: 'Continue' }).click();
-  await expect(fresh.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(fresh.getByRole('heading', { name: 'Activity' })).toBeVisible();
 });
 
 test('a passkey logs in without a password', async ({ page, browser }) => {
@@ -195,7 +197,7 @@ test('a passkey logs in without a password', async ({ page, browser }) => {
   await page.getByRole('menuitem', { name: 'Log out' }).click();
   await expect(page).toHaveURL(/\/login(\?next=%2Fadmin%2Fusers)?$/);
   await page.getByRole('button', { name: 'Log in with a passkey' }).click();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
   const me = await page.request.get('/api/v1/me');
   expect(await me.text()).toContain(email);
 
@@ -211,7 +213,7 @@ test('a passkey logs in without a password', async ({ page, browser }) => {
   await checkAccessibility(page);
   expect((await page.request.get('/api/v1/me')).status()).toBe(401);
   await page.getByRole('button', { name: 'Confirm with your passkey' }).click();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
 });
 
 test('every tab of the admin console works and is accessible', async ({ page }) => {
@@ -243,10 +245,9 @@ test('every tab of the admin console works and is accessible', async ({ page }) 
   await expect(page.getByRole('row', { name: /Ready/ })).toContainText('ready');
 });
 
-test('an administrator can reach the admin console from the account menu', async ({ page }) => {
+test('an administrator reaches the admin console from the settings button', async ({ page }) => {
   await login(page, ADMIN.email, ADMIN.password);
-  await page.getByRole('button', { name: 'Account' }).click();
-  await page.getByRole('menuitem', { name: 'Administration' }).click();
+  await page.getByRole('banner').getByRole('link', { name: 'Administration' }).click();
   await expect(page.getByRole('heading', { name: 'Summary', level: 1 })).toBeVisible();
 });
 
@@ -297,6 +298,7 @@ test('a normal user has no way into the admin console', async ({ page, browser }
   await page.getByRole('button', { name: 'Account' }).click();
   await expect(page.getByRole('menuitem', { name: 'Your account' })).toBeVisible();
   await expect(page.getByRole('menuitem', { name: 'Administration' })).toHaveCount(0);
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Administration' })).toHaveCount(0);
   await page.goto('/admin/users');
   await expect(page.getByRole('alert')).toBeVisible();
   const res = await page.request.get('/api/v1/admin/users');

@@ -200,28 +200,9 @@ async function addComment(page: Page, pageId: string, data: object) {
 async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
   await page.evaluate(() => document.fonts.ready);
-  await placeSpaceStrip(page);
-  // Which spaces the strip holds depends on every test before this one, so only the
-  // picture of the strip itself shows its chips.
-  const strip = name === 'space-strip' ? [] : [page.locator('.space-strip ul')];
-  await expect(page).toHaveScreenshot(`${name}.png`, { mask: [...mask, ...strip] });
-}
-
-/**
- * Scrolls the space strip again as the app does, now that the fixed font has changed the width
- * of its chips. The app scrolled it with the font it had at load, so without this the strip
- * stood wherever that earlier font had put it, and a picture changed from run to run.
- */
-async function placeSpaceStrip(page: Page) {
-  await page.evaluate(() => {
-    const list = document.querySelector<HTMLElement>('.space-strip ul');
-    const chip = list?.querySelector('[aria-current]');
-    if (!list || !chip) return;
-    list.scrollLeft = 0;
-    const box = list.getBoundingClientRect();
-    const place = chip.getBoundingClientRect();
-    if (place.right > box.right) list.scrollLeft += place.right - box.right;
-  });
+  // The favourite spaces of the personal sidebar belong to the reader alone; the strip of spaces,
+  // which held every space and needed a mask, left the sidebar in spec 078.
+  await expect(page).toHaveScreenshot(`${name}.png`, { mask });
 }
 
 /** Gives every match the same text, so a time cannot change the width of what holds it. */
@@ -231,6 +212,14 @@ async function fixText(where: Locator, text: string) {
       element.textContent = fixed;
     });
   }, text);
+}
+
+/**
+ * The cards of the start screen say how long ago each page was touched, and that text, and so the
+ * width of its mask, depends on how long the run took (spec 078, NAV-105).
+ */
+async function fixStartTimes(page: Page) {
+  await fixText(page.locator('.touch-did time'), 'now');
 }
 
 async function newReaderPage(browser: Browser, colorScheme: 'light' | 'dark'): Promise<Page> {
@@ -347,6 +336,7 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.getByRole('heading', { name: 'Your first week', level: 1 })).toBeVisible();
     await page.goto('/');
     await expect(page.getByRole('link', { name: 'Your first week' }).first()).toBeVisible();
+    await fixStartTimes(page);
     await picture(page, 'start', [page.locator('time')]);
     await page.context().close();
   });
@@ -429,6 +419,11 @@ test.describe('the look of every kind of screen', () => {
 
   test('the editor with its handle and the slash menu', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
+    // What is typed here must not reach the draft: whether the autosave fires before the
+    // context closes is timing, and the next picture of this page would show the slash.
+    await page.route(`**/api/v1/pages/${pageId}/draft`, (route) =>
+      route.request().method() === 'PUT' ? route.fulfill({ status: 200, json: {} }) : route.fallback(),
+    );
     await page.goto(`/pages/${pageId}/edit`);
     const body = page.locator('.prose.editing');
     await body.locator('h2').click();
@@ -601,7 +596,7 @@ test.describe('the look of every kind of screen', () => {
   test('a version with its changes', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto(`/pages/${pageId}/history`);
-    await page.getByRole('button', { name: 'View' }).first().click();
+    await page.getByRole('main').getByRole('button', { name: 'View', exact: true }).first().click();
     await expect(page.getByRole('dialog').locator('.diff-block').first()).toBeVisible();
     await picture(page, 'version-changes', [page.getByRole('dialog').getByRole('status')]);
     await page.context().close();
@@ -912,11 +907,13 @@ test.describe('the look of every kind of screen', () => {
   test('the quick search panel', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/');
-    await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
     await page.keyboard.press('/');
     await page.keyboard.type('week');
     await expect(page.getByRole('option', { name: /Your first week/ })).toBeVisible();
-    await picture(page, 'quick-search');
+    await fixStartTimes(page);
+    // A result names the day its page changed, which is the day of the run.
+    await picture(page, 'quick-search', [page.locator('.quick-detail')]);
     await page.context().close();
   });
 
@@ -933,6 +930,7 @@ test.describe('the look of every kind of screen', () => {
       'aria-pressed',
       'true',
     );
+    await fixStartTimes(page);
     await picture(page, 'quick-search-filters');
     await page.context().close();
   });
@@ -996,17 +994,60 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
-  test('the strip with more spaces than fit', async ({ page }) => {
-    await login(page, ADMIN.email, ADMIN.password);
-    for (const name of ['Customer care', 'Design', 'Finance', 'Human resources', 'Operations']) {
-      const res = await page.request.post('/api/v1/spaces', {
-        data: { key: name.slice(0, 4).toUpperCase(), name },
-      });
-      expect(res.status(), await res.text()).toBe(201);
-    }
+  // The Spaces panel does the work of the strip of spaces (spec 078, NAV-135).
+  test('the Spaces panel beside the sidebar', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    expect((await page.request.put(`/api/v1/spaces/${spaceId}/favourite`)).ok()).toBeTruthy();
     await page.goto(`/pages/${pageId}`);
-    await expect(page.getByRole('navigation', { name: 'Your spaces' }).getByRole('link')).toHaveCount(7);
-    await picture(page, 'space-strip', [page.getByTestId('last-updated')]);
+    const places = page.getByRole('navigation', { name: 'Your places' });
+    await places.getByRole('button', { name: 'Spaces', exact: true }).click();
+    const panel = page.getByRole('dialog', { name: 'Spaces' });
+    await expect(panel.getByRole('region', { name: 'Favourites' })).toContainText('Engineering Handbook');
+    await picture(page, 'spaces-panel', [page.getByTestId('last-updated')]);
+    await page.keyboard.press('Escape');
+    await places.getByRole('button', { name: 'Recent', exact: true }).click();
+    await expect(page.getByRole('dialog', { name: 'Recent' })).toContainText('Your first week');
+    await picture(page, 'recent-panel', [page.getByTestId('last-updated')]);
+    expect((await page.request.delete(`/api/v1/spaces/${spaceId}/favourite`)).ok()).toBeTruthy();
+    await page.context().close();
+  });
+
+  test('the account menu with its theme, and the space menu', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto(`/pages/${pageId}`);
+    await page.getByRole('button', { name: 'Account' }).click();
+    await page.getByRole('menuitem', { name: 'Theme' }).click();
+    await expect(page.getByRole('menuitemradio', { name: 'Same as my system' })).toBeVisible();
+    await picture(page, 'account-menu', [page.getByTestId('last-updated')]);
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: 'More for this space' }).click();
+    await expect(page.getByRole('group', { name: 'Space tools' })).toBeVisible();
+    await picture(page, 'space-menu', [page.getByTestId('last-updated')]);
+    await page.context().close();
+  });
+
+  test('customising the sidebar', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/tasks');
+    await page
+      .getByRole('navigation', { name: 'Your places' })
+      .getByRole('button', { name: 'More', exact: true })
+      .click();
+    await page.getByRole('menuitem', { name: 'Customise sidebar' }).click();
+    await expect(page.getByRole('dialog', { name: 'Customise sidebar' })).toBeVisible();
+    await picture(page, 'customise-sidebar');
+    await page.context().close();
+  });
+
+  test('DraftsView: your drafts', async ({ browser }) => {
+    const page = await newReaderPage(browser, 'light');
+    await page.goto('/drafts');
+    await expect(page.getByRole('heading', { name: 'Drafts', level: 1 })).toBeVisible();
+    await expect(page.getByRole('main').locator('p.muted, li').first()).toBeVisible();
+    await fixText(page.locator('#main time'), 'now');
+    await picture(page, 'drafts', [page.locator('time')]);
+    await page.context().close();
   });
 
   test('right-to-left', async ({ browser }) => {
@@ -1090,8 +1131,11 @@ test.describe('the look of every kind of screen', () => {
     });
     expect(done.ok(), await done.text()).toBeTruthy();
     await page.goto('/spaces/HANDBOOK/blog');
-    await expect(page.getByRole('link', { name: 'We moved to the new office' })).toBeVisible();
-    await picture(page, 'blog', [page.locator('.post-list .muted'), page.locator('h2')]);
+    // The post shows in the Blogs group of the sidebar as well (SPC-103).
+    await expect(
+      page.getByRole('main').getByRole('link', { name: 'We moved to the new office' }),
+    ).toBeVisible();
+    await picture(page, 'blog', [page.locator('.post-list .muted'), page.locator('#main h2')]);
     await checkAccessibility(page);
     await page.context().close();
   });
@@ -1685,6 +1729,7 @@ test.describe('the look of every kind of screen', () => {
       await page.getByRole('button', { name: /^Notifications, \d+ unread$/ }).click();
       const panel = page.getByRole('region', { name: 'Notifications' });
       await expect(panel.getByText('Please read this before Monday.')).toBeVisible();
+      await fixStartTimes(page);
       await picture(page, 'bell', [page.locator('time')]);
       await page.context().close();
     });

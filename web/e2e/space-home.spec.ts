@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
-// Spec 016: the home of a space, the strip of spaces, and the example space.
+// Spec 016: the home of a space and the example space. Since spec 078 the space's header row
+// leads home, and the Spaces panel does the work of the strip of spaces (frame.spec.ts).
 import { ADMIN, checkAccessibility, expect, login, newSpace, publishedPage, test, unique } from './helpers';
 
 test.beforeEach(async ({ page }) => {
@@ -13,8 +14,8 @@ test('the home page is marked as home, and is not a row of the tree', async ({ p
   await page.goto(`/spaces/${space.key}`);
   await expect(page).toHaveURL(new RegExp(`/pages/${space.home_page_id}$`));
 
-  const links = page.getByRole('navigation', { name: 'Space links' });
-  const home = links.getByRole('link', { name: 'Home', exact: true });
+  const home = page.locator('#space-head-link');
+  await expect(home).toHaveText(name);
   await expect(home).toHaveAttribute('aria-current', 'page');
   await expect(page.locator('.crumbs [aria-current]')).toHaveText('Home');
 
@@ -24,13 +25,14 @@ test('the home page is marked as home, and is not a row of the tree', async ({ p
   await expect(page.getByRole('button', { name: 'Show the current page' })).toHaveCount(0);
   await expect(tree.locator('a[data-row]').first()).toHaveAttribute('tabindex', '0');
 
-  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByLabel('Filter pages').fill(name);
   await expect(tree).toContainText('No page has that in its title.');
   await page.getByLabel('Filter pages').fill('');
-  await page.getByLabel('Order of the pages').selectOption('alphabet');
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'A to Z' }).click();
   await expect(tree.getByRole('link', { name })).toHaveCount(0);
-  await page.getByLabel('Order of the pages').selectOption('tree');
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'Tree' }).click();
   await checkAccessibility(page);
 
   await tree.getByRole('link', { name: 'Below home' }).click();
@@ -56,58 +58,11 @@ test('a row can be dropped between top rows that have different parents', async 
   await expect(page.getByRole('alert')).toHaveCount(0);
 });
 
-test('the strip lists spaces, marks the current one and works from the keyboard', async ({ page }) => {
-  const name = unique('Strip');
-  const current = await newSpace(page, name);
-  const others = [];
-  for (let i = 0; i < 8; i++) others.push(await newSpace(page, unique(`Other ${i}`)));
-  await page.goto(`/pages/${current.home_page_id}`);
-
-  const strip = page.getByRole('navigation', { name: 'Your spaces' });
-  const chip = strip.getByRole('link', { name, exact: true });
-  await expect(chip).toHaveAttribute('aria-current', 'true');
-  await expect(chip).toBeInViewport();
-  await expect(strip.getByRole('link', { name: 'All spaces' })).toBeVisible();
-  await checkAccessibility(page);
-
-  const list = strip.getByRole('list');
-  const scrolls = await list.evaluate((el) => el.scrollWidth > el.clientWidth);
-  expect(scrolls).toBeTruthy();
-  const page_scroll = await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
-  expect(page_scroll).toBeTruthy();
-
-  const before = await list.evaluate((el) => el.scrollLeft);
-  await list.hover();
-  await page.mouse.wheel(0, 200);
-  await expect.poll(() => list.evaluate((el) => el.scrollLeft)).not.toBe(before);
-
-  const last = strip.getByRole('listitem').last().getByRole('link');
-  await last.focus();
-  await expect(last).toBeInViewport();
-  await page.keyboard.press('Enter');
-  await expect(page).toHaveURL(/\/pages\//);
-  await expect(strip.locator('[aria-current]')).not.toHaveText(name);
-});
-
-test('an archived space keeps its place in its own strip', async ({ page }) => {
-  const name = unique('Old strip');
-  const space = await newSpace(page, name);
-  const res = await page.request.post(`/api/v1/spaces/${space.id}/archive`, { data: {} });
-  expect(res.status()).toBe(204);
-  await page.goto(`/pages/${space.home_page_id}`);
-  const strip = page.getByRole('navigation', { name: 'Your spaces' });
-  await expect(strip.getByRole('link', { name, exact: true })).toHaveAttribute('aria-current', 'true');
-});
-
 test('an administrator adds the example space, and every page of it works', async ({ page }) => {
   await page.goto('/admin/settings');
   await page.getByRole('button', { name: 'Add example space' }).click();
   await expect(page.locator('h1')).toContainText('Welcome to Diffluence');
-  const links = page.getByRole('navigation', { name: 'Space links' });
-  await expect(links.getByRole('link', { name: 'Home', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expect(page.locator('#space-head-link')).toHaveAttribute('aria-current', 'page');
 
   const tree = page.getByRole('navigation', { name: 'Pages' });
   const titles = [

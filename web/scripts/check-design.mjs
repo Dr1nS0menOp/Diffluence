@@ -26,6 +26,7 @@ export const CONTRAST_PAIRS = [
   ['ink', 'side', NORMAL_TEXT],
   ['ink', 'subtle', NORMAL_TEXT],
   ['ink', 'subtle-hover', NORMAL_TEXT],
+  ['ink', 'float', NORMAL_TEXT],
   ['ink', 'code', NORMAL_TEXT],
   ['ink', 'ok-tint', NORMAL_TEXT],
   ['ink', 'danger-tint', NORMAL_TEXT],

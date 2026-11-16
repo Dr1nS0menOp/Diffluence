@@ -21,6 +21,8 @@ The intuition of a familiar wiki is the aim, never a copy. The clean-room rules 
 
 ## The arrangement decided on 2026-11-14 (ADR-045)
 
+**Built so far:** the frame (spec 078, ADR-046): the top bar, the sidebar outside a space, its panels, the space's block of the sidebar, the start screen, the current item and the line of the frame. The rules below for those parts now describe the built screens, and the old rules they replaced are gone from this document.
+
 On 2026-11-14 the product owner decided that, for the arrangement of a screen, a study of pictures of another wiki product wins over this document: which regions a screen has, where they sit, what each holds, their order and grouping, what stays in view and how a state is marked. The look does not change: colours, icons, fonts and every token value stay as this document and `tokens.css` set them. Each change below replaces the named rule of this document when its screen is rebuilt, in a wave with its own study and new design pictures; until then the existing rule describes the built screen, and the pictures in `web/e2e/design-baselines/` keep guarding it. The requirement lines of blueprint 03 that end with "(changes the design standard, decided 2026-11-14)" are the source of truth for the detail; this list only names what changes and which rule it touches.
 
 ### Lines, cards and outlines
@@ -168,7 +170,7 @@ The colours that carry the look:
 | `--color-strong` | `#131C2B` | Headings |
 | `--color-muted` | `#566278` | Secondary text |
 | `--color-accent` | `#1D5FBF` | Links, primary buttons, the current item |
-| `--color-accent-tint` | `#E4EDFA` | Background of the current item |
+| `--color-accent-tint` | `#E4EDFA` | Background of the current item, which also has rounded corners, accent text in normal weight and a short accent bar on its start edge (NAV-144) |
 | `--color-side` | `#F5F7FA` | Sidebar, toolbar |
 | `--color-line` | `#DDE2EA` | Dividers |
 | `--color-guide` | `#B9C6D8` | Quiet outlines, such as the edge of a table in a page. No longer the tree |
@@ -184,15 +186,15 @@ Every screen is one of these. Do not invent another.
 
 | Frame | Used for | Built from |
 | --- | --- | --- |
-| **Plain** | Start screen, search, your account | Top bar, `Plain` in `app.tsx` (wide, or `reading`) |
+| **Plain** | Search, your account, people, labels | Top bar, `Plain` in `app.tsx` (wide, or `reading`) |
 | **Space** | Everything inside a space | Top bar, `Frame` or `SpaceShell` in `components/frame.tsx`: sidebar and a centred `.column` |
 | **Settings** | The administration, and the settings of a space | Top bar, `SettingsFrame` in `components/settings-frame.tsx`: the sections in the sidebar in groups that fold, with a way to jump to one, and the large area that changes them. One section at a time, at its own address (`?section=`) |
-| **Personal** | Home, Recent, Favourites, Tasks, Watching, all spaces | Top bar, `HomeFrame` in `components/home-frame.tsx`: a sidebar with your own places and your spaces, beside a `.column` |
+| **Personal** | The start screen, Recent, Favourites, Drafts, Tasks, Watching, all spaces | Top bar, `HomeFrame` in `components/home-frame.tsx`: the sidebar with the global part (`GlobalPart`) and the favourite spaces, beside a `.column` |
 | **Focus** | The editor | Top bar, sidebar, `main.focus`: `SpaceShell` with `focus`, and no reading column around it |
 
 The login page stands alone: one card on the sidebar colour.
 
-**Top bar:** logo and name, Home, Spaces, Recent, Favourites and Create, then search in the middle, then the bell, help and the account menu on the far side. Search is the main element of the bar, because people spend much of their time there (ADR-035): it takes the room there is, up to `--size-search-main`, and is never pushed to a corner. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox, and it always searches every space: there is no chip that keeps it inside one (spec 033). Clicking it unfolds one panel: first the filters as buttons (Spaces, Type, Labels, People, Date), each with a small chooser below the row, then the results; the space chooser has a field that finds any space by name. Chosen spaces, labels and people become words of the search syntax (`space:`, `label:`, `author:`), so a typed query and the buttons mean the same thing; type and date travel as the parameters the results page reads. The results page shows those words as chips that take a word out again.
+**Top bar (spec 078):** three groups. At the start the button that shows or hides the sidebar (`SidebarToggle`, which a frame with such a sidebar places into the bar, so the Plain and Settings frames have none), then the logo and name. In the middle search with Create directly after it. At the end the bell, help, the settings button to the administration (administrators only) and the account menu: round buttons with only an icon, a neutral square on hover and focus, framed while their menu is open. The account menu starts with who you are, then Profile, Your account and Theme (a sub-menu), then a group headed with the instance name, then Log out. Search is the main element of the bar, because people spend much of their time there (ADR-035): it takes the room there is, up to `--size-search-main`, and is never pushed to a corner. Create adds a page in the current space, or a space when there is none, and a small menu offers both. The search box is a combobox, and it always searches every space: there is no chip that keeps it inside one (spec 033). Clicking it unfolds one panel: first the filters as buttons (Spaces, Type, Labels, People, Date), each with a small chooser below the row, then the results; the space chooser has a field that finds any space by name. Chosen spaces, labels and people become words of the search syntax (`space:`, `label:`, `author:`), so a typed query and the buttons mean the same thing; type and date travel as the parameters the results page reads. The results page shows those words as chips that take a word out again.
 
 **A page:** breadcrumbs with Edit, Share, star, lock and More on one line; the title; the byline; the document; child pages; reactions; comments. It fills the reading column, however short the text is. Files sit in the document as tiles, and a page has no upload (ADR-022). Rarely used actions live in More, never as a row of buttons. A header image sits above all of it. The contents list stands beside the column when there is room, and the column keeps its width. The column scales: `--size-page` is at least `--size-reading`, 64 percent of the room, and at most `--size-reading-max`. Full width takes all the room. Details is one panel on the far side, on top of the page, and does not block reading. Comments use the same place, and only one of the two is open at a time. On a narrow screen comments become a sheet from the bottom, so the words stay above it.
 
@@ -236,7 +238,8 @@ Use these. Reuse beats a new variant.
 | A message in the flow | `.note`, `.note-error`, `ErrorNote` |
 | A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
 | A time | `RelativeTime` |
-| Switching between lists | `Tabs`, which brings the arrow keys |
+| Switching between lists | `Tabs`, which brings the arrow keys; on the start screen, pills (`.pill` with `aria-pressed`) |
+| A panel beside the sidebar | The panels of `components/sidebar-panels.tsx` |
 | Writing a comment | `CommentBox` |
 | Counting responses | `Reactions`, for a page or a comment |
 | A menu in something that scrolls | `Menu` with `floating` |
@@ -256,11 +259,12 @@ Use these. Reuse beats a new variant.
 - The tree starts folded from the first level: the top pages show, with their branches shut, so the shape of a space shows at once (spec 033).
 - What a reader collapses stays collapsed, per space, across pages and reloads.
 - Going to a page reveals it, also when it sits in a collapsed branch.
-- The current page has the tint, and shows the add button. Other rows show it on hover or focus.
-- The sidebar itself can be put away, and starts hidden on narrow screens. Its width is a preference.
-- The sidebar from top to bottom: the strip of spaces, the name of the space, the part **This space** (Home, Overview, People, Blog, Files, Archive and the shortcuts), then the tree itself, without a heading of its own. The part folds shut from its heading and can be made taller or shorter by its handle, by mouse or arrow keys; both are kept per person (`SidebarPart`). The tools of the tree (filter, collapse, show the current page, new page, link, select) are a quiet row of icons above it. The filter and the choice of view sit behind the filter icon, and stay open while they do something. No part of the sidebar ever shrinks to run over another: the sidebar scrolls instead. The flat views say that the tree is where pages are arranged.
-- The home page is not a row of the tree. It has the fixed Home row, which is marked while it is open, and its children are the top rows. On the home page the breadcrumbs end in Home.
-- The strip of spaces scrolls sideways on its own, in the order of the Spaces menu, with the current space marked.
+- The current page is marked as the current item (NAV-144), and shows the add button. Other rows show it on hover or focus.
+- The sidebar itself can be put away from the button at the start of the top bar, or with `[`, and starts hidden on narrow screens. Its width is a preference. A thin line sets it apart from the main area.
+- The sidebar from top to bottom (spec 078): the global part (`GlobalPart`: the start screen, then the person's own entries in their order, then More or Customise sidebar); inside a space, after a line, the space's block (`SpaceBlock`): the header row with the badge, the name and More, then Shortcuts, Content, Blogs and Space apps, each under a heading of an icon and a word with its buttons at the end. The heading of Content carries add and order and view; the filter is always shown under it, then the tree. On the personal screens the favourite spaces follow the global part instead. The whole sidebar scrolls as one; Back to top floats over it once it has scrolled. The flat views say that the tree is where pages are arranged.
+- Recent, Favourites and Spaces open a panel beside the sidebar (`components/sidebar-panels.tsx`): a card with a title and Close, a filter field with the focus, groups under small muted headings, and its actions at the foot under a line. Escape and Close give the focus back to the entry.
+- The home page is not a row of the tree. The space's header row leads to it and is marked while it is open, and its children are the top rows. On the home page the breadcrumbs end in Home.
+- The space menu holds the space's tools (Overview, People, Files, Archived pages), Export, Automation and Space settings, then Archive and Delete.
 - The tree is a `nav` with links and the keys of the tree pattern, so it is one Tab stop plus the buttons of the focused row.
 
 ## The editor

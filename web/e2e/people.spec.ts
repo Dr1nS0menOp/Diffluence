@@ -414,7 +414,7 @@ test('a manager runs access, and cannot reach administer or the settings', async
   });
   expect(reach.status()).toBe(409);
   expect(await reach.text()).toContain('needs_administer');
-  await expect(as.getByRole('link', { name: 'Space settings' })).toHaveCount(0);
+  await expect(as.getByRole('menuitem', { name: 'Space settings' })).toHaveCount(0);
   await as.context().close();
 });
 
@@ -611,7 +611,7 @@ test('a first visit explains the basics, once', async ({ page, browser }) => {
   await page.getByRole('button', { name: 'Got it' }).click();
   await expect(page.getByRole('heading', { name: 'New here?' })).toHaveCount(0);
   await page.reload();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'New here?' })).toHaveCount(0);
 });
 

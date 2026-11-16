@@ -32,7 +32,8 @@ export async function login(page: Page, email: string, password = PASSWORD) {
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Log in', exact: true }).click();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  // The account button is in the top bar of every screen after login, on every width.
+  await expect(page.getByRole('button', { name: 'Account' })).toBeVisible();
   // People with only a password are asked for more. Tests on other things put that off.
   await page.request.post('/api/v1/me/sign-in-prompt/later');
 }

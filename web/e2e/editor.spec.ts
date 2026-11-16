@@ -42,7 +42,8 @@ test.beforeEach(async ({ page }) => {
 test('writing a page with Markdown shortcuts and publishing it', async ({ page }) => {
   const space = await newSpace(page, 'Editor space');
   await page.goto(`/spaces/${space.key}`);
-  await page.getByRole('button', { name: 'New page' }).click();
+  await page.getByRole('button', { name: 'Create in this space' }).click();
+  await page.getByRole('menuitem', { name: 'New page' }).click();
   await page.getByRole('dialog').getByLabel('Title', { exact: true }).fill('Shortcuts');
   await page.getByRole('dialog').getByRole('button', { name: 'Create' }).click();
 
@@ -436,7 +437,7 @@ test('trash: delete, restore, and purge', async ({ page }) => {
   await page.getByRole('button', { name: 'More actions' }).click();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Delete' }).click();
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
 
   await page.goto(`/spaces/${space.key}/trash`);
   await expect(page.getByRole('cell', { name: 'Doomed', exact: true })).toBeVisible();

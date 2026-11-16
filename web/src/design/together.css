@@ -346,41 +346,177 @@
   font-size: var(--text-small);
 }
 
-.home-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
-  gap: var(--space-8);
-  margin-block-start: var(--space-6);
-}
-
-.home-side h2 {
-  margin-block-start: 0;
-}
-
-.home-side section + section {
-  margin-block-start: var(--space-5);
-}
-
 .tabs-filter {
   margin-block-start: var(--space-3);
 }
 
-.feed-item {
-  padding-block: var(--space-3);
+/* The start screen: one centred column of parts (spec 078, NAV-102). */
+.start-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.start-part > h2 {
+  margin: var(--space-4) 0 0;
+  font-size: var(--text-section);
+}
+
+/* What the person last touched: cards, three to a row (NAV-104, NAV-105). */
+.touch-cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.touch-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  block-size: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  color: var(--color-ink);
+  font-size: var(--text-small);
+  text-decoration: none;
+}
+
+.touch-card:hover {
+  border-color: var(--color-accent);
+  color: var(--color-ink);
+}
+
+.touch-kind {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  inline-size: var(--size-twist);
+  block-size: var(--size-twist);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+  color: var(--color-muted);
+}
+
+.touch-title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1-5);
+  min-inline-size: 0;
+  font-size: var(--text-ui);
+}
+
+.touch-title strong {
+  min-inline-size: 0;
+  overflow: hidden;
+  color: var(--color-strong);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.touch-did {
+  margin-block-start: var(--space-2);
+  font-size: var(--text-caption);
+}
+
+/* The choice of feed: pills in a row, the chosen one pressed (NAV-106). */
+.pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.pill {
+  gap: var(--space-1-5);
+  min-block-size: var(--size-tool);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-pill);
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-weight: var(--weight-regular);
+}
+
+.pill:hover {
+  background: var(--color-subtle);
+}
+
+.pill[aria-pressed='true'] {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint);
+  color: var(--color-accent);
+}
+
+.feed-filter {
+  align-self: flex-start;
+}
+
+/* A page in the feed: a card with who did what, then the page (NAV-107, NAV-109). */
+.feed-card {
+  margin-block-end: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  font-size: var(--text-small);
+}
+
+.feed-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
   border-block-end: 1px solid var(--color-line);
 }
 
-.feed-item h3 {
+.feed-card-head strong {
+  color: var(--color-strong);
+}
+
+.feed-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-3);
+  padding-inline-start: calc(var(--space-3) + var(--size-avatar-small) + var(--space-2));
+}
+
+.feed-card-title {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   margin: 0;
-  font-size: var(--text-ui);
+  font-size: var(--text-section);
 }
 
-.feed-item p {
-  margin-block: var(--space-1) 0;
-  font-size: var(--text-small);
+.feed-card-body p {
+  margin: 0;
+}
+
+/* The first two lines of the page, as plain words. */
+.feed-card-excerpt {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.feed-card-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-block-start: var(--space-1);
+  color: var(--color-muted);
+}
+
+.feed-card-comments {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-inline-start: auto;
 }
 
 @media (max-width: 50rem) {
@@ -388,8 +524,12 @@
     padding-inline-start: var(--space-4);
   }
 
-  .home-columns {
+  .touch-cards {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .feed-card-body {
+    padding-inline-start: var(--space-3);
   }
 
   /* A sheet from the bottom, so the words a thread is about stay above it. */

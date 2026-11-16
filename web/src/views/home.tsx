@@ -1,51 +1,28 @@
 // SPDX-License-Identifier: Apache-2.0
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type ComponentType, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import {
-  api,
-  NIL_ID,
-  type FeedItem,
-  type ListedPage,
-  type Me,
-  type PageDetail,
-  type Space,
-  type TaskItem,
-} from '../api';
+import { api, NIL_ID, type FeedItem, type ListedPage, type Me, type PageDetail, type Space } from '../api';
 import { Link, useLocation } from '../router';
 import { NewSpaceDialog } from '../components/create';
 import { FirstUseCard, WelcomePage } from '../components/first-use';
 import { DocumentView } from '../components/editor/editor';
-import { IconPlus } from '../components/icons';
+import { IconClock, IconComment, IconEye, IconPlus } from '../components/icons';
+import { lastTouched } from '../components/sidebar-entries';
 import { PageMark } from '../components/topbar';
 import { pageTitle } from '../page-name';
-import { ErrorNote, Loading, RelativeTime, SpaceBadge, Tabs } from '../components/ui';
+import { Avatar, ErrorNote, Loading, RelativeTime } from '../components/ui';
 
 const TABS = ['for_you', 'recent', 'popular'] as const;
 type Tab = (typeof TABS)[number];
+const TAB_ICONS: Record<Tab, ComponentType<{ size?: number }>> = {
+  for_you: IconEye,
+  recent: IconClock,
+  popular: IconComment,
+};
 const FEED_PAGE = 20;
-const TASKS_SHOWN = 5;
-
-function PageList({ title, path }: { title: string; path: string }) {
-  const { t } = useTranslation();
-  const q = useQuery({ queryKey: [path], queryFn: () => api.get<{ pages: ListedPage[] }>(path) });
-  return (
-    <section>
-      <h2>{title}</h2>
-      {q.isPending && <Loading />}
-      {q.data?.pages.length === 0 && <p className="muted">{t('home.nothingYet')}</p>}
-      <ul className="page-list">
-        {q.data?.pages.map((p) => (
-          <li key={p.id}>
-            <PageMark page={p} />
-            <Link href={`/pages/${p.id}`}>{pageTitle(t, p.title)}</Link>
-            <span className="muted">{p.space_name}</span>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
+const CARDS_SHOWN = 6;
+const RESPONSE_ICON_SIZE = 16;
 
 function CompanyHome({ pageId }: { pageId: string }) {
   const { t } = useTranslation();
@@ -78,54 +55,86 @@ export function StartScreen({ me }: { me: Me }) {
   return <HomeView me={me} />;
 }
 
-function OpenTasks() {
+/** What the person last worked on or visited, as cards, three to a row (NAV-104, NAV-105). */
+function PickUpCards() {
   const { t } = useTranslation();
-  const q = useQuery({
-    queryKey: ['tasks', 'assigned', 'open'],
-    queryFn: () => api.get<{ tasks: TaskItem[] }>('/me/tasks?tab=assigned&status=open'),
+  const visited = useQuery({
+    queryKey: ['recent-list', 'visited'],
+    queryFn: () => api.get<{ pages: ListedPage[] }>('/me/recent?kind=visited'),
   });
-  const list = q.data?.tasks.slice(0, TASKS_SHOWN) ?? [];
+  const worked = useQuery({
+    queryKey: ['recent-list', 'worked'],
+    queryFn: () => api.get<{ pages: ListedPage[] }>('/me/recent?kind=worked'),
+  });
+  const cards = lastTouched(visited.data?.pages, worked.data?.pages, CARDS_SHOWN);
   return (
-    <section>
-      <h2>{t('tasks.title')}</h2>
-      {q.data && list.length === 0 && <p className="muted">{t('tasks.none')}</p>}
-      <ul className="page-list">
-        {list.map((task) => (
-          <li key={task.id}>
-            <Link href={`/pages/${task.page_id}`}>{task.text || t('tasks.untitled')}</Link>
+    <section aria-labelledby="pick-up-heading" className="start-part">
+      <h2 id="pick-up-heading">{t('home.pickUp')}</h2>
+      {(visited.isPending || worked.isPending) && <Loading />}
+      <ErrorNote error={visited.error ?? worked.error} />
+      {visited.data && worked.data && cards.length === 0 && (
+        <p className="muted">{t('home.nothingTouched')}</p>
+      )}
+      <ul className="touch-cards">
+        {cards.map(({ page, did }) => (
+          <li key={page.id}>
+            <Link
+              href={page.unpublished ? `/pages/${page.id}/edit` : `/pages/${page.id}`}
+              className="touch-card"
+            >
+              <span className="touch-kind">
+                <PageMark page={page} />
+              </span>
+              <span className="touch-title">
+                <strong>{pageTitle(t, page.title)}</strong>
+                {page.unpublished && <span className="lozenge neutral">{t('home.draftMark')}</span>}
+              </span>
+              <span className="muted">{page.space_name}</span>
+              <span className="touch-did muted">
+                {t(`home.did_${did}`)} <RelativeTime value={page.at} />
+              </span>
+            </Link>
           </li>
         ))}
       </ul>
-      {list.length > 0 && <Link href="/tasks">{t('tasks.all')}</Link>}
     </section>
   );
 }
 
+/** One page in the feed: who did what and when, the page, its first lines and its responses (NAV-107). */
 function FeedEntry({ item, at, total }: { item: FeedItem; at: number; total: number }) {
   const { t } = useTranslation();
+  const author = item.author_name || t('common.unknown');
   return (
     <article
-      className="feed-item"
+      className="feed-card"
       tabIndex={0}
       aria-posinset={at}
       aria-setsize={total}
       aria-label={pageTitle(t, item.title)}
     >
-      <h3>
-        <PageMark page={item} /> <Link href={`/pages/${item.page_id}`}>{pageTitle(t, item.title)}</Link>
-      </h3>
-      <p className="muted">
-        {item.space_name} ·{' '}
-        {t(`home.kind_${item.kind}`, {
-          name: item.author_name || t('common.unknown'),
-          count: item.pages ?? 0,
-        })}{' '}
-        · <RelativeTime value={item.at} />
-      </p>
-      {item.excerpt && <p>{item.excerpt}</p>}
-      {(item.reactions > 0 || item.comments > 0) && (
-        <p className="muted">{t('home.responses', { reactions: item.reactions, comments: item.comments })}</p>
-      )}
+      <div className="feed-card-head">
+        <Avatar name={author} size="small" />
+        <strong>{author}</strong>
+        <span className="muted">
+          {t(`home.event_${item.kind}`, { count: item.pages ?? 0 })} · <RelativeTime value={item.at} />
+        </span>
+      </div>
+      <div className="feed-card-body">
+        <h3 className="feed-card-title">
+          <PageMark page={item} /> <Link href={`/pages/${item.page_id}`}>{pageTitle(t, item.title)}</Link>
+        </h3>
+        <p className="muted">{item.space_name}</p>
+        {item.excerpt && <p className="feed-card-excerpt">{item.excerpt}</p>}
+        <div className="feed-card-foot">
+          {item.reactions > 0 && <span>{t('home.reactionCount', { count: item.reactions })}</span>}
+          <span className="feed-card-comments">
+            <IconComment size={RESPONSE_ICON_SIZE} />
+            <span aria-hidden="true">{item.comments}</span>
+            <span className="visually-hidden">{t('home.commentCount', { count: item.comments })}</span>
+          </span>
+        </div>
+      </div>
     </article>
   );
 }
@@ -173,7 +182,7 @@ function Feed({ tab, spaceId }: { tab: Tab; spaceId: string }) {
   };
 
   return (
-    <div id="feed-panel" role="tabpanel" aria-label={t(`home.tab_${tab}`)}>
+    <div id="feed-panel">
       {q.isPending && <Loading />}
       <ErrorNote error={q.error} />
       {q.data && items.length === 0 && <p className="muted">{t(`home.empty_${tab}`)}</p>}
@@ -199,76 +208,76 @@ function Feed({ tab, spaceId }: { tab: Tab; spaceId: string }) {
   );
 }
 
-export function HomeView({ me }: { me: Me }) {
+/** Without any space there is nothing to read yet: one sentence and the way to make the first (NAV-037). */
+function FirstSpace({ me }: { me: Me }) {
   const { t } = useTranslation();
   const [adding, setAdding] = useState(false);
+  return (
+    <section className="start-part">
+      <p>{t('home.noSpaces')}</p>
+      {me.global_permissions.includes('create_space') && (
+        <button type="button" className="primary" onClick={() => setAdding(true)}>
+          <IconPlus size={RESPONSE_ICON_SIZE} /> {t('home.newSpace')}
+        </button>
+      )}
+      {adding && <NewSpaceDialog onClose={() => setAdding(false)} />}
+    </section>
+  );
+}
+
+/**
+ * The start screen: one centred column with getting started, the cards of what the person last
+ * touched, the welcome message, and the feed with its choices as pills (spec 078, NAV-102 to NAV-106).
+ */
+export function HomeView({ me }: { me: Me }) {
+  const { t } = useTranslation();
   const [tab, setTab] = useState<Tab>('for_you');
   const [spaceId, setSpaceId] = useState('');
   const spaces = useQuery({ queryKey: ['spaces'], queryFn: () => api.get<{ spaces: Space[] }>('/spaces') });
 
   return (
     <>
-      <h1 className="greeting">{t('home.welcome', { name: me.user.display_name })}</h1>
-      <WelcomePage />
+      <h1 className="visually-hidden">{t('nav.home')}</h1>
       <FirstUseCard />
-      <div className="section-head">
-        <h2>{t('home.spaces')}</h2>
-        {me.global_permissions.includes('create_space') && (
-          <button type="button" onClick={() => setAdding(true)}>
-            <IconPlus size={16} /> {t('home.newSpace')}
-          </button>
-        )}
-      </div>
-      {spaces.isPending && <Loading />}
       <ErrorNote error={spaces.error} />
-      {spaces.data?.spaces.length === 0 && <p className="muted">{t('home.noSpaces')}</p>}
-      <ul className="cards">
-        {spaces.data?.spaces.map((s) => (
-          <li key={s.id}>
-            <Link href={`/spaces/${s.key}`} className="space-card">
-              <SpaceBadge space={s} size="large" />
-              <span>
-                <strong>{s.name}</strong>
-                {s.description && <p>{s.description}</p>}
-              </span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-      <div className="home-columns">
-        <div>
-          <Tabs
-            names={TABS}
-            current={tab}
-            label={t('home.activity')}
-            nameOf={(name) => t(`home.tab_${name}`)}
-            panel="feed-panel"
-            onChange={setTab}
-          />
-          {tab === 'recent' && (spaces.data?.spaces.length ?? 0) > 1 && (
-            <select
-              className="tabs-filter"
-              aria-label={t('home.filterSpace')}
-              value={spaceId}
-              onChange={(e) => setSpaceId(e.target.value)}
-            >
-              <option value="">{t('search.anySpace')}</option>
-              {spaces.data?.spaces.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {s.name}
-                </option>
-              ))}
-            </select>
-          )}
-          <Feed tab={tab} spaceId={tab === 'recent' ? spaceId : ''} />
+      {spaces.data?.spaces.length === 0 && <FirstSpace me={me} />}
+      <PickUpCards />
+      <WelcomePage />
+      <section aria-labelledby="activity-heading" className="start-part">
+        <h2 id="activity-heading">{t('home.activity')}</h2>
+        <div role="group" aria-label={t('home.feedChoice')} className="pills">
+          {TABS.map((name) => {
+            const Icon = TAB_ICONS[name];
+            return (
+              <button
+                key={name}
+                type="button"
+                className="pill"
+                aria-pressed={tab === name}
+                onClick={() => setTab(name)}
+              >
+                <Icon size={RESPONSE_ICON_SIZE} /> {t(`home.tab_${name}`)}
+              </button>
+            );
+          })}
         </div>
-        <aside className="home-side" aria-label={t('home.yourThings')}>
-          <PageList title={t('home.recent')} path="/me/recent" />
-          <PageList title={t('home.favourites')} path="/me/favourites" />
-          <OpenTasks />
-        </aside>
-      </div>
-      {adding && <NewSpaceDialog onClose={() => setAdding(false)} />}
+        {tab === 'recent' && (spaces.data?.spaces.length ?? 0) > 1 && (
+          <select
+            className="feed-filter"
+            aria-label={t('home.filterSpace')}
+            value={spaceId}
+            onChange={(e) => setSpaceId(e.target.value)}
+          >
+            <option value="">{t('search.anySpace')}</option>
+            {spaces.data?.spaces.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <Feed tab={tab} spaceId={tab === 'recent' ? spaceId : ''} />
+      </section>
     </>
   );
 }

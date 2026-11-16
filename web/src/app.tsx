@@ -11,7 +11,8 @@ import { forgetPersonalData, forgetSharedDocuments, PersonProvider } from './per
 import { Link, match, navigate, useLocation } from './router';
 import { applyTheme } from './preferences';
 import { NewDatabaseDialog, NewPageDialog, NewPostDialog, NewSpaceDialog } from './components/create';
-import { SpaceShell, useCreateTarget } from './components/frame';
+import { useCreateTarget } from './components/current-space';
+import { SpaceShell } from './components/frame';
 import { IconChevronDown, IconPlus, Logo } from './components/icons';
 import { Menu, MenuItem } from './components/menu';
 import { TemplateGallery } from './components/template-gallery';
@@ -21,7 +22,8 @@ import { IdleWarning, ReauthProvider } from './components/session';
 import { ShortcutsProvider, useShortcut } from './components/shortcuts';
 import { SiteNotes } from './components/site-notes';
 import { ToastProvider } from './components/toast';
-import { AccountMenu, FavouritesMenu, HelpMenu, RecentMenu, SpacesMenu } from './components/topbar';
+import { SidebarProvider, SidebarSlot } from './components/sidebar-state';
+import { AccountMenu, HelpMenu, SettingsButton } from './components/topbar';
 import { ErrorNote, Loading } from './components/ui';
 import { PersonalDataView, ProfileView, TokensView } from './views/account';
 import { ForgotView, InvitationView, ResetView, SignupView } from './views/account-links';
@@ -30,7 +32,7 @@ import { ContentView } from './views/content';
 import { DirectoryView } from './views/directory';
 import { GroupView } from './views/group';
 import { StartScreen } from './views/home';
-import { FavouritesView, RecentView } from './views/lists';
+import { DraftsView, FavouritesView, RecentView } from './views/lists';
 import { LoginView } from './views/login';
 import { SetupView } from './views/setup';
 import { ArchiveView, BlogView, LabelsView, LabelView, MissingPage } from './views/organise';
@@ -128,7 +130,6 @@ function CreateButton({ me, onCreate }: { me: Me; onCreate: (what: Creating) => 
 function Shell({ me, children }: { me: Me; children: ReactNode }) {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const { pathname } = useLocation();
   const target = useCreateTarget();
   const [creating, setCreating] = useState<Creating>(null);
   const appearance = useQuery(appearanceQuery).data;
@@ -147,37 +148,27 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
     navigate('/login');
   };
   return (
-    <>
+    <SidebarProvider>
       <a className="skip" href="#main">
         {t('app.skip')}
       </a>
+      {/* Three groups: the sidebar button and the name; search with Create; the round buttons (NAV-090). */}
       <header className="top">
         <div className="top-start">
+          <SidebarSlot />
           <Link href="/" className="brand">
             {appearance?.logo ? <img src={appearance.logo} alt="" className="brand-logo" /> : <Logo />}{' '}
             {appearance?.name || t('app.name')}
           </Link>
-          <nav aria-label={t('nav.mainMenu')} className="top-nav">
-            <Link href="/" className="nav-link" aria-current={pathname === '/' ? 'page' : undefined}>
-              {t('nav.home')}
-            </Link>
-            <SpacesMenu />
-            <Link
-              href="/people"
-              className="nav-link"
-              aria-current={pathname === '/people' ? 'page' : undefined}
-            >
-              {t('nav.people')}
-            </Link>
-            <RecentMenu />
-            <FavouritesMenu />
-            <CreateButton me={me} onCreate={setCreating} />
-          </nav>
         </div>
-        <QuickSearch />
+        <div className="top-middle">
+          <QuickSearch />
+          <CreateButton me={me} onCreate={setCreating} />
+        </div>
         <div className="top-end">
           <NotificationBell />
           <HelpMenu />
+          <SettingsButton me={me} />
           <AccountMenu me={me} onLogout={() => void logout()} />
         </div>
       </header>
@@ -197,7 +188,7 @@ function Shell({ me, children }: { me: Me; children: ReactNode }) {
         <NewPostDialog space={target.space} onClose={() => setCreating(null)} />
       )}
       {creating === 'space' && <NewSpaceDialog onClose={() => setCreating(null)} />}
-    </>
+    </SidebarProvider>
   );
 }
 
@@ -215,7 +206,7 @@ function Routes({ me }: { me: Me }) {
   let m;
   if (pathname === '/') {
     return (
-      <HomeFrame>
+      <HomeFrame width="reading">
         <StartScreen me={me} />
       </HomeFrame>
     );
@@ -301,6 +292,13 @@ function Routes({ me }: { me: Me }) {
     return (
       <HomeFrame width="reading">
         <WatchingView />
+      </HomeFrame>
+    );
+  }
+  if ((m = match('/drafts', pathname))) {
+    return (
+      <HomeFrame width="reading">
+        <DraftsView />
       </HomeFrame>
     );
   }

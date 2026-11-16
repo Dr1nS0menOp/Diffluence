@@ -104,7 +104,7 @@ test('opening a version shows what changed in it, and can show the clean page', 
   await publish(page, id, 'Versions', 1, [words('the second words')]);
 
   await page.goto(`/pages/${id}/history`);
-  await page.getByRole('button', { name: 'View' }).first().click();
+  await page.getByRole('main').getByRole('button', { name: 'View', exact: true }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Version 2' });
   await expect(dialog.locator('ins')).toHaveText('second');
   await expect(dialog.locator('del')).toHaveText('first');
@@ -117,7 +117,7 @@ test('opening a version shows what changed in it, and can show the clean page', 
   await expect(dialog.locator('ins')).toHaveText('second');
   await dialog.getByRole('button', { name: 'Close' }).click();
 
-  await page.getByRole('button', { name: 'View' }).last().click();
+  await page.getByRole('main').getByRole('button', { name: 'View', exact: true }).last().click();
   const first = page.getByRole('dialog', { name: 'Version 1' });
   await expect(first.locator('.prose')).toHaveText('the first words');
   await expect(first.getByRole('button', { name: 'Show the changes' })).toHaveCount(0);
@@ -134,7 +134,7 @@ test('a version after a removed one shows clean, with no error', async ({ page }
   expect(res.ok(), await res.text()).toBeTruthy();
 
   await page.goto(`/pages/${id}/history`);
-  await page.getByRole('button', { name: 'View' }).first().click();
+  await page.getByRole('main').getByRole('button', { name: 'View', exact: true }).first().click();
   const dialog = page.getByRole('dialog', { name: 'Version 3' });
   await expect(dialog.locator('.prose')).toHaveText('the third words');
   await expect(dialog.getByRole('alert')).toHaveCount(0);

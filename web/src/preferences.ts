@@ -17,6 +17,8 @@ export const DEFAULT_PREFERENCES: Preferences = {
   sidebar_width: 18,
   sidebar_shut: null,
   sidebar_links_height: 0,
+  sidebar_order: null,
+  sidebar_hidden: null,
   settings_shut: null,
   tree_view: 'tree',
   language: 'en',

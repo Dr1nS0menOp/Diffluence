@@ -512,13 +512,16 @@ test('an image gets a size, an alignment, alt text and a caption', async ({ page
     mimeType: 'image/png',
     buffer: PNG,
   });
+  // The floating image bar holds the same tools once it shows, which is a matter of timing;
+  // floating-bars.spec.ts tests that bar, this test the fixed row.
+  const row = page.getByRole('toolbar', { name: 'Formatting' });
   await body(page).locator('img').click();
-  await page.getByRole('button', { name: 'Image size' }).click();
+  await row.getByRole('button', { name: 'Image size' }).click();
   await page.getByRole('menuitemradio', { name: 'Medium' }).click();
   await body(page).locator('img').click();
-  await page.getByRole('button', { name: 'Align to the centre' }).click();
+  await row.getByRole('button', { name: 'Align to the centre' }).click();
   await body(page).locator('img').click();
-  await page.getByRole('button', { name: 'Describe this image' }).click();
+  await row.getByRole('button', { name: 'Describe this image' }).click();
   const dialog = page.getByRole('dialog', { name: 'Describe this image' });
   await dialog.getByLabel('Alt text').fill('A tiny dot');
   await dialog.getByLabel('Caption').fill('The smallest picture');

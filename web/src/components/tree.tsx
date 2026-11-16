@@ -38,8 +38,8 @@ import {
   IconSortDown,
   IconStar,
   IconTask,
+  IconTick,
   IconTrash,
-  IconFilter,
 } from './icons';
 import { Menu, MenuDownload, MenuItem, MenuSeparator } from './menu';
 import { personalKey, usePerson } from '../personal';
@@ -766,26 +766,28 @@ function SelectionBar({
   );
 }
 
-/** The heading, tools, filter and tree of a space's sidebar. */
+/**
+ * The Content group of a space's sidebar: its heading with add and order and view, the filter
+ * that is always shown, and the tree (spec 078, SPC-101).
+ */
 export function PagesSection({
   spaceId,
   home,
   current,
   canMove,
   onAdd,
-  onAddRoot,
-  onAddLink,
+  createItems,
   onDialog,
   draftSpace = false,
 }: {
   spaceId: string;
-  /** The home page has its own row above the tree. */
+  /** The space's header row leads to the home page, so it is not a row of the tree. */
   home: string | null;
   current?: string;
   canMove: boolean;
   onAdd?: (parent: string) => void;
-  onAddRoot?: () => void;
-  onAddLink?: () => void;
+  /** What the add button of the heading offers, or nothing for someone who may not add. */
+  createItems?: ReactNode;
   onDialog: (page: PageSummary, dialog: RowDialog) => void;
   /** The space is the draft space of a pair, whose tree offers Changed since release. */
   draftSpace?: boolean;
@@ -794,12 +796,9 @@ export function PagesSection({
   const { preferences, update } = usePreferences();
   const [memory, setMemory] = useBranchMemory(spaceId);
   const [filter, setFilter] = useState('');
-  // The filters stay out of sight until asked for, and stay open while they do something.
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const [selection, setSelection] = useState<string[] | null>(null);
   const views = draftSpace ? DRAFT_TREE_VIEWS : TREE_VIEWS;
   const view = views.find((v) => v === preferences.tree_view) ?? 'tree';
-  const showFilters = filtersOpen || filter !== '' || view !== 'tree';
   const parts = useTreeParts(spaceId, current, memory.opened);
   const nodes = useMemo(() => parts.nodes.filter((n) => n.id !== home), [parts.nodes, home]);
   const typed = useDelayed(filter.trim());
@@ -827,102 +826,61 @@ export function PagesSection({
     });
   };
   return (
-    <section className="pages-part" aria-label={t('space.pages')}>
-      {/* The tools stay quiet above the tree, without a heading of their own (spec 033). */}
-      <div className="tree-tools">
-        <button
-          type="button"
-          className="node-add always"
-          aria-label={t('tree.showFilters')}
-          title={t('tree.showFilters')}
-          aria-expanded={showFilters}
-          onClick={() => {
-            if (showFilters) setFilter('');
-            setFiltersOpen(!showFilters);
-          }}
-        >
-          <IconFilter size={ROW_ICON_SIZE} />
-        </button>
-        <button
-          type="button"
-          className="node-add always"
-          aria-label={t('tree.collapseAll')}
-          title={t('tree.collapseAll')}
-          onClick={() => setMemory(collapseEverything(nodes))}
-        >
-          <IconCollapse size={ROW_ICON_SIZE} />
-        </button>
-        {current && (
-          <button
-            type="button"
-            className="node-add always"
-            aria-label={t('tree.showCurrent')}
-            title={t('tree.showCurrent')}
-            onClick={showCurrent}
-          >
-            <IconLocate size={ROW_ICON_SIZE} />
-          </button>
-        )}
-        {onAddRoot && (
-          <button
-            type="button"
-            className="node-add always"
-            aria-label={t('space.newPage')}
-            title={t('space.newPage')}
-            onClick={onAddRoot}
-          >
-            <IconPlus size={ROW_ICON_SIZE} />
-          </button>
-        )}
-        {onAddLink && (
-          <button
-            type="button"
-            className="node-add always"
-            aria-label={t('tree.addLink')}
-            title={t('tree.addLink')}
-            onClick={onAddLink}
-          >
-            <IconLink size={ROW_ICON_SIZE} />
-          </button>
-        )}
-        {canMove && (
-          <button
-            type="button"
-            className="node-add always"
-            aria-label={t('tree.select')}
-            title={t('tree.select')}
-            aria-pressed={selection !== null}
-            onClick={() => setSelection(selection === null ? [] : null)}
-          >
-            <IconTask size={ROW_ICON_SIZE} />
-          </button>
-        )}
+    <section className="side-group" aria-labelledby="content-heading">
+      <div className="side-group-head">
+        <h2 id="content-heading" className="side-group-title">
+          <IconPage size={ROW_ICON_SIZE} /> {t('space.content')}
+        </h2>
+        <span className="side-group-tools">
+          {createItems && (
+            <Menu label={t('space.createHere')} trigger={<IconPlus size={ROW_ICON_SIZE} />} floating>
+              {createItems}
+            </Menu>
+          )}
+          <Menu label={t('tree.orderAndView')} trigger={<IconSortDown size={ROW_ICON_SIZE} />} floating>
+            <div role="group" aria-label={t('tree.view')}>
+              {views.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  role="menuitemradio"
+                  aria-checked={view === v}
+                  onClick={() => update({ tree_view: v })}
+                >
+                  <span className="menu-tick">{view === v && <IconTick size={MENU_ICON_SIZE} />}</span>
+                  {t(`tree.view_${v}`)}
+                </button>
+              ))}
+            </div>
+            <MenuSeparator />
+            <MenuItem onClick={() => setMemory(collapseEverything(nodes))}>
+              <IconCollapse size={MENU_ICON_SIZE} /> {t('tree.collapseAll')}
+            </MenuItem>
+            {current && (
+              <MenuItem onClick={showCurrent}>
+                <IconLocate size={MENU_ICON_SIZE} /> {t('tree.showCurrent')}
+              </MenuItem>
+            )}
+            {canMove && (
+              <MenuItem onClick={() => setSelection(selection === null ? [] : null)}>
+                <IconTask size={MENU_ICON_SIZE} />{' '}
+                {selection === null ? t('tree.select') : t('tree.stopSelecting')}
+              </MenuItem>
+            )}
+          </Menu>
+        </span>
       </div>
-      {showFilters && (
-        <div className="tree-controls">
-          <input
-            type="search"
-            value={filter}
-            aria-label={t('tree.filter')}
-            placeholder={t('tree.filter')}
-            onChange={(e) => setFilter(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setFilter('');
-            }}
-          />
-          <select
-            aria-label={t('tree.view')}
-            value={view}
-            onChange={(e) => update({ tree_view: e.target.value })}
-          >
-            {views.map((v) => (
-              <option key={v} value={v}>
-                {t(`tree.view_${v}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
+      <input
+        type="search"
+        className="side-filter"
+        value={filter}
+        aria-label={t('tree.filter')}
+        placeholder={t('tree.filter')}
+        onChange={(e) => setFilter(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') setFilter('');
+        }}
+      />
       {parts.isPending && <Loading />}
       <ErrorNote error={parts.error ?? found.error} />
       <PageTree

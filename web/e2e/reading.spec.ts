@@ -79,27 +79,34 @@ test('a chosen theme beats the system, and is right after a reload', async ({ pa
   await checkAccessibility(page);
 });
 
-test('the top bar menus show where a person has been', async ({ page }) => {
+test('the panels of the sidebar show where a person has been', async ({ page }) => {
   const space = await newSpace(page, 'Menu space');
   const id = await publishedPage(page, space.id, 'Menu page', 'text');
   await page.goto(`/pages/${id}`);
   await page.getByRole('button', { name: 'Add to favourites' }).click();
 
-  await page.getByRole('button', { name: 'Recent', exact: true }).click();
-  await expect(page.getByRole('menuitem', { name: /Menu page/ })).toBeVisible();
+  const places = page.getByRole('navigation', { name: 'Your places' });
+  await places.getByRole('button', { name: 'Recent', exact: true }).click();
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Recent' })
+      .getByRole('link', { name: /Menu page/ })
+      .first(),
+  ).toBeVisible();
   await page.keyboard.press('Escape');
 
-  await page.getByRole('button', { name: 'Favourites', exact: true }).click();
-  await expect(page.getByRole('menuitem', { name: /Menu page/ })).toBeVisible();
-  await page.getByRole('menuitem', { name: 'All favourites' }).click();
+  await places.getByRole('button', { name: 'Favourites', exact: true }).click();
+  const favourites = page.getByRole('dialog', { name: 'Favourites' });
+  await expect(favourites.getByRole('link', { name: /Menu page/ })).toBeVisible();
+  await favourites.getByRole('link', { name: 'All favourites' }).click();
   await expect(page.getByRole('heading', { name: 'Favourites', level: 1 })).toBeVisible();
 
   // Other tests visit spaces too, so this one is visited last, just before the menu opens.
   await page.goto(`/spaces/${space.key}`);
-  // The sidebar of the personal screens has a part named Spaces too.
-  await page.getByRole('banner').getByRole('button', { name: 'Spaces', exact: true }).click();
-  await expect(page.getByRole('menuitem', { name: 'Menu space' })).toBeVisible();
-  await page.getByRole('menuitem', { name: 'All spaces' }).click();
+  await places.getByRole('button', { name: 'Spaces', exact: true }).click();
+  const spaces = page.getByRole('dialog', { name: 'Spaces' });
+  await expect(spaces.getByRole('link', { name: 'Menu space' }).first()).toBeVisible();
+  await spaces.getByRole('link', { name: 'All spaces' }).click();
   await expect(page).toHaveURL(/\/spaces$/);
 });
 
@@ -108,7 +115,7 @@ test('quick search works from the keyboard alone', async ({ page }) => {
   const word = unique('quickword');
   const id = await publishedPage(page, space.id, `${word} page`, 'text');
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Spaces' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Activity' })).toBeVisible();
 
   await page.keyboard.press('/');
   const box = page.getByRole('combobox', { name: 'Search' });
@@ -192,7 +199,6 @@ test('the tree filters, keeps parents, and marks what matches', async ({ page })
   await page.goto(`/pages/${child}`);
 
   const tree = page.getByRole('navigation', { name: 'Pages' });
-  await page.getByRole('button', { name: 'Filter the tree' }).click();
   await page.getByLabel('Filter pages').fill('holiday');
   await expect(tree.getByRole('link', { name: 'Holiday plan' })).toBeVisible();
   await expect(tree.getByRole('link', { name: 'Handbook' })).toBeVisible();
@@ -204,9 +210,11 @@ test('the tree filters, keeps parents, and marks what matches', async ({ page })
   await page.getByLabel('Filter pages').press('Escape');
   await expect(tree.getByRole('link', { name: 'Unrelated' })).toBeVisible();
 
-  await page.getByLabel('Order of the pages').selectOption('alphabet');
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'A to Z' }).click();
   await expect(tree).toContainText('Pages are arranged in the tree view.');
-  await page.getByLabel('Order of the pages').selectOption('tree');
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'Tree' }).click();
 });
 
 test('the tree works from the keyboard and is one Tab stop', async ({ page }) => {
@@ -307,7 +315,7 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
 
   // Settings have their own sidebar; the shortcuts show on the space itself.
   await page.goto(`/spaces/${space.key}`);
-  const links = page.getByRole('navigation', { name: 'Space links' });
+  const links = page.getByRole('region', { name: 'Shortcuts' });
   await expect(
     links
       .locator('.side-link')
@@ -419,7 +427,7 @@ test('favourites can be ordered without dragging, and removed together', async (
   await expect(rows).toHaveCount(before - 2);
 });
 
-test('a page without a title is listed as Untitled on the home page', async ({ page }) => {
+test('a page without a title is listed as Untitled among the favourites', async ({ page }) => {
   // A guided template may leave a title empty (spec 074); a link still needs a name.
   const space = await newSpace(page, 'Untitled space');
   const created = await page.request.post('/api/v1/pages', {
@@ -429,8 +437,12 @@ test('a page without a title is listed as Untitled on the home page', async ({ p
   const { id } = (await created.json()) as { id: string };
   expect((await page.request.put(`/api/v1/pages/${id}/favourite`, { data: {} })).status()).toBe(204);
   await page.goto('/?personal=1');
-  const yours = page.getByRole('complementary', { name: 'Your pages and tasks' });
-  await expect(yours.locator(`a[href="/pages/${id}"]`)).toHaveText('Untitled');
+  await page
+    .getByRole('navigation', { name: 'Your places' })
+    .getByRole('button', { name: 'Favourites', exact: true })
+    .click();
+  const yours = page.getByRole('dialog', { name: 'Favourites' });
+  await expect(yours.locator(`a[href="/pages/${id}"]`)).toContainText('Untitled');
   await checkAccessibility(page);
 });
 
@@ -669,7 +681,7 @@ test('an old version says what it is, and a comparison folds what did not change
   await expect(page.getByText('Line 2', { exact: true })).toBeVisible();
 
   await page.goto(`/pages/${id}/history`);
-  await page.getByRole('button', { name: 'View' }).last().click();
+  await page.getByRole('main').getByRole('button', { name: 'View', exact: true }).last().click();
   await expect(page.getByRole('dialog')).toContainText('This is version 1');
   await expect(
     page.getByRole('dialog').getByRole('link', { name: 'Go to the current version' }),

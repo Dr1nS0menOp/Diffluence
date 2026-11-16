@@ -223,11 +223,12 @@ test('a draft space is started from a space with content, and its tree lists wha
   expect(edited.ok(), await edited.text()).toBeTruthy();
 
   await page.goto(`/pages/${copy}`);
-  await page.getByRole('button', { name: 'Filter the tree' }).click();
-  await page.getByLabel('Order of the pages').selectOption({ label: 'Changed since release' });
-  const tree = page.getByRole('region', { name: 'Pages' });
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'Changed since release' }).click();
+  const tree = page.getByRole('navigation', { name: 'Pages' });
   await expect(tree.getByRole('link', { name: 'Forklift' })).toBeVisible();
   await expect(tree.getByRole('link', { name: 'Crane' })).toHaveCount(0);
   await checkAccessibility(page);
-  await page.getByLabel('Order of the pages').selectOption({ label: 'Tree' });
+  await page.getByRole('button', { name: 'Order and view' }).click();
+  await page.getByRole('menuitemradio', { name: 'Tree' }).click();
 });

@@ -6,7 +6,7 @@ import { moved } from '../views/lists';
 import { suggestKey } from './create';
 import { contentsOf, countWords, headingsOf, readingMinutes, slidesOf, slugify } from './editor/outline';
 import { addSearch, readSearches, rowsOf } from './quick-search';
-import { orderSpaces, withCurrent } from './space-strip';
+import { orderSpaces } from './my-spaces';
 import { buildTree, collapseEverything, matchParts, showsBranch, typeAheadRow } from './tree-model';
 import { branchesToLoad, levelsThatGoOn, mergeParts } from './tree-data';
 import { dayText, isKnownTimeZone, localTimeIn, momentText, relativeText, type DateChoice } from '../dates';
@@ -291,7 +291,7 @@ describe('dates', () => {
   });
 });
 
-describe('the strip of spaces', () => {
+describe('the order of spaces in the search filter', () => {
   const space = (id: string): Space => ({
     id,
     key: id,
@@ -310,11 +310,6 @@ describe('the strip of spaces', () => {
 
   it('has nothing to show before an answer', () => {
     expect(orderSpaces(undefined, undefined)).toEqual([]);
-  });
-
-  it('always shows the current space, also when a list leaves it out', () => {
-    expect(withCurrent([space('a')], space('old')).map((s) => s.id)).toEqual(['old', 'a']);
-    expect(withCurrent([space('a')], space('a'))).toHaveLength(1);
   });
 });
 

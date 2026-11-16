@@ -2,18 +2,18 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, type Category, type PageRef, type Shortcut, type Space, type TrashItem } from '../api';
+import { api, type Category, type PageRef, type Space, type TrashItem } from '../api';
 import { Link, navigate, useLocation } from '../router';
 import { AnimalChoice } from '../components/animal-choice';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { useDelayed } from '../components/quick-search';
-import { IconArrowDown, IconArrowUp, IconChevronLeft } from '../components/icons';
+import { IconChevronLeft } from '../components/icons';
+import { ShortcutsForm } from '../components/shortcut-links';
 import { SettingsFrame, type SettingsGroup } from '../components/settings-frame';
 import { SpaceRolesPanel } from './access-roles';
 import { ConfirmButton, ErrorNote, Field, Loading, SpaceBadge } from '../components/ui';
 import { useDates } from '../dates';
 import { ExportSection, ImportSection, PDFDesignSection } from './exchange';
-import { moved } from './lists';
 import {
   DeleteSpaceButton,
   FeaturesSection,
@@ -119,88 +119,10 @@ export function SpaceHome({ spaceKey }: { spaceKey: string }) {
 
 function ShortcutsSection({ space }: { space: Space }) {
   const { t } = useTranslation();
-  const client = useQueryClient();
-  const key = ['shortcuts', space.id];
-  const q = useQuery({
-    queryKey: key,
-    queryFn: () => api.get<{ shortcuts: Shortcut[] }>(`/spaces/${space.id}/shortcuts`),
-  });
-  const [label, setLabel] = useState('');
-  const [target, setTarget] = useState('');
-  const save = useMutation({
-    mutationFn: (shortcuts: Shortcut[]) =>
-      api.put(`/spaces/${space.id}/shortcuts`, {
-        shortcuts: shortcuts.map((s) => ({ label: s.label, target: s.target })),
-      }),
-    onSuccess: () => {
-      setLabel('');
-      setTarget('');
-    },
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
-  });
-  const list = q.data?.shortcuts ?? [];
   return (
     <section>
       <h2>{t('shortcutLinks.title')}</h2>
-      <p className="muted">{t('shortcutLinks.help')}</p>
-      <ErrorNote error={q.error ?? save.error} />
-      <ul className="page-list">
-        {list.map((s, at) => (
-          <li key={s.id ?? s.label}>
-            <span className="grow">{s.label}</span>
-            <span className="muted">{s.target}</span>
-            <button
-              type="button"
-              className="icon"
-              aria-label={t('favourites.moveUp', { title: s.label })}
-              disabled={at === 0}
-              onClick={() => save.mutate(moved(list, at, -1))}
-            >
-              <IconArrowUp size={16} />
-            </button>
-            <button
-              type="button"
-              className="icon"
-              aria-label={t('favourites.moveDown', { title: s.label })}
-              disabled={at === list.length - 1}
-              onClick={() => save.mutate(moved(list, at, 1))}
-            >
-              <IconArrowDown size={16} />
-            </button>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => save.mutate(list.filter((_, i) => i !== at))}
-            >
-              {t('common.remove')}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        className="row"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          save.mutate([...list, { label, target }]);
-        }}
-      >
-        <input
-          value={label}
-          aria-label={t('shortcutLinks.label')}
-          placeholder={t('shortcutLinks.label')}
-          required
-          onChange={(e) => setLabel(e.target.value)}
-        />
-        <input
-          className="grow"
-          value={target}
-          aria-label={t('shortcutLinks.target')}
-          placeholder={t('shortcutLinks.target')}
-          required
-          onChange={(e) => setTarget(e.target.value)}
-        />
-        <button type="submit">{t('common.add')}</button>
-      </form>
+      <ShortcutsForm space={space} />
     </section>
   );
 }

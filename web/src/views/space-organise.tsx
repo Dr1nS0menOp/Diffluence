@@ -493,40 +493,53 @@ export function RulesSection({ space }: { space: Space }) {
 }
 
 /** Deleting a space asks for its key, and offers something milder first (SPC-073). */
+export function DeleteSpaceDialog({
+  space,
+  onDelete,
+  onClose,
+}: {
+  space: Space;
+  onDelete: () => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [typed, setTyped] = useState('');
+  return (
+    <Dialog title={t('space.deleteSpace')} onClose={onClose}>
+      <p>{t('space.confirmDelete')}</p>
+      <p className="muted">{t('spaceSettings.deleteInstead')}</p>
+      <Field label={t('spaceSettings.typeKey', { key: space.key })}>
+        <input value={typed} autoFocus onChange={(e) => setTyped(e.target.value)} />
+      </Field>
+      <div className="dialog-actions">
+        <button type="button" className="quiet" onClick={onClose}>
+          {t('common.cancel')}
+        </button>
+        <button
+          type="button"
+          className="danger"
+          disabled={typed !== space.key}
+          onClick={() => {
+            onClose();
+            onDelete();
+          }}
+        >
+          {t('space.deleteSpace')}
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
 export function DeleteSpaceButton({ space, onDelete }: { space: Space; onDelete: () => void }) {
   const { t } = useTranslation();
   const [open, setOpen] = useState(false);
-  const [typed, setTyped] = useState('');
   return (
     <>
       <button type="button" className="danger" onClick={() => setOpen(true)}>
         {t('space.deleteSpace')}
       </button>
-      {open && (
-        <Dialog title={t('space.deleteSpace')} onClose={() => setOpen(false)}>
-          <p>{t('space.confirmDelete')}</p>
-          <p className="muted">{t('spaceSettings.deleteInstead')}</p>
-          <Field label={t('spaceSettings.typeKey', { key: space.key })}>
-            <input value={typed} autoFocus onChange={(e) => setTyped(e.target.value)} />
-          </Field>
-          <div className="dialog-actions">
-            <button type="button" className="quiet" onClick={() => setOpen(false)}>
-              {t('common.cancel')}
-            </button>
-            <button
-              type="button"
-              className="danger"
-              disabled={typed !== space.key}
-              onClick={() => {
-                setOpen(false);
-                onDelete();
-              }}
-            >
-              {t('space.deleteSpace')}
-            </button>
-          </div>
-        </Dialog>
-      )}
+      {open && <DeleteSpaceDialog space={space} onDelete={onDelete} onClose={() => setOpen(false)} />}
     </>
   );
 }

@@ -338,6 +338,10 @@ mutate "undo never runs out" internal/trash/trash.go \
   's.replace("AND deleted_at > now() - make_interval(secs => $3) FOR UPDATE", "AND $3::float8 > 0 FOR UPDATE")' $app -run TestUndoOfADelete
 mutate "any theme is accepted" internal/identity/preferences.go \
   's.replace("case !slices.Contains(themes, p.Theme):", "case len(p.Theme) < 0:")' $app -run TestPreferences
+mutate "any name is an entry of the sidebar" internal/identity/preferences.go \
+  's.replace("if seen[name] || !slices.Contains(known, name) {", "if seen[name] || len(known) < 0 {")' $app -run TestOwnSidebar
+mutate "an entry of the sidebar may be named twice" internal/identity/preferences.go \
+  's.replace("if seen[name] || !slices.Contains(known, name) {", "if !slices.Contains(known, name) {")' $app -run TestOwnSidebar
 mutate "a shortcut may go anywhere" internal/spaces/shortcuts.go \
   's.replace("if err != nil || strings.HasPrefix(lower", "if (err != nil && len(lower) < 0) || strings.HasPrefix(lower")' $app -run TestShortcuts
 mutate "the directory counts hidden pages" internal/spaces/directory.go \

@@ -98,6 +98,45 @@ func TestPreferencesFollowThePersonAndRefuseUnknownValues(t *testing.T) {
 	}
 }
 
+func TestOwnSidebarRefusesUnknownOrRepeatedEntriesAndKeepsTheChoice(t *testing.T) {
+	e := newEnv(t)
+	anna := e.user("anna@example.com", identity.PermUseProduct)
+	with := func(key string, value any) map[string]any {
+		return map[string]any{"theme": "system", "shortcuts": true, "contents": true, "hover_cards": true,
+			"sidebar_width": 18, "tree_view": "tree", key: value}
+	}
+	tooMany := make([]string, 30)
+	for i := range tooMany {
+		tooMany[i] = "recent"
+	}
+	for name, body := range map[string]map[string]any{
+		"unknown entry in the order":    with("sidebar_order", []string{"recent", "secret"}),
+		"repeated entry in the order":   with("sidebar_order", []string{"recent", "tasks", "recent"}),
+		"the start screen in the order": with("sidebar_order", []string{"start", "recent"}),
+		"unknown hidden entry":          with("sidebar_hidden", []string{"secret"}),
+		"repeated hidden entry":         with("sidebar_hidden", []string{"tasks", "tasks"}),
+		"the start screen hidden":       with("sidebar_hidden", []string{"start"}),
+		"a very long order":             with("sidebar_order", tooMany),
+	} {
+		if status, out := anna.do("PUT", "/api/v1/me/preferences", body); status != 400 {
+			t.Errorf("%s: got %d: %s", name, status, out)
+		}
+	}
+
+	if got := anna.ok("GET", "/api/v1/me/preferences", nil); got["sidebar_order"] != nil || got["sidebar_hidden"] != nil {
+		t.Fatalf("someone who never chose has no order and no hidden list: %v", got)
+	}
+	chosen := with("sidebar_order", []string{"tasks", "recent", "spaces"})
+	chosen["sidebar_hidden"] = []string{}
+	anna.ok("PUT", "/api/v1/me/preferences", chosen)
+	kept := anna.ok("GET", "/api/v1/me/preferences", nil)
+	order, _ := kept["sidebar_order"].([]any)
+	hidden, isList := kept["sidebar_hidden"].([]any)
+	if len(order) != 3 || order[0] != "tasks" || order[2] != "spaces" || !isList || len(hidden) != 0 {
+		t.Fatalf("the order and an empty hidden list were not kept apart from the default: %v", kept)
+	}
+}
+
 func TestFavouriteSpacesAndOwnOrderOfFavouritePages(t *testing.T) {
 	e := newEnv(t)
 	owner := e.user("owner@example.com", identity.PermUseProduct, identity.PermCreateSpace)

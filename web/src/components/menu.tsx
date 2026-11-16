@@ -17,20 +17,31 @@ const ENOUGH_MENU_ROOM_PX = 320;
 /** The bars that stay in place while the page, and any menu in it, slides under them. */
 export const FIXED_BARS = '.top, .edit-bar, .toolbar, .find-bar';
 
-/** Places a list on the screen beside its button, flipped when it would not fit. */
-function placeBeside(list: HTMLElement, button: HTMLElement) {
-  const anchor = button.getBoundingClientRect();
-  const fitsBelow = anchor.bottom + FLOATING_GAP_PX + list.offsetHeight <= window.innerHeight;
-  const top = fitsBelow ? anchor.bottom + FLOATING_GAP_PX : anchor.top - FLOATING_GAP_PX - list.offsetHeight;
-  const left = Math.min(anchor.left, window.innerWidth - list.offsetWidth - FLOATING_GAP_PX);
-  list.style.top = `${Math.max(top, FLOATING_GAP_PX)}px`;
-  list.style.left = `${Math.max(left, FLOATING_GAP_PX)}px`;
-}
-
 /** Where the free screen starts above a button. */
 function freeScreenTop(anchor: DOMRect) {
   const bars = Array.from(document.querySelectorAll(FIXED_BARS), (bar) => bar.getBoundingClientRect().bottom);
   return Math.max(0, ...bars.filter((bottom) => bottom <= anchor.top));
+}
+
+/**
+ * Places a list on the screen beside its button: below it when it fits or when there is no more
+ * room above, else above it, never under a fixed bar, and shorter with its own scrolling when the
+ * side it takes has too little room (such as the long menu of a space low in the sidebar).
+ */
+function placeBeside(list: HTMLElement, button: HTMLElement) {
+  const anchor = button.getBoundingClientRect();
+  const height = list.offsetHeight;
+  const below = window.innerHeight - anchor.bottom - 2 * FLOATING_GAP_PX;
+  const above = anchor.top - freeScreenTop(anchor) - 2 * FLOATING_GAP_PX;
+  const staysBelow = height <= below || below >= ENOUGH_MENU_ROOM_PX || below >= above;
+  const room = staysBelow ? below : above;
+  const top = staysBelow
+    ? anchor.bottom + FLOATING_GAP_PX
+    : anchor.top - FLOATING_GAP_PX - Math.min(height, room);
+  const left = Math.min(anchor.left, window.innerWidth - list.offsetWidth - FLOATING_GAP_PX);
+  list.style.top = `${Math.max(top, FLOATING_GAP_PX)}px`;
+  list.style.left = `${Math.max(left, FLOATING_GAP_PX)}px`;
+  if (height > room) list.style.maxBlockSize = `${room}px`;
 }
 
 /** A long menu stays on the screen: shorter when that leaves enough, or else above its button. */
@@ -98,8 +109,12 @@ export function Menu({
 
   useEffect(() => {
     if (!open || !floating) return;
-    // A fixed list would stay behind while its button scrolls away.
-    const close = () => setOpen(false);
+    // A fixed list would stay behind while its button scrolls away; scrolling the list itself,
+    // when it is too long for the room, keeps it open.
+    const close = (e: Event) => {
+      if (list.current?.contains(e.target as Node)) return;
+      setOpen(false);
+    };
     window.addEventListener('scroll', close, { capture: true, passive: true });
     return () => window.removeEventListener('scroll', close, { capture: true });
   }, [open, floating]);
@@ -125,7 +140,10 @@ export function Menu({
       onLeave?.();
       return;
     }
-    const items = Array.from(root.current?.querySelectorAll<HTMLElement>(ENABLED_ITEMS) ?? []);
+    // The items of a sub-menu move by its own keys, not by those of this menu.
+    const items = Array.from(list.current?.querySelectorAll<HTMLElement>(ENABLED_ITEMS) ?? []).filter(
+      (item) => item.parentElement?.closest('[role="menu"]') === list.current,
+    );
     const target = itemForKey(e.key, items, items.indexOf(document.activeElement as HTMLElement));
     if (!target) return;
     e.preventDefault();
