@@ -15,6 +15,7 @@ import (
 	"github.com/diffluence/diffluence/internal/document"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 // These calls are unchecked on purpose. Evaluate refuses a template to everyone,
@@ -132,7 +133,7 @@ func (s *Service) SetCompanyHome(ctx context.Context, c identity.Caller, id uuid
 			return err
 		}
 	}
-	return s.settings.Write(ctx, c, companyHomeKey, id)
+	return s.settings.Write(ctx, c, companyHomeKey, id, settings.SafeFields{settings.WholeValue})
 }
 
 // DraftRetention reads how many days an unused draft stays.
@@ -147,5 +148,5 @@ func (s *Service) SetDraftRetention(ctx context.Context, c identity.Caller, days
 	if days <= draftWarningDays || days > maxDraftDays {
 		return apperr.Invalid("Drafts stay between 15 and 3650 days.")
 	}
-	return s.settings.Write(ctx, c, draftRetentionKey, days)
+	return s.settings.Write(ctx, c, draftRetentionKey, days, settings.SafeFields{settings.WholeValue})
 }

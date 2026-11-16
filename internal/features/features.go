@@ -87,7 +87,7 @@ func (s *Service) SetInstance(ctx context.Context, c identity.Caller, v Instance
 	if !known(v.Off) || !known(v.NewOff) {
 		return apperr.Invalid("That is not a feature.")
 	}
-	return s.settings.Write(ctx, c, instanceKey, v)
+	return s.settings.Write(ctx, c, instanceKey, v, settings.SafeFields{"off", "new_off"})
 }
 
 // Enabled reports whether a feature is on in a space.

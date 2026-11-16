@@ -3140,6 +3140,39 @@ mutate "a field finds only whole words" internal/identity/names.go \
   's.replace("terms[i] = \"\x27\" + w + \"\x27:*\"", "terms[i] = \"\x27\" + w + \"\x27\"")' ./internal/identity/ -run '^TestNameWordsAreStartsOfWords$'
 mutate_web "the Tasks tab asks for the filters of pages" src/views/search.tsx \
   's.replace("for (const key of [\x27q\x27, \x27space_id\x27, \x27archived\x27]) {", "for (const key of [...address.keys()]) {")' src/views/search.test.ts
+# Spec 090, wave RV11: a settings change records each changed field before and after, keeps
+# the values of unlisted fields, names and passwords out, the appearance answer is kept per
+# node and limited per address, and a link keeps no title.
+mutate "a field not listed as safe keeps its values in the audit row" internal/settings/changes.go \
+  's.replace("\t\tif !slices.Contains(safe, name) {", "\t\tif false \x26\x26 !slices.Contains(safe, name) {")' $settings
+mutate "the organisation name keeps its values in the audit row" internal/settings/changes.go \
+  's.replace("\"banner_ends\", \"welcome_page\"},", "\"banner_ends\", \"welcome_page\", \"organisation_name\"},")' $settings
+mutate "a long value is kept whole in the audit row" internal/settings/changes.go \
+  's.replace("\tif utf8.RuneCountInString(s) <= maxAuditValueRunes {", "\tif true || utf8.RuneCountInString(s) <= maxAuditValueRunes {")' $settings
+mutate "an address keeps its user and password in the audit row" internal/settings/changes.go \
+  's.replace("\tu.User = nil\n", "")' $settings
+mutate "a terms or help address may carry a user and password" internal/settings/sections.go \
+  's.replace(" \x26\x26 u.User == nil \x26\x26", " \x26\x26")' $settings
+mutate "a section change records nothing before" internal/settings/sections.go \
+  's.replace("changes, err := SectionChanges(name, stored, v)", "changes, err := SectionChanges(name, v, v)")' $app -run '^(TestASettingsChangeRecordsEachChangedFieldBeforeAndAfter|TestTheOrganisationNameIsRecordedAsChangedWithoutItsValue)$'
+mutate "a reset of the look records nothing" internal/settings/sections.go \
+  's.replace("SectionChanges(SectionLook, stored, \x26Look{})", "SectionChanges(SectionLook, \x26Look{}, \x26Look{}); _ = stored")' $app -run '^TestAResetOfTheLookRecordsWhatItReset$'
+mutate "a stored value records no change" internal/settings/settings.go \
+  's.replace("changes, err := Changes(before, raw, safe)", "changes, err := Changes(raw, raw, safe)")' $app -run '^TestAStoredSettingRecordsItsValueBeforeAndAfter$'
+mutate "the general values record no change" internal/settings/settings.go \
+  's.replace("Changes(before, stored, valuesSafeFields)", "Changes(stored, stored, valuesSafeFields); _ = before")' $app -run '^TestTheGeneralValuesRecordWhatChanged$'
+mutate "the backup schedule records no change" internal/backups/schedule.go \
+  's.replace("settings.SectionChanges(settings.SectionBackups, stored, next)", "settings.SectionChanges(settings.SectionBackups, next, next)")' $app -run '^TestTheBackupScheduleRecordsWhatChanged$'
+mutate "the appearance is read again on every call" internal/settings/appearance.go \
+  's.replace("\tif !s.appearance.readAt.IsZero() \x26\x26", "\tif false \x26\x26 !s.appearance.readAt.IsZero() \x26\x26")' $app -run '^TestTheAppearanceAnswerIsKeptUntilASettingChanges$'
+mutate "a section change leaves the old appearance" internal/settings/sections.go \
+  's.replace("\tif err == nil {\n\t\ts.forgetAppearance()\n\t}\n\treturn v, err\n", "\treturn v, err\n")' $app -run '^TestTheAppearanceAnswerIsKeptUntilASettingChanges$'
+mutate "a reset of the look leaves the old appearance" internal/settings/sections.go \
+  's.replace("\tif err == nil {\n\t\ts.forgetAppearance()\n\t}\n\treturn err\n}\n\n// AuditDays", "\treturn err\n}\n\n// AuditDays")' $app -run '^TestTheAppearanceAnswerIsKeptUntilASettingChanges$'
+mutate "the appearance answer has no limit per address" internal/httpapi/handlers_appearance.go \
+  's.replace("if PrincipalFrom(r.Context()) == nil \x26\x26 !s.appearanceCalls.allow(", "if false \x26\x26 !s.appearanceCalls.allow(")' $app -run '^TestTheAppearanceAnswerIsLimitedPerAddressWithoutALogin$'
+mutate "a saved link keeps its title" internal/document/attrs.go \
+  's.replace("\treturn Mark{Type: MarkLink, Attrs: map[string]any{\"href\": safe}}, nil", "\tattrs := map[string]any{\"href\": safe}\n\tkeepText(m.Attrs, attrs, \"title\", 1000)\n\treturn Mark{Type: MarkLink, Attrs: attrs}, nil")' ./internal/document/
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

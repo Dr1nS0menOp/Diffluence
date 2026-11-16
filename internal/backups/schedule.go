@@ -170,7 +170,11 @@ func (s *Service) setSchedule(ctx context.Context, c identity.Caller, body io.Re
 		if err := settings.StoreSection(ctx, tx, settings.SectionBackups, next); err != nil {
 			return err
 		}
-		details := map[string]any{"section": settings.SectionBackups, "interval_hours": next.IntervalHours, "keep": next.Keep}
+		changes, err := settings.SectionChanges(settings.SectionBackups, stored, next)
+		if err != nil {
+			return err
+		}
+		details := map[string]any{"section": settings.SectionBackups, "changes": changes}
 		if change.Confirmed {
 			details["confirmed"] = true
 		}

@@ -481,9 +481,9 @@ func cleanLink(m Mark) (Mark, error) {
 	if err != nil {
 		return Mark{}, err
 	}
-	attrs := map[string]any{"href": safe}
-	keepText(m.Attrs, attrs, "title", 1000)
-	return Mark{Type: MarkLink, Attrs: attrs}, nil
+	// A link keeps no title: its tooltip could name another address than the one it opens
+	// (spec 090).
+	return Mark{Type: MarkLink, Attrs: map[string]any{"href": safe}}, nil
 }
 
 func cleanMark(m Mark) (Mark, error) {

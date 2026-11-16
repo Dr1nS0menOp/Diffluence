@@ -320,7 +320,7 @@ func (c *converter) inline(parent ast.Node, marks []Mark, hoisted *[]Node) []Nod
 		case *extast.Strikethrough:
 			out = append(out, c.inline(v, withMark(marks, Mark{Type: MarkStrike}), hoisted)...)
 		case *ast.Link:
-			out = append(out, c.link(string(v.Destination), string(v.Title), v, marks, hoisted)...)
+			out = append(out, c.link(string(v.Destination), v, marks, hoisted)...)
 		case *ast.AutoLink:
 			url := string(v.URL(c.src))
 			label := string(v.Label(c.src))
@@ -364,7 +364,7 @@ func fileName(destination string) string {
 	return truncate(base, maxFilenameBytes)
 }
 
-func (c *converter) link(dest, title string, n ast.Node, marks []Mark, hoisted *[]Node) []Node {
+func (c *converter) link(dest string, n ast.Node, marks []Mark, hoisted *[]Node) []Node {
 	if c.attachments != nil {
 		if id, ok := c.attachments(dest); ok {
 			*hoisted = append(*hoisted, Node{Type: TypeFile, Attrs: map[string]any{"attachment_id": id.String(), "filename": fileName(dest)}})
@@ -384,11 +384,8 @@ func (c *converter) link(dest, title string, n ast.Node, marks []Mark, hoisted *
 		c.warn("A link to %q is not allowed and was removed.", truncate(dest, 80))
 		return c.inline(n, marks, hoisted)
 	}
-	attrs := map[string]any{"href": href}
-	if title != "" {
-		attrs["title"] = truncate(title, 1000)
-	}
-	return c.inline(n, withMark(marks, Mark{Type: MarkLink, Attrs: attrs}), hoisted)
+	// The title of a Markdown link is left out, as the document gate leaves it out (spec 090).
+	return c.inline(n, withMark(marks, Mark{Type: MarkLink, Attrs: map[string]any{"href": href}}), hoisted)
 }
 
 func (c *converter) image(v *ast.Image, marks []Mark, hoisted *[]Node) []Node {

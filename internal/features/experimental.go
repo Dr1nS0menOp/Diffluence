@@ -101,7 +101,7 @@ func (s *Service) SetExperimental(ctx context.Context, c identity.Caller, v Expe
 		}
 		since[part] = at
 	}
-	return s.settings.Write(ctx, c, experimentalKey, Experimental{On: on, OnSince: since})
+	return s.settings.Write(ctx, c, experimentalKey, Experimental{On: on, OnSince: since}, settings.SafeFields{"on", "on_since"})
 }
 
 // refuseWhileOlderReleaseRuns refuses to turn on a part held for older releases while a

@@ -57,6 +57,7 @@ type Service struct {
 	pool        *pgxpool.Pool
 	store       storage.Store
 	maintenance maintenanceCache
+	appearance  appearanceCache
 }
 
 // NewService creates the service.
@@ -144,22 +145,38 @@ func Store(ctx context.Context, tx pgx.Tx, key string, raw []byte) error {
 	return err
 }
 
-// Write stores one value, and audits who did it. The route decides who may.
-func (s *Service) Write(ctx context.Context, c identity.Caller, key string, v any) error {
+// Write stores one value, and audits who did it with what changed: the values before and
+// after of the fields safe names, and every other changed field without its values (spec 090).
+// The route decides who may.
+func (s *Service) Write(ctx context.Context, c identity.Caller, key string, v any, safe SafeFields) error {
 	raw, err := json.Marshal(v)
 	if err != nil {
 		return err
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var before []byte
+		err := tx.QueryRow(ctx, "SELECT value FROM settings WHERE key = $1 FOR UPDATE", key).Scan(&before)
+		if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
 		if err := Store(ctx, tx, key, raw); err != nil {
 			return err
 		}
-		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", key, "", map[string]any{"key": key})); err != nil {
+		changes, err := Changes(before, raw, safe)
+		if err != nil {
 			return err
 		}
-		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"key": key})
+		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", key, "",
+			map[string]any{"key": key, "changes": changes})); err != nil {
+			return err
+		}
+		_, err = outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"key": key})
 		return err
 	})
+	if err == nil {
+		s.forgetAppearance()
+	}
+	return err
 }
 
 // TrashRetention is how long deleted items are kept.
@@ -226,7 +243,11 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, v Values) error
 	if err != nil {
 		return err
 	}
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		before, err := s.GetIn(ctx, tx)
+		if err != nil {
+			return err
+		}
 		stored := map[string]any{keyTrashRetentionDays: v.TrashRetentionDays, keyMaxUploadMiB: v.MaxUploadMiB,
 			keyMailEnabled: v.MailEnabled, keyMailExcerpts: v.MailExcerpts,
 			keyReactionsEnabled: v.ReactionsEnabled, keyGroupMentions: v.GroupMentions, keyBlockedFileTypes: blocked}
@@ -236,10 +257,18 @@ func (s *Service) Update(ctx context.Context, c identity.Caller, v Values) error
 				return err
 			}
 		}
-		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", "", "", stored)); err != nil {
+		changes, err := Changes(before, stored, valuesSafeFields)
+		if err != nil {
 			return err
 		}
-		_, err := outbox.Enqueue(ctx, tx, "settings.updated", v)
+		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", "", "", map[string]any{"changes": changes})); err != nil {
+			return err
+		}
+		_, err = outbox.Enqueue(ctx, tx, "settings.updated", v)
 		return err
 	})
+	if err == nil {
+		s.forgetAppearance()
+	}
+	return err
 }

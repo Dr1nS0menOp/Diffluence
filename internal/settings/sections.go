@@ -214,13 +214,15 @@ func cleanLine(text string, limit int) (string, bool) {
 	return text, utf8.RuneCountInString(text) <= limit && !strings.ContainsAny(text, "\r\n\x00")
 }
 
-// safeAddress accepts an http or https address, or nothing.
+// safeAddress accepts an http or https address, or nothing. Plain http stays allowed for an
+// internal site without a certificate. A user name or password is refused: the appearance
+// answer hands the address to anyone, and the part before @ can pose as another site (spec 090).
 func safeAddress(address string) bool {
 	if address == "" {
 		return true
 	}
 	u, err := url.Parse(address)
-	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && len(address) <= 2048
+	return err == nil && (u.Scheme == "http" || u.Scheme == "https") && u.Host != "" && u.User == nil && len(address) <= 2048
 }
 
 func (g General) validate() error {
@@ -234,7 +236,7 @@ func (g General) validate() error {
 		return apperr.Invalid("That is not a time zone.")
 	}
 	if !safeAddress(g.HelpURL) {
-		return apperr.Invalid("The help address must be an http or https address.")
+		return apperr.Invalid("The help address must be an http or https address, without a user name or password.")
 	}
 	seen := map[int]bool{}
 	for _, day := range g.WorkingDays {
@@ -298,7 +300,7 @@ func (l Look) validate() error {
 		return apperr.Invalid("A banner is information or a warning.")
 	}
 	if !safeAddress(l.TermsURL) {
-		return apperr.Invalid("The terms address must be an http or https address.")
+		return apperr.Invalid("The terms address must be an http or https address, without a user name or password.")
 	}
 	if (l.AccentLight == "") != (l.AccentDark == "") {
 		return apperr.Invalid("An accent needs a colour for light and a colour for dark.")
@@ -418,11 +420,11 @@ func (s *Service) setSection(ctx context.Context, c identity.Caller, name string
 	}
 	v := decoded.(section)
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		stored, err := lockedSection(ctx, tx, name, change.At)
+		if err != nil {
+			return err
+		}
 		if g, ok := v.(guarded); ok {
-			stored, err := lockedSection(ctx, tx, name, change.At)
-			if err != nil {
-				return err
-			}
 			if v, err = g.guard(change, stored); err != nil {
 				return err
 			}
@@ -430,16 +432,23 @@ func (s *Service) setSection(ctx context.Context, c identity.Caller, name string
 		if err := StoreSection(ctx, tx, name, v); err != nil {
 			return err
 		}
-		details := map[string]any{"section": name}
+		changes, err := SectionChanges(name, stored, v)
+		if err != nil {
+			return err
+		}
+		details := map[string]any{"section": name, "changes": changes}
 		if change.Confirmed {
 			details["confirmed"] = true
 		}
 		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", name, "", details)); err != nil {
 			return err
 		}
-		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
+		_, err = outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": name})
 		return err
 	})
+	if err == nil {
+		s.forgetAppearance()
+	}
 	return v, err
 }
 
@@ -567,16 +576,29 @@ func (s *Service) ApplyFirstSetup(ctx context.Context, c identity.Caller, organi
 
 // ResetLook returns everything about the look to the defaults.
 func (s *Service) ResetLook(ctx context.Context, c identity.Caller) error {
-	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		stored, err := lockedSection(ctx, tx, SectionLook, time.Now())
+		if err != nil {
+			return err
+		}
 		if _, err := tx.Exec(ctx, "DELETE FROM settings WHERE key = $1", sectionKeyPrefix+SectionLook); err != nil {
 			return err
 		}
-		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", SectionLook, "", map[string]any{"section": SectionLook, "reset": true})); err != nil {
+		changes, err := SectionChanges(SectionLook, stored, &Look{})
+		if err != nil {
 			return err
 		}
-		_, err := outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": SectionLook})
+		details := map[string]any{"section": SectionLook, "reset": true, "changes": changes}
+		if _, err := audit.Record(ctx, tx, c.Event("settings.updated", "settings", SectionLook, "", details)); err != nil {
+			return err
+		}
+		_, err = outbox.Enqueue(ctx, tx, "settings.updated", map[string]any{"section": SectionLook})
 		return err
 	})
+	if err == nil {
+		s.forgetAppearance()
+	}
+	return err
 }
 
 // AuditDays reads how long audit rows stay, for the prune command. Zero means for ever.

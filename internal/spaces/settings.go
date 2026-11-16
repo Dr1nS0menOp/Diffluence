@@ -18,6 +18,7 @@ import (
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/ids"
 	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 const maxIconBytes = 1 << 20
@@ -355,5 +356,5 @@ func (s *Service) SetDefaultPreset(ctx context.Context, c identity.Caller, prese
 	if preset != "" && preset != permissions.PresetTeamSpace && preset != permissions.PresetReadOnly {
 		return apperr.Invalid("That is not a permission set.")
 	}
-	return s.settings.Write(ctx, c, defaultPresetKey, preset)
+	return s.settings.Write(ctx, c, defaultPresetKey, preset, settings.SafeFields{settings.WholeValue})
 }

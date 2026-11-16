@@ -4,6 +4,7 @@ package httpapi
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/diffluence/diffluence/internal/identity"
@@ -13,6 +14,14 @@ import (
 
 // fontCacheSeconds can be long: a replaced font gets a new versioned address.
 const fontCacheSeconds = "31536000"
+
+// appearanceCallsPerWindow is how often one address may ask for the appearance without a login
+// in appearanceWindow: far more than the pages one person opens, and the answer comes from the
+// node's copy, so the limit only stops a flood.
+const (
+	appearanceCallsPerWindow = 600
+	appearanceWindow         = time.Minute
+)
 
 func (s *Server) registerAppearanceRoutes() {
 	r := s.router
@@ -34,17 +43,14 @@ type fontJSON struct {
 }
 
 func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
-	font, found, err := s.deps.Settings.CurrentFont(r.Context())
-	if err != nil {
-		s.fail(w, r, err)
+	// Anyone may ask without a login, so an address is limited the way the login limits count
+	// addresses; someone logged in is not (spec 090).
+	if PrincipalFrom(r.Context()) == nil && !s.appearanceCalls.allow(addressKey(metaFrom(r).IP)) {
+		w.Header().Set("Retry-After", strconv.Itoa(int(appearanceWindow.Seconds())))
+		writeError(w, http.StatusTooManyRequests, "rate_limited", "Too many requests. Try again later.")
 		return
 	}
-	var look settings.Look
-	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionLook, &look); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	logo, hasLogo, err := s.deps.Settings.CurrentLogo(r.Context())
+	a, err := s.deps.Settings.Appearance(r.Context())
 	if err != nil {
 		s.fail(w, r, err)
 		return
@@ -54,27 +60,18 @@ func (s *Server) handleAppearance(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	general := settings.DefaultGeneral
-	if err := s.deps.Settings.ReadSection(r.Context(), settings.SectionGeneral, &general); err != nil {
-		s.fail(w, r, err)
-		return
-	}
-	features, err := s.features(r)
-	if err != nil {
-		s.fail(w, r, err)
-		return
-	}
+	look := a.Look
 	out := map[string]any{"font": nil, "name": look.InstanceName, "organisation": look.OrganisationName, "accent": settings.DerivedAccent(look.AccentLight, look.AccentDark),
 		"login_welcome": look.LoginWelcome, "terms_url": look.TermsURL, "banner": activeBanner(look), "welcome_page": look.WelcomePage,
-		"help_url": general.HelpURL, "maintenance": maintenance, "logo": "", "mail_ready": s.deps.Identity.MailReady(),
-		"self_signup": features.SelfSignup,
+		"help_url": a.General.HelpURL, "maintenance": maintenance, "logo": "", "mail_ready": s.deps.Identity.MailReady(),
+		"self_signup": a.Features.SelfSignup,
 		// The id of the frontend this server ships, so an open tab notices a newer version (spec 041).
 		"build": webui.Build()}
-	if found {
-		out["font"] = fontJSON{Name: font.Name, Format: font.Format, Version: font.Version}
+	if a.HasFont {
+		out["font"] = fontJSON{Name: a.Font.Name, Format: a.Font.Format, Version: a.Font.Version}
 	}
-	if hasLogo {
-		out["logo"] = "/api/v1/appearance/logo?v=" + logo.Version
+	if a.HasLogo {
+		out["logo"] = "/api/v1/appearance/logo?v=" + a.Logo.Version
 	}
 	writeJSON(w, http.StatusOK, out)
 }

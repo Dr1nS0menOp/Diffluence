@@ -108,6 +108,7 @@ func (s *Service) RemoveFont(ctx context.Context, c identity.Caller) error {
 // changeFont applies one change to the stored font. The file of the previous
 // font is queued for deletion and the change recorded, in the same transaction.
 func (s *Service) changeFont(ctx context.Context, c identity.Caller, fontName string, apply func(pgx.Tx) error) error {
+	defer s.forgetAppearance()
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		previous, found, err := loadFont(ctx, tx)
 		if err != nil {

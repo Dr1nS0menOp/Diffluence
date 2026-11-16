@@ -14,6 +14,7 @@ import (
 	"github.com/diffluence/diffluence/internal/audit"
 	"github.com/diffluence/diffluence/internal/identity"
 	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/diffluence/diffluence/internal/settings"
 )
 
 const (
@@ -145,5 +146,5 @@ func (s *Service) SetPolicy(ctx context.Context, c identity.Caller, p ExportPoli
 	if err != nil {
 		return err
 	}
-	return s.settings.Write(ctx, c, limitsKey, p.Limits)
+	return s.settings.Write(ctx, c, limitsKey, p.Limits, settings.SafeFields{"max_export_mib", "max_import_mib", "public_sites_enabled", "public_links_enabled"})
 }

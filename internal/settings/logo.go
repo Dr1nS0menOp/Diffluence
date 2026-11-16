@@ -111,6 +111,7 @@ func (s *Service) RemoveLogo(ctx context.Context, c identity.Caller) error {
 }
 
 func (s *Service) changeLogo(ctx context.Context, c identity.Caller, apply func(pgx.Tx) error) error {
+	defer s.forgetAppearance()
 	return pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		previous, found, err := loadLogo(ctx, tx)
 		if err != nil {

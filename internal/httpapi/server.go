@@ -158,6 +158,8 @@ type Server struct {
 	// accountLinkWork holds a place for every forgot-password or sign-up request whose work
 	// runs on beside its answer.
 	accountLinkWork chan struct{}
+	// appearanceCalls limits the appearance answer per address for those without a login.
+	appearanceCalls *limiter
 }
 
 // New builds the API.
@@ -182,6 +184,7 @@ func New(d Deps) (*Server, error) {
 		sockets:       newSocketCap(socketsPerNode, socketsPerLogin),
 
 		accountLinkWork: make(chan struct{}, accountLinkWorkers),
+		appearanceCalls: newLimiter(appearanceCallsPerWindow, appearanceWindow),
 	}
 	if d.Config.SecureCookies() {
 		// The __Host- prefix makes browsers refuse the cookie unless it is
