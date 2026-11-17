@@ -52,7 +52,8 @@ func (c Caller) Event(action, objectType, objectID, spaceID string, details map[
 	a := c.Actor()
 	if c.Rule != nil {
 		// A copy: callers keep using their map after this.
-		withRule := make(map[string]any, len(details)+1)
+		// The size is only a hint: the map grows for the one key that may be new.
+		withRule := make(map[string]any, len(details))
 		for key, value := range details {
 			withRule[key] = value
 		}

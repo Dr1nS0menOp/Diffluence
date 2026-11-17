@@ -64,7 +64,8 @@ func Changes(before, after any, safe SafeFields) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	names := make([]string, 0, len(old)+len(fresh))
+	// The size is only a hint: append grows the slice for names that are only in fresh.
+	names := make([]string, 0, len(old))
 	for name := range old {
 		names = append(names, name)
 	}
