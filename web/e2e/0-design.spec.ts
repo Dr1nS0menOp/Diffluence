@@ -1789,6 +1789,9 @@ test.describe('the look of every kind of screen', () => {
         .toBeGreaterThan(1);
       await page.goto('/notifications');
       await expect(page.getByText('Please read this before Monday.')).toBeVisible();
+      // The three notifications arrive one by one, and a time's width would move the rows.
+      await expect(page.getByText(/asks you to approve the template/)).toBeVisible({ timeout: 20_000 });
+      await fixText(page.locator('main time'), 'a while ago');
       await picture(page, 'notifications', [page.locator('time')]);
       await checkAccessibility(page);
       await page.context().close();
