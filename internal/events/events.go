@@ -19,9 +19,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // Lanes is how many lanes each consumer has (D5). The migration fixes it in a CHECK, and
@@ -30,7 +30,7 @@ const Lanes = 4
 
 // Channel is what the sequencer notifies and the worker listens on (D6). The payload is the
 // head position as text.
-const Channel = "diffluence_events"
+const Channel = "kenwerk_events"
 
 // lockKey serialises the relay and the sequencer across nodes, so positions follow the
 // order in which events became visible (D1).

@@ -12,15 +12,15 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/spaces"
-	"github.com/diffluence/diffluence/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/storage"
 )
 
 // Carrying out a run of more than one page, in the worker (PUB-450 to PUB-455, PUB-1061): up
@@ -213,7 +213,7 @@ type batchState struct {
 func (s *Service) openBatch(ctx context.Context, tx pgx.Tx, r runRow) (batchState, error) {
 	var st batchState
 	// The mark lets the trigger of a published space through, for this transaction only.
-	if _, err := tx.Exec(ctx, "SELECT set_config('diffluence.release', 'on', true)"); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT set_config('kenwerk.release', 'on', true)"); err != nil {
 		return st, err
 	}
 	var cancel bool

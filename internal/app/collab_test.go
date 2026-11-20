@@ -12,15 +12,15 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 const collabToken = "a-long-service-token"
 
 // ticketHeader carries the ticket from the API to the service (spec 067).
-const ticketHeader = "X-Diffluence-Collab-Ticket"
+const ticketHeader = "X-Kenwerk-Collab-Ticket"
 
 type collabTeam struct {
 	e       *env

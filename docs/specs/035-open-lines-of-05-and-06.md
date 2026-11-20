@@ -20,12 +20,12 @@ Lines with none of these three stay as they were, marked with their wave, so nob
 
 | Line | What | Load budget (ARC-238) |
 |---|---|---|
-| SEC-503, SEC-511, SEC-502, SEC-514 | The PDF helper answers only with its password (`DIFFLUENCE_PDF_PASSWORD`), never fetches an address, runs no script in pages, has no webhook, runs read-only without capabilities, and stops a request after 120 seconds. The image is pinned by digest. Without a password set, an existing install keeps working | No query. One header per helper call |
+| SEC-503, SEC-511, SEC-502, SEC-514 | The PDF helper answers only with its password (`KENWERK_PDF_PASSWORD`), never fetches an address, runs no script in pages, has no webhook, runs read-only without capabilities, and stops a request after 120 seconds. The image is pinned by digest. Without a password set, an existing install keeps working | No query. One header per helper call |
 | SEC-107 | Passwords are normalised to Unicode NFC before hashing and counting. A hash from before is still checked as typed, and is stored again in the new form after a match | No query. A second hash only for a password that is not already NFC |
 | SEC-106 (partly) | A new password may not hold the name of the product. The organisation name follows when wave X gives an instance one | No query |
 | SEC-319 (partly) | The characters that change reading order are removed from page titles, file names, display names (local, from the provider, from SCIM) and space names | No query |
 | DAT-015, GAP-019, PRM-177 | The schema refuses deleting a parent page alone (migration 0035, `ON DELETE NO ACTION`). The purge deletes whole branches in one statement, so it keeps working | No query in normal use |
-| SEC-178 | `diffluence session end --email ADDR` or `--all` logs one person or everyone out without disabling anyone, audited as `sessions.ended`. `--all` must be given on purpose | Saving class: one lookup, one delete, one audit row |
+| SEC-178 | `kenwerk session end --email ADDR` or `--all` logs one person or everyone out without disabling anyone, audited as `sessions.ended`. `--all` must be given on purpose | Saving class: one lookup, one delete, one audit row |
 | SEC-150 | A step-up through the identity provider asks with `prompt=login` and `max_age=0`, and is refused unless the token's `auth_time` is after the step-up started, less one minute for clocks | No query beyond the existing flow |
 | SEC-1025 | A test plants a wrong password, the old and new password, a token and the session cookie, and finds none of them in the log, the audit log or the outbox | Test only |
 | SEC-149, SEC-152, SEC-433, SEC-507, SEC-657, SEC-723 | The identity provider guide says how session lifetimes relate and who gets an account. The install guide says what each helper reaches and which way out the app needs. `docs/operations/incidents.md` is the runbook, with how to replace every secret | Documents |

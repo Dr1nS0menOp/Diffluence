@@ -21,7 +21,7 @@ This is a clean-room study (`docs/blueprint/02-clean-room-and-licensing.md`). Bl
 - form builders, document assembly and project generators, read through their public documentation;
 - research on forms and wizards;
 - WCAG 2.2;
-- Diffluence's own code and blueprints.
+- Kenwerk's own code and blueprints.
 
 No product's source was read.
 

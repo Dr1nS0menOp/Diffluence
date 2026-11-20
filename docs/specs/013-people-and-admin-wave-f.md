@@ -88,7 +88,7 @@ Blueprint 06 found these, and they were closed on this branch, each with a test 
 | SEC-134 | Passkeys require user verification at login, at step-up and at registration |
 | SEC-135 | `POST /me/passkeys/begin`, `/finish`, `DELETE /me/passkeys/{id}` and `POST /me/totp/disable` are `Sensitive` |
 | SEC-820 | A failed login stores a keyed hash for an unknown address, and the id for a known account. Rows already written cannot be changed, so they stay until their retention ends |
-| SEC-814 | `audit.Check` verifies the chain and the checkpoints. The daily job, the Verify button and `diffluence audit verify`, which `restore.sh` runs, all use it. The result of the daily job shows in the console. Telling administrators by notification waits for wave C (SEC-655) |
+| SEC-814 | `audit.Check` verifies the chain and the checkpoints. The daily job, the Verify button and `kenwerk audit verify`, which `restore.sh` runs, all use it. The result of the daily job shows in the console. Telling administrators by notification waits for wave C (SEC-655) |
 | SEC-124 | New recovery codes hold 128 bits. Existing codes stay valid until a person sets up again, so nobody is locked out |
 | SEC-126 | After removing a factor the screen offers `POST /me/sessions/end-others`. An administrator's reset ends the sessions itself |
 | SEC-156 | SCIM tokens have `expires_at`, one year by default and at most. The console warns 30 days ahead, also for service tokens. Rotating gives a successor, and the old token ends within 7 days. A personal or service token without a date lasts a year |
@@ -200,7 +200,7 @@ Everything that changes a rule is listed here, because a rule lives in three pla
 
 ### F6. Tokens and step-up (ACC-019, ADM-005)
 
-- **Tokens:** Your account, Tokens. A name, an expiry of at most a year, and a scope: read, or read and write. Shown once, with a `dfl_` prefix so secret scanners find them. Stored hashed, with the last use. An administrator can turn the feature off, which stops all tokens.
+- **Tokens:** Your account, Tokens. A name, an expiry of at most a year, and a scope: read, or read and write. Shown once, with a `kenwerk_` prefix so secret scanners find them. Stored hashed, with the last use. An administrator can turn the feature off, which stops all tokens.
 - **What a token does:** it acts as the person, so every permission check stays the same. A write needs the write scope. `SessionOnly` routes refuse tokens.
 - **Step-up:** a route wrapped in `Sensitive` answers `reauth_required` after 10 minutes. The client opens a dialog for the password or a passkey, then repeats the request. Accounts of an identity provider go through a fresh login with `prompt=login`.
 - **Which actions:** give or take *administrator*, reset someone's password or second factor, anonymise, recover access, create a SCIM or service token, maintenance mode, audit retention, change the second-factor rule.
@@ -249,7 +249,7 @@ Everything that changes a rule is listed here, because a rule lives in three pla
 - **Settings** become typed sections: general, features, access, retention, mail, look. Each has its own limits and one audit event.
 - **Features:** comments, reactions, blogs, invitations, personal spaces, self sign-up, analytics, automation. Off hides and deletes nothing.
 - **Defaults:** language, time zone, permission set for new spaces, draft retention, text in mail.
-- **Audit retention:** D11. The console shows the policy, and the command `diffluence audit prune`, run with the owner's role, verifies the chain, writes a signed anchor and removes older rows. Verification then starts at the anchor.
+- **Audit retention:** D11. The console shows the policy, and the command `kenwerk audit prune`, run with the owner's role, verifies the chain, writes a signed anchor and removes older rows. Verification then starts at the anchor.
 - **Mail:** server, sender, reply-to and Send test. The password stays in a file or the environment. The queue view shows address, kind, status and time, with no content.
 - **Content defaults:** screens for templates, statuses and categories, on what waves D and F built.
 - **Jobs:** Retry and Cancel on failed and queued jobs, audited. A running job cannot be cancelled in this wave.

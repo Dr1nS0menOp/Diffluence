@@ -13,7 +13,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 func parse(t *testing.T, doc string) document.Node {

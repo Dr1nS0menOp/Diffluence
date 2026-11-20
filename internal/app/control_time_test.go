@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/notify"
 )
 
 // Document control, wave DC5 of spec 064: due dates, reminders, escalation and the due job.

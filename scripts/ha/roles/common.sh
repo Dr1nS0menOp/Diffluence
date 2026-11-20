@@ -11,7 +11,7 @@ here=$(cd "$(dirname "$0")/.." && pwd)
 # node_addr <node name>: the node's address on the test network.
 node_addr() {
   local key
-  key="HA_$(echo "${1#diffluence-ha-}" | tr '[:lower:]' '[:upper:]')"
+  key="HA_$(echo "${1#kenwerk-ha-}" | tr '[:lower:]' '[:upper:]')"
   printf '%s' "${!key:-}"
 }
 

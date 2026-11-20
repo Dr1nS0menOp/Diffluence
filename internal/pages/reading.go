@@ -11,10 +11,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/workflow"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/workflow"
 )
 
 // Read and understood, and periodic review (spec 064 wave DC5, blueprint 09.9). Both follow a

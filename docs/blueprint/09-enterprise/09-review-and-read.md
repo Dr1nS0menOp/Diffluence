@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-document-control.md](01-document-control.md).
 
-Two duties follow a document after it is approved. First, it must stay right: EU GMP Annex 11 clause 11 asks for periodic evaluation, and quality systems set a next review date on every controlled document so that procedures do not quietly go stale. Second, the people it applies to must know it: auditors ask for evidence that staff read the current version of the procedures they follow. Neither is in today's Diffluence.
+Two duties follow a document after it is approved. First, it must stay right: EU GMP Annex 11 clause 11 asks for periodic evaluation, and quality systems set a next review date on every controlled document so that procedures do not quietly go stale. Second, the people it applies to must know it: auditors ask for evidence that staff read the current version of the procedures they follow. Neither is in today's Kenwerk.
 
 ## 9.1 Periodic review
 

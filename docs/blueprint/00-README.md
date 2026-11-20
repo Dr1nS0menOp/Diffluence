@@ -1,5 +1,7 @@
-# Diffluence: Blueprint
+# Kenwerk: Blueprint
 
+> **Name: Kenwerk** (since 17 November 2026, spec 095). The product owner replaced the working name below because it sat too close to the name of a commercial wiki. The note is kept as the record of where the name came from.
+>
 > **Working name: Diffluence.** In hydrology, a *diffluence* is the point where a river splits into branches. It is the opposite of a *confluence*. That suits an open-source wiki that anyone may fork. Before going public, check the name with EUIPO (TMview) and USPTO, and check the domain (see 02).
 
 | | |
@@ -39,7 +41,7 @@
 
 ## Resolved with the product owner (2026-11-03)
 
-1. **Name:** *Diffluence*, pending a trademark check before going public.
+1. **Name:** *Kenwerk*, pending a trademark check before going public.
 2. **Guests:** guests *can be granted* access to any space, but see nothing until someone grants it.
 3. **Document format:** structured JSON is the source of truth. Markdown is for typing, import and export (ADR-004).
 4. **Page views:** *not* in the audit log. They come later as a separate statistics/analytics feature.

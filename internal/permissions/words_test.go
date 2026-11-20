@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // interfaceWords reads the names and lines of every permission from the interface, keyed

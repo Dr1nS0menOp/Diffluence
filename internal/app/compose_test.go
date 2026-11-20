@@ -44,11 +44,11 @@ func TestOnlyTheBackupServiceHoldsTheOwnerOfTheTables(t *testing.T) {
 		}
 		return found
 	}
-	server, backup := service("diffluence"), service("backup")
+	server, backup := service("kenwerk"), service("backup")
 	if strings.Contains(server, "migrate_database_url") || strings.Contains(server, "MIGRATE_DATABASE_URL") {
 		t.Errorf("the server holds the owner of the tables:\n%s", server)
 	}
-	if !strings.Contains(server, `DIFFLUENCE_MIGRATE_ON_START: "false"`) {
+	if !strings.Contains(server, `KENWERK_MIGRATE_ON_START: "false"`) {
 		t.Error("the server would try to migrate as the application role")
 	}
 	if !strings.Contains(backup, "migrate_database_url") {
@@ -67,7 +67,7 @@ func TestEveryPublishedPortListensOnThisMachineByDefault(t *testing.T) {
 		t.Fatal("no published port found")
 	}
 	for _, p := range ports {
-		if !strings.HasPrefix(p[1], `"${DIFFLUENCE_BIND:-127.0.0.1}:`) {
+		if !strings.HasPrefix(p[1], `"${KENWERK_BIND:-127.0.0.1}:`) {
 			t.Errorf("a port listens on every address by default: %s", p[1])
 		}
 	}

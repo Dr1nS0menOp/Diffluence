@@ -14,10 +14,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/outbox"
 )
 
 // Some changes let more through than the section in force allows: a weaker rule for logging

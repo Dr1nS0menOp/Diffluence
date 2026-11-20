@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/ids"
 )
 
 func doc(content string) []byte { return []byte(`{"type":"doc","content":[` + content + `]}`) }

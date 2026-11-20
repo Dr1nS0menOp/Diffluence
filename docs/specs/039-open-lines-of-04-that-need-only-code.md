@@ -61,7 +61,7 @@ On the development machine, in the test database, one person with one space and 
 | Before | 1,675 | 0 (no mark existed) | 0 % |
 | After | 1,675 | 170 | 10.1 % |
 
-The mark costs 6.1 ns per query (`FreshnessOf` on a marked context, Go benchmark), against roughly 0.3 ms for an average query in that mix. The share is low because page views and trees are most of the mix and must stay current; in a busy instance search and reports weigh more, and the gauge `diffluence_db_queries_may_lag_total` shows the real share.
+The mark costs 6.1 ns per query (`FreshnessOf` on a marked context, Go benchmark), against roughly 0.3 ms for an average query in that mix. The share is low because page views and trees are most of the mix and must stay current; in a busy instance search and reports weigh more, and the gauge `kenwerk_db_queries_may_lag_total` shows the real share.
 
 ## Acceptance criteria
 
@@ -76,7 +76,7 @@ The mark costs 6.1 ns per query (`FreshnessOf` on a marked context, Go benchmark
 
 ## How the product owner tests it
 
-1. Start Diffluence with the PDF helper, open the system screen as administrator: the PDF helper is shown as answering.
+1. Start Kenwerk with the PDF helper, open the system screen as administrator: the PDF helper is shown as answering.
 2. Stop the PDF helper and wait a minute. The console warns that a helper does not answer; the PDF button and the PDF export format are gone. The wiki still works.
 3. Start the helper again and wait a minute: the warning goes and the PDF options come back.
 4. As an editor, open a PDF on a page in PdfCraft, change something and save it there. The browser downloads it, and under the viewer a line offers "Keep it as a new version". Keep it, and the file shows a second version.

@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 func TestASearchThatFindsNoSlotHearsThatItIsBusy(t *testing.T) {

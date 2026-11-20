@@ -37,7 +37,7 @@ var on atomic.Bool
 func On() bool { return on.Load() }
 
 // tracerName is the instrumentation scope of every span.
-const tracerName = "github.com/diffluence/diffluence"
+const tracerName = "github.com/kenwerk/kenwerk"
 
 func tracer() trace.Tracer { return otel.Tracer(tracerName) }
 
@@ -71,9 +71,9 @@ func Start(ctx context.Context, o Options) (func(context.Context) error, error) 
 	// The variables come last, so OTEL_SERVICE_NAME and OTEL_RESOURCE_ATTRIBUTES win (D2).
 	res, err := resource.New(ctx,
 		resource.WithAttributes(
-			attribute.String("service.name", "diffluence"),
+			attribute.String("service.name", "kenwerk"),
 			attribute.String("service.version", o.Version),
-			attribute.String("diffluence.role", o.Role)),
+			attribute.String("kenwerk.role", o.Role)),
 		resource.WithFromEnv())
 	if err != nil {
 		return nil, err

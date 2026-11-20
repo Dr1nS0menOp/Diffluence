@@ -7,7 +7,7 @@ Blueprint 01 aims at thousands of people per instance, with pages under 300 ms (
 - **Open or closed: the model decides the answer.** Schroeder, Wierman and Harchol-Balter (NSDI 2006) showed that a load tool where each simulated user waits for an answer before sending the next request (a *closed* model) behaves very differently from real traffic where new people arrive whatever the server does (an *open* model). In a closed test, a slow server slows the test down and hides its own slowness. People on a wiki arrive like an open model. In k6 the open model is the `constant-arrival-rate` and `ramping-arrival-rate` executors; `constant-vus` is closed.
 - **Coordinated omission.** A load tool that sends the next request only after the previous answer misses the requests that would have been sent during a stall, so its percentiles look far better than what people felt. Gil Tene named this and showed how large the error can be. The arrival-rate executors avoid it, provided the tool has enough free virtual users; k6 reports when it had to drop iterations, and that number must be read.
 - **Little's Law.** The number of requests in the system equals the arrival rate times the time each spends there. It turns a measured latency into the number of connections, workers and memory needed, and shows why a queue in front of a slow part grows without limit once arrivals exceed what it can serve.
-- **Scaling is not linear.** Gunther's Universal Scalability Law describes how contention (waiting for a shared lock) and coherence (keeping copies in step) make each extra node or CPU add less, and past a point less than nothing. Diffluence's audit lock is a contention point of exactly this kind (blueprint 04, ARC-201 to ARC-203).
+- **Scaling is not linear.** Gunther's Universal Scalability Law describes how contention (waiting for a shared lock) and coherence (keeping copies in step) make each extra node or CPU add less, and past a point less than nothing. Kenwerk's audit lock is a contention point of exactly this kind (blueprint 04, ARC-201 to ARC-203).
 - **The tail decides.** Dean and Barroso (CACM 2013): with several requests per page, the slowest decides what a person waits for. Targets are p95 and p99.
 - **Method.** Jain's *The Art of Computer Systems Performance Analysis* remains the reference for planning experiments: one change at a time, repeated runs, and stated confidence instead of single numbers.
 
@@ -48,7 +48,7 @@ From blueprint 04.8 and `limits.md`: 5,000 people, 10% active at once, about 40%
 
 **Separate the load tool.** The tool that makes the load must run on its own VM with its own CPUs, so it never competes with what it measures; k6 reports its own CPU, and a busy load tool gives false numbers.
 
-## 8.5 Where Diffluence stands
+## 8.5 Where Kenwerk stands
 
 | Practice | State | Where |
 |---|---|---|
@@ -60,7 +60,7 @@ From blueprint 04.8 and `limits.md`: 5,000 people, 10% active at once, about 40%
 
 ## 8.6 Recommendations
 
-- **OPS-109** · new · **High.** Run the test series of 8.2 on two virtual machines (one for Diffluence and PostgreSQL, one for k6) with the open model, at the model, at two and at four times the model, and past that until it gives way. Record everything listed in 8.4, and put the results in `limits.md` next to the development numbers, marked with the machine.
+- **OPS-109** · new · **High.** Run the test series of 8.2 on two virtual machines (one for Kenwerk and PostgreSQL, one for k6) with the open model, at the model, at two and at four times the model, and past that until it gives way. Record everything listed in 8.4, and put the results in `limits.md` next to the development numbers, marked with the machine.
 - **OPS-110** · new · **High.** A soak of at least 24 hours at the model, with a sample every minute of memory, goroutines, database connections, table and index sizes, queue length and disk. Anything that only grows is a finding.
 - **OPS-111** · new · **Medium.** k6 scripts in the repository for each test of 8.2, using arrival-rate executors only, with thresholds that fail the run, and a check that the tool dropped no iterations. The read mix, the search mix and the writers are separate scenarios so their share can be changed.
 - **OPS-112** · new · **Medium.** A small load test in CI (OPS-015): the model at a tenth of its size for two minutes against the CI database, failing when p95 of reading grows more than a set share against the last main. It finds a slow query early; it does not measure capacity.

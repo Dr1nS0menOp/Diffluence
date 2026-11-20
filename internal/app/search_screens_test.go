@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // searchAnswer runs a full search and gives its total, whether it was capped and its rows.

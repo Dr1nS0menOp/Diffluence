@@ -35,7 +35,7 @@ Spec 036 made role assignments a list: `role_assignments` holds one row per role
 
 ### 4. The backup check
 
-Wave O7 (spec 044) made a node check, before it migrates, that the last noted backup is no older than `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE`, and only when that is set (D2). A new installation is never checked. Spec 048 recommended refusing by default after 24 hours, and ADR-040 decided it.
+Wave O7 (spec 044) made a node check, before it migrates, that the last noted backup is no older than `KENWERK_UPGRADE_BACKUP_MAX_AGE`, and only when that is set (D2). A new installation is never checked. Spec 048 recommended refusing by default after 24 hours, and ADR-040 decided it.
 
 ## Choices
 
@@ -53,8 +53,8 @@ Wave O7 (spec 044) made a node check, before it migrates, that the last noted ba
 | D10 | Telling unnamed roles apart | The server marks a role `unnamed` when its name has that shape and it is not built in. The screens read the mark, not the name | One place for the rule |
 | D11 | Changing an unnamed role | When its permissions change and the name stays as given, the count in the name follows. A name an administrator gives stays | So the name never says something untrue |
 | D12 | Roles made before | Migration 0044 renames each role named `Custom: …` with the description the database gives, in the order they were made. Other roles keep their names | Only names the database made change; nobody gains or loses anything |
-| D13 | The backup age | 24 hours unless `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` is set. `off` switches the check off; then the node only warns. `0`, a negative age or anything else is refused at start | A typing mistake must not switch a safety check off |
-| D14 | Where the backup check runs | Where wave O7 put the other checks: a node that migrates on start, and only when there is something to migrate. `diffluence migrate`, the deliberate route by hand, does not check the backup, as it does not check the queue | Kept as spec 044 built it. A new installation is never refused |
+| D13 | The backup age | 24 hours unless `KENWERK_UPGRADE_BACKUP_MAX_AGE` is set. `off` switches the check off; then the node only warns. `0`, a negative age or anything else is refused at start | A typing mistake must not switch a safety check off |
+| D14 | Where the backup check runs | Where wave O7 put the other checks: a node that migrates on start, and only when there is something to migrate. `kenwerk migrate`, the deliberate route by hand, does not check the backup, as it does not check the queue | Kept as spec 044 built it. A new installation is never refused |
 | D15 | The upgrade test and the dev environment | `scripts/upgrade-test.sh` notes a backup before it starts the new release, as an operator does. The end-to-end tests start from an empty database, which is a new installation | So the test proves the path an operator takes |
 
 ## Migration
@@ -106,7 +106,7 @@ The previous release does not read `database.edit`. It keeps asking `page.edit` 
 1. Administration > Roles > New role: tick View the space and Edit pages, not Edit databases. Give it to a test person in a space with a database.
 2. As that person, open a page: Edit shows. Open the database: no Edit.
 3. Open the Access screen of that space as a space administrator. Under the test person, choose Viewer in "Add a role": they now hold both roles. Open a role to see its permissions. Take one away with the cross beside it.
-4. To see the backup check, update a test installation without running `scripts/backup.sh` first: it does not start, and its log says to run the backup or to set `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off`.
+4. To see the backup check, update a test installation without running `scripts/backup.sh` first: it does not start, and its log says to run the backup or to set `KENWERK_UPGRADE_BACKUP_MAX_AGE=off`.
 
 ## Provenance
 

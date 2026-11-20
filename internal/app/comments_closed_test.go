@@ -5,8 +5,8 @@ package app_test
 import (
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The pages module owns the switch; the comments module asks it at the moment of each

@@ -41,7 +41,7 @@ Who may do what is decided in the spaces:
 ## Checking it
 
 - **The health page** (Administration, System health) has the line Published spaces: what the last consistency check found. It runs by itself once a week and after the part is turned on again; Check now runs it at once, and Fix what it found recomputes every status from the versions.
-- **The command line**: `docker compose exec diffluence diffluence check publishing` checks every pair; `--fix` recomputes what differs.
+- **The command line**: `docker compose exec kenwerk kenwerk check publishing` checks every pair; `--fix` recomputes what differs.
 - **Verification**: on a draft page, Verify the published text checks its twin; in the settings section of a draft space, Verify every published page checks them all in the background and lists the pages that differ, whose draft version changed, that cannot be verified yet or whose draft was purged. A twin that differs was changed past the application, in the database: treat it as an incident ([incidents.md](incidents.md)).
 
 ## Backups and restores

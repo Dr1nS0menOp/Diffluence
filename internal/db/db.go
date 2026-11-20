@@ -15,7 +15,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // Querier is satisfied by *pgxpool.Pool, *pgxpool.Conn and pgx.Tx.
@@ -39,7 +39,7 @@ func Open(ctx context.Context, url string) (*pgxpool.Pool, error) {
 		// Never echo the URL: it contains the password.
 		return nil, errors.New("db: invalid DATABASE_URL")
 	}
-	cfg.ConnConfig.RuntimeParams["application_name"] = "diffluence"
+	cfg.ConnConfig.RuntimeParams["application_name"] = "kenwerk"
 	// pgx prepares each statement once, and after five runs PostgreSQL may switch to a
 	// generic plan that cannot see which optional filters are empty. On real data such
 	// plans of the feed took over two minutes against 233 ms (spec 061), so every query

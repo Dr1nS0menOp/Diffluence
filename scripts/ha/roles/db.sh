@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # A database node of the HA topology (spec 062): PostgreSQL 16, an etcd member and Patroni
 # with the watchdog required. Run as root on db1, db2 and db3, with this folder copied over.
-# Usage: bash roles/db.sh diffluence-ha-db1
+# Usage: bash roles/db.sh kenwerk-ha-db1
 set -eu
 # shellcheck source=common.sh
 . "$(dirname "$0")/common.sh"
@@ -21,14 +21,14 @@ pg_dropcluster --stop 16 main 2>/dev/null || true
 # etcd: one member per database node, three in all (D13 of spec 048).
 cat >/etc/default/etcd <<ETCD
 ETCD_NAME=$NODE_NAME
-ETCD_DATA_DIR=/var/lib/etcd/diffluence
+ETCD_DATA_DIR=/var/lib/etcd/kenwerk
 ETCD_LISTEN_PEER_URLS=http://$NODE_ADDR:2380
 ETCD_LISTEN_CLIENT_URLS=http://$NODE_ADDR:2379,http://127.0.0.1:2379
 ETCD_INITIAL_ADVERTISE_PEER_URLS=http://$NODE_ADDR:2380
 ETCD_ADVERTISE_CLIENT_URLS=http://$NODE_ADDR:2379
-ETCD_INITIAL_CLUSTER=diffluence-ha-db1=http://$HA_DB1:2380,diffluence-ha-db2=http://$HA_DB2:2380,diffluence-ha-db3=http://$HA_DB3:2380
+ETCD_INITIAL_CLUSTER=kenwerk-ha-db1=http://$HA_DB1:2380,kenwerk-ha-db2=http://$HA_DB2:2380,kenwerk-ha-db3=http://$HA_DB3:2380
 ETCD_INITIAL_CLUSTER_STATE=new
-ETCD_INITIAL_CLUSTER_TOKEN=diffluence-ha
+ETCD_INITIAL_CLUSTER_TOKEN=kenwerk-ha
 ETCD
 systemctl enable etcd >/dev/null
 systemctl restart etcd

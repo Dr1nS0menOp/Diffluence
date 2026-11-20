@@ -4,19 +4,19 @@
 # embeds them.
 version: 2
 
-project_name: diffluence
+project_name: kenwerk
 
 before:
   hooks:
     # The package unit is the unit of deploy/systemd with the path a package uses: one unit
     # to keep (spec 057, D2).
     - mkdir -p build/package
-    - sh -c "sed 's#/usr/local/bin/diffluence#/usr/bin/diffluence#' deploy/systemd/diffluence.service > build/package/diffluence.service"
+    - sh -c "sed 's#/usr/local/bin/kenwerk#/usr/bin/kenwerk#' deploy/systemd/kenwerk.service > build/package/kenwerk.service"
 
 builds:
-  - id: diffluence
-    main: ./cmd/diffluence
-    binary: diffluence
+  - id: kenwerk
+    main: ./cmd/kenwerk
+    binary: kenwerk
     env:
       - CGO_ENABLED=0
     goos: [linux]
@@ -26,13 +26,13 @@ builds:
     # the console's warning about an old release reads the commit, not the build (spec 051).
     ldflags:
       - -s -w
-      - -X github.com/diffluence/diffluence/internal/version.Version=v{{ .Version }}
-      - -X github.com/diffluence/diffluence/internal/version.Date={{ slice .CommitDate 0 10 }}
+      - -X github.com/kenwerk/kenwerk/internal/version.Version=v{{ .Version }}
+      - -X github.com/kenwerk/kenwerk/internal/version.Date={{ slice .CommitDate 0 10 }}
     # Files carry the time of the commit, never of the build, so two builds are the same.
     mod_timestamp: "{{ .CommitTimestamp }}"
 
 archives:
-  - id: diffluence
+  - id: kenwerk
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
@@ -45,24 +45,24 @@ archives:
         info: *fileinfo
       - src: CHANGELOG.md
         info: *fileinfo
-      - src: deploy/systemd/diffluence.service
-        dst: deploy/systemd/diffluence.service
+      - src: deploy/systemd/kenwerk.service
+        dst: deploy/systemd/kenwerk.service
         info: *fileinfo
       - src: deploy/install-lxc.sh
         dst: deploy/install-lxc.sh
         info: *fileinfo
-      - src: deploy/diffluence.example.yaml
-        dst: deploy/diffluence.example.yaml
+      - src: deploy/kenwerk.example.yaml
+        dst: deploy/kenwerk.example.yaml
         info: *fileinfo
 
 nfpms:
   - id: packages
-    package_name: diffluence
+    package_name: kenwerk
     file_name_template: "{{ .PackageName }}_{{ .Version }}_{{ .Arch }}"
     formats: [deb, rpm]
-    vendor: Diffluence
-    homepage: https://github.com/Dr1nS0menOp/Diffluence
-    maintainer: Diffluence <DiffluenceCreator@protonmail.com>
+    vendor: Kenwerk
+    homepage: https://github.com/Dr1nS0menOp/Kenwerk
+    maintainer: Kenwerk <KenwerkCreator@protonmail.com>
     description: |-
       A self-hosted wiki for teams.
       Pages, spaces, permissions, search and an audit log, on PostgreSQL.
@@ -74,29 +74,29 @@ nfpms:
     recommends:
       - postgresql
     contents:
-      - src: build/package/diffluence.service
-        dst: /usr/lib/systemd/system/diffluence.service
+      - src: build/package/kenwerk.service
+        dst: /usr/lib/systemd/system/kenwerk.service
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
-      - src: deploy/diffluence.example.yaml
-        dst: /usr/share/doc/diffluence/diffluence.example.yaml
+      - src: deploy/kenwerk.example.yaml
+        dst: /usr/share/doc/kenwerk/kenwerk.example.yaml
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: LICENSE
-        dst: /usr/share/doc/diffluence/LICENSE
+        dst: /usr/share/doc/kenwerk/LICENSE
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
       - src: NOTICE
-        dst: /usr/share/doc/diffluence/NOTICE
+        dst: /usr/share/doc/kenwerk/NOTICE
         file_info:
           mode: 0644
           mtime: "{{ .CommitDate }}"
     # An RPM records the machine that built it; a fixed name keeps two builds the same.
     rpm:
-      buildhost: diffluence-release
+      buildhost: kenwerk-release
     scripts:
       postinstall: deploy/packaging/postinstall.sh
       preremove: deploy/packaging/preremove.sh
@@ -158,7 +158,7 @@ release:
       --certificate-oidc-issuer https://token.actions.githubusercontent.com \
       --certificate-identity "https://github.com/{{ .Env.GITHUB_REPOSITORY }}/.github/workflows/release.yml@refs/tags/{{ .Tag }}"
     sha256sum --ignore-missing -c checksums.txt
-    gh attestation verify diffluence_{{ .Version }}_amd64.deb --repo {{ .Env.GITHUB_REPOSITORY }}
+    gh attestation verify kenwerk_{{ .Version }}_amd64.deb --repo {{ .Env.GITHUB_REPOSITORY }}
     ```
 
-    The image `ghcr.io/{{ .Env.IMAGE_OWNER }}/diffluence:{{ .Version }}` is signed the same way: `cosign verify` with the same issuer and identity. See `docs/operations/install.md`.
+    The image `ghcr.io/{{ .Env.IMAGE_OWNER }}/kenwerk:{{ .Version }}` is signed the same way: `cosign verify` with the same issuer and identity. See `docs/operations/install.md`.

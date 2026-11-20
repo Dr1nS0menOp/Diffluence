@@ -46,7 +46,7 @@ The code already has the answer to this in two places (`search/words.go`, `pages
 
 ### The public address
 
-`identity.NewWebAuthn` uses the host of `DIFFLUENCE_PUBLIC_URL` as the passkey RP ID, and the library refuses an IP address. The app stopped at start, and Compose restarted it forever. **Decided:** the configuration refuses an IP address at start and asks for a host name, rather than starting without passkeys. Why: passkeys are a second factor and part of how login stays safe; an installation that quietly lacks them would be weaker without anyone choosing that, and a second way to run the app adds paths to test. The address never worked, so no working installation changes. `localhost` stays allowed, because browsers accept it as a name.
+`identity.NewWebAuthn` uses the host of `KENWERK_PUBLIC_URL` as the passkey RP ID, and the library refuses an IP address. The app stopped at start, and Compose restarted it forever. **Decided:** the configuration refuses an IP address at start and asks for a host name, rather than starting without passkeys. Why: passkeys are a second factor and part of how login stays safe; an installation that quietly lacks them would be weaker without anyone choosing that, and a second way to run the app adds paths to test. The address never worked, so no working installation changes. `localhost` stays allowed, because browsers accept it as a name.
 
 ## What this wave builds, worst risk first
 
@@ -88,7 +88,7 @@ The notification list was measured too: it was already 3.8 ms, as PostgreSQL pic
 ## How the product owner tests it
 
 1. Open the start screen, the bell and the quick box with a file name: they show what they showed before, only sooner.
-2. Set `DIFFLUENCE_PUBLIC_URL=http://192.0.2.10:8080` (any address) and start: the app stops at once and the log asks for a host name. With `http://localhost:8080` it starts.
+2. Set `KENWERK_PUBLIC_URL=http://192.0.2.10:8080` (any address) and start: the app stops at once and the log asks for a host name. With `http://localhost:8080` it starts.
 3. On the test server, run the stress test again (`scripts/stress/README.md`) and compare with the report of 10 November.
 
 ## What one machine cannot prove
@@ -99,6 +99,6 @@ The notification list was measured too: it was already 3.8 ms, as PostgreSQL pic
 
 ## Open for the product owner
 
-- **The audit lock (ARC-203).** The blueprint already names the way out: write events without a hash in the transaction, and let one worker chain them seconds later, so the log stays complete and tamper-evident with a short tail that is not chained yet. It changes ADR-013, so it waits for a measurement and the product owner's agreement. The measurement now exists: with all 5,000 people at once, saving waited 3.7 s (p50) on a disk that syncs about 160 times a second. On a fast disk the lock costs far less, so the question is whether Diffluence should carry that load on slow disks.
+- **The audit lock (ARC-203).** The blueprint already names the way out: write events without a hash in the transaction, and let one worker chain them seconds later, so the log stays complete and tamper-evident with a short tail that is not chained yet. It changes ADR-013, so it waits for a measurement and the product owner's agreement. The measurement now exists: with all 5,000 people at once, saving waited 3.7 s (p50) on a disk that syncs about 160 times a second. On a fast disk the lock costs far less, so the question is whether Kenwerk should carry that load on slow disks.
 
 Decided in this wave, with the reasons above: the lock stays for now (step 5), and an IP address is refused rather than started without passkeys (step 6).

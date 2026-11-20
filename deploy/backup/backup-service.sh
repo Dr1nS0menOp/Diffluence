@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # The backup service of compose.yaml (spec 054): the steps of scripts/backup.sh, run from
 # inside Compose on an interval, so an installation has backups without anyone remembering.
-#   diffluence-backup loop   back up every DIFFLUENCE_BACKUP_INTERVAL (the default)
-#   diffluence-backup once   make one backup and exit with its result
-#   diffluence-backup way-back
+#   kenwerk-backup loop   back up every KENWERK_BACKUP_INTERVAL (the default)
+#   kenwerk-backup once   make one backup and exit with its result
+#   kenwerk-backup way-back
 #                            after a restore from the console stopped halfway, restore the
 #                            safety backup it made first (spec 059)
 # It reads the database as the owner, the data volume and ./secrets read-only, and the key
@@ -24,9 +24,9 @@ target=/backups
 key=/key/backup.key
 # What this service holds to: how many backups it keeps at least, and how long it waits at
 # most. It sits in the backup folder, which the server never reaches (spec 076).
-held=$target/.diffluence-held.json
-interval=${DIFFLUENCE_BACKUP_INTERVAL:-4h}
-keep=${DIFFLUENCE_BACKUP_KEEP:-42}
+held=$target/.kenwerk-held.json
+interval=${KENWERK_BACKUP_INTERVAL:-4h}
+keep=${KENWERK_BACKUP_KEEP:-42}
 export GNUPGHOME=/tmp/gnupg
 
 log() { printf '%s backup: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$*"; }
@@ -51,7 +51,7 @@ setup_problem() {
     echo "the key folder is the backup folder: the key may not sit with the backups it opens"
   else
     case "$keep" in
-      '' | *[!0-9]* | 0) echo "DIFFLUENCE_BACKUP_KEEP must be a whole number above 0, not $keep" ;;
+      '' | *[!0-9]* | 0) echo "KENWERK_BACKUP_KEEP must be a whole number above 0, not $keep" ;;
     esac
   fi
 }
@@ -61,11 +61,11 @@ setup_problem() {
 # derived from the backup key. A failure is logged and tried again the next round; backups go
 # on meanwhile, because a backup may be what an upgrade waits for.
 tend() {
-  if ! diffluence worker migrate; then
+  if ! kenwerk worker migrate; then
     log "the migrations did not run; the server shows why on its page. Trying again within a minute"
   fi
   if [ -s "$key" ] && schema_ready; then
-    diffluence worker checkpoint --key "$key" || log "no audit checkpoint was signed this round"
+    kenwerk worker checkpoint --key "$key" || log "no audit checkpoint was signed this round"
   fi
 }
 
@@ -92,7 +92,7 @@ as_owner() {
   "$@" --dbname="$url"
 }
 
-# schema_ready is whether Diffluence has made its tables, so a backup can be noted.
+# schema_ready is whether Kenwerk has made its tables, so a backup can be noted.
 schema_ready() {
   [ "$(as_owner psql -tAc "SELECT to_regclass('audit_events') IS NOT NULL" 2>/dev/null)" = t ]
 }
@@ -117,11 +117,11 @@ backup_once() {
   fi
   mkdir -p "$GNUPGHOME" || return 1
   stamp=$(date -u +%Y%m%dT%H%M%SZ)
-  name=diffluence-$stamp
+  name=kenwerk-$stamp
   # A backup is written under a name no restore picks, and renamed once every part is in.
   step="clearing an unfinished backup"
-  rm -rf -- "$target"/.partial-diffluence-* || return 1
-  work=$target/.partial-diffluence-$stamp
+  rm -rf -- "$target"/.partial-kenwerk-* || return 1
+  work=$target/.partial-kenwerk-$stamp
   dir=$target/$name
   step="making the backup folder"
   mkdir "$work" || return 1
@@ -151,8 +151,8 @@ backup_once() {
   chown -R "$(stat -c %u:%g "$target")" "$work" || return 1
   mv "$work" "$dir" || return 1
   step="noting the backup for the checks before an upgrade"
-  if ! diffluence backup note >/dev/null; then
-    log "the backup in $dir is complete, but noting it in Diffluence failed: an upgrade that asks for a recent backup will refuse"
+  if ! kenwerk backup note >/dev/null; then
+    log "the backup in $dir is complete, but noting it in Kenwerk failed: an upgrade that asks for a recent backup will refuse"
     return 1
   fi
   log "backup written to $dir and noted"
@@ -173,12 +173,12 @@ report() {
   local reason=$1 size
   if [ "$2" = ok ]; then
     size=$(du -sb "$target/$name" | cut -f1)
-    diffluence backup report --name "$name" --reason "$reason" --started "$started" --size "${size:-0}" >/dev/null ||
+    kenwerk backup report --name "$name" --reason "$reason" --started "$started" --size "${size:-0}" >/dev/null ||
       log "the console could not be told about $name"
   else
     # A failure before a name was chosen still reports, under the time it started.
-    [ -n "${name:-}" ] || name=diffluence-$(date -u -d "$started" +%Y%m%dT%H%M%SZ)
-    diffluence backup report --name "$name" --reason "$reason" --started "$started" --failed "failed while $step" >/dev/null ||
+    [ -n "${name:-}" ] || name=kenwerk-$(date -u -d "$started" +%Y%m%dT%H%M%SZ)
+    kenwerk backup report --name "$name" --reason "$reason" --started "$started" --failed "failed while $step" >/dev/null ||
       log "the console could not be told that a backup failed"
   fi
 }
@@ -195,25 +195,25 @@ attempt() {
   fi
 }
 
-# restore carries out a restore the console asked for (spec 059): diffluence checks the
-# backup and stops every node, this script makes the safety backup, and diffluence restores
+# restore carries out a restore the console asked for (spec 059): kenwerk checks the
+# backup and stops every node, this script makes the safety backup, and kenwerk restores
 # and checks. Each step writes down where it is, so the console and the waiting page say it.
 restore() {
   local id=$1 chosen=$2
   log "restoring $chosen over the installation, as the console asked"
-  if ! diffluence backup restore-prepare --request "$id" --dir "$target" --key "$key"; then
+  if ! kenwerk backup restore-prepare --request "$id" --dir "$target" --key "$key"; then
     log "the restore of $chosen did not begin; nothing was changed"
     return 1
   fi
   restoring=1
   if ! attempt request; then
     restoring=
-    diffluence backup restore-abort --request "$id" --step "$step" --dir "$target" --key "$key" ||
+    kenwerk backup restore-abort --request "$id" --step "$step" --dir "$target" --key "$key" ||
       log "could not tell the console that the restore ended"
     return 1
   fi
   restoring=
-  if ! diffluence backup restore-run --request "$id" --safety "$name" --dir "$target" --key "$key"; then
+  if ! kenwerk backup restore-run --request "$id" --safety "$name" --dir "$target" --key "$key"; then
     log "the restore stopped; every node waits. The way back: docker compose run --rm backup way-back"
     return 1
   fi
@@ -225,7 +225,7 @@ restore() {
 # that cannot be read, nothing is removed.
 prune() {
   local old floor kept=$keep
-  if ! floor=$(diffluence backup held --held "$held"); then
+  if ! floor=$(kenwerk backup held --held "$held"); then
     log "no old backup was removed: what this service holds to could not be read from $held"
     return 0
   fi
@@ -236,7 +236,7 @@ prune() {
       ;;
   esac
   [ "$kept" -ge "$floor" ] || kept=$floor
-  find "$target" -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | head -n -"$kept" |
+  find "$target" -mindepth 1 -maxdepth 1 -type d -name 'kenwerk-*' | sort | head -n -"$kept" |
     while IFS= read -r old; do
       rm -rf -- "$old" && log "removed the old backup $old"
     done
@@ -245,7 +245,7 @@ prune() {
 # due_in is how many seconds remain before the next backup is due.
 due_in() {
   local newest age
-  newest=$(find "$target" -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | tail -n 1)
+  newest=$(find "$target" -mindepth 1 -maxdepth 1 -type d -name 'kenwerk-*' | sort | tail -n 1)
   [ -n "$newest" ] || { echo 0; return; }
   age=$(($(date +%s) - $(stat -c %Y "$newest")))
   echo $((age >= every ? 0 : every - age))
@@ -256,11 +256,11 @@ case "${1:-loop}" in
     attempt manual
     ;;
   way-back)
-    diffluence backup restore-way-back --dir "$target" --key "$key"
+    kenwerk backup restore-way-back --dir "$target" --key "$key"
     ;;
   loop)
     if ! every=$(seconds_of "$interval"); then
-      log "DIFFLUENCE_BACKUP_INTERVAL must look like 4h, 30m or 1d, not $interval"
+      log "KENWERK_BACKUP_INTERVAL must look like 4h, 30m or 1d, not $interval"
       exit 2
     fi
     log "backing up every $interval unless the console chose otherwise, keeping the newest $keep"
@@ -268,13 +268,13 @@ case "${1:-loop}" in
     while true; do
       tend
       if ! schema_ready; then
-        log "waiting for the tables of Diffluence before the first backup"
+        log "waiting for the tables of Kenwerk before the first backup"
         sleep 60
         continue
       fi
       # The console decides when (its schedule, or "back up now") and how many to keep.
       # A release from before spec 058 has no answer; then the folder decides, as before.
-      if answer=$(diffluence backup next --default-interval "${every}s" --default-keep "$keep" \
+      if answer=$(kenwerk backup next --default-interval "${every}s" --default-keep "$keep" \
         --key-fingerprint "$(key_fingerprint)" --key "$key" --held "$held" 2>/dev/null); then
         read -r what value keep_now minutes <<<"$answer"
         case "$what" in
@@ -323,7 +323,7 @@ case "${1:-loop}" in
     done
     ;;
   *)
-    echo "usage: diffluence-backup [loop|once|way-back]" >&2
+    echo "usage: kenwerk-backup [loop|once|way-back]" >&2
     exit 2
     ;;
 esac

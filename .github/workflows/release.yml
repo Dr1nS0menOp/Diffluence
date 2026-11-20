@@ -101,20 +101,20 @@ jobs:
           context: .
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence:${{ github.ref_name }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk:${{ github.ref_name }}
           build-args: |
             VERSION=${{ github.ref_name }}
             BUILD_DATE=${{ env.BUILD_DATE }}
           sbom: true
           provenance: mode=max
       - name: sign the image
-        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/diffluence@${DIGEST}"
+        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/kenwerk@${DIGEST}"
         env:
           DIGEST: ${{ steps.image.outputs.digest }}
       - name: provenance of the image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk
           subject-digest: ${{ steps.image.outputs.digest }}
           push-to-registry: true
       # The backup service and the service for editing together are released the same way,
@@ -126,20 +126,20 @@ jobs:
           target: backup
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence-backup:${{ github.ref_name }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk-backup:${{ github.ref_name }}
           build-args: |
             VERSION=${{ github.ref_name }}
             BUILD_DATE=${{ env.BUILD_DATE }}
           sbom: true
           provenance: mode=max
       - name: sign the backup image
-        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/diffluence-backup@${DIGEST}"
+        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/kenwerk-backup@${DIGEST}"
         env:
           DIGEST: ${{ steps.backup-image.outputs.digest }}
       - name: provenance of the backup image
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence-backup
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk-backup
           subject-digest: ${{ steps.backup-image.outputs.digest }}
           push-to-registry: true
       - id: collab-image
@@ -148,24 +148,24 @@ jobs:
           context: collab
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence-collab:${{ github.ref_name }}
+          tags: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk-collab:${{ github.ref_name }}
           sbom: true
           provenance: mode=max
       - name: sign the image of the service for editing together
-        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/diffluence-collab@${DIGEST}"
+        run: cosign sign --yes "ghcr.io/${IMAGE_OWNER}/kenwerk-collab@${DIGEST}"
         env:
           DIGEST: ${{ steps.collab-image.outputs.digest }}
       - name: provenance of the image of the service for editing together
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
-          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/diffluence-collab
+          subject-name: ghcr.io/${{ env.IMAGE_OWNER }}/kenwerk-collab
           subject-digest: ${{ steps.collab-image.outputs.digest }}
           push-to-registry: true
       - name: SBOM of the image, on the release
         run: |
-          image="ghcr.io/${IMAGE_OWNER}/diffluence@${DIGEST}"
-          syft scan "$image" --output "spdx-json=dist/diffluence_${GITHUB_REF_NAME#v}_image.spdx.json" \
-            --output "cyclonedx-json=dist/diffluence_${GITHUB_REF_NAME#v}_image.cdx.json"
+          image="ghcr.io/${IMAGE_OWNER}/kenwerk@${DIGEST}"
+          syft scan "$image" --output "spdx-json=dist/kenwerk_${GITHUB_REF_NAME#v}_image.spdx.json" \
+            --output "cyclonedx-json=dist/kenwerk_${GITHUB_REF_NAME#v}_image.cdx.json"
           gh release upload "$GITHUB_REF_NAME" dist/*_image.spdx.json dist/*_image.cdx.json
         env:
           DIGEST: ${{ steps.image.outputs.digest }}

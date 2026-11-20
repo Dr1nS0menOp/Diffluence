@@ -1,10 +1,10 @@
 # Known limits
 
-What was tried to break Diffluence, where it gave way, how it fails, and what to set. Spec 025 holds the plan.
+What was tried to break Kenwerk, where it gave way, how it fails, and what to set. Spec 025 holds the plan.
 
 This is a self-test by the people who built the app. It is **not** an independent penetration test. A limit that was not reached is written as "not reached at N", which never means safe.
 
-**What Diffluence claims:** one node, a few hundred people, measured on your own hardware (ADR-043). The figures for 5,000 people below are targets and measurements on test machines, not a promise; several nodes are not proven. The stress tests on a real server: [10 November](../reports/2026-11-10-stress-test.md) and [12 November](../reports/2026-11-12-stress-test-2.md).
+**What Kenwerk claims:** one node, a few hundred people, measured on your own hardware (ADR-043). The figures for 5,000 people below are targets and measurements on test machines, not a promise; several nodes are not proven. The stress tests on a real server: [10 November](../reports/2026-11-10-stress-test.md) and [12 November](../reports/2026-11-12-stress-test-2.md).
 
 ## How it was measured
 
@@ -224,7 +224,7 @@ Off, nothing of tracing runs: the middleware is not in the chain, the pool has n
 | Many changes at once that each need a second connection | Since spec 050, work that holds a connection reads through it instead of asking the pool for another, so creating many spaces at once finishes, and any wait that is left ends as busy within 10 seconds | Nothing to set |
 | The disk of the data folder is full | Uploads answer 500 "Something went wrong", no half file stays, text still saves, and `/readyz` still says ready | Watch the disk yourself |
 | An account that gets 100 wrong passwords from many addresses in 15 minutes | That person cannot log in until the window ends | This limit stops a botnet from guessing. Passkeys and an identity provider do not depend on it |
-| The address of the proxy is not in `DIFFLUENCE_TRUSTED_PROXIES` | Everyone counts as one address, so 50 failed logins in 15 minutes stop all logins | Set it |
+| The address of the proxy is not in `KENWERK_TRUSTED_PROXIES` | Everyone counts as one address, so 50 failed logins in 15 minutes stop all logins | Set it |
 
 ## Failures under load
 

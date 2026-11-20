@@ -50,12 +50,12 @@ Saving waits longest because a save is worth waiting for and is rare. The number
 
 **Password hashing.** Argon2id is meant to be expensive. At most half the cores, and at least one, hash at once per node. A login waits for its turn; the waiting is bounded by the saving class above.
 
-**Load budget and query count.** The spec template gets a section *Load budget*: queries per request, writes per action, and the class. A test counts the queries of the main screens (opening a page, the tree, search, the bell) and fails when one goes past its budget. The count comes from a tracer on the pool that adds one per query; it is also a metric, `diffluence_db_queries_total`. Background work in a test can add queries, so the test takes the lowest of three runs. ARC-197 (load permission facts once in `Get`) follows only if the count shows the page is far over a sensible budget.
+**Load budget and query count.** The spec template gets a section *Load budget*: queries per request, writes per action, and the class. A test counts the queries of the main screens (opening a page, the tree, search, the bell) and fails when one goes past its budget. The count comes from a tracer on the pool that adds one per query; it is also a metric, `kenwerk_db_queries_total`. Background work in a test can add queries, so the test takes the lowest of three runs. ARC-197 (load permission facts once in `Get`) follows only if the count shows the page is far over a sensible budget.
 
 ## Behaviour
 
 - Under normal load nothing changes.
-- When reading floods a node, saving still answers. Reading past its limit gets "Diffluence is very busy right now. Try again in a moment." A text being written stays in the browser, as it does today.
+- When reading floods a node, saving still answers. Reading past its limit gets "Kenwerk is very busy right now. Try again in a moment." A text being written stays in the browser, as it does today.
 - When search floods a node, reading and saving keep working.
 - A load balancer stops sending people to a node that says busy, and sends them back when it has caught up.
 

@@ -27,10 +27,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
 )
 
 // Schema URNs.
@@ -44,7 +44,7 @@ const (
 	schemaSchema  = "urn:ietf:params:scim:schemas:core:2.0:Schema"
 	contentType   = "application/scim+json"
 	maxBody       = 2 << 20
-	tokenPrefix   = "dfl_scim_"
+	tokenPrefix   = "kenwerk_scim_"
 
 	// A token always ends: bearer tokens need a lifetime the provider can check.
 	tokenLife    = 365 * 24 * time.Hour
@@ -928,7 +928,7 @@ func (s *Service) ServiceProviderConfig(w http.ResponseWriter, _ *http.Request) 
 		"filter":         map[string]any{"supported": true, "maxResults": 500},
 		"changePassword": off, "sort": off, "etag": off,
 		"authenticationSchemes": []map[string]any{{"type": "oauthbearertoken", "name": "Bearer token",
-			"description": "A token from the Diffluence admin console."}},
+			"description": "A token from the Kenwerk admin console."}},
 		"meta": map[string]any{"resourceType": "ServiceProviderConfig", "location": s.baseURL + "/ServiceProviderConfig"},
 	})
 }

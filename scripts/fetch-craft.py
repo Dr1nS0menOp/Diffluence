@@ -56,7 +56,7 @@ HOST_PAGE = """<!doctype html>
 
 def download(url: str) -> bytes:
     """Returns the bytes at a public address."""
-    request = urllib.request.Request(url, headers={'User-Agent': 'diffluence-build'})
+    request = urllib.request.Request(url, headers={'User-Agent': 'kenwerk-build'})
     with urllib.request.urlopen(request, timeout=300) as response:
         return response.read()
 

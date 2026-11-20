@@ -17,10 +17,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/keys"
 )
 
 // keyEnv is an instance with one uploaded file and one sealed TOTP seed.

@@ -11,10 +11,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/pages"
 )
 
 const iconBodyLimit = 2 << 20

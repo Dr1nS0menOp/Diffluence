@@ -18,7 +18,7 @@ Proof against real systems, each with its own containers:
 ```sh
 bash scripts/restore-drill.sh                                    # back up, destroy, restore
 scripts/dev bash scripts/upgrade-test.sh <old binary> <new binary>
-docker build -t diffluence:local . && bash scripts/idp-test/run.sh  # real Authentik
+docker build -t kenwerk:local . && bash scripts/idp-test/run.sh  # real Authentik
 ```
 
 ## Mail while developing
@@ -31,17 +31,17 @@ docker compose -f compose.dev.yaml --profile mail up -d mailpit
 
 The screen is at <http://localhost:18025>. Set `DEV_MAIL_PORT` to use another port.
 
-To send to it from a Diffluence started with `compose.yaml`, put it on the same network, and set these in `.env`. Recreate the container with `docker compose up -d` afterwards:
+To send to it from a Kenwerk started with `compose.yaml`, put it on the same network, and set these in `.env`. Recreate the container with `docker compose up -d` afterwards:
 
 ```sh
-docker network connect diffluence_default diffluence-dev-mailpit-1
+docker network connect kenwerk_default kenwerk-dev-mailpit-1
 ```
 
 ```sh
-DIFFLUENCE_SMTP_HOST=diffluence-dev-mailpit-1
-DIFFLUENCE_SMTP_PORT=1025
-DIFFLUENCE_SMTP_TLS=none
-DIFFLUENCE_SMTP_FROM=diffluence@example.test
+KENWERK_SMTP_HOST=kenwerk-dev-mailpit-1
+KENWERK_SMTP_PORT=1025
+KENWERK_SMTP_TLS=none
+KENWERK_SMTP_FROM=kenwerk@example.test
 ```
 
 Then Administration, Instance, Mail, Send a test mail to yourself should show up in Mailpit. `none` means no encryption, which is only fine because this mail never leaves the machine. Automated tests use a fake server of their own, and need none of this.

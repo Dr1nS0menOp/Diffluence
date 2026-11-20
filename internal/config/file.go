@@ -21,7 +21,7 @@ type fileEntry struct {
 	key  string // the key as written, nested keys joined with _
 }
 
-// configFile is the configuration file named by DIFFLUENCE_CONFIG_FILE.
+// configFile is the configuration file named by KENWERK_CONFIG_FILE.
 type configFile struct {
 	path    string
 	entries map[string]fileEntry // by the name of the setting, such as SMTP_HOST or SMTP_PASSWORD_FILE

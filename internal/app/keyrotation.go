@@ -14,11 +14,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/storage"
-	"github.com/diffluence/diffluence/internal/webhooks"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/webhooks"
 )
 
 // sealedColumn is one column whose values the keyring seals (spec 034). Its two queries

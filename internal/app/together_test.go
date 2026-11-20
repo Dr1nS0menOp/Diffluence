@@ -17,12 +17,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/comments"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/mail"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/comments"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 func commentBody(text string, extra ...any) map[string]any {

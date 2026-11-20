@@ -14,9 +14,9 @@ ADR-040 made an upgrade refuse without a backup noted in the last 24 hours. The 
 
 ### Step 1: automatic backups by default (OPS-080)
 
-- A `backup` service in `compose.yaml`, on by default. It runs the same steps as `scripts/backup.sh` every `DIFFLUENCE_BACKUP_INTERVAL` (default `4h`, the RPO of blueprint 07), keeps the newest `DIFFLUENCE_BACKUP_KEEP` backups (default 42, a week), and notes each complete backup with `diffluence backup note`.
-- Its image is a stage of the main `Dockerfile` (`target: backup`): `postgres:16` for a `pg_dump` of the same major version, `gnupg` from Debian, and the `diffluence` binary of the same build. No Go or npm dependency is added.
-- It reads the database as the owner (`migrate_database_url`), the data volume read-only, and `./secrets` read-only. It writes to `${DIFFLUENCE_BACKUP_DIR:-./backups}`. The key is `backup.key` in `${DIFFLUENCE_BACKUP_KEY_DIR:-./backup-key}`, mounted read-only.
+- A `backup` service in `compose.yaml`, on by default. It runs the same steps as `scripts/backup.sh` every `KENWERK_BACKUP_INTERVAL` (default `4h`, the RPO of blueprint 07), keeps the newest `KENWERK_BACKUP_KEEP` backups (default 42, a week), and notes each complete backup with `kenwerk backup note`.
+- Its image is a stage of the main `Dockerfile` (`target: backup`): `postgres:16` for a `pg_dump` of the same major version, `gnupg` from Debian, and the `kenwerk` binary of the same build. No Go or npm dependency is added.
+- It reads the database as the owner (`migrate_database_url`), the data volume read-only, and `./secrets` read-only. It writes to `${KENWERK_BACKUP_DIR:-./backups}`. The key is `backup.key` in `${KENWERK_BACKUP_KEY_DIR:-./backup-key}`, mounted read-only.
 - `scripts/setup-secrets.sh` makes the key on a new installation, and on an existing one when run again; it never overwrites one.
 - Failure paths: no key, or an empty one, means a clear log line on every interval and no backup, never a crash loop. A key folder that is the backup folder is refused. A failed backup leaves no folder that looks complete: it is written under a temporary name and renamed only when every part and `SHA256SUMS` are written. The health page already warns after 26 hours without a noted backup (OPS-077).
 - `docker compose run --rm backup once` makes one backup and exits with its result.
@@ -25,13 +25,13 @@ ADR-040 made an upgrade refuse without a backup noted in the last 24 hours. The 
 ### Step 2: a waiting node instead of a restart loop
 
 - `app.New` returns an `*app.UpgradeRefused` with every problem and its kind (backup, disk, queue, extension) when the checks before an upgrade refuse.
-- `diffluence serve` then does not exit. It serves on the same address:
+- `kenwerk serve` then does not exit. It serves on the same address:
   - `/livez`: 200, so the process is alive.
   - `/readyz`: 503 with `{"status":"waiting_for_upgrade","problems":[kinds]}`, so no load balancer sends people.
   - `/api/...`: 503 JSON with the code `upgrade_waiting` and `Retry-After: 60`.
   - Every other path: a plain HTML page, 503, that says the upgrade waits, names the kind of each problem and the commands that fix it. It shows no numbers, dates or paths, because anyone can open it. The full reasons are in the log.
-- It touches nothing in the database. It tries again every minute, and at once on `SIGHUP` (`docker compose kill -s HUP diffluence`). `backup.sh` sends that signal after noting a backup, to a node that is unhealthy only, since a release before this one stops on SIGHUP; the backup service has no Docker socket, by design, so the node's minute retry picks its backup up.
-- The Compose health check still reports not ready, and `docker compose ps` shows the container running. `diffluence healthcheck` prints the reason it got.
+- It touches nothing in the database. It tries again every minute, and at once on `SIGHUP` (`docker compose kill -s HUP kenwerk`). `backup.sh` sends that signal after noting a backup, to a node that is unhealthy only, since a release before this one stops on SIGHUP; the backup service has no Docker socket, by design, so the node's minute retry picks its backup up.
+- The Compose health check still reports not ready, and `docker compose ps` shows the container running. `kenwerk healthcheck` prints the reason it got.
 
 ### Step 3: the first upgrade under the rule (ADR-042)
 
@@ -39,10 +39,10 @@ ADR-040 made an upgrade refuse without a backup noted in the last 24 hours. The 
 - From the next upgrade on the rule holds in full, because the waiver is in the audit log.
 - The other checks (disk, queue, extension) are never waived.
 
-### Step 4: `diffluence migrate --without-backup`
+### Step 4: `kenwerk migrate --without-backup`
 
-- `diffluence migrate` now runs the backup part of the checks too. Before, it ran no check at all, which made it a silent way around ADR-040.
-- `--without-backup` upgrades once without a backup and writes `system.upgrade_without_backup` with `{"reason":"operator_override"}`. It is preferred over leaving `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off` set, which also waives every later upgrade.
+- `kenwerk migrate` now runs the backup part of the checks too. Before, it ran no check at all, which made it a silent way around ADR-040.
+- `--without-backup` upgrades once without a backup and writes `system.upgrade_without_backup` with `{"reason":"operator_override"}`. It is preferred over leaving `KENWERK_UPGRADE_BACKUP_MAX_AGE=off` set, which also waives every later upgrade.
 - `migrate` also writes the upgrade marker (`system.upgrade_started`), as a migrating node does.
 - `--contract` alone, with nothing to expand, needs no backup check: it runs only after the grace of a finished upgrade.
 

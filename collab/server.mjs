@@ -8,16 +8,16 @@ import { createAccess, isTheAPI, ticketFrom } from './access.mjs';
 import { MAX_MESSAGE_BYTES, documentJSON, fitsTheStore } from './document.mjs';
 import { bindPresence } from './presence.mjs';
 
-const API_URL = (process.env.DIFFLUENCE_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
-const TOKEN = process.env.DIFFLUENCE_COLLAB_TOKEN ?? '';
-const PORT = Number(process.env.DIFFLUENCE_COLLAB_PORT ?? 1234);
+const API_URL = (process.env.KENWERK_API_URL ?? 'http://localhost:8080').replace(/\/$/, '');
+const TOKEN = process.env.KENWERK_COLLAB_TOKEN ?? '';
+const PORT = Number(process.env.KENWERK_COLLAB_PORT ?? 1234);
 const RECHECK_MS = 60_000;
 const SAVE_DEBOUNCE_MS = 2_000;
 const SAVE_MAX_DEBOUNCE_MS = 10_000;
 const CLOSE_REFUSED_STATE = { code: 4422, reason: 'document-refused' };
 
 if (!TOKEN) {
-  console.error('DIFFLUENCE_COLLAB_TOKEN is not set');
+  console.error('KENWERK_COLLAB_TOKEN is not set');
   process.exit(1);
 }
 

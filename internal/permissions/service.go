@@ -11,8 +11,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // Service loads facts and answers permission questions.

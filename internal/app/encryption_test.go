@@ -12,8 +12,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // storedFiles returns every file below the object store.

@@ -12,7 +12,7 @@ import (
 // writeConfig writes a configuration file with the given mode and returns its path.
 func writeConfig(t *testing.T, body string, mode os.FileMode) string {
 	t.Helper()
-	p := filepath.Join(t.TempDir(), "diffluence.yaml")
+	p := filepath.Join(t.TempDir(), "kenwerk.yaml")
 	if err := os.WriteFile(p, []byte(body), mode); err != nil {
 		t.Fatal(err)
 	}
@@ -24,7 +24,7 @@ func writeConfig(t *testing.T, body string, mode os.FileMode) string {
 
 // withFile is an environment that names the file and nothing else, unless more is given.
 func withFile(path string, more map[string]string) LookupFunc {
-	m := map[string]string{"DIFFLUENCE_CONFIG_FILE": path}
+	m := map[string]string{"KENWERK_CONFIG_FILE": path}
 	for k, v := range more {
 		m[k] = v
 	}
@@ -50,9 +50,9 @@ func TestAnUnknownKeyInTheFileIsRefusedWithItsLine(t *testing.T) {
 }
 
 func TestAKeyWithThePrefixIsNamedAsSuch(t *testing.T) {
-	p := writeConfig(t, "database_url: postgres://x\nDIFFLUENCE_LOG_LEVEL: debug\n", 0o600)
+	p := writeConfig(t, "database_url: postgres://x\nKENWERK_LOG_LEVEL: debug\n", 0o600)
 	_, err := Load(withFile(p, nil))
-	mustFail(t, err, "line 2", "without DIFFLUENCE_")
+	mustFail(t, err, "line 2", "without KENWERK_")
 }
 
 func TestASettingWrittenTwiceIsRefused(t *testing.T) {
@@ -113,13 +113,13 @@ func TestAFileThatIsNotYAMLIsRefusedWithItsLine(t *testing.T) {
 }
 
 func TestAMissingFileIsRefused(t *testing.T) {
-	_, err := Load(withFile(filepath.Join(t.TempDir(), "absent.yaml"), map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	_, err := Load(withFile(filepath.Join(t.TempDir(), "absent.yaml"), map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	mustFail(t, err, "CONFIG_FILE")
 }
 
 func TestAnEmptyFileChangesNothing(t *testing.T) {
 	p := writeConfig(t, "# only a comment\n", 0o600)
-	c, err := Load(withFile(p, map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(withFile(p, map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -141,7 +141,7 @@ func TestTheFileWinsOverTheDefault(t *testing.T) {
 
 func TestTheEnvironmentWinsOverTheFile(t *testing.T) {
 	p := writeConfig(t, "database_url: postgres://file\nlog_level: debug\n", 0o600)
-	c, err := Load(withFile(p, map[string]string{"DIFFLUENCE_LOG_LEVEL": "warn"}))
+	c, err := Load(withFile(p, map[string]string{"KENWERK_LOG_LEVEL": "warn"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -154,7 +154,7 @@ func TestTheEnvironmentWinsOverTheFile(t *testing.T) {
 // the file applies.
 func TestAnEmptyVariableLeavesTheFileInEffect(t *testing.T) {
 	p := writeConfig(t, "database_url: postgres://x\nlog_level: debug\n", 0o600)
-	c, settings, err := Inspect(withFile(p, map[string]string{"DIFFLUENCE_LOG_LEVEL": ""}))
+	c, settings, err := Inspect(withFile(p, map[string]string{"KENWERK_LOG_LEVEL": ""}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestTheEnvironmentsFileVariantWinsOverTheFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	p := writeConfig(t, "database_url: postgres://file\n", 0o600)
-	c, err := Load(withFile(p, map[string]string{"DIFFLUENCE_DATABASE_URL_FILE": secret}))
+	c, err := Load(withFile(p, map[string]string{"KENWERK_DATABASE_URL_FILE": secret}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestAnEmptySecretNeedsNoPrivateFile(t *testing.T) {
 
 func TestTheReportNamesEverySourceAndHidesSecrets(t *testing.T) {
 	p := writeConfig(t, "database_url: postgres://owner:dbpass@db:5432/wiki\nlog_level: debug\nmetrics_token: s3cret-token\nsmtp:\n  host: mail.example.com\n  from: w@example.com\n", 0o600)
-	_, settings, err := Inspect(withFile(p, map[string]string{"DIFFLUENCE_LOG_LEVEL": "warn", "DIFFLUENCE_PDF_PASSWORD": "pdfpass"}))
+	_, settings, err := Inspect(withFile(p, map[string]string{"KENWERK_LOG_LEVEL": "warn", "KENWERK_PDF_PASSWORD": "pdfpass"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -270,7 +270,7 @@ func TestTheReportNamesEverySourceAndHidesSecrets(t *testing.T) {
 
 // The example that ships must load as written, with its secrets in files of their own.
 func TestTheExampleFileLoads(t *testing.T) {
-	body, err := os.ReadFile(filepath.Join("..", "..", "deploy", "diffluence.example.yaml"))
+	body, err := os.ReadFile(filepath.Join("..", "..", "deploy", "kenwerk.example.yaml"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +293,7 @@ func TestTheExampleFileLoads(t *testing.T) {
 
 // Every setting Load asks for is a key of the file; there is no second list to forget.
 func TestEverySettingIsAKeyOfTheFile(t *testing.T) {
-	_, settings, err := Inspect(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	_, settings, err := Inspect(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil {
 		t.Fatal(err)
 	}

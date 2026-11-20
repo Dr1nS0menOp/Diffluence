@@ -15,15 +15,15 @@ Verified on 2026-11-04 against real Authentik 2026.8.5, with a real browser goin
 - **Grant types: enable `authorization_code`.** Without it Authentik answers "the request is otherwise malformed", and the audit log shows `provider_error:invalid_request`.
 
 ```sh
-DIFFLUENCE_OIDC_ISSUER=https://auth.example.com/application/o/<slug>/
-DIFFLUENCE_OIDC_CLIENT_ID=...
-DIFFLUENCE_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc_client_secret
-DIFFLUENCE_OIDC_DISPLAY_NAME=Authentik
-DIFFLUENCE_OIDC_GROUPS_CLAIM=groups        # optional
-DIFFLUENCE_OIDC_AUTO_CREATE=true           # optional: accounts at first login, see "Who gets an account"
+KENWERK_OIDC_ISSUER=https://auth.example.com/application/o/<slug>/
+KENWERK_OIDC_CLIENT_ID=...
+KENWERK_OIDC_CLIENT_SECRET_FILE=/run/secrets/oidc_client_secret
+KENWERK_OIDC_DISPLAY_NAME=Authentik
+KENWERK_OIDC_GROUPS_CLAIM=groups        # optional
+KENWERK_OIDC_AUTO_CREATE=true           # optional: accounts at first login, see "Who gets an account"
 ```
 
-**SCIM.** In Diffluence: Administration, Security, Provisioning, New token. In Authentik: create a SCIM provider with URL `https://wiki.example.com/scim/v2` and that token, using the default user and group mappings, then add it as a backchannel provider of the application. Users and groups arrive automatically.
+**SCIM.** In Kenwerk: Administration, Security, Provisioning, New token. In Authentik: create a SCIM provider with URL `https://wiki.example.com/scim/v2` and that token, using the default user and group mappings, then add it as a backchannel provider of the application. Users and groups arrive automatically.
 
 Authentik sets `externalId` to the same value as the OIDC subject. That is how an account created through SCIM is linked at first login, without trusting an e-mail address. Authentik does not mark addresses as verified by default, so linking on e-mail would not work there anyway.
 
@@ -48,23 +48,23 @@ Any provider with discovery, the code flow and PKCE should work. For a groups cl
 - Disabling a user ends their sessions at once, for every login method.
 - Deleting a user through SCIM disables the account. Their content and audit trail stay.
 - Groups from SCIM or OIDC are read-only in the admin console.
-- If a provider removes the last administrator, `diffluence user create-admin` is the way back. SCIM acts as the system, so the rule that keeps one administrator does not stop it: a provider can disable every administrator, and only someone with the host can undo that (SEC-159).
-- Providers look people up by e-mail address with `GET /scim/v2/Users?filter=...`, so the address sits in the query string, as RFC 7644 allows but advises against. Diffluence never logs query strings. **Your reverse proxy must not log them either**: log the path only, or turn access logs off for `/scim/v2` (SEC-161).
+- If a provider removes the last administrator, `kenwerk user create-admin` is the way back. SCIM acts as the system, so the rule that keeps one administrator does not stop it: a provider can disable every administrator, and only someone with the host can undo that (SEC-159).
+- Providers look people up by e-mail address with `GET /scim/v2/Users?filter=...`, so the address sits in the query string, as RFC 7644 allows but advises against. Kenwerk never logs query strings. **Your reverse proxy must not log them either**: log the path only, or turn access logs off for `/scim/v2` (SEC-161).
 - A SCIM filter is understood whole or refused: only `eq` on the attributes a route reads, joined by `and`.
 
 ## How long a login lasts
 
 A login through a provider opens a session here, and from then on the two run apart:
 
-- **Ending a session at the provider does not end it here.** It runs until its idle limit (8 hours by default) or its absolute limit (7 days), unless SCIM disables the person, which ends it at once. Set `DIFFLUENCE_SESSION_IDLE_TIMEOUT` shorter if that matters, and use SCIM so leaving the organisation counts here straight away.
+- **Ending a session at the provider does not end it here.** It runs until its idle limit (8 hours by default) or its absolute limit (7 days), unless SCIM disables the person, which ends it at once. Set `KENWERK_SESSION_IDLE_TIMEOUT` shorter if that matters, and use SCIM so leaving the organisation counts here straight away.
 - **Asking for proof again** before a heavy action sends a person back to the provider for a fresh login.
 - **A provider with a shorter session** does not shorten ours. Choose the limits here with the provider's in mind, and write the choice down.
 - **There is no limit on the number of sessions per person** (ASVS 7.1.2). A person sees every session under Account, Sessions, and ends any of them there (SEC-179).
 
 ## Who gets an account
 
-`DIFFLUENCE_OIDC_AUTO_CREATE` is off by default: a login through the provider then opens only an account that already exists, made through SCIM or by invitation. Set it to `true` and **everyone the provider lets in gets an account here at their first login.** That suits a provider that only holds your own organisation. With a shared or public provider, leave it off, or limit who may log in at the provider itself.
+`KENWERK_OIDC_AUTO_CREATE` is off by default: a login through the provider then opens only an account that already exists, made through SCIM or by invitation. Set it to `true` and **everyone the provider lets in gets an account here at their first login.** That suits a provider that only holds your own organisation. With a shared or public provider, leave it off, or limit who may log in at the provider itself.
 
-A new account takes its e-mail address from the provider, so it is made only when the provider says it verified that address (`email_verified: true` in the token). Otherwise the login is refused, and the audit log shows the reason `email_not_verified`: with a provider where people choose their own address, someone could otherwise take the address of a colleague who has not logged in yet. Authentik does not mark addresses as verified by default, and Entra ID does not send the claim. With such a provider, either mark the addresses verified there, or set `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only your organisation can set an address at the provider.
+A new account takes its e-mail address from the provider, so it is made only when the provider says it verified that address (`email_verified: true` in the token). Otherwise the login is refused, and the audit log shows the reason `email_not_verified`: with a provider where people choose their own address, someone could otherwise take the address of a colleague who has not logged in yet. Authentik does not mark addresses as verified by default, and Entra ID does not send the claim. With such a provider, either mark the addresses verified there, or set `KENWERK_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only your organisation can set an address at the provider.
 
 A group from the provider can hold *administrator*. Whoever controls that group at the provider then controls this instance, so treat the provider's administrators as administrators here, and protect their accounts the same way.

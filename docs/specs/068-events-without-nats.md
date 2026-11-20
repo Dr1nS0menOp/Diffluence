@@ -2,10 +2,10 @@
 
 Status: study and plan, 2026-11-13. Waves EV1 (section 6) and EV2 (section 7) are built: the
 PostgreSQL path stands beside NATS, and an operator switches to it with
-`diffluence events switch postgres`; nothing switches by itself. Blueprint lines: ADR-007,
+`kenwerk events switch postgres`; nothing switches by itself. Blueprint lines: ADR-007,
 ADR-018, OPS-012, OPS-083; spec 062 (F1, F3, T6) and spec 063 (F1).
 
-Written for: the people who build and run Diffluence, and the product owner, who decides.
+Written for: the people who build and run Kenwerk, and the product owner, who decides.
 
 ## Why
 
@@ -41,9 +41,9 @@ may be overruled.
    `audit.Record`, with the audit action as the event type (for example `pages.go:205-222`).
 2. The relay in the worker (`outbox.Relay`) polls every 500 ms, claims up to 100 rows with
    `FOR UPDATE SKIP LOCKED` in `created_at, id` order, publishes each to the subject
-   `diffluence.events.<type>` with the event id as the message id, and sets `published_at` in the
+   `kenwerk.events.<type>` with the event id as the message id, and sets `published_at` in the
    same transaction. Events over 900 KiB are set aside as failures.
-3. JetStream keeps the stream `DIFFLUENCE_EVENTS` (file storage, 7 days, duplicate window
+3. JetStream keeps the stream `KENWERK_EVENTS` (file storage, 7 days, duplicate window
    2 minutes, replicas from spec 063).
 4. Four durable consumers, all in the worker role, get every event. Each acks on success, or
    asks again after 10 s, 1 min, 5 min, 15 min and 1 h; after that the event goes to
@@ -52,7 +52,7 @@ may be overruled.
 
 API nodes publish nothing and consume nothing. They connect to NATS only so that readiness
 (`needsQueueToBeReady`), the upgrade check (`ProblemQueue`) and the gauge
-`diffluence_queue_healthy` can report it.
+`kenwerk_queue_healthy` can report it.
 
 ### 1.2 Producers
 
@@ -132,7 +132,7 @@ change tx ──INSERT──▶ outbox_events          (as today: commits with t
             sequencer (one at a time, under an advisory xact lock)
                            │  moves rows in order, gives each a gapless position
                            ▼
-                      event_log (pos, lane, id, type, payload, …)   ── NOTIFY diffluence_events
+                      event_log (pos, lane, id, type, payload, …)   ── NOTIFY kenwerk_events
                            │
       ┌────────────┬───────┴─────┬────────────┐
  notifications  automation   webhooks       collab        one cursor per (consumer, lane),
@@ -159,7 +159,7 @@ One transaction per batch of up to 500:
    can hand out a value twice if its log record was not on disk.
 4. Insert the rows into `event_log` with positions `head-n+1 … head` and their lane (2.4).
 5. Delete them from `outbox_events`.
-6. `SELECT pg_notify('diffluence_events', '<head>')`.
+6. `SELECT pg_notify('kenwerk_events', '<head>')`.
 7. Commit, with `synchronous_commit` as the server has it (on).
 
 Because the lock is held until commit, the next batch sees this one committed, and every row it
@@ -238,7 +238,7 @@ applied.
 
 **D6. NOTIFY is a hint, polling is the guarantee.**
 
-- Each worker holds one dedicated connection that runs `LISTEN diffluence_events`. A notification
+- Each worker holds one dedicated connection that runs `LISTEN kenwerk_events`. A notification
   wakes all its consumer loops at once.
 - Every loop also polls every second without a wake-up, so a lost notification, a dropped
   connection or a database failover costs at most one second of latency, never an event.
@@ -246,9 +246,9 @@ applied.
   limit. Events are never sent in a notification.
 - Notifications reach only sessions connected at commit; a worker that reconnects polls at once.
 - `LISTEN` needs a session. Behind PgBouncer in transaction mode it does not work, so the
-  listening connection uses `DIFFLUENCE_LISTEN_DATABASE_URL` (**D8**) when set, pointing at the
-  database directly or at HAProxy (as `DIFFLUENCE_MIGRATE_DATABASE_URL` does for migrations, but
-  with the application role, not the owner). Unset, it uses `DIFFLUENCE_DATABASE_URL`. If LISTEN
+  listening connection uses `KENWERK_LISTEN_DATABASE_URL` (**D8**) when set, pointing at the
+  database directly or at HAProxy (as `KENWERK_MIGRATE_DATABASE_URL` does for migrations, but
+  with the application role, not the owner). Unset, it uses `KENWERK_DATABASE_URL`. If LISTEN
   does not work there, the worker logs it once and runs on polling.
 - PostgreSQL's notification queue is 8 GB by default and is drained by every listener; one
   listening connection per worker, which only reads, keeps it empty.
@@ -316,9 +316,9 @@ is no second store with its own sync policy to decide.
 
 ### 2.9 Seeing it run
 
-- Gauges: `diffluence_events_waiting` (rows in `outbox_events`), `diffluence_event_lag_seconds`
-  per consumer (age of the oldest event past its cursors), `diffluence_event_retries` per
-  consumer. They replace `diffluence_queue_healthy`.
+- Gauges: `kenwerk_events_waiting` (rows in `outbox_events`), `kenwerk_event_lag_seconds`
+  per consumer (age of the oldest event past its cursors), `kenwerk_event_retries` per
+  consumer. They replace `kenwerk_queue_healthy`.
 - System health warns when an event waits more than a minute for the sequencer, or a consumer
   lags more than 5 minutes, as it does for the audit sealer today.
 
@@ -333,7 +333,7 @@ The state is all in one database, so loss is a query, not an estimate:
 - **L4** (witness). In tests and on the server, a webhook endpoint subscribed to every type is a
   ledger: `webhook_deliveries` must hold one row per event in `event_log`, by event id.
 
-`diffluence events check` runs L1 to L3 and prints the first breach. The hard-reset test of
+`kenwerk events check` runs L1 to L3 and prints the first breach. The hard-reset test of
 section 5 runs it after recovery, together with L4 against the load tool's own list of changes it
 saw acknowledged.
 
@@ -358,7 +358,7 @@ and the sequencer are one loop under the events lock:
 
 **Release N+2 (B)** removes NATS. Its upgrade check refuses, as it does for a missing backup,
 unless `event_transport = 'postgres'` and `nats_drained_at` is set, and names what to do.
-`DIFFLUENCE_NATS_URL` and `DIFFLUENCE_NATS_REPLICAS` are accepted and ignored with a warning in B,
+`KENWERK_NATS_URL` and `KENWERK_NATS_REPLICAS` are accepted and ignored with a warning in B,
 and refused in the release after it.
 
 Published rows with `published_at` set stay in `outbox_events` until the existing 7-day purge,
@@ -466,7 +466,7 @@ outside the binary, and NATS as a future bus between installations. None is in t
   follow (ADR-016).
 - Code: `internal/queue`, the relay's publish path, the 900 KiB limit's reason, the NATS store
   under the data folder.
-- Configuration: `DIFFLUENCE_NATS_URL`, `DIFFLUENCE_NATS_REPLICAS`, the rule that only role `all`
+- Configuration: `KENWERK_NATS_URL`, `KENWERK_NATS_REPLICAS`, the rule that only role `all`
   may embed, and their Helm, Compose and HA script lines.
 - Operations: three NATS machines in the HA layout of spec 062, their install and upgrade, test
   T6, and "A NATS cluster" in "Not run".
@@ -528,7 +528,7 @@ release A first.
 
 | Wave | What | Proof |
 |---|---|---|
-| **EV1** | Release A, part 1: migration (tables, `event_head`, `event_transport = 'nats'`); the sequencer in the relay loop behind the transport value; consumer loops with lanes, leases, retries, the LISTEN connection and polling; `diffluence events check`; gauges and System health. Default stays `nats` | Tests written first: `TestALateCommitIsNotSkipped` (a transaction that started first and committed last gets the later position), `TestPositionsHaveNoGaps`, `TestEveryEventReachesEveryConsumer`, `TestAFailedEventDoesNotHoldItsLane`, `TestARetryEndsInFailures`, `TestAnEndedLeaseIsTakenOver`, `TestALostCursorCommitRepeatsAndNeverSkips`, `TestPollingDeliversWithoutNotify`, `TestASaveDoesNotNotify`, `TestEventsOfOnePageKeepTheirOrder`. Mutations on every SQL condition (`pos >`, lane filter, lease check, retry insert, delete in the sequencer, the cleanup bound) |
+| **EV1** | Release A, part 1: migration (tables, `event_head`, `event_transport = 'nats'`); the sequencer in the relay loop behind the transport value; consumer loops with lanes, leases, retries, the LISTEN connection and polling; `kenwerk events check`; gauges and System health. Default stays `nats` | Tests written first: `TestALateCommitIsNotSkipped` (a transaction that started first and committed last gets the later position), `TestPositionsHaveNoGaps`, `TestEveryEventReachesEveryConsumer`, `TestAFailedEventDoesNotHoldItsLane`, `TestARetryEndsInFailures`, `TestAnEndedLeaseIsTakenOver`, `TestALostCursorCommitRepeatsAndNeverSkips`, `TestPollingDeliversWithoutNotify`, `TestASaveDoesNotNotify`, `TestEventsOfOnePageKeepTheirOrder`. Mutations on every SQL condition (`pos >`, lane filter, lease check, retry insert, delete in the sequencer, the cleanup bound) |
 | **EV2** | Release A, part 2: the switch and the drain; the trace column; the upgrade check of release B written and tested against fixtures | `TestEachEventGoesOneWayAcrossTheSwitch`, `TestAnOldRelayAfterTheSwitchLosesNothing` (an N relay still running), `TestTheSwitchWaitsForEveryNode`, `TestDrainedIsSetOnlyWhenNothingWaits`; the CI upgrade job across the switch (G4) |
 | **Measure** | B1, B2 in the development container; B3, B5 and G3 in one session on the stress server | Results in `limits.md` and a report in `docs/reports`. Gate for EV3 |
 | **EV3** | Release B: remove `internal/queue`, the NATS modules, the settings (warned, then refused), the readiness and upgrade parts, Helm, Compose, HA scripts; a new ADR superseding ADR-007; update ADR-018, OPS-012, OPS-083, spec 062, `limits.md`, `dependencies.md`, the install guide | `go mod tidy` diff; the upgrade check refuses without the drain (test); the whole suite and the mutation check; the rolling upgrade A to B |
@@ -553,10 +553,10 @@ release A first.
 | Tables `event_head`, `event_transport`, `event_log`, `event_cursors`, `event_retries`; the vacuum setting of `outbox_events` | migration 0053 | Created; `event_transport` holds `nats` |
 | The sequencer (D1) | `internal/events/sequencer.go`, called by the relay through `outbox.Sequencer` | Takes the events lock on every batch, then reads the transport. Under `nats` the relay publishes as before |
 | Consumer loops: four lanes per consumer, leases, cursors, retries (D3 to D5) | `internal/events/consumer.go`, `retries.go` | The worker reads the transport once a minute and starts them only on `postgres` |
-| The listening connection and polling (D6, D8) | `internal/events/listen.go`; `DIFFLUENCE_LISTEN_DATABASE_URL` | Starts with the consumer loops |
+| The listening connection and polling (D6, D8) | `internal/events/listen.go`; `KENWERK_LISTEN_DATABASE_URL` | Starts with the consumer loops |
 | Cleanup (D10) | `clean-up-event-log`, hourly | Runs; with no cursor it deletes nothing |
-| `diffluence events check` (L1 to L3) | `cmd/diffluence` | Works under both transports |
-| Gauges and System health (2.9) | `diffluence_events_waiting`, `diffluence_event_lag_seconds{consumer}`, `diffluence_event_retries{consumer}`; codes `events_waiting`, `events_lagging` | `events_waiting` warns under both transports |
+| `kenwerk events check` (L1 to L3) | `cmd/kenwerk` | Works under both transports |
+| Gauges and System health (2.9) | `kenwerk_events_waiting`, `kenwerk_event_lag_seconds{consumer}`, `kenwerk_event_retries{consumer}`; codes `events_waiting`, `events_lagging` | `events_waiting` warns under both transports |
 
 Nothing sets the transport to `postgres` in this release: that is the switch of EV2, which also
 drains NATS. The tests and the measurement set it on a throw-away database.
@@ -650,7 +650,7 @@ EV2. **G5** is met for this wave: every one of the 48 mutations it added is caug
 ### 7.1 The switch, on an operator's command
 
 Section 2.11 had a worker switch by itself once every node ran release A. This release switches
-only when an operator runs `diffluence events switch postgres` (D24): the measurements on the
+only when an operator runs `kenwerk events switch postgres` (D24): the measurements on the
 stress server (G2, G3) come after this wave, and 5.1 keeps release A on `nats` until they pass.
 
 | Step | What happens |
@@ -673,12 +673,12 @@ database as any earlier release leaves it, and refuses, naming what to do, when:
 | The database | The problem names |
 |---|---|
 | has no `event_transport`, or no `nats_drained_at` | upgrade to the release that switches first |
-| is on `nats` | `diffluence events switch postgres` |
+| is on `nats` | `kenwerk events switch postgres` |
 | has a node of a release from before 0053 seen in five minutes | that node |
 | is on `postgres`, not drained | wait until `events status` says drained |
 | has an outbox row published at or after the drain | stop the older node, switch again, wait |
 
-It is tested against a fixture of each state. `diffluence events status` uses it now; EV3 puts it
+It is tested against a fixture of each state. `kenwerk events status` uses it now; EV3 puts it
 into the checks before an upgrade, with the kind `events`.
 
 ### 7.3 The trace
@@ -703,13 +703,13 @@ sequencer reaches it, then both side by side under writers) passed at once: EV1'
 already waits for a row an older relay holds. It guards that, and the existing mutation of the
 `published_at` filter breaks it. Elsewhere: `TestATraceGoesFromTheSaveToTheConsumer`, two tests in
 `internal/tracing`, `TestAnEventWaitingForItsRetryCountsAsWaiting` in `internal/queue`,
-`TestEventsSwitchAndStatus` in `cmd/diffluence`, and in `internal/app`
+`TestEventsSwitchAndStatus` in `cmd/kenwerk`, and in `internal/app`
 `TestARunningWorkerFollowsTheSwitchAndNotesTheDrain`, a running node that hears of a mention
 through NATS, is switched, hears of the next through the log, and notes the drain.
 
 The CI `upgrade` job (G4) now switches while release N and this one run side by side (or once N
 stops, if N is from before 0053), writes through both, and fails unless every event of the log
-reaches all four consumers, NATS is noted drained, and `diffluence events check` passes, before
+reaches all four consumers, NATS is noted drained, and `kenwerk events check` passes, before
 and after the rollback. It proves delivery by cursors and the drain, not by the webhook witness of
 L4.
 
@@ -733,7 +733,7 @@ and 24 busy processes did not fail, so it is not proven.
 ### 7.6 Measured again on the real data set
 
 `TestEventsOnRealData` on 13 November 2026, on the same dump and container as 6.4, now through
-`diffluence events switch` and with the trace column. The machine's load rose from 4 to 24 during
+`kenwerk events switch` and with the trace column. The machine's load rose from 4 to 24 during
 the run, as other builds started, so the later stages are pessimistic.
 
 | Stage | Lag p50 / p95, notifications | Lag p95, the other three | Queue database time |
@@ -763,7 +763,7 @@ Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
 | D5 | Four lanes per consumer, by page, space, user or group, else event id |
 | D6 | NOTIFY only wakes; every loop polls every second, so a lost notification costs latency, never an event |
 | D7 | Only the sequencer sends NOTIFY; saves never do |
-| D8 | `DIFFLUENCE_LISTEN_DATABASE_URL` for the listening connection behind PgBouncer, defaulting to the database URL, with the application role |
+| D8 | `KENWERK_LISTEN_DATABASE_URL` for the listening connection behind PgBouncer, defaulting to the database URL, with the application role |
 | D9 | Target: an event handled by every consumer within 1 s (p95) at four times the model |
 | D10 | `event_log` kept 7 days and never below a cursor; batched delete, no partitioning unless B1 or B3 asks for it; own autovacuum settings for `outbox_events` |
 | D11 | The queue is code of our own on pgx, following the jobs, mail queue and audit sealer patterns, rather than a job library |
@@ -779,13 +779,13 @@ Each decided on the product owner's behalf on 2026-11-13; each may be overruled.
 | D21 | Wave EV1: L3 counts a worker only after it has run a minute |
 | D22 | Wave EV1: System health warns in its "work" line when an event waits over a minute (both transports) or a consumer lags over five minutes; a gauge may carry one label, here the consumer |
 | D23 | Wave EV1: migration 0052 is a placeholder on this branch for the number wave RV1 holds; it goes when RV1 merges |
-| D24 | Wave EV2: the switch is an operator's command, `diffluence events switch postgres`, not automatic on upgrade, because G2 and G3 are measured after this wave. A later release may switch by itself once they pass |
+| D24 | Wave EV2: the switch is an operator's command, `kenwerk events switch postgres`, not automatic on upgrade, because G2 and G3 are measured after this wave. A later release may switch by itself once they pass |
 | D25 | Wave EV2: release A starts at migration 0053, since EV1's relays already take the events lock and its workers start the consumers of the log on `postgres`; the switch waits only for nodes below 0053 seen in the last five minutes |
 | D26 | Wave EV2: the switch creates the cursors of the four consumers at the head in its own transaction; a cursor made at a worker's first look (D16) would skip events sequenced in between |
-| D27 | Wave EV2: the undo is `diffluence events switch nats`, at any time, without waiting for nodes; a worker runs the consumers of the log while the transport is `postgres`, a cursor is behind an event of its lane, or a retry waits |
+| D27 | Wave EV2: the undo is `kenwerk events switch nats`, at any time, without waiting for nodes; a worker runs the consumers of the log while the transport is `postgres`, a cursor is behind an event of its lane, or a retry waits |
 | D28 | Wave EV2: NATS is drained when the four durables have no pending and no unacknowledged message (a waiting retry is unacknowledged), no older node runs, and no switch came while NATS was asked (`changed_at` moves on every switch); a missing durable is an error, not empty. A periodic task notes it each minute, and an older node that shows up undoes it |
 | D29 | Wave EV2: a switch to `postgres` while on `postgres` starts a new drain; release B refuses when an outbox row was published at or after the drain |
-| D30 | Wave EV2: the check of release B is `events.NATSRemovalProblem`, used by `diffluence events status` now and by the upgrade check in EV3 |
+| D30 | Wave EV2: the check of release B is `events.NATSRemovalProblem`, used by `kenwerk events status` now and by the upgrade check in EV3 |
 | D31 | Wave EV2: the trace column holds the W3C `traceparent` only, stored when tracing is on; the NATS path is unchanged |
 | D32 | Wave EV2: a worker checks every 5 s, not every minute, whether to run the consumers of the log; one row read |
 | D33 | Wave EV2: migration 0059 holds the two columns and may run twice; 0058 is a placeholder for wave DC2 until it lands |

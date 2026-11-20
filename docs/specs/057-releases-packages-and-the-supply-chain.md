@@ -33,12 +33,12 @@ Every action is pinned by commit SHA, with the tag in a comment, as `renovate.js
 
 ### 1. Packages and archives (OPS-093, OPS-005)
 
-- `.goreleaser.yaml` builds `./cmd/diffluence` for `linux/amd64` and `linux/arm64`, with `CGO_ENABLED=0`, `-trimpath` and the same `-ldflags` as the `Makefile`: the version (`v` and the tag) and the date of the commit. `mod_timestamp` is the commit time, so files carry no build time.
+- `.goreleaser.yaml` builds `./cmd/kenwerk` for `linux/amd64` and `linux/arm64`, with `CGO_ENABLED=0`, `-trimpath` and the same `-ldflags` as the `Makefile`: the version (`v` and the tag) and the date of the commit. `mod_timestamp` is the commit time, so files carry no build time.
 - The web assets are built before GoReleaser, in the workflow (`npm ci` and `vite build`), because they are embedded in the binary.
-- **Archives:** `diffluence_<version>_linux_<arch>.tar.gz` with the binary, `LICENSE`, `NOTICE`, `README.md`, `CHANGELOG.md`, the systemd unit, `install-lxc.sh` and the example configuration.
+- **Archives:** `kenwerk_<version>_linux_<arch>.tar.gz` with the binary, `LICENSE`, `NOTICE`, `README.md`, `CHANGELOG.md`, the systemd unit, `install-lxc.sh` and the example configuration.
 - **Packages:** `.deb` and `.rpm` through nFPM.
-  - The binary goes to `/usr/bin/diffluence`, and the unit to `/usr/lib/systemd/system/diffluence.service`. The unit is made from `deploy/systemd/diffluence.service`, with only the path of the binary changed, so there is one unit to keep.
-  - `postinstall` creates the system user and group `diffluence`, `/var/lib/diffluence` (0700, owned by the user) and `/etc/diffluence` (0750, `root:diffluence`). It reloads systemd and restarts the service only if it already runs (an upgrade). It never enables or starts it on a first install, because there is no configuration yet. It prints where the next steps are.
+  - The binary goes to `/usr/bin/kenwerk`, and the unit to `/usr/lib/systemd/system/kenwerk.service`. The unit is made from `deploy/systemd/kenwerk.service`, with only the path of the binary changed, so there is one unit to keep.
+  - `postinstall` creates the system user and group `kenwerk`, `/var/lib/kenwerk` (0700, owned by the user) and `/etc/kenwerk` (0750, `root:kenwerk`). It reloads systemd and restarts the service only if it already runs (an upgrade). It never enables or starts it on a first install, because there is no configuration yet. It prints where the next steps are.
   - `preremove` stops and disables the service only when the package is really removed, not on an upgrade. The data folder, the configuration and the user are kept on removal; the guide says how to remove them.
   - The packages recommend `postgresql` and do not depend on it, since the database may run elsewhere.
 - **Checksums:** `checksums.txt`, SHA-256, over every archive, package and SBOM.
@@ -61,13 +61,13 @@ Every action is pinned by commit SHA, with the tag in a comment, as `renovate.js
 - It runs only on a pushed tag `v<major>.<minor>.<patch>`, never on a pull request and never on a branch.
 - `permissions: {}` at the top. The one job gets `contents: write` (the draft release), `packages: write` (the image on GHCR), `id-token: write` (keyless signing and attestations) and `attestations: write`.
 - It refuses a tag that is not on `main`.
-- The image goes to `ghcr.io/<owner>/diffluence:<version>`, for `linux/amd64` and `linux/arm64`, built from the same `Dockerfile` as CI with QEMU for arm64. That is slow, but a release is rare, and one Dockerfile stays the only recipe for the image.
+- The image goes to `ghcr.io/<owner>/kenwerk:<version>`, for `linux/amd64` and `linux/arm64`, built from the same `Dockerfile` as CI with QEMU for arm64. That is slow, but a release is rare, and one Dockerfile stays the only recipe for the image.
 
 ### 4. Reproducibility (OPS-095)
 
 - `scripts/reproducible.sh` copies the tree twice, to folders of a different depth and name. In each it builds the web assets and the binary, with its own Go build cache and npm cache, the same version and the same commit date. It compares every file of `internal/webui/dist/` and the binary byte for byte, names each file that differs, and exits 1 then.
 - The CI job `release-dry-run` runs it, then `goreleaser check`, then a snapshot release twice, comparing the archives and packages too.
-- It also installs the `.deb` in a clean Debian container and the `.rpm` in a clean Fedora container, and runs `diffluence version` there.
+- It also installs the `.deb` in a clean Debian container and the `.rpm` in a clean Fedora container, and runs `kenwerk version` there.
 - The job runs on pushes to `main` and on the nightly run, not on pull requests. It only proves that a release still builds, so it need not hold up a review.
 
 ### 5. Base images by digest (OPS-096)
@@ -80,7 +80,7 @@ Every action is pinned by commit SHA, with the tag in a comment, as `renovate.js
 ### 6. Feature toggles (OPS-097)
 
 Not built. No feature is shipped dark today, and the coding standards say to write no code for a need that does not exist yet. `release.md` gets the rule for the first toggle instead:
-- a named setting `DIFFLUENCE_FEATURE_<NAME>`, read once at start through the configuration of spec 056;
+- a named setting `KENWERK_FEATURE_<NAME>`, read once at start through the configuration of spec 056;
 - with an owner and an issue for its removal in the changelog;
 - removed within two releases.
 
@@ -101,8 +101,8 @@ Before 1.0, nothing is supported, as today.
 |---|---|---|
 | The configuration is valid | `goreleaser check` | Locally in the GoReleaser container; CI dry run |
 | Archives and packages build for amd64 and arm64 | `goreleaser release --snapshot --clean --skip=sign,sbom` | Locally; CI dry run |
-| The `.deb` installs, creates the user and folders, places the unit, and the service starts against a test database | Install in a clean Debian 12 container with systemd as PID 1 and a PostgreSQL container beside it; `systemctl start diffluence`; `/readyz` | Locally |
-| The `.rpm` installs and runs | `rpm -i` in a clean Fedora container, `diffluence version` | Locally; CI dry run |
+| The `.deb` installs, creates the user and folders, places the unit, and the service starts against a test database | Install in a clean Debian 12 container with systemd as PID 1 and a PostgreSQL container beside it; `systemctl start kenwerk`; `/readyz` | Locally |
+| The `.rpm` installs and runs | `rpm -i` in a clean Fedora container, `kenwerk version` | Locally; CI dry run |
 | The binary and the web assets reproduce | `scripts/reproducible.sh` | Locally; CI dry run |
 | The packages reproduce | Two snapshot runs, `checksums.txt` compared | Locally; CI dry run |
 | The SBOMs list Go modules and npm packages | syft on the binary and the source tree | Locally, with the syft container |
@@ -125,15 +125,15 @@ None. Nothing here runs in the product. The dry run adds a CI job of about eight
 ## Decided in this wave
 
 - **D1. The image is built by the existing `Dockerfile` with buildx and QEMU, not by GoReleaser.** One recipe for the image keeps CI and the release image the same; arm64 under QEMU is slow, but releases are rare.
-- **D2. One systemd unit, two paths.** The package unit is made from `deploy/systemd/diffluence.service` at release time, with `/usr/local/bin` changed to `/usr/bin`, because files installed by a package belong under `/usr` and files installed by hand under `/usr/local`.
+- **D2. One systemd unit, two paths.** The package unit is made from `deploy/systemd/kenwerk.service` at release time, with `/usr/local/bin` changed to `/usr/bin`, because files installed by a package belong under `/usr` and files installed by hand under `/usr/local`.
 - **D3. A package never starts the service on a first install,** because it has no database address yet. It does restart a running service on an upgrade, as Debian packages do, and the checks before an upgrade (spec 054) then decide whether it may migrate.
 - **D4. The release is a draft.** A person reads the notes and publishes it; the image is pushed before that, under the version tag only.
 - **D5. The dry run runs on `main` and nightly, not on pull requests,** following the product owner's wish for quicker checks during development (2026-11-11).
 - **D6. No toggle code** (section 6).
-- **D7. The systemd unit sets `DIFFLUENCE_DATA_DIR` and `DIFFLUENCE_HTTP_ADDR` itself.** Installing the package in a Debian container with systemd showed that the unit worked only when the environment file named the data folder, as `install-lxc.sh` writes it: otherwise the embedded queue tried to keep its store outside the one folder the sandbox lets the service write, and the service restarted again and again. The unit now carries both defaults, and the environment file may still change them. With them, the full sandbox of the unit starts and `/readyz` answers 200; no sandbox option had to be loosened.
+- **D7. The systemd unit sets `KENWERK_DATA_DIR` and `KENWERK_HTTP_ADDR` itself.** Installing the package in a Debian container with systemd showed that the unit worked only when the environment file named the data folder, as `install-lxc.sh` writes it: otherwise the embedded queue tried to keep its store outside the one folder the sandbox lets the service write, and the service restarted again and again. The unit now carries both defaults, and the environment file may still change them. With them, the full sandbox of the unit starts and `/readyz` answers 200; no sandbox option had to be loosened.
 - **D8. Two kinds of file differ between builds by design:** the SBOMs, because syft writes a creation time and a document id. The reproducibility check compares the binary, the web assets, the archives and the packages, not the SBOMs.
 
 ## Found while building
 
-- An RPM records the name of the machine that built it, so two builds differed in that one field. The configuration now sets a fixed build host (`diffluence-release`), and the `.rpm` files reproduce.
+- An RPM records the name of the machine that built it, so two builds differed in that one field. The configuration now sets a fixed build host (`kenwerk-release`), and the `.rpm` files reproduce.
 - GoReleaser runs syft inside `dist/`, so the SBOM of the source scans the folder above it (`dir:..`), and syft's exclude patterns need `/**`.

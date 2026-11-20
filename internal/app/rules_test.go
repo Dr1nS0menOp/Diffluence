@@ -17,10 +17,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/webhooks"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/webhooks"
 )
 
 func onComment(actions ...map[string]any) map[string]any {

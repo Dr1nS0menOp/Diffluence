@@ -8,11 +8,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/analytics"
-	"github.com/diffluence/diffluence/internal/csvout"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/presence"
+	"github.com/kenwerk/kenwerk/internal/analytics"
+	"github.com/kenwerk/kenwerk/internal/csvout"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/presence"
 )
 
 const popularPagesShown = 5

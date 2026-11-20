@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Document control, wave DC5 of spec 064: moves, copies and imports (DOC-1200 to DOC-1213),

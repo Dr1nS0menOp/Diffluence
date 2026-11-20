@@ -166,7 +166,7 @@ Go integration tests for each route, with people who may and may not. Vitest for
 ## For the product owner to decide
 
 - No dependency was added, and none is asked for.
-- Which office service to run. Collabora needs `DIFFLUENCE_COLLABORA_URL`, the other choice is the `pdf` profile.
+- Which office service to run. Collabora needs `KENWERK_COLLABORA_URL`, the other choice is the `pdf` profile.
 - Whether the rest of chapter 5, the further dynamic blocks, is worth a small wave of its own.
 
 ## Provenance

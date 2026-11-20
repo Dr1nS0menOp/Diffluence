@@ -9,12 +9,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/labels"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/labels"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The parts of making a set of pages from a template that belong to pages (spec 074).

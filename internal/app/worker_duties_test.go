@@ -17,11 +17,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // In Compose the backup service migrates and signs checkpoints, and the server holds only

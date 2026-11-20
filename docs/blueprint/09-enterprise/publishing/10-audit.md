@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-draft-and-published-spaces.md](01-draft-and-published-spaces.md).
 
-The question an auditor asks of a published space is: what did readers have on a given date, where did it come from, and who decided it. ISO 9001 7.5.3.2 asks for control of distribution, access, changes (version control) and retention; where the pair holds controlled documents, Part 11 §11.10(e) asks for secure, computer-generated, time-stamped audit trails. Diffluence's audit log is hash-chained, sealed after saving (ADR-041) and witnessed outside the database (ADR-039); this chapter says what the pair writes to it, and how the history of releases is read.
+The question an auditor asks of a published space is: what did readers have on a given date, where did it come from, and who decided it. ISO 9001 7.5.3.2 asks for control of distribution, access, changes (version control) and retention; where the pair holds controlled documents, Part 11 §11.10(e) asks for secure, computer-generated, time-stamped audit trails. Kenwerk's audit log is hash-chained, sealed after saving (ADR-041) and witnessed outside the database (ADR-039); this chapter says what the pair writes to it, and how the history of releases is read.
 
 ## 10.1 What is audited
 

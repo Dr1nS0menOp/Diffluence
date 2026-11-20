@@ -2,7 +2,7 @@
 
 ## Supported versions
 
-Diffluence is **alpha**. No version is supported before 1.0. From 1.0 on:
+Kenwerk is **alpha**. No version is supported before 1.0. From 1.0 on:
 
 - only the newest release line receives fixes;
 - a security fix ships as a patch of that line, within the times below, and is never back-ported to an older line;
@@ -14,13 +14,13 @@ Releases are signed with Sigstore and carry SLSA provenance and an SBOM; `docs/o
 
 ## Reporting a vulnerability
 
-**Do not open a public issue.** Use GitHub's *Report a vulnerability* button (private vulnerability reporting) on this repository. If you cannot use it, mail DiffluenceCreator@protonmail.com.
+**Do not open a public issue.** Use GitHub's *Report a vulnerability* button (private vulnerability reporting) on this repository. If you cannot use it, mail KenwerkCreator@protonmail.com.
 
 Please include the affected version or commit, the steps to reproduce, and the impact you expect.
 
 ## What to expect
 
-These are aims, not promises. Diffluence comes without guarantee, and security updates are not guaranteed. See [the security risks](docs/security/risks.md).
+These are aims, not promises. Kenwerk comes without guarantee, and security updates are not guaranteed. See [the security risks](docs/security/risks.md).
 
 - Acknowledgement within 3 working days
 - A first assessment within 7 days

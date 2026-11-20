@@ -9,8 +9,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Spec 074, wave GT5: export and import (TPL-852, TPL-1106). A file never carries who has a

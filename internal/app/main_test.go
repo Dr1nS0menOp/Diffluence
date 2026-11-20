@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // TestMain migrates one database and copies it for every test, since migrating anew took a

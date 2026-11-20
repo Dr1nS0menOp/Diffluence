@@ -7,11 +7,11 @@ import (
 	"crypto/ed25519"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/mail"
-	"github.com/diffluence/diffluence/internal/publishing"
-	"github.com/diffluence/diffluence/internal/sharing"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/publishing"
+	"github.com/kenwerk/kenwerk/internal/sharing"
 )
 
 // AddMigrationForTest makes this binary know one more migration.
@@ -31,7 +31,7 @@ func (a *App) InstallationKeyForTest() ed25519.PrivateKey {
 func (a *App) SignCheckpointForTest(ctx context.Context) error { return a.signCheckpoint(ctx) }
 
 // CheckWitnessForTest compares the chain with checkpoints taken from an application log,
-// as `diffluence audit verify --witness` does.
+// as `kenwerk audit verify --witness` does.
 func (a *App) CheckWitnessForTest(ctx context.Context, witness []audit.Checkpoint) (audit.WitnessResult, error) {
 	key, err := a.keyring.SigningKey()
 	if err != nil {

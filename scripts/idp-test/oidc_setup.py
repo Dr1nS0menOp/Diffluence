@@ -24,10 +24,10 @@ scopes = [m['pk'] for m in ak('GET', '/propertymappings/provider/scope/?page_siz
 print('flows ok:', 'default-provider-authorization-implicit-consent' in flows, 'scopes:', len(scopes))
 
 s, provider = ak('POST', '/providers/oauth2/', {
-    'name': 'Diffluence OIDC',
+    'name': 'Kenwerk OIDC',
     'authorization_flow': flows['default-provider-authorization-implicit-consent'],
     'invalidation_flow': flows['default-provider-invalidation-flow'],
-    'client_type': 'confidential', 'client_id': 'diffluence-client', 'client_secret': 'diffluence-secret',
+    'client_type': 'confidential', 'client_id': 'kenwerk-client', 'client_secret': 'kenwerk-secret',
     'redirect_uris': [{'matching_mode': 'strict', 'url': 'http://localhost:8080/api/v1/auth/oidc/callback'}],
     'signing_key': key['pk'], 'property_mappings': scopes, 'sub_mode': 'hashed_user_id', 'issuer_mode': 'per_provider',
     'grant_types': ['authorization_code', 'refresh_token'],
@@ -35,7 +35,7 @@ s, provider = ak('POST', '/providers/oauth2/', {
 print('provider', s)
 if s != 201:
     print(provider); sys.exit(1)
-s, app = ak('POST', '/core/applications/', {'name': 'Diffluence login', 'slug': 'diffluence', 'provider': provider['pk']})
+s, app = ak('POST', '/core/applications/', {'name': 'Kenwerk login', 'slug': 'kenwerk', 'provider': provider['pk']})
 print('application', s, '' if s == 201 else app)
 
 # One user only Authentik knows, and one who arrives through SCIM first.

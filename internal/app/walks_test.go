@@ -14,9 +14,9 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/blocks"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/blocks"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // plant is the word every planted thing of the hidden page holds. No answer to the

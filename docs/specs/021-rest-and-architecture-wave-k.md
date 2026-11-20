@@ -30,7 +30,7 @@ Chapters 1, 2, 3, 7, 8, 9, 10, 11, 12 and 13 of blueprint 03 still hold about 90
 | # | Decision | Why |
 |---|---|---|
 | D1 | `internal/metrics` is our own small registry, in the Prometheus text format | Counters, gauges and one histogram do not justify a dependency tree. |
-| D2 | `/metrics` is a `Public` route with its own Bearer token from `DIFFLUENCE_METRICS_TOKEN`, compared in constant time, and 404 without one | Prometheus has no session. Off by default. |
+| D2 | `/metrics` is a `Public` route with its own Bearer token from `KENWERK_METRICS_TOKEN`, compared in constant time, and 404 without one | Prometheus has no session. Off by default. |
 | D3 | Labels on requests are method and status class only | A path is unbounded and holds ids. |
 | D4 | Metrics that come from the database are read when scraped, with a short timeout | No background loop to keep alive. |
 | D5 | `traceparent` is read, validated and logged as `trace_id`; an invalid one is ignored, never an error | Input from outside must not break a request. No spans are exported, which would need a dependency. |
@@ -41,7 +41,7 @@ Chapters 1, 2, 3, 7, 8, 9, 10, 11, 12 and 13 of blueprint 03 still hold about 90
 | D10 | A backup is one archive, encrypted with AES-256 by `gpg`, with a passphrase file given by the operator. Without the key the script refuses | SEC-636. `master.key` no longer sits in the clear beside the data. |
 | D11 | The passphrase file may not sit in the backup folder | A key next to its lock protects nothing. |
 | D12 | The restore drill joins the nightly CI job | An automatic restore test, as blueprint 07 promises. |
-| D13 | The Helm chart lives in `deploy/helm/diffluence`, and takes an existing PostgreSQL and existing secrets | It holds no secret values. |
+| D13 | The Helm chart lives in `deploy/helm/kenwerk`, and takes an existing PostgreSQL and existing secrets | It holds no secret values. |
 
 ## What is built, line by line
 

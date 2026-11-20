@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // The checkpoints are signed by a chain of keys (spec 070). The first is the installation's
@@ -32,7 +32,7 @@ const checkpointKeyChangedAction = "audit.checkpoint_key_changed"
 var ErrKeyNotInForce = errors.New("audit: this key no longer signs checkpoints")
 
 // keyChangeLabel keeps an endorsement apart from every other message the key signs.
-var keyChangeLabel = []byte("diffluence checkpoint key v1\x00")
+var keyChangeLabel = []byte("kenwerk checkpoint key v1\x00")
 
 // keyChangeMessage is what the installation's key signs to bring in a key at a position.
 func keyChangeMessage(fromSeq int64, public []byte) []byte {

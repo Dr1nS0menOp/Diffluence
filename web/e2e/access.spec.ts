@@ -241,7 +241,7 @@ test('every tab of the admin console works and is accessible', async ({ page }) 
   await page.goto('/admin/scim');
   await page.getByLabel('Token name').fill(unique('token'));
   await page.getByRole('button', { name: 'New token' }).click();
-  await expect(page.getByRole('dialog').locator('code')).toContainText('dfl_scim_');
+  await expect(page.getByRole('dialog').locator('code')).toContainText('kenwerk_scim_');
 
   await page.goto('/admin/system');
   await expect(page.getByRole('row', { name: /Ready/ })).toContainText('ready');
@@ -277,9 +277,9 @@ test('an imported font is used everywhere, also before logging in, and can be re
   const usesImportedFont = (p: Page) =>
     expect
       .poll(() => p.evaluate(() => getComputedStyle(document.body).fontFamily))
-      .toContain('Diffluence Imported');
+      .toContain('Kenwerk Imported');
   await usesImportedFont(page);
-  expect(await page.evaluate(() => document.fonts.check('16px "Diffluence Imported"'))).toBe(true);
+  expect(await page.evaluate(() => document.fonts.check('16px "Kenwerk Imported"'))).toBe(true);
 
   const anonymous = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
   await anonymous.goto('/login');
@@ -290,7 +290,7 @@ test('an imported font is used everywhere, also before logging in, and can be re
   await expect(page.getByText('This installation uses the system font.')).toBeVisible();
   await expect
     .poll(() => page.evaluate(() => getComputedStyle(document.body).fontFamily))
-    .not.toContain('Diffluence Imported');
+    .not.toContain('Kenwerk Imported');
 });
 
 test('a normal user has no way into the admin console', async ({ page, browser }) => {

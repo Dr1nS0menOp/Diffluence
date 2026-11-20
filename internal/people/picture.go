@@ -10,7 +10,7 @@ import (
 	_ "image/jpeg" // decoders for uploaded pictures
 	"image/png"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 const (

@@ -8,8 +8,8 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/failures"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/failures"
 )
 
 // transportCheckEvery is how often a worker looks whether it must run the consumers of the

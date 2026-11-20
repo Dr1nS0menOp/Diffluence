@@ -5,10 +5,10 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/publishing"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/publishing"
 )
 
 // Draft and published spaces, wave PB1 of spec 073: linking a pair, its settings, the status

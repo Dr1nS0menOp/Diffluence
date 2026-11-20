@@ -7,7 +7,7 @@ Decided by the product owner on 2026-11-11: a full restore over the live install
 An administrator chooses a complete backup on Administration, System, Backups, reads what is lost, types the installation's name, gives a second factor, and presses **Restore over this installation**. Then:
 
 1. The console writes a restore (`ops.restores`, state `requested`) and an audit entry `backup.restore_requested`.
-2. The backup worker picks it up within a minute (`diffluence backup next` answers `restore <id> <backup>`), and checks the backup while the nodes still serve (`preparing`): every part against `SHA256SUMS`, the key opens `master.key.gpg`, and the newest migration in the dump is one this release knows.
+2. The backup worker picks it up within a minute (`kenwerk backup next` answers `restore <id> <backup>`), and checks the backup while the nodes still serve (`preparing`): every part against `SHA256SUMS`, the key opens `master.key.gpg`, and the newest migration in the dump is one this release knows.
 3. The worker stops every node (`stopping`). Each node looks every 5 seconds, stops serving, and shows a waiting page. The worker waits until no node has said it is starting or serving for 20 seconds.
 4. The worker makes a **safety backup** of the installation as it is (`backing_up`), with the same steps as every backup.
 5. The worker restores (`restoring`, from here `changed` is true):
@@ -34,12 +34,12 @@ An administrator chooses a complete backup on Administration, System, Backups, r
 | D7 | The worker restores only when no node has said it is starting or serving for 20 seconds; nodes say so every 5 seconds, also while they migrate or start (`starting`). A node that starts while a restore runs never serves: it looks before its first request, and before it opens anything. | A node that keeps serving could write into tables being made again. The worker refuses to change anything then. |
 | D8 | Before it restores, the worker ends the sessions of every other database role. A role that may not do so only logs it. | A node that missed the waiting page, such as one paused for a long time, loses its connections, so it cannot write. |
 | D9 | The database is restored in one transaction: `DROP SCHEMA public CASCADE`, `CREATE SCHEMA public`, then the dump without its entry for `public` and without `ops`, through `psql --single-transaction`. | A failure leaves the database exactly as it was. A table a newer release added cannot linger and break the migrations of the older backup. |
-| D10 | The data folder is emptied only when it holds a `master.key`, and only at an absolute path. | A wrong `DIFFLUENCE_DATA_DIR` must never empty another folder. |
+| D10 | The data folder is emptied only when it holds a `master.key`, and only at an absolute path. | A wrong `KENWERK_DATA_DIR` must never empty another folder. |
 | D11 | A backup made by a newer release is refused while the nodes still serve. | This release cannot know the shape of a newer database; restoring it would break the installation. |
 | D12 | The worker writes the request and the result again into the restored audit log, sealed, as the system with the name of who asked. | The restore rewound the audit log with everything else, so without this it would leave no trace. The witness log outside the database (ADR-039) keeps the checkpoints from before. |
 | D13 | The way back is `docker compose run --rm backup way-back`, which restores the safety backup of a failed restore with every node still waiting. The waiting page names the command. | When a restore stopped halfway, the console is down too, because every node waits. The way back must work without it. |
 | D14 | The public waiting page names the step, never the backup, a date or a person. | Anyone can open it (spec 054). The details are in the log and in `ops.restores`. |
-| D15 | An operator with the machine can ask for a restore with `diffluence backup restore-request --name … --confirm …`, without a second factor; the audit log says it came from the command line. | Shell access to the installation is more than the console's second factor. The drill uses this route. |
+| D15 | An operator with the machine can ask for a restore with `kenwerk backup restore-request --name … --confirm …`, without a second factor; the audit log says it came from the command line. | Shell access to the installation is more than the console's second factor. The drill uses this route. |
 | D16 | Restoring a single space or page from a backup is not part of this. It goes on the roadmap as a later item. | It is a different feature, closer to the trash than to a restore. Open question 1 of spec 058, decided for now as later. |
 
 ## 3. Failure paths and their proof
@@ -64,7 +64,7 @@ The whole path runs for real in the restore drill (`scripts/restore-drill.sh`, s
 
 ## 4. Kubernetes
 
-The worker logic is the `diffluence` binary and the backup script, so a Job runs it:
+The worker logic is the `kenwerk` binary and the backup script, so a Job runs it:
 - **How it starts:** a CronJob every minute, or an operator's controller, that runs `backup next` and acts on the answer.
 - **What it needs:** the backup volume, the key secret, the data volume (read and write), and the owner's database address.
 - **The app:** the Deployment stays as it is and shows the waiting page. Nodes are not stopped or scaled, so the Job needs no Kubernetes permission beyond its own Pod.

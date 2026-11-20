@@ -67,14 +67,14 @@ for (const [path, entry] of collabPackages) {
 console.log(`collab: ${collabPackages.length} shipped packages`);
 
 // Go: every module compiled into the binary.
-const list = execFileSync('go', ['list', '-deps', '-f', '{{with .Module}}{{.Path}} {{.Dir}}{{end}}', './cmd/diffluence'], {
+const list = execFileSync('go', ['list', '-deps', '-f', '{{with .Module}}{{.Path}} {{.Dir}}{{end}}', './cmd/kenwerk'], {
   encoding: 'utf8',
   maxBuffer: 1 << 26,
 });
 const modules = new Map();
 for (const line of list.split('\n')) {
   const [path, dir] = line.split(' ');
-  if (path && dir && !path.startsWith('github.com/diffluence/')) modules.set(path, dir);
+  if (path && dir && !path.startsWith('github.com/kenwerk/')) modules.set(path, dir);
 }
 for (const [path, dir] of modules) {
   const file = readdirSync(dir).find((f) => /^(licen[cs]e|copying)/i.test(f));

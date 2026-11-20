@@ -20,11 +20,11 @@ command -v qm >/dev/null || { echo "qm not found: run this on the test host" >&2
 template=9000
 
 mkdir -p /var/lib/vz/snippets
-cp "$here/cloud-init/common.yaml" /var/lib/vz/snippets/diffluence-ha-common.yaml
+cp "$here/cloud-init/common.yaml" /var/lib/vz/snippets/kenwerk-ha-common.yaml
 
 if ! qm status "$template" >/dev/null 2>&1; then
   echo "== template $template"
-  qm create "$template" --name diffluence-ha-template --cores 1 --memory 1024 --cpu host \
+  qm create "$template" --name kenwerk-ha-template --cores 1 --memory 1024 --cpu host \
     --net0 virtio,bridge=vmbr0 --scsihw virtio-scsi-single --agent enabled=1 \
     --serial0 socket --vga serial0 --ostype l26
   qm importdisk "$template" "$image" "$HA_STORAGE" --format raw >/dev/null
@@ -35,7 +35,7 @@ fi
 
 address_of() {
   local key
-  key="HA_$(echo "${1#diffluence-ha-}" | tr '[:lower:]' '[:upper:]')"
+  key="HA_$(echo "${1#kenwerk-ha-}" | tr '[:lower:]' '[:upper:]')"
   printf '%s' "${!key:-}"
 }
 
@@ -52,7 +52,7 @@ echo "$HA_VMS" | while read -r id name role vcpu mem disk; do
   qm clone "$template" "$id" --name "$name" >/dev/null
   qm set "$id" --cores "$vcpu" --memory "$mem" --sshkeys "$pubkey" \
     --ipconfig0 "ip=$addr/$HA_PREFIX,gw=$HA_GATEWAY" \
-    --cicustom "vendor=local:snippets/diffluence-ha-common.yaml" >/dev/null
+    --cicustom "vendor=local:snippets/kenwerk-ha-common.yaml" >/dev/null
   qm resize "$id" scsi0 "${disk}G" >/dev/null
   qm start "$id"
 done

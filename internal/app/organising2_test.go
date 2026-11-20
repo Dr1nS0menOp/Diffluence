@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 func (u *user) saveDraft(page, title string, base int, text string) {

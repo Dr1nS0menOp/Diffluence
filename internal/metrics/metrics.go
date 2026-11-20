@@ -126,19 +126,19 @@ func (r *Requests) requestText() string {
 	slices.SortFunc(keys, func(a, b requestKey) int {
 		return cmp.Or(cmp.Compare(a.method, b.method), cmp.Compare(a.statusClass, b.statusClass))
 	})
-	text := "# HELP diffluence_http_requests_total HTTP requests, by method and class of status.\n" +
-		"# TYPE diffluence_http_requests_total counter\n"
+	text := "# HELP kenwerk_http_requests_total HTTP requests, by method and class of status.\n" +
+		"# TYPE kenwerk_http_requests_total counter\n"
 	for _, k := range keys {
-		text += fmt.Sprintf("diffluence_http_requests_total{method=%q,status=%q} %d\n", k.method, k.statusClass, r.counts[k])
+		text += fmt.Sprintf("kenwerk_http_requests_total{method=%q,status=%q} %d\n", k.method, k.statusClass, r.counts[k])
 	}
-	text += "# HELP diffluence_http_request_duration_seconds How long requests took.\n" +
-		"# TYPE diffluence_http_request_duration_seconds histogram\n"
+	text += "# HELP kenwerk_http_request_duration_seconds How long requests took.\n" +
+		"# TYPE kenwerk_http_request_duration_seconds histogram\n"
 	for i, bound := range durationBuckets {
-		text += fmt.Sprintf("diffluence_http_request_duration_seconds_bucket{le=%q} %d\n", number(bound), r.bucketCounts[i])
+		text += fmt.Sprintf("kenwerk_http_request_duration_seconds_bucket{le=%q} %d\n", number(bound), r.bucketCounts[i])
 	}
-	text += fmt.Sprintf("diffluence_http_request_duration_seconds_bucket{le=\"+Inf\"} %d\n", r.total)
-	text += fmt.Sprintf("diffluence_http_request_duration_seconds_sum %s\n", number(r.seconds))
-	text += fmt.Sprintf("diffluence_http_request_duration_seconds_count %d\n", r.total)
+	text += fmt.Sprintf("kenwerk_http_request_duration_seconds_bucket{le=\"+Inf\"} %d\n", r.total)
+	text += fmt.Sprintf("kenwerk_http_request_duration_seconds_sum %s\n", number(r.seconds))
+	text += fmt.Sprintf("kenwerk_http_request_duration_seconds_count %d\n", r.total)
 	return text
 }
 

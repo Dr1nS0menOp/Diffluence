@@ -64,8 +64,8 @@ Nobody should feel locked in. Everything that goes in can come out.
 - **EXC-032** · phase 11 · **Mapping users:** the importer matches authors on e-mail, and asks what to do with those it cannot match.
 - **EXC-033** · built · **Dry run:** every import can first show what it would do, with a count and warnings, and change nothing.
 - **EXC-034** · phase 11 · **Other wikis:** importers for common open formats, such as MediaWiki XML and exports of other Markdown wikis.
-- **EXC-047** · phase 11 · **Leaving for Confluence and other apps:** a space can be moved from Diffluence to Confluence and other apps, with as much as those formats can hold, and a report of what could not come along.
-- **EXC-048** · phase 11 · **Other large tools:** people can migrate to Diffluence from other large tools. Which ones follows from what people ask for by then.
+- **EXC-047** · phase 11 · **Leaving for Confluence and other apps:** a space can be moved from Kenwerk to Confluence and other apps, with as much as those formats can hold, and a report of what could not come along.
+- **EXC-048** · phase 11 · **Other large tools:** people can migrate to Kenwerk from other large tools. Which ones follows from what people ask for by then.
 - **EXC-035** · built · An import can be undone in one action, as long as nobody edited the imported pages.
 - **EXC-036** · built · Unknown content is kept as readable text with a note, never silently dropped.
 - **EXC-037** · built · **Bundle:** imports the signed archive, and checks the signature.

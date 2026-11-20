@@ -8,10 +8,10 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/conditions"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/templates/fields"
+	"github.com/kenwerk/kenwerk/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/templates/fields"
 )
 
 // Spec 074, wave GT5, TPL-602: the readable change list names every kind of change.

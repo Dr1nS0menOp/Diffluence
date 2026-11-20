@@ -13,18 +13,18 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/comments"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/comments"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/spaces"
 )
 
 // The release status of a draft page, in words (PUB-330, PUB-331, PUB-421, PUB-702).
@@ -840,7 +840,7 @@ func (s *Service) Release(ctx context.Context, c identity.Caller, pageID uuid.UU
 	var out Report
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		// The mark lets the trigger of a published space through, for this transaction only.
-		if _, err := tx.Exec(ctx, "SELECT set_config('diffluence.release', 'on', true)"); err != nil {
+		if _, err := tx.Exec(ctx, "SELECT set_config('kenwerk.release', 'on', true)"); err != nil {
 			return err
 		}
 		src, p, err := s.draftPage(ctx, tx, c, pageID)

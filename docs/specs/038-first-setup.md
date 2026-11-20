@@ -1,6 +1,6 @@
 # 038: The first setup screen
 
-Status: built on branch `wave-f2`. Asked for by the product owner: whoever installs Diffluence names the company or person it is for, which the search box then shows as "Search in {name}". Until now that was only possible on the command line or under Administration, Look (spec 033).
+Status: built on branch `wave-f2`. Asked for by the product owner: whoever installs Kenwerk names the company or person it is for, which the search box then shows as "Search in {name}". Until now that was only possible on the command line or under Administration, Look (spec 033).
 
 Also in this wave, from the open points of wave X, both approved by the product owner: the folded state of the settings groups is kept per person, and the results page drops its own space select in favour of the `space:` words of the search panel.
 
@@ -10,7 +10,7 @@ A screen that creates the first administrator is the most valuable target an ins
 
 | Threat | Answer |
 |---|---|
-| A stranger reaches a fresh install first | The screen needs a one-time code that only appears in the server's log and in `diffluence setup-code`. Reading either means running the server already. |
+| A stranger reaches a fresh install first | The screen needs a one-time code that only appears in the server's log and in `kenwerk setup-code`. Reading either means running the server already. |
 | Guessing the code | 80 random bits. 10 wrong tries end a code, and one address gets 10 tries in 15 minutes. |
 | A code that lies around | A code lasts an hour. A new code replaces every older one. |
 | Reusing a code, or a setup after the setup | A code works once. The screen is closed as soon as any administrator grant exists, or any code was ever used. Closed routes answer exactly as an unknown route does. |
@@ -33,7 +33,7 @@ Logging the code is on purpose and is the one exception to "no secrets in logs":
 | Organisation name and default time zone, checked before anything is created | `settings.CheckFirstSetup`, `settings.ApplyFirstSetup` |
 | `GET /api/v1/setup` (open or 404), `POST /api/v1/setup` | `internal/httpapi/handlers_setup.go`; both public, with the reason in the code and in blueprint 04.5 |
 | The server logs a fresh code at start while the setup is open | `internal/app/setup.go` |
-| `diffluence setup-code` | `cmd/diffluence/setup.go` |
+| `kenwerk setup-code` | `cmd/kenwerk/setup.go` |
 | The screen: code, organisation, the first administrator, language and time zone | `web/src/views/setup.tsx` |
 | The login page sends a visitor of an open install to `/setup` | `web/src/views/login.tsx` |
 | After the setup the new administrator is signed in and lands on Security with a note to add a passkey | `web/src/views/profile.tsx` |
@@ -61,7 +61,7 @@ Found by the product owner in the same wave: at about 1150 px the Users screen r
 
 Failure paths first, in `internal/app/setup_test.go`: no code, a wrong code, a wrong code with a wrong form, an expired code, an old code after a new one, too many wrong tries, too many tries from one address, an administrator already present, the setup closed for good after use even when no administrator is left, two people at once, a wrong field that leaves the code usable, and no code in the audit log or the table. Then the way that works: the administrator, the organisation, the time zone and a working session.
 
-`cmd/diffluence/setup_test.go` covers `setup-code` before and after an administrator exists, and `create-admin --organisation`, which had no test.
+`cmd/kenwerk/setup_test.go` covers `setup-code` before and after an administrator exists, and `create-admin --organisation`, which had no test.
 
 Seven new mutations break each guard: any code works, codes never expire, codes can be guessed for ever, a used code stays unused, the setup stays open with an administrator, the form is read before the code, and one address may guess for ever. Each is caught.
 
@@ -82,4 +82,4 @@ The login page asks `GET /api/v1/setup` once per visit before anyone logs in: on
 - The log line when the server starts is not covered by a test, because the tests do not run `serve`; the text it uses is.
 - More than one language: the field shows English only.
 - The settings area in Firefox and Safari: the tests run Chromium only. In Chromium the exact picture of the report, with the area starting in the middle of the window, did not appear with the test data; the overflow did, and is fixed.
-- With several API nodes, each start makes a new code and the newest wins; the install guide says to use the newest line or `diffluence setup-code`.
+- With several API nodes, each start makes a new code and the newest wins; the install guide says to use the newest line or `kenwerk setup-code`.

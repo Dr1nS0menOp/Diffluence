@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/blocks"
+	"github.com/kenwerk/kenwerk/internal/blocks"
 )
 
 func (s *Server) registerBlockRoutes() {

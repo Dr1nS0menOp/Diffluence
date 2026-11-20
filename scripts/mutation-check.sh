@@ -837,7 +837,7 @@ mutate "a reaction works on an archived page" internal/permissions/evaluate.go \
 mutate "a removed version lives on in a quote" internal/pages/versions.go \
   's.replace("if err := comments.BlankQuotes(ctx, tx, c, id, removed, current); err != nil {", "_ = removed\n\t\tif err := comments.BlankQuotes(ctx, tx, c, id, current, current); err != nil {")' $app -run TestRemovingAVersionBlanksTheQuotesThatHoldIt
 mutate "nodes hand out rights at the same time" internal/db/db.go \
-  's.replace("\"SELECT pg_advisory_xact_lock($1)\", migrationLockKey", "\"SELECT $1::bigint\", migrationLockKey")' ./internal/db/ -count=5 -run TestGrantApp
+  's.replace("pollLock(ctx, tx, \"SELECT pg_try_advisory_xact_lock($1)\")", "pollLock(ctx, tx, \"SELECT $1::bigint IS NOT NULL\")")' ./internal/db/ -count=5 -run TestGrantApp
 
 mutate "an export holds a hidden page" internal/pages/export.go \
   's.replace("JOIN perm_visible_pages($1) vis ON vis.page_id = p.id", "JOIN (SELECT id AS page_id FROM pages WHERE $1::uuid IS NOT NULL) vis ON vis.page_id = p.id")' $app -run TestExportLeavesOutWhatThePersonCannotSee
@@ -1581,7 +1581,7 @@ mutate "a plain address on the network counts as safe" internal/config/config.go
 mutate "the console keeps quiet about a plain address" internal/httpapi/handlers_console.go \
   's.replace("if s.deps.Config.PlainToOthers() {", "if false {")' $app -run TestTheConsoleWarnsOfAPlainPublicAddressThatOthersReach
 mutate "the app listens on every address" compose.yaml \
-  's.replace("${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080", "${DIFFLUENCE_PORT:-8080}:8080")' $app -run TestEveryPublishedPortListensOnThisMachineByDefault
+  's.replace("${KENWERK_BIND:-127.0.0.1}:${KENWERK_PORT:-8080}:8080", "${KENWERK_PORT:-8080}:8080")' $app -run TestEveryPublishedPortListensOnThisMachineByDefault
 mutate "a SCIM filter on an attribute nobody reads is ignored" internal/scim/scim.go \
   's.replace("if !slices.Contains(known, attr) {", "if !slices.Contains(known, attr) && false {")' ./internal/scim/ -run TestAFilterIsUnderstoodWholeOrRefused
 mutate "many addresses together flood one inbox" internal/httpapi/handlers_people.go \
@@ -1682,10 +1682,10 @@ mutate "a broken witness line is skipped" internal/audit/witness.go \
   's.replace("return nil, fmt.Errorf(\"audit: witness line %d cannot be read\", number)", "continue")' ./internal/audit/ -run TestABrokenWitnessLineIsAnError
 mutate "checkpoints from before a prune count as damage" internal/audit/witness.go \
   's.replace("if c.Seq <= prunedUpTo {", "if c.Seq <= prunedUpTo && prunedUpTo < 0 {")' ./internal/audit/ -run TestWitnessCheckpointsBeforeAPruneAreSkipped
-mutate "audit verify ignores the witness" cmd/diffluence/main.go \
-  's.replace("if res.OK && witness != nil {", "if res.OK && witness == nil {")' ./cmd/diffluence/ -run TestAuditVerifyComparesTheChainWithTheWitnessLog
-mutate "an empty witness log passes" cmd/diffluence/main.go \
-  's.replace("if len(witness) == 0 {", "if len(witness) < 0 {")' ./cmd/diffluence/ -run TestAuditVerifyRefusesAWitnessLogWithoutCheckpoints
+mutate "audit verify ignores the witness" cmd/kenwerk/main.go \
+  's.replace("if res.OK && witness != nil {", "if res.OK && witness == nil {")' ./cmd/kenwerk/ -run TestAuditVerifyComparesTheChainWithTheWitnessLog
+mutate "an empty witness log passes" cmd/kenwerk/main.go \
+  's.replace("if len(witness) == 0 {", "if len(witness) < 0 {")' ./cmd/kenwerk/ -run TestAuditVerifyRefusesAWitnessLogWithoutCheckpoints
 mutate "a hundred wrong passwords stop nothing" internal/identity/identity.go \
   's.replace("THEN now() END", "THEN NULL END")' ./internal/identity/ -run TestAHundredWrongPasswordsStopPasswordLoginAcrossARestart
 mutate "the right password opens a stopped account" internal/identity/identity.go \
@@ -1806,7 +1806,7 @@ mutate "off does not switch the backup check off" internal/config/config.go \
 mutate "an age of zero switches the backup check off" internal/config/config.go \
   's.replace("if err != nil || d <= 0 {", "if err != nil || d < 0 {")' ./internal/config/ -run TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose
 mutate "the refusal does not say how to go on" internal/app/upgrade.go \
-  's.replace("\"or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one\"", "\"or switch the check off\"")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
+  's.replace("\"or set KENWERK_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one\"", "\"or switch the check off\"")' $app -run TestTheChecksBeforeAnUpgradeSayWhyTheyRefuse
 mutate_web "adding a role takes the others away" src/views/access-roles.tsx \
   's.replace("return held.includes(added) ? held : [...held, added];", "return [added];")' src/views/access-roles.test.ts
 mutate_web "taking one role away takes them all" src/views/access-roles.tsx \
@@ -1908,8 +1908,8 @@ mutate "a failed witness report is fine" internal/health/health.go \
   's.replace("case f.WitnessReported \x26\x26 !f.WitnessOK:", "case false:")' $health -run TestAFailedWitnessComparisonIsAProblem
 mutate "a witness report of exactly eight days warns" internal/health/health.go \
   's.replace("f.Now.Sub(f.WitnessAt) > WitnessWarnAfter:", "f.Now.Sub(f.WitnessAt) >= WitnessWarnAfter:")' $health -run TestAWitnessReportOlderThanEightDaysWarns
-mutate "the witness report says OK on a mismatch" cmd/diffluence/main.go \
-  's.replace("return audit.WitnessCheck{OK: compared.OK,", "return audit.WitnessCheck{OK: true,")' ./cmd/diffluence/ -run TestAuditVerifyReportsTheWitnessComparison
+mutate "the witness report says OK on a mismatch" cmd/kenwerk/main.go \
+  's.replace("return audit.WitnessCheck{OK: compared.OK,", "return audit.WitnessCheck{OK: true,")' ./cmd/kenwerk/ -run TestAuditVerifyReportsTheWitnessComparison
 mutate "the audit area hides an unendorsed key" internal/audit/console.go \
   's.replace("k.Endorsed = len(public) == ed25519.PublicKeySize \x26\x26 ed25519.Verify(", "k.Endorsed = len(public) == ed25519.PublicKeySize || ed25519.Verify(")' ./internal/audit/ -run TestTheAuditOverviewNamesTheCheckpointAndTheKeys
 mutate "a tracing header is shown" internal/config/console.go \
@@ -1939,10 +1939,10 @@ mutate "a witness report keeps the role its insert names" internal/db/migrations
   's.replace("NEW.recorded_by := current_user;", "NEW.recorded_by := COALESCE(NULLIF(NEW.recorded_by, \x27\x27), current_user);")' ./internal/audit/ -run TestTheDatabaseStampsTheRoleAndTimeOfAWitnessReport
 mutate "a witness report keeps the time its insert names" internal/db/migrations/0067_witness_reports_by_owner.sql \
   's.replace("  NEW.checked_at := now();\n", "")' ./internal/audit/ -run TestTheDatabaseStampsTheRoleAndTimeOfAWitnessReport
-mutate "audit verify records its report with the application role" cmd/diffluence/main.go \
-  's.replace("recordWitnessReport(ctx, reportURL,", "recordWitnessReport(ctx, cfg.DatabaseURL+reportURL[:0],")' ./cmd/diffluence/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
-mutate "audit verify reports without the owner of the tables" cmd/diffluence/main.go \
-  's.replace("\tif errors.Is(err, errNoOwner) {\n\t\treturn \"\", errNoReportOwner\n\t}\n", "\tif errors.Is(err, errNoOwner) {\n\t\treturn cfg.DatabaseURL, nil\n\t}\n")' ./cmd/diffluence/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
+mutate "audit verify records its report with the application role" cmd/kenwerk/main.go \
+  's.replace("recordWitnessReport(ctx, reportURL,", "recordWitnessReport(ctx, cfg.DatabaseURL+reportURL[:0],")' ./cmd/kenwerk/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
+mutate "audit verify reports without the owner of the tables" cmd/kenwerk/main.go \
+  's.replace("\tif errors.Is(err, errNoOwner) {\n\t\treturn \"\", errNoReportOwner\n\t}\n", "\tif errors.Is(err, errNoOwner) {\n\t\treturn cfg.DatabaseURL, nil\n\t}\n")' ./cmd/kenwerk/ -run TestAuditVerifyReportsAsTheOwnerOfTheTables
 mutate "the summary warns of the disk at the default level only" internal/console/console.go \
   's.replace("return percent, percent < warnPercent", "return percent, percent < health.DiskWarnPercent")' ./internal/console/ -run TestDiskNearlyFullFollowsTheWarnLevelOfTheHealthSettings
 mutate "the summary is not told the warn level" internal/app/app.go \
@@ -1955,10 +1955,10 @@ mutate "failed mail goes as soon as sent mail" internal/app/health.go \
   's.replace("status = \x27failed\x27 AND created_at < now() - make_interval(secs => $1)\", keepFailedWork}", "status = \x27failed\x27 AND created_at < now() - make_interval(secs => $1)\", keepFinishedWork}")' $app -run TestTheCleanerRemovesOnlyOldFinishedWork
 mutate "the cleaner keeps nodes that are gone" internal/app/health.go \
   's.replace("DELETE FROM nodes WHERE last_seen_at < now()", "DELETE FROM nodes WHERE last_seen_at > now()")' $app -run TestTheCleanerRemovesOnlyOldFinishedWork
-mutate "doctor passes with a problem" cmd/diffluence/doctor.go \
-  's.replace("\tif problems > 0 {\n\t\treturn errDoctorFound", "\tif false {\n\t\treturn errDoctorFound")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
-mutate "doctor forgets a key it cannot read" cmd/diffluence/doctor.go \
-  's.replace("if !doctorKeys(ctx, cfg, stdout) {", "if false \x26\x26 !doctorKeys(ctx, cfg, stdout) {")' ./cmd/diffluence/ -run TestDoctorFailsWhenTheKeyIsMissing
+mutate "doctor passes with a problem" cmd/kenwerk/doctor.go \
+  's.replace("\tif problems > 0 {\n\t\treturn errDoctorFound", "\tif false {\n\t\treturn errDoctorFound")' ./cmd/kenwerk/ -run TestDoctorFailsWhenTheKeyIsMissing
+mutate "doctor forgets a key it cannot read" cmd/kenwerk/doctor.go \
+  's.replace("if !doctorKeys(ctx, cfg, stdout) {", "if false \x26\x26 !doctorKeys(ctx, cfg, stdout) {")' ./cmd/kenwerk/ -run TestDoctorFailsWhenTheKeyIsMissing
 
 # Spec 053: upgrades made stronger.
 db=./internal/db/
@@ -2045,10 +2045,10 @@ mutate "the waiting page shows the reasons in full" internal/app/waiting.go \
   's.replace("_ = waitingPage.Execute(w, waitingFixes(kinds))", "_ = waitingPage.Execute(w, []waitingFix{{Title: refused.Error()}})")' $app -run TestTheWaitingPageNamesTheFixButNoDetails
 mutate "a retry keeps the waiting node" internal/app/waiting.go \
   's.replace("\tcase <-retry:\n", "\tcase <-make(chan struct{}):\n")' $app -run TestAWaitingNodeFreesItsAddressWhenItTriesAgain
-mutate "SIGHUP does not end the wait" cmd/diffluence/main.go \
-  's.replace("\t\tcase <-hup:\n", "\t\tcase <-make(chan os.Signal):\n")' ./cmd/diffluence/ -run TestAWaitingNodeTriesAgainOnSIGHUP
-mutate "a stopped waiting node reports a failure" cmd/diffluence/main.go \
-  's.replace("if errors.Is(err, context.Canceled) {\n\t\treturn nil", "if false {\n\t\treturn nil")' ./cmd/diffluence/ -run TestAWaitingNodeStoppedBySIGTERMExitsCleanly
+mutate "SIGHUP does not end the wait" cmd/kenwerk/main.go \
+  's.replace("\t\tcase <-hup:\n", "\t\tcase <-make(chan os.Signal):\n")' ./cmd/kenwerk/ -run TestAWaitingNodeTriesAgainOnSIGHUP
+mutate "a stopped waiting node reports a failure" cmd/kenwerk/main.go \
+  's.replace("if errors.Is(err, context.Canceled) {\n\t\treturn nil", "if false {\n\t\treturn nil")' ./cmd/kenwerk/ -run TestAWaitingNodeStoppedBySIGTERMExitsCleanly
 # Spec 052, ADR-041: the audit chain is sealed a moment after saving.
 audit=./internal/audit/
 mutate "a save takes the chain lock again" internal/audit/audit.go \
@@ -2096,7 +2096,7 @@ mutate "the metrics say nothing waits long" internal/app/gauges.go \
 mutate "a backup note waits for the sealer" internal/app/upgrade.go \
   's.replace("return audit.RecordSealed(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",", "return audit.RecordStandalone(ctx, pool, audit.Event{ActorType: audit.ActorSystem, ActorID: \"cli\",")' $app -run TestTheHealthPageShowsTheBackupAndTheDisk
 
-# Spec 056: the configuration file and diffluence config check.
+# Spec 056: the configuration file and kenwerk config check.
 cfgpkg=./internal/config/
 mutate "an unknown key in the file is taken" internal/config/report.go \
   's.replace("\t\tif !l.asked[name] {", "\t\tif false {")' $cfgpkg -run TestAnUnknownKeyInTheFileIsRefusedWithItsLine
@@ -2134,8 +2134,8 @@ mutate "the publish folder is not tried" internal/config/probe.go \
   's.replace("\tif c.PublishDir != \"\" {\n\t\trun(", "\tif false {\n\t\trun(")' $cfgpkg -run TestAPublishFolderThatCannotBeWrittenWarns
 mutate "the test file stays in the publish folder" internal/config/probe.go \
   's.replace("if err := os.Remove(name); err != nil {\n\t\treturn errors.New(\"a test file", "if err := error(nil); err != nil {\n\t\treturn errors.New(\"a test file")' $cfgpkg -run TestTryingThePublishFolderLeavesNothingBehind
-mutate "config check passes a configuration a start refuses" cmd/diffluence/config.go \
-  's.replace("\t\treturn errConfigRefused\n", "\t\treturn nil\n")' ./cmd/diffluence/ -run TestConfigCheckExitsOneOnABadFile
+mutate "config check passes a configuration a start refuses" cmd/kenwerk/config.go \
+  's.replace("\t\treturn errConfigRefused\n", "\t\treturn nil\n")' ./cmd/kenwerk/ -run TestConfigCheckExitsOneOnABadFile
 
 # Spec 058: the console runs backups through a worker, shows the configuration and logs
 # people out.
@@ -2196,14 +2196,14 @@ mutate "a serving node ignores a restore" internal/app/restoring.go \
   's.replace("\t\t\tclose(started)\n", "\t\t\t_ = started\n")' $app -run TestAServingNodeStopsWhenARestoreBegins
 mutate "a waiting node never serves again" internal/app/restoring.go \
   's.replace("\t\tif now == nil {\n", "\t\tif now == nil {\n\t\t\tcontinue\n\t\t}\n\t\tif false {\n")' $app -run TestANodeWaitsOnThePageWhileARestoreRunsAndGoesOnAfter
-mutate "a restore makes the schema ops again" cmd/diffluence/restore.go \
-  's.replace("slices.Contains(fields, \"ops\") || makesPublic", "(false \x26\x26 slices.Contains(fields, \"ops\")) || makesPublic")' ./cmd/diffluence/ -run TestARestoreLeavesTheSchemaOpsAlone
-mutate "the last migration in a dump counts, not the newest" cmd/diffluence/restore.go \
-  's.replace("newest = max(newest, v)", "newest = v")' ./cmd/diffluence/ -run TestTheNewestMigrationIsReadFromTheDump
-mutate "the files step empties any folder" cmd/diffluence/restore.go \
-  's.replace("if keyErr != nil \x26\x26 markErr != nil {", "if keyErr != nil \x26\x26 markErr != nil \x26\x26 false {")' ./cmd/diffluence/ -run TestTheFilesStepEmptiesOnlyADataFolder
-mutate "a backup name may hold a backslash" cmd/diffluence/restore.go \
-  's.replace("strings.ContainsAny(name, `/\\`)", "false")' ./cmd/diffluence/ -run TestABackupNameStaysInTheBackupFolder
+mutate "a restore makes the schema ops again" cmd/kenwerk/restore.go \
+  's.replace("slices.Contains(fields, \"ops\") || makesPublic", "(false \x26\x26 slices.Contains(fields, \"ops\")) || makesPublic")' ./cmd/kenwerk/ -run TestARestoreLeavesTheSchemaOpsAlone
+mutate "the last migration in a dump counts, not the newest" cmd/kenwerk/restore.go \
+  's.replace("newest = max(newest, v)", "newest = v")' ./cmd/kenwerk/ -run TestTheNewestMigrationIsReadFromTheDump
+mutate "the files step empties any folder" cmd/kenwerk/restore.go \
+  's.replace("if keyErr != nil \x26\x26 markErr != nil {", "if keyErr != nil \x26\x26 markErr != nil \x26\x26 false {")' ./cmd/kenwerk/ -run TestTheFilesStepEmptiesOnlyADataFolder
+mutate "a backup name may hold a backslash" cmd/kenwerk/restore.go \
+  's.replace("strings.ContainsAny(name, `/\\`)", "false")' ./cmd/kenwerk/ -run TestABackupNameStaysInTheBackupFolder
 
 # Spec 061: reads fast on real data, and no read can hold the database for long.
 mutate "a query of a request has no limit" internal/db/db.go \
@@ -2303,8 +2303,8 @@ mutate "applying the session settings again does nothing" internal/db/session_se
   's.replace("_, err := q.Exec(ctx, SessionSettingsSQL)", "_, err := q.Exec(ctx, \"SELECT 1\")")' ./internal/db/ -run TestTheSessionSettingsComeBackOnADatabaseThatLostThem
 mutate "a node on a restored database leaves the settings lost" internal/app/upgrade.go \
   's.replace("though it is recorded.\n\t\treturn db.ApplySessionSettings(ctx, owner)", "though it is recorded.\n\t\treturn nil")' $app -run TestANodeStartingOnARestoredDatabaseSetsTheSessionSettingsAgain
-mutate "migrate leaves the settings lost" cmd/diffluence/main.go \
-  's.replace("if err := db.ApplySessionSettings(ctx, pool); err != nil {", "if err := error(nil); err != nil {")' ./cmd/diffluence/ -run TestMigrateSetsTheSessionSettingsAgainWithNothingToMigrate
+mutate "migrate leaves the settings lost" cmd/kenwerk/main.go \
+  's.replace("if err := db.ApplySessionSettings(ctx, pool); err != nil {", "if err := error(nil); err != nil {")' ./cmd/kenwerk/ -run TestMigrateSetsTheSessionSettingsAgainWithNothingToMigrate
 # Spec 064, wave DC1: readers see approved versions only, every change starts review again,
 # a publish supersedes the round, a space workflow wins, and no workflow lacks a way out.
 mutate "a never-approved page shows to readers" internal/permissions/evaluate.go \
@@ -2440,7 +2440,7 @@ mutate "the hash leaves out the files" internal/pages/content_hash.go \
 mutate "the hash leaves out the bytes of a file" internal/pages/content_hash.go \
   's.replace("\t\tfield(\"sha256\", f.SHA256)\n", "")' ./internal/pages/ -run TestAnyChangeToTheSignedContentChangesItsHash
 mutate "verification trusts changed content" internal/pages/signatures.go \
-  's.replace("\tcase v.Recomputed != v.VersionHash:\n", "\tcase false:\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch|TestTheAuditorsExportVerifiesOutsideDiffluence)$'
+  's.replace("\tcase v.Recomputed != v.VersionHash:\n", "\tcase false:\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch|TestTheAuditorsExportVerifiesOutsideKenwerk)$'
 mutate "verification trusts a moved record" internal/pages/signatures.go \
   's.replace("\tcase rec.ContentHash != v.VersionHash:\n", "\tcase false:\n")' $app -run '^(TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch)$'
 mutate "verification trusts a changed audit entry" internal/pages/signatures.go \
@@ -2770,8 +2770,8 @@ mutate "a server without the owner runs contract migrations" internal/app/ops.go
   's.replace("\tif a.cfg.LeavesMigrations() {\n\t\treturn 0, nil\n\t}\n", "")' $app -run TestContractMigrationsRunInTheBackupServiceAfterTheGrace
 mutate "the server's checkpoint job fails once the backup service signs" internal/app/ops.go \
   's.replace("if errors.Is(err, audit.ErrKeyNotInForce) {", "if false {")' $app -run TestTheServerStopsSigningOnceTheBackupServiceDoes
-mutate "migrate in the server tries as the application role" cmd/diffluence/worker.go \
-  's.replace("\tcase cfg.LeavesMigrations():\n\t\treturn \"\", errNoOwner\n", "")' ./cmd/diffluence/ -run TestAContainerWithoutTheOwnerSaysWhereToMigrate
+mutate "migrate in the server tries as the application role" cmd/kenwerk/worker.go \
+  's.replace("\tcase cfg.LeavesMigrations():\n\t\treturn \"\", errNoOwner\n", "")' ./cmd/kenwerk/ -run TestAContainerWithoutTheOwnerSaysWhereToMigrate
 
 # Spec 071 (wave RV4).
 mutate "each IPv6 address counts apart" internal/httpapi/limiter.go \
@@ -2803,7 +2803,7 @@ mutate "a check ignores the counts of erasures" internal/audit/audit.go \
 mutate "anonymising records no count" internal/identity/lifecycle.go \
   's.replace("audit.DetailErasedParts: erased}", "\"erased\": erased}")' $app -run TestPersonalDataInTheAuditLogCanBeErasedWhileTheChainHolds
 mutate "a permission change is counted at every statement" internal/db/migrations/0057_counted_at_commit.sql \
-  's.replace("IF current_setting(\x27diffluence.permissions_counted\x27, true) = \x27yes\x27 THEN", "IF false THEN")' ./internal/permissions/ -run TestALongPermissionChangeDoesNotHoldUpOthers
+  's.replace("IF current_setting(\x27kenwerk.permissions_counted\x27, true) = \x27yes\x27 THEN", "IF false THEN")' ./internal/permissions/ -run TestALongPermissionChangeDoesNotHoldUpOthers
 mutate "a group change holds the count until it commits" internal/db/migrations/0057_counted_at_commit.sql \
   's.replace("ON group_members\n    DEFERRABLE INITIALLY DEFERRED", "ON group_members\n    DEFERRABLE INITIALLY IMMEDIATE")' ./internal/permissions/ -run TestALongPermissionChangeDoesNotHoldUpOthers
 mutate "an export cut at its limit says it is complete" internal/audit/audit.go \
@@ -2823,8 +2823,8 @@ mutate "the boundary check counts the SQL of tests" internal/db/boundary_test.go
   's.replace(" || strings.HasSuffix(path, \"_test.go\") {\n\t\t\t\treturn err", " {\n\t\t\t\treturn err")' ./internal/db/ -run TestCountCrossingsCountsOnlyOtherModulesOutsideTests
 mutate "a view of the migrations has no owner to check" internal/db/boundary_test.go \
   's.replace("\t\tfor _, match := range createdView.FindAllStringSubmatch(code, -1) {\n\t\t\tout[tableKey(match[1])] = true\n\t\t}\n", "")' ./internal/db/ -run TestEveryTableHasAnOwningModule
-mutate "the owner's password stays in the address on psql's command line" cmd/diffluence/restore.go \
-  's.replace("\tu.User = neturl.User(u.User.Username())\n", "")' ./cmd/diffluence/ -run TestTheOwnersPasswordIsTakenOutOfTheAddress
+mutate "the owner's password stays in the address on psql's command line" cmd/kenwerk/restore.go \
+  's.replace("\tu.User = neturl.User(u.User.Username())\n", "")' ./cmd/kenwerk/ -run TestTheOwnersPasswordIsTakenOutOfTheAddress
 mutate "a failed backup can be restored" internal/backups/readiness.go \
   's.replace("WHERE name = $1 AND ok)", "WHERE name = $1)")' ./internal/backups/ -run TestReadinessSaysWhetherABackupIsWholeAndWhetherOneIsOpen
 mutate "a node that left still holds up a restore" internal/restore/restore.go \
@@ -2845,7 +2845,7 @@ mutate "SQL: the editing list ignores the managed rule" internal/db/migrations/0
 mutate "a refusal in a published space does not say why" internal/permissions/service.go \
   's.replace("} else if refusedOnlyAsManaged(d) {", "} else if false \x26\x26 refusedOnlyAsManaged(d) {")' $app -run '^TestNobodyWritesAPublishedSpaceByHand$'
 mutate "the trigger is dropped" internal/db/migrations/0061_publishing.sql \
-  's.replace("IF space IS NOT NULL AND current_setting(\x27diffluence.release\x27, true)", "IF false AND space IS NOT NULL AND current_setting(\x27diffluence.release\x27, true)")' $app -run '^TestTheDatabaseRefusesAWriteIntoAPublishedSpaceWithoutTheReleaseMark$'
+  's.replace("IF space IS NOT NULL AND current_setting(\x27kenwerk.release\x27, true)", "IF false AND space IS NOT NULL AND current_setting(\x27kenwerk.release\x27, true)")' $app -run '^TestTheDatabaseRefusesAWriteIntoAPublishedSpaceWithoutTheReleaseMark$'
 mutate "the end of a pair reaches no node" internal/db/migrations/0061_publishing.sql \
   's.replace("UPDATE OF status, pair_role ON spaces", "UPDATE OF status ON spaces")' $app -run '^TestTurningThePartOffKeepsPublishedSpacesReadOnlyAndEndingOpen$'
 mutate "the migration gives administrators no release" internal/db/migrations/0061_publishing.sql \

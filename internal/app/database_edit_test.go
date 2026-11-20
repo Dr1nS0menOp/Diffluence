@@ -5,7 +5,7 @@ package app_test
 import (
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Spec 049: editing a database has its own permission. Everything that changes a database

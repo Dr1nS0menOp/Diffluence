@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Draft and published spaces, wave PB3 of spec 073: approval releases. Document control runs in

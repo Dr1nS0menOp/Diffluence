@@ -12,7 +12,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/keys"
 )
 
 func testKeyring(t *testing.T, fill byte) *keys.Keyring {

@@ -8,7 +8,7 @@ The study (Yin et al., SOSP 2011; Xu et al., FSE 2015 and OSDI 2016) gives three
 
 | Point | Found in the code | Consequence |
 |---|---|---|
-| Settings | `internal/config/config.go` reads every setting from `DIFFLUENCE_*`, each also from `*_FILE` | Twelve-factor already; a file is only an addition |
+| Settings | `internal/config/config.go` reads every setting from `KENWERK_*`, each also from `*_FILE` | Twelve-factor already; a file is only an addition |
 | Errors | `Load` collects every problem and names the variable | The message is good; a file needs a line number as well |
 | Both a value and its `_FILE` | Refused | Keep, and apply the same rule inside the file |
 | A command that checks without starting | None; `doctor` loads the configuration but needs a database | An operator cannot test a change before a restart |
@@ -19,13 +19,13 @@ The study (Yin et al., SOSP 2011; Xu et al., FSE 2015 and OSDI 2016) gives three
 
 ## Decisions
 
-1. **One file, named by `DIFFLUENCE_CONFIG_FILE`.** No file is read unless that variable is set, so installations from before change nothing.
-2. **The keys are the names of the environment variables, in lower case, without `DIFFLUENCE_`.** A mapping may nest them: `smtp: {host: x}` is `smtp_host`. Writing the same setting twice, also once flat and once nested, is refused, as is an unknown key. Each refusal names the key and its line.
+1. **One file, named by `KENWERK_CONFIG_FILE`.** No file is read unless that variable is set, so installations from before change nothing.
+2. **The keys are the names of the environment variables, in lower case, without `KENWERK_`.** A mapping may nest them: `smtp: {host: x}` is `smtp_host`. Writing the same setting twice, also once flat and once nested, is refused, as is an unknown key. Each refusal names the key and its line.
 3. **The order is default, then the file, then the environment.** A container platform can still override any value. `config check` says which source won, and says when the environment overrides the file.
 4. **Values are read as the text written, never as YAML's guess of a type.** `no` stays the text `no`, which a true/false setting refuses; `012` stays `012`, never an octal number. A list or mapping where one value belongs is refused.
 5. **Secrets.** A secret may come from a path (`smtp_password_file: /run/secrets/smtp`), like `*_FILE` in the environment. A secret written in the file itself is allowed only when the file can be read by its owner alone; otherwise the start is refused, and the message says to run `chmod 600` or use a `_file` key. The secrets are the database addresses, `smtp_password`, `oidc_client_secret`, `collab_token`, `metrics_token` and `pdf_password`.
 6. **One validator.** `config.Load` stays the only place that checks settings. The server, `doctor` and `config check` all call it, so they cannot disagree. Every setting `Load` asks for is a known key, so a setting added later is known in the file without a second list.
-7. **`diffluence config check`** loads the configuration as a start would, prints every setting with the value in effect and its source, with each secret shown as `(set)` and the password in a database address replaced, then tries the settings that are otherwise only used later (decision 8). It exits 1 when the configuration is refused, and 0 otherwise; a probe that fails is a warning, because the outside system may be down for its own reasons. `--offline` skips the probes.
+7. **`kenwerk config check`** loads the configuration as a start would, prints every setting with the value in effect and its source, with each secret shown as `(set)` and the password in a database address replaced, then tries the settings that are otherwise only used later (decision 8). It exits 1 when the configuration is refused, and 0 otherwise; a probe that fails is a warning, because the outside system may be down for its own reasons. `--offline` skips the probes.
 8. **Settings used later are tried at start (OPS-101)**, without side effects, each within 5 seconds: the mail server's name resolves and its port accepts a connection, the identity provider's discovery document loads, and the publish folder takes a file that is removed at once. At `serve` a failure is a warning in the log; `config check` and `doctor` print it.
 9. **The list of settings (OPS-102).** No setting is removed or renamed in this wave: installations set them. The guide gets a short list of what every installation sets, and marks the rest as rarely needed.
 
@@ -39,7 +39,7 @@ Each step: failing test first, then the change, then a mutation.
 4. The report of sources and masked values.
 5. The probes.
 6. The command `config check`, and `doctor` printing the probes.
-7. The example file `deploy/diffluence.example.yaml`, `install.md`, `compose.yaml`, the changelog, the OPS lines, `docs/dependencies.md`.
+7. The example file `deploy/kenwerk.example.yaml`, `install.md`, `compose.yaml`, the changelog, the OPS lines, `docs/dependencies.md`.
 
 ## Tests
 
@@ -48,7 +48,7 @@ Each step: failing test first, then the change, then a mutation.
 - `TestASecretInAFileOthersCanReadIsRefused`, and the same file with mode 600 is accepted.
 - `TestTheReportNamesEverySourceAndHidesSecrets`: no secret text appears in the output.
 - `TestTheProbesWarnAndNeverFail` with a closed port, an unreachable provider and a folder that cannot be written.
-- `TestConfigCheckExitsOneOnABadFile` in `cmd/diffluence`.
+- `TestConfigCheckExitsOneOnABadFile` in `cmd/kenwerk`.
 
 ## Load budget (ARC-238)
 

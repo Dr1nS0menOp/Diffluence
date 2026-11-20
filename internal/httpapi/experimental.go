@@ -5,7 +5,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/diffluence/diffluence/internal/features"
+	"github.com/kenwerk/kenwerk/internal/features"
 )
 
 // experimental serves next only while an experimental part is on (spec 069). Access is

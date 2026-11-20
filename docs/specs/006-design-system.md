@@ -15,7 +15,7 @@ The first interface worked, but looked unfinished. The product owner wants the i
 
 **Asking first.** Discarding a draft, restoring a version, and deleting a page, a space or a trashed item ask for confirmation in a dialog of our own. Adding a link uses one too. The browser's own dialogs never open.
 
-**The font.** Diffluence uses the system font of the device. Under Administration, Settings, Appearance an administrator can import one font in WOFF2 or WOFF format of at most 2 MiB. It applies to everyone at once, also on the login page. "Use the system font" removes it. A file that is not such a font is refused with a clear message. A font that the browser cannot use changes nothing: the system font stays.
+**The font.** Kenwerk uses the system font of the device. Under Administration, Settings, Appearance an administrator can import one font in WOFF2 or WOFF format of at most 2 MiB. It applies to everyone at once, also on the login page. "Use the system font" removes it. A file that is not such a font is refused with a clear message. A font that the browser cannot use changes nothing: the system font stays.
 
 ## Permissions and audit
 

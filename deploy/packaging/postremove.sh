@@ -1,7 +1,7 @@
 #!/bin/sh
 # SPDX-License-Identifier: Apache-2.0
-# After the .deb or .rpm removes Diffluence (spec 057). The data, the configuration and the
-# diffluence user stay: removing a package must never remove a wiki. The guide says how to
+# After the .deb or .rpm removes Kenwerk (spec 057). The data, the configuration and the
+# kenwerk user stay: removing a package must never remove a wiki. The guide says how to
 # remove them by hand.
 set -e
 

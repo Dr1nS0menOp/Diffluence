@@ -5,8 +5,8 @@ package app_test
 import (
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // TestTheAccessScreenPreviewsARoleBeforeGivingIt is the route behind the Access screen

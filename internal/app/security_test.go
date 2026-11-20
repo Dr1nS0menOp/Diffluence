@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // userVerificationOf reads what a begin route asks of the authenticator.

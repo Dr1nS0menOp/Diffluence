@@ -10,8 +10,8 @@ import (
 
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // uuidLike finds an id in a span: a path or a value holds one, a route pattern never does.

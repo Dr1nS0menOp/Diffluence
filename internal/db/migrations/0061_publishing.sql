@@ -109,12 +109,12 @@ CREATE OR REPLACE FUNCTION publishing_managed(space uuid) RETURNS boolean LANGUA
 $$;
 
 -- publishing_refuse stops a write into a published space that is not a release (PUB-224). The
--- release path marks its transaction with the local setting diffluence.release; the
+-- release path marks its transaction with the local setting kenwerk.release; the
 -- application role can set it too, so this protects against mistakes and older nodes, not
 -- against a compromised application, which the permission rule and the audit cover (D6).
 CREATE OR REPLACE FUNCTION publishing_refuse(space uuid) RETURNS void LANGUAGE plpgsql AS $$
 BEGIN
-    IF space IS NOT NULL AND current_setting('diffluence.release', true) IS DISTINCT FROM 'on'
+    IF space IS NOT NULL AND current_setting('kenwerk.release', true) IS DISTINCT FROM 'on'
        AND publishing_managed(space) THEN
         RAISE EXCEPTION 'This space is changed only by releases: it is the published space of a pair (spec 073).'
             USING ERRCODE = 'DF073';

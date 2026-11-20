@@ -7,11 +7,11 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/mail"
-	"github.com/diffluence/diffluence/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/notify"
 )
 
 // accountMailContext binds sealed account mail to the queue.

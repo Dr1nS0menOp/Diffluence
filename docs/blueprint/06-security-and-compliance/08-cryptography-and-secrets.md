@@ -33,10 +33,10 @@ ASVS 11.1.2 asks for an inventory. Primitives come from the Go standard library 
 
 **What can go wrong:** the key lies next to the data, a key leaks and cannot be replaced, one key does too many jobs.
 
-- **SEC-710** · built · The KEK is a 32-byte file with mode 0600, outside the database. When several nodes run, `DIFFLUENCE_MASTER_KEY_FILE` is required, and the same key is shared.
+- **SEC-710** · built · The KEK is a 32-byte file with mode 0600, outside the database. When several nodes run, `KENWERK_MASTER_KEY_FILE` is required, and the same key is shared.
 - **SEC-711** · built · By default `master.key` sits in the data directory, next to the stored files. The guide says to back it up apart. See SEC-636. A backup now keeps `master.key` encrypted, with the key apart.
 - **SEC-712** · phase 3 · A KMS can hold the KEK: OpenBao or Vault Transit, or an HSM (ADR-011, ASVS 13.3.3).
-- **SEC-713** · built · The KEK can be replaced without downtime (spec 034, ASVS 13.3.4). Every sealed value names its key by a one-way id. `diffluence key add`, `promote`, `reseal`, `check` and `retire` bring a new key in, seal every value and stored file again, prove that everything opens, and only then remove the old key. A crash at any step leaves everything readable. Values from before key ids still open.
+- **SEC-713** · built · The KEK can be replaced without downtime (spec 034, ASVS 13.3.4). Every sealed value names its key by a one-way id. `kenwerk key add`, `promote`, `reseal`, `check` and `retire` bring a new key in, seal every value and stored file again, prove that everything opens, and only then remove the old key. A crash at any step leaves everything readable. Values from before key ids still open.
 - **SEC-714** · partly · The signing key for audit checkpoints and the key behind login fingerprints come from a root that stays when the KEK is replaced (spec 034, D3), so replacing the KEK no longer changes them. Still open: the root sits in the same file as the KEK, so whoever steals that file can forge checkpoints even after the KEK is replaced. Replacing the root needs new signing keys, checkpoints verified against the public key stored with each, and every fingerprint worked out again.
 - **SEC-715** · later · An external anchor for the checkpoints: the signed head goes to a system the instance cannot change. See SEC-833.
 

@@ -2,7 +2,7 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<title>Diffluence: drie ontwerprichtingen</title>
+<title>Kenwerk: drie ontwerprichtingen</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 :root { --font: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif; }
@@ -182,7 +182,7 @@ main { position: relative; }
 </head>
 <body>
 <div class="pick">
-  <b>Diffluence</b>
+  <b>Kenwerk</b>
   <div class="group" id="designs"></div>
   <div class="group" id="screens"></div>
   <div class="group"><button id="theme" aria-pressed="false">Donker</button></div>
@@ -236,7 +236,7 @@ const tree = () => `
   ${leaf('A wide page', false)}${leaf('A long read', false)}`;
 const filter = `<div class="filter" id="filter"><input placeholder="Filter pages"><div class="chips"><button class="chip on">Tree</button><button class="chip">Recent</button><button class="chip">Mine</button><button class="chip">Drafts</button></div></div>`;
 const spaceSide = (current) => `
-  <div class="sidehead"><span class="animal">OW</span><span>Welcome to Diffluence</span></div>
+  <div class="sidehead"><span class="animal">OW</span><span>Welcome to Kenwerk</span></div>
   ${section('Space', ['home:Home', 'info:Overview', 'people:People', 'blog:Blog', 'file:Files', 'archive:Archive'].map((x) => { const [i, t] = x.split(':'); return item(i, t, t === current); }).join(''), { h: 150 })}
   <div class="split" data-split></div>
   ${section('Pages', filter + tree(), { fill: true, tools: `<button class="tool" data-filter title="Filter">${icon(I.funnel, 14)}</button><button class="tool" title="New page">${icon(I.plus, 14)}</button>` })}
@@ -244,7 +244,7 @@ const spaceSide = (current) => `
 const homeSide = `
   ${section('You', item('home', 'For you', true) + item('clock', 'Recent', false) + item('star', 'Favourites', false) + item('check', 'Tasks', false) + item('page', 'Drafts', false))}
   <div class="split" data-split></div>
-  ${section('Spaces', `<div class="item"><span class="animal" style="width:22px;height:22px;font-size:9px">OW</span>Welcome to Diffluence</div><div class="item"><span class="animal b" style="width:22px;height:22px;font-size:9px">EL</span>Engineering</div><div class="item"><span class="animal c" style="width:22px;height:22px;font-size:9px">WH</span>People team</div><div class="item"><span class="animal d" style="width:22px;height:22px;font-size:9px">FX</span>Marketing</div>${item('grid', 'All spaces', false)}`, { fill: true, tools: `<button class="tool" title="New space">${icon(I.plus, 14)}</button>` })}`;
+  ${section('Spaces', `<div class="item"><span class="animal" style="width:22px;height:22px;font-size:9px">OW</span>Welcome to Kenwerk</div><div class="item"><span class="animal b" style="width:22px;height:22px;font-size:9px">EL</span>Engineering</div><div class="item"><span class="animal c" style="width:22px;height:22px;font-size:9px">WH</span>People team</div><div class="item"><span class="animal d" style="width:22px;height:22px;font-size:9px">FX</span>Marketing</div>${item('grid', 'All spaces', false)}`, { fill: true, tools: `<button class="tool" title="New space">${icon(I.plus, 14)}</button>` })}`;
 const spaceSettingsSide = `
   <div class="back" data-go="page">${icon(I.back, 14)} Back to the space</div>
   <div class="sidehead"><span class="animal">OW</span><span>Space settings</span></div>
@@ -277,14 +277,14 @@ const personCard = ([n, j, c, r]) => `<div class="card"><div class="row"><span c
 const main = {
   home: () => `<div class="wrap wide"><h1>Good morning, Sam</h1><p class="sub">Here is what changed while you were away.</p>
     <h2>Your spaces</h2><div class="cards">
-      <div class="card"><div class="row"><span class="animal">OW</span><div><b>Welcome to Diffluence</b><small>18 pages</small></div></div></div>
+      <div class="card"><div class="row"><span class="animal">OW</span><div><b>Welcome to Kenwerk</b><small>18 pages</small></div></div></div>
       <div class="card"><div class="row"><span class="animal b">EL</span><div><b>Engineering</b><small>246 pages</small></div></div></div>
       <div class="card"><div class="row"><span class="animal c">WH</span><div><b>People team</b><small>64 pages</small></div></div></div></div>
     <h2>Recent activity</h2><div class="feed">
       <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#0f7f76">NH</span>Noor changed <a style="color:var(--accent)">Release checklist</a><small>10 minutes ago</small></div>
       <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#c2571a">LV</span>Lena commented on <a style="color:var(--accent)">Holidays</a><small>1 hour ago</small></div>
       <div><span class="face" style="width:28px;height:28px;font-size:11px;background:#2563d9">TB</span>Tom published <a style="color:var(--accent)">Team budget</a><small>Yesterday</small></div></div></div>`,
-  page: () => `<div class="wrap"><div class="crumb"><span>Welcome to Diffluence / Writing a page</span><span class="row"><button class="btn">Edit</button><button class="btn">Share</button></span></div>
+  page: () => `<div class="wrap"><div class="crumb"><span>Welcome to Kenwerk / Writing a page</span><span class="row"><button class="btn">Edit</button><button class="btn">Share</button></span></div>
     <div class="toolrail"><button title="Comments">${icon(I.blog)}</button><button title="Details">${icon(I.info)}</button><button title="Contents">${icon(I.grid)}</button></div><h1>Tables</h1><div class="facts"><span>By Noor Haddad</span><span><i></i>In progress</span><span>${icon(I.clock, 14)}4 min</span><span>${icon(I.star, 14)}12</span></div>
     <div class="prose"><p>A table holds numbers and short facts. Click in a table to see its tools, and drag its edge to make it wider.</p><p>Labels sit under the page as plain words. They need no box: they are links, and only adding one looks like a field when you click it.</p></div>
     <div class="labels"><a>handbook</a><a>tables</a><a>example</a><span class="add">Add label</span></div></div>`,
@@ -294,7 +294,7 @@ const main = {
     ${state.design === 'B' ? `<div class="peoplegrid">${people.map(personCard).join('')}</div>` : people.map(personRow).join('')}</div>`,
   space: () => `<div class="wrap"><h1>Details</h1><p class="sub">What this space is called and what it is for.</p>
     <div class="panel">
-      ${setting('Name', 'Shown in the sidebar and in search.', '<input class="field" value="Welcome to Diffluence">')}
+      ${setting('Name', 'Shown in the sidebar and in search.', '<input class="field" value="Welcome to Kenwerk">')}
       ${setting('Key', 'Part of the address of this space.', '<input class="field" value="WELCOME">')}
       ${setting('Animal', 'Every space has its own.', '<span class="row"><span class="animal">OW</span><button class="btn">Change</button></span>')}
     </div><h2>Features</h2><div class="panel">
@@ -321,7 +321,7 @@ function render() {
   document.getElementById('theme').setAttribute('aria-pressed', state.dark);
   document.getElementById('why').innerHTML = `<b>${designs[state.design].name}</b>${designs[state.design].why}`;
   document.getElementById('app').innerHTML = `<div class="app ${state.design} ${state.dark ? 'dark' : ''}">
-    <div class="top"><span class="logo"><i>Y</i>Diffluence</span><a class="nav" data-go="home">Home</a><a class="nav">Spaces</a><a class="nav" data-go="people">People</a><a class="nav">Recent</a><button class="create">+ Create</button><span class="grow"></span><input class="search" placeholder="Search pages"><a class="nav" data-go="admin">${icon(I.gear)}</a><span class="me">S</span></div>
+    <div class="top"><span class="logo"><i>Y</i>Kenwerk</span><a class="nav" data-go="home">Home</a><a class="nav">Spaces</a><a class="nav" data-go="people">People</a><a class="nav">Recent</a><button class="create">+ Create</button><span class="grow"></span><input class="search" placeholder="Search pages"><a class="nav" data-go="admin">${icon(I.gear)}</a><span class="me">S</span></div>
     <div class="body"><nav class="rail"><button class="${state.screen === 'home' ? 'on' : ''}" data-go="home" title="Home">${icon(I.home, 20)}</button><button class="${state.screen === 'page' ? 'on' : ''}" data-go="page" title="Pages">${icon(I.page, 20)}</button><button class="${state.screen === 'people' ? 'on' : ''}" data-go="people" title="People">${icon(I.people, 20)}</button><button title="Tasks">${icon(I.check, 20)}</button><span class="grow"></span><button class="${state.screen === 'admin' ? 'on' : ''}" data-go="admin" title="Administration">${icon(I.gear, 20)}</button></nav>
     <aside class="side">${side[state.screen]}<div class="drag" data-drag></div></aside><main>${main[state.screen]()}</main></div></div>`;
 }

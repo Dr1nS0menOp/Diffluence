@@ -24,8 +24,8 @@ Lines without one of these stay as they were. A line is left out of this wave wh
 | SEC-190 | At most 3 reset or sign-up mails per recipient in 15 minutes, from any address. The answer and its timing stay the same, so nothing tells whether the address has an account | No query; one counter in memory per node |
 | SEC-113 | Turning off TOTP shares the count of every route that checks a password | No query |
 | SEC-257, SEC-256 | A warning at start, and an item in the admin console, when the public address is plain http on any host but this machine | No query |
-| SEC-627 | Compose publishes the app on `127.0.0.1` unless `DIFFLUENCE_BIND` says otherwise | None |
-| SEC-153 | The cookie of the login flow is `__Secure-diffluence_oidc` on https | None |
+| SEC-627 | Compose publishes the app on `127.0.0.1` unless `KENWERK_BIND` says otherwise | None |
+| SEC-153 | The cookie of the login flow is `__Secure-kenwerk_oidc` on https | None |
 | SEC-351, SEC-1022 | New fuzz targets for the HTML import, import archives and SCIM filters, and the search language joins `make fuzz`. A SCIM filter on an attribute the route does not read is now refused, where it was ignored | Nightly only |
 | SEC-548 (partly) | A test proves that text removed is gone from the state the service keeps, stores and sends, and that it would stay without garbage collection | Test only |
 | SEC-159, SEC-161, SEC-179, SEC-423, SEC-625, SEC-728, SEC-843, SEC-905 | `docs/operations/identity-providers.md` and `install.md` | Documents |

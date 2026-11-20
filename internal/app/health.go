@@ -10,16 +10,16 @@ import (
 	"sync"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/publishing"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/storage"
-	"github.com/diffluence/diffluence/internal/version"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/publishing"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/version"
 )
 
 // healthFreshFor is how long one reading of the facts is shown again (spec 051 load
@@ -39,7 +39,7 @@ const (
 	keepBackupHistory = 400 * 24 * time.Hour
 )
 
-// HealthSource is what reading the health facts needs, so "diffluence doctor" can read
+// HealthSource is what reading the health facts needs, so "kenwerk doctor" can read
 // them without a running node.
 type HealthSource struct {
 	Pool           db.Querier

@@ -200,7 +200,7 @@ Space settings, Webhooks, for space administrators, and for the instance in Admi
 
 ### H11. Command line tool
 
-`diffluence client export`, `import`, `backup-content`, `pages list`, and `spaces list`. `DIFFLUENCE_URL`, and the token through `DIFFLUENCE_TOKEN` or `DIFFLUENCE_TOKEN_FILE`. JSON on standard output, messages on standard error, and clear exit codes. It only uses the public API (PLT-040).
+`kenwerk client export`, `import`, `backup-content`, `pages list`, and `spaces list`. `KENWERK_URL`, and the token through `KENWERK_TOKEN` or `KENWERK_TOKEN_FILE`. JSON on standard output, messages on standard error, and clear exit codes. It only uses the public API (PLT-040).
 
 ## Part 4: Presence
 
@@ -410,7 +410,7 @@ Migration 0012, expand only:
 5. Make a rule that triggers itself, and see that it stops.
 6. Add a webhook to a test address that is not allowed yet, and see the refusal. Allow the host, and watch the delivery log.
 7. Create a token with `read`, try to change a page with it, and see the refusal.
-8. Run `diffluence client export` with that token.
+8. Run `kenwerk client export` with that token.
 9. Open a page in two browsers as two people, and see each other. Edit in both, and see the warning.
 
 ## Provenance

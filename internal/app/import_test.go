@@ -13,11 +13,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/office"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/office"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 // post uploads a file and returns the answer.

@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/version"
-	"github.com/diffluence/diffluence/internal/webui"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/version"
+	"github.com/kenwerk/kenwerk/internal/webui"
 )
 
 const loginWindow = 15 * time.Minute
@@ -333,7 +333,7 @@ func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 		s.internalError(w, r, err)
 		return
 	}
-	name := "diffluence-audit-" + time.Now().UTC().Format("20060102-150405") + ".csv"
+	name := "kenwerk-audit-" + time.Now().UTC().Format("20060102-150405") + ".csv"
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", `attachment; filename="`+name+`"`)
 	// A long log takes longer to send than the server's write timeout. Each query of the
@@ -347,7 +347,7 @@ func (s *Server) handleAuditExport(w http.ResponseWriter, r *http.Request) {
 
 // auditWalkLimit is how long the check from the console may walk the chain in its one
 // query: long enough for millions of events, and still an end. The nightly check and
-// `diffluence audit verify` have no limit. Only auditors ask, and the class of search and
+// `kenwerk audit verify` have no limit. Only auditors ask, and the class of search and
 // reports bounds how many walks run at once.
 const auditWalkLimit = 10 * time.Minute
 

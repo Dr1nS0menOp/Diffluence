@@ -65,7 +65,7 @@ The feed numbers are the median of five runs through `feed.Service` and pgx, wit
 
 ## The repeatable check
 
-`scripts/stress/real-data.sh <dump>` restores a dump into a throw-away PostgreSQL 16 on the toolbox's network and runs `TestTheFeedIsFastOnRealData`, which fails when a tab passes its budget. Without `DIFFLUENCE_REALDATA_URL` the test skips, so `make check` is unchanged. The dump holds generated people and pages only, but it stays out of the repository. A change to a hot read is measured this way as well as on generated data.
+`scripts/stress/real-data.sh <dump>` restores a dump into a throw-away PostgreSQL 16 on the toolbox's network and runs `TestTheFeedIsFastOnRealData`, which fails when a tab passes its budget. Without `KENWERK_REALDATA_URL` the test skips, so `make check` is unchanged. The dump holds generated people and pages only, but it stays out of the repository. A change to a hot read is measured this way as well as on generated data.
 
 ## Load budget (ARC-238)
 

@@ -13,11 +13,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // upgradeConfig starts a node on url the way an operator does.
@@ -145,7 +145,7 @@ func TestAnUpgradeWithoutARecentBackupIsRefusedByDefault(t *testing.T) {
 	tdb, migs := previousRelease(t)
 	earlierUpgradeWithoutBackup(t, tdb)
 	cfg, err := config.Load(func(key string) (string, bool) {
-		v, ok := map[string]string{"DIFFLUENCE_DATABASE_URL": tdb.URL}[key]
+		v, ok := map[string]string{"KENWERK_DATABASE_URL": tdb.URL}[key]
 		return v, ok
 	})
 	if err != nil {
@@ -153,7 +153,7 @@ func TestAnUpgradeWithoutARecentBackupIsRefusedByDefault(t *testing.T) {
 	}
 	cfg.HTTPAddr, cfg.DataDir = "127.0.0.1:0", t.TempDir()
 	_, err = startNode(t, cfg)
-	for _, want := range []string{"no backup was noted", "scripts/backup.sh", "migrate --without-backup", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off"} {
+	for _, want := range []string{"no backup was noted", "scripts/backup.sh", "migrate --without-backup", "KENWERK_UPGRADE_BACKUP_MAX_AGE=off"} {
 		if err == nil || !strings.Contains(err.Error(), want) {
 			t.Fatalf("want a refusal naming %q, got %v", want, err)
 		}
@@ -212,7 +212,7 @@ func TestAnUpgradeLeavesAMarkerNamingTheLastBackup(t *testing.T) {
 	}
 }
 
-// diffluence migrate used to check nothing. Now it asks for the backup too, and
+// kenwerk migrate used to check nothing. Now it asks for the backup too, and
 // --without-backup goes on once, on the record (spec 054).
 func TestMigrateAsksForTheBackupAndGoesOnOnceWhenToldTo(t *testing.T) {
 	tdb, migs := previousRelease(t)

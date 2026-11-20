@@ -2,8 +2,8 @@
 
 package workflow
 
-// Example is a workflow Diffluence ships, so a space can start at once (DOC-131). Its
-// names are written for Diffluence; the screens translate them by Key and the ids of its
+// Example is a workflow Kenwerk ships, so a space can start at once (DOC-131). Its
+// names are written for Kenwerk; the screens translate them by Key and the ids of its
 // states and transitions, and a copy keeps whatever words the person saves.
 type Example struct {
 	Key         string     `json:"key"`

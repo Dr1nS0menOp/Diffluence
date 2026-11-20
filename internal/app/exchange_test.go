@@ -12,9 +12,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // runJobs works off the queue, as the worker does.

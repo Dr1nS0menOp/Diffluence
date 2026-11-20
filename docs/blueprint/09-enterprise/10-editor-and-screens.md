@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-document-control.md](01-document-control.md).
 
-Document control is used by quality teams for years at a time, often under pressure of an audit. The screens must be calm, plain and fully usable by keyboard and screen reader. They follow the design standard of Diffluence (`docs/design/README.md`, the Stil look of ADR-034, the settings layout with the list on the left), and WCAG 2.2 at level AA.
+Document control is used by quality teams for years at a time, often under pressure of an audit. The screens must be calm, plain and fully usable by keyboard and screen reader. They follow the design standard of Kenwerk (`docs/design/README.md`, the Stil look of ADR-034, the settings layout with the list on the left), and WCAG 2.2 at level AA.
 
 ## 10.1 Where things live
 

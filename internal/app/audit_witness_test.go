@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // newEnvWithLog runs the server with a log at warning level, as a quiet installation

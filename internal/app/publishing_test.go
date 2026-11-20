@@ -15,9 +15,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Draft and published spaces, wave PB1 of spec 073. The pure rule is proved by the permission
@@ -395,7 +395,7 @@ func TestTheDatabaseRefusesAWriteIntoAPublishedSpaceWithoutTheReleaseMark(t *tes
 		t.Fatal(err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, "SELECT set_config('diffluence.release', 'on', true)"); err != nil {
+	if _, err := tx.Exec(ctx, "SELECT set_config('kenwerk.release', 'on', true)"); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := tx.Exec(ctx, writes["a rename"]); err != nil {

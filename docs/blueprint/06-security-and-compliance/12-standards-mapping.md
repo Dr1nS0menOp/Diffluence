@@ -10,7 +10,7 @@ Customers and auditors ask in the words of standards, so this chapter answers in
 | **gap** | Open, and in no plan yet |
 | **op** | The operator's part, which the guide must cover |
 | **later** | Chosen to wait. The SEC line or the row says why |
-| **n/a** | Does not apply to Diffluence |
+| **n/a** | Does not apply to Kenwerk |
 
 ## 12.1 ASVS 5.0.0
 
@@ -353,7 +353,7 @@ Level 2 is the aim, so these are what stands between us and it, leaving out what
 
 Article 21(2) names ten measures. The duty falls on the organisation, never on the software, so a product can only help. Whether an organisation falls under the law is a legal question. *Lawyer.*
 
-| Measure | What Diffluence offers | What stays with the customer |
+| Measure | What Kenwerk offers | What stays with the customer |
 |---|---|---|
 | (a) Risk analysis and security policies | This blueprint as input | The analysis and the policies |
 | (b) Incident handling | The audit log, and ending sessions. The runbook is SEC-657 | The process and the reporting |
@@ -379,7 +379,7 @@ BIO2 builds on ISO/IEC 27001 and 27002:2022, which order 93 controls in four the
 
 ## 12.5 GDPR Article 32
 
-| Measure | In Diffluence |
+| Measure | In Kenwerk |
 |---|---|
 | (a) Pseudonymisation and encryption | Chapter 8. Analytics without names in wave H. Page text is not encrypted (SEC-726) |
 | (b) Confidentiality, integrity, availability, resilience | Chapters 3, 7, 9 |

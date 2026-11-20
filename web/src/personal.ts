@@ -6,12 +6,12 @@
 import { createContext, useContext } from 'react';
 import type { Json } from './api';
 
-const PERSONAL_PREFIX = 'diffluence.person.';
+const PERSONAL_PREFIX = 'kenwerk.person.';
 const DRAFT_PART = '.draft.';
 const UNSAVED_PART = '.unsaved.';
 const SHARED_PART = '.shared.';
-const UNKEYED_NAMES = ['diffluence.searches'];
-const UNKEYED_PREFIXES = ['diffluence.tree.', 'diffluence.comment.', 'diffluence.backup.'];
+const UNKEYED_NAMES = ['kenwerk.searches'];
+const UNKEYED_PREFIXES = ['kenwerk.tree.', 'kenwerk.comment.', 'kenwerk.backup.'];
 const DRAFT_KEEP_MS = 7 * 86_400_000;
 const RECENT_ITEMS_NAME = 'insert.recent';
 const RECENT_EMOJI_NAME = 'emoji.recent';

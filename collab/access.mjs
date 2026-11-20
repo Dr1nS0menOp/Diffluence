@@ -6,7 +6,7 @@
 
 import { createHash, timingSafeEqual } from 'node:crypto';
 
-export const TICKET_HEADER = 'x-diffluence-collab-ticket';
+export const TICKET_HEADER = 'x-kenwerk-collab-ticket';
 
 /**
  * Whether an Authorization header carries the token the API shares with the service. Both

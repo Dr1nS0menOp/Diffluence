@@ -26,12 +26,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // givePassword sets a password for an account directly, as only a test does: no route
@@ -528,10 +528,10 @@ func TestTheLoginFlowCookieIsSecureByNameOnHTTPS(t *testing.T) {
 		}
 		return resp.Header.Get("Set-Cookie")
 	}
-	if got := flowCookie("https://wiki.example.com"); !strings.HasPrefix(got, "__Secure-diffluence_oidc=") || !strings.Contains(got, "; Secure") {
+	if got := flowCookie("https://wiki.example.com"); !strings.HasPrefix(got, "__Secure-kenwerk_oidc=") || !strings.Contains(got, "; Secure") {
 		t.Fatalf("on https: %q", got)
 	}
-	if got := flowCookie("http://localhost"); !strings.HasPrefix(got, "diffluence_oidc=") {
+	if got := flowCookie("http://localhost"); !strings.HasPrefix(got, "kenwerk_oidc=") {
 		t.Fatalf("on http: %q", got)
 	}
 }
@@ -724,7 +724,7 @@ func TestSCIMTokens(t *testing.T) {
 	s, id := newScim(t, e, admin)
 
 	s.want(200, "GET", "/ServiceProviderConfig", nil)
-	(&scimClient{e: e, token: "dfl_scim_wrong"}).want(401, "GET", "/Users", nil)
+	(&scimClient{e: e, token: "kenwerk_scim_wrong"}).want(401, "GET", "/Users", nil)
 	(&scimClient{e: e, token: ""}).want(401, "GET", "/Users", nil)
 
 	var stored int

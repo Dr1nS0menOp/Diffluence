@@ -12,12 +12,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/conditions"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/labels"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/templates/fields"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/labels"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/templates/fields"
 )
 
 // The bounds of a template (spec 074, TPL-102, TPL-825, TPL-906).
@@ -61,7 +61,7 @@ func (r Restrictions) sameSubjects(other Restrictions) bool {
 
 func (r Restrictions) any() bool { return len(r.View) > 0 || len(r.Edit) > 0 }
 
-// Entry is one page a template makes (TPL-100). Key is made by Diffluence and survives
+// Entry is one page a template makes (TPL-100). Key is made by Kenwerk and survives
 // renaming and moving, so links keep pointing at it.
 type Entry struct {
 	Key          string       `json:"key"`

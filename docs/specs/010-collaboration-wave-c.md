@@ -217,11 +217,11 @@ Types: `mention`, `task_assigned`, `task_due`, `share`, `comment`, `reply`, `rea
 
 ### C11. E-mail
 
-- **Settings:** `DIFFLUENCE_SMTP_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD` (and `_PASSWORD_FILE`), `_FROM`, `_REPLY_TO`, `_TLS` with `starttls` (default), `implicit` or `none`. Without a host, mail is off, and the app says so in the admin console.
+- **Settings:** `KENWERK_SMTP_HOST`, `_PORT`, `_USERNAME`, `_PASSWORD` (and `_PASSWORD_FILE`), `_FROM`, `_REPLY_TO`, `_TLS` with `starttls` (default), `implicit` or `none`. Without a host, mail is off, and the app says so in the admin console.
 - **Sending:** the worker works through `mail_queue`. A slow or broken server never touches a request. It tries five times with growing waits, then marks the mail as failed.
 - **Rendered when sent:** the queue holds notification ids, not text. Access is checked and the text is made at that moment, so a person who lost access gets nothing.
 - **Message:** plain text and HTML. `html/template` escapes everything. Names and titles lose line breaks, and non-ASCII headers are encoded.
-- **Headers:** `Auto-Submitted: auto-generated`, `List-Id`, `List-Unsubscribe`, `List-Unsubscribe-Post`, and `X-Diffluence-Reason` for filters.
+- **Headers:** `Auto-Submitted: auto-generated`, `List-Id`, `List-Unsubscribe`, `List-Unsubscribe-Post`, and `X-Kenwerk-Reason` for filters.
 - **Content:** title and link by default. With the instance setting on, a short excerpt.
 - **At once:** the types with that choice, in a batch per minute, so five mentions are one mail.
 - **Digest:** daily or weekly, grouped by space, with comments, reactions, new and changed pages. Left out when there is nothing new, and things already read are left out too.

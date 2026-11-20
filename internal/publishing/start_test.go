@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/spaces"
 )
 
 // TestAStartLeadsEveryReferenceToTheCopiesAndTakesNothingAway is PUB-1310 and D57: links, cards,

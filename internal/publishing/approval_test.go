@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 // TestAReleaseTakesTheApprovedVersionOfAControlledPage is PUB-700: of a controlled page a

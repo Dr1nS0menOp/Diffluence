@@ -3,6 +3,12 @@
 Plain-language notes per release. Every entry has an "Upgrade impact" line.
 
 ## Unreleased
+### Changed: the product is called Kenwerk (spec 095, wave KR1)
+- The product formerly called Diffluence is now Kenwerk, everywhere: the screens, the command `kenwerk`, the images `kenwerk`, `kenwerk-backup` and `kenwerk-collab`, the packages, the systemd unit `kenwerk.service`, the Helm chart, the Go module `github.com/kenwerk/kenwerk`, the settings `KENWERK_*`, the database `kenwerk` with the roles `kenwerk_owner` and `kenwerk_app`, the cookie `kenwerk_session`, the metrics `kenwerk_*`, the tracing service name and the backup folders `kenwerk-<time>Z`
+- Personal tokens start with `kenwerk_` and SCIM tokens with `kenwerk_scim_`
+- The river mark stays; only the name beside it changes
+- Entries below keep the old name, as they were written
+- Upgrade impact: rename; existing installs start fresh (pre-1.0). The old `DIFFLUENCE_*` settings, database and role names, cookie, tokens, backups and audit chains are not read, and a database made by an earlier build refuses to start because six migrations changed
 ### Changed: the administration, as blueprint 03 arranges it (spec 081, wave SC4)
 - The sidebar of the administration starts with a header row, **Back to the start screen** and the name, which stays in place while the list scrolls. Then three sections that are always open, each entry with an icon: **Overview** (Summary, Insights, Analytics, Audit log, System health, Events, Upgrades, Configuration), **Tools** (Automation, Spaces, Announcements) and **People and access** (Users, Groups, Invitations, Service accounts). Then a **Settings** heading with the search field under it, and five groups that fold: **Instance** (General, Rules, Organising, Mail, Templates, Document control), **Security** (Login and second factor, Sessions, Provisioning, Export and publishing, Outgoing calls), **Permissions** (Instance permissions, Roles, Defaults for new spaces), **Look** and **Data** (Care, Backups, Import a space, Spaces in the trash, Webhooks). Which groups you folded is remembered for you; the settings of a space no longer fold with them
 - The search field finds a section by its name as well as a setting inside one. The sidebar keeps its place when you move between sections, and shows the section you opened by its address or the search. Automation and Import a space carry the word Experimental while their part is on, and leave the sidebar while it is off; their address then says the part is off

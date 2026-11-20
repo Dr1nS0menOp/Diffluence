@@ -975,7 +975,7 @@ export interface PageDetail extends PageSummary {
   review_only: boolean;
 }
 
-/** What a state means to Diffluence, whatever a space calls it (spec 064). */
+/** What a state means to Kenwerk, whatever a space calls it (spec 064). */
 export type WorkflowStateKind = 'draft' | 'in_review' | 'approved' | 'rejected' | 'obsolete';
 
 /** Which step the system takes when a review passes or asks for changes (spec 064, DC2). */
@@ -1081,7 +1081,7 @@ export interface WorkflowVersion {
   changes: WorkflowChange[];
 }
 
-/** A workflow Diffluence ships, which a space copies to start (DOC-131). */
+/** A workflow Kenwerk ships, which a space copies to start (DOC-131). */
 export interface WorkflowExample {
   key: string;
   name: string;

@@ -1,4 +1,4 @@
-# Diffluence
+# Kenwerk
 
 **An open-source, self-hosted knowledge platform. Secure by default, boring to operate, painless to upgrade.**
 
@@ -8,7 +8,7 @@
 >
 > **Experimental parts** are off on a new installation, and an administrator turns each on under Administration, Organising: automation rules, databases, bundles between instances, restore from the console, draft and published spaces, and guided templates. Public sites and analytics are experimental too, with their own switches, which also start off ([ADR-043](docs/blueprint/10-decision-log.md)).
 
-Diffluence is a team wiki with spaces, pages and enterprise-grade permissions, licensed under Apache 2.0. The plan and every design decision live in [`docs/blueprint/`](docs/blueprint/00-README.md).
+Kenwerk is a team wiki with spaces, pages and enterprise-grade permissions, licensed under Apache 2.0. The plan and every design decision live in [`docs/blueprint/`](docs/blueprint/00-README.md).
 
 ## What it does
 
@@ -21,13 +21,13 @@ Needs Docker with the Compose plugin.
 ```sh
 sh scripts/setup-secrets.sh
 docker compose up -d --build --wait
-docker compose logs diffluence | grep 'first setup'
+docker compose logs kenwerk | grep 'first setup'
 ```
 
-Then open http://localhost:8080/setup and enter the setup code from that log line. The setup screen asks for the name of your company or your own name, which the search box shows as "Search in Your team", and makes you the first administrator. The code works once, for an hour; `docker compose exec diffluence diffluence setup-code` gives a new one. You can also make the first administrator on the command line:
+Then open http://localhost:8080/setup and enter the setup code from that log line. The setup screen asks for the name of your company or your own name, which the search box shows as "Search in Your team", and makes you the first administrator. The code works once, for an hour; `docker compose exec kenwerk kenwerk setup-code` gives a new one. You can also make the first administrator on the command line:
 
 ```sh
-printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name "You" --organisation "Your team"
+printf '%s\n' 'a long password' | docker compose exec -T kenwerk kenwerk user create-admin --email you@example.com --name "You" --organisation "Your team"
 ```
 
 For a real installation, read [the install guide](docs/operations/install.md).
@@ -50,19 +50,19 @@ For a real installation, read [the install guide](docs/operations/install.md).
 
 | Command | What it does |
 |---|---|
-| `diffluence serve` | Runs the server. `DIFFLUENCE_ROLE` = `all` (default), `api` or `worker`. |
-| `diffluence migrate` | Applies pending *expand* migrations, after asking for a recent backup; `--without-backup` goes on once without one, recorded in the audit log |
-| `diffluence user create-admin` | Creates a local administrator account |
-| `diffluence setup-code` | Prints a new one-time code for the setup screen of a new install |
-| `diffluence audit verify` | Verifies the audit log hash chain |
-| `diffluence key <step>` | Checks or replaces `master.key` while Diffluence runs; see [backup and restore](docs/operations/backup-restore.md#replace-it) |
-| `diffluence session end` | Logs one person (`--email`) or everyone (`--all`) out, without disabling anyone; see [incidents](docs/operations/incidents.md) |
-| `diffluence healthcheck` | Asks a running server whether it is ready |
-| `diffluence version` | Prints the version |
+| `kenwerk serve` | Runs the server. `KENWERK_ROLE` = `all` (default), `api` or `worker`. |
+| `kenwerk migrate` | Applies pending *expand* migrations, after asking for a recent backup; `--without-backup` goes on once without one, recorded in the audit log |
+| `kenwerk user create-admin` | Creates a local administrator account |
+| `kenwerk setup-code` | Prints a new one-time code for the setup screen of a new install |
+| `kenwerk audit verify` | Verifies the audit log hash chain |
+| `kenwerk key <step>` | Checks or replaces `master.key` while Kenwerk runs; see [backup and restore](docs/operations/backup-restore.md#replace-it) |
+| `kenwerk session end` | Logs one person (`--email`) or everyone (`--all`) out, without disabling anyone; see [incidents](docs/operations/incidents.md) |
+| `kenwerk healthcheck` | Asks a running server whether it is ready |
+| `kenwerk version` | Prints the version |
 
 ## Configuration
 
-All settings come from environment variables. Any variable can instead be read from a file by appending `_FILE`, for example `DIFFLUENCE_DATABASE_URL_FILE=/run/secrets/db_url`. See [`.env.example`](.env.example).
+All settings come from environment variables. Any variable can instead be read from a file by appending `_FILE`, for example `KENWERK_DATABASE_URL_FILE=/run/secrets/db_url`. See [`.env.example`](.env.example).
 
 ## Contributing
 
@@ -70,13 +70,13 @@ Read [CONTRIBUTING.md](CONTRIBUTING.md). Every commit needs a DCO sign-off (`git
 
 ## Security
 
-Diffluence comes without guarantee, and security updates are not guaranteed. Read [the security risks](docs/security/risks.md) before you use it.
+Kenwerk comes without guarantee, and security updates are not guaranteed. Read [the security risks](docs/security/risks.md) before you use it.
 
 Please report vulnerabilities privately. See [SECURITY.md](SECURITY.md).
 
 ## Contact
 
-Mail [DiffluenceCreator@protonmail.com](mailto:DiffluenceCreator@protonmail.com). The author is Dutch and prefers to stay anonymous.
+Mail [KenwerkCreator@protonmail.com](mailto:KenwerkCreator@protonmail.com). The author is Dutch and prefers to stay anonymous.
 
 ## Licence
 

@@ -103,7 +103,7 @@ The Insert tool opens a dialog with a search field and the same list, for people
 - **Alignment:** Start, Centre and End on paragraphs and headings. Logical names mean right-to-left mirrors by itself. Justify is left out: it hurts reading and accessibility.
 - **Indent:** in a list it nests the item. In a paragraph or heading it adds one step, up to six. Outdent reverses it.
 - **Keyboard:** see A18.
-- **Edge cases:** inline code cannot take colours. A colour tool with an empty selection applies to what is typed next. Colours and alignment do not reach Markdown. Pasted colours are dropped by the allow-list unless they come from Diffluence.
+- **Edge cases:** inline code cannot take colours. A colour tool with an empty selection applies to what is typed next. Colours and alignment do not reach Markdown. Pasted colours are dropped by the allow-list unless they come from Kenwerk.
 
 ### A6. Panels
 

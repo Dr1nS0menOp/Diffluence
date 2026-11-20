@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/conditions"
 )
 
 // Kind is what a field asks for.

@@ -13,17 +13,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/sites"
-	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/sites"
+	"github.com/kenwerk/kenwerk/internal/spaces"
 )
 
 // Space kinds that cannot be in a pair: a personal space has one writer and no audience

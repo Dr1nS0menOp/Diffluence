@@ -181,7 +181,7 @@ func TestAModuleIsItsFirstTwoFolders(t *testing.T) {
 	cases := map[string]string{
 		"internal/pages/pages.go":            "internal/pages",
 		"internal/identity/leaked/leaked.go": "internal/identity",
-		"cmd/diffluence/restore.go":          "cmd/diffluence",
+		"cmd/kenwerk/restore.go":             "cmd/kenwerk",
 		"main.go":                            "",
 	}
 	for path, want := range cases {
@@ -206,7 +206,7 @@ func TestCountCrossingsCountsOnlyOtherModulesOutsideTests(t *testing.T) {
 	write("internal/pages/pages_test.go", "package pages\nconst t = `SELECT 1 FROM users`\n")
 	write("internal/webhooks/w.go", "package webhooks\nconst a, b = `SELECT title FROM pages`, `UPDATE pages SET x = 1`\n")
 	write("internal/testutil/u.go", "package testutil\nconst q = `DELETE FROM pages`\n")
-	write("cmd/diffluence/main.go", "package main\nconst q = `SELECT 1 FROM users`\n")
+	write("cmd/kenwerk/main.go", "package main\nconst q = `SELECT 1 FROM users`\n")
 	owners := map[string]string{"pages": "internal/pages", "users": "internal/identity"}
 	got, err := countCrossings(root, owners)
 	if err != nil {
@@ -215,7 +215,7 @@ func TestCountCrossingsCountsOnlyOtherModulesOutsideTests(t *testing.T) {
 	want := map[crossing]int{
 		{"internal/pages", "users"}:    1,
 		{"internal/webhooks", "pages"}: 2,
-		{"cmd/diffluence", "users"}:    1,
+		{"cmd/kenwerk", "users"}:       1,
 	}
 	if fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("got %v, want %v", got, want)

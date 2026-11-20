@@ -21,6 +21,6 @@ services:
       - -c
       - max_connections=200
     shm_size: 1gb
-  diffluence:
+  kenwerk:
     environment:
-      DIFFLUENCE_EXAMPLE_SPACE: ${DIFFLUENCE_EXAMPLE_SPACE:-true}
+      KENWERK_EXAMPLE_SPACE: ${KENWERK_EXAMPLE_SPACE:-true}

@@ -12,10 +12,10 @@
 CREATE OR REPLACE FUNCTION permission_generation_bump_once() RETURNS trigger LANGUAGE plpgsql AS $$
 BEGIN
     -- A setting local to the transaction marks it as counted; it ends with the transaction.
-    IF current_setting('diffluence.permissions_counted', true) = 'yes' THEN
+    IF current_setting('kenwerk.permissions_counted', true) = 'yes' THEN
         RETURN NULL;
     END IF;
-    PERFORM set_config('diffluence.permissions_counted', 'yes', true);
+    PERFORM set_config('kenwerk.permissions_counted', 'yes', true);
     UPDATE permission_generation SET n = n + 1;
     RETURN NULL;
 END;

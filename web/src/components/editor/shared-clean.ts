@@ -14,7 +14,7 @@ const SAFE_SCHEMES = new Set(['http:', 'https:', 'mailto:']);
 const isAddressAttribute = (name: string) => /(^|_)(href|src|url)$/.test(name);
 
 /** The origin of the changes this module makes, so they are never cleaned twice. */
-export const CLEAN_ORIGIN = 'diffluence-clean';
+export const CLEAN_ORIGIN = 'kenwerk-clean';
 
 /** Whether an address leads to an allowed scheme. A relative address or an anchor is allowed. */
 export function isSafeAddress(value: unknown): boolean {

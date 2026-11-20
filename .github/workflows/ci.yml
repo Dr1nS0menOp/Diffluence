@@ -35,15 +35,15 @@ jobs:
       postgres:
         image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
-          POSTGRES_USER: diffluence
-          POSTGRES_PASSWORD: diffluence
-          POSTGRES_DB: diffluence
+          POSTGRES_USER: kenwerk
+          POSTGRES_PASSWORD: kenwerk
+          POSTGRES_DB: kenwerk
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U diffluence"
+          --health-cmd "pg_isready -U kenwerk"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
+      KENWERK_TEST_DATABASE_URL: postgres://kenwerk:kenwerk@localhost:5432/kenwerk?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -116,15 +116,15 @@ jobs:
       postgres:
         image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
-          POSTGRES_USER: diffluence
-          POSTGRES_PASSWORD: diffluence
-          POSTGRES_DB: diffluence
+          POSTGRES_USER: kenwerk
+          POSTGRES_PASSWORD: kenwerk
+          POSTGRES_DB: kenwerk
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U diffluence"
+          --health-cmd "pg_isready -U kenwerk"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
+      KENWERK_TEST_DATABASE_URL: postgres://kenwerk:kenwerk@localhost:5432/kenwerk?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -146,49 +146,49 @@ jobs:
       postgres:
         image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
-          POSTGRES_USER: diffluence
-          POSTGRES_PASSWORD: diffluence
-          POSTGRES_DB: diffluence
+          POSTGRES_USER: kenwerk
+          POSTGRES_PASSWORD: kenwerk
+          POSTGRES_DB: kenwerk
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U diffluence"
+          --health-cmd "pg_isready -U kenwerk"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: build image
-        run: docker build -t diffluence:ci .
+        run: docker build -t kenwerk:ci .
       - name: build the image of the backup service (spec 054)
-        run: docker build --target backup -t diffluence-backup:ci .
+        run: docker build --target backup -t kenwerk-backup:ci .
       - name: build the image of the service for editing together
-        run: docker build -t diffluence-collab:ci collab
+        run: docker build -t kenwerk-collab:ci collab
       # Every image the reference installation runs is scanned, not only the app (spec 067).
       - name: scan the app image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: diffluence:ci
+          image-ref: kenwerk:ci
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
       - name: scan the backup image
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: diffluence-backup:ci
+          image-ref: kenwerk-backup:ci
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
       - name: scan the image of the service for editing together
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: diffluence-collab:ci
+          image-ref: kenwerk-collab:ci
           severity: HIGH,CRITICAL
           exit-code: "1"
           ignore-unfixed: true
       # ADR-038: a ZAP baseline against the real image, as a browser would reach it.
       - name: start the image for ZAP
         run: |
-          docker run -d --name diffluence --network host \
-            -e DIFFLUENCE_DATABASE_URL='postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable' \
-            -e DIFFLUENCE_PUBLIC_URL=http://localhost:8080 diffluence:ci
+          docker run -d --name kenwerk --network host \
+            -e KENWERK_DATABASE_URL='postgres://kenwerk:kenwerk@localhost:5432/kenwerk?sslmode=disable' \
+            -e KENWERK_PUBLIC_URL=http://localhost:8080 kenwerk:ci
           for _ in $(seq 1 60); do curl -sf http://localhost:8080/readyz >/dev/null && break; sleep 1; done
           curl -sf http://localhost:8080/readyz
       - name: ZAP baseline
@@ -201,7 +201,7 @@ jobs:
           allow_issue_writing: false
       - name: server log, when something failed
         if: failure()
-        run: docker logs diffluence 2>&1 | tail -50
+        run: docker logs kenwerk 2>&1 | tail -50
 
   # ADR-038: Semgrep's rules for Go, TypeScript, React and secrets. A finding fails the
   # build; an exception is a nosemgrep comment on the line, with the reason above it.
@@ -327,8 +327,8 @@ jobs:
             case "$f" in
               *.tar.gz)
                 mkdir -p "$RUNNER_TEMP/a" "$RUNNER_TEMP/b"
-                tar -xzf "$first/$f" -C "$RUNNER_TEMP/a" diffluence && tar -xzf "dist/$f" -C "$RUNNER_TEMP/b" diffluence &&
-                  diff <(go version -m "$RUNNER_TEMP/a/diffluence") <(go version -m "$RUNNER_TEMP/b/diffluence") | head -8 |
+                tar -xzf "$first/$f" -C "$RUNNER_TEMP/a" kenwerk && tar -xzf "dist/$f" -C "$RUNNER_TEMP/b" kenwerk &&
+                  diff <(go version -m "$RUNNER_TEMP/a/kenwerk") <(go version -m "$RUNNER_TEMP/b/kenwerk") | head -8 |
                   while IFS= read -r line; do echo "::error title=$f::$line"; done || true
                 rm -rf "$RUNNER_TEMP/a" "$RUNNER_TEMP/b" ;;
             esac
@@ -337,9 +337,9 @@ jobs:
       - name: the .deb installs on Debian and the .rpm on Fedora
         run: |
           docker run --rm -v "$PWD/dist:/dist:ro" debian:12 sh -c \
-            'dpkg -i /dist/*_amd64.deb && id diffluence && test -d /var/lib/diffluence && diffluence version'
+            'dpkg -i /dist/*_amd64.deb && id kenwerk && test -d /var/lib/kenwerk && kenwerk version'
           docker run --rm -v "$PWD/dist:/dist:ro" fedora:41 sh -c \
-            'rpm -i /dist/*_amd64.rpm && id diffluence && test -d /var/lib/diffluence && diffluence version'
+            'rpm -i /dist/*_amd64.rpm && id kenwerk && test -d /var/lib/kenwerk && kenwerk version'
 
   nightly:
     if: github.event_name == 'schedule'
@@ -348,15 +348,15 @@ jobs:
       postgres:
         image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
         env:
-          POSTGRES_USER: diffluence
-          POSTGRES_PASSWORD: diffluence
-          POSTGRES_DB: diffluence
+          POSTGRES_USER: kenwerk
+          POSTGRES_PASSWORD: kenwerk
+          POSTGRES_DB: kenwerk
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U diffluence"
+          --health-cmd "pg_isready -U kenwerk"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@localhost:5432/diffluence?sslmode=disable
+      KENWERK_TEST_DATABASE_URL: postgres://kenwerk:kenwerk@localhost:5432/kenwerk?sslmode=disable
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0

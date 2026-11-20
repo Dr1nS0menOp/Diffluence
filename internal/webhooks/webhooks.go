@@ -22,16 +22,16 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/outward"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/outward"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 const (

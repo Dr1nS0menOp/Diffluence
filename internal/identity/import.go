@@ -11,7 +11,7 @@ import (
 	"net/mail"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 const maxImportRows = 1000

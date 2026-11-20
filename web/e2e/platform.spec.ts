@@ -162,7 +162,7 @@ test.describe('insight', () => {
     await page.getByLabel('Name').fill('script');
     await page.getByRole('button', { name: 'New token' }).click();
     const secret = (await page.locator('code').first().textContent()) ?? '';
-    expect(secret).toContain('dfl_');
+    expect(secret).toContain('kenwerk_');
     const headers = { Authorization: `Bearer ${secret}` };
     const anonymous = await page.context().browser()?.newContext({ baseURL: 'http://localhost:8080' });
     const refused = await anonymous?.request.patch(`/api/v1/pages/${target}`, {

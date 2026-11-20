@@ -21,11 +21,11 @@ decrypt secrets.tar.gpg | tar -C secrets -xf -
 chmod 644 secrets/*.txt
 
 docker compose up -d --wait postgres
-decrypt database.dump.gpg | docker compose exec -T postgres pg_restore -U diffluence_owner -d diffluence --clean --if-exists --exit-on-error
+decrypt database.dump.gpg | docker compose exec -T postgres pg_restore -U kenwerk_owner -d kenwerk --clean --if-exists --exit-on-error
 
 # Create the volume, without starting the server yet.
-docker compose create diffluence
-volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq diffluence)")
+docker compose create kenwerk
+volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/kenwerk"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq kenwerk)")
 decrypt files.tar.gz.gpg | docker run --rm -i -v "$volume:/data" busybox tar -C /data -xzf -
 for extra in next previous; do
   if [ -f "$src/master.key.$extra.gpg" ]; then
@@ -41,10 +41,10 @@ decrypt master.key.gpg | docker run --rm -i -v "$volume:/data" busybox \
 # one being restored, so the check for a recent backup does not apply.
 docker compose run --rm --no-deps -T \
   -v "$PWD/secrets/migrate_database_url.txt:/run/secrets/migrate_database_url:ro" \
-  -e DIFFLUENCE_MIGRATE_DATABASE_URL_FILE=/run/secrets/migrate_database_url \
-  -e DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off diffluence migrate
-docker compose up -d --wait diffluence
-docker compose exec -T diffluence diffluence audit verify
+  -e KENWERK_MIGRATE_DATABASE_URL_FILE=/run/secrets/migrate_database_url \
+  -e KENWERK_UPGRADE_BACKUP_MAX_AGE=off kenwerk migrate
+docker compose up -d --wait kenwerk
+docker compose exec -T kenwerk kenwerk audit verify
 # Every secret and stored file must open with the restored keys.
-docker compose exec -T diffluence diffluence key check
+docker compose exec -T kenwerk kenwerk key check
 echo "restore finished"

@@ -12,14 +12,14 @@ CREATE SCHEMA IF NOT EXISTS ops;
 -- No foreign key reaches into public, because a restore drops and makes those tables again.
 CREATE TABLE IF NOT EXISTS ops.restores (
     id                uuid PRIMARY KEY,
-    backup_name       text NOT NULL CHECK (backup_name ~ '^diffluence-[0-9]{8}T[0-9]{6}Z$'),
+    backup_name       text NOT NULL CHECK (backup_name ~ '^kenwerk-[0-9]{8}T[0-9]{6}Z$'),
     requested_by      uuid,
     requested_by_name text NOT NULL CHECK (length(requested_by_name) <= 200),
     requested_at      timestamptz NOT NULL DEFAULT now(),
     state             text NOT NULL CHECK (state IN
         ('requested', 'preparing', 'stopping', 'backing_up', 'restoring', 'checking', 'done', 'refused', 'failed')),
     step              text NOT NULL DEFAULT '' CHECK (length(step) <= 300),
-    safety_name       text CHECK (safety_name ~ '^diffluence-[0-9]{8}T[0-9]{6}Z$'),
+    safety_name       text CHECK (safety_name ~ '^kenwerk-[0-9]{8}T[0-9]{6}Z$'),
     -- changed is set before the first step that alters the installation; from then on a
     -- failure keeps the nodes waiting.
     changed           boolean NOT NULL DEFAULT false,

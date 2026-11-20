@@ -112,14 +112,14 @@ func waitingFixes(kinds []ProblemKind) []waitingFix {
 				"docker compose run --rm backup once",
 				"bash scripts/backup.sh /path/to/backups /path/to/backup.key",
 				// The backup service holds the owner of the tables since spec 070.
-				"docker compose run --rm --entrypoint diffluence backup migrate --without-backup   (once, without a backup)",
+				"docker compose run --rm --entrypoint kenwerk backup migrate --without-backup   (once, without a backup)",
 			}})
 		case ProblemDisk:
-			fixes = append(fixes, waitingFix{"The data folder is nearly full", []string{"docker compose logs diffluence"}})
+			fixes = append(fixes, waitingFix{"The data folder is nearly full", []string{"docker compose logs kenwerk"}})
 		case ProblemQueue:
-			fixes = append(fixes, waitingFix{"The queue does not answer", []string{"docker compose logs diffluence"}})
+			fixes = append(fixes, waitingFix{"The queue does not answer", []string{"docker compose logs kenwerk"}})
 		case ProblemExtension:
-			fixes = append(fixes, waitingFix{"A PostgreSQL extension is missing", []string{"docker compose logs diffluence"}})
+			fixes = append(fixes, waitingFix{"A PostgreSQL extension is missing", []string{"docker compose logs kenwerk"}})
 		case ProblemMigrations:
 			fixes = append(fixes, waitingFix{"The database waits for the backup service to migrate it", []string{
 				"docker compose up -d --build backup",
@@ -138,6 +138,6 @@ code{display:block;background:#f2f2f4;padding:.4rem .6rem;border-radius:4px;marg
 <body><h1>Waiting before an upgrade</h1>
 <p>A new version is installed, and it waits before it changes the database. It tries again every minute, and starts as soon as it may. Nothing has changed yet.</p>
 {{range .}}<h2>{{.Title}}</h2><p>An administrator can fix it with one of these, in the folder with compose.yaml:</p>{{range .Commands}}<code>{{.}}</code>{{end}}{{end}}
-<p>The full reasons are in the log: <code>docker compose logs diffluence</code></p>
+<p>The full reasons are in the log: <code>docker compose logs kenwerk</code></p>
 </body></html>
 `))

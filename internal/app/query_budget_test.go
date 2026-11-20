@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // queryBudgets are the queries each main screen may cost, as one request (ARC-239). A change

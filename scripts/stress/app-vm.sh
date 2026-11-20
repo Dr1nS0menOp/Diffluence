@@ -12,19 +12,19 @@ sudo apt-get update -q
 sudo DEBIAN_FRONTEND=noninteractive apt-get install -yq docker.io docker-compose-v2 git sysstat
 sudo usermod -aG docker "$USER"
 
-if [ ! -d Diffluence ]; then
-  git clone -q https://github.com/Dr1nS0menOp/Diffluence.git
+if [ ! -d Kenwerk ]; then
+  git clone -q https://github.com/Dr1nS0menOp/Kenwerk.git
 fi
-cd Diffluence
+cd Kenwerk
 git fetch -q origin && git checkout -q "$ref"
 git log --oneline -1
 
 sh scripts/setup-secrets.sh
 cat > .env <<ENV
-DIFFLUENCE_PUBLIC_URL=$public_url
-DIFFLUENCE_BIND=0.0.0.0
-DIFFLUENCE_METRICS_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
-DIFFLUENCE_EXAMPLE_SPACE=false
+KENWERK_PUBLIC_URL=$public_url
+KENWERK_BIND=0.0.0.0
+KENWERK_METRICS_TOKEN=$(head -c 24 /dev/urandom | base64 | tr -d '/+=')
+KENWERK_EXAMPLE_SPACE=false
 ENV
 cp ../compose.stress.yaml compose.override.yaml
 sudo docker compose up -d --build --wait

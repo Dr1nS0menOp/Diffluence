@@ -15,11 +15,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/templates"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/templates"
 )
 
 // Spec 074, wave GT1: sets of pages from one template, all or nothing.

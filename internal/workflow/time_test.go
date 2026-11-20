@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/conditions"
 )
 
 // timedFlow is reviewedFlow with a due period, an overdue step back to draft, a timed approved

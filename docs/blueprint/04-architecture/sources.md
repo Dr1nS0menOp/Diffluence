@@ -1,6 +1,6 @@
 # 04: Sources
 
-Read on 2026-11-05 for this study, in our own words. Diffluence's own code, specs and ADRs are the first source. The others are for Go, PostgreSQL, NATS and the web platform.
+Read on 2026-11-05 for this study, in our own words. Kenwerk's own code, specs and ADRs are the first source. The others are for Go, PostgreSQL, NATS and the web platform.
 
 ## NATS
 

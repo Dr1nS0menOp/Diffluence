@@ -47,7 +47,7 @@ The Held by cell of the Roles screen gets `white-space: nowrap`, so the count ne
 
 Spec 041 made the Reload of a new version wait for the open editor to save. Two kinds of open work were left out.
 
-**Comment boxes.** A comment box already keeps its draft in the browser on every change. It now also joins `diffluence:before-reload`: it writes the draft once more and notes, in this tab's `sessionStorage`, that it was open with text. After the reload a reply box and the box of a comment being changed open again by themselves with the text; for a comment being changed, the kept text wins over the saved comment. An empty box is not opened again. A comment on a selection keeps its draft, but its box does not open again, because the selection is gone.
+**Comment boxes.** A comment box already keeps its draft in the browser on every change. It now also joins `kenwerk:before-reload`: it writes the draft once more and notes, in this tab's `sessionStorage`, that it was open with text. After the reload a reply box and the box of a comment being changed open again by themselves with the text; for a comment being changed, the kept text wins over the saved comment. An empty box is not opened again. A comment on a selection keeps its draft, but its box does not open again, because the selection is gone.
 
 **Settings forms.** Every text field of a form in the settings area (the administration and a space's settings) that someone typed in is written to `sessionStorage` before the reload, with the address of the screen. After the reload each value goes back into its field as the form appears, for up to 15 seconds, the way typing does, so the screen's own state follows. Nothing is saved to the server. Password fields are never kept.
 

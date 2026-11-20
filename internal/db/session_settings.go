@@ -12,7 +12,7 @@ BEGIN
   EXECUTE format('ALTER DATABASE %I SET plan_cache_mode = force_custom_plan', current_database());
   EXECUTE format('ALTER DATABASE %I SET jit = off', current_database());
 EXCEPTION WHEN insufficient_privilege THEN
-  RAISE NOTICE 'diffluence: not the owner of the database, so plan_cache_mode and jit are only sent at connect';
+  RAISE NOTICE 'kenwerk: not the owner of the database, so plan_cache_mode and jit are only sent at connect';
 END
 $$;`
 

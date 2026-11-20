@@ -22,9 +22,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 const (
@@ -152,7 +152,7 @@ func (s *Service) Post(ctx context.Context, address string, body []byte, headers
 		return Answer{}, err
 	}
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("User-Agent", "Diffluence")
+	req.Header.Set("User-Agent", "Kenwerk")
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}

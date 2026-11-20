@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 const savedPath = "/api/v1/saved-blocks"

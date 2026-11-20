@@ -7,9 +7,9 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/webui"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/webui"
 )
 
 // fontCacheSeconds can be long: a replaced font gets a new versioned address.

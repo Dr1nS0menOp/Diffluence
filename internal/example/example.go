@@ -17,14 +17,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/comments"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/spaces"
-	"github.com/diffluence/diffluence/internal/templates"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/comments"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/templates"
 )
 
 //go:embed content

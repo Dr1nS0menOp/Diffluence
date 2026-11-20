@@ -9,7 +9,7 @@ import { appearanceQuery } from '../appearance';
 import { IconExternal } from './icons';
 
 /** Our own documentation, for an instance whose administrator set no address. */
-export const DOCUMENTATION_ADDRESS = 'https://github.com/Dr1nS0menOp/Diffluence/tree/main/docs';
+export const DOCUMENTATION_ADDRESS = 'https://github.com/Dr1nS0menOp/Kenwerk/tree/main/docs';
 
 const MARK_SIZE = 14;
 

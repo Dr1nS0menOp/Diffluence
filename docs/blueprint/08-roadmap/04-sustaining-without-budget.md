@@ -1,6 +1,6 @@
 # 08.4: Keeping it going without a budget
 
-Diffluence has no paying customers and no budget; it asks for donations. Blueprint 08 plans years of work. This chapter looks at what research says about funding and sustaining open-source work, what routes exist for a project like this one, and what that means for the roadmap.
+Kenwerk has no paying customers and no budget; it asks for donations. Blueprint 08 plans years of work. This chapter looks at what research says about funding and sustaining open-source work, what routes exist for a project like this one, and what that means for the roadmap.
 
 ## 4.1 What the research says
 
@@ -20,7 +20,7 @@ The plain conclusion: a project of one maintainer must plan for pauses, make it 
 | **A foundation or fiscal host** | Holds money and trademarks, outlives one person | Membership terms; a legal relationship |
 | **Paid support or hosting by others** | Companies may sell support for an Apache-2.0 product without asking | Nothing from the project, and no income for it either |
 
-**The EU Cyber Resilience Act.** Recital 15 of Regulation (EU) 2024/2847 says that accepting donations without the intention of making a profit is not a commercial activity, so a project that only takes donations is not a "manufacturer" under the Act. An "open-source software steward", an organisation that supports such software for commercial use, has lighter duties: a cybersecurity policy and cooperation on vulnerabilities. Diffluence's disclosure process and security policy already cover much of that (blueprint 06, SEC-1041).
+**The EU Cyber Resilience Act.** Recital 15 of Regulation (EU) 2024/2847 says that accepting donations without the intention of making a profit is not a commercial activity, so a project that only takes donations is not a "manufacturer" under the Act. An "open-source software steward", an organisation that supports such software for commercial use, has lighter duties: a cybersecurity policy and cooperation on vulnerabilities. Kenwerk's disclosure process and security policy already cover much of that (blueprint 06, SEC-1041).
 
 ## 4.3 What that means for the roadmap
 

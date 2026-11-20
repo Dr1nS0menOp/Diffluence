@@ -14,7 +14,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // migrated is the database a test binary migrates once and copies for each test that asks for

@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-document-control.md](01-document-control.md).
 
-When an auditor visits, they ask for the history of a document: every version, who changed it, who reviewed and approved it, when, with what signatures, and how the procedure itself was controlled. Part 11 §11.10(e) asks for secure, computer-generated, time-stamped audit trails that record the date and time of operator entries and actions, do not obscure earlier information, and are kept as long as the records. Annex 11 clause 9 adds that the reason for a change should be recorded where it matters. Diffluence's audit log is already hash-chained, sealed after saving (ADR-041) and witnessed outside the database (ADR-039); this chapter says what document control adds to it and how an auditor gets it out.
+When an auditor visits, they ask for the history of a document: every version, who changed it, who reviewed and approved it, when, with what signatures, and how the procedure itself was controlled. Part 11 §11.10(e) asks for secure, computer-generated, time-stamped audit trails that record the date and time of operator entries and actions, do not obscure earlier information, and are kept as long as the records. Annex 11 clause 9 adds that the reason for a change should be recorded where it matters. Kenwerk's audit log is already hash-chained, sealed after saving (ADR-041) and witnessed outside the database (ADR-039); this chapter says what document control adds to it and how an auditor gets it out.
 
 ## 11.1 What is audited
 

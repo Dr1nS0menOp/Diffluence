@@ -11,4 +11,4 @@ Standards and regulations, read for what they require:
 - W3C: [Web Authentication Level 3](https://www.w3.org/TR/webauthn-3/), user verification.
 - OpenID Foundation: [OpenID Connect Core 1.0](https://openid.net/specs/openid-connect-core-1_0.html), `prompt=login` and `max_age`, for a fresh login at signing.
 
-Behaviour: blueprint 08 names a document-management product only to say which behaviour is meant. This study did not read its pages; every requirement here comes from the standards above and from Diffluence's own code and blueprints.
+Behaviour: blueprint 08 names a document-management product only to say which behaviour is meant. This study did not read its pages; every requirement here comes from the standards above and from Kenwerk's own code and blueprints.

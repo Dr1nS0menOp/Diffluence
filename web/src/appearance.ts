@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { api } from './api';
 import { spreadPoll } from './polling';
 
-const IMPORTED_FAMILY = 'Diffluence Imported';
+const IMPORTED_FAMILY = 'Kenwerk Imported';
 const NOTES_POLL_MS = 30_000;
 
 export interface ImportedFont {

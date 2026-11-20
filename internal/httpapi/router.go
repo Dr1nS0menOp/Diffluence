@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 type accessKind int

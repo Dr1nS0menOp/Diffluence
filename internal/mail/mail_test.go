@@ -20,7 +20,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
+	"github.com/kenwerk/kenwerk/internal/config"
 )
 
 // fakeServer is a small SMTP server, enough to see what a client really does.
@@ -160,7 +160,7 @@ func TestPasswordsOnlyTravelOverTLS(t *testing.T) {
 		t.Fatalf("secured=%v auth=%v", server.secured, server.authWhile)
 	}
 	for _, want := range []string{"Auto-Submitted: auto-generated", "List-Unsubscribe-Post: List-Unsubscribe=One-Click",
-		"List-Unsubscribe: <https://wiki.example.com/api/v1/mail/unsubscribe/token>", "List-Id: wiki", "X-Diffluence-Reason: mentioned"} {
+		"List-Unsubscribe: <https://wiki.example.com/api/v1/mail/unsubscribe/token>", "List-Id: wiki", "X-Kenwerk-Reason: mentioned"} {
 		if !strings.Contains(server.data, want) {
 			t.Fatalf("missing %q in\n%s", want, server.data)
 		}

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity/leaked"
+	"github.com/kenwerk/kenwerk/internal/identity/leaked"
 )
 
 func TestAPasswordThatWasAddedIsAlwaysFound(t *testing.T) {

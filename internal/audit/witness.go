@@ -14,7 +14,7 @@ import (
 	"io"
 	"slices"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // The witness is a copy of every checkpoint in the application log, so it reaches a

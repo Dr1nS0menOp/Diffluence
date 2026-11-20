@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/diffluence/diffluence/internal/conditions"
-	"github.com/diffluence/diffluence/internal/templates"
+	"github.com/kenwerk/kenwerk/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/templates"
 )
 
 // The routes of guided templates (spec 074). Each is registered behind the experimental

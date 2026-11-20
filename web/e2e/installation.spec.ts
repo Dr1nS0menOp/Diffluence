@@ -45,7 +45,7 @@ test('the audit area shows the keys that sign and how to report the witness', as
     page.getByRole('cell', { name: "The installation's own, from the encryption key" }),
   ).toBeVisible();
   await expect(
-    page.getByText('diffluence audit verify --witness FILE --report', { exact: false }),
+    page.getByText('kenwerk audit verify --witness FILE --report', { exact: false }),
   ).toBeVisible();
 });
 
@@ -56,8 +56,8 @@ test('the monitoring files are the files of the release', async ({ page }) => {
   await expect(page.getByRole('menuitem', { name: 'Monitoring rules (Prometheus)' })).toBeVisible();
   await page.keyboard.press('Escape');
   for (const [kind, name] of [
-    ['rules', 'diffluence-rules.yml'],
-    ['dashboard', 'diffluence-dashboard.json'],
+    ['rules', 'kenwerk-rules.yml'],
+    ['dashboard', 'kenwerk-dashboard.json'],
   ]) {
     const answer = await page.request.get(`/api/v1/admin/monitoring/${kind}`);
     expect(answer.status()).toBe(200);

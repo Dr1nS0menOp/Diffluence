@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 func TestAFileMovesToAnotherPageAndKeepsItsID(t *testing.T) {

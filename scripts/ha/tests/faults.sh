@@ -4,7 +4,7 @@
 # does. Runs on the test host as root (it needs qm for the hard ones) and reaches the VMs
 # over ssh as the operator's user with sudo.
 # Usage: bash faults.sh <fault> <target> [seconds]
-#   kill <vm-name> <service>   SIGKILL the service (patroni, postgresql, nats, diffluence, haproxy, pgbouncer)
+#   kill <vm-name> <service>   SIGKILL the service (patroni, postgresql, nats, kenwerk, haproxy, pgbouncer)
 #   stop-primary               SIGSTOP the PostgreSQL leader's postmaster for [seconds], then SIGCONT
 #   pause-vm <vm-id>           freeze the whole VM for [seconds] (qm suspend), then resume
 #   reset-vm <vm-id>           hard reset, as a power cut (qm reset)
@@ -20,7 +20,7 @@ user=${HA_SSH_USER:-ubuntu}
 
 addr_of() {
   local key
-  key="HA_$(echo "${1#diffluence-ha-}" | tr '[:lower:]' '[:upper:]')"
+  key="HA_$(echo "${1#kenwerk-ha-}" | tr '[:lower:]' '[:upper:]')"
   printf '%s' "${!key:-}"
 }
 on() { ssh -o BatchMode=yes -o ConnectTimeout=5 "$user@$(addr_of "$1")" "sudo sh -c '$2'"; }

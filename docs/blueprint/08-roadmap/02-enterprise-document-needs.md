@@ -13,7 +13,7 @@ ADR-038 puts three enterprise document features before 1.0: document control, dr
 
 Two further needs show up in every regulated setting, because auditors ask about them: **periodic review** (each controlled document has a next review date, and owners are reminded), and **read and understood** (people confirm they read a new version of a procedure, with a record).
 
-## 2.2 Where Diffluence stands
+## 2.2 Where Kenwerk stands
 
 | Need | State | Where |
 |---|---|---|
@@ -43,6 +43,6 @@ Two further needs show up in every regulated setting, because auditors ask about
 - US FDA: [21 CFR Part 11, Electronic Records; Electronic Signatures](https://www.ecfr.gov/current/title-21/chapter-I/subchapter-A/part-11), and [Guidance for Industry, Part 11 Scope and Application](https://www.fda.gov/regulatory-information/search-fda-guidance-documents/part-11-electronic-records-electronic-signatures-scope-and-application), 2003.
 - European Commission: [EudraLex Volume 4, Annex 11, Computerised Systems](https://health.ec.europa.eu/system/files/2016-11/annex11_01-2011_en_0.pdf), 2011.
 - ISO: [ISO/IEC 27001:2022](https://www.iso.org/standard/27001), Annex A 5.37.
-- Diffluence: blueprint 08, section "Enterprise document features", and `03-functional/sources.md`, for which public behaviour pages were read.
+- Kenwerk: blueprint 08, section "Enterprise document features", and `03-functional/sources.md`, for which public behaviour pages were read.
 
 All sources of this study are also in [sources.md](sources.md).

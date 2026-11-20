@@ -8,10 +8,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Document control, wave DC2 of spec 064: reviewers, rules to pass, independence, the

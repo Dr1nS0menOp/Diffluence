@@ -11,7 +11,7 @@ Templating.app answers the first with three layers:
 - app-wide permissions;
 - restrictions per template on browsing, editing and applying, where an empty restriction limits nothing.
 
-Its public documentation describes no approval step, so the second answer is Diffluence's own.
+Its public documentation describes no approval step, so the second answer is Kenwerk's own.
 
 ## 7.1 Rights per template
 

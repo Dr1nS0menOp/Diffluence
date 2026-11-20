@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
-// Verifies the electronic signatures in an auditor's export of Diffluence, outside Diffluence
+// Verifies the electronic signatures in an auditor's export of Kenwerk, outside Kenwerk
 // (spec 064, DOC-742). It needs Node.js and nothing else. The procedure it follows is written
 // down in docs/operations/regulated-use.md, so an auditor can check this script against it or
 // follow the steps by hand.
@@ -23,7 +23,7 @@ function field(name, value) {
 function canonicalForm(content) {
   const files = [...content.files].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   const parts = [
-    Buffer.from('diffluence-signed-content\n1\n', 'utf8'),
+    Buffer.from('kenwerk-signed-content\n1\n', 'utf8'),
     field('title', content.title),
     field('schema', String(content.schema_version)),
     field('document', content.document),

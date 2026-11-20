@@ -13,11 +13,11 @@ Words used in the column Who:
 
 ## 2.1 Commands of the binary
 
-From `cmd/diffluence/main.go`, `key.go`, `client.go` and `worker.go`.
+From `cmd/kenwerk/main.go`, `key.go`, `client.go` and `worker.go`.
 
 | Line | Command | What it does | Who | Console today |
 |---|---|---|---|---|
-| CSL-101 | `serve` | Runs the server in the role of `DIFFLUENCE_ROLE` | Host | No (it is the server) |
+| CSL-101 | `serve` | Runs the server in the role of `KENWERK_ROLE` | Host | No (it is the server) |
 | CSL-102 | `migrate` | Applies expand migrations, after the checks before an upgrade (backup age, free space, PostgreSQL version) | Worker shell (owner) | System health shows waiting migrations |
 | CSL-103 | `migrate --contract` | Also applies contract migrations at once, ending the window for a rollback | Worker shell (owner) | No; health shows when the grace ends |
 | CSL-104 | `migrate --without-backup` | Upgrades once without a recent backup, recorded as `system.upgrade_without_backup` | Worker shell (owner) | No |
@@ -57,13 +57,13 @@ And the entry points of the backup service image (`deploy/backup/backup-service.
 
 | Line | Command | What it does | Who | Console today |
 |---|---|---|---|---|
-| CSL-136 | `diffluence-backup loop` | The worker itself: each minute it migrates, signs, asks the console and backs up | Host starts it | Its state is shown |
-| CSL-137 | `diffluence-backup once` | One backup now | Host | Yes: Back up now |
-| CSL-138 | `diffluence-backup way-back` | The way back after a restore stopped halfway | Host | No |
+| CSL-136 | `kenwerk-backup loop` | The worker itself: each minute it migrates, signs, asks the console and backs up | Host starts it | Its state is shown |
+| CSL-137 | `kenwerk-backup once` | One backup now | Host | Yes: Back up now |
+| CSL-138 | `kenwerk-backup way-back` | The way back after a restore stopped halfway | Host | No |
 
 ## 2.2 Settings the server reads
 
-From `internal/config/config.go`: each is a variable `DIFFLUENCE_<NAME>`, a key of the configuration file, or a file named by `<NAME>_FILE` (spec 056). The Configuration page lists all of them today, with their source, secrets as `(set)`. **Who** is always the host: whoever starts the process. **Console today** is "shown" for all of them unless stated.
+From `internal/config/config.go`: each is a variable `KENWERK_<NAME>`, a key of the configuration file, or a file named by `<NAME>_FILE` (spec 056). The Configuration page lists all of them today, with their source, secrets as `(set)`. **Who** is always the host: whoever starts the process. **Console today** is "shown" for all of them unless stated.
 
 | Line | Setting | What it does |
 |---|---|---|
@@ -121,22 +121,22 @@ The server never reads these. **Who** is the host.
 
 | Line | Setting | Read by | What it does | Console today |
 |---|---|---|---|---|
-| CSL-200 | `DIFFLUENCE_BACKUP_INTERVAL` | Backup service | How often to back up, the default under the console's schedule | Yes: the schedule wins (spec 058) |
-| CSL-201 | `DIFFLUENCE_BACKUP_KEEP` | Backup service | How many backups to keep, the default | Yes: the number kept wins |
-| CSL-202 | `DIFFLUENCE_BACKUP_DIR` | Compose | Where backups go on the host | No |
-| CSL-203 | `DIFFLUENCE_BACKUP_KEY_DIR` | Compose | The folder of `backup.key` | Only the key's fingerprint |
-| CSL-204 | `DIFFLUENCE_BIND` | Compose | Which address of the host the port listens on | No |
-| CSL-205 | `DIFFLUENCE_PORT` | Compose | The port on the host | No |
-| CSL-206 | `DIFFLUENCE_IMAGE` | Compose | The server's image | The version is shown |
-| CSL-207 | `DIFFLUENCE_BACKUP_IMAGE` | Compose | The worker's image | No |
-| CSL-208 | `DIFFLUENCE_RESTORE_CHECK_PORT` | `restore-check.sh` | The port of the throw-away project | No |
-| CSL-209 | `DIFFLUENCE_URL`, `DIFFLUENCE_TOKEN`, `DIFFLUENCE_TOKEN_FILE` | `diffluence client` | Which server and which token | No |
-| CSL-210 | `DIFFLUENCE_API_URL`, `DIFFLUENCE_COLLAB_PORT` | The editing service | Where it reaches the app, where it listens | No |
+| CSL-200 | `KENWERK_BACKUP_INTERVAL` | Backup service | How often to back up, the default under the console's schedule | Yes: the schedule wins (spec 058) |
+| CSL-201 | `KENWERK_BACKUP_KEEP` | Backup service | How many backups to keep, the default | Yes: the number kept wins |
+| CSL-202 | `KENWERK_BACKUP_DIR` | Compose | Where backups go on the host | No |
+| CSL-203 | `KENWERK_BACKUP_KEY_DIR` | Compose | The folder of `backup.key` | Only the key's fingerprint |
+| CSL-204 | `KENWERK_BIND` | Compose | Which address of the host the port listens on | No |
+| CSL-205 | `KENWERK_PORT` | Compose | The port on the host | No |
+| CSL-206 | `KENWERK_IMAGE` | Compose | The server's image | The version is shown |
+| CSL-207 | `KENWERK_BACKUP_IMAGE` | Compose | The worker's image | No |
+| CSL-208 | `KENWERK_RESTORE_CHECK_PORT` | `restore-check.sh` | The port of the throw-away project | No |
+| CSL-209 | `KENWERK_URL`, `KENWERK_TOKEN`, `KENWERK_TOKEN_FILE` | `kenwerk client` | Which server and which token | No |
+| CSL-210 | `KENWERK_API_URL`, `KENWERK_COLLAB_PORT` | The editing service | Where it reaches the app, where it listens | No |
 | CSL-211 | `OTEL_EXPORTER_OTLP_*`, `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | The trace exporter | The collector and labels | No |
 | CSL-212 | The suffix `_FILE` | `internal/config` | Reads a setting from a file, for secrets | Yes: the source says "file" |
 | CSL-213 | The values of the Helm chart (`publicUrl`, `mode`, `natsUrl`, replicas, `existingSecret`, persistence, ingress, `extraEnv`, resources) | Helm | The Kubernetes layout | Only through the settings they become |
 
-`DIFFLUENCE_TEST_DATABASE_URL` and the other variables of `scripts/dev`, `scripts/e2e`, `scripts/stress` and `scripts/ha` are for building and testing Diffluence, not for running it, and are left out of the sorting.
+`KENWERK_TEST_DATABASE_URL` and the other variables of `scripts/dev`, `scripts/e2e`, `scripts/stress` and `scripts/ha` are for building and testing Kenwerk, not for running it, and are left out of the sorting.
 
 ## 2.4 Settings held in the database, and fixed values
 
@@ -175,17 +175,17 @@ From `scripts/` and `deploy/`. **Who** is the host, unless stated.
 | CSL-264 | `scripts/setup-secrets.sh` | Makes the secret files and the backup key, never overwrites | No |
 | CSL-265 | `deploy/install-lxc.sh` | Installs on Debian or Ubuntu with a local PostgreSQL, as root | No |
 | CSL-266 | `deploy/postgres-init.sh` | Makes the application role when the database is created | No |
-| CSL-267 | `deploy/diffluence.example.yaml` | The commented configuration file | Its values are shown |
-| CSL-268 | `deploy/systemd/diffluence.service` | The sandboxed unit for LXC and bare Linux | No |
+| CSL-267 | `deploy/kenwerk.example.yaml` | The commented configuration file | Its values are shown |
+| CSL-268 | `deploy/systemd/kenwerk.service` | The sandboxed unit for LXC and bare Linux | No |
 | CSL-269 | `deploy/packaging/postinstall.sh`, `preremove.sh`, `postremove.sh` | What the `.deb` and `.rpm` do on install, upgrade and removal | No |
 | CSL-270 | `deploy/backup/backup-service.sh` | The worker of Compose | Its state is shown |
-| CSL-271 | `deploy/helm/diffluence` | The Kubernetes chart | No |
-| CSL-272 | `deploy/monitoring/diffluence-rules.yml` | Prometheus alerts and objectives | No |
-| CSL-273 | `deploy/monitoring/diffluence-dashboard.json` | A dashboard | No |
+| CSL-271 | `deploy/helm/kenwerk` | The Kubernetes chart | No |
+| CSL-272 | `deploy/monitoring/kenwerk-rules.yml` | Prometheus alerts and objectives | No |
+| CSL-273 | `deploy/monitoring/kenwerk-dashboard.json` | A dashboard | No |
 | CSL-274 | `compose.yaml` | The reference installation | No |
 | CSL-275 | `.env` (from `.env.example`) | The settings of the Compose installation | Its values are shown |
 
-- **CSL-280** · not sorted · The tools for building and testing Diffluence are left out, because an operator never runs them against an installation: `upgrade-check.sh`, `upgrade-test.sh`, `mutation-check.sh`, `reproducible.sh`, `ci-local.sh`, `check-dco.sh`, `check-licenses.mjs`, `fetch-craft.py`, `scripts/dev`, `scripts/e2e`, `scripts/ha/`, `scripts/stress/`, `scripts/load/` and `scripts/idp-test/`. `scripts/load/reading.js` is named in `install.md` for a load test against a copy; it stays a tool.
+- **CSL-280** · not sorted · The tools for building and testing Kenwerk are left out, because an operator never runs them against an installation: `upgrade-check.sh`, `upgrade-test.sh`, `mutation-check.sh`, `reproducible.sh`, `ci-local.sh`, `check-dco.sh`, `check-licenses.mjs`, `fetch-craft.py`, `scripts/dev`, `scripts/e2e`, `scripts/ha/`, `scripts/stress/`, `scripts/load/` and `scripts/idp-test/`. `scripts/load/reading.js` is named in `install.md` for a load test against a copy; it stays a tool.
 
 ## 2.6 Totals
 

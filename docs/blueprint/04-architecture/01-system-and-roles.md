@@ -4,7 +4,7 @@ How to read this chapter: see `../04-architecture.md`. Every line has a number a
 
 ## 1.1 The shape
 
-- **ARC-001** · built · Diffluence is a modular monolith: one Go codebase, one binary, strict modules inside (chapter 2).
+- **ARC-001** · built · Kenwerk is a modular monolith: one Go codebase, one binary, strict modules inside (chapter 2).
 - **ARC-002** · built · The binary has three roles. `api` serves HTTP. `worker` does background work. `all` does both, for small installations.
 - **ARC-003** · built · The frontend is built into the binary (`internal/webui`), so one file is an installation.
 - **ARC-004** · built · The frontend talks only to the public API, like any other client. There is no private back door.
@@ -14,7 +14,7 @@ How to read this chapter: see `../04-architecture.md`. Every line has a number a
 - **ARC-008** · built · Every process registers in `nodes` and sends a heartbeat every 15 seconds, so the console can show the cluster, and contract migrations can wait for old nodes.
 - **ARC-009** · built · `/livez` says the process runs. `/readyz` says it may get traffic: database, migrations, queue and storage. A worker serves only these two.
 - **ARC-010** · built · Stopping is graceful. A node first reports "not ready", waits `SHUTDOWN_DELAY`, finishes open requests within 30 seconds, then stops its background work.
-- **ARC-011** · built · Configuration comes from `DIFFLUENCE_*` variables. Each can be read from a file with `_FILE`, for secrets. All mistakes are reported at once, not one at a time.
+- **ARC-011** · built · Configuration comes from `KENWERK_*` variables. Each can be read from a file with `_FILE`, for secrets. All mistakes are reported at once, not one at a time.
 - **ARC-012** · built · The command line offers `serve`, `migrate`, `user`, `audit` and `version`.
 - **ARC-013** · built · The command line gains `client`, which only uses the public API with a token (PLT-040, D22 of spec 015).
 
@@ -36,7 +36,7 @@ How to read this chapter: see `../04-architecture.md`. Every line has a number a
 
 ## 1.3 The three shapes of an installation
 
-**Small: one process.** One `diffluence` with `role=all`, PostgreSQL, a local disk. Up to a few hundred people. `compose.yaml` is this shape.
+**Small: one process.** One `kenwerk` with `role=all`, PostgreSQL, a local disk. Up to a few hundred people. `compose.yaml` is this shape.
 
 **Complete: one server with helpers.** The same, plus the optional containers an administrator chose in chapter 4. Each is separate, and each can be left out.
 

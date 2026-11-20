@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 // roomStore is a disk whose room a test sets, and that counts how often it was asked.

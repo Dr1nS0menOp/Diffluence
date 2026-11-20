@@ -315,7 +315,7 @@ test('a token is shown once, and can be taken back', async ({ page, browser }) =
   await page.getByLabel('Name').fill('My script');
   await page.getByRole('button', { name: 'New token' }).click();
   const dialog = page.getByRole('dialog', { name: 'New token' });
-  await expect(dialog.getByTestId('token-secret')).toContainText('dfl_');
+  await expect(dialog.getByTestId('token-secret')).toContainText('kenwerk_');
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('row', { name: /My script/ })).toBeVisible();
   await page.getByRole('button', { name: 'Revoke' }).click();
@@ -331,7 +331,7 @@ test('a person downloads their data and asks for removal', async ({ page, browse
   await checkAccessibility(page);
   const download = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download my data' }).click();
-  expect((await download).suggestedFilename()).toBe('my-diffluence-data.json');
+  expect((await download).suggestedFilename()).toBe('my-kenwerk-data.json');
   await page.getByRole('button', { name: 'Ask for removal' }).click();
   await page.getByRole('dialog').getByRole('button', { name: 'Ask for removal' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'has been sent' })).toBeVisible();
@@ -677,7 +677,7 @@ test('a SCIM token shows when it ends, and rotating gives a successor', async ({
   const row = page.getByRole('row', { name: new RegExp(name) });
   await row.getByRole('button', { name: 'Rotate' }).click();
   const dialog = page.getByRole('dialog');
-  await expect(dialog.locator('code')).toContainText('dfl_scim_');
+  await expect(dialog.locator('code')).toContainText('kenwerk_scim_');
   await expect(dialog).toContainText('7 days');
   await dialog.getByRole('button', { name: 'Close' }).click();
   await expect(page.getByRole('row', { name: new RegExp(name) })).toHaveCount(2);

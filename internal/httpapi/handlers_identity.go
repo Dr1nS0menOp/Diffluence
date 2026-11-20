@@ -12,11 +12,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/sso"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/sso"
 )
 
-const oidcCookie = "diffluence_oidc"
+const oidcCookie = "kenwerk_oidc"
 
 func (s *Server) registerIdentityRoutes() {
 	r := s.router

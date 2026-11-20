@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 var fast = identity.Params{Memory: 64, Time: 1, Threads: 1, SaltLen: 16, KeyLen: 32}

@@ -6,7 +6,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 func TestEverySplitPermissionKnowsTheBundleVersionThatHoldsIt(t *testing.T) {

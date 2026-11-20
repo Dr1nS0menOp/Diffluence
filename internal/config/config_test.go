@@ -15,7 +15,7 @@ func env(m map[string]string) LookupFunc {
 }
 
 func TestDefaults(t *testing.T) {
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -36,15 +36,15 @@ func TestDefaults(t *testing.T) {
 // Single sign-on makes no account until an operator says so, and then only for an address
 // the provider verified, unless the operator says that too.
 func TestSingleSignOnMakesNoAccountsByDefault(t *testing.T) {
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.OIDC.AutoCreate || c.OIDC.AllowUnverifiedEmail {
 		t.Fatalf("defaults: %+v", c.OIDC)
 	}
-	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x",
-		"DIFFLUENCE_OIDC_AUTO_CREATE": "true", "DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL": "true"}))
+	c, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x",
+		"KENWERK_OIDC_AUTO_CREATE": "true", "KENWERK_OIDC_ALLOW_UNVERIFIED_EMAIL": "true"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +58,7 @@ func TestFileVariant(t *testing.T) {
 	if err := os.WriteFile(p, []byte("postgres://from-file\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL_FILE": p}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL_FILE": p}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,8 +69,8 @@ func TestFileVariant(t *testing.T) {
 
 func TestBothVariantsIsAnError(t *testing.T) {
 	_, err := Load(env(map[string]string{
-		"DIFFLUENCE_DATABASE_URL":      "a",
-		"DIFFLUENCE_DATABASE_URL_FILE": "/nonexistent",
+		"KENWERK_DATABASE_URL":      "a",
+		"KENWERK_DATABASE_URL_FILE": "/nonexistent",
 	}))
 	if err == nil || !strings.Contains(err.Error(), "not both") {
 		t.Fatalf("want 'not both' error, got %v", err)
@@ -79,10 +79,10 @@ func TestBothVariantsIsAnError(t *testing.T) {
 
 func TestErrorsAreCollected(t *testing.T) {
 	_, err := Load(env(map[string]string{
-		"DIFFLUENCE_ROLE":            "api", // also requires NATS_URL
-		"DIFFLUENCE_PUBLIC_URL":      "https://wiki.example.com/sub/path",
-		"DIFFLUENCE_LOG_LEVEL":       "loud",
-		"DIFFLUENCE_TRUSTED_PROXIES": "10.0.0.0/8, nonsense",
+		"KENWERK_ROLE":            "api", // also requires NATS_URL
+		"KENWERK_PUBLIC_URL":      "https://wiki.example.com/sub/path",
+		"KENWERK_LOG_LEVEL":       "loud",
+		"KENWERK_TRUSTED_PROXIES": "10.0.0.0/8, nonsense",
 	}))
 	if err == nil {
 		t.Fatal("expected errors")
@@ -97,20 +97,20 @@ func TestErrorsAreCollected(t *testing.T) {
 // ADR-040: an upgrade asks for a backup of at most 24 hours unless the operator switches
 // the check off on purpose with "off". Zero or a negative age is a mistake, not "off".
 func TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose(t *testing.T) {
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil || c.UpgradeBackupMaxAge != 24*time.Hour {
 		t.Fatalf("default %v, err %v", c.UpgradeBackupMaxAge, err)
 	}
-	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "26h"}))
+	c, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_UPGRADE_BACKUP_MAX_AGE": "26h"}))
 	if err != nil || c.UpgradeBackupMaxAge != 26*time.Hour {
 		t.Fatalf("set %v, err %v", c.UpgradeBackupMaxAge, err)
 	}
-	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": "off"}))
+	c, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_UPGRADE_BACKUP_MAX_AGE": "off"}))
 	if err != nil || c.UpgradeBackupMaxAge != 0 {
 		t.Fatalf("off %v, err %v", c.UpgradeBackupMaxAge, err)
 	}
 	for _, bad := range []string{"-1h", "0", "0s", "never", "yes"} {
-		_, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE": bad}))
+		_, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_UPGRADE_BACKUP_MAX_AGE": bad}))
 		if err == nil || !strings.Contains(err.Error(), "UPGRADE_BACKUP_MAX_AGE") || !strings.Contains(err.Error(), "off") {
 			t.Fatalf("%q: want a refusal that names off, got %v", bad, err)
 		}
@@ -121,16 +121,16 @@ func TestTheBackupAgeForAnUpgradeIsADayByDefaultAndOffOnlyOnPurpose(t *testing.T
 // working day can still be rolled back. Zero is for a test installation; negative is a mistake.
 func TestContractMigrationsWaitADayByDefault(t *testing.T) {
 	for _, bad := range []string{"-1h", "soon"} {
-		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_CONTRACT_GRACE": bad}))
+		_, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_CONTRACT_GRACE": bad}))
 		if err == nil || !strings.Contains(err.Error(), "CONTRACT_GRACE") {
 			t.Fatalf("%q: want a refusal, got %v", bad, err)
 		}
 	}
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil || c.ContractGrace != 24*time.Hour {
 		t.Fatalf("default %v, err %v", c.ContractGrace, err)
 	}
-	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_CONTRACT_GRACE": "0s"}))
+	c, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_CONTRACT_GRACE": "0s"}))
 	if err != nil || c.ContractGrace != 0 {
 		t.Fatalf("zero %v, err %v", c.ContractGrace, err)
 	}
@@ -140,21 +140,21 @@ func TestContractMigrationsWaitADayByDefault(t *testing.T) {
 // outside 0 to 1 is a typing mistake that refuses the start.
 func TestTracingIsOffByDefaultAndItsShareIsFromZeroToOne(t *testing.T) {
 	for _, bad := range []string{"1.5", "-0.1", "NaN", "Inf", "ten", "10%"} {
-		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_TRACING_SAMPLE": bad}))
+		_, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_TRACING_SAMPLE": bad}))
 		if err == nil || !strings.Contains(err.Error(), "TRACING_SAMPLE") {
 			t.Fatalf("%q: want a refusal, got %v", bad, err)
 		}
 	}
-	if _, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_TRACING": "sometimes"})); err == nil {
+	if _, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_TRACING": "sometimes"})); err == nil {
 		t.Fatal("a switch that is not true or false was taken")
 	}
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil || c.Tracing || c.TracingSample != 0.1 {
 		t.Fatalf("default on=%v share=%v, err %v", c.Tracing, c.TracingSample, err)
 	}
 	for value, want := range map[string]float64{"0": 0, "1": 1, "0.25": 0.25} {
-		c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x",
-			"DIFFLUENCE_TRACING": "true", "DIFFLUENCE_TRACING_SAMPLE": value}))
+		c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x",
+			"KENWERK_TRACING": "true", "KENWERK_TRACING_SAMPLE": value}))
 		if err != nil || !c.Tracing || c.TracingSample != want {
 			t.Fatalf("%q: on=%v share=%v, err %v", value, c.Tracing, c.TracingSample, err)
 		}
@@ -163,9 +163,9 @@ func TestTracingIsOffByDefaultAndItsShareIsFromZeroToOne(t *testing.T) {
 
 func TestHTTPSAndProxies(t *testing.T) {
 	c, err := Load(env(map[string]string{
-		"DIFFLUENCE_DATABASE_URL":    "postgres://x",
-		"DIFFLUENCE_PUBLIC_URL":      "https://wiki.example.com",
-		"DIFFLUENCE_TRUSTED_PROXIES": "10.1.2.3/8,::1/128",
+		"KENWERK_DATABASE_URL":    "postgres://x",
+		"KENWERK_PUBLIC_URL":      "https://wiki.example.com",
+		"KENWERK_TRUSTED_PROXIES": "10.1.2.3/8,::1/128",
 	}))
 	if err != nil {
 		t.Fatal(err)
@@ -188,7 +188,7 @@ func TestAPlainAddressIsWeakOnlyWhenOthersReachIt(t *testing.T) {
 		"http://localhost:8080":    false,
 		"http://LocalHost:8080":    false,
 	} {
-		c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_PUBLIC_URL": address}))
+		c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_PUBLIC_URL": address}))
 		if err != nil {
 			t.Fatalf("%s: %v", address, err)
 		}
@@ -202,7 +202,7 @@ func TestAPlainAddressIsWeakOnlyWhenOthersReachIt(t *testing.T) {
 // is one clear message at the start instead of a loop of restarts (spec 050).
 func TestAnIPAddressIsRefusedAsThePublicAddress(t *testing.T) {
 	for _, address := range []string{"http://192.0.2.10:8080", "https://192.0.2.10", "http://127.0.0.1:8080", "http://[::1]:8080", "http://[2001:db8::1]"} {
-		_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_PUBLIC_URL": address}))
+		_, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_PUBLIC_URL": address}))
 		if err == nil || !strings.Contains(err.Error(), "host name") {
 			t.Errorf("%s: got %v, want a refusal that asks for a host name", address, err)
 		}
@@ -212,9 +212,9 @@ func TestAnIPAddressIsRefusedAsThePublicAddress(t *testing.T) {
 func TestTheDrawingServiceIsOptionalAndNeverOurOwnOrigin(t *testing.T) {
 	load := func(address string) (Config, error) {
 		return Load(env(map[string]string{
-			"DIFFLUENCE_DATABASE_URL": "postgres://x",
-			"DIFFLUENCE_PUBLIC_URL":   "https://wiki.example.com",
-			"DIFFLUENCE_DRAWING_URL":  address,
+			"KENWERK_DATABASE_URL": "postgres://x",
+			"KENWERK_PUBLIC_URL":   "https://wiki.example.com",
+			"KENWERK_DRAWING_URL":  address,
 		}))
 	}
 	c, err := load("")

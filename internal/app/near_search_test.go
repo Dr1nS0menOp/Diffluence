@@ -11,7 +11,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/search"
+	"github.com/kenwerk/kenwerk/internal/search"
 )
 
 func quickTitles(u *user, text string) []string {

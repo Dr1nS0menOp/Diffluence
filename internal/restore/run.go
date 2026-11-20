@@ -13,7 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/audit"
 )
 
 // Steps are what the worker does to an installation. The real ones run gpg, pg_restore
@@ -120,7 +120,7 @@ func (r Runner) Prepare(ctx context.Context, id uuid.UUID) error {
 		return r.fail(ctx, id, "the backup's database could not be read; nothing was changed", err)
 	}
 	if newest > r.NewestKnown {
-		return r.fail(ctx, id, "the backup was made by a newer release of Diffluence; restore it with that release; nothing was changed",
+		return r.fail(ctx, id, "the backup was made by a newer release of Kenwerk; restore it with that release; nothing was changed",
 			fmt.Errorf("%w: migration %d, this release knows %d", ErrNewerBackup, newest, r.NewestKnown))
 	}
 	if err := Move(ctx, r.Pool, id, StateStopping, "stopping every node"); err != nil {

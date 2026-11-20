@@ -17,16 +17,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // The content a signature is bound to (DOC-711): SHA-256 over a canonical form of a
 // version's title, its document and the files it pins. The form is versioned, so a later
 // change of the document format can still verify the signatures made before it. Its exact
 // shape is written down in docs/operations/regulated-use.md, where an auditor rebuilds it
-// outside Diffluence (DOC-742); change it only as a new form.
+// outside Kenwerk (DOC-742); change it only as a new form.
 
 // ContentForm is the version of the canonical form new signatures use.
 const ContentForm = 1
@@ -54,7 +54,7 @@ type SignedContent struct {
 // per part, each value with its length in bytes so no value can pose as another part.
 func (c SignedContent) CanonicalForm() []byte {
 	var b bytes.Buffer
-	b.WriteString("diffluence-signed-content\n1\n")
+	b.WriteString("kenwerk-signed-content\n1\n")
 	field := func(name, value string) {
 		b.WriteString(name)
 		b.WriteByte(' ')

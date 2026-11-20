@@ -6,7 +6,7 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 // FuzzReadDOCX reads hostile files. It may refuse them, never crash on them.

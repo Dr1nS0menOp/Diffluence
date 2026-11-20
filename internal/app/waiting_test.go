@@ -89,7 +89,7 @@ func TestTheWaitingPageNamesTheBackupServiceThatMigrates(t *testing.T) {
 		{ProblemBackup, "no backup was noted"}, {ProblemMigrations, "3 migration(s) of this release have not run"}}}
 	page := get(t, waitingHandler(refused), "/").Body.String()
 	for _, want := range []string{"waits for the backup service to migrate", "docker compose up -d --build backup",
-		"docker compose logs backup", "--entrypoint diffluence backup migrate --without-backup"} {
+		"docker compose logs backup", "--entrypoint kenwerk backup migrate --without-backup"} {
 		if !strings.Contains(page, want) {
 			t.Errorf("the page lacks %q", want)
 		}

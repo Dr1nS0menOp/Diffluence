@@ -3,7 +3,7 @@
 package workflow
 
 import (
-	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/conditions"
 )
 
 // Conditions on a step (DOC-120, spec 064 wave DC5): simple tests picked from a list, joined
@@ -176,7 +176,7 @@ func checkConditions(tr Transition) *Problem {
 			valid = t.Label == "" && t.Part == ""
 		}
 		if !valid {
-			return problem("bad_conditions", tr.ID, "A condition of %q is not one Diffluence knows.", tr.Name)
+			return problem("bad_conditions", tr.ID, "A condition of %q is not one Kenwerk knows.", tr.Name)
 		}
 	}
 	return nil

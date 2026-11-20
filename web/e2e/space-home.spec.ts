@@ -62,7 +62,7 @@ test('a row can be dropped between top rows that have different parents', async 
 test('an administrator adds the example space, and every page of it works', async ({ page }) => {
   await page.goto('/admin/settings');
   await page.getByRole('button', { name: 'Add example space' }).click();
-  await expect(page.locator('h1')).toContainText('Welcome to Diffluence');
+  await expect(page.locator('h1')).toContainText('Welcome to Kenwerk');
   await expect(page.locator('#space-head-link')).toHaveAttribute('aria-current', 'page');
 
   const tree = page.getByRole('navigation', { name: 'Pages' });

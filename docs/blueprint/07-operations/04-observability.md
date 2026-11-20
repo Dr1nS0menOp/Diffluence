@@ -1,10 +1,10 @@
 # 07.4: Observability: metrics, logs, traces and alerts
 
-An operator of Diffluence has to know three things without reading code: is it working for people, is it about to stop, and why did it go wrong. This chapter sets out how the industry answers them, and what Diffluence should ship so a small team gets good answers with little effort.
+An operator of Kenwerk has to know three things without reading code: is it working for people, is it about to stop, and why did it go wrong. This chapter sets out how the industry answers them, and what Kenwerk should ship so a small team gets good answers with little effort.
 
 ## 4.1 What the research and practice say
 
-- **Measure what people feel.** The Google SRE book names four golden signals for a service: latency, traffic, errors and saturation. Tom Wilkie's RED method (rate, errors, duration) is the same for requests, and Brendan Gregg's USE method (utilisation, saturation, errors) is the same for resources. Diffluence already exports most of these.
+- **Measure what people feel.** The Google SRE book names four golden signals for a service: latency, traffic, errors and saturation. Tom Wilkie's RED method (rate, errors, duration) is the same for requests, and Brendan Gregg's USE method (utilisation, saturation, errors) is the same for resources. Kenwerk already exports most of these.
 - **Tracing explains slow requests.** Google's Dapper paper (Sigelman et al., 2010) showed that following one request through every service, with low overhead and sampling, finds problems that logs and averages hide. OpenTelemetry is the vendor-neutral standard that grew from that line of work, and W3C Trace Context is the header (`traceparent`) that carries a trace across services.
 - **Tails matter more than averages.** Dean and Barroso, *The Tail at Scale* (CACM 2013): when one page needs many requests, the slowest of them decides the page. So targets are percentiles (p95, p99), never means.
 - **Alert on symptoms, against an objective.** A service level objective (SLO) says what share of requests must be good, such as 99.5% under 300 ms over 30 days. The remaining 0.5% is the error budget. The SRE workbook's chapter on alerting on SLOs recommends alerts on how fast the budget burns, checked over a long and a short window at once, so an alert fires quickly for a real outage and not at all for a short blip. That is the industry's main answer to **alert fatigue**: pages for symptoms people feel, tickets for causes.
@@ -14,7 +14,7 @@ An operator of Diffluence has to know three things without reading code: is it w
 
 The OpenTelemetry project rates its Go SDK by signal: **traces stable, metrics stable, logs beta**. Most self-hosted projects therefore keep Prometheus for metrics, keep their own structured logs, and add OpenTelemetry for traces, exported with OTLP to a collector of the operator's choice (Jaeger, Tempo, or a vendor). Export is off until the operator gives an address, so nothing leaves the machine by surprise.
 
-## 4.3 Where Diffluence stands
+## 4.3 Where Kenwerk stands
 
 | Practice | State | Where |
 |---|---|---|

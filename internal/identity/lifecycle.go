@@ -17,12 +17,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity/leaked"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity/leaked"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/outbox"
 )
 
 // The single-purpose links of an account's life. They live in auth_challenges, so
@@ -129,7 +129,7 @@ func LoadBlocklist(path string) (map[string]bool, error) {
 }
 
 // productWord may not appear in a password.
-const productWord = "diffluence"
+const productWord = "kenwerk"
 
 // validateNewPassword applies every rule to a new password. NIST SP 800-63B asks
 // for a check against known bad passwords, and not for odd characters.

@@ -1,6 +1,6 @@
 # Validation pack: electronic signatures
 
-Every requirement line of blueprint chapter 09.8 and the tests that prove it (DOC-790). A customer who validates their use of Diffluence takes this list with the results of the release's run: `make check` for the Go tests, `scripts/e2e` for the browser tests. `TestTheValidationPackNamesEveryLineAndItsTests` fails when a line of 09.8 is missing here or a test named here does not exist. What remains the customer's is in `regulated-use.md`.
+Every requirement line of blueprint chapter 09.8 and the tests that prove it (DOC-790). A customer who validates their use of Kenwerk takes this list with the results of the release's run: `make check` for the Go tests, `scripts/e2e` for the browser tests. `TestTheValidationPackNamesEveryLineAndItsTests` fails when a line of 09.8 is missing here or a test named here does not exist. What remains the customer's is in `regulated-use.md`.
 
 Go tests are named by their function, browser tests by their title after the word e2e.
 
@@ -18,12 +18,12 @@ Go tests are named by their function, browser tests by their title after the wor
 | DOC-733 | No signing through tokens, automation or the system | `TestASignatureIsRefusedToAnyoneButItsSigner` |
 | DOC-740 | The page and its history show the signatures | `TestASignatureRecordHoldsEveryField`, `TestThePublishedCopyOfASignedVersionShowsItsSignatures`, e2e: "an author signs an approval in the signing dialog" |
 | DOC-741 | Verification recomputes the hash and checks the audit entry | `TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch` |
-| DOC-742 | The auditor's export verifies outside Diffluence | `TestTheAuditorsExportVerifiesOutsideDiffluence` |
+| DOC-742 | The auditor's export verifies outside Kenwerk | `TestTheAuditorsExportVerifiesOutsideKenwerk` |
 | DOC-750 | A signature belongs to one account; a disabled one's still verify | `TestSignaturesOfADisabledSignerStillVerify` |
 | DOC-751 | Signing is enabled per person, with how they were identified | `TestASignatureIsRefusedToAnyoneButItsSigner`, `TestSignaturesOfADisabledSignerStillVerify` |
 | DOC-760 | Signing needs the right to take the step | `TestASignatureIsRefusedToAnyoneButItsSigner` |
 | DOC-770 | Signatures and signed versions are never deleted or changed | `TestSignedVersionsSurviveDeletePurgeAndRemoval` |
 | DOC-771 | Erasure keeps signature records | `TestErasureKeepsSignaturesAndErasesTheRest`, `TestAnonymisingLeavesTheIdOnlyWhereThatIsDecided` |
-| DOC-772 | Signatures verify after a restore | `TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch` (the check `diffluence signatures verify` runs), and the step in `scripts/restore-drill.sh` |
+| DOC-772 | Signatures verify after a restore | `TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch` (the check `kenwerk signatures verify` runs), and the step in `scripts/restore-drill.sh` |
 | DOC-790 | This pack names every line | `TestTheValidationPackNamesEveryLineAndItsTests` |
 | DOC-791 | Qualified signatures through a trust provider | Not built: open for the product owner |

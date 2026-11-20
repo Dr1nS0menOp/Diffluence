@@ -50,12 +50,12 @@ func OpenAPI(routes []Route) ([]byte, error) {
 	}
 	raw, err := json.MarshalIndent(map[string]any{
 		"openapi": "3.1.0",
-		"info": map[string]any{"title": "Diffluence API", "version": openAPIVersion,
+		"info": map[string]any{"title": "Kenwerk API", "version": openAPIVersion,
 			"description": "See docs/api/README.md for what stays stable."},
 		"servers": []any{map[string]any{"url": "/"}},
 		"components": map[string]any{"securitySchemes": map[string]any{
 			"token":   map[string]any{"type": "http", "scheme": "bearer"},
-			"session": map[string]any{"type": "apiKey", "in": "cookie", "name": "diffluence_session"}}},
+			"session": map[string]any{"type": "apiKey", "in": "cookie", "name": "kenwerk_session"}}},
 		"paths": paths,
 	}, "", "  ")
 	if err != nil {

@@ -37,7 +37,7 @@ Until now `audit.Record` took one advisory lock, read the newest hash, and inser
 | 2 | `audit.Record` writes to `audit_pending`, without the lock | `internal/audit/audit.go` |
 | 3 | `audit.SealWaiting` and `audit.SealIn`: take the chain lock, read up to 500 waiting events oldest first (locked for this transaction), link and insert them, move their personal parts, remove them from `audit_pending` | `internal/audit/seal.go` |
 | 4 | `audit.RecordSealed`: the former path, straight into the chain, for the upgrade marker and the note of a backup, which run before migrations | `internal/audit/audit.go`, `internal/app/upgrade.go` |
-| 5 | Every worker seals every second, and once more when it stops; `audit verify`, the console's check and each checkpoint seal first | `internal/app/ops.go`, `internal/app/app.go`, `cmd/diffluence/main.go` |
+| 5 | Every worker seals every second, and once more when it stops; `audit verify`, the console's check and each checkpoint seal first | `internal/app/ops.go`, `internal/app/app.go`, `cmd/kenwerk/main.go` |
 | 6 | Readers see waiting events at once: lists first without a seq, exports last with an empty seq; `audit_entries` for queries of what happened | `internal/audit/audit.go`, `internal/console/console.go` |
 | 7 | Erasing a person also erases the personal part of a waiting event | `internal/audit/audit.go` |
 | 8 | Pruning seals inside its own transaction, so the chain goes on from the anchor even when every event was removed | `internal/audit/prune.go`, `seal.go` |
@@ -87,7 +87,7 @@ Every new check has a mutation in `scripts/mutation-check.sh`.
 
 ### Measured
 
-`TestMeasureSavesUnderTheChainLock`, run only with `DIFFLUENCE_MEASURE=1`: 32 writers save 1,280 times at once, each save one transaction with one event, first holding the lock until commit as before, then without it, with a sealer running. In the development container, three runs: from about 2,000 to about 17,000 saves a second, p50 from 15 ms to 1.4 ms, p95 from 18 ms to 2.8 ms. That database does not sync to disk on commit, which is the very step the lock was held across, so the gain on a server is larger. The numbers are in `docs/operations/limits.md`.
+`TestMeasureSavesUnderTheChainLock`, run only with `KENWERK_MEASURE=1`: 32 writers save 1,280 times at once, each save one transaction with one event, first holding the lock until commit as before, then without it, with a sealer running. In the development container, three runs: from about 2,000 to about 17,000 saves a second, p50 from 15 ms to 1.4 ms, p95 from 18 ms to 2.8 ms. That database does not sync to disk on commit, which is the very step the lock was held across, so the gain on a server is larger. The numbers are in `docs/operations/limits.md`.
 
 ## Load budget (ARC-238)
 

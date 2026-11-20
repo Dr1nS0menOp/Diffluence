@@ -14,7 +14,7 @@ Blueprint 08 lists six phases after 1.0: AI, the platform and apps, linked insta
 ## 3.2 The platform: API, apps and a marketplace (phase 7)
 
 **Hurdles.**
-- **Supply chain at the scale of an ecosystem.** Zimmermann et al. studied npm (USENIX Security 2019): a few maintainer accounts could reach a large part of all packages, and installing one package trusts on average dozens of others. A marketplace makes Diffluence an ecosystem of the same kind.
+- **Supply chain at the scale of an ecosystem.** Zimmermann et al. studied npm (USENIX Security 2019): a few maintainer accounts could reach a large part of all packages, and installing one package trusts on average dozens of others. A marketplace makes Kenwerk an ecosystem of the same kind.
 - **Tokens and delegated access.** OAuth is easy to get subtly wrong; RFC 9700 (2025) collects the current best practice.
 - **Sandboxes have costs.** WebAssembly is a good sandbox for macros, but Jangda et al. measured it running notably slower than native code in real applications (USENIX ATC 2019), and every host interface added to the sandbox is a new door.
 
@@ -24,7 +24,7 @@ Blueprint 08 lists six phases after 1.0: AI, the platform and apps, linked insta
 
 **Hurdles.**
 - **Trust between independent servers.** Raman et al. measured Mastodon (IMC 2019): instances run by volunteers go offline, a few large ones gather most people, and content on a vanished instance is lost unless copied. Linking wikis brings the same questions of who trusts whom, and what happens when a linked instance disappears or turns hostile.
-- **Merging edits from two places.** Conflict-free replicated data types (Shapiro et al., 2011) and the local-first work of Kleppmann et al. (Onward! 2019) show how documents can merge without a central server; Diffluence's editing service already uses such a type. Permissions and history do not merge as easily as text.
+- **Merging edits from two places.** Conflict-free replicated data types (Shapiro et al., 2011) and the local-first work of Kleppmann et al. (Onward! 2019) show how documents can merge without a central server; Kenwerk's editing service already uses such a type. Permissions and history do not merge as easily as text.
 
 **How others meet it.** Explicit, revocable trust per pair of instances; copies rather than live links for content that must survive; a protocol written as a document, such as W3C ActivityPub, before code.
 

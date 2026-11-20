@@ -16,11 +16,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/mail"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Document control, wave DC3 of spec 064: the content around the page. A reader held on the

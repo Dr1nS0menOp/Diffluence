@@ -6,9 +6,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // TestAChangeEndsKeptFactsAtOnce: a node keeps the facts of a person and a space between

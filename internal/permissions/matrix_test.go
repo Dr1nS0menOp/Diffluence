@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // The generated matrix from blueprint 05: user type × group membership × space
@@ -657,7 +657,7 @@ func TestMatrixSQLAgreesWithEvaluate(t *testing.T) {
 		t.Helper()
 		// Pages of a published space are written as a release writes them (spec 073, PUB-224).
 		var marked pgx.Batch
-		marked.Queue("SELECT set_config('diffluence.release', 'on', false)")
+		marked.Queue("SELECT set_config('kenwerk.release', 'on', false)")
 		for _, q := range batch.QueuedQueries {
 			marked.Queue(q.SQL, q.Arguments...)
 		}

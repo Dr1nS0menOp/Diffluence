@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/conditions"
 )
 
 // Spec 074, wave GT3: a section of text a condition switches (TPL-422).

@@ -10,14 +10,14 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/comments"
-	"github.com/diffluence/diffluence/internal/feed"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/sharing"
-	"github.com/diffluence/diffluence/internal/trash"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/comments"
+	"github.com/kenwerk/kenwerk/internal/feed"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/sharing"
+	"github.com/kenwerk/kenwerk/internal/trash"
 )
 
 func (s *Server) registerTogetherRoutes() {

@@ -1,6 +1,6 @@
 # 03: Functional requirements
 
-This is the full functional description of Diffluence: what the product does, screen by screen and rule by rule, written so that the product owner can test it and a build session can implement it without guessing.
+This is the full functional description of Kenwerk: what the product does, screen by screen and rule by rule, written so that the product owner can test it and a build session can implement it without guessing.
 
 It came from a clean-room study on 2026-11-05 (ADR-023). Public help pages of other wikis were read for behaviour only. Everything here is in our own words, and the look stays ours (`docs/design/README.md`). `03-functional/sources.md` lists every source, as the clean-room process demands.
 

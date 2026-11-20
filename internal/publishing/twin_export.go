@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/pages"
 )
 
 // twinState is the state a file of a published page names: the page readers have is always the

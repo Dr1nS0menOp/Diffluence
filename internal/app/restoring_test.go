@@ -16,8 +16,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/restore"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/restore"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // putRestore writes a restore in a state, as the console and the worker would.
@@ -25,7 +25,7 @@ func putRestore(t *testing.T, tdb testutil.TestDB, state string, changed bool, s
 	t.Helper()
 	id := uuid.New()
 	if _, err := tdb.Pool.Exec(context.Background(), `INSERT INTO ops.restores (id, backup_name, requested_by_name, state, changed, step)
-		VALUES ($1, 'diffluence-20261111T071618Z', 'test', $2, $3, $4)`, id, state, changed, step); err != nil {
+		VALUES ($1, 'kenwerk-20261111T071618Z', 'test', $2, $3, $4)`, id, state, changed, step); err != nil {
 		t.Fatal(err)
 	}
 	return id
@@ -57,7 +57,7 @@ func TestANodeWaitsOnThePageWhileARestoreRunsAndGoesOnAfter(t *testing.T) {
 	body, _ := io.ReadAll(resp.Body)
 	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusServiceUnavailable || !strings.Contains(string(body), "restoring the database") ||
-		strings.Contains(string(body), "diffluence-2026") || strings.Contains(string(body), "test") {
+		strings.Contains(string(body), "kenwerk-2026") || strings.Contains(string(body), "test") {
 		t.Fatalf("the page: %d %s", resp.StatusCode, body)
 	}
 	resp, err = http.Get(addr + "/readyz")

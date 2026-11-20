@@ -5,7 +5,7 @@ package app_test
 import (
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The create permissions of spec 045: a blog post and a database are made with a

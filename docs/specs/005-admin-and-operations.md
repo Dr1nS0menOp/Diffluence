@@ -4,7 +4,7 @@ Status: built, waiting for the product owner's acceptance session (written by Cl
 Phase: 1 and 2
 
 ## Problem
-An operator must be able to run Diffluence without touching the database, and upgrades must need no manual steps.
+An operator must be able to run Kenwerk without touching the database, and upgrades must need no manual steps.
 
 ## Behaviour
 
@@ -14,7 +14,7 @@ An operator must be able to run Diffluence without touching the database, and up
 
 **Background jobs** run in the worker and only once across nodes: remove expired sessions and challenges, remove old published outbox rows, purge expired trash, delete stored files of purged items, verify the audit chain daily, sign a daily audit checkpoint with Ed25519, and run imports.
 
-**Upgrades.** Every node registers itself with its version and the highest migration it knows. When every live node knows a pending contract migration, the worker applies it automatically after a grace period, so no human step is needed. `diffluence migrate --contract` stays as a manual override.
+**Upgrades.** Every node registers itself with its version and the highest migration it knows. When every live node knows a pending contract migration, the worker applies it automatically after a grace period, so no human step is needed. `kenwerk migrate --contract` stays as a manual override.
 
 **Upgrade test.** A script starts the previous build with traffic, starts this build next to it on the same database, stops the old node, and fails on any failed request.
 

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 func TestTheScopeOfARequestComesFromItsRoute(t *testing.T) {

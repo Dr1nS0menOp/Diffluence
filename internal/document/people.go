@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 // The kinds of mention.

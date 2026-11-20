@@ -24,7 +24,7 @@ interface PendingSigning {
   comment: string;
 }
 
-const PENDING_KEY = 'diffluence.signing';
+const PENDING_KEY = 'kenwerk.signing';
 
 /** A signing step that came back from the identity provider for this page, if any. */
 export function pendingSigning(pageId: string): PendingSigning | null {

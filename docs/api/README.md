@@ -1,4 +1,4 @@
-# The Diffluence API
+# The Kenwerk API
 
 Our own web app uses the same API as everyone else. The routes and what each needs are in [`routes.txt`](routes.txt), and the same list is an OpenAPI 3.1 description in [`openapi.json`](openapi.json), also at `/api/v1/openapi.json` for anyone logged in. A test fails when either differs from the routes.
 
@@ -12,7 +12,7 @@ The description covers each route, its method, its path parameters and its rule,
 
 ## Tokens
 
-A personal access token goes in `Authorization: Bearer dfl_...`. It has scopes:
+A personal access token goes in `Authorization: Bearer kenwerk_...`. It has scopes:
 
 | Scope | Allows |
 |---|---|
@@ -37,14 +37,14 @@ A webhook follows the Standard Webhooks format: the headers `webhook-id`, `webho
 
 ## The command line tool
 
-`diffluence client` uses only this API. Set `DIFFLUENCE_URL`, and `DIFFLUENCE_TOKEN` or `DIFFLUENCE_TOKEN_FILE`.
+`kenwerk client` uses only this API. Set `KENWERK_URL`, and `KENWERK_TOKEN` or `KENWERK_TOKEN_FILE`.
 
 | Command | What it does |
 |---|---|
-| `diffluence client spaces list` | The spaces you can see, as JSON |
-| `diffluence client pages list <space-id>` | The pages of a space, as JSON |
-| `diffluence client export <space-id> <file>` | Saves a space as a zip |
-| `diffluence client import <space-id> <file>` | Imports a file into a space |
-| `diffluence client backup-content <folder>` | Saves every space you can see |
+| `kenwerk client spaces list` | The spaces you can see, as JSON |
+| `kenwerk client pages list <space-id>` | The pages of a space, as JSON |
+| `kenwerk client export <space-id> <file>` | Saves a space as a zip |
+| `kenwerk client import <space-id> <file>` | Imports a file into a space |
+| `kenwerk client backup-content <folder>` | Saves every space you can see |
 
 Exit codes: 0 done, 1 failed, 2 wrong use, 3 refused by the server.

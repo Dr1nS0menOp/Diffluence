@@ -13,9 +13,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/restore"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/restore"
 )
 
 // A restore from the console rewinds the whole installation (spec 059). These tests prove

@@ -33,9 +33,9 @@ test('only the token of the API is the API, compared in constant time', () => {
 });
 
 test('the service reads the ticket and nothing else from the socket', () => {
-  const headers = new Headers({ cookie: 'diffluence_session=secret', 'x-diffluence-collab-ticket': 'abc.def' });
+  const headers = new Headers({ cookie: 'kenwerk_session=secret', 'x-kenwerk-collab-ticket': 'abc.def' });
   assert.equal(ticketFrom(headers), 'abc.def');
-  assert.equal(ticketFrom(new Headers({ cookie: 'diffluence_session=secret' })), '');
+  assert.equal(ticketFrom(new Headers({ cookie: 'kenwerk_session=secret' })), '');
 });
 
 test('the API is asked with the page and the ticket only', async () => {

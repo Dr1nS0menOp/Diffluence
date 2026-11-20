@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/failures"
+	"github.com/kenwerk/kenwerk/internal/failures"
 )
 
 // retryWaits are the pauses before each retry: the first after the event failed in its

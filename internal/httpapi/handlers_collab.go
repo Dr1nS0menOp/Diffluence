@@ -11,8 +11,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/collab"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/collab"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 const maxCollabBody = 32 << 20

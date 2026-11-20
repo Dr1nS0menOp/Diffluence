@@ -45,7 +45,7 @@ test('the top bar holds the sidebar button and the name, then search and Create,
         .filter((el) => (el as HTMLElement).offsetParent !== null)
         .map((el) => el.getAttribute('aria-label') || el.textContent?.trim() || ''),
     );
-  const order = ['Hide sidebar', 'Diffluence', 'Search', 'Create', 'Help', 'Administration', 'Account'];
+  const order = ['Hide sidebar', 'Kenwerk', 'Search', 'Create', 'Help', 'Administration', 'Account'];
   const places_ = order.map((name) => names.findIndex((n) => n.startsWith(name)));
   expect(
     places_.every((at) => at >= 0),

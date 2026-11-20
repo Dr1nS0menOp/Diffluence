@@ -44,7 +44,7 @@ The roadmap names a publishing app for a commercial wiki only to say which behav
 - C. Tran, K. Champion, B. M. Hill, R. Greenstadt, "The Risks, Benefits, and Consequences of Prepublication Moderation: Evidence from 17 Wikipedia Language Editions", Proc. ACM Hum.-Comput. Interact. 6 (CSCW2), 2022 ([record](https://dblp1.uni-trier.de/rec/journals/pacmhci/TranCHG22.html), [text](https://arxiv.org/abs/2202.05548)) (through search): prepublication review kept low-quality edits from readers very effectively, with at most moderate effects on the amount and quality of contributions, and some sign of discouraging newcomers.
 - C. Tran, E. Take, K. Champion, B. M. Hill, R. Greenstadt, "Challenges in Restructuring Community-based Moderation", 2024 ([text](https://arxiv.org/abs/2402.17880)) (through search): support for the flagged-revisions system waned over time; its further deployment was halted.
 
-## Diffluence
+## Kenwerk
 
 - Code read on 2026-11-14: `internal/pages/tree.go` (copy), `internal/pages/links.go`, `internal/document` (links), `internal/attachments/attachments.go` (`CopyAll`), `internal/sites/links.go`, `internal/features`, `internal/health/health.go`, migrations `0002`, `0051` and `0054`.
 - Documents: blueprint 09.1 to 09.14 and their sources, spec 064 and the report of wave DC1, blueprints 02, 04.8 and 08, the decision log (ADR-009, ADR-010, ADR-025, ADR-034 to ADR-043), the design standard, `docs/operations/limits.md`, and spec 069.

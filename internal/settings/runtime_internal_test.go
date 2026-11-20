@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 // The disk thresholds have bounds, and the refuse level always stays below the warn level

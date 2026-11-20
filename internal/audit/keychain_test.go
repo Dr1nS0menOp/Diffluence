@@ -12,8 +12,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // The installation's own key (derived from master.key in the product) and the backup

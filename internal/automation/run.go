@@ -13,12 +13,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Step is one line of a run. It holds ids and codes: what a page is called is looked

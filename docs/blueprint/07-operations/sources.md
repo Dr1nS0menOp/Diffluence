@@ -1,6 +1,6 @@
 # 07: Sources
 
-Read on 2026-11-10 for this study, in our own words. Diffluence's own code, specs and ADRs are the first source. Each chapter ends with the sources it leans on; this page holds them all, by subject. No product's code, text or screens were copied; other products are named only for public facts about how they upgrade, back up or release.
+Read on 2026-11-10 for this study, in our own words. Kenwerk's own code, specs and ADRs are the first source. Each chapter ends with the sources it leans on; this page holds them all, by subject. No product's code, text or screens were copied; other products are named only for public facts about how they upgrade, back up or release.
 
 ## Upgrades and schema change
 

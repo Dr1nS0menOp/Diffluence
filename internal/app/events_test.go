@@ -9,11 +9,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Once the events run through PostgreSQL the worker's own consumers take them from the event
@@ -174,8 +174,8 @@ func TestEventGaugesNameEachConsumer(t *testing.T) {
 		{Consumer: "collab"},
 	})
 	want := []string{
-		`diffluence_event_lag_seconds{consumer="webhooks"} 3`, `diffluence_event_lag_seconds{consumer="collab"} 0`,
-		`diffluence_event_retries{consumer="webhooks"} 2`, `diffluence_event_retries{consumer="collab"} 0`,
+		`kenwerk_event_lag_seconds{consumer="webhooks"} 3`, `kenwerk_event_lag_seconds{consumer="collab"} 0`,
+		`kenwerk_event_retries{consumer="webhooks"} 2`, `kenwerk_event_retries{consumer="collab"} 0`,
 	}
 	if len(gauges) != len(want) {
 		t.Fatalf("%d gauges", len(gauges))

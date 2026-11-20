@@ -19,12 +19,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // SubjectPrefix is prepended to the event type to form the NATS subject.
-const SubjectPrefix = "diffluence.events."
+const SubjectPrefix = "kenwerk.events."
 
 // MaxEventBytes stays below the 1 MiB that NATS takes in one message by default. An event
 // holds ids, so only a fault makes one this large.

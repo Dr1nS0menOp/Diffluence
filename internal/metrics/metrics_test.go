@@ -25,7 +25,7 @@ func TestBucketsAreCumulativeAndEndInInf(t *testing.T) {
 	got := text(t, r)
 	for _, line := range []string{
 		`_bucket{le="0.005"} 1`, `_bucket{le="0.5"} 2`, `_bucket{le="10"} 2`, `_bucket{le="+Inf"} 3`,
-		`diffluence_http_request_duration_seconds_count 3`,
+		`kenwerk_http_request_duration_seconds_count 3`,
 	} {
 		if !strings.Contains(got, line) {
 			t.Errorf("missing %s in:\n%s", line, got)
@@ -52,8 +52,8 @@ func TestAStatusOutsideTheRangeIsOther(t *testing.T) {
 }
 
 func TestGaugesAreWrittenWithTheirType(t *testing.T) {
-	got := text(t, NewRequests(), Gauge{Name: "diffluence_x", Help: "An x.", Value: 2.5})
-	if !strings.Contains(got, "# TYPE diffluence_x gauge\ndiffluence_x 2.5\n") {
+	got := text(t, NewRequests(), Gauge{Name: "kenwerk_x", Help: "An x.", Value: 2.5})
+	if !strings.Contains(got, "# TYPE kenwerk_x gauge\nkenwerk_x 2.5\n") {
 		t.Fatal(got)
 	}
 }
@@ -61,12 +61,12 @@ func TestGaugesAreWrittenWithTheirType(t *testing.T) {
 // Series of one name share one HELP and TYPE, as the text format requires.
 func TestGaugesOfOneNameAreWrittenAsOneMetric(t *testing.T) {
 	got := text(t, NewRequests(),
-		Gauge{Name: "diffluence_lag", Help: "A lag.", Value: 1, Label: Label{"consumer", "webhooks"}},
-		Gauge{Name: "diffluence_lag", Help: "A lag.", Value: 0, Label: Label{"consumer", "collab"}},
-		Gauge{Name: "diffluence_y", Help: "A y.", Value: 3})
-	want := "# HELP diffluence_lag A lag.\n# TYPE diffluence_lag gauge\n" +
-		"diffluence_lag{consumer=\"webhooks\"} 1\ndiffluence_lag{consumer=\"collab\"} 0\n" +
-		"# HELP diffluence_y A y.\n# TYPE diffluence_y gauge\ndiffluence_y 3\n"
+		Gauge{Name: "kenwerk_lag", Help: "A lag.", Value: 1, Label: Label{"consumer", "webhooks"}},
+		Gauge{Name: "kenwerk_lag", Help: "A lag.", Value: 0, Label: Label{"consumer", "collab"}},
+		Gauge{Name: "kenwerk_y", Help: "A y.", Value: 3})
+	want := "# HELP kenwerk_lag A lag.\n# TYPE kenwerk_lag gauge\n" +
+		"kenwerk_lag{consumer=\"webhooks\"} 1\nkenwerk_lag{consumer=\"collab\"} 0\n" +
+		"# HELP kenwerk_y A y.\n# TYPE kenwerk_y gauge\nkenwerk_y 3\n"
 	if !strings.HasSuffix(got, want) {
 		t.Fatal(got)
 	}

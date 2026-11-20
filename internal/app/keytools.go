@@ -8,10 +8,10 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/storage"
 )
 
 // KeyTools is what the key commands need, without starting a server: the database, the

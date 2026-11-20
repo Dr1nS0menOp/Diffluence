@@ -29,7 +29,7 @@ const MENU_ICON_SIZE = 18;
 const TOP_ICON_SIZE = 20;
 const PAGE_ICON_SIZE = 16;
 const THEMES = ['light', 'dark', 'system'] as const;
-const THIRD_PARTY_LICENCES = 'https://github.com/Dr1nS0menOp/Diffluence/blob/main/docs/dependencies.md';
+const THIRD_PARTY_LICENCES = 'https://github.com/Dr1nS0menOp/Kenwerk/blob/main/docs/dependencies.md';
 
 /** A page's own emoji, or the page icon. */
 export function PageMark({ page }: { page: { emoji: string } }) {

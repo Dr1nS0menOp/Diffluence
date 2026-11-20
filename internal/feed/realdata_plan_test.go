@@ -14,7 +14,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // TestTheFeedKeepsItsHashOnRealData is DOC-1301: with document control on a tenth of the
@@ -22,9 +22,9 @@ import (
 // versions through their index rather than reading them all. It runs only against a restored dump of the seeded data
 // (scripts/stress/real-data.sh) after the pages are put under control.
 func TestTheFeedKeepsItsHashOnRealData(t *testing.T) {
-	url := os.Getenv("DIFFLUENCE_REALDATA_URL")
+	url := os.Getenv("KENWERK_REALDATA_URL")
 	if url == "" {
-		t.Skip("DIFFLUENCE_REALDATA_URL is not set; see scripts/stress/real-data.sh")
+		t.Skip("KENWERK_REALDATA_URL is not set; see scripts/stress/real-data.sh")
 	}
 	ctx := context.Background()
 	pool, err := db.Open(ctx, url)

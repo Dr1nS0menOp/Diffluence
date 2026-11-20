@@ -10,7 +10,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // TendOptions are what the backup service migrates with (spec 070).
@@ -18,7 +18,7 @@ type TendOptions struct {
 	// AppRole is the application role, which gets its rights after each migration.
 	AppRole string
 	// BackupMaxAge is how old the last noted backup may be before an upgrade; zero switches
-	// the check off, as DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off does.
+	// the check off, as KENWERK_UPGRADE_BACKUP_MAX_AGE=off does.
 	BackupMaxAge  time.Duration
 	ContractGrace time.Duration
 	Log           *slog.Logger

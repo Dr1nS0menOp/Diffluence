@@ -13,12 +13,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/tracing"
-	"github.com/diffluence/diffluence/internal/version"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/version"
 )
 
 const (
@@ -109,7 +109,7 @@ func (a *App) RunContractMigrations(ctx context.Context) (int, error) {
 
 // contractDue lists the pending contract migrations and says whether they may run now:
 // every live node knows them, and every node has run this release for the grace period
-// (DIFFLUENCE_CONTRACT_GRACE), so a problem found the next day can still be rolled back
+// (KENWERK_CONTRACT_GRACE), so a problem found the next day can still be rolled back
 // (spec 048 D1).
 func contractDue(ctx context.Context, q db.Querier, migs []db.Migration, grace time.Duration) ([]db.Migration, bool, error) {
 	pending, err := db.PendingContract(ctx, q, migs)
@@ -153,7 +153,7 @@ func (a *App) runContractMigrations(ctx context.Context) error {
 func (a *App) SealAudit(ctx context.Context) error {
 	ctx, end := tracing.Span(ctx, "audit seal", "")
 	sealed, err := audit.SealWaiting(ctx, a.pool)
-	tracing.Count(ctx, "diffluence.audit.sealed", sealed)
+	tracing.Count(ctx, "kenwerk.audit.sealed", sealed)
 	end(err)
 	return err
 }

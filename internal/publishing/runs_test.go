@@ -9,7 +9,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/pages"
 )
 
 // TestEachPageOfAScopeGetsItsPartInARun is PUB-401 to PUB-403, PUB-420 to PUB-422, PUB-1010 and

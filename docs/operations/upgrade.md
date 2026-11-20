@@ -1,4 +1,4 @@
-# Upgrading Diffluence
+# Upgrading Kenwerk
 
 Written for: operators.
 
@@ -6,16 +6,16 @@ Written for: operators.
 git pull && docker compose up -d --build     # or: docker compose pull && docker compose up -d
 ```
 
-That is all. There are no manual steps. If you changed a setting or the configuration file, check it first: `docker compose run --rm --no-deps -T diffluence config check` refuses what a start would refuse, without starting ([install.md](install.md#checking-a-change-before-a-restart)).
+That is all. There are no manual steps. If you changed a setting or the configuration file, check it first: `docker compose run --rm --no-deps -T kenwerk config check` refuses what a start would refuse, without starting ([install.md](install.md#checking-a-change-before-a-restart)).
 
-**Build the backup service too.** Since spec 070 it runs the migrations, so `docker compose up -d --build` must rebuild it with the server. With pulled images, set `DIFFLUENCE_BACKUP_IMAGE` to the backup image of the same release. A server whose database waits for a backup service of an older release shows "The database waits for the backup service to migrate it", with the command that fixes it.
+**Build the backup service too.** Since spec 070 it runs the migrations, so `docker compose up -d --build` must rebuild it with the server. With pulled images, set `KENWERK_BACKUP_IMAGE` to the backup image of the same release. A server whose database waits for a backup service of an older release shows "The database waits for the backup service to migrate it", with the command that fixes it.
 
 ### Upgrading to the layout of spec 070
 
 `compose.yaml` no longer gives the server the owner of the tables; the backup service holds it alone, and the server waits until it has migrated. What to do depends on how you upgrade:
 
-- **With the `compose.yaml` of the repository** (`git pull`): nothing more. The server loses the secret `migrate_database_url` and gets `DIFFLUENCE_MIGRATE_ON_START: "false"`; the backup service migrates, signs the checkpoints and asks for a code before a restore.
-- **With a `compose.yaml` of your own**, kept from before: it keeps working. The server still holds both addresses and migrates as before, beside the backup service, and logs at each upgrade that the new layout leaves this to the backup service. To move: remove `DIFFLUENCE_MIGRATE_DATABASE_URL_FILE` and `migrate_database_url` from the `diffluence` service, add `DIFFLUENCE_MIGRATE_ON_START: "false"` to it, and add `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` and `DIFFLUENCE_CONTRACT_GRACE` to the `backup` service if you set them.
+- **With the `compose.yaml` of the repository** (`git pull`): nothing more. The server loses the secret `migrate_database_url` and gets `KENWERK_MIGRATE_ON_START: "false"`; the backup service migrates, signs the checkpoints and asks for a code before a restore.
+- **With a `compose.yaml` of your own**, kept from before: it keeps working. The server still holds both addresses and migrates as before, beside the backup service, and logs at each upgrade that the new layout leaves this to the backup service. To move: remove `KENWERK_MIGRATE_DATABASE_URL_FILE` and `migrate_database_url` from the `kenwerk` service, add `KENWERK_MIGRATE_ON_START: "false"` to it, and add `KENWERK_UPGRADE_BACKUP_MAX_AGE` and `KENWERK_CONTRACT_GRACE` to the `backup` service if you set them.
 - **Without the backup service:** keep the server's owner address, as before; it migrates and signs as it did.
 
 Nothing is lost either way: the change of checkpoint key is a position in the chain, and older checkpoints keep verifying with the key they were made with.
@@ -27,9 +27,9 @@ With one node, Compose stops the old container and starts the new one, so people
 1. The new version starts and first checks that it may migrate (below). Then it applies **expand** migrations. They only add things, so the running version keeps working. In Compose the backup service does this, within a minute, and the server waits on its page until it is done (spec 070); elsewhere the node itself does.
 2. With several nodes, you replace them one at a time. Old and new run side by side on the same database.
 3. Every node reports its version and the migrations it knows, every 15 seconds.
-4. When every live node knows a pending **contract** migration, and the newest node has been up for a day, the worker runs it automatically: in Compose the backup service, elsewhere a node's worker. It is recorded in the audit log as `system.contract_migrated`. The day leaves room to notice a problem the next working day and still roll back. Set `DIFFLUENCE_CONTRACT_GRACE` to change it, such as `72h` for a longer window, or `0s` on a test installation.
+4. When every live node knows a pending **contract** migration, and the newest node has been up for a day, the worker runs it automatically: in Compose the backup service, elsewhere a node's worker. It is recorded in the audit log as `system.contract_migrated`. The day leaves room to notice a problem the next working day and still roll back. Set `KENWERK_CONTRACT_GRACE` to change it, such as `72h` for a longer window, or `0s` on a test installation.
 
-`diffluence migrate --contract` runs them by hand if you ever need to.
+`kenwerk migrate --contract` runs them by hand if you ever need to.
 
 Every migration runs with a time limit of a minute (`statement_timeout`), besides the five seconds it may wait for a lock. A migration that runs longer stops, rolls back and names itself in the log, so it cannot hold a busy table; nothing is half done. A migration that needs longer says so in its first lines, with the reason. Indexes on large tables are built alongside the traffic (`CREATE INDEX CONCURRENTLY`), outside a transaction; if such a build fails, it leaves an invalid index behind, and the next start names it and stops until it is dropped:
 
@@ -54,34 +54,34 @@ While it waits:
 - `docker compose ps` shows it running and unhealthy, and `docker inspect` shows the reason in its health log;
 - it touches nothing in the database.
 
-Once the cause is fixed it migrates by itself within a minute. `docker compose kill -s HUP diffluence` makes it check at once; `scripts/backup.sh` does that after a backup. Releases before spec 054 exited instead, and Compose restarted them in a loop.
+Once the cause is fixed it migrates by itself within a minute. `docker compose kill -s HUP kenwerk` makes it check at once; `scripts/backup.sh` does that after a backup. Releases before spec 054 exited instead, and Compose restarted them in a loop.
 
 | Check | Refuses when |
 |---|---|
-| PostgreSQL | The server is older than PostgreSQL 16. Also for `diffluence migrate` |
+| PostgreSQL | The server is older than PostgreSQL 16. Also for `kenwerk migrate` |
 | Free space | The data folder has less than 512 MiB free |
 | Queue | NATS does not answer |
-| Backup | No backup was noted in the last 24 hours, or within `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Also for `diffluence migrate`. The first upgrade of an installation that never noted a backup goes on once, below (ADR-040, ADR-042) |
-| Newer database | A newer release has already run a contract migration. Also for a node with `DIFFLUENCE_MIGRATE_ON_START=false`. This one stops the node, as the database is beyond what it can read |
-| Migrations elsewhere | A node with `DIFFLUENCE_MIGRATE_ON_START=false` finds migrations of its release not run yet. It waits with the kind `migrations` and looks again every 5 seconds, until the backup service or `diffluence migrate` ran them (spec 070). It names the backup too when that is what the migration waits for |
+| Backup | No backup was noted in the last 24 hours, or within `KENWERK_UPGRADE_BACKUP_MAX_AGE` when that is set, such as `48h`. Also for `kenwerk migrate`. The first upgrade of an installation that never noted a backup goes on once, below (ADR-040, ADR-042) |
+| Newer database | A newer release has already run a contract migration. Also for a node with `KENWERK_MIGRATE_ON_START=false`. This one stops the node, as the database is beyond what it can read |
+| Migrations elsewhere | A node with `KENWERK_MIGRATE_ON_START=false` finds migrations of its release not run yet. It waits with the kind `migrations` and looks again every 5 seconds, until the backup service or `kenwerk migrate` ran them (spec 070). It names the backup too when that is what the migration waits for |
 
 **An upgrade waits without a backup of the last 24 hours.** The backup service of `compose.yaml` makes one every 4 hours ([backup-restore.md](backup-restore.md)), so an installation that runs it never waits. The reason in the log looks like this:
 
 ```
-waiting before the upgrade: upgrade refused before migrating: no backup was noted: run scripts/backup.sh or the backup service first (docker compose run --rm backup once), or upgrade once without one with diffluence migrate --without-backup, or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one
+waiting before the upgrade: upgrade refused before migrating: no backup was noted: run scripts/backup.sh or the backup service first (docker compose run --rm backup once), or upgrade once without one with kenwerk migrate --without-backup, or set KENWERK_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one
 ```
 
 The ways on, best first:
 
 1. **Make a backup:** `docker compose run --rm backup once`, or `bash scripts/backup.sh <folder> <key>`. The node migrates within a minute.
-2. **Upgrade once without one:** `docker compose run --rm --entrypoint diffluence backup migrate --without-backup`, in the backup service, which holds the owner of the tables (with an old `compose.yaml`: `docker compose run --rm diffluence migrate --without-backup`). It writes `system.upgrade_without_backup` with the reason `operator_override` to the audit log. The next upgrade asks for a backup again.
-3. **Switch the check off:** `DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off`. Every later upgrade then goes on without a backup too, with only a warning in the log, so prefer the first two.
+2. **Upgrade once without one:** `docker compose run --rm --entrypoint kenwerk backup migrate --without-backup`, in the backup service, which holds the owner of the tables (with an old `compose.yaml`: `docker compose run --rm kenwerk migrate --without-backup`). It writes `system.upgrade_without_backup` with the reason `operator_override` to the audit log. The next upgrade asks for a backup again.
+3. **Switch the check off:** `KENWERK_UPGRADE_BACKUP_MAX_AGE=off`. Every later upgrade then goes on without a backup too, with only a warning in the log, so prefer the first two.
 
 **The first upgrade under the rule** (ADR-042): an installation that holds data, never noted a backup, and never upgraded without one, is not stopped by the backup check once. The node logs `UPGRADING WITHOUT A RECENT BACKUP` as a warning, writes `system.upgrade_without_backup` with the reason `first_upgrade_under_the_backup_rule`, and migrates. The health page keeps warning that no backup was ever noted. From the next upgrade on, the rule holds in full. The other checks are never waived.
 
 A new installation is never asked for a backup: it has nothing to back up.
 
-The backup service and `scripts/backup.sh` note each complete backup in the audit log as `system.backup_noted`. A backup made another way can be noted with `docker compose exec diffluence diffluence backup note`, or `docker compose run --rm --no-deps diffluence backup note` when the node is not running, but only once it is complete.
+The backup service and `scripts/backup.sh` note each complete backup in the audit log as `system.backup_noted`. A backup made another way can be noted with `docker compose exec kenwerk kenwerk backup note`, or `docker compose run --rm --no-deps kenwerk backup note` when the node is not running, but only once it is complete.
 
 ## The marker before an upgrade
 
@@ -110,11 +110,11 @@ Draft and published spaces (`publishing`, spec 073) stay off after an upgrade un
 - **An older node cannot write into a published space.** A trigger in the database refuses every write of page content in a published space that is not a release, so a node of the previous release, which does not know the rule, shows its user an ordinary error and changes nothing. Readers keep reading.
 - **Background work needs the newer release.** Runs of more than one page, approval releases, starting a draft space from a space with content, the space-wide verification and the weekly check are work of the worker. A worker of the previous release leaves a job kind it does not know for one that does, so finish upgrading every node that runs the worker before you start such work. A run going during the upgrade shows as stopped once its node stops, and is resumed from the release screen with the versions of its preview.
 - **Rolling back** after pairs exist leaves published spaces read-only through the trigger, and the previous release has no screen for them. Roll forward again to change them, or end the pairs first (Space settings, Published space, End the link), which works while the part is off.
-- **After the upgrade**, the health page shows the line Published spaces: the consistency check of every pair runs once a week by itself, and once after the part is turned on again. `diffluence check publishing` runs it from the command line, and `--fix` recomputes what differs.
+- **After the upgrade**, the health page shows the line Published spaces: the consistency check of every pair runs once a week by itself, and once after the part is turned on again. `kenwerk check publishing` runs it from the command line, and `--fix` recomputes what differs.
 
 ## Single sign-on after an upgrade
 
-Since spec 071, single sign-on makes no account at a first login unless `DIFFLUENCE_OIDC_AUTO_CREATE=true` is set, and then only for an address the provider marks as verified. An installation that relied on accounts being made at the first login sets `DIFFLUENCE_OIDC_AUTO_CREATE=true` before upgrading. When its provider does not mark addresses as verified (Authentik by default, Entra ID), it also marks them there, or sets `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only the organisation can set an address at the provider (`docs/operations/identity-providers.md`). People who already have an account log in as before.
+Since spec 071, single sign-on makes no account at a first login unless `KENWERK_OIDC_AUTO_CREATE=true` is set, and then only for an address the provider marks as verified. An installation that relied on accounts being made at the first login sets `KENWERK_OIDC_AUTO_CREATE=true` before upgrading. When its provider does not mark addresses as verified (Authentik by default, Entra ID), it also marks them there, or sets `KENWERK_OIDC_ALLOW_UNVERIFIED_EMAIL=true` when only the organisation can set an address at the provider (`docs/operations/identity-providers.md`). People who already have an account log in as before.
 
 ## Erased personal parts after an upgrade
 
@@ -127,8 +127,8 @@ Since migration 0059 (spec 068, wave EV2) the events can go through PostgreSQL i
 To switch, once every node runs this release or the one before it (migration 0053 or later):
 
 ```
-docker compose exec diffluence diffluence events switch postgres
-docker compose exec diffluence diffluence events status
+docker compose exec kenwerk kenwerk events switch postgres
+docker compose exec kenwerk kenwerk events status
 ```
 
 The switch waits while a node of an older release has been seen in the last five minutes, and names it. From the next relay batch on, every new event goes to the event log; the workers start its consumers within five seconds. Their NATS consumers keep running and finish what NATS still holds, including retries that wait up to an hour. A worker notes within a minute of NATS being empty that it is drained; `events status` then says `NATS: drained at` with the time, and `release without NATS: may be installed`.
@@ -136,10 +136,10 @@ The switch waits while a node of an older release has been seen in the last five
 To undo the switch, at any time and without waiting for nodes:
 
 ```
-docker compose exec diffluence diffluence events switch nats
+docker compose exec kenwerk kenwerk events switch nats
 ```
 
-New events go through NATS again. What the event log already holds is still handed to every consumer, by every worker of this release, until nothing is left. The drain is forgotten; switching to postgres again starts a new one. If a node of an older release published to NATS after the drain, `events status` says so; stop that node, run `diffluence events switch postgres` again and wait for the drain.
+New events go through NATS again. What the event log already holds is still handed to every consumer, by every worker of this release, until nothing is left. The drain is forgotten; switching to postgres again starts a new one. If a node of an older release published to NATS after the drain, `events status` says so; stop that node, run `kenwerk events switch postgres` again and wait for the drain.
 
 ## Rolling back
 
@@ -164,13 +164,13 @@ Administration, Overview, **Upgrades** shows each node with its release, the new
 
 | Metric | Means |
 |---|---|
-| `diffluence_schema_migration` | The highest migration applied to the database |
-| `diffluence_migrations_pending_expand` | Expand migrations of this node not applied yet. Above zero, the node says `migrations` on `/readyz` |
-| `diffluence_migrations_pending_contract` | Contract migrations of this node that wait for every node to know them. If this stays above zero long after every node runs the new release, look at the node list in the admin console |
+| `kenwerk_schema_migration` | The highest migration applied to the database |
+| `kenwerk_migrations_pending_expand` | Expand migrations of this node not applied yet. Above zero, the node says `migrations` on `/readyz` |
+| `kenwerk_migrations_pending_contract` | Contract migrations of this node that wait for every node to know them. If this stays above zero long after every node runs the new release, look at the node list in the admin console |
 
 ## Proof
 
-`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request. It switches the events to PostgreSQL while both run (or once the old one stops, when it is from before the switch), and fails unless every event of the log reaches every consumer, NATS is noted as drained, and `diffluence events check` passes before and after the rollback.
+`scripts/upgrade-check.sh <commit>` builds the release at that commit and the one in the checkout, and runs `scripts/upgrade-test.sh` between them. That test starts the old version with traffic, starts the new one on the same database, runs both, stops the old one, and fails on any failed request. It switches the events to PostgreSQL while both run (or once the old one stops, when it is from before the switch), and fails unless every event of the log reaches every consumer, NATS is noted as drained, and `kenwerk events check` passes before and after the rollback.
 
 It also writes across versions: the old version publishes a page, saves a draft, comments and uploads a file; the new one reads all of it, writes its own, and the old one reads that while both run. Then it stops the new one and starts the old one again on the migrated database, as a rollback, which reads everything both wrote. At the end no job may have failed, no event may be set aside and the outbox must be empty, and the audit chain both wrote must hold.
 

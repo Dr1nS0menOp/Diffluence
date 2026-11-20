@@ -14,11 +14,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/metrics"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/metrics"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 type ctxKey int
@@ -346,7 +346,7 @@ func (s *Server) withMaintenance(next http.Handler) http.Handler {
 			return
 		}
 		if state.On {
-			writeError(w, http.StatusServiceUnavailable, "maintenance", "Diffluence is in maintenance. Your text stays here. Try again shortly.")
+			writeError(w, http.StatusServiceUnavailable, "maintenance", "Kenwerk is in maintenance. Your text stays here. Try again shortly.")
 			return
 		}
 		next.ServeHTTP(w, r)

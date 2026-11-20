@@ -14,9 +14,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/version"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/version"
 )
 
 // minFreeForUpgrade is the free space the data folder needs before a node migrates:
@@ -25,7 +25,7 @@ const minFreeForUpgrade = 512 << 20
 
 // The audit actions of an upgrade.
 const (
-	// ActionBackupNoted is what "diffluence backup note" writes, which scripts/backup.sh
+	// ActionBackupNoted is what "kenwerk backup note" writes, which scripts/backup.sh
 	// runs once a backup is complete.
 	ActionBackupNoted = "system.backup_noted"
 	// ActionUpgradeStarted marks the point before a node migrates a database that holds
@@ -153,8 +153,8 @@ func (a *App) waitForMigrations(ctx context.Context) error {
 		}
 	}
 	problems = append(problems, UpgradeProblem{ProblemMigrations, fmt.Sprintf(
-		"%d migration(s) of this release have not run, and this node does not migrate (DIFFLUENCE_MIGRATE_ON_START=false): "+
-			"in Compose the backup service runs them (docker compose up -d --build backup), elsewhere diffluence migrate",
+		"%d migration(s) of this release have not run, and this node does not migrate (KENWERK_MIGRATE_ON_START=false): "+
+			"in Compose the backup service runs them (docker compose up -d --build backup), elsewhere kenwerk migrate",
 		st.PendingExpand)})
 	return &UpgradeRefused{Problems: problems}
 }
@@ -204,8 +204,8 @@ func trigramState(ctx context.Context, q db.Querier) (extensionState, error) {
 
 // backupWayOut tells an operator who has no recent backup how to go on (ADR-040, ADR-042).
 const backupWayOut = "run scripts/backup.sh or the backup service first (docker compose run --rm backup once), " +
-	"or upgrade once without one with diffluence migrate --without-backup, " +
-	"or set DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one"
+	"or upgrade once without one with kenwerk migrate --without-backup, " +
+	"or set KENWERK_UPGRADE_BACKUP_MAX_AGE=off to upgrade without one"
 
 // upgradeProblems lists the reasons an upgrade may not start. None = it may.
 // backupMaxAge zero means the operator switched the backup check off.
@@ -291,7 +291,7 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 		return nil
 	}
 	if maxAge == 0 {
-		a.log.Warn("upgrading with the backup check switched off (DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE=off)",
+		a.log.Warn("upgrading with the backup check switched off (KENWERK_UPGRADE_BACKUP_MAX_AGE=off)",
 			"last_backup_noted", !facts.lastBackup.IsZero())
 	}
 	if waivesFirstUpgrade(facts, maxAge) {
@@ -303,7 +303,7 @@ func (a *App) checkBeforeUpgrade(ctx context.Context, owner *pgxpool.Pool) error
 }
 
 // CheckBackupBeforeMigrating is the backup part of the checks before an upgrade, for
-// diffluence migrate. It used to check nothing, which made it a silent way around the
+// kenwerk migrate. It used to check nothing, which made it a silent way around the
 // backup rule (spec 054). The other checks need the node's queue and data folder, so they
 // stay with the node. On a database that holds data it leaves the upgrade marker.
 func CheckBackupBeforeMigrating(ctx context.Context, owner *pgxpool.Pool, migs []db.Migration, maxAge time.Duration,

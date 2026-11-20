@@ -12,10 +12,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
-// Entries of the chain as an auditor checks them outside Diffluence (spec 064, DOC-741,
+// Entries of the chain as an auditor checks them outside Kenwerk (spec 064, DOC-741,
 // DOC-742): the exact payload the chain hashes, the hash of the entry before it, and its
 // own hash, so hash = SHA-256(prev_hash || payload) can be recomputed by anyone.
 

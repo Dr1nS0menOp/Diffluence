@@ -14,12 +14,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/plaintext"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/plaintext"
 )
 
 // Sources of an account.
@@ -247,7 +247,7 @@ func (s *Service) callerIsSystemAdministrator(ctx context.Context, q db.Querier,
 // keepsAnAdministrator stops people from removing the last administrator by
 // accident. It does not apply to identity providers: they are leading, and a sync
 // that fails here would lock users out of logging in. If a provider removes the
-// last administrator, "diffluence user create-admin" is the way back.
+// last administrator, "kenwerk user create-admin" is the way back.
 func (s *Service) keepsAnAdministrator(ctx context.Context, tx pgx.Tx, c Caller) error {
 	if c.System != "" {
 		return nil

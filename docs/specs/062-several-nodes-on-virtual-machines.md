@@ -22,8 +22,8 @@ stopped during these sessions.
 | db1, db2, db3 | 910–912 | 2 each | 6 GB each | 60 GB each | PostgreSQL 16, Patroni, one etcd member, the softdog watchdog |
 | nats1, nats2, nats3 | 913–915 | 1 each | 2 GB each | 20 GB each | NATS JetStream cluster member |
 | edge | 916 | 2 | 2 GB | 20 GB | HAProxy (leader on 5000, replicas on 5001, app on 80) and PgBouncer (6432, transaction mode) |
-| api1, api2 | 917–918 | 2 each | 4 GB each | 20 GB each | `diffluence` with `DIFFLUENCE_ROLE=api`, from the `.deb` of wave O5 |
-| work1, work2 | 919–920 | 1 each | 3 GB each | 20 GB each | `diffluence` with `DIFFLUENCE_ROLE=worker` |
+| api1, api2 | 917–918 | 2 each | 4 GB each | 20 GB each | `kenwerk` with `KENWERK_ROLE=api`, from the `.deb` of wave O5 |
+| work1, work2 | 919–920 | 1 each | 3 GB each | 20 GB each | `kenwerk` with `KENWERK_ROLE=worker` |
 | load | 901 | 4 | 8 GB | 30 GB | k6, the write ledger |
 
 That is 21 vCPUs on 12 cores (1.75 times overcommitted, which suits a test where most
@@ -56,7 +56,7 @@ Everything is in `scripts/ha/`, described in its README. One session builds it:
    creates the database and its two roles on the leader. Passwords reach `psql` through
    the environment, never through the command line.
 5. On api1 first, then the rest, `roles/app.sh` installs the `.deb`, writes the
-   environment file, runs `diffluence config check --offline`, and starts the service.
+   environment file, runs `kenwerk config check --offline`, and starts the service.
 
 The addresses and secrets of one run live in `scripts/ha/ha.local.env`, which git ignores.
 An example sits next to it.
@@ -87,8 +87,8 @@ It fails on:
 | Id | Test | Fault | Passes when |
 |---|---|---|---|
 | T0 | The baseline | none | Both api nodes ready. `patronictl list` shows a leader, one synchronous and one asynchronous standby. NATS shows 3 routes. The stream holds 3 replicas (after F1, section 4). Ledger clean. |
-| T1 | An api node dies | `kill api1 diffluence` | HAProxy takes it out within 4 s (fall 2, inter 2 s). Failed requests are only those in flight on that node. Ledger clean. |
-| T2 | A worker dies | `kill work1 diffluence` | The other worker takes over the relay and the jobs once the dead node's leases end. No job is lost or done twice. The outbox drains. Ledger clean. |
+| T1 | An api node dies | `kill api1 kenwerk` | HAProxy takes it out within 4 s (fall 2, inter 2 s). Failed requests are only those in flight on that node. Ledger clean. |
+| T2 | A worker dies | `kill work1 kenwerk` | The other worker takes over the relay and the jobs once the dead node's leases end. No job is lost or done twice. The outbox drains. Ledger clean. |
 | T3 | The leader dies | `reset-vm` of the leader's VM | A new leader within 30 s (the ttl). Writes fail only within that window and then go on. Ledger clean: no acknowledged write lost, because of synchronous replication. The old node rejoins as a standby with `pg_rewind`. |
 | T4 | The leader freezes | `stop-primary 60`, then `pause-vm` of the leader for 60 s | A new leader within 30 s. The old one, when it wakes, accepts no write: Patroni demotes it, or the watchdog resets it. Ledger shows no two truths. |
 | T5 | The network splits | `cut db1` from db2 and from db3, with db1 the leader, for 60 s | db1 loses the leader key and stops taking writes within the ttl. db2 or db3 becomes the leader. When the network heals, db1 rejoins as a standby. Ledger clean. |
@@ -110,13 +110,13 @@ Checked by reading the code at `503220b`.
 
 | | Finding | Needed |
 |---|---|---|
-| F1 | `queue.Open` creates the stream without `Replicas`, so in a cluster it has 1 replica, and losing that node loses it | **Built in spec 063:** `DIFFLUENCE_NATS_REPLICAS` (1, 3 or 5; default 1). A node raises the copies of an existing stream, never lowers them. |
+| F1 | `queue.Open` creates the stream without `Replicas`, so in a cluster it has 1 replica, and losing that node loses it | **Built in spec 063:** `KENWERK_NATS_REPLICAS` (1, 3 or 5; default 1). A node raises the copies of an existing stream, never lowers them. |
 | F2 | `db.Open` sends `plan_cache_mode` and `jit` as startup parameters (spec 061). PgBouncer refuses unknown startup parameters, and with `ignore_startup_parameters` it drops them. | **Built in spec 063:** migration 0050 sets both for the database with `ALTER DATABASE … SET`, so they hold behind PgBouncer too. The Patroni template still sets them server-wide (D6). |
-| F3 | After a hard reset of the queue, published events may be gone (T6 shows how many) | **If T6 loses events under the chosen policy:** `diffluence outbox resend --since <time>`, sending published rows again with the event id as the message id, so the queue's two-minute duplicate window and idempotent consumers drop repeats. Check first that the relay sets the message id. |
-| F4 | `DIFFLUENCE_NATS_URL` with a comma-separated list | **No:** `nats.Connect` takes a list as it is. |
+| F3 | After a hard reset of the queue, published events may be gone (T6 shows how many) | **If T6 loses events under the chosen policy:** `kenwerk outbox resend --since <time>`, sending published rows again with the event id as the message id, so the queue's two-minute duplicate window and idempotent consumers drop repeats. Check first that the relay sets the message id. |
+| F4 | `KENWERK_NATS_URL` with a comma-separated list | **No:** `nats.Connect` takes a list as it is. |
 | F5 | Several database hosts or `target_session_attrs` | **No:** HAProxy routes to the leader. pgx can also take a host list, if an operator wants that without HAProxy. |
 | F6 | Prepared statements behind PgBouncer | **No change:** pgx prepares statements, and PgBouncer 1.21 or later keeps them with `max_prepared_statements`. Ubuntu 24.04 ships 1.22. OPS-086 still wants the whole suite run behind PgBouncer once, which needs no server and can be a local test. |
-| F7 | The migration lock is a session advisory lock | **No change:** migrations use `DIFFLUENCE_MIGRATE_DATABASE_URL` to HAProxy's port 5000, around PgBouncer. |
+| F7 | The migration lock is a session advisory lock | **No change:** migrations use `KENWERK_MIGRATE_DATABASE_URL` to HAProxy's port 5000, around PgBouncer. |
 | F8 | Sessions | **No stickiness:** sessions live in PostgreSQL, so any api node serves anyone. The editing service is one node and stays out of this topology (`install.md`: more than one needs routing by page, not built). |
 
 | F9 | Files live in each node's own data folder | **Yes, for files across nodes:** S3 storage (wave 9), or one shared folder for every app node as a stopgap. The tests of this wave use comments and pages, which live in PostgreSQL. |

@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/metrics"
+	"github.com/kenwerk/kenwerk/internal/metrics"
 )
 
 // An editing socket stays open as long as its editor; it must not hold a place of reading.

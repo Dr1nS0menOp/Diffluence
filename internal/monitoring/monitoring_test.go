@@ -31,13 +31,13 @@ func TestTheEmbeddedFilesEqualDeployMonitoring(t *testing.T) {
 }
 
 func TestAFileIsFoundByItsKindOnly(t *testing.T) {
-	for kind, name := range map[string]string{"rules": "diffluence-rules.yml", "dashboard": "diffluence-dashboard.json"} {
+	for kind, name := range map[string]string{"rules": "kenwerk-rules.yml", "dashboard": "kenwerk-dashboard.json"} {
 		f, ok := ByKind(kind)
 		if !ok || f.Name != name {
 			t.Errorf("%s: %+v %v", kind, f.Name, ok)
 		}
 	}
-	for _, kind := range []string{"", "../go.mod", "diffluence-rules.yml", "README"} {
+	for _, kind := range []string{"", "../go.mod", "kenwerk-rules.yml", "README"} {
 		if _, ok := ByKind(kind); ok {
 			t.Errorf("%q found a file", kind)
 		}

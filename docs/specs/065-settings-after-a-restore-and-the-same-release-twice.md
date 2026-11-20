@@ -10,9 +10,9 @@ Migration 0050 stores `plan_cache_mode = force_custom_plan` and `jit = off` as d
 
 - `db.ApplySessionSettings` runs the statements of 0050 once more, from the constant `db.SessionSettingsSQL`. A test keeps the constant equal to the body of 0050, so the two cannot drift apart.
 - Every run of migrations calls it after migrating, even when nothing was pending:
-  - a node starting with `DIFFLUENCE_MIGRATE_ON_START` (the default), in `prepareSchema`;
+  - a node starting with `KENWERK_MIGRATE_ON_START` (the default), in `prepareSchema`;
   - `App.migrate`;
-  - `diffluence migrate`, which the restore from the console (spec 059) uses for its step "bringing the database up to this release".
+  - `kenwerk migrate`, which the restore from the console (spec 059) uses for its step "bringing the database up to this release".
 - So every restore path ends in a step that sets the defaults again: `scripts/restore.sh` and `restore-check.sh` start a node, and the console restore migrates.
 - It is idempotent and costs two catalogue writes per start. A role that does not own the database gets the same notice as from 0050, and the pool still sends both settings at connect.
 
@@ -27,7 +27,7 @@ Migration 0050 stores `plan_cache_mode = force_custom_plan` and `jit = off` as d
 
 **Decided on the product owner's behalf on 2026-11-13, may be overruled.**
 
-- **D1:** apply the settings at every migration run instead of adding a step to each restore script or a separate `diffluence db settings` command. The restore paths are four and will grow, while every one of them already ends with migrations. One place cannot be forgotten by the next path.
+- **D1:** apply the settings at every migration run instead of adding a step to each restore script or a separate `kenwerk db settings` command. The restore paths are four and will grow, while every one of them already ends with migrations. One place cannot be forgotten by the next path.
 
 ## 2. Two builds of one release differed on CI
 

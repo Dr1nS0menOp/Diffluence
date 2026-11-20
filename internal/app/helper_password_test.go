@@ -19,7 +19,7 @@ func TestThePDFHelperGetsItsPasswordAndRefusesWithoutIt(t *testing.T) {
 	var sent bool
 	helper := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, given, sent = r.BasicAuth()
-		if !sent || user != "diffluence" || given != password {
+		if !sent || user != "kenwerk" || given != password {
 			w.WriteHeader(http.StatusUnauthorized)
 			return
 		}
@@ -44,7 +44,7 @@ func TestThePDFHelperGetsItsPasswordAndRefusesWithoutIt(t *testing.T) {
 	if resp.StatusCode != 200 || body != "%PDF-fake" {
 		t.Fatalf("with the password: %d %q", resp.StatusCode, body)
 	}
-	if user != "diffluence" || given != password {
+	if user != "kenwerk" || given != password {
 		t.Fatalf("the helper got %q", user)
 	}
 }

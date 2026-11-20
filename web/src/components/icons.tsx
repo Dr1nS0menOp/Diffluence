@@ -160,7 +160,7 @@ export function IconMore({ size }: { size?: number }) {
   );
 }
 
-/** A river that splits in two: what the word diffluence means. */
+/** A river that splits in two: the mark kept from the former working name (spec 095). */
 export function Logo({ size = 28 }: { size?: number }) {
   return (
     <svg viewBox="0 0 32 32" width={size} height={size} aria-hidden="true" focusable="false">

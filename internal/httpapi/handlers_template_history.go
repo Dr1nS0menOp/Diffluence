@@ -5,7 +5,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The routes of where pages came from (spec 074, wave GT5): the origin in a page's Details,

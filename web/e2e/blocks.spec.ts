@@ -614,7 +614,7 @@ function onePagePdf(): Buffer {
     '<</Type/Catalog/Pages 2 0 R>>',
     '<</Type/Pages/Kids[3 0 R]/Count 1>>',
     '<</Type/Page/Parent 2 0 R/MediaBox[0 0 300 200]/Contents 4 0 R/Resources<</Font<</F1 5 0 R>>>>>>',
-    '<</Length 44>>stream\nBT /F1 18 Tf 20 100 Td (Hello Diffluence) Tj ET\nendstream',
+    '<</Length 44>>stream\nBT /F1 18 Tf 20 100 Td (Hello Kenwerk) Tj ET\nendstream',
     '<</Type/Font/Subtype/Type1/BaseFont/Helvetica>>',
   ];
   let body = '%PDF-1.4\n';

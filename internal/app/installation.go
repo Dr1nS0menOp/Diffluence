@@ -9,12 +9,12 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/version"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/version"
 )
 
 // The areas of the console that show what runs the installation (spec 075, wave CS1). Each
@@ -24,7 +24,7 @@ import (
 // UpgradeSource is what the upgrade page reads besides the database.
 type UpgradeSource struct {
 	Migrations []db.Migration
-	// Grace is DIFFLUENCE_CONTRACT_GRACE, and GraceSource where its value came from.
+	// Grace is KENWERK_CONTRACT_GRACE, and GraceSource where its value came from.
 	Grace       time.Duration
 	GraceSource string
 }
@@ -152,7 +152,7 @@ func (a *App) startedSource(name string) string {
 	return ""
 }
 
-// EventsState is what diffluence events status prints (CSL-590).
+// EventsState is what kenwerk events status prints (CSL-590).
 type EventsState struct {
 	Transport  events.Transport `json:"transport"`
 	ChangedAt  time.Time        `json:"changed_at"`

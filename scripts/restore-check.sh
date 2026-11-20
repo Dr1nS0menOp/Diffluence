@@ -13,7 +13,7 @@ backups=${1:?usage: restore-check.sh <backups folder> <key file>}
 key=$(realpath "${2:?usage: restore-check.sh <backups folder> <key file>}")
 src=$(pwd)
 [ -f "$src/compose.yaml" ] || { echo "run it from the folder with compose.yaml" >&2; exit 2; }
-newest=$(find "$backups" -mindepth 1 -maxdepth 1 -type d -name 'diffluence-*' | sort | tail -n 1)
+newest=$(find "$backups" -mindepth 1 -maxdepth 1 -type d -name 'kenwerk-*' | sort | tail -n 1)
 [ -n "$newest" ] || { echo "RESTORE CHECK FAILED: no backup in $backups" >&2; exit 1; }
 
 # tell_console reports the result to the live installation's console (spec 058), which
@@ -24,9 +24,9 @@ tell_console() {
   local args=(backup restore-checked --name "$(basename "$newest")" --seconds "${1:-0}")
   [ -z "${2:-}" ] || args+=(--failed "$2")
   # The throw-away project's settings must not reach the live installation's Compose.
-  if (unset COMPOSE_PROJECT_NAME DIFFLUENCE_PORT DIFFLUENCE_PUBLIC_URL DIFFLUENCE_IMAGE
-    cd "$src" && { docker compose exec -T diffluence diffluence "${args[@]}" ||
-    docker compose run --rm --no-deps -T diffluence "${args[@]}"; }) >/dev/null 2>&1; then
+  if (unset COMPOSE_PROJECT_NAME KENWERK_PORT KENWERK_PUBLIC_URL KENWERK_IMAGE
+    cd "$src" && { docker compose exec -T kenwerk kenwerk "${args[@]}" ||
+    docker compose run --rm --no-deps -T kenwerk "${args[@]}"; }) >/dev/null 2>&1; then
     return 0
   fi
   echo "the console could not be told the result of the restore check" >&2
@@ -37,13 +37,13 @@ fail() {
   exit 1
 }
 # The image the live installation runs, used as it is: the check never builds or tags one.
-live=$(docker compose ps -aq diffluence)
+live=$(docker compose ps -aq kenwerk)
 image=$(docker inspect --format '{{.Config.Image}}' "$live" 2>/dev/null) || image=
-[ -n "$image" ] || fail "no Diffluence container here to take the image from"
+[ -n "$image" ] || fail "no Kenwerk container here to take the image from"
 
 work=$(mktemp -d)
 project=dflrestorecheck$$
-port=${DIFFLUENCE_RESTORE_CHECK_PORT:-18097}
+port=${KENWERK_RESTORE_CHECK_PORT:-18097}
 cleanup() {
   if ! (cd "$work" && COMPOSE_PROJECT_NAME=$project docker compose down -v >/dev/null 2>&1); then
     echo "could not remove the throw-away project $project: docker compose -p $project down -v" >&2
@@ -56,7 +56,7 @@ trap cleanup EXIT
 cp "$src/compose.yaml" "$work/"
 cp -r "$src/scripts" "$src/deploy" "$work/"
 cd "$work"
-export COMPOSE_PROJECT_NAME=$project DIFFLUENCE_PORT=$port DIFFLUENCE_PUBLIC_URL=http://localhost:$port DIFFLUENCE_IMAGE=$image
+export COMPOSE_PROJECT_NAME=$project KENWERK_PORT=$port KENWERK_PUBLIC_URL=http://localhost:$port KENWERK_IMAGE=$image
 
 start=$(date +%s)
 if ! bash scripts/restore.sh "$newest" "$key" >restore.log 2>&1; then
@@ -65,7 +65,7 @@ if ! bash scripts/restore.sh "$newest" "$key" >restore.log 2>&1; then
   fail "$(basename "$newest") did not restore"
 fi
 took=$(($(date +%s) - start))
-counts=$(docker compose exec -T postgres psql -U diffluence_owner -d diffluence -tA -F ' ' -c \
+counts=$(docker compose exec -T postgres psql -U kenwerk_owner -d kenwerk -tA -F ' ' -c \
   "SELECT (SELECT count(*) FROM pages), (SELECT count(*) FROM attachments), (SELECT count(*) FROM users)")
 read -r pages files people <<<"$counts"
 if [ "${people:-0}" -lt 1 ]; then

@@ -3,7 +3,7 @@
     "securitySchemes": {
       "session": {
         "in": "cookie",
-        "name": "diffluence_session",
+        "name": "kenwerk_session",
         "type": "apiKey"
       },
       "token": {
@@ -14,7 +14,7 @@
   },
   "info": {
     "description": "See docs/api/README.md for what stays stable.",
-    "title": "Diffluence API",
+    "title": "Kenwerk API",
     "version": "1.0.0"
   },
   "openapi": "3.1.0",

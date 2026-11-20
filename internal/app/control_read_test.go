@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/notify"
 )
 
 // Document control, wave DC5 of spec 064: read and understood (DOC-820 to DOC-824) and

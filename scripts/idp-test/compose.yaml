@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: Apache-2.0
-# A throw-away Authentik next to Diffluence. See scripts/idp-test/run.sh.
+# A throw-away Authentik next to Kenwerk. See scripts/idp-test/run.sh.
 name: dfl-idp
 services:
   ak-db:
@@ -44,26 +44,26 @@ services:
   db:
     image: postgres:16
     environment:
-      POSTGRES_USER: diffluence
-      POSTGRES_PASSWORD: diffluence
-      POSTGRES_DB: diffluence
+      POSTGRES_USER: kenwerk
+      POSTGRES_PASSWORD: kenwerk
+      POSTGRES_DB: kenwerk
     tmpfs: [/var/lib/postgresql/data]
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U diffluence"]
+      test: ["CMD-SHELL", "pg_isready -U kenwerk"]
       interval: 2s
       retries: 30
-  diffluence:
-    image: diffluence:local
+  kenwerk:
+    image: kenwerk:local
     environment:
-      DIFFLUENCE_DATABASE_URL: postgres://diffluence:diffluence@db:5432/diffluence?sslmode=disable
-      DIFFLUENCE_PUBLIC_URL: http://localhost:8080
-      DIFFLUENCE_OIDC_ISSUER: http://ak-server:9000/application/o/diffluence/
-      DIFFLUENCE_OIDC_CLIENT_ID: diffluence-client
-      DIFFLUENCE_OIDC_CLIENT_SECRET: diffluence-secret
-      DIFFLUENCE_OIDC_DISPLAY_NAME: Authentik
-      DIFFLUENCE_OIDC_GROUPS_CLAIM: groups
+      KENWERK_DATABASE_URL: postgres://kenwerk:kenwerk@db:5432/kenwerk?sslmode=disable
+      KENWERK_PUBLIC_URL: http://localhost:8080
+      KENWERK_OIDC_ISSUER: http://ak-server:9000/application/o/kenwerk/
+      KENWERK_OIDC_CLIENT_ID: kenwerk-client
+      KENWERK_OIDC_CLIENT_SECRET: kenwerk-secret
+      KENWERK_OIDC_DISPLAY_NAME: Authentik
+      KENWERK_OIDC_GROUPS_CLAIM: groups
       # The test logs in people the provider holds, so accounts are made at the first login.
-      DIFFLUENCE_OIDC_AUTO_CREATE: "true"
+      KENWERK_OIDC_AUTO_CREATE: "true"
     depends_on:
       db:
         condition: service_healthy

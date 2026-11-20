@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 func searchTitles(t *testing.T, u *user, query string) []string {

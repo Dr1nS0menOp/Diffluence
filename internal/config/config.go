@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 // Package config loads settings from environment variables and, when
-// DIFFLUENCE_CONFIG_FILE names one, a YAML file. Every setting can instead be read from
+// KENWERK_CONFIG_FILE names one, a YAML file. Every setting can instead be read from
 // a file of its own by appending _FILE (for Docker/Kubernetes secrets). The order is the
 // default, then the file, then the environment (spec 056).
 package config
@@ -190,7 +190,7 @@ func (c Config) DrawingOrigin() string {
 // LookupFunc matches os.LookupEnv. Tests pass a map-backed function.
 type LookupFunc func(key string) (string, bool)
 
-const prefix = "DIFFLUENCE_"
+const prefix = "KENWERK_"
 
 // FromEnvironment loads the configuration from the process environment.
 func FromEnvironment() (Config, error) { return Load(os.LookupEnv) }
@@ -202,7 +202,7 @@ func Load(lookup LookupFunc) (Config, error) {
 }
 
 // Inspect builds a Config as Load does, and also says which value each setting has and
-// where it came from, with secrets hidden, for diffluence config check. Load and Inspect
+// where it came from, with secrets hidden, for kenwerk config check. Load and Inspect
 // are one validator, so the server and the check cannot disagree.
 func Inspect(lookup LookupFunc) (Config, []Setting, error) {
 	l := loader{lookup: lookup, asked: map[string]bool{}, origins: map[string]origin{}}
@@ -223,7 +223,7 @@ func (l *loader) load() Config {
 	c := Config{
 		Role:                  Role(l.str("ROLE", string(RoleAll))),
 		HTTPAddr:              l.str("HTTP_ADDR", ":8080"),
-		InstanceName:          l.str("INSTANCE_NAME", "Diffluence"),
+		InstanceName:          l.str("INSTANCE_NAME", "Kenwerk"),
 		DatabaseURL:           l.str("DATABASE_URL", ""),
 		MigrateDatabaseURL:    l.str("MIGRATE_DATABASE_URL", ""),
 		ListenDatabaseURL:     l.str("LISTEN_DATABASE_URL", ""),

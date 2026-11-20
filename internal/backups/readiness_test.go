@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // A restore asks backups whether a backup is whole and whether one is still being made.

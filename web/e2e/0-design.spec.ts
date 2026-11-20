@@ -322,7 +322,7 @@ test.describe('the look of every kind of screen', () => {
           : route.fallback(),
       );
       await page.goto('/setup');
-      await expect(page.getByRole('heading', { name: 'Set up Diffluence' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Set up Kenwerk' })).toBeVisible();
       await expect(page.getByLabel('Setup code')).toBeFocused();
       await checkAccessibility(page);
       await picture(page, `setup-${colorScheme}`);

@@ -22,11 +22,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/outbox"
 )
 
 // The sections of the settings. Each has its own limits and one audit event.
@@ -124,7 +124,7 @@ type Access struct {
 }
 
 // Retention says how long audit rows are kept. Zero means for ever. Longer than the
-// default needs a stated reason (SEC-831). Only the command "diffluence audit prune"
+// default needs a stated reason (SEC-831). Only the command "kenwerk audit prune"
 // acts on it (spec 013, D11).
 type Retention struct {
 	AuditDays     int    `json:"audit_days"`
@@ -143,7 +143,7 @@ type RetentionLowering struct {
 }
 
 // Backups is how often the backup worker makes a backup and how many it keeps (spec 058).
-// Zero means the default the worker was started with, such as DIFFLUENCE_BACKUP_INTERVAL,
+// Zero means the default the worker was started with, such as KENWERK_BACKUP_INTERVAL,
 // so an installation that never opens this section behaves as before. The backups module
 // stores it, because whether a change keeps fewer backups depends on what its worker holds
 // (spec 076).

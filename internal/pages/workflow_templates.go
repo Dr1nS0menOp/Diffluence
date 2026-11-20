@@ -12,13 +12,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/workflow"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/workflow"
 )
 
 // Instance templates of workflows (DOC-130). An instance administrator keeps them; a space
@@ -78,7 +78,7 @@ func requireInstanceAdministrator(ctx context.Context, q db.Querier, c identity.
 }
 
 // WorkflowStarts lists what a space can start a workflow from: the instance templates and
-// the two examples Diffluence ships (DOC-131). Any person of the instance may see them.
+// the two examples Kenwerk ships (DOC-131). Any person of the instance may see them.
 func (s *Service) WorkflowStarts(ctx context.Context) ([]WorkflowTemplate, []workflow.Example, error) {
 	rows, err := s.pool.Query(ctx, "SELECT "+templateColumns+" FROM workflow_templates WHERE archived_at IS NULL ORDER BY lower(name) LIMIT $1",
 		maxWorkflowTemplates)

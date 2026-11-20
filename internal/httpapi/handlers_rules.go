@@ -7,11 +7,11 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/automation"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/webhooks"
+	"github.com/kenwerk/kenwerk/internal/automation"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/webhooks"
 )
 
 func (s *Server) registerRuleRoutes() {

@@ -66,7 +66,7 @@
 - **ORG-050** · built · A template can hold **fields**: single line, multiple lines or a list of choices. Creating a page first shows a short form, and the answers fill in the page. Fields with the same name share a value.
 - **ORG-051** · built · A template can set the title pattern, such as `Meeting {date}`, and a default parent page, chosen in the General section of the template (spec 074, wave GT2).
 - **ORG-052** · built · Templates can hold images and attachments, which are copied to each new page.
-- **ORG-053** · built · Diffluence ships a starter set in our own words: meeting notes, decision record, project plan, how-to guide, incident review, retrospective, requirements, onboarding plan, team home, weekly update.
+- **ORG-053** · built · Kenwerk ships a starter set in our own words: meeting notes, decision record, project plan, how-to guide, incident review, retrospective, requirements, onboarding plan, team home, weekly update.
 - **ORG-054** · built · Administrators can hide starter templates, and promote templates so they come first.
 - **ORG-055** · built · A **space template** bundles a home page, pages, labels and templates for a new space.
 - **ORG-056** · built · A person can favourite templates, and sees recently used ones first.

@@ -14,12 +14,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/restore"
-	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/restore"
+	"github.com/kenwerk/kenwerk/internal/settings"
 )
 
 // Some changes of the console let more through than before: fewer backups kept, backups

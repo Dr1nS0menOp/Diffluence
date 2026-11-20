@@ -6,7 +6,7 @@
 #   scripts/upgrade-check.sh [git commit of release N]
 #
 # Without a commit, or with one git does not know, N is the commit before HEAD.
-# Needs Go, git, curl, psql and DIFFLUENCE_TEST_DATABASE_URL.
+# Needs Go, git, curl, psql and KENWERK_TEST_DATABASE_URL.
 set -eu
 here=$(cd "$(dirname "$0")/.." && pwd)
 base=${1:-}
@@ -22,7 +22,7 @@ mkdir "$work/old-src"
 # An archive, not a worktree: it leaves the repository as it was.
 git -C "$here" archive --format=tar "$base" >"$work/old.tar"
 tar -C "$work/old-src" -xf "$work/old.tar"
-(cd "$work/old-src" && CGO_ENABLED=0 go build -trimpath -o "$work/old" ./cmd/diffluence)
+(cd "$work/old-src" && CGO_ENABLED=0 go build -trimpath -o "$work/old" ./cmd/kenwerk)
 echo "release N+1: this checkout"
-(cd "$here" && CGO_ENABLED=0 go build -trimpath -o "$work/new" ./cmd/diffluence)
+(cd "$here" && CGO_ENABLED=0 go build -trimpath -o "$work/new" ./cmd/kenwerk)
 bash "$here/scripts/upgrade-test.sh" "$work/old" "$work/new"

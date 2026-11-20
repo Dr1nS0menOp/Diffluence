@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/audit"
 )
 
 // lastSettingsChange gives the details of the newest settings.updated event.

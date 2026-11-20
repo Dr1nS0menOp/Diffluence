@@ -51,9 +51,9 @@ Every item of chapter 02 is judged on three questions, in this order. The first 
 | CSL-133 | `doctor` | S | System health is its console face. |
 | CSL-134 | `client …` | K | Because it is a client of the API, for scripts. |
 | CSL-135 | `version` | S | Shown on System health and the upgrade page. |
-| CSL-136 | `diffluence-backup loop` | K | Because it is the worker. |
-| CSL-137 | `diffluence-backup once` | C | Built as Back up now. |
-| CSL-138 | `diffluence-backup way-back` | K | As CSL-121. |
+| CSL-136 | `kenwerk-backup loop` | K | Because it is the worker. |
+| CSL-137 | `kenwerk-backup once` | C | Built as Back up now. |
+| CSL-138 | `kenwerk-backup way-back` | K | As CSL-121. |
 
 ## 3.3 Settings the server reads
 
@@ -79,15 +79,15 @@ All 47 settings of 2.2 are **S**, with one exception, CSL-169. The reasons, by k
 
 | Line | Item | Class | Reason |
 |---|---|---|---|
-| CSL-200 | `DIFFLUENCE_BACKUP_INTERVAL` | C | Built: the console's schedule wins. |
-| CSL-201 | `DIFFLUENCE_BACKUP_KEEP` | C | Built; lowering it becomes third tier (CSL-505). |
-| CSL-202 | `DIFFLUENCE_BACKUP_DIR` | S | The worker reports its targets; the folder is on the worker's machine (CSL-503). |
-| CSL-203 | `DIFFLUENCE_BACKUP_KEY_DIR` | S | Only the fingerprint, as today. |
-| CSL-204 | `DIFFLUENCE_BIND` | K | Because the server never sees it: Compose reads it to publish a port. |
-| CSL-205 | `DIFFLUENCE_PORT` | K | The same. |
-| CSL-206 | `DIFFLUENCE_IMAGE` | K | Because changing the image is an upgrade, which the console does not do (CSL-1001). The version that runs is shown. |
-| CSL-207 | `DIFFLUENCE_BACKUP_IMAGE` | K | The same; the worker's version is shown (CSL-412). |
-| CSL-208 | `DIFFLUENCE_RESTORE_CHECK_PORT` | K | Because only the script reads it; the console's restore test does not need a port (CSL-510). |
+| CSL-200 | `KENWERK_BACKUP_INTERVAL` | C | Built: the console's schedule wins. |
+| CSL-201 | `KENWERK_BACKUP_KEEP` | C | Built; lowering it becomes third tier (CSL-505). |
+| CSL-202 | `KENWERK_BACKUP_DIR` | S | The worker reports its targets; the folder is on the worker's machine (CSL-503). |
+| CSL-203 | `KENWERK_BACKUP_KEY_DIR` | S | Only the fingerprint, as today. |
+| CSL-204 | `KENWERK_BIND` | K | Because the server never sees it: Compose reads it to publish a port. |
+| CSL-205 | `KENWERK_PORT` | K | The same. |
+| CSL-206 | `KENWERK_IMAGE` | K | Because changing the image is an upgrade, which the console does not do (CSL-1001). The version that runs is shown. |
+| CSL-207 | `KENWERK_BACKUP_IMAGE` | K | The same; the worker's version is shown (CSL-412). |
+| CSL-208 | `KENWERK_RESTORE_CHECK_PORT` | K | Because only the script reads it; the console's restore test does not need a port (CSL-510). |
 | CSL-209 | Client variables | K | Because they belong to a client, not to the installation. |
 | CSL-210 | Variables of the editing service | K | Because another program reads them. |
 | CSL-211 | `OTEL_*` | S | Shown with values that may hold credentials hidden (CSL-604). |
@@ -122,8 +122,8 @@ All 47 settings of 2.2 are **S**, with one exception, CSL-169. The reasons, by k
 | CSL-264 | `scripts/setup-secrets.sh` | K | Because it makes the secrets before anything runs. |
 | CSL-265 | `deploy/install-lxc.sh` | K | Because it installs the server. |
 | CSL-266 | `deploy/postgres-init.sh` | K | Because it runs once when the database is made, as its superuser. |
-| CSL-267 | `deploy/diffluence.example.yaml` | S | The file's values and lines are shown as sources (CSL-601). |
-| CSL-268 | `deploy/systemd/diffluence.service` | K | Because systemd owns it. |
+| CSL-267 | `deploy/kenwerk.example.yaml` | S | The file's values and lines are shown as sources (CSL-601). |
+| CSL-268 | `deploy/systemd/kenwerk.service` | K | Because systemd owns it. |
 | CSL-269 | Packaging scripts | K | Because the package manager runs them. |
 | CSL-270 | `deploy/backup/backup-service.sh` | K | Because it is the worker. |
 | CSL-271 | Helm chart | K | Because Helm owns it. |
@@ -162,7 +162,7 @@ Security decides far more than those two: it is why the backup rule, outgoing ca
 
 | Area | Compose | Kubernetes | LXC and packages |
 |---|---|---|---|
-| Worker | The backup service (built) | A Deployment of one pod, `diffluence worker run` (CSL-421) | A second unit, `diffluence-worker.service` (CSL-422) |
+| Worker | The backup service (built) | A Deployment of one pod, `kenwerk worker run` (CSL-421) | A second unit, `kenwerk-worker.service` (CSL-422) |
 | Owner of the tables | Worker only (built) | Worker only, once the chart has the worker; until then the server holds it | Worker only, once the unit exists; until then the server holds it |
 | Backup target | Host folder (built); S3 later | A volume claim of the worker; S3 later | A folder of the worker's user; S3 later |
 | Back up now, schedule, keep | Worker | Worker | Worker |
@@ -172,7 +172,7 @@ Security decides far more than those two: it is why the backup rule, outgoing ca
 | Key steps | Worker writes in the data volume | **Shown with commands**: the key comes from a Secret, which only the cluster's operator may write (CSL-556) | Worker writes in the key's folder, when it is the worker's group's to write |
 | Contract migrations now | Worker | Worker (or a pre-upgrade Job, when the chart has one) | Worker |
 | Log level, disk thresholds, events switch | Server, through the database | The same | The same |
-| Codes in the worker's log | `docker compose logs backup` | `kubectl logs deploy/diffluence-worker` | `journalctl -u diffluence-worker` |
+| Codes in the worker's log | `docker compose logs backup` | `kubectl logs deploy/kenwerk-worker` | `journalctl -u kenwerk-worker` |
 | Start-up configuration | Server and worker each report theirs | The same | The same |
 
 - **CSL-321** · new · Without any worker, the console offers no class C item that needs one: each area says that no worker has reported, names the platform's way to add one, and shows the command. *Why:* a button that does nothing for ever is worse than none. *Proof:* an e2e test with no worker row.

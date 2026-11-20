@@ -11,9 +11,9 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/feed"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/feed"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // realDataBudget is the most one feed may take on the seeded data of the stress test
@@ -31,9 +31,9 @@ var realDataBudget = map[string]time.Duration{
 // even to show what the planner does with real data, which is how a feed of 20 ms in
 // development became one of minutes on the server.
 func TestTheFeedIsFastOnRealData(t *testing.T) {
-	url := os.Getenv("DIFFLUENCE_REALDATA_URL")
+	url := os.Getenv("KENWERK_REALDATA_URL")
 	if url == "" {
-		t.Skip("DIFFLUENCE_REALDATA_URL is not set; see scripts/stress/real-data.sh")
+		t.Skip("KENWERK_REALDATA_URL is not set; see scripts/stress/real-data.sh")
 	}
 	ctx := context.Background()
 	pool, err := db.Open(ctx, url)

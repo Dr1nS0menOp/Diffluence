@@ -20,7 +20,7 @@ import (
 // Warning is a setting that loads but does not work yet, such as a mail server that does
 // not answer. It never names an address or a secret.
 type Warning struct {
-	Setting string // the name without DIFFLUENCE_
+	Setting string // the name without KENWERK_
 	Message string
 }
 
@@ -109,7 +109,7 @@ func probeIssuer(ctx context.Context, issuer string) error {
 
 // probeFolder writes a file in the folder and removes it again.
 func probeFolder(dir string) error {
-	f, err := os.CreateTemp(dir, ".diffluence-probe-*")
+	f, err := os.CreateTemp(dir, ".kenwerk-probe-*")
 	if err != nil {
 		return errors.New("the publish folder cannot be written")
 	}

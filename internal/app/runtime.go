@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/settings"
 )
 
 // runtimeEvery is how often a node rereads the log level for a while and the disk

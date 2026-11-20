@@ -4,36 +4,36 @@ Written for the operator of an instance. Do the steps in this order, and write d
 
 ## 1. Stop it from getting worse
 
-- **One account is taken over:** run `diffluence session end --email address` to log that person out everywhere without disabling them, or disable the account in Administration, Users, which also stops its tokens. Then reset its password and factors.
-- **Many accounts, or you do not know which:** run `diffluence session end --all`. Everyone logs in again, and nobody is disabled. Both are in the audit log.
+- **One account is taken over:** run `kenwerk session end --email address` to log that person out everywhere without disabling them, or disable the account in Administration, Users, which also stops its tokens. Then reset its password and factors.
+- **Many accounts, or you do not know which:** run `kenwerk session end --all`. Everyone logs in again, and nobody is disabled. Both are in the audit log.
 - **The server itself is in doubt:** turn on Maintenance mode in the administration, so it only reads, and take a backup before changing anything.
 
 ## 2. Replace what may be known
 
 | Secret | Where it lives | How to replace it |
 |---|---|---|
-| `master.key` | Data directory, or `DIFFLUENCE_MASTER_KEY_FILE` | `diffluence key add`, then `promote`, `reseal`, `check` and `retire`. See [backup and restore](backup-restore.md#replace-it). It runs while people work |
+| `master.key` | Data directory, or `KENWERK_MASTER_KEY_FILE` | `kenwerk key add`, then `promote`, `reseal`, `check` and `retire`. See [backup and restore](backup-restore.md#replace-it). It runs while people work |
 | Database passwords | `secrets/` | Change the role's password in PostgreSQL, update the file, restart |
-| OIDC client secret | `DIFFLUENCE_OIDC_CLIENT_SECRET` | Make a new one at the provider, set it, restart, then remove the old one there |
+| OIDC client secret | `KENWERK_OIDC_CLIENT_SECRET` | Make a new one at the provider, set it, restart, then remove the old one there |
 | SCIM tokens | Administration, Security, Provisioning | Make a new token, set it at the provider, revoke the old one |
 | Personal API tokens | Each person's account | Revoke them in Administration, Users, or ask people to |
-| Mail password | `DIFFLUENCE_SMTP_PASSWORD` | Change it at the mail server, set it, restart |
-| Helper secrets | `DIFFLUENCE_PDF_PASSWORD`, `DIFFLUENCE_COLLAB_TOKEN` | Set a new value for both sides, restart both |
+| Mail password | `KENWERK_SMTP_PASSWORD` | Change it at the mail server, set it, restart |
+| Helper secrets | `KENWERK_PDF_PASSWORD`, `KENWERK_COLLAB_TOKEN` | Set a new value for both sides, restart both |
 | Webhook secrets | Administration, Data, Webhooks | Rotate per endpoint: both signatures go out for a day |
-| Metrics token | `DIFFLUENCE_METRICS_TOKEN` | Set a new one for Diffluence and the scraper |
+| Metrics token | `KENWERK_METRICS_TOKEN` | Set a new one for Kenwerk and the scraper |
 
 Replace a secret on a schedule as well, not only after an incident: at least once a year, and whenever someone who knew it leaves.
 
 ## 3. Find out what happened
 
-- **The audit log** shows who did what, and its chain shows whether it was changed: run `diffluence audit verify --witness` with the application log your log server kept, so a removed tail shows too; Administration, Audit log shows the newest comparison reported with `--report` ([install.md](install.md#a-copy-of-the-audit-log-outside-the-database)).
+- **The audit log** shows who did what, and its chain shows whether it was changed: run `kenwerk audit verify --witness` with the application log your log server kept, so a removed tail shows too; Administration, Audit log shows the newest comparison reported with `--report` ([install.md](install.md#a-copy-of-the-audit-log-outside-the-database)).
 - **Password login stopped for someone** after 100 wrong passwords in a row: the audit log has `auth.password_locked`, and the failed logins before it show from which addresses.
 - **Refused requests and failed logins** are audit events too. Filter on them for the time in question.
 - **The request log** of the server holds addresses and times, never tokens or passwords.
 
 ## 4. Restore, when data was damaged
 
-Restore the last good backup, then run `diffluence key check --deep` to prove every file opens. Anonymise again the people who were anonymised after that backup. See [backup and restore](backup-restore.md).
+Restore the last good backup, then run `kenwerk key check --deep` to prove every file opens. Anonymise again the people who were anonymised after that backup. See [backup and restore](backup-restore.md).
 
 ## 5. Tell the people who must know
 
@@ -41,4 +41,4 @@ If personal data may have been seen by someone who should not have seen it, the 
 
 ## Afterwards
 
-Write down what happened, what it touched, how it was stopped and what changes now. If Diffluence itself was at fault, report it privately as [SECURITY.md](../../SECURITY.md) describes.
+Write down what happened, what it touched, how it was stopped and what changes now. If Kenwerk itself was at fault, report it privately as [SECURITY.md](../../SECURITY.md) describes.

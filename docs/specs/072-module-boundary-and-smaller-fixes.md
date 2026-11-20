@@ -37,7 +37,7 @@ Next to that, this wave takes four smaller items:
 | `webhooks` read `pages.title` for an endpoint that asks for titles | `pages.Title` |
 | `sharing` read `spaces.home_page_id` for a guest invitation | `spaces.HomePage` |
 | `restore` read `backup_runs` and `backup_requests` before a restore | `backups.ReadinessToRestore` |
-| `cmd/diffluence` deleted its row of `ops.nodes` when a node had started | `restore.Leave` |
+| `cmd/kenwerk` deleted its row of `ops.nodes` when a node had started | `restore.Leave` |
 
 **Limits of the check.** It reads SQL written with upper-case keywords, as all SQL here is. A table named after a comma in `FROM a, b` is not seen; none is written that way today. SQL inside `perm_*` functions and other SQL functions of the migrations is not read: those are shared on purpose (ARC-027).
 
@@ -49,7 +49,7 @@ Next to that, this wave takes four smaller items:
 ### 3. The owner's password stays off the command line
 
 - The backup service runs `psql` and `pg_dump` through `as_owner`: the address without its password goes on the command line, the password, percent-decoded, goes in `PGPASSWORD`. A command line is readable by every process in the container; the environment of a process only by the process itself and root. An address in the `key=value` form is passed whole, as before.
-- A restore (`diffluence backup restore-run`) gives `psql` the same split (`passwordApart` in `cmd/diffluence/restore.go`).
+- A restore (`kenwerk backup restore-run`) gives `psql` the same split (`passwordApart` in `cmd/kenwerk/restore.go`).
 
 ### 4. Placeholder migrations and the removal half
 
@@ -58,7 +58,7 @@ Next to that, this wave takes four smaller items:
 
 ### 5. Where `master.key` lives
 
-- The install guide says to keep `master.key` apart from the data on a real installation: with the packages, the LXC script or Kubernetes through `DIFFLUENCE_MASTER_KEY_FILE` on another disk, mount or secret store. In Compose the backup service reads the key from the data volume, so there the key stays and the volume is kept out of copies that would not get a key's care. The default itself is unchanged, so no installation has to move a file.
+- The install guide says to keep `master.key` apart from the data on a real installation: with the packages, the LXC script or Kubernetes through `KENWERK_MASTER_KEY_FILE` on another disk, mount or secret store. In Compose the backup service reads the key from the data volume, so there the key stays and the volume is kept out of copies that would not get a key's care. The default itself is unchanged, so no installation has to move a file.
 
 ## Permissions and audit
 

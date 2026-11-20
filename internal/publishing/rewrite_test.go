@@ -10,8 +10,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/pages"
 )
 
 // world is a draft space with a released page, a page not released yet, a database, a page of

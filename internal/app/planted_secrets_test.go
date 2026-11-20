@@ -12,7 +12,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
+	"github.com/kenwerk/kenwerk/internal/config"
 )
 
 // lockedBuffer collects log lines from the handlers that run at the same time.

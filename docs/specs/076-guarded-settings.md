@@ -38,7 +38,7 @@ From this release a change that lets more through is a system administrator's, w
 
 ### What exists
 
-The backup service asks `diffluence backup next` every round, at most a minute apart, and prunes to the `keep` it is told. The server's database role writes the backup section. So far, whatever that section said was what the backup service kept.
+The backup service asks `kenwerk backup next` every round, at most a minute apart, and prunes to the `keep` it is told. The server's database role writes the backup section. So far, whatever that section said was what the backup service kept.
 
 ### Options for the backup service's own guard
 
@@ -50,7 +50,7 @@ The backup service must never remove more backups, nor back up less often, than 
 | B. A table only the owner of the tables may write | The database keeps it | In a `compose.yaml` of before spec 070 the server still holds the owner's address; a restore rewinds it |
 | **C. A small file in the backup folder** | The server never mounts that folder; nothing it writes reaches the file; a replay has nothing to replay | One more file the backup service keeps; a new backup folder starts again |
 
-**Choice: C.** It is the simplest form that holds against everything the server's role can write. The file `/backups/.diffluence-held.json` holds the fewest backups the service keeps, the longest it waits between two, and the code it waits for, if any. It holds no key and no code: only a random part the code is made from.
+**Choice: C.** It is the simplest form that holds against everything the server's role can write. The file `/backups/.kenwerk-held.json` holds the fewest backups the service keeps, the longest it waits between two, and the code it waits for, if any. It holds no key and no code: only a random part the code is made from.
 
 ### Behaviour
 
@@ -71,16 +71,16 @@ The backup service must never remove more backups, nor back up less often, than 
 
 ### The first round
 
-A backup service that holds nothing yet starts from whatever keeps the most: the console's choice or its own defaults (`DIFFLUENCE_BACKUP_KEEP`, `DIFFLUENCE_BACKUP_INTERVAL`). An installation that kept fewer through the console before this release confirms that once with a code.
+A backup service that holds nothing yet starts from whatever keeps the most: the console's choice or its own defaults (`KENWERK_BACKUP_KEEP`, `KENWERK_BACKUP_INTERVAL`). An installation that kept fewer through the console before this release confirms that once with a code.
 
 ### Removing old backups
 
-The shell of the backup service asks `diffluence backup held` for the number held before it removes anything, and never keeps fewer, also for `docker compose run --rm backup once`. When the file cannot be read, nothing is removed and the log says why. `diffluence backup held` reads only the file, so it works while the database cannot be reached.
+The shell of the backup service asks `kenwerk backup held` for the number held before it removes anything, and never keeps fewer, also for `docker compose run --rm backup once`. When the file cannot be read, nothing is removed and the log says why. `kenwerk backup held` reads only the file, so it works while the database cannot be reached.
 
 ## 3. A shorter audit retention
 
 - It needs a confirmed change and a reason, one line of at most 500 characters.
-- It holds 7 days after it was saved (`RetentionLoweringDelay`). Until then the longer time holds, for `diffluence audit prune` as for the console.
+- It holds 7 days after it was saved (`RetentionLoweringDelay`). Until then the longer time holds, for `kenwerk audit prune` as for the console.
 - The Retention form shows "From …, audit rows are kept for 90 days, because: …", and a button "Keep the longer time", which any administrator may press: it keeps more, never less (`DELETE /api/v1/admin/settings/retention/lowering`, audited as `settings.retention_lowering_cancelled`).
 - An ordinary save keeps a waiting time as it is. A form cannot set one: the server ignores the `lowering` a client sends.
 - A longer time stays as before: an administrator's change, with a reason beyond a year.
@@ -122,7 +122,7 @@ The shell of the backup service asks `diffluence backup held` for the number hel
 
 ## Upgrade path
 
-- The guard of the backup service also covers a platform without Compose once it runs `diffluence backup next --held` with a file the server cannot reach.
+- The guard of the backup service also covers a platform without Compose once it runs `kenwerk backup next --held` with a file the server cannot reach.
 - The console's attention list could name a shorter audit retention that waits; the Retention form shows it today.
 
 ## Decided on the product owner's behalf on 2026-11-14, may be overruled
@@ -130,8 +130,8 @@ The shell of the backup service asks `diffluence backup held` for the number hel
 - **D1: the backup service holds its own minimum in a file in the backup folder (option C).** It is the simplest form that holds against a replay of an older confirmed value; the server never reaches that folder.
 - **D2: the backup interval is held the same way as the number kept.** Backing up less often thins backups as surely as keeping fewer.
 - **D3: the first round holds the more keeping of the console's choice and the service's defaults.** Taking whatever the database says at the first round would let a value written just before an upgrade through. The cost is one code for an installation that kept fewer than its defaults on purpose.
-- **D4: a shorter audit retention waits 7 days, and any administrator can take it back.** The wait gives other administrators time to see it on the Retention form before `diffluence audit prune` acts on it; taking it back keeps more, so it needs no more than an administrator. The console study proposed the same.
-- **D5: a retention lowered is not confirmed with a code from the backup service's log.** The backup service does not prune the audit log; an operator runs `diffluence audit prune` by hand, so the person at the host already decides when rows go. The wait and the reason take the place of the code.
+- **D4: a shorter audit retention waits 7 days, and any administrator can take it back.** The wait gives other administrators time to see it on the Retention form before `kenwerk audit prune` acts on it; taking it back keeps more, so it needs no more than an administrator. The console study proposed the same.
+- **D5: a retention lowered is not confirmed with a code from the backup service's log.** The backup service does not prune the audit log; an operator runs `kenwerk audit prune` by hand, so the person at the host already decides when rows go. The wait and the reason take the place of the code.
 - **D6: a new sign-up domain and guest invitations turned on count as weaker.** Both let more people in, which is what a weaker rule for logging in does. Self sign-up in the Features section stays an ordinary change, because it admits only the listed domains, which this guard covers.
 - **D7: the code entered for fewer backups needs system administration but no second login.** As for a restore: the change before it already asked for a fresh login and a second factor, and the code from the log is the proof.
 - **D8: no backup "target" field exists today.** The section has only the interval and the number kept. A field added later, such as where backups go, must be judged in `keepsFewer` and held by the backup service before the console offers it.

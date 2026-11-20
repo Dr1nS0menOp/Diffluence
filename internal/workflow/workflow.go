@@ -13,7 +13,7 @@ import (
 	"unicode/utf8"
 )
 
-// Kind is what a state means to the rest of Diffluence. Names differ by organisation and
+// Kind is what a state means to the rest of Kenwerk. Names differ by organisation and
 // language; readers, search and exports decide by kind only (DOC-101).
 type Kind string
 

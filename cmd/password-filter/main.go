@@ -13,7 +13,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/identity/leaked"
+	"github.com/kenwerk/kenwerk/internal/identity/leaked"
 )
 
 // At 16 bits per entry and 11 hashes, about 1 in 2000 other passwords is refused

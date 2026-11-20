@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-draft-and-published-spaces.md](01-draft-and-published-spaces.md).
 
-The screens follow the design standard of Diffluence (`docs/design/README.md`): the Stil look of ADR-034, the five frames, the components listed there, every word through the translation files, every screen with an approved picture in light, dark, narrow and right-to-left, and WCAG 2.2 at level AA. No layout, icon or wording of another product is used (`02-clean-room-and-licensing.md`). This feature adds **no new frame** and as few new components as it can: one screen, one settings section, a band, and marks in existing places.
+The screens follow the design standard of Kenwerk (`docs/design/README.md`): the Stil look of ADR-034, the five frames, the components listed there, every word through the translation files, every screen with an approved picture in light, dark, narrow and right-to-left, and WCAG 2.2 at level AA. No layout, icon or wording of another product is used (`02-clean-room-and-licensing.md`). This feature adds **no new frame** and as few new components as it can: one screen, one settings section, a band, and marks in existing places.
 
 ## 13.1 Where things live
 

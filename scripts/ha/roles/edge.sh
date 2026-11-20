@@ -21,18 +21,18 @@ export PGPASSWORD=$HA_PG_SUPERUSER_PASSWORD HA_PG_OWNER_PASSWORD HA_PG_APP_PASSW
 psql -h 127.0.0.1 -p 5000 -U postgres -d postgres -v ON_ERROR_STOP=1 <<'SQL'
 \getenv owner_pw HA_PG_OWNER_PASSWORD
 \getenv app_pw HA_PG_APP_PASSWORD
-SELECT 'CREATE ROLE diffluence_owner LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'diffluence_owner')\gexec
-SELECT 'CREATE ROLE diffluence_app LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'diffluence_app')\gexec
-ALTER ROLE diffluence_owner PASSWORD :'owner_pw';
-ALTER ROLE diffluence_app PASSWORD :'app_pw';
-SELECT 'CREATE DATABASE diffluence OWNER diffluence_owner' WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'diffluence')\gexec
+SELECT 'CREATE ROLE kenwerk_owner LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kenwerk_owner')\gexec
+SELECT 'CREATE ROLE kenwerk_app LOGIN' WHERE NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kenwerk_app')\gexec
+ALTER ROLE kenwerk_owner PASSWORD :'owner_pw';
+ALTER ROLE kenwerk_app PASSWORD :'app_pw';
+SELECT 'CREATE DATABASE kenwerk OWNER kenwerk_owner' WHERE NOT EXISTS (SELECT 1 FROM pg_database WHERE datname = 'kenwerk')\gexec
 SQL
 unset PGPASSWORD
 
 render pgbouncer.ini.tmpl /etc/pgbouncer/pgbouncer.ini
 # The app's role only: migrations go to HAProxy's port 5000 directly, as the owner.
 umask 077
-printf '"%s" "%s"\n' diffluence_app "$HA_PG_APP_PASSWORD" >/etc/pgbouncer/userlist.txt
+printf '"%s" "%s"\n' kenwerk_app "$HA_PG_APP_PASSWORD" >/etc/pgbouncer/userlist.txt
 chown postgres:postgres /etc/pgbouncer/userlist.txt
 systemctl restart pgbouncer
 echo "edge: HAProxy on 5000 (leader), 5001 (replicas), 80 (app), 8404 (stats); PgBouncer on 6432"

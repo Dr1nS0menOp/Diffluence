@@ -54,7 +54,7 @@ func boundary() (string, error) {
 	if _, err := rand.Read(raw); err != nil {
 		return "", err
 	}
-	return "diffluence-" + hex.EncodeToString(raw), nil
+	return "kenwerk-" + hex.EncodeToString(raw), nil
 }
 
 // Compose builds the bytes of a message.
@@ -85,7 +85,7 @@ func Compose(from, replyTo, listID string, m Message, at time.Time) ([]byte, err
 	header("Auto-Submitted", "auto-generated")
 	header("List-Id", oneLine(listID))
 	if m.Reason != "" {
-		header("X-Diffluence-Reason", oneLine(m.Reason))
+		header("X-Kenwerk-Reason", oneLine(m.Reason))
 	}
 	if m.Unsubscribe != "" {
 		header("List-Unsubscribe", "<"+oneLine(m.Unsubscribe)+">")

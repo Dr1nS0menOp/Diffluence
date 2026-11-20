@@ -5,7 +5,7 @@ How a release is numbered, how long it is looked after, how it reaches a machine
 ## 5.1 Versions and the rhythm of releases
 
 - **Semantic Versioning 2.0.0** gives `MAJOR.MINOR.PATCH` a meaning: a major breaks, a minor adds, a patch fixes. Before 1.0 anything may change. For a server application, "breaks" means what an operator must do, not only the API.
-- **Time-based releases work for volunteer projects.** Michlmayr, Fitzgerald and Stol interviewed members of seven large volunteer projects that moved from "release when ready" to a fixed rhythm (IEEE Software 2015). The fixed date helped planning, made releases smaller and less risky, and stopped one unfinished feature from holding up everything else. The conditions: a short freeze before each release, and features that can be held back (switched off) when they are not ready. Diffluence's monthly plan after 1.0 fits this.
+- **Time-based releases work for volunteer projects.** Michlmayr, Fitzgerald and Stol interviewed members of seven large volunteer projects that moved from "release when ready" to a fixed rhythm (IEEE Software 2015). The fixed date helped planning, made releases smaller and less risky, and stopped one unfinished feature from holding up everything else. The conditions: a short freeze before each release, and features that can be held back (switched off) when they are not ready. Kenwerk's monthly plan after 1.0 fits this.
 - **Feature toggles let unfinished work ship dark.** Rahman, Querel, Rigby and Adams (MSR 2016) studied toggles in practice: they make a fixed rhythm possible, and they turn into debt when they are never removed. The common rule is that each toggle has an owner and a date to remove it.
 
 ## 5.2 How long a release is looked after
@@ -18,7 +18,7 @@ How a release is numbered, how long it is looked after, how it reaches a machine
 | Node.js | Even majors become LTS, supported for 30 months |
 | Nextcloud | Each major about a year, with paid extended support |
 
-A project without staff cannot back-port fixes to many lines. Blueprint 07 therefore supports only the newest line. The cost lands on the operator, who must upgrade monthly. The industry answer that keeps that bearable is the one Diffluence already has: an upgrade that is one command, never needs a person, and can be undone (chapter 1). One extra promise makes it fairer: how far back an installation may be and still jump straight to the newest release (decided in spec 048: six months).
+A project without staff cannot back-port fixes to many lines. Blueprint 07 therefore supports only the newest line. The cost lands on the operator, who must upgrade monthly. The industry answer that keeps that bearable is the one Kenwerk already has: an upgrade that is one command, never needs a person, and can be undone (chapter 1). One extra promise makes it fairer: how far back an installation may be and still jump straight to the newest release (decided in spec 048: six months).
 
 ## 5.3 Packages
 
@@ -32,11 +32,11 @@ GoReleaser builds release archives for many platforms and, through its nFPM part
 - **Reproducible builds.** Lamb and Zacchiroli (IEEE Software 2022) argue that only a build anyone can repeat bit for bit lets others check a binary against its source. Go has produced perfectly reproducible toolchains since 1.21, and Go programs built with `-trimpath`, without cgo and with a fixed version reproduce well. The web assets built by Vite need the same care: a locked `package-lock.json` and no timestamps.
 - **SBOM.** A list of every component, in SPDX or CycloneDX. The NTIA minimum elements (2021) say what it must hold. The EU Cyber Resilience Act will expect one for products placed on the market, and customers already ask.
 
-## 5.5 Where Diffluence stands
+## 5.5 Where Kenwerk stands
 
 | Practice | State | Where |
 |---|---|---|
-| Version from the tag, `diffluence version` | Built | `Makefile`, `internal/version/version.go` |
+| Version from the tag, `kenwerk version` | Built | `Makefile`, `internal/version/version.go` |
 | `-trimpath`, no cgo, stripped | Built | `Makefile`, `Dockerfile` |
 | Release checklist with an upgrade-impact line | Built | `docs/operations/release.md`, OPS-062 |
 | GitHub Actions pinned to commit SHAs | Built | `renovate.json`, `.github/workflows/ci.yml` |

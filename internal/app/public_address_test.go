@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
+	"github.com/kenwerk/kenwerk/internal/config"
 )
 
 // SEC-257: cookies and HSTS follow the public address, so a plain one that others reach is said

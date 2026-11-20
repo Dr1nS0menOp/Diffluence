@@ -9,7 +9,7 @@ The WebSocket of the editor (`GET /collab`, ARC-118) stays open as long as a per
 **What is built.**
 
 - The socket does not pass the admission gates of spec 061, so open editors never take a place that a read or a save needs.
-- It is not timed as a request: a socket open for an hour would otherwise fill the slowest bucket of `diffluence_http_request_duration_seconds`.
+- It is not timed as a request: a socket open for an hour would otherwise fill the slowest bucket of `kenwerk_http_request_duration_seconds`.
 - It has caps of its own: 512 open sockets per node and 8 per login, counted by the id of the session. Past a cap the answer is `503 busy` with `Retry-After: 5`, and the editor tries again. The cap is taken after the checks of spec 067 (a session, the right to edit the page, the ticket), so a refused socket holds no place.
 - The origin check stays. It stops a page on another site in a browser. A client that is not a browser can send any origin, but it still needs a session and the right to edit, and the caps bound what it can hold.
 
@@ -61,13 +61,13 @@ An administrator runs accounts and groups. An account or group that holds `syste
 
 ## 3. The address of the reverse proxy in Compose
 
-`DIFFLUENCE_TRUSTED_PROXIES` says whose `X-Forwarded-For` is believed (SEC-012).
+`KENWERK_TRUSTED_PROXIES` says whose `X-Forwarded-For` is believed (SEC-012).
 
 **What is built.**
 
 - `compose.yaml` passes it on. Left empty, it is `127.0.0.0/8,::1/128,172.16.0.0/12`.
 - That default fits the port Compose publishes on `127.0.0.1`. A proxy on the same machine reaches the app through Docker's gateway, and a proxy in the same Compose project from its own network. Docker takes both from `172.16.0.0/12`. Nothing else can reach a port on `127.0.0.1`, so nobody else can claim an address.
-- With `DIFFLUENCE_BIND=0.0.0.0` the operator sets the proxy's own address: other machines in that range could then reach the port.
+- With `KENWERK_BIND=0.0.0.0` the operator sets the proxy's own address: other machines in that range could then reach the port.
 - `.env.example` and the install guide say so.
 - System health warns (`proxy_not_trusted`) when every login of the last day came from one private or loopback address, and more than one person logged in. That address is the proxy, not yet trusted. A shared public address, such as an office line, does not warn.
 
@@ -121,6 +121,6 @@ An administrator runs accounts and groups. An account or group that holds `syste
 ## Upgrade
 
 - Nothing to do for an installation with its proxy on the same machine or in the same Compose project: the new default trusts it, and login limits and the audit log get the address of each person. Take the new `compose.yaml` with the release.
-- With `DIFFLUENCE_BIND=0.0.0.0`, set `DIFFLUENCE_TRUSTED_PROXIES` to the proxy's address. A value set in `.env` before this release was not passed on by `compose.yaml`, and now is.
+- With `KENWERK_BIND=0.0.0.0`, set `KENWERK_TRUSTED_PROXIES` to the proxy's address. A value set in `.env` before this release was not passed on by `compose.yaml`, and now is.
 - Administrators without `system_administrator` can no longer start a restore, nor act on accounts and groups that hold it.
 - Scripts that called the reset-password route with a password must read the link from the answer instead.

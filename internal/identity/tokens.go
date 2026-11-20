@@ -13,13 +13,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/ids"
 )
 
 const (
 	// tokenPrefix lets secret scanners find a leaked token.
-	tokenPrefix  = "dfl_"
+	tokenPrefix  = "kenwerk_"
 	maxTokenLife = 366 * 24 * time.Hour
 	// A token always ends, also when nobody chose a date (SEC-156).
 	defaultTokenLife = 365 * 24 * time.Hour

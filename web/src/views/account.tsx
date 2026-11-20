@@ -389,7 +389,7 @@ export function PersonalDataView() {
   const { t } = useTranslation();
   const download = useMutation({
     mutationFn: () => api.post<unknown>('/me/export'),
-    onSuccess: (data) => saveAsFile('my-diffluence-data.json', data),
+    onSuccess: (data) => saveAsFile('my-kenwerk-data.json', data),
   });
   const removal = useMutation({ mutationFn: () => api.post('/me/removal-request') });
   return (

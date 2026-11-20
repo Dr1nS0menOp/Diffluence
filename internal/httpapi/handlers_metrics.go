@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/metrics"
+	"github.com/kenwerk/kenwerk/internal/metrics"
 )
 
 // sameSecret compares in constant time. Hashing first hides the length as well.

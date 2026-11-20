@@ -23,9 +23,9 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/pquerna/otp/totp"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Electronic signatures, wave DC4 of spec 064 (blueprint 09.8). The refusals come first:
@@ -744,8 +744,8 @@ func TestTamperingInTheDatabaseTurnsTheMarkToDoesNotMatch(t *testing.T) {
 
 // DOC-1020, DOC-1021, DOC-742: the auditor's export needs space.audit, is audited with its
 // scope and period, and the documented procedure, run by its script, verifies it outside
-// Diffluence. A changed export fails the script.
-func TestTheAuditorsExportVerifiesOutsideDiffluence(t *testing.T) {
+// Kenwerk. A changed export fails the script.
+func TestTheAuditorsExportVerifiesOutsideKenwerk(t *testing.T) {
 	node, err := exec.LookPath("node")
 	if err != nil {
 		t.Skip("node is not installed here; the development toolbox has it")

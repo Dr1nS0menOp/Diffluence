@@ -1,21 +1,21 @@
-# Security risks of using Diffluence
+# Security risks of using Kenwerk
 
-Read this before you put real information in Diffluence. The first part is for everyone. After that come a part for people who run it and a part for people who write and read in it.
+Read this before you put real information in Kenwerk. The first part is for everyone. After that come a part for people who run it and a part for people who write and read in it.
 
-Last updated: 14 November 2026. Diffluence is **alpha** software, sized for one node and a few hundred people, measured on your own hardware.
+Last updated: 14 November 2026. Kenwerk is **alpha** software, sized for one node and a few hundred people, measured on your own hardware.
 
 ## The short version
 
-- **There is no guarantee.** Diffluence comes as it is, without warranty. It may contain security flaws, known or unknown, and they can lead to data being lost, changed or read by the wrong people.
+- **There is no guarantee.** Kenwerk comes as it is, without warranty. It may contain security flaws, known or unknown, and they can lead to data being lost, changed or read by the wrong people.
 - **Security updates are not guaranteed.** Nobody promises that the software is actively kept up to date, that a flaw is fixed within a set time, or that this project still exists next year. There is no support contract and no help desk.
-- **It has not been independently tested.** No outside company has done a penetration test or an audit, and Diffluence holds no certification. All testing so far was done by the project itself. For 1.0, one outside reader is planned for permissions, login and restore (ADR-043).
-- **You carry the risk.** Whoever installs Diffluence is responsible for the server, the backups, the updates and the data, and for meeting the law that applies to that data.
+- **It has not been independently tested.** No outside company has done a penetration test or an audit, and Kenwerk holds no certification. All testing so far was done by the project itself. For 1.0, one outside reader is planned for permissions, login and restore (ADR-043).
+- **You carry the risk.** Whoever installs Kenwerk is responsible for the server, the backups, the updates and the data, and for meeting the law that applies to that data.
 
-If you need guarantees, a support contract or a certified product, Diffluence is not that today.
+If you need guarantees, a support contract or a certified product, Kenwerk is not that today.
 
 ## What "no guarantee" means
 
-Diffluence is licensed under the [Apache License 2.0](../../LICENSE). Section 7 says the software is provided "AS IS", without warranties of any kind. Section 8 says the contributors are not liable for damages from using it.
+Kenwerk is licensed under the [Apache License 2.0](../../LICENSE). Section 7 says the software is provided "AS IS", without warranties of any kind. Section 8 says the contributors are not liable for damages from using it.
 
 The response times in [SECURITY.md](../../SECURITY.md) are aims, not promises. Before 1.0, no version is supported at all.
 
@@ -36,18 +36,18 @@ You should know this to judge the risk yourself.
 | Script running in a page | An attacker acts in the browser of a person who opens the page |
 | A stolen account or session | An attacker works as that person until the session ends |
 | A malicious file or import | A file harms a helper service, or uses up memory or disk |
-| A compromised dependency | Code from a library Diffluence relies on does something harmful ([Ladisa et al.](#research)) |
+| A compromised dependency | Code from a library Kenwerk relies on does something harmful ([Ladisa et al.](#research)) |
 | A server that is not kept up to date | A known, published flaw is used against your installation |
 | Lost or broken backups | Data is gone for good |
 | Too much load | The service slows down or stops |
 
-Diffluence has measures against each of these, listed in the [threat model](threat-model.md). A measure lowers a risk. It does not end it.
+Kenwerk has measures against each of these, listed in the [threat model](threat-model.md). A measure lowers a risk. It does not end it.
 
-## For people who run Diffluence
+## For people who run Kenwerk
 
 **Do not rely on these, because they are not there or not finished:**
 
-- **Page text is not encrypted by Diffluence at rest.** Search needs the text. Stored files are encrypted, but the database is not: use disk encryption on the server.
+- **Page text is not encrypted by Kenwerk at rest.** Search needs the text. Stored files are encrypted, but the database is not: use disk encryption on the server.
 - **Without `master.key`, no file can be read.** Files are encrypted with keys that `master.key` protects. Back it up apart from the data, and do not lose it. Replace it when someone who knew it leaves, or when you suspect it leaked: [backup and restore](../operations/backup-restore.md#replace-it) says how. In Compose the audit checkpoints are signed by the backup service with a key derived from the backup key (spec 070), so `master.key` alone no longer signs one that verifies. Together with the owner's database password it still lets a thief bring in a key of their own: the copies of the checkpoints in your log server show that.
 - **Files are served from the same address as the app.** Other measures cover the known attacks, but a separate address would be stronger.
 - **Limits on login attempts per minute are counted per node.** A restart clears them, and two nodes count apart. The stop after a long run of wrong passwords is different: it is stored with the account, so it holds on every node and after a restart, until a new password is set or an administrator lifts it (ADR-038).
@@ -76,27 +76,27 @@ Diffluence has measures against each of these, listed in the [threat model](thre
 4. **Make backups, and test restoring them.** Keep the backup key apart from the backups. Without it, a backup cannot be read. See [backup and restore](../operations/backup-restore.md).
 5. **Log in through an identity provider or with passkeys**, certainly for administrators. Keep the number of administrators small.
 6. **Keep secrets in files or environment variables**, as the install guide says, and limit who can reach the server. Anyone with access to the server or the database can get around everything in the app. In Compose the server's container holds only the application's database role: the backup service holds the owner's password and the backup key, so protect its log and the folders `secrets/` and `backup-key/` most of all. Reading its log is also what confirms a restore from the console.
-7. **Check the audit log.** Run `diffluence audit verify`, and keep a copy of the log elsewhere.
+7. **Check the audit log.** Run `kenwerk audit verify`, and keep a copy of the log elsewhere.
 8. **Limit resources**, so one heavy task cannot stop the whole server.
 9. **Try it with data you can lose** before you trust it with data you cannot.
 
-**The law.** The organisation that runs an installation decides what happens with the data, and is usually the controller under the GDPR. It has to assess whether Diffluence is suitable for that data. This document is not legal advice.
+**The law.** The organisation that runs an installation decides what happens with the data, and is usually the controller under the GDPR. It has to assess whether Kenwerk is suitable for that data. This document is not legal advice.
 
-## For people who write and read in Diffluence
+## For people who write and read in Kenwerk
 
 - **Your administrator is in charge.** The people who run the server can reach what is stored on it, also pages that are restricted in the app. Actions are recorded in an audit log, and they may see what you did.
 - **Do not store passwords, keys or other secrets in pages.** Pages keep their old versions, so deleting the text later does not remove it from the history. Backups keep it longer still.
 - **Deleted does not mean gone at once.** Pages stay in the trash for a while, and in backups after that.
 - **Check who can see a page** before you write something sensitive. A space can be open to more people than you think, and a restriction can be changed by those who manage it.
-- **Think before sharing.** Whoever has a public link can read the page. Whatever people download or export is out of reach of Diffluence.
+- **Think before sharing.** Whoever has a public link can read the page. Whatever people download or export is out of reach of Kenwerk.
 - **Be careful with attachments.** A file from a colleague can still be harmful. Open it as you would an attachment in an e-mail.
-- **Watch out for false messages.** A mail that asks you to log in may not come from Diffluence. Check the address, and go to the site yourself.
+- **Watch out for false messages.** A mail that asks you to log in may not come from Kenwerk. Check the address, and go to the site yourself.
 - **Protect your account.** Use a passkey, or an authenticator app. Log out on a shared computer. You get a mail when your password, second factor or a passkey changes: if that was not you, tell your administrator at once.
 - **Report anything odd** to your administrator: a page you should not see, a login you do not recognise.
 
 ## Research
 
-During the build, the project studied current security standards and wrote down, line by line, how Diffluence relates to them. That work is in [blueprint 06](../blueprint/06-security-and-compliance.md), with its [sources](../blueprint/06-security-and-compliance/sources.md).
+During the build, the project studied current security standards and wrote down, line by line, how Kenwerk relates to them. That work is in [blueprint 06](../blueprint/06-security-and-compliance.md), with its [sources](../blueprint/06-security-and-compliance/sources.md).
 
 **Standards:**
 
@@ -106,7 +106,7 @@ During the build, the project studied current security standards and wrote down,
 - [RFC 9700](https://www.rfc-editor.org/rfc/rfc9700), best practice for OAuth 2.0 security
 - [SLSA 1.1](https://slsa.dev/spec/v1.1/levels), on the supply chain
 
-**Academic background:** published research on the kinds of measures Diffluence uses.
+**Academic background:** published research on the kinds of measures Kenwerk uses.
 
 | Topic | Publication |
 |---|---|
@@ -120,7 +120,7 @@ During the build, the project studied current security standards and wrote down,
 | Testing the tests | Y. Jia and M. Harman, [An Analysis and Survey of the Development of Mutation Testing](https://doi.org/10.1109/TSE.2010.62), IEEE Transactions on Software Engineering, 2011 |
 | Security of code written with AI | N. Perry, M. Srivastava, D. Kumar and D. Boneh, [Do Users Write More Insecure Code with AI Assistants?](https://doi.org/10.1145/3576915.3623157), ACM CCS, 2023 |
 
-Following a standard or a paper does not make software secure. These sources show what good practice looks like, not that Diffluence meets it without error.
+Following a standard or a paper does not make software secure. These sources show what good practice looks like, not that Kenwerk meets it without error.
 
 ## Found a problem?
 

@@ -18,21 +18,21 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // JobKindBundle is the background job that writes a bundle.
 const JobKindBundle = "bundle_export"
 
 const (
-	bundleFormat = "diffluence-bundle"
+	bundleFormat = "kenwerk-bundle"
 	// bundleVersion 9 holds template.propose, which spec 074 split off page.create; version 8
 	// carries the record of document control and the version readers see of
 	// each page (spec 064, DOC-532); version 7 holds space.release, which spec 073 split off

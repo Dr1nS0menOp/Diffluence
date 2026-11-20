@@ -63,25 +63,25 @@ describe('what a browser keeps for a person', () => {
     localStorage.setItem(personalKey('anna', 'searches'), '["secret"]');
     localStorage.setItem(personalKey('bob', 'tree.space'), '{}');
     keepDraft('anna', 'page', BODY, NOW);
-    localStorage.setItem('diffluence.theme', 'dark');
-    sessionStorage.setItem('diffluence.scroll', '{}');
+    localStorage.setItem('kenwerk.theme', 'dark');
+    sessionStorage.setItem('kenwerk.scroll', '{}');
 
     forgetPersonalData();
 
     expect(localStorage.length).toBe(1);
-    expect(localStorage.getItem('diffluence.theme')).toBe('dark');
+    expect(localStorage.getItem('kenwerk.theme')).toBe('dark');
     expect(sessionStorage.length).toBe(0);
   });
 
   it('drops what older versions kept without a person', () => {
-    localStorage.setItem('diffluence.searches', '["secret"]');
-    localStorage.setItem('diffluence.tree.space', '{}');
-    localStorage.setItem('diffluence.theme', 'dark');
+    localStorage.setItem('kenwerk.searches', '["secret"]');
+    localStorage.setItem('kenwerk.tree.space', '{}');
+    localStorage.setItem('kenwerk.theme', 'dark');
 
     dropUnkeyedData();
 
     expect(localStorage.length).toBe(1);
-    expect(localStorage.getItem('diffluence.theme')).toBe('dark');
+    expect(localStorage.getItem('kenwerk.theme')).toBe('dark');
   });
 });
 

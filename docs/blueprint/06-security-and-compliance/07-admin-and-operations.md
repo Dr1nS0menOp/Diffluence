@@ -22,7 +22,7 @@
 - **SEC-615** · built · The image is distroless, runs as non-root, and holds no shell or package manager. The reference Compose file adds a read-only root file system, no capabilities and `no-new-privileges`.
 - **SEC-616** · built · The systemd unit locks the process down: no new privileges, a read-only system, private temp and devices, no capabilities, and memory that cannot be both writable and executable.
 - **SEC-617** · built · The application connects to PostgreSQL as a role that does not own the tables, so it cannot switch off the audit log's protection. Migrations use the owner. Both reference installs do this.
-- **SEC-618** · partly · A single role still works, when `DIFFLUENCE_MIGRATE_DATABASE_URL` is empty. The audit log's triggers then protect only against mistakes. The console should show a warning. Low. Belongs in wave F.
+- **SEC-618** · partly · A single role still works, when `KENWERK_MIGRATE_DATABASE_URL` is empty. The audit log's triggers then protect only against mistakes. The console should show a warning. Low. Belongs in wave F.
 - **SEC-619** · built · Secrets come from the environment or from `_FILE`, for Docker and Kubernetes secrets. `setup-secrets.sh` makes random ones, in a folder only the owner can open.
 - **SEC-620** · built · There are no default passwords in the reference install. `.env.example` uses `change-me` as a visible placeholder.
 - **SEC-621** · built · No debug routes, no profiling on the public port, no directory listings, no source control data in the image (ASVS 13.4.1 to 13.4.3).
@@ -31,7 +31,7 @@
 - **SEC-624** · phase 3 · An external NATS needs TLS and its own account, and so does anything else between nodes (ASVS 12.3.3).
 - **SEC-625** · built · The reference install talks to PostgreSQL with `sslmode=disable`, on a private Docker network or the local machine. A database on another machine needs `verify-full`, and the guide must say so (ASVS 12.3.1, 12.3.2). Built: in `docs/operations/install.md` (spec 042).
 - **SEC-626** · built · TLS ends at a reverse proxy, which the guide requires. The guide should give settings: TLS 1.2 or newer, and `X-Forwarded-For` set by the proxy only (ASVS 12.1.1, 4.1.3).
-- **SEC-627** · built · `DIFFLUENCE_PORT` is published on all addresses in the reference Compose file, in plain http. A proxy on the same machine only needs `127.0.0.1`. Change the default. Low. Built (spec 042): the port listens on `127.0.0.1` unless `DIFFLUENCE_BIND` says otherwise, `TestEveryPublishedPortListensOnThisMachineByDefault`.
+- **SEC-627** · built · `KENWERK_PORT` is published on all addresses in the reference Compose file, in plain http. A proxy on the same machine only needs `127.0.0.1`. Change the default. Low. Built (spec 042): the port listens on `127.0.0.1` unless `KENWERK_BIND` says otherwise, `TestEveryPublishedPortListensOnThisMachineByDefault`.
 - **SEC-628** · built · A failure in the session lookup answers 503. It does not continue as if nobody were logged in, so errors fail closed (ASVS 16.5.3).
 
 ## 7.3 Backups

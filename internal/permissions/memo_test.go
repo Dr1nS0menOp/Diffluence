@@ -7,9 +7,9 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 func TestTheMemoKeepsEachPersonsOwnFactsAndLivesOneContext(t *testing.T) {

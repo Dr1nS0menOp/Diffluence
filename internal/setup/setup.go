@@ -3,7 +3,7 @@
 // Package setup guards the first setup of a new instance (spec 038). The setup screen
 // creates the first administrator, so a stranger who reaches a fresh install first must not
 // be able to use it. The screen is open only while no administrator exists, and only with a
-// one-time code that the server writes to its log and `diffluence setup-code` prints: the
+// one-time code that the server writes to its log and `kenwerk setup-code` prints: the
 // person who installed the server can read it, a visitor cannot.
 package setup
 
@@ -21,8 +21,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/ids"
 )
 
 // CodeLifetime is how long a code works. An install is usually finished within minutes,
@@ -257,13 +257,13 @@ func format(code string) string {
 }
 
 func digest(code string) []byte {
-	sum := sha256.Sum256([]byte("diffluence-setup:" + code))
+	sum := sha256.Sum256([]byte("kenwerk-setup:" + code))
 	return sum[:]
 }
 
 // Announcement is the line a server logs while the setup is open, with the code in it.
 // The code is meant for the log: whoever reads the log of the server installed it.
 func Announcement(address, code string) string {
-	return fmt.Sprintf("first setup: open %s/setup and enter the code %s (valid for %s; `diffluence setup-code` gives a new one)",
+	return fmt.Sprintf("first setup: open %s/setup and enter the code %s (valid for %s; `kenwerk setup-code` gives a new one)",
 		strings.TrimRight(address, "/"), code, CodeLifetime)
 }

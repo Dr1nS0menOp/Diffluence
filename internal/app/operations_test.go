@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 const metricsToken = "scrape-secret-with-enough-length"
@@ -36,7 +36,7 @@ func TestMetricsNeedTheRightToken(t *testing.T) {
 		"no kind":  {"Authorization", metricsToken},
 		"as basic": {"Authorization", "Basic " + metricsToken},
 	} {
-		if resp, body := e.do(e.client(), "GET", "/metrics", "", headers...); resp.StatusCode != 401 || strings.Contains(body, "diffluence_") {
+		if resp, body := e.do(e.client(), "GET", "/metrics", "", headers...); resp.StatusCode != 401 || strings.Contains(body, "kenwerk_") {
 			t.Errorf("%s: %d %s", name, resp.StatusCode, body)
 		}
 	}
@@ -51,14 +51,14 @@ func TestMetricsCountRequestsAndShowWhatWaits(t *testing.T) {
 		t.Fatalf("%d %s", resp.StatusCode, resp.Header.Get("Content-Type"))
 	}
 	for _, want := range []string{
-		`diffluence_http_requests_total{method="GET",status="2xx"}`,
-		`diffluence_http_requests_total{method="GET",status="4xx"}`,
-		`diffluence_http_request_duration_seconds_bucket{le="+Inf"}`,
-		"diffluence_database_up 1", "diffluence_outbox_unpublished ", "diffluence_jobs_queued ", "diffluence_jobs_failed_7d ",
-		"diffluence_mail_queued ", "diffluence_storage_deletions_queued ", "diffluence_db_pool_acquired_connections ",
-		"diffluence_db_pool_max_connections ", "diffluence_goroutines ", "diffluence_queue_healthy 1",
-		"diffluence_migrations_pending_expand 0", "diffluence_migrations_pending_contract 0",
-		fmt.Sprintf("diffluence_schema_migration %d\n", newestMigration(t)),
+		`kenwerk_http_requests_total{method="GET",status="2xx"}`,
+		`kenwerk_http_requests_total{method="GET",status="4xx"}`,
+		`kenwerk_http_request_duration_seconds_bucket{le="+Inf"}`,
+		"kenwerk_database_up 1", "kenwerk_outbox_unpublished ", "kenwerk_jobs_queued ", "kenwerk_jobs_failed_7d ",
+		"kenwerk_mail_queued ", "kenwerk_storage_deletions_queued ", "kenwerk_db_pool_acquired_connections ",
+		"kenwerk_db_pool_max_connections ", "kenwerk_goroutines ", "kenwerk_queue_healthy 1",
+		"kenwerk_migrations_pending_expand 0", "kenwerk_migrations_pending_contract 0",
+		fmt.Sprintf("kenwerk_schema_migration %d\n", newestMigration(t)),
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("missing %q", want)

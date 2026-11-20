@@ -11,7 +11,7 @@ import { reloadWhenSaved } from '../before-reload';
 import { Link, useLocation } from '../router';
 import { ErrorNote } from './ui';
 
-const DISMISSED_BANNER_KEY = 'diffluence.banner';
+const DISMISSED_BANNER_KEY = 'kenwerk.banner';
 
 function Maintenance({ message, isNews }: { message: string; isNews: boolean }) {
   const { t } = useTranslation();

@@ -14,13 +14,13 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/storage"
 )
 
 const (
@@ -31,7 +31,7 @@ const (
 	fontSignature       = 4
 )
 
-// Font is the typeface an administrator imported. By default Diffluence uses the
+// Font is the typeface an administrator imported. By default Kenwerk uses the
 // system font, so nothing needs to be shipped or licensed; an organisation can
 // bring its own house font here.
 type Font struct {

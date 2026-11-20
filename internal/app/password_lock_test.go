@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // lockedState reads the run of wrong passwords and whether password login stopped.

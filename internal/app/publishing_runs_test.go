@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/publishing"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/publishing"
 )
 
 // Draft and published spaces, wave PB2 of spec 073: releasing a branch and the whole space,
@@ -674,7 +674,7 @@ func TestTheConsistencyCheckFindsAndFixesWhatDrifted(t *testing.T) {
 	}
 	e.sql("UPDATE page_pairs SET released_title = 'Corrupted', changed = '{title}' WHERE draft_page_id = $1", page)
 	twin := w.twin(page)
-	e.sql(`DO $$ BEGIN PERFORM set_config('diffluence.release', 'on', true);
+	e.sql(`DO $$ BEGIN PERFORM set_config('kenwerk.release', 'on', true);
 		INSERT INTO page_versions (id, origin_instance_id, page_id, number, title, document, schema_version, author_id, summary)
 		SELECT gen_random_uuid(), origin_instance_id, page_id, 2, title, document, schema_version, author_id, 'by hand'
 		FROM page_versions WHERE page_id = '` + twin + `' AND number = 1; END $$`)

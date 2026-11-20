@@ -539,7 +539,7 @@ function RestoreOver({ data }: { data: BackupOverview }) {
         <>
           <p>{t('running.restoreByCommand')}</p>
           <pre>
-            <code>{`docker compose exec backup diffluence backup restore-request --name ${chosen.name} --confirm '${data.installation_name}'`}</code>
+            <code>{`docker compose exec backup kenwerk backup restore-request --name ${chosen.name} --confirm '${data.installation_name}'`}</code>
           </pre>
         </>
       )}
@@ -666,7 +666,7 @@ function ConfigurationProbe({ probe }: { probe: Configuration['probe'] }) {
       <ul>
         {probe.warnings.map((w) => (
           <li key={w.setting}>
-            <code>{`DIFFLUENCE_${w.setting}`}</code>: {w.message}
+            <code>{`KENWERK_${w.setting}`}</code>: {w.message}
           </li>
         ))}
       </ul>

@@ -5,8 +5,8 @@
 ## 10.1 Who is who
 
 - **The organisation that runs an instance is the controller.** It decides why people's data is processed. In most cases that is an employer.
-- **The Diffluence project** writes software, and does not touch the data of a self-hosted instance. Recital 78 encourages producers of such software to build data protection in, so controllers can meet their duties. It is encouragement, not a duty on us. That is still the bar we hold ourselves to.
-- **Whoever hosts Diffluence for someone else** is probably a processor under Article 28, with a contract, instructions, confidentiality, help with rights and with breaches, and deletion at the end. *Lawyer*, if the product owner ever offers hosting.
+- **The Kenwerk project** writes software, and does not touch the data of a self-hosted instance. Recital 78 encourages producers of such software to build data protection in, so controllers can meet their duties. It is encouragement, not a duty on us. That is still the bar we hold ourselves to.
+- **Whoever hosts Kenwerk for someone else** is probably a processor under Article 28, with a contract, instructions, confidentiality, help with rights and with breaches, and deletion at the end. *Lawyer*, if the product owner ever offers hosting.
 
 - **SEC-900** · built · No telemetry, no call home, no outside fonts or scripts, no third-party services by default. An instance works with no internet at all.
 - **SEC-901** · new · `docs/compliance/` holds what a controller needs: this chapter, the record below, and the works council text. The blueprint promised it, and it does not exist yet. Belongs before 1.0.
@@ -15,7 +15,7 @@
 
 Article 5 is the frame. Article 25 asks for data protection by design and by default, and by default data must not reach an indefinite number of people.
 
-| Principle (Article 5) | In Diffluence |
+| Principle (Article 5) | In Kenwerk |
 |---|---|
 | Lawfulness, fairness, transparency | Features that show who did what are visible to the people concerned. A person sees their own sessions and login history |
 | Purpose limitation | Audit data is for security. It must not become a performance tool (10.7) |
@@ -106,7 +106,7 @@ A breach must usually reach the supervisory authority within 72 hours (Article 3
 
 Article 88 lets member states set rules for employment. In the Netherlands, an employer needs the works council's consent for a scheme on processing personal data of staff, and for systems aimed at or **suitable for** monitoring presence, behaviour or performance (Wet op de ondernemingsraden, article 27(1), points k and l). "Suitable for" is wide. *Lawyer.*
 
-Features in Diffluence that are suitable for monitoring:
+Features in Kenwerk that are suitable for monitoring:
 
 | Feature | What it could show | Guard |
 |---|---|---|

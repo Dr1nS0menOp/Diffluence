@@ -74,7 +74,7 @@ func newEntry(kek []byte) (entry, error) {
 	}
 	e := entry{kek: append([]byte(nil), kek...)}
 	mac := hmac.New(sha256.New, e.kek)
-	mac.Write([]byte("diffluence key id v1"))
+	mac.Write([]byte("kenwerk key id v1"))
 	copy(e.id[:], mac.Sum(nil))
 	return e, nil
 }
@@ -306,7 +306,7 @@ func (k *Keyring) byID(id []byte) (entry, bool) {
 // Fingerprint gives a keyed hash of a value, for one purpose. It shows that two values
 // were the same, and without the key it cannot be reversed or tried against a list.
 func (k *Keyring) Fingerprint(purpose string, value []byte) ([]byte, error) {
-	key, err := hkdf.Key(sha256.New, k.root, nil, "diffluence fingerprint v1 "+purpose, sha256.Size)
+	key, err := hkdf.Key(sha256.New, k.root, nil, "kenwerk fingerprint v1 "+purpose, sha256.Size)
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +317,7 @@ func (k *Keyring) Fingerprint(purpose string, value []byte) ([]byte, error) {
 
 // SigningKey derives the Ed25519 key that signs audit checkpoints.
 func (k *Keyring) SigningKey() (ed25519.PrivateKey, error) {
-	seed, err := hkdf.Key(sha256.New, k.root, nil, "diffluence audit checkpoint signing v1", ed25519.SeedSize)
+	seed, err := hkdf.Key(sha256.New, k.root, nil, "kenwerk audit checkpoint signing v1", ed25519.SeedSize)
 	if err != nil {
 		return nil, err
 	}

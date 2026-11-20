@@ -13,9 +13,9 @@ new_password() { od -An -tx1 -N24 /dev/urandom | tr -d ' \n'; }
 owner=$(cat secrets/db_owner_password.txt)
 app=$(cat secrets/db_app_password.txt)
 [ -f secrets/migrate_database_url.txt ] ||
-  printf 'postgres://diffluence_owner:%s@postgres:5432/diffluence?sslmode=disable' "$owner" >secrets/migrate_database_url.txt
+  printf 'postgres://kenwerk_owner:%s@postgres:5432/kenwerk?sslmode=disable' "$owner" >secrets/migrate_database_url.txt
 [ -f secrets/database_url.txt ] ||
-  printf 'postgres://diffluence_app:%s@postgres:5432/diffluence?sslmode=disable' "$app" >secrets/database_url.txt
+  printf 'postgres://kenwerk_app:%s@postgres:5432/kenwerk?sslmode=disable' "$app" >secrets/database_url.txt
 # The containers read these as a non-root user.
 chmod 644 secrets/*.txt
 echo "secrets are in ./secrets. Keep this folder out of git and back it up."

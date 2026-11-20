@@ -10,19 +10,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/settings"
 )
 
-// workerDefaults is what a worker started with DIFFLUENCE_BACKUP_INTERVAL=4h and
-// DIFFLUENCE_BACKUP_KEEP=42 tells the console.
+// workerDefaults is what a worker started with KENWERK_BACKUP_INTERVAL=4h and
+// KENWERK_BACKUP_KEEP=42 tells the console.
 var workerDefaults = backups.Defaults{Interval: 4 * time.Hour, Keep: 42, KeyFingerprint: "0123456789abcdef"}
 
-func stamp(at time.Time) string { return "diffluence-" + at.UTC().Format("20060102T150405Z") }
+func stamp(at time.Time) string { return "kenwerk-" + at.UTC().Format("20060102T150405Z") }
 
 // Only administrators reach the backup page, the configuration and logging people out.
 func TestOnlyAdministratorsRunTheInstallation(t *testing.T) {
@@ -284,8 +284,8 @@ func TestAFailedBackupMailsTheAdministratorsAtMostTwiceADay(t *testing.T) {
 func TestTheConsoleShowsTheConfigurationWithoutSecrets(t *testing.T) {
 	e := newEnv(t)
 	root := admin(e)
-	t.Setenv("DIFFLUENCE_SMTP_PASSWORD", "very-secret-mail-password")
-	t.Setenv("DIFFLUENCE_DATABASE_URL", "postgres://app:very-secret-db-password@db.example.com:5432/diffluence")
+	t.Setenv("KENWERK_SMTP_PASSWORD", "very-secret-mail-password")
+	t.Setenv("KENWERK_DATABASE_URL", "postgres://app:very-secret-db-password@db.example.com:5432/kenwerk")
 	out := root.want(200, "GET", "/api/v1/admin/configuration", nil)
 	if strings.Contains(out, "very-secret") {
 		t.Fatalf("a secret is shown: %s", out)

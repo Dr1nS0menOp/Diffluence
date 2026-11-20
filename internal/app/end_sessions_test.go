@@ -6,7 +6,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // During an incident an operator ends sessions without disabling anyone (SEC-178).

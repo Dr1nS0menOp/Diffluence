@@ -14,11 +14,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/metrics"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/metrics"
 )
 
 func mustMigrations(t *testing.T) []db.Migration {
@@ -31,8 +31,8 @@ func mustMigrations(t *testing.T) []db.Migration {
 }
 
 // metricName finds the names of metrics in the monitoring files. Recording rules are named
-// with colons (diffluence:...), so they are not taken for metrics the server sends.
-var metricName = regexp.MustCompile(`\bdiffluence_[a-z0-9_]+`)
+// with colons (kenwerk:...), so they are not taken for metrics the server sends.
+var metricName = regexp.MustCompile(`\bkenwerk_[a-z0-9_]+`)
 
 // monitoringMetricNames lists every metric the shipped rules and dashboard use, with the
 // suffixes of a histogram's series taken off.

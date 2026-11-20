@@ -1,6 +1,6 @@
 # 07.7: Running it yourself: what small teams struggle with
 
-Diffluence is self-hosted, often by a team where one person looks after it next to other work. That person decides whether the product is trusted. This chapter collects what operators of self-hosted wikis and similar open-source products run into, from public documentation, issue trackers and post-mortems, and turns it into product work.
+Kenwerk is self-hosted, often by a team where one person looks after it next to other work. That person decides whether the product is trusted. This chapter collects what operators of self-hosted wikis and similar open-source products run into, from public documentation, issue trackers and post-mortems, and turns it into product work.
 
 ## 7.1 What goes wrong, again and again
 
@@ -19,11 +19,11 @@ The common thread: each failure is quiet until it is large. The fixes the better
 ## 7.2 How the better projects answer it
 
 - **A health page for the administrator** that shows version and age, pending migrations, background work, disk, last backup, mail and login status, each with a plain sentence and a link to the guide. Nextcloud's overview of setup warnings and GitLab's admin health checks are two forms of it.
-- **A refusal with a reason** instead of a broken state: Sentry's hard stops, Diffluence's own checks before migrating.
+- **A refusal with a reason** instead of a broken state: Sentry's hard stops, Kenwerk's own checks before migrating.
 - **Numbers to compare with**: published sizing and limits for typical installations.
 - **A guide per failure**, written in the words an operator would search for.
 
-## 7.3 Where Diffluence stands
+## 7.3 Where Kenwerk stands
 
 | Practice | State | Where |
 |---|---|---|
@@ -43,7 +43,7 @@ The common thread: each failure is quiet until it is large. The fixes the better
 - **OPS-104** · built (spec 051) · **High.** Low disk is visible before it is full: below 10% free in the data folder, administrators get a warning on every page of the console; below 2%, uploads, imports and exports are refused with a clear message instead of failing halfway, while reading and saving text go on. `/readyz` reports the state, so a load balancer with another node can prefer it.
 - **OPS-105** · built (spec 051) · **Medium.** Everything that grows has a limit or a cleaner, and the guide lists them: logs (standard error, rotated by the platform), previews (made again when needed), the trash (retention), exports (removed after their download window), the outbox and failures (purged), and the queue's files. A test fills each one and checks it shrinks.
 - **OPS-106** · built (spec 051; the optional check of the public release feed is not built) · **Medium.** A sign when the installation is behind: the binary knows its own release date, and the console says when it is more than 60 days old, without asking any outside server. An optional check of the public release feed can be switched on by the operator; it is off by default, so nothing phones home (decided in spec 048).
-- **OPS-107** · built (spec 051) · **Medium.** `diffluence doctor`: one command that runs the checks of the health page from the command line, plus `config check` (chapter 6) and `key check`, and prints a short report an operator can paste in a support question, with no secrets and no personal data.
+- **OPS-107** · built (spec 051) · **Medium.** `kenwerk doctor`: one command that runs the checks of the health page from the command line, plus `config check` (chapter 6) and `key check`, and prints a short report an operator can paste in a support question, with no secrets and no personal data.
 - **OPS-115** · built (spec 058) · **High.** Backups are run from the console on every platform: the console sets the schedule and how many are kept, asks for a backup now, lists every backup with its size, state and test restore, and shows whether the backup worker checked in and holds a key. The worker (the Compose service, a Kubernetes CronJob, a systemd timer) asks and reports through the database. A failed backup or test restore shows on System health and mails the administrators at most twice a day.
 - **OPS-116** · built (spec 058) · **Medium.** The console shows the configuration the server starts with and where each value came from, with every secret hidden, and what a restart would refuse.
 - **OPS-117** · built (spec 058) · **Medium.** The console logs one person out everywhere, or everyone after an incident, with a fresh login and an audit entry.

@@ -6,7 +6,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/diffluence/diffluence/internal/setup"
+	"github.com/kenwerk/kenwerk/internal/setup"
 )
 
 // announceSetup writes a fresh setup code to the log while no administrator exists, so

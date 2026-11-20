@@ -16,7 +16,7 @@ Each section sets out the options, the choice, and the way to a stronger form la
 
 ## What each process holds afterwards
 
-| | Server container (`diffluence`) | Backup service (`backup`) |
+| | Server container (`kenwerk`) | Backup service (`backup`) |
 |---|---|---|
 | Application role address | yes | yes |
 | Owner address | **no** (was yes) | yes |
@@ -35,30 +35,30 @@ What the application role may still do is unchanged, except that it may only rea
 |---|---|---|
 | A. A one-shot `migrate` service, with the server waiting on `service_completed_successfully` | Standard Compose pattern; the owner address lives only seconds | A refused upgrade fails `docker compose up` instead of showing the waiting page of ADR-042; a third container to build and keep; contract migrations still need a long-lived place |
 | **B. The backup service** | Already holds the owner address and runs on every Compose install by default; one place for expand and contract migrations; the server keeps its waiting page | The backup service becomes a little more than backups |
-| C. The operator runs `diffluence migrate` by hand | No new code | Breaks "upgrades have no manual steps" (blueprint 07) |
+| C. The operator runs `kenwerk migrate` by hand | No new code | Breaks "upgrades have no manual steps" (blueprint 07) |
 
 **Choice: B.** The server stays in charge of what people see: while migrations wait, it shows the waiting page with the reason and the command that helps.
 
 ### Behaviour
 
-- **Server.** `compose.yaml` gives the server only `DIFFLUENCE_DATABASE_URL_FILE` and sets `DIFFLUENCE_MIGRATE_ON_START=false`.
+- **Server.** `compose.yaml` gives the server only `KENWERK_DATABASE_URL_FILE` and sets `KENWERK_MIGRATE_ON_START=false`.
   - A node that does not migrate on start refuses a database whose expand migrations of its release have not run. It does not exit: it serves the waiting page with the new kind `migrations`.
     - The page names the fix: `docker compose up -d --build backup`, and `docker compose logs backup` for the reason.
     - When the backup check would refuse the upgrade, the page names that kind too.
     - While `migrations` is the only kind, the node looks again every 5 seconds instead of every minute, so a new installation is up within seconds of the backup service migrating it.
   - A node that has no owner address and does not migrate on start leaves contract migrations to whoever migrates.
-- **Backup service.** Every round of its loop, at most a minute apart, it first runs `diffluence worker migrate`:
-  - with expand migrations pending, the checks of `diffluence migrate` (the backup rule of ADR-040 and ADR-042, and the upgrade marker), then the migrations, the session defaults and the grants of the application role;
-  - with contract migrations pending, the rule the server's worker used until now: every live node knows them, and the newest has run for `DIFFLUENCE_CONTRACT_GRACE`. Each is recorded as `system.contract_migrated`;
+- **Backup service.** Every round of its loop, at most a minute apart, it first runs `kenwerk worker migrate`:
+  - with expand migrations pending, the checks of `kenwerk migrate` (the backup rule of ADR-040 and ADR-042, and the upgrade marker), then the migrations, the session defaults and the grants of the application role;
+  - with contract migrations pending, the rule the server's worker used until now: every live node knows them, and the newest has run for `KENWERK_CONTRACT_GRACE`. Each is recorded as `system.contract_migrated`;
   - otherwise nothing, in two indexed reads.
   - On a refusal it logs the reason and tries again next round; the backups go on.
-- **Command line.** In a container without the owner address, `diffluence migrate` and `diffluence user create-admin` do not try to migrate as the application role.
+- **Command line.** In a container without the owner address, `kenwerk migrate` and `kenwerk user create-admin` do not try to migrate as the application role.
   - `migrate` says in one sentence where to run it: in the backup service.
   - `create-admin` refuses a database that is not migrated yet, and says to wait for the backup service.
 
 ### An installation that keeps its old `compose.yaml`
 
-The server there still holds both addresses and `DIFFLUENCE_MIGRATE_ON_START` is unset, so it migrates as before, beside the backup service; the migration lock lets them take turns. Nothing fails. The log says, at the moment the server migrates, that this layout gives the server the owner address and that the new `compose.yaml` moves migrations to the backup service. With a new `compose.yaml` and a backup image from before this release, the server waits on the page that names `docker compose up -d --build backup`.
+The server there still holds both addresses and `KENWERK_MIGRATE_ON_START` is unset, so it migrates as before, beside the backup service; the migration lock lets them take turns. Nothing fails. The log says, at the moment the server migrates, that this layout gives the server the owner address and that the new `compose.yaml` moves migrations to the backup service. With a new `compose.yaml` and a backup image from before this release, the server waits on the page that names `docker compose up -d --build backup`.
 
 ### Upgrade path
 
@@ -85,20 +85,20 @@ The checkpoints of ADR-039 are Ed25519 signatures. The private key is derived wi
 
 - A new table `audit_signing_keys` lists every key after the first: from which position of the chain it signs (`from_seq`), its public key, and an **endorsement**: a signature over `from_seq` and the public key, made with the installation's own checkpoint key, the one derived from `master.key`.
 - The key that signs a checkpoint at position `s` is the newest key whose `from_seq` is at most `s`; before the first entry it is the installation's key. So existing checkpoints keep verifying unchanged.
-- **The change point.** The first time the backup service runs `diffluence worker checkpoint` with a backup key, it:
+- **The change point.** The first time the backup service runs `kenwerk worker checkpoint` with a backup key, it:
   - takes the lock of the chain, so nothing is sealed meanwhile;
   - writes the new key with `from_seq` one past both the head of the chain and the newest checkpoint;
   - records `audit.checkpoint_key_changed`, with the position and the public key;
   - signs a checkpoint with the new key at once.
 - When the backup key is replaced, the derived key changes, and the next round makes another change point the same way. A lost key therefore stops nothing.
 - A trigger on `audit_checkpoints` refuses a checkpoint whose public key is not the key in force at its position. The application role may only read `audit_signing_keys`.
-- **Verification**, in the console, the daily job, `diffluence audit verify` and the check after a restore:
+- **Verification**, in the console, the daily job, `kenwerk audit verify` and the check after a restore:
   - checks each endorsement against the installation's public key;
   - checks each checkpoint against the key in force at its position;
   - accepts an anchor of a prune signed by the installation's key or by an endorsed key.
   - The witness comparison uses the same rule.
 - The server's own checkpoint job stops by itself once a newer key is in force, so the two never race. An installation without the backup service, or without a backup key, keeps signing in the server as before.
-- The backup service writes each witness line to its own log. `docker compose logs --no-log-prefix backup | diffluence audit verify --witness -` compares them.
+- The backup service writes each witness line to its own log. `docker compose logs --no-log-prefix backup | kenwerk audit verify --witness -` compares them.
 
 ### What each control holds against (D9)
 
@@ -124,7 +124,7 @@ The console writes a request into `ops.restores`, after a fresh login, the insta
 | B. A confirmation command run in the backup service | Same strength, no console step | Takes the restore out of the console, which the product owner chose to keep |
 | C. A request signed on the administrator's device, such as by a passkey | Ties the order to a person | A WebAuthn verifier in the worker, a stored credential it trusts, and much more code |
 
-**Choice: A.** The command line keeps a road as strong as B: `diffluence backup restore-request` run inside the backup service holds the key, so it fills in the code itself.
+**Choice: A.** The command line keeps a road as strong as B: `kenwerk backup restore-request` run inside the backup service holds the key, so it fills in the code itself.
 
 ### Behaviour
 
@@ -132,7 +132,7 @@ The console writes a request into `ops.restores`, after a fresh login, the insta
 - **Asking and confirming.**
   1. The console asks for a restore as before. The request waits in state `requested`.
   2. The backup service sees it within a minute, writes one line to its log, and notes that it did:
-     `To restore diffluence-20261113T080000Z, enter this confirmation code in the console: 12345-67890 (valid 30 minutes)`.
+     `To restore kenwerk-20261113T080000Z, enter this confirmation code in the console: 12345-67890 (valid 30 minutes)`.
   3. The console shows "Enter the confirmation code from the backup service's log", with the command `docker compose logs backup` and a field.
   4. A system administrator enters it. The console stores it beside the request and records `backup.restore_code_entered`, without the code.
   5. The backup service compares it in constant time on its next round:
@@ -173,7 +173,7 @@ The application role may still insert or change rows in `ops.restores`, but noth
 ## Acceptance criteria
 
 - [x] A server with only the application role's address and `MIGRATE_ON_START=false` waits on an unmigrated database with the kind `migrations`, and serves once the backup service migrated it.
-- [x] `diffluence worker migrate` applies expand migrations with the backup check and the grants, and contract migrations after the grace period, recording each.
+- [x] `kenwerk worker migrate` applies expand migrations with the backup check and the grants, and contract migrations after the grace period, recording each.
 - [x] A server without the owner's address runs no contract migration.
 - [x] An old layout, where the server holds both addresses, keeps migrating as before.
 - [x] Checkpoints verify across the change point. A checkpoint signed with the installation's key after it is refused by the database and fails verification. An endorsement by another key fails verification.
@@ -191,9 +191,9 @@ The application role may still insert or change rows in `ops.restores`, but noth
 ## How the product owner tests it
 
 1. On a test installation, pull this release, `docker compose up -d --build`, and watch `docker compose logs backup`: it migrates, then backs up and signs checkpoints.
-2. `docker compose config diffluence` shows the server with only the secret `database_url`, and `DIFFLUENCE_MIGRATE_ON_START: "false"`.
+2. `docker compose config kenwerk` shows the server with only the secret `database_url`, and `KENWERK_MIGRATE_ON_START: "false"`.
 3. In the console, ask for a restore. Within a minute the backup service's log shows a code. Type a wrong one: the console says so. Type the right one: the restore runs.
-4. `docker compose exec diffluence diffluence audit verify` reports the chain whole, with checkpoints before and after the change of key.
+4. `docker compose exec kenwerk kenwerk audit verify` reports the chain whole, with checkpoints before and after the change of key.
 
 ## Decided on the product owner's behalf on 2026-11-13, may be overruled
 

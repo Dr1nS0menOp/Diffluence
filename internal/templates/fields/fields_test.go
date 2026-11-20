@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 // The table of cases that TypeScript runs as well (spec 074, TPL-325). Go and the form

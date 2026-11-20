@@ -5,7 +5,7 @@ package backups
 import (
 	"context"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // Readiness is what a restore must know about backups before it is asked for.

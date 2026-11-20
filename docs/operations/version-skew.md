@@ -8,7 +8,7 @@ During an upgrade, two releases share one database, one queue and one storage fo
 
 | Part | May differ by | For how long | Proven by |
 |---|---|---|---|
-| Nodes (`api`, `worker`, `all`) | One release: N and N+1 side by side | Until the last old node stops. Contract migrations of N+1 wait until every live node knows them, plus `DIFFLUENCE_CONTRACT_GRACE` (a day by default) | `scripts/upgrade-test.sh` in CI, on every change |
+| Nodes (`api`, `worker`, `all`) | One release: N and N+1 side by side | Until the last old node stops. Contract migrations of N+1 wait until every live node knows them, plus `KENWERK_CONTRACT_GRACE` (a day by default) | `scripts/upgrade-test.sh` in CI, on every change |
 | Rolling back | One release: N starts again on a database N+1 migrated | Until N+1's contract migrations ran; after that N refuses to start and names the migration | The rollback step of the upgrade test; `TestOlderNodeRefusesADatabaseAfterAContractMigration` |
 | Jobs in the jobs table | One release | A job of a kind a node does not know waits for a node that does | `TestAJobOfANewerReleaseWaitsForANodeThatKnowsIt` |
 | Events in the outbox and the queue | One release | Every listener ignores a type or a field it does not know | `TestEveryListenerLetsAnEventOfANewerReleasePass`; the upgrade test checks that no event is set aside |

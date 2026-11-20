@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/restore"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/restore"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // A node that stops starting says so at once, so a restore need not wait for it to go quiet.

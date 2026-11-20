@@ -13,7 +13,7 @@ trap 'rm -rf "$work"' EXIT
 # A fixed version and commit date: the same inputs a release gives both builds.
 version=${VERSION:-v0.0.0-repro}
 date=${BUILD_DATE:-2026-01-01}
-pkg=github.com/diffluence/diffluence/internal/version
+pkg=github.com/kenwerk/kenwerk/internal/version
 
 build_in() {
   local dir=$1
@@ -32,7 +32,7 @@ build_in() {
     cd "$dir"
     GOCACHE="$dir/.gocache" GOFLAGS=-buildvcs=false CGO_ENABLED=0 \
       go build -trimpath -ldflags "-s -w -X $pkg.Version=$version -X $pkg.Date=$date" \
-      -o "$dir/out/diffluence" ./cmd/diffluence
+      -o "$dir/out/kenwerk" ./cmd/kenwerk
   )
 }
 
@@ -48,7 +48,7 @@ compare() {
     differ=$((differ + 1))
   fi
 }
-compare "$work/one/a/out/diffluence" "$work/two/deeper/b/out/diffluence" diffluence
+compare "$work/one/a/out/kenwerk" "$work/two/deeper/b/out/kenwerk" kenwerk
 count=1
 while IFS= read -r -d '' file; do
   rel=${file#"$work/one/a/"}
@@ -70,4 +70,4 @@ if [ "$differ" -gt 0 ]; then
   echo "$differ of $count files differ: the build does not reproduce"
   exit 1
 fi
-echo "the build reproduces: $count files the same, sha256 of the binary $(sha256sum <"$work/one/a/out/diffluence" | cut -c1-16)"
+echo "the build reproduces: $count files the same, sha256 of the binary $(sha256sum <"$work/one/a/out/kenwerk" | cut -c1-16)"

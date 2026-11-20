@@ -2,22 +2,22 @@
 # Reference installation: one node, embedded queue, local disk.
 #   sh scripts/setup-secrets.sh
 #   docker compose up -d --wait
-#   printf '%s\n' 'a long password' | docker compose exec -T diffluence diffluence user create-admin --email you@example.com --name You
+#   printf '%s\n' 'a long password' | docker compose exec -T kenwerk kenwerk user create-admin --email you@example.com --name You
 # See docs/operations/install.md. Put a TLS reverse proxy in front of it.
 services:
   postgres:
     image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
     restart: unless-stopped
     environment:
-      POSTGRES_USER: diffluence_owner
-      POSTGRES_DB: diffluence
+      POSTGRES_USER: kenwerk_owner
+      POSTGRES_DB: kenwerk
       POSTGRES_PASSWORD_FILE: /run/secrets/db_owner_password
     secrets: [db_owner_password, db_app_password]
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./deploy/postgres-init.sh:/docker-entrypoint-initdb.d/10-app-role.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U diffluence_owner -d diffluence"]
+      test: ["CMD-SHELL", "pg_isready -U kenwerk_owner -d kenwerk"]
       interval: 5s
       retries: 10
 
@@ -32,69 +32,69 @@ services:
     security_opt: ["no-new-privileges:true"]
     cap_drop: [ALL]
     environment:
-      DIFFLUENCE_API_URL: http://diffluence:8080
-      DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
+      KENWERK_API_URL: http://kenwerk:8080
+      KENWERK_COLLAB_TOKEN: ${KENWERK_COLLAB_TOKEN:-}
 
-  diffluence:
-    image: ${DIFFLUENCE_IMAGE:-diffluence:local}
+  kenwerk:
+    image: ${KENWERK_IMAGE:-kenwerk:local}
     build: .
     restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
-      DIFFLUENCE_ROLE: all
-      DIFFLUENCE_COLLAB_URL: ${DIFFLUENCE_COLLAB_URL:-}
-      DIFFLUENCE_COLLAB_TOKEN: ${DIFFLUENCE_COLLAB_TOKEN:-}
+      KENWERK_ROLE: all
+      KENWERK_COLLAB_URL: ${KENWERK_COLLAB_URL:-}
+      KENWERK_COLLAB_TOKEN: ${KENWERK_COLLAB_TOKEN:-}
       # Empty = no /metrics.
-      DIFFLUENCE_METRICS_TOKEN: ${DIFFLUENCE_METRICS_TOKEN:-}
+      KENWERK_METRICS_TOKEN: ${KENWERK_METRICS_TOKEN:-}
       # A YAML file with settings, mounted below; empty = none (docs/operations/install.md).
       # A value set here and not empty wins over the file.
-      DIFFLUENCE_CONFIG_FILE: ${DIFFLUENCE_CONFIG_FILE:-}
+      KENWERK_CONFIG_FILE: ${KENWERK_CONFIG_FILE:-}
       # Empty = http://localhost:8080.
-      DIFFLUENCE_PUBLIC_URL: ${DIFFLUENCE_PUBLIC_URL:-}
+      KENWERK_PUBLIC_URL: ${KENWERK_PUBLIC_URL:-}
       # Who may say, in X-Forwarded-For, which address a request came from. The default
       # fits the port below on 127.0.0.1: a proxy on this machine reaches the app through
       # Docker's gateway, and one in this Compose project from its own network, both in
       # 172.16.0.0/12, where Docker takes its networks from. Nobody else can reach the port.
-      # With DIFFLUENCE_BIND=0.0.0.0, set this to the address of the proxy alone, or anyone
+      # With KENWERK_BIND=0.0.0.0, set this to the address of the proxy alone, or anyone
       # on such a network could pass any address (docs/operations/install.md).
-      DIFFLUENCE_TRUSTED_PROXIES: ${DIFFLUENCE_TRUSTED_PROXIES:-127.0.0.0/8,::1/128,172.16.0.0/12}
+      KENWERK_TRUSTED_PROXIES: ${KENWERK_TRUSTED_PROXIES:-127.0.0.0/8,::1/128,172.16.0.0/12}
       # The application connects as a role that does not own the tables, so it cannot
       # disable the audit log's protection. It holds no other: the backup service below
       # migrates as the owner, and this node waits on its page until that is done (spec 070).
-      DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
-      DIFFLUENCE_MIGRATE_ON_START: "false"
+      KENWERK_DATABASE_URL_FILE: /run/secrets/database_url
+      KENWERK_MIGRATE_ON_START: "false"
       # Mail. Without a host it is off, and mail waits in the queue.
-      DIFFLUENCE_SMTP_HOST: ${DIFFLUENCE_SMTP_HOST:-}
+      KENWERK_SMTP_HOST: ${KENWERK_SMTP_HOST:-}
       # Empty = 587, and starttls below.
-      DIFFLUENCE_SMTP_PORT: ${DIFFLUENCE_SMTP_PORT:-}
-      DIFFLUENCE_SMTP_USERNAME: ${DIFFLUENCE_SMTP_USERNAME:-}
-      DIFFLUENCE_SMTP_PASSWORD: ${DIFFLUENCE_SMTP_PASSWORD:-}
-      DIFFLUENCE_SMTP_FROM: ${DIFFLUENCE_SMTP_FROM:-}
-      DIFFLUENCE_SMTP_REPLY_TO: ${DIFFLUENCE_SMTP_REPLY_TO:-}
-      DIFFLUENCE_DRAWING_URL: ${DIFFLUENCE_DRAWING_URL:-}
-      DIFFLUENCE_SMTP_TLS: ${DIFFLUENCE_SMTP_TLS:-}
+      KENWERK_SMTP_PORT: ${KENWERK_SMTP_PORT:-}
+      KENWERK_SMTP_USERNAME: ${KENWERK_SMTP_USERNAME:-}
+      KENWERK_SMTP_PASSWORD: ${KENWERK_SMTP_PASSWORD:-}
+      KENWERK_SMTP_FROM: ${KENWERK_SMTP_FROM:-}
+      KENWERK_SMTP_REPLY_TO: ${KENWERK_SMTP_REPLY_TO:-}
+      KENWERK_DRAWING_URL: ${KENWERK_DRAWING_URL:-}
+      KENWERK_SMTP_TLS: ${KENWERK_SMTP_TLS:-}
       # PDF files need the helper below. Empty = no PDF, and browser print remains.
-      DIFFLUENCE_PDF_URL: ${DIFFLUENCE_PDF_URL:-}
+      KENWERK_PDF_URL: ${KENWERK_PDF_URL:-}
       # The password the helper asks for. Set the same value for the helper below.
-      DIFFLUENCE_PDF_PASSWORD: ${DIFFLUENCE_PDF_PASSWORD:-}
-      DIFFLUENCE_COLLABORA_URL: ${DIFFLUENCE_COLLABORA_URL:-}
+      KENWERK_PDF_PASSWORD: ${KENWERK_PDF_PASSWORD:-}
+      KENWERK_COLLABORA_URL: ${KENWERK_COLLABORA_URL:-}
       # Public sites are written below this folder. Empty = no sites.
-      DIFFLUENCE_PUBLISH_DIR: ${DIFFLUENCE_PUBLISH_DIR:-}
+      KENWERK_PUBLISH_DIR: ${KENWERK_PUBLISH_DIR:-}
       # An upgrade refuses to migrate when the last backup.sh run is older than this.
       # Empty = 24h. "off" upgrades without a recent backup (docs/operations/upgrade.md).
-      DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
+      KENWERK_UPGRADE_BACKUP_MAX_AGE: ${KENWERK_UPGRADE_BACKUP_MAX_AGE:-}
       # Empty = 24h: how long contract migrations wait after an upgrade (docs/operations/upgrade.md).
-      DIFFLUENCE_CONTRACT_GRACE: ${DIFFLUENCE_CONTRACT_GRACE:-}
+      KENWERK_CONTRACT_GRACE: ${KENWERK_CONTRACT_GRACE:-}
     secrets: [database_url]
     # Plain http, so only this machine by default: the TLS proxy in front reaches it here.
-    # Set DIFFLUENCE_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).
-    ports: ["${DIFFLUENCE_BIND:-127.0.0.1}:${DIFFLUENCE_PORT:-8080}:8080"]
+    # Set KENWERK_BIND=0.0.0.0 only when the proxy runs on another machine (SEC-627).
+    ports: ["${KENWERK_BIND:-127.0.0.1}:${KENWERK_PORT:-8080}:8080"]
     volumes:
-      - data:/var/lib/diffluence
-      # A configuration file: uncomment, and set DIFFLUENCE_CONFIG_FILE=/etc/diffluence/diffluence.yaml.
-      # - ./diffluence.yaml:/etc/diffluence/diffluence.yaml:ro
+      - data:/var/lib/kenwerk
+      # A configuration file: uncomment, and set KENWERK_CONFIG_FILE=/etc/kenwerk/kenwerk.yaml.
+      # - ./kenwerk.yaml:/etc/kenwerk/kenwerk.yaml:ro
     networks: [default, helpers]
     read_only: true
     security_opt: ["no-new-privileges:true"]
@@ -108,7 +108,7 @@ services:
   # the migrations of a new release, signs the audit checkpoints with a key derived from the
   # backup key, and carries out a restore only with the code it writes to its own log.
   backup:
-    image: ${DIFFLUENCE_BACKUP_IMAGE:-diffluence-backup:local}
+    image: ${KENWERK_BACKUP_IMAGE:-kenwerk-backup:local}
     build:
       context: .
       target: backup
@@ -117,25 +117,25 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DIFFLUENCE_BACKUP_INTERVAL: ${DIFFLUENCE_BACKUP_INTERVAL:-4h}
+      KENWERK_BACKUP_INTERVAL: ${KENWERK_BACKUP_INTERVAL:-4h}
       # How many backups to keep: 42 is a week at one every 4 hours.
-      DIFFLUENCE_BACKUP_KEEP: ${DIFFLUENCE_BACKUP_KEEP:-42}
-      DIFFLUENCE_DATABASE_URL_FILE: /run/secrets/database_url
+      KENWERK_BACKUP_KEEP: ${KENWERK_BACKUP_KEEP:-42}
+      KENWERK_DATABASE_URL_FILE: /run/secrets/database_url
       # Migrations, checkpoints and a restore from the console run as the owner of the
       # tables: the backup service is the worker that carries them out (specs 059 and 070).
-      DIFFLUENCE_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
-      DIFFLUENCE_DATA_DIR: /data
-      DIFFLUENCE_INSTANCE_NAME: ${DIFFLUENCE_INSTANCE_NAME:-}
+      KENWERK_MIGRATE_DATABASE_URL_FILE: /run/secrets/migrate_database_url
+      KENWERK_DATA_DIR: /data
+      KENWERK_INSTANCE_NAME: ${KENWERK_INSTANCE_NAME:-}
       # The checks before an upgrade and the wait before contract migrations, as the server
       # read them before spec 070 (docs/operations/upgrade.md).
-      DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE: ${DIFFLUENCE_UPGRADE_BACKUP_MAX_AGE:-}
-      DIFFLUENCE_CONTRACT_GRACE: ${DIFFLUENCE_CONTRACT_GRACE:-}
+      KENWERK_UPGRADE_BACKUP_MAX_AGE: ${KENWERK_UPGRADE_BACKUP_MAX_AGE:-}
+      KENWERK_CONTRACT_GRACE: ${KENWERK_CONTRACT_GRACE:-}
     secrets: [database_url, migrate_database_url]
     volumes:
       - data:/data
       - ./secrets:/secrets:ro
-      - ${DIFFLUENCE_BACKUP_DIR:-./backups}:/backups
-      - ${DIFFLUENCE_BACKUP_KEY_DIR:-./backup-key}:/key:ro
+      - ${KENWERK_BACKUP_DIR:-./backups}:/backups
+      - ${KENWERK_BACKUP_KEY_DIR:-./backup-key}:/key:ro
     read_only: true
     tmpfs: [/tmp]
     security_opt: ["no-new-privileges:true"]
@@ -146,8 +146,8 @@ services:
 
   # The helper for PDF files and office previews. It reads hostile files, so it can only
   # reach the app: no database, no internet (ARC-074).
-  # Start it with --profile pdf, and set DIFFLUENCE_PDF_URL=http://pdf:3000 and a long
-  # DIFFLUENCE_PDF_PASSWORD in .env. With a password set, it answers nobody without it.
+  # Start it with --profile pdf, and set KENWERK_PDF_URL=http://pdf:3000 and a long
+  # KENWERK_PDF_PASSWORD in .env. With a password set, it answers nobody without it.
   # It never fetches an address, runs no script in pages, and holds nothing on disk.
   pdf:
     image: gotenberg/gotenberg:8.40.0@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996
@@ -155,8 +155,8 @@ services:
     restart: unless-stopped
     networks: [helpers]
     environment:
-      GOTENBERG_API_BASIC_AUTH_USERNAME: diffluence
-      GOTENBERG_API_BASIC_AUTH_PASSWORD: ${DIFFLUENCE_PDF_PASSWORD:-}
+      GOTENBERG_API_BASIC_AUTH_USERNAME: kenwerk
+      GOTENBERG_API_BASIC_AUTH_PASSWORD: ${KENWERK_PDF_PASSWORD:-}
     # The password switches on the check, so an install without one keeps working.
     entrypoint:
       - sh

@@ -7,33 +7,33 @@
 #
 #   scripts/upgrade-test.sh <old binary> <new binary>
 #
-# Needs DIFFLUENCE_TEST_DATABASE_URL pointing at a role that may create databases.
+# Needs KENWERK_TEST_DATABASE_URL pointing at a role that may create databases.
 set -euo pipefail
 # A failure inside $(...) stops the test too, not only one outside it.
 shopt -s inherit_errexit
 old=$1
 new=$2
-: "${DIFFLUENCE_TEST_DATABASE_URL:?needs a test database}"
+: "${KENWERK_TEST_DATABASE_URL:?needs a test database}"
 
 work=$(mktemp -d)
 db="dfl_upgrade_$$"
-base=${DIFFLUENCE_TEST_DATABASE_URL%%\?*}
+base=${KENWERK_TEST_DATABASE_URL%%\?*}
 base=${base%/*}
 url="$base/$db?sslmode=disable"
 pids=()
 stop_all() {
   for p in "${pids[@]:-}"; do kill "$p" 2>/dev/null || true; done
   wait 2>/dev/null || true
-  psql "$DIFFLUENCE_TEST_DATABASE_URL" -q -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" || true
+  psql "$KENWERK_TEST_DATABASE_URL" -q -c "DROP DATABASE IF EXISTS $db WITH (FORCE)" || true
   rm -rf "$work"
 }
 trap stop_all EXIT
-psql "$DIFFLUENCE_TEST_DATABASE_URL" -q -c "CREATE DATABASE $db"
+psql "$KENWERK_TEST_DATABASE_URL" -q -c "CREATE DATABASE $db"
 
-export DIFFLUENCE_DATABASE_URL=$url DIFFLUENCE_PUBLIC_URL=http://localhost:8091 DIFFLUENCE_LOG_LEVEL=warn DIFFLUENCE_SHUTDOWN_DELAY=1s
+export KENWERK_DATABASE_URL=$url KENWERK_PUBLIC_URL=http://localhost:8091 KENWERK_LOG_LEVEL=warn KENWERK_SHUTDOWN_DELAY=1s
 
 serve() { # binary port data-dir log
-  DIFFLUENCE_HTTP_ADDR=":$2" DIFFLUENCE_DATA_DIR="$3" "$1" serve >"$4" 2>&1 &
+  KENWERK_HTTP_ADDR=":$2" KENWERK_DATA_DIR="$3" "$1" serve >"$4" 2>&1 &
   pids+=($!)
   for _ in $(seq 1 100); do
     curl -sf "http://localhost:$2/readyz" >/dev/null && return 0
@@ -45,7 +45,7 @@ serve() { # binary port data-dir log
 }
 
 echo "1. the old version starts and takes traffic"
-echo 'correct horse battery staple' | DIFFLUENCE_DATA_DIR="$work/old" "$old" user create-admin --email admin@example.com --name Admin >/dev/null
+echo 'correct horse battery staple' | KENWERK_DATA_DIR="$work/old" "$old" user create-admin --email admin@example.com --name Admin >/dev/null
 serve "$old" 8091 "$work/old" "$work/old.log"
 old_pid=${pids[-1]}
 
@@ -132,11 +132,11 @@ before=$(newest)
 # As an operator does before an upgrade, a backup is noted; an upgrade asks for one of at
 # most a day (ADR-040). A release from before "backup note" existed cannot note one, and
 # the new binary does it then.
-DIFFLUENCE_DATA_DIR="$work/old" "$old" backup note >/dev/null 2>&1 ||
-  DIFFLUENCE_DATA_DIR="$work/old" "$new" backup note >/dev/null
+KENWERK_DATA_DIR="$work/old" "$old" backup note >/dev/null 2>&1 ||
+  KENWERK_DATA_DIR="$work/old" "$new" backup note >/dev/null
 
 echo "2. the new version starts on the same database and migrates it"
-# Every node of an installation has the same key (DIFFLUENCE_MASTER_KEY_FILE) and the same
+# Every node of an installation has the same key (KENWERK_MASTER_KEY_FILE) and the same
 # file store; each keeps its own queue folder.
 mkdir -p "$work/new" "$work/old/objects"
 cp "$work/old/master.key" "$work/new/master.key"
@@ -161,7 +161,7 @@ sleep 3
 
 # Spec 068: an operator switches the events from NATS to PostgreSQL. A release from before the
 # switch holds it up while it runs, so it comes once that release stops.
-events_cmd() { DIFFLUENCE_DATA_DIR="$work/new" "$new" events "$@"; }
+events_cmd() { KENWERK_DATA_DIR="$work/new" "$new" events "$@"; }
 switch_events() {
   local out
   if out=$(events_cmd switch postgres 2>&1); then
@@ -279,6 +279,6 @@ wait "${pids[-1]}" || true
 pids=()
 
 echo "6. the audit chain written by both versions is intact, and so is the event log"
-DIFFLUENCE_DATA_DIR="$work/new" "$new" audit verify
+KENWERK_DATA_DIR="$work/new" "$new" audit verify
 events_cmd check
 echo "upgrade test passed"

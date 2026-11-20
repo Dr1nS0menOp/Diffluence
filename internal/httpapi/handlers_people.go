@@ -14,12 +14,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/people"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/watches"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/people"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/watches"
 )
 
 // forgotAnswerTime makes every answer on the forgot-password route take as long,
@@ -555,7 +555,7 @@ func (s *Server) handleMyData(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	w.Header().Set("Content-Disposition", attachmentHeader("diffluence-my-data.json"))
+	w.Header().Set("Content-Disposition", attachmentHeader("kenwerk-my-data.json"))
 	writeJSON(w, http.StatusOK, map[string]any{"personal_data": data, "pages": pages})
 }
 
@@ -669,7 +669,7 @@ func (c *csvResponse) Write(b []byte) (int, error) {
 	if !c.started {
 		c.started = true
 		c.Header().Set("Content-Type", "text/csv; charset=utf-8")
-		c.Header().Set("Content-Disposition", attachmentHeader("diffluence-access.csv"))
+		c.Header().Set("Content-Disposition", attachmentHeader("kenwerk-access.csv"))
 	}
 	return c.ResponseWriter.Write(b)
 }

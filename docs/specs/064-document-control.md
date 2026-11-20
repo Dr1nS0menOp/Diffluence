@@ -249,7 +249,7 @@ Every wave follows these rules:
 **Load (DOC-1303):**
 - Signing hashes the version once, when it is first signed, and keeps the hash in `version_hashes`; later signatures of that version compare with it.
 - Showing a controlled page reads its signatures inside the query the band already makes, so it adds no query. The history adds one query for the signatures of the versions it lists.
-- A full verification recomputes the hash and reads the audit entry with its two neighbours: three small queries per signature, only on demand, in the control history, the auditor's export and `diffluence signatures verify`.
+- A full verification recomputes the hash and reads the audit entry with its two neighbours: three small queries per signature, only on demand, in the control history, the auditor's export and `kenwerk signatures verify`.
 
 **Decided on the product owner's behalf on 2026-11-15, may be overruled:**
 
@@ -264,15 +264,15 @@ Every wave follows these rules:
 | DC4-7 | A confirmation is the password with a code of the authenticator app (never a recovery code), a passkey with user verification, or, only for someone without a password, a new login at the identity provider after the step began, allowing one minute of clock difference as the step-up does. That login opens no session, and never makes or links an account | DOC-730, DOC-731; a recovery code is written down where others may find it |
 | DC4-8 | A wrong password or code of a confirmation counts toward the stop after 100 wrong passwords, with the same answer for both; a failed passkey is audited but does not count, because a passkey is not guessed | DOC-732 |
 | DC4-9 | The signed content is canonical form 1: title, document format version, the document as canonical JSON, and the files the version shows with their version, name and SHA-256, each with its length, as written in `docs/operations/regulated-use.md` | DOC-711; an auditor can rebuild it by hand |
-| DC4-10 | The page shows the quick mark (the record against the hash its version keeps); the history verifies in full on demand, as do the control history, the auditor's export and `diffluence signatures verify` | DOC-741, DOC-1303 |
-| DC4-11 | Signed records are kept without end: signatures, the versions they sign and the file versions those show. A trash item that holds them cannot be purged and stays past its time; a signed version cannot be removed; pruning the audit log stops at the first signature | DOC-770; Diffluence has no retention period per space yet |
+| DC4-10 | The page shows the quick mark (the record against the hash its version keeps); the history verifies in full on demand, as do the control history, the auditor's export and `kenwerk signatures verify` | DOC-741, DOC-1303 |
+| DC4-11 | Signed records are kept without end: signatures, the versions they sign and the file versions those show. A trash item that holds them cannot be purged and stays past its time; a signed version cannot be removed; pruning the audit log stops at the first signature | DOC-770; Kenwerk has no retention period per space yet |
 | DC4-12 | The control history lists every audit entry about the page with its place in the chain, the newest 2000, with the verification of each signature. It shows no title or text, and needs `space.audit` | DOC-1010; reading the audit of a space is not reading every page |
 | DC4-13 | The auditor's export is JSON Lines, made while the request waits, for at most 1000 pages, with a period. A page the exporter may not read gives its record without title or text. The PDF report and the export as background work come with DC5 and DOC-1305 | DOC-1020 partly; the machine-readable copy first, so outside verification works now |
 | DC4-14 | The outside verification is `scripts/verify-signatures.mjs`, which needs only Node.js, and the same steps written for doing by hand | DOC-742 |
 | DC4-15 | Bundles do not carry signatures yet; DC5 brings them with DOC-1212. A workflow imported from a bundle that names a meaning the space lacks refuses signing until the space adds it | Imported signatures need their own record (DOC-1421) |
 | DC4-16 | Every export's control line names the signatures of the version in the file | DC3-11, Part 11 §11.50(b) |
 | DC4-17 | "Two-step review" signs its quality approval as approved | DC2-15 |
-| DC4-18 | Diffluence has no impersonation and no support sessions. The signature itself refuses everything but a person's own live session without a pending second factor, so such a session, if one comes, cannot sign without its own decision | DOC-733 |
+| DC4-18 | Kenwerk has no impersonation and no support sessions. The signature itself refuses everything but a person's own live session without a pending second factor, so such a session, if one comes, cannot sign without its own decision | DOC-733 |
 | DC4-19 | Qualified signatures through a trust provider (open question 1): not now. Recommended for after 1.0, when a customer needs them, because they cost a provider and a contract | DOC-791 |
 | DC4-20 | Retention against erasure (open question 2): keep DOC-1417 for every controlled space, without a choice per space, until there are retention periods per space | A choice per space would need a period to end at |
 | DC4-21 | PUB-731 comes with DC4, which landed after PB3: the published copy of a signed version shows its signatures in its band, with the printed name, date and time, and meaning, whatever "show approvers to readers" says; no record is copied. The control block of PDF and Word exports of a published copy comes with PB4, because an export of the published space would need the pair's records, which belong to publishing | Part 11 §11.50(b) on the screen now; the exports with the wave that owns them |
@@ -331,7 +331,7 @@ Every wave follows these rules:
 **Not in this wave:**
 - the PDF report of the auditor's export and the export as background work (DOC-1020 partly, DOC-1305 partly);
 - a signature of meaning "read and understood" (DOC-821 partly): confirming is an acknowledgement for now;
-- conditions on page properties, which Diffluence does not have (DOC-120 partly);
+- conditions on page properties, which Kenwerk does not have (DOC-120 partly);
 - a screen for absences and for the escalation targets and reading groups of a state; the API takes them (DOC-241, DOC-231, DOC-820);
 - the restore drill step with an open round (DOC-1211), resuming a large assignment killed halfway (DOC-1251), and the budgets of DOC-1306 on the real-data dump.
 
@@ -355,7 +355,7 @@ Every wave follows these rules:
 | DC5-8 | An approved state asks 1 to 10 groups to confirm reading. They are resolved at approval to active members who view the space, never guests; people who join later are asked by the job. A confirmation is for the version readers see now, once, only after the page showed that version in the same session, and never through a token | DOC-820 to DOC-824, DOC-1418 |
 | DC5-9 | A timed approved state has a period of 1 to 120 months, 12 when it names none. A page may have a shorter one, set by whoever may set its workflow. The owner, or the space's administrators when the owner left, is reminded 30 days before and on the date, then weekly. On the date the state's periodic review step starts a round on the same text as the system; passing it confirms the version without a new one and moves the date on, and watchers are not told of a new version | DOC-800 to DOC-805, DOC-1223 |
 | DC5-10 | A space workflow exempts at most 20 labels. Adding or removing one, and renaming a label onto or away from one, needs space.workflows; a copy keeps an exempt label only for someone who may set it | DOC-402: nobody escapes review with a label |
-| DC5-11 | Conditions are a label present or absent, a change of the title, the body or the files since the approved version, and at least one file, joined by "all of" or "any of", at most ten, through `conditions.Combine` and `conditions.MaxTests`. A label the space's fixed list no longer allows fails closed. Diffluence has no page properties, so there is no property condition yet | DOC-120, TPL-433 |
+| DC5-11 | Conditions are a label present or absent, a change of the title, the body or the files since the approved version, and at least one file, joined by "all of" or "any of", at most ten, through `conditions.Combine` and `conditions.MaxTests`. A label the space's fixed list no longer allows fails closed. Kenwerk has no page properties, so there is no property condition yet | DOC-120, TPL-433 |
 | DC5-12 | No automation action takes a step. A token takes steps with every check of a person, conditions included, and never signs or confirms reading | DOC-121, DOC-1413 |
 | DC5-13 | A move to another space never takes a page workflow along, and an approval under the other space's procedure never counts: under control there the page starts at its newest version and readers see nothing until it is approved; without control it is an ordinary page at its approved version | DOC-1200, DOC-430 |
 | DC5-14 | A bundle's workflows arrive without their reviewers, escalation targets and reading groups, which are people of another installation. A bundle whose readers' version is not the approved one is refused. Signatures arrive as imported records, shown with their installation and verified against the content here, and never count as a signature or an approval here. The bundle keeps version 8 with an optional list of signatures | DOC-1212, DOC-1421 |
@@ -388,5 +388,5 @@ DOC-1300 to DOC-1306:
 
 ## Open for the product owner
 
-1. **Qualified signatures:** should Diffluence ever offer qualified signatures through a trust provider? That costs a provider and a contract.
+1. **Qualified signatures:** should Kenwerk ever offer qualified signatures through a trust provider? That costs a provider and a contract.
 2. **Retention against erasure:** should signed records in controlled spaces be kept against an erasure request (decided for now, DOC-1417), or should that be a choice per space?

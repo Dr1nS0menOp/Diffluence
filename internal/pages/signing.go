@@ -14,14 +14,14 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/workflow"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/workflow"
 )
 
 // Electronic signatures (spec 064, wave DC4, blueprint 09.8). A step of a workflow can
@@ -117,7 +117,7 @@ func (s *Service) sign(ctx context.Context, tx pgx.Tx, c identity.Caller, in Sig
 
 // versionHash gives the content hash of a version, storing it at its first signature. A
 // version whose content no longer gives the hash stored for it was changed behind
-// Diffluence's back, and nobody signs it (DOC-741).
+// Kenwerk's back, and nobody signs it (DOC-741).
 func (s *Service) versionHash(ctx context.Context, tx pgx.Tx, pageID uuid.UUID, number int) ([]byte, error) {
 	// The files a version shows are pinned when it is written; a version from before pins
 	// existed gets them now, which is what it shows.

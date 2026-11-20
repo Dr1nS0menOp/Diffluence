@@ -12,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // realDataControlBudget is what spec 064 allows on the seeded data of the stress test, with a
@@ -96,9 +96,9 @@ func medianOf(u *user, method, path string, body any) time.Duration {
 // (scripts/stress/real-data.sh), migrating it first, or skips the test when there is none.
 func openRealData(t *testing.T) *env {
 	t.Helper()
-	realURL := os.Getenv("DIFFLUENCE_REALDATA_URL")
+	realURL := os.Getenv("KENWERK_REALDATA_URL")
 	if realURL == "" {
-		t.Skip("DIFFLUENCE_REALDATA_URL is not set; see scripts/stress/real-data.sh")
+		t.Skip("KENWERK_REALDATA_URL is not set; see scripts/stress/real-data.sh")
 	}
 	public, _ := url.Parse("http://localhost")
 	cfg := config.Config{Role: config.RoleAll, HTTPAddr: "127.0.0.1:0", PublicURL: public, InstanceName: "Real data",

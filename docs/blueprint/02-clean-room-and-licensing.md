@@ -18,7 +18,7 @@ We want behaviour that users recognise from Confluence (proprietary) and Docmost
 
 - Reading or copying source code of Docmost, Plane, OpenProject, Huly or any copyleft or proprietary wiki or issue tracker
 - Including anything from Docmost's enterprise folders (`ee/`), which are under a separate proprietary licence
-- Using an Atlassian product or account to develop Diffluence, including the Confluence of an employer and its exports (one exception, decided by the product owner: see "One exception" below)
+- Using an Atlassian product or account to develop Kenwerk, including the Confluence of an employer and its exports (one exception, decided by the product owner: see "One exception" below)
 - Non-public APIs, decompiling, or capturing network traffic of Atlassian products
 - Copying documentation text, UI copy, icons, illustrations, templates or pixel-exact layouts
 - Using "Confluence", "Atlassian" or "Jira" in our product name, logo or domain. Descriptive use ("Import from Confluence") is fine.
@@ -54,6 +54,7 @@ On 2026-11-14 the product owner decided to use a set of 154 pictures of the scre
 
 ## Name
 
+- **Kenwerk** (the name since 17 November 2026, spec 095): chosen by the product owner to replace the working name below, which sat too close to the name of a commercial wiki. The checks before going public apply to it.
 - **Diffluence** (working name): a real English word for a river splitting into branches, and a playful counterpart to Confluence. No software product by that name turned up in a quick search.
 - **Before going public:** search EUIPO TMview and USPTO in classes 9 and 42, check the `.org`/`.io`/`.dev` domains and the GitHub organisation name, and design an original logo with no similarity to Atlassian's marks.
 

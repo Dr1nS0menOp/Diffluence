@@ -7,8 +7,8 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // The test database turns on every experimental part, so each suite tests the part

@@ -1,8 +1,8 @@
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 # The date of the commit, not of the build, so two builds of one commit are the same (spec 051).
 BUILD_DATE ?= $(shell git log -1 --format=%cs 2>/dev/null)
-LDFLAGS := -s -w -X github.com/diffluence/diffluence/internal/version.Version=$(VERSION) \
-	-X github.com/diffluence/diffluence/internal/version.Date=$(BUILD_DATE)
+LDFLAGS := -s -w -X github.com/kenwerk/kenwerk/internal/version.Version=$(VERSION) \
+	-X github.com/kenwerk/kenwerk/internal/version.Date=$(BUILD_DATE)
 STATICCHECK := honnef.co/go/tools/cmd/staticcheck@v0.8.2
 GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 
@@ -11,13 +11,13 @@ GOVULNCHECK := golang.org/x/vuln/cmd/govulncheck@v1.9.0
 all: web build
 
 build:
-	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/diffluence ./cmd/diffluence
+	CGO_ENABLED=0 go build -trimpath -ldflags "$(LDFLAGS)" -o bin/kenwerk ./cmd/kenwerk
 
 web:
 	cd web && npm ci --no-fund --no-audit && npx vite build
 
 run: build
-	./bin/diffluence serve
+	./bin/kenwerk serve
 
 test:
 	go test ./...

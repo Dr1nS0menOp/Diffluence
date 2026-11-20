@@ -21,7 +21,7 @@ The promise of this feature is that a draft cannot reach readers through a page 
 | Read the pair's audit | `space.audit` in the draft space; in the published space, its own `space.audit` shows the effects without draft names |
 
 *Proof:* a matrix test of this table, for an instance administrator, both spaces' administrators, a release manager, a writer, a reader of the published space only, a person in both, and a guest.
-- **PUB-602** · built · **Instance administrators** get no way around the managed rule (PUB-220) and no view of the draft space beyond what their grants give, as everywhere in Diffluence (ADR-009). *Proof:* matrix cases.
+- **PUB-602** · built · **Instance administrators** get no way around the managed rule (PUB-220) and no view of the draft space beyond what their grants give, as everywhere in Kenwerk (ADR-009). *Proof:* matrix cases.
 - **PUB-603** · built · A person who may view **both** spaces sees each page as what it is: in the draft space, a band with the release status; in the published space, a quiet line "Released from a draft" with a link to the draft page (PUB-1230). They are never shown draft content inside the published space. *Proof:* tests for a person in both.
 
 ## 7.2 What linking checks

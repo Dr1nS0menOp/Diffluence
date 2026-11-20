@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/health"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/health"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 func (e *env) auditWaiting() int {
@@ -109,7 +109,7 @@ func TestEventsLeftUnsealedShowOnTheHealthPage(t *testing.T) {
 	for _, g := range app.HealthGauges(facts) {
 		gauges[g.Name] = g.Value
 	}
-	if gauges["diffluence_audit_unsealed_events"] != 1 || gauges["diffluence_audit_sealing_lag_seconds"] < 110 {
+	if gauges["kenwerk_audit_unsealed_events"] != 1 || gauges["kenwerk_audit_sealing_lag_seconds"] < 110 {
 		t.Fatalf("metrics: %v", gauges)
 	}
 }

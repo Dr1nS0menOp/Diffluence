@@ -1,6 +1,6 @@
 # 04: Architecture
 
-This is how Diffluence is built and how it must grow to carry all of blueprint 03 and specs 008 to 016: what runs where, who owns what, how parts talk, how they fail, and what was traded for what.
+This is how Kenwerk is built and how it must grow to carry all of blueprint 03 and specs 008 to 016: what runs where, who owns what, how parts talk, how they fail, and what was traded for what.
 
 It came from a study on 2026-11-05, as the product owner asked for every blueprint. It reads the code as it is, not as the first version of this text hoped it would be. `04-architecture/sources.md` lists every source.
 
@@ -28,7 +28,7 @@ When something is built, its status changes in the same pull request.
           │ Reverse proxy  │  TLS, limits
           └───────┬────────┘
    ┌──────────────▼──────────────┐        ┌───────────────────┐
-   │ diffluence, role api        │◄──────►│ Editing service   │ optional
+   │ kenwerk, role api        │◄──────►│ Editing service   │ optional
    │ router, access rules, API   │        │ Node.js, Yjs      │
    └──┬───────────────┬──────────┘        └───────────────────┘
       │               │
@@ -40,7 +40,7 @@ When something is built, its status changes in the same pull request.
 │ the truth   │   │   │
 └─────────────┘   │   │
              ┌────┴───┴────────────────┐      ┌──────────────┐
-             │ diffluence, role worker │◄────►│ NATS         │
+             │ kenwerk, role worker │◄────►│ NATS         │
              │ relay, jobs, listeners  │      │ events       │
              └────┬────────────────────┘      └──────────────┘
                   │ only outward, each optional

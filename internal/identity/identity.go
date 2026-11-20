@@ -24,12 +24,12 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/plaintext"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/plaintext"
 )
 
 // Global permissions.
@@ -150,7 +150,7 @@ func NewService(pool *pgxpool.Pool, instanceID uuid.UUID, opts Options) *Service
 		opts.Now = time.Now
 	}
 	if opts.Issuer == "" {
-		opts.Issuer = "Diffluence"
+		opts.Issuer = "Kenwerk"
 	}
 	return &Service{pool: pool, instanceID: instanceID, params: opts.Params,
 		idle: opts.SessionIdleTimeout, maxAge: opts.SessionMaxAge, now: opts.Now,
@@ -162,7 +162,7 @@ func NewService(pool *pgxpool.Pool, instanceID uuid.UUID, opts Options) *Service
 func (s *Service) dummyHash() string {
 	s.dummyOnce.Do(func() {
 		// Made once and kept for every later login, so no single request may cut it short.
-		s.dummy, _ = HashPassword(context.Background(), "diffluence-timing-equaliser", s.params)
+		s.dummy, _ = HashPassword(context.Background(), "kenwerk-timing-equaliser", s.params)
 	})
 	return s.dummy
 }

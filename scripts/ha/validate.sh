@@ -37,9 +37,9 @@ set -a
 # shellcheck disable=SC1091
 . "$work/ha.local.env"
 set +a
-NODE_NAME=diffluence-ha-db1 NODE_ADDR=10.0.0.11 NATS_SYNC_LINE="sync_interval: always" \
+NODE_NAME=kenwerk-ha-db1 NODE_ADDR=10.0.0.11 NATS_SYNC_LINE="sync_interval: always" \
   envsubst <"$here/conf/patroni.yml.tmpl" >"$work/patroni.yml"
-NODE_NAME=diffluence-ha-nats1 NATS_SYNC_LINE="sync_interval: always" \
+NODE_NAME=kenwerk-ha-nats1 NATS_SYNC_LINE="sync_interval: always" \
   envsubst <"$here/conf/nats.conf.tmpl" >"$work/nats.conf"
 envsubst <"$here/conf/haproxy.cfg.tmpl" >"$work/haproxy.cfg"
 chmod 755 "$work"

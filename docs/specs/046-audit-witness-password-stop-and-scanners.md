@@ -12,10 +12,10 @@ Phase: the second wave of ADR-038 (security). Wave PM ran at the same time (perm
 |---|---|
 | Chain | `audit_events` with a hash per row over the row before, an advisory lock for the order, triggers against update and delete, and no such rights for the application role (SEC-810, SEC-811) |
 | Checkpoints | `audit.SignCheckpoint` signs `(seq, hash)` of the head with Ed25519, stores it in `audit_checkpoints` and records `audit.checkpoint_signed`. The job `audit-checkpoint` ran once a day |
-| Checking | `audit.Check` walks the chain, then every checkpoint against the key and the chain. The daily job, the Verify button, `diffluence audit verify` and `restore.sh` all call it (SEC-814) |
+| Checking | `audit.Check` walks the chain, then every checkpoint against the key and the chain. The daily job, the Verify button, `kenwerk audit verify` and `restore.sh` all call it (SEC-814) |
 | The gap | Whoever owns the tables can switch off the trigger, delete the newest rows and the checkpoints that cover them, and switch it on again. The shorter chain is whole, and every checkpoint left matches it. Nothing outside the database remembers how far the chain reached |
 | The key | Derived from the root in `master.key`, outside the database. Whoever holds both can sign new checkpoints (SEC-815) |
-| The application log | JSON on standard error through `slog`, at the level `DIFFLUENCE_LOG_LEVEL` sets. Operators send it to a log server or a SIEM |
+| The application log | JSON on standard error through `slog`, at the level `KENWERK_LOG_LEVEL` sets. Operators send it to a log server or a SIEM |
 
 ### Password guessing
 
@@ -48,9 +48,9 @@ After the checkpoint is committed, the worker writes one line:
 {"level":"INFO","msg":"audit checkpoint","witness":"audit-checkpoint-1","seq":4711,"hash":"…","signature":"…","public_key":"…"}
 ```
 
-It is written after the commit, because a line for a checkpoint that was rolled back would later look like a removed tail. It is written whatever `DIFFLUENCE_LOG_LEVEL` says: a handler wrapper answers "enabled" for every level, so an operator who quiets the log does not lose the witness. The line holds a position, two hashes and a public key, and no personal data. The format has a name, so a later shape can be told apart.
+It is written after the commit, because a line for a checkpoint that was rolled back would later look like a removed tail. It is written whatever `KENWERK_LOG_LEVEL` says: a handler wrapper answers "enabled" for every level, so an operator who quiets the log does not lose the witness. The line holds a position, two hashes and a public key, and no personal data. The format has a name, so a later shape can be told apart.
 
-### D3. `diffluence audit verify --witness FILE`
+### D3. `kenwerk audit verify --witness FILE`
 
 It reads the log (`-` for standard input), takes every line with the witness name, also after a prefix from a container runtime, and refuses a witness line it cannot read: a log that was tampered with must not pass because a line was skipped. A log with no witness line is refused as the wrong file. It then runs the usual check, and compares each checkpoint, oldest first:
 

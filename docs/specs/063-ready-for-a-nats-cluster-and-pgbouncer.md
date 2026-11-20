@@ -16,11 +16,11 @@ Spec 062 found two things the app needs before it can run on several nodes:
 
 ## F1: copies of the event stream
 
-- `DIFFLUENCE_NATS_REPLICAS` (and `nats_replicas` in the configuration file) is read through
+- `KENWERK_NATS_REPLICAS` (and `nats_replicas` in the configuration file) is read through
   the one validator of spec 056. Default 1.
 - Allowed: 1, 3 or 5. JetStream keeps an odd number so a majority can agree; more than five
   gains nothing for one stream. Anything else is refused at start, naming the setting.
-- Above 1 needs `DIFFLUENCE_NATS_URL`: the embedded server is one node. Refused at start.
+- Above 1 needs `KENWERK_NATS_URL`: the embedded server is one node. Refused at start.
 - `queue.Open` creates or updates the stream with the copies it gets from
   `streamReplicas(existing, configured)`, which is the larger of the two.
 - A start that asks for more copies than the server can hold fails with the count in the

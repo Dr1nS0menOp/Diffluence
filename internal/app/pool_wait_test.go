@@ -11,8 +11,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // smallPool gives the app a pool of n connections, so a request that holds one

@@ -11,11 +11,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/monitoring"
-	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/monitoring"
+	"github.com/kenwerk/kenwerk/internal/settings"
 )
 
 // Installation is what the console's areas of the running installation read (spec 075, wave
@@ -23,7 +23,7 @@ import (
 type Installation struct {
 	// Upgrades reads the nodes, the migrations and the last upgrade marker.
 	Upgrades func(ctx context.Context) (any, error)
-	// Events reads where the events transport stands, as diffluence events status does.
+	// Events reads where the events transport stands, as kenwerk events status does.
 	Events func(ctx context.Context) (any, error)
 	// Audit reads the newest checkpoint, the signing keys and the newest witness report.
 	Audit func(ctx context.Context) (any, error)
@@ -198,7 +198,7 @@ type configurationSeen struct {
 }
 
 // handleConfiguration shows the settings the server started with and where each came
-// from, as diffluence config check prints them: secrets as (set), database addresses
+// from, as kenwerk config check prints them: secrets as (set), database addresses
 // without their password. It reads the environment and the file again, so it shows what
 // a restart would take, and marks what differs from the start (CSL-601). Problems are
 // listed by key and line, never with a value. Beside them: the variables of the trace

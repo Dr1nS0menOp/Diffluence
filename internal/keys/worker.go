@@ -38,7 +38,7 @@ func LoadWorker(path string) (*Worker, error) {
 }
 
 func (w *Worker) derive(purpose string, size int) ([]byte, error) {
-	return hkdf.Key(sha256.New, w.secret, nil, "diffluence backup service "+purpose+" v1", size)
+	return hkdf.Key(sha256.New, w.secret, nil, "kenwerk backup service "+purpose+" v1", size)
 }
 
 // CheckpointKey is the Ed25519 key with which the backup service signs audit checkpoints.

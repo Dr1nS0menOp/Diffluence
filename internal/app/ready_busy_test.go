@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/httpapi"
+	"github.com/kenwerk/kenwerk/internal/httpapi"
 )
 
 func TestAFullPoolIsBusyNotAGoneDatabase(t *testing.T) {

@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // A long transaction that changes who may do what, such as an import or a sync of people,

@@ -1,10 +1,10 @@
 # Public sites
 
-Diffluence writes public sites as plain files. It never serves them: a web server of your own does (ADR-010).
+Kenwerk writes public sites as plain files. It never serves them: a web server of your own does (ADR-010).
 
 ## Set-up
 
-1. Set `DIFFLUENCE_PUBLISH_DIR` to a folder that both the API and the worker can write to: a withdrawal happens in the API.
+1. Set `KENWERK_PUBLISH_DIR` to a folder that both the API and the worker can write to: a withdrawal happens in the API.
 2. Turn on public sites and public links under Administration, Security, Export and publishing.
 3. Point a web server at `<folder>/<site>/live` for a site, and at `<folder>/links` for public links.
 
@@ -34,4 +34,4 @@ Keep the folder out of the reach of the instance's own address, and do not list 
 
 ## PDF
 
-PDF needs the helper process: `docker compose --profile pdf up -d`, and `DIFFLUENCE_PDF_URL=http://pdf:3000`. It gets only HTML that Diffluence made, and needs no outside network. The same helper opens office files as a PDF, on request of someone who may see them. For those it gets the content and the extension of the file. To use Collabora for them instead, set `DIFFLUENCE_COLLABORA_URL`.
+PDF needs the helper process: `docker compose --profile pdf up -d`, and `KENWERK_PDF_URL=http://pdf:3000`. It gets only HTML that Kenwerk made, and needs no outside network. The same helper opens office files as a PDF, on request of someone who may see them. For those it gets the content and the extension of the file. To use Collabora for them instead, set `KENWERK_COLLABORA_URL`.

@@ -48,7 +48,7 @@
 
 The Act treats free and open-source software differently. A project that is not part of a commercial activity seems to fall outside it. A legal person that supports open-source software meant for commercial use can be an *open-source software steward*, with lighter duties: a public security policy, a contact point, cooperation with authorities, and reporting. A party that sells the product, or support for it, can be a *manufacturer*, with all duties.
 
-So the answer depends on what the product owner does with Diffluence: keep it a free project, start a foundation, or sell hosting or support. Several sources also note that the Commission published guidance on 27 July 2026, which was not read for this study.
+So the answer depends on what the product owner does with Kenwerk: keep it a free project, start a foundation, or sell hosting or support. Several sources also note that the Commission published guidance on 27 July 2026, which was not read for this study.
 
 - **SEC-1040** · later · The role of the project under the Cyber Resilience Act. There is no budget for a lawyer and no paying customer (ADR-029). The product owner asks for donations. Whether donations change that role is unchecked, and worth a look if money ever comes in.
 - **SEC-1041** · partly · Much of what the Act asks is here already: a vulnerability process, a contact point, security updates, a secure default. SBOM (SEC-1006) and documented support periods are missing.

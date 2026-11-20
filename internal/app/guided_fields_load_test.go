@@ -12,10 +12,10 @@ import (
 // TestTheLoadBudgetOfTheDryRun measures TPL-904 on generated data: the dry run of the check
 // step within 150 ms for 10 pages and 1 s for 100, at p95. Every page asks questions of
 // several kinds, so the answers are checked as a real form's are, including a person and a
-// page the server looks up. Run it outside the race detector, with DIFFLUENCE_LOAD_BUDGET set.
+// page the server looks up. Run it outside the race detector, with KENWERK_LOAD_BUDGET set.
 func TestTheLoadBudgetOfTheDryRun(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
-		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	if os.Getenv("KENWERK_LOAD_BUDGET") == "" {
+		t.Skip("KENWERK_LOAD_BUDGET is not set")
 	}
 	e := newEnv(t)
 	owner, editor, _, space := e.team("LOAD")

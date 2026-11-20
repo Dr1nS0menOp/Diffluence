@@ -12,7 +12,7 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/net/html"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 func FuzzFrontMatter(f *testing.F) {
@@ -31,7 +31,7 @@ func FuzzVerifyBundle(f *testing.F) {
 	if err != nil {
 		f.Fatal(err)
 	}
-	if _, err := w.Write([]byte(`{"format":"diffluence-bundle"}`)); err != nil {
+	if _, err := w.Write([]byte(`{"format":"kenwerk-bundle"}`)); err != nil {
 		f.Fatal(err)
 	}
 	if err := zw.Close(); err != nil {

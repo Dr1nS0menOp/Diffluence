@@ -65,7 +65,7 @@ The browser opens a WebSocket on `/collab`, and the binary passes it on to the s
 - **The API checks the upgrade itself, before passing it on.** It checks the origin as before, then the session cookie and the right to edit that page.
   - With no session it answers 401.
   - A page the person may not edit, a page that does not exist, a token or a session still waiting for its second factor gets 404.
-- **The cookie stays with the API.** It removes the `Cookie` and `Authorization` headers. In their place it sets `X-Diffluence-Collab-Ticket`, and a header of that name from the browser is replaced.
+- **The cookie stays with the API.** It removes the `Cookie` and `Authorization` headers. In their place it sets `X-Kenwerk-Collab-Ticket`, and a header of that name from the browser is replaced.
 - **The ticket** names the session, the person, the page and an expiry two minutes ahead.
   - It is signed with HMAC-SHA-256.
   - The key comes from the key file through `Keyring.Fingerprint`, under its own purpose (`collab ticket v1`).

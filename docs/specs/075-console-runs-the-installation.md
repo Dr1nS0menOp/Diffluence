@@ -67,10 +67,10 @@ Status: built on 2026-11-14. What was built, and what differs from the plan belo
 ## CS2: the worker in Go and its tasks
 
 **Scope:**
-- `diffluence worker run` (CSL-420), the shell script reduced to `once` and `way-back`;
+- `kenwerk worker run` (CSL-420), the shell script reduced to `once` and `way-back`;
 - `ops.tasks` and `ops.workers` (CSL-405 to CSL-413), claims, limits and validation;
 - the tiers in one table (CSL-450 to CSL-455), and their mails;
-- the code and seal for every tier-3 task (CSL-430 to CSL-434), and `diffluence task request` in the worker;
+- the code and seal for every tier-3 task (CSL-430 to CSL-434), and `kenwerk task request` in the worker;
 - reporting back, progress, the cleaner (CSL-440 to CSL-444);
 - the Worker section (CSL-595, CSL-596) and the `WorkerCode` component (CSL-806);
 - the configuration page's tab per process (CSL-602, CSL-603, CSL-605, CSL-606);
@@ -103,7 +103,7 @@ Status: built on 2026-11-14. What was built, and what differs from the plan belo
 - the restore test into the scratch database: the scratch database at install, the capability, the schedule, Test now, room first, the result, priority (CSL-510 to CSL-516);
 - the screens of CSL-815.
 
-**Data:** migration `00xx_restore_test.sql` (expand): the test's settings key needs none; `backup_runs` gains `target` and `key_fingerprint`. `deploy/postgres-init.sh` makes `diffluence_check`.
+**Data:** migration `00xx_restore_test.sql` (expand): the test's settings key needs none; `backup_runs` gains `target` and `key_fingerprint`. `deploy/postgres-init.sh` makes `kenwerk_check`.
 
 **Tests:**
 - the prune across two targets, and a target that disappears;
@@ -164,8 +164,8 @@ Status: built on 2026-11-14. What was built, and what differs from the plan belo
 ## CS6: a worker on Kubernetes and on LXC
 
 **Scope:**
-- the chart's `diffluence-worker` Deployment, the app's pods without the owner's address (CSL-421);
-- `diffluence-worker.service`, its user and `worker.env` for the LXC script and the packages; the server's unit with only the application role (CSL-422);
+- the chart's `kenwerk-worker` Deployment, the app's pods without the owner's address (CSL-421);
+- `kenwerk-worker.service`, its user and `worker.env` for the LXC script and the packages; the server's unit with only the application role (CSL-422);
 - the platform's commands in every "no worker" sentence and code line (CSL-320, CSL-321);
 - the threat model's "Accepted for now" line on Helm, the LXC script and the packages removed; `install.md` and `upgrade.md` with the move for existing installations.
 
@@ -197,12 +197,12 @@ Each decided on the product owner's behalf on 2026-11-14; each may be overruled.
 |---|---|---|
 | D1 | CSL-1201 | Requirement lines use the prefix CSL |
 | D2 | CSL-1202 | One table `ops.tasks` for every new kind of work; the backup tables and `ops.restores` stay |
-| D3 | CSL-1203 | The worker's loop in Go, `diffluence worker run`; `pg_dump`, `pg_restore` and `gpg` stay outside tools |
+| D3 | CSL-1203 | The worker's loop in Go, `kenwerk worker run`; `pg_dump`, `pg_restore` and `gpg` stay outside tools |
 | D4 | CSL-1204 | Three tiers: administrator; system administrator with a fresh login; plus a second factor and the code from the worker's log |
 | D5 | CSL-1205 | Whatever removes history or a way back is tier 3: fewer backups kept, a target that drops backups, lower audit retention, contract migrations now, retiring a key, a restore |
 | D6 | CSL-1206 | The worker reports its capabilities and targets; the console offers only those |
 | D7 | CSL-1207 | Kubernetes: a Deployment of one worker pod, `Recreate`, not a CronJob |
-| D8 | CSL-1208 | LXC and packages: a second unit, `diffluence-worker.service`, under its own user |
+| D8 | CSL-1208 | LXC and packages: a second unit, `kenwerk-worker.service`, under its own user |
 | D9 | CSL-1209 | The restore test uses a scratch database made at install, never a Compose project and never the Docker socket |
 | D10 | CSL-1210 | The witness is compared outside, by command, which reports its result to the console |
 | D11 | CSL-1211 | The worker prunes daily; lowering retention waits seven days after the code, cancellable |
@@ -226,7 +226,7 @@ Each decided on the product owner's behalf on 2026-11-14; each may be overruled.
 | D29 | CSL-562 | Until the worker reports its platform (CS2), the upgrade page shows the commands of Docker Compose, Helm and the packages, each labelled |
 | D30 | CSL-604 | `OTEL_RESOURCE_ATTRIBUTES` is free text and shows only as set, like headers and keys; an endpoint shows without its user, password, query and fragment |
 | D31 | CSL-607 | The reason of each class S setting is a sentence in the table; links to `install.md` per row wait, because an installation does not serve the documentation |
-| D32 | CSL-570 | The log level for a while reaches every Diffluence node of every role; the backup service follows when the worker runs in Go (CS2) |
+| D32 | CSL-570 | The log level for a while reaches every Kenwerk node of every role; the backup service follows when the worker runs in Go (CS2) |
 | D33 | CSL-601 | "Changes at the next restart" compares the values as the page shows them: a secret whose value changed but whose source did not is not marked, because the server keeps no secret for the page |
 | D34 | CSL-532 | Witness reports are kept, not pruned: a daily report is about 365 small rows a year. The application role may add and read them, never change or remove one |
 | D35 | CSL-702 | The log level and the thresholds are read together every five seconds in one statement by key, beside maintenance mode, not inside its read, which is per request and cached |

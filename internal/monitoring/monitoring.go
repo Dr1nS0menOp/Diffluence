@@ -9,10 +9,10 @@ import (
 	_ "embed" // the files below are part of the binary
 )
 
-//go:embed diffluence-rules.yml
+//go:embed kenwerk-rules.yml
 var rules []byte
 
-//go:embed diffluence-dashboard.json
+//go:embed kenwerk-dashboard.json
 var dashboard []byte
 
 // File is one file to download.
@@ -26,8 +26,8 @@ type File struct {
 // Files are the monitoring files, by the kind the console names them with.
 func Files() []File {
 	return []File{
-		{Kind: "rules", Name: "diffluence-rules.yml", ContentType: "application/yaml", Body: rules},
-		{Kind: "dashboard", Name: "diffluence-dashboard.json", ContentType: "application/json", Body: dashboard},
+		{Kind: "rules", Name: "kenwerk-rules.yml", ContentType: "application/yaml", Body: rules},
+		{Kind: "dashboard", Name: "kenwerk-dashboard.json", ContentType: "application/json", Body: dashboard},
 	}
 }
 

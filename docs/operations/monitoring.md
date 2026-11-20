@@ -1,11 +1,11 @@
 # Watching an installation
 
-Written for: operators who run Diffluence and want to know before people notice.
+Written for: operators who run Kenwerk and want to know before people notice.
 
-Diffluence watches itself (spec 051). You see the same checks in three places:
+Kenwerk watches itself (spec 051). You see the same checks in three places:
 
 - **System health** in the console: every check, with what it says and what to do. Every console page shows a band while the disk is running out, and the summary lists the checks that need a look.
-- **`diffluence doctor`** on the command line: the same checks, plus the configuration and the keys, in a short report you can paste into a question. It holds no address, secret or name. It exits 1 when something needs a person now.
+- **`kenwerk doctor`** on the command line: the same checks, plus the configuration and the keys, in a short report you can paste into a question. It holds no address, secret or name. It exits 1 when something needs a person now.
 - **`/metrics`** for Prometheus, with the rules and the dashboard in [`deploy/monitoring/`](../../deploy/monitoring/).
 
 ## The checks
@@ -15,7 +15,7 @@ Diffluence watches itself (spec 051). You see the same checks in three places:
 | Disk of the stored files | 10% or more free | Less than 10% free, or the growth of the last 30 days would fill it within a month | Less than 2% free: uploads, imports and exports are refused, text still saves |
 | Database | Its size, and its growth over 30 days (measured once an hour) | | |
 | Backup | Noted in the last 26 hours | None noted, or older than 26 hours | |
-| Migrations | All applied, or contract migrations waiting during an upgrade | A contract migration waited a day longer than `DIFFLUENCE_CONTRACT_GRACE` | |
+| Migrations | All applied, or contract migrations waiting during an upgrade | A contract migration waited a day longer than `KENWERK_CONTRACT_GRACE` | |
 | Background work | Runs | A job failed in 7 days, or an event gave up | An event waited more than an hour to reach the queue |
 | Audit log | Events are sealed into the chain within seconds | An event waited more than a minute to be sealed: no worker seals | An event waited more than 15 minutes, so no checkpoint covers it |
 | Mail | Set up | No mail server, or a mail failed in the last day | |
@@ -31,44 +31,44 @@ The answer is kept for 30 seconds per node. Nothing is asked of any outside serv
 Administration, System health offers the rules and the dashboard of the running release as downloads under **Monitoring files**, from a copy built into the binary that a test keeps equal to `deploy/monitoring/`. The page says whether `/metrics` is on, never the token. Below it, **Log level** shows the level each node runs at; an administrator can raise it for 1, 4 or 24 hours, for every node or one, and it returns by itself (a quieter level needs a system administrator and a second factor). Debug never writes a password, a token or the words of a page, and the witness line of the audit log is written at every level.
 
 
-`/metrics` answers a scraper that sends the token set in `DIFFLUENCE_METRICS_TOKEN`. Names change only with a note in the changelog.
+`/metrics` answers a scraper that sends the token set in `KENWERK_METRICS_TOKEN`. Names change only with a note in the changelog.
 
 | Metric | What |
 |---|---|
-| `diffluence_http_requests_total{method,status}` | Requests, by method and class of status (`2xx`, `5xx`, ...) |
-| `diffluence_http_request_duration_seconds` | How long requests took; a bound at 0.3 seconds for the latency objective |
-| `diffluence_database_up` | Whether the database answered the scrape |
-| `diffluence_queue_healthy` | Whether this node reaches the queue |
-| `diffluence_db_pool_acquired_connections`, `_idle_connections`, `_max_connections` | The connection pool |
-| `diffluence_outbox_unpublished`, `diffluence_outbox_stuck` | Events waiting; those waiting more than an hour |
-| `diffluence_jobs_queued`, `diffluence_jobs_failed_7d` | Jobs waiting; jobs failed in 7 days |
-| `diffluence_event_failures` | Events that gave up and wait for a replay |
-| `diffluence_events_waiting` | Events in the outbox, waiting for the relay or the sequencer (spec 068) |
-| `diffluence_event_lag_seconds{consumer}`, `diffluence_event_retries{consumer}` | Once events run through PostgreSQL: how old the oldest event a consumer has not passed is, and its events waiting for a retry |
-| `diffluence_mail_queued`, `diffluence_mail_failed_1d` | Mail waiting; mail failed in a day |
-| `diffluence_audit_unsealed_events`, `diffluence_audit_sealing_lag_seconds` | Audit events waiting for the sealer; how long the oldest has waited (ADR-041) |
-| `diffluence_storage_deletions_queued` | Stored files waiting to be removed |
-| `diffluence_disk_free_bytes`, `diffluence_disk_total_bytes` | The disk of the stored files, when the store knows it |
-| `diffluence_database_size_bytes` | The database at the last hourly measurement |
-| `diffluence_backup_last_noted_timestamp_seconds` | When a backup was last noted; 0 = never |
-| `diffluence_schema_migration`, `diffluence_migrations_pending_expand`, `diffluence_migrations_pending_contract` | How far migrations are |
-| `diffluence_migration_applied_timestamp_seconds` | When the last migration was applied |
-| `diffluence_build_timestamp_seconds` | The date of the commit the release was built from |
-| `diffluence_health_problems`, `diffluence_health_warnings` | How many checks need a person now, and how many a look |
+| `kenwerk_http_requests_total{method,status}` | Requests, by method and class of status (`2xx`, `5xx`, ...) |
+| `kenwerk_http_request_duration_seconds` | How long requests took; a bound at 0.3 seconds for the latency objective |
+| `kenwerk_database_up` | Whether the database answered the scrape |
+| `kenwerk_queue_healthy` | Whether this node reaches the queue |
+| `kenwerk_db_pool_acquired_connections`, `_idle_connections`, `_max_connections` | The connection pool |
+| `kenwerk_outbox_unpublished`, `kenwerk_outbox_stuck` | Events waiting; those waiting more than an hour |
+| `kenwerk_jobs_queued`, `kenwerk_jobs_failed_7d` | Jobs waiting; jobs failed in 7 days |
+| `kenwerk_event_failures` | Events that gave up and wait for a replay |
+| `kenwerk_events_waiting` | Events in the outbox, waiting for the relay or the sequencer (spec 068) |
+| `kenwerk_event_lag_seconds{consumer}`, `kenwerk_event_retries{consumer}` | Once events run through PostgreSQL: how old the oldest event a consumer has not passed is, and its events waiting for a retry |
+| `kenwerk_mail_queued`, `kenwerk_mail_failed_1d` | Mail waiting; mail failed in a day |
+| `kenwerk_audit_unsealed_events`, `kenwerk_audit_sealing_lag_seconds` | Audit events waiting for the sealer; how long the oldest has waited (ADR-041) |
+| `kenwerk_storage_deletions_queued` | Stored files waiting to be removed |
+| `kenwerk_disk_free_bytes`, `kenwerk_disk_total_bytes` | The disk of the stored files, when the store knows it |
+| `kenwerk_database_size_bytes` | The database at the last hourly measurement |
+| `kenwerk_backup_last_noted_timestamp_seconds` | When a backup was last noted; 0 = never |
+| `kenwerk_schema_migration`, `kenwerk_migrations_pending_expand`, `kenwerk_migrations_pending_contract` | How far migrations are |
+| `kenwerk_migration_applied_timestamp_seconds` | When the last migration was applied |
+| `kenwerk_build_timestamp_seconds` | The date of the commit the release was built from |
+| `kenwerk_health_problems`, `kenwerk_health_warnings` | How many checks need a person now, and how many a look |
 
 ## Traces
 
-Diffluence can send traces to an OpenTelemetry collector (spec 060). It is **off** by default, and then nothing leaves the machine and nothing of it runs.
+Kenwerk can send traces to an OpenTelemetry collector (spec 060). It is **off** by default, and then nothing leaves the machine and nothing of it runs.
 
 | Setting | Default | What |
 |---|---|---|
-| `DIFFLUENCE_TRACING` | `false` | Switch traces on |
-| `DIFFLUENCE_TRACING_SAMPLE` | `0.1` | The share of new traces kept, from 0 to 1. A request that arrives inside a sampled trace (a `traceparent` from your proxy) is always kept |
+| `KENWERK_TRACING` | `false` | Switch traces on |
+| `KENWERK_TRACING_SAMPLE` | `0.1` | The share of new traces kept, from 0 to 1. A request that arrives inside a sampled trace (a `traceparent` from your proxy) is always kept |
 | `OTEL_EXPORTER_OTLP_ENDPOINT` or `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT` | `http://localhost:4318` | Where the collector takes OTLP over HTTP |
 | `OTEL_EXPORTER_OTLP_HEADERS`, `_CERTIFICATE`, `_TIMEOUT`, `_COMPRESSION` | | Authentication and transport, as OpenTelemetry documents them |
-| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | `diffluence` | The name and labels of this service in your tracing back end |
+| `OTEL_SERVICE_NAME`, `OTEL_RESOURCE_ATTRIBUTES` | `kenwerk` | The name and labels of this service in your tracing back end |
 
-The first two are settings of Diffluence: they may sit in the configuration file and show in `diffluence config check`. The `OTEL_*` variables are the standard ones every collector documents; the exporter reads them itself, so put them in the environment.
+The first two are settings of Kenwerk: they may sit in the configuration file and show in `kenwerk config check`. The `OTEL_*` variables are the standard ones every collector documents; the exporter reads them itself, so put them in the environment.
 
 What a trace holds:
 
@@ -76,9 +76,9 @@ What a trace holds:
 |---|---|---|
 | A request | The route pattern, such as `GET /api/v1/pages/{id}`; `GET` alone for a request without a route | `http.request.method`, `http.route`, `http.response.status_code` |
 | A query | The operation and the first table, such as `SELECT pages` | `db.system.name`, `db.operation.name`, `db.collection.name` |
-| An event sent and handled | `queue publish diffluence.events.page.created`, `queue consume notify` | `messaging.system`, `messaging.destination.name`, `messaging.consumer.group.name` |
+| An event sent and handled | `queue publish kenwerk.events.page.created`, `queue consume notify` | `messaging.system`, `messaging.destination.name`, `messaging.consumer.group.name` |
 | A job and a periodic task | `job page.export`, `task purge-trash` | |
-| The audit sealer | `audit seal` | `diffluence.audit.sealed`: how many events it sealed |
+| The audit sealer | `audit seal` | `kenwerk.audit.sealed`: how many events it sealed |
 | The backup worker's commands | `backup next`, `backup report`, `backup restore-checked` | |
 
 **Never in a span:** a path, a query string, an id, a statement or its values, a title, page text, a name, an email address, a token, a client address or a user agent. A failure sets the span's status to `error`, or for a database error to its SQLSTATE code, never to the error's message, which can quote a value. A test runs the whole application with tracing on and fails if any span holds such content.
@@ -113,7 +113,7 @@ Every line is JSON on standard error, with `time`, `level` and `msg`. The messag
 
 ## Alerts
 
-[`deploy/monitoring/diffluence-rules.yml`](../../deploy/monitoring/diffluence-rules.yml) holds two objectives, over 30 days: 99.5% of requests succeed, and 99.5% take less than 300 ms. A fast burn of the error budget pages within minutes and a slow one opens a ticket, as the Google SRE workbook describes. The other alerts are causes that need a person: Diffluence or its database down, the disk above 85% and above 98% full, no backup in 26 hours, jobs failing, an outbox that does not drain, audit events not sealed for 15 minutes, events that gave up, a contract migration waiting a day, the queue unreachable, mail failing, a release older than 60 days. Change the numbers to your own objective.
+[`deploy/monitoring/kenwerk-rules.yml`](../../deploy/monitoring/kenwerk-rules.yml) holds two objectives, over 30 days: 99.5% of requests succeed, and 99.5% take less than 300 ms. A fast burn of the error budget pages within minutes and a slow one opens a ticket, as the Google SRE workbook describes. The other alerts are causes that need a person: Kenwerk or its database down, the disk above 85% and above 98% full, no backup in 26 hours, jobs failing, an outbox that does not drain, audit events not sealed for 15 minutes, events that gave up, a contract migration waiting a day, the queue unreachable, mail failing, a release older than 60 days. Change the numbers to your own objective.
 
 ## What grows, and what keeps it small
 
@@ -135,6 +135,6 @@ Every line is JSON on standard error, with `time`, `level` and `msg`. The messag
 | Size measurements of the database | 40 days | `purge-finished-work`, daily |
 | The queue's files | 7 days per stream | NATS itself |
 | Stored files nothing points at | Until an administrator removes them | Care in the console |
-| The audit log | The retention set in the console | `diffluence audit prune`, by the owner of the tables |
+| The audit log | The retention set in the console | `kenwerk audit prune`, by the owner of the tables |
 | Audit events waiting for the sealer | Seconds | The sealer of every worker, every second |
 | Pages, versions and files | For good: they are what people keep | People and the trash |

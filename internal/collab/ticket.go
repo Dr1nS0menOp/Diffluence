@@ -12,12 +12,12 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/keys"
 )
 
 // TicketHeader carries a ticket from the API to the service, in place of the cookies of
 // the browser, which the API takes off the socket (spec 067).
-const TicketHeader = "X-Diffluence-Collab-Ticket"
+const TicketHeader = "X-Kenwerk-Collab-Ticket"
 
 // ticketLifetime is how long a ticket opens the service. The service asks again every
 // minute and gets a new ticket each time, so a ticket outlives one missed recheck and no

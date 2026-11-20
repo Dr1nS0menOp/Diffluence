@@ -12,11 +12,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // Wave CS1 of spec 075: the console shows what runs the installation, and changes the log
@@ -129,15 +129,15 @@ func TestASystemAdministratorConfirmsAQuieterLevelWithASecondFactor(t *testing.T
 // it comes from (CSL-304, CSL-604).
 func TestNoAreaOfTheInstallationShowsASecret(t *testing.T) {
 	const secret = "planted-installation-secret"
-	t.Setenv("DIFFLUENCE_SMTP_PASSWORD", secret+"-mail")
-	t.Setenv("DIFFLUENCE_METRICS_TOKEN", secret+"-metrics")
-	t.Setenv("DIFFLUENCE_DATABASE_URL", "postgres://app:"+secret+"@db.example.com:5432/diffluence")
+	t.Setenv("KENWERK_SMTP_PASSWORD", secret+"-mail")
+	t.Setenv("KENWERK_METRICS_TOKEN", secret+"-metrics")
+	t.Setenv("KENWERK_DATABASE_URL", "postgres://app:"+secret+"@db.example.com:5432/kenwerk")
 	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer "+secret)
 	t.Setenv("OTEL_EXPORTER_OTLP_ENDPOINT", "https://otel:"+secret+"@collector.example.com/?token="+secret)
 	e := newEnvWith(t, func(c *config.Config) { c.MetricsToken = secret + "-metrics" })
 	root := admin(e)
 	// Changed after the start, so the page holds both the running and the next value.
-	t.Setenv("DIFFLUENCE_SMTP_PASSWORD", secret+"-mail-next")
+	t.Setenv("KENWERK_SMTP_PASSWORD", secret+"-mail-next")
 	t.Setenv("OTEL_EXPORTER_OTLP_HEADERS", "authorization=Bearer "+secret+"-next")
 	for _, path := range installationReads {
 		if out := root.want(http.StatusOK, "GET", path, nil); strings.Contains(out, secret) {
@@ -154,13 +154,13 @@ func TestNoAreaOfTheInstallationShowsASecret(t *testing.T) {
 // exporter and the last try of the outside settings, and has no way to change any of it
 // (CSL-601, CSL-604, CSL-608, CSL-609).
 func TestTheConfigurationShowsWhatChangesAtTheNextRestart(t *testing.T) {
-	t.Setenv("DIFFLUENCE_LOG_LEVEL", "info")
-	t.Setenv("OTEL_SERVICE_NAME", "diffluence-test")
+	t.Setenv("KENWERK_LOG_LEVEL", "info")
+	t.Setenv("OTEL_SERVICE_NAME", "kenwerk-test")
 	e := newEnv(t)
 	root := admin(e)
 	probes := &config.ProbeRecord{}
 	e.app.UseProbes(probes)
-	t.Setenv("DIFFLUENCE_LOG_LEVEL", "debug")
+	t.Setenv("KENWERK_LOG_LEVEL", "debug")
 	var page struct {
 		Settings []struct {
 			Name             string `json:"name"`
@@ -197,7 +197,7 @@ func TestTheConfigurationShowsWhatChangesAtTheNextRestart(t *testing.T) {
 			t.Fatalf("the level changed after the start: %+v", s)
 		}
 	}
-	if !found || len(page.Tracing) != 1 || page.Tracing[0].Value != "diffluence-test" || page.Tracing[0].Source != "environment" {
+	if !found || len(page.Tracing) != 1 || page.Tracing[0].Value != "kenwerk-test" || page.Tracing[0].Source != "environment" {
 		t.Fatalf("level found %v, tracing %+v", found, page.Tracing)
 	}
 	if page.Probe.Done {
@@ -495,7 +495,7 @@ func TestTheUpgradePageNamesTheNodeAContractMigrationWaitsFor(t *testing.T) {
 	}
 }
 
-// The events area says what diffluence events status says (CSL-590).
+// The events area says what kenwerk events status says (CSL-590).
 func TestTheEventsAreaShowsTheTransport(t *testing.T) {
 	e := newEnv(t)
 	root := admin(e)
@@ -512,7 +512,7 @@ func TestTheEventsAreaShowsTheTransport(t *testing.T) {
 func TestTheMonitoringFilesAreTheReleasesOwn(t *testing.T) {
 	e := newEnv(t)
 	root := admin(e)
-	for kind, name := range map[string]string{"rules": "diffluence-rules.yml", "dashboard": "diffluence-dashboard.json"} {
+	for kind, name := range map[string]string{"rules": "kenwerk-rules.yml", "dashboard": "kenwerk-dashboard.json"} {
 		resp, body := e.do(root.c, "GET", "/api/v1/admin/monitoring/"+kind, "")
 		want, err := os.ReadFile("../../deploy/monitoring/" + name)
 		if err != nil {

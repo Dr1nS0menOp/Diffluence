@@ -9,15 +9,15 @@ import (
 
 // Without its own address a worker listens on the database the pool uses (spec 068 D8).
 func TestTheListenAddressFallsBackToTheDatabase(t *testing.T) {
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://app@bouncer/db"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://app@bouncer/db"}))
 	if err != nil {
 		t.Fatal(err)
 	}
 	if c.ListenURL() != "postgres://app@bouncer/db" {
 		t.Errorf("ListenURL = %q", c.ListenURL())
 	}
-	c, err = Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://app@bouncer/db",
-		"DIFFLUENCE_LISTEN_DATABASE_URL": "postgres://app@primary/db"}))
+	c, err = Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://app@bouncer/db",
+		"KENWERK_LISTEN_DATABASE_URL": "postgres://app@primary/db"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -28,8 +28,8 @@ func TestTheListenAddressFallsBackToTheDatabase(t *testing.T) {
 
 // The listen address holds the password of the application role, so the report hides it.
 func TestTheListenAddressIsShownWithoutItsPassword(t *testing.T) {
-	_, settings, err := Inspect(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x",
-		"DIFFLUENCE_LISTEN_DATABASE_URL": "postgres://app:secret@primary:5432/db"}))
+	_, settings, err := Inspect(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x",
+		"KENWERK_LISTEN_DATABASE_URL": "postgres://app:secret@primary:5432/db"}))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,10 +1,10 @@
 # Beta criteria
 
-Written for: operators who want to know when Diffluence is worth trying on real work, and contributors who want to know what still stands between today and the first beta.
+Written for: operators who want to know when Kenwerk is worth trying on real work, and contributors who want to know what still stands between today and the first beta.
 
-Diffluence is **alpha**. A release is called **beta** only when every criterion below holds on the commit that is tagged, and the beta notes link the evidence of each one. This page answers RMP-001 of the [roadmap](blueprint/08-roadmap.md) and its [chapter 1](blueprint/08-roadmap/01-sequencing-to-1-0.md). What 1.0 then promises is in [promises.md](promises.md).
+Kenwerk is **alpha**. A release is called **beta** only when every criterion below holds on the commit that is tagged, and the beta notes link the evidence of each one. This page answers RMP-001 of the [roadmap](blueprint/08-roadmap.md) and its [chapter 1](blueprint/08-roadmap/01-sequencing-to-1-0.md). What 1.0 then promises is in [promises.md](promises.md).
 
-**What beta means here.** Beta is the first release meant for people who did not build Diffluence, on data they can afford to restore from a backup. It claims what [ADR-043](blueprint/10-decision-log.md) claims and nothing more: **one node, a few hundred people, measured on your own hardware**. The stable parts below should not lose data or show anyone what they may not see; the experimental parts may still change or go. Beta is not 1.0: nothing is frozen yet, and no version is supported.
+**What beta means here.** Beta is the first release meant for people who did not build Kenwerk, on data they can afford to restore from a backup. It claims what [ADR-043](blueprint/10-decision-log.md) claims and nothing more: **one node, a few hundred people, measured on your own hardware**. The stable parts below should not lose data or show anyone what they may not see; the experimental parts may still change or go. Beta is not 1.0: nothing is frozen yet, and no version is supported.
 
 **Status today** is read from the repository on 2026-11-14, at main `fe000ca`. Each status says one of three things:
 
@@ -14,7 +14,7 @@ Diffluence is **alpha**. A release is called **beta** only when every criterion 
 
 ## 1. Features
 
-The stable set is everything Diffluence does that is not listed as experimental: spaces and the page tree, the editor, drafts, versions, compare and restore, attachments and files, search, the trash, comments, notifications and watching, labels and templates, document control, local accounts with a second factor, passkeys, OIDC login and SCIM, roles, groups, guests and restrictions, the audit log and its witness, import and export (Markdown, HTML, PDF, Word, OpenDocument), the admin console, backups, upgrades, and the optional service for editing together.
+The stable set is everything Kenwerk does that is not listed as experimental: spaces and the page tree, the editor, drafts, versions, compare and restore, attachments and files, search, the trash, comments, notifications and watching, labels and templates, document control, local accounts with a second factor, passkeys, OIDC login and SCIM, roles, groups, guests and restrictions, the audit log and its witness, import and export (Markdown, HTML, PDF, Word, OpenDocument), the admin console, backups, upgrades, and the optional service for editing together.
 
 The experimental set is what the installation switches on part by part (ADR-043, spec 069): `automation`, `databases` (with sheets), `bundles`, `console_restore`, `publishing` (draft and published spaces, spec 073) and `guided_templates` (spec 074), all in `internal/features/experimental.go`, plus public sites and analytics, which keep switches of their own. All start off.
 
@@ -27,7 +27,7 @@ The experimental set is what the installation switches on part by part (ADR-043,
 
 ## 2. Security
 
-Diffluence has no budget for a penetration test (ADR-029). Until a volunteer or a donation makes one possible, three things stand in for it: the automated checks on every change, the self-test repeated on the candidate, and one outside reader before 1.0 (ADR-043).
+Kenwerk has no budget for a penetration test (ADR-029). Until a volunteer or a donation makes one possible, three things stand in for it: the automated checks on every change, the self-test repeated on the candidate, and one outside reader before 1.0 (ADR-043).
 
 | # | Criterion | How it is checked | Evidence | Today |
 |---|---|---|---|---|
@@ -47,7 +47,7 @@ The claim is one node and a few hundred people. The test server of the stress te
 |---|---|---|---|---|
 | L1 | At the claim, 50 people active at once (a few hundred people, of whom one in ten is active, rounded up), on the test server with the candidate: reading a page and saving answered busy in under 1% of requests, page p95 at most 300 ms, publish p95 at most 500 ms, and no wrong answer | `SCENARIO=level` at 50 people, 4 minutes | A report in `docs/reports/` and a row in `limits.md` marked with the machine and the commit | **Not met.** On 12 November, at 50 people: 30% busy and page p95 3.0 s. The fixes since (spec 061, spec 064) were measured on a copy of that data in the development container, not on the server |
 | L2 | Room for four times the work (ADR-036): at 200 active people nothing is lost or wrong, no save fails, search is turned away before reading, and everything recovers by itself when the load stops | `SCENARIO=level` at 200 people | As L1 | **Not met.** Last run on 10 November, before the changes of waves AC, LD and PF |
-| L3 | A soak of 24 hours at the claim (OPS-110): memory of the app flat after the first hour, no job failed, the audit sealer never more than a minute behind, `diffluence audit verify` passes at the end | `load.js` at 50 people for 24 hours | As L1 | **Not met.** Never run |
+| L3 | A soak of 24 hours at the claim (OPS-110): memory of the app flat after the first hour, no job failed, the audit sealer never more than a minute behind, `kenwerk audit verify` passes at the end | `load.js` at 50 people for 24 hours | As L1 | **Not met.** Never run |
 | L4 | The hot queries stay within their budgets on the real data set: the feed (recent 150 ms, for you 500 ms, popular 250 ms) and a controlled read at most 5 ms over an ordinary one | `TestTheFeedIsFastOnRealData`, `TestDocumentControlOnRealData`, against the dump, on the candidate | `limits.md`, "Measured on the real data set" | **Met** on 12 and 13 November; to repeat on the candidate |
 
 Several nodes, PgBouncer, a NATS cluster and 5,000 people are **not** beta criteria (decision 1). They become criteria for any later claim of more than one node.
@@ -61,7 +61,7 @@ Several nodes, PgBouncer, a NATS cluster and 5,000 people are **not** beta crite
 | U3 | The release is signed with Sigstore and carries SLSA provenance and SBOMs, and a download verifies as `install.md` says (OPS-094) | Step 8 of the release checklist on a real tag | The release on GitHub | **Not met.** Built and run as a dry run; signing and provenance are only proven by a first tagged release |
 | U4 | The restore drill runs every night on a fresh installation: page, file, search, login, audit chain and the roles of the database (OPS-054) | CI job `nightly`, `scripts/restore-drill.sh` | `.github/workflows/ci.yml` | **Met** as a gate; that it is green is C1 |
 | U5 | The time to restore 10 GB is measured on the real disks of the test server, and written in `backup-restore.md` (part of OPS-078; 100 GB is a 1.0 criterion) | `scripts/restore-check.sh` on a backup of that size | `docs/operations/backup-restore.md` | **Not met.** Only a small set was timed (29 seconds) |
-| U6 | A person who did not build Diffluence installs it on a fresh machine, upgrades it between two tagged releases, makes a backup and restores it, with the guides alone. Every place a guide fell short is fixed before the beta | The person writes down each step and each stumble | A report in `docs/reports/` | **Not met.** The stress test of 10 November was installed by its builders from `install.md`; the three gaps it found are fixed (D5) |
+| U6 | A person who did not build Kenwerk installs it on a fresh machine, upgrades it between two tagged releases, makes a backup and restores it, with the guides alone. Every place a guide fell short is fixed before the beta | The person writes down each step and each stumble | A report in `docs/reports/` | **Not met.** The stress test of 10 November was installed by its builders from `install.md`; the three gaps it found are fixed (D5) |
 
 ## 5. Documentation
 

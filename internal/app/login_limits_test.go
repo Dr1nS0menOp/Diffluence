@@ -10,8 +10,8 @@ import (
 	"net/netip"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 func newEnvBehindProxy(t *testing.T) *env {

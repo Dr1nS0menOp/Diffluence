@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-document-control.md](01-document-control.md).
 
-Some teams control a whole space (every procedure of a quality system); others control a handful of pages in an otherwise open space (a policy inside a team space). Both must be possible, without ever leaving a page under two procedures at once. ISO 9001 7.5.3 leaves the scope of control to the organisation, so Diffluence offers both scopes and makes the effective one plain.
+Some teams control a whole space (every procedure of a quality system); others control a handful of pages in an otherwise open space (a policy inside a team space). Both must be possible, without ever leaving a page under two procedures at once. ISO 9001 7.5.3 leaves the scope of control to the organisation, so Kenwerk offers both scopes and makes the effective one plain.
 
 ## 5.1 The space workflow
 

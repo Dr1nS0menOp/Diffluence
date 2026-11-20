@@ -1,7 +1,7 @@
 -- phase: expand
 -- SPDX-License-Identifier: Apache-2.0
 -- Spec 075, wave CS1. The comparison of the audit chain with its witness runs outside, next to
--- the log store, and reports its result here with "diffluence audit verify --witness --report",
+-- the log store, and reports its result here with "kenwerk audit verify --witness --report",
 -- so the console can show the newest result and its age (CSL-532). The application role may
 -- add a report and read them; it may not change or remove one. Each node also says the log
 -- level it runs at (CSL-572), and, from wave CS5, which key ids it holds (CSL-551). The

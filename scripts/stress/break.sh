@@ -4,7 +4,7 @@
 # "level" scenario from the load machine. Each prints what it did and when.
 # Usage: bash break.sh pg-restart | app-kill | full-disk | full-disk-undo | audit-verify
 set -u
-cd ~/Diffluence || exit 1
+cd ~/Kenwerk || exit 1
 dc() { sudo docker compose "$@" < /dev/null; }
 case $1 in
   pg-restart)
@@ -16,7 +16,7 @@ case $1 in
     # The process is killed, as a crash would: `docker kill` counts as a deliberate stop,
     # which the restart policy leaves stopped.
     echo "$(date +%T) killing the app's process with SIGKILL"
-    sudo kill -9 "$(sudo docker inspect -f '{{.State.Pid}}' diffluence-diffluence-1)"
+    sudo kill -9 "$(sudo docker inspect -f '{{.State.Pid}}' kenwerk-kenwerk-1)"
     sleep 1
     for i in $(seq 1 60); do
       [ "$(curl -s -m 2 -o /dev/null -w '%{http_code}' http://127.0.0.1:8080/readyz)" = 200 ] && break
@@ -36,6 +36,6 @@ case $1 in
     ;;
   audit-verify)
     # The container already reads the owner's address from its secret file.
-    sudo docker compose exec -T diffluence diffluence audit verify < /dev/null 2>&1 | tail -5
+    sudo docker compose exec -T kenwerk kenwerk audit verify < /dev/null 2>&1 | tail -5
     ;;
 esac

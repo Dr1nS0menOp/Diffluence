@@ -1,12 +1,12 @@
 # Regulated use: electronic records and signatures
 
-This guide is for an organisation that uses Diffluence under 21 CFR Part 11, EU GMP Annex 11 or a quality system such as ISO 9001. It says what Diffluence provides, how an auditor verifies a signature outside Diffluence, and what remains the organisation's own work (RMP-015, DOC-790). The requirements behind it are blueprint chapter 09.8; spec 064 holds the decisions.
+This guide is for an organisation that uses Kenwerk under 21 CFR Part 11, EU GMP Annex 11 or a quality system such as ISO 9001. It says what Kenwerk provides, how an auditor verifies a signature outside Kenwerk, and what remains the organisation's own work (RMP-015, DOC-790). The requirements behind it are blueprint chapter 09.8; spec 064 holds the decisions.
 
-Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a validated use of a system, with procedures and training. Diffluence supplies the technical controls those rules ask of a system, and the evidence that they work.
+Kenwerk is not "Part 11 compliant" on its own. Compliance belongs to a validated use of a system, with procedures and training. Kenwerk supplies the technical controls those rules ask of a system, and the evidence that they work.
 
-## What Diffluence provides
+## What Kenwerk provides
 
-| Clause | What Diffluence does |
+| Clause | What Kenwerk does |
 |---|---|
 | Part 11 §11.10(b), Annex 11 clause 8 | Every export holds the version a person reads, with a control line that names its state, version, approval and signatures. The auditor's export (below) is the machine-readable copy. |
 | §11.10(c) | Signatures, the versions they sign and the files those versions show cannot be deleted or changed, by administrators either. A signed page goes to the trash as before, but is never purged; pruning the audit log stops where the records of document control begin. |
@@ -20,19 +20,19 @@ Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a valida
 
 ## What remains yours
 
-- **Validation** of your use of Diffluence (§11.10(a)). Each release comes with its validation pack, `docs/operations/validation-pack.md`, which names the test that proves each requirement; the results are the run of that release.
+- **Validation** of your use of Kenwerk (§11.10(a)). Each release comes with its validation pack, `docs/operations/validation-pack.md`, which names the test that proves each requirement; the results are the run of that release.
 - **Training** of the people who sign (§11.10(i)).
 - **Written policies** that hold people accountable for what they sign (§11.10(j)). The signing dialog shows the meaning before anything else, and your policy says what each meaning commits to.
-- **Confirming who a person is** before an administrator enables signing for them (§11.100(b)). Diffluence records who enabled it and how the person was identified, as a choice of four ways; it never stores the number of an identity document.
+- **Confirming who a person is** before an administrator enables signing for them (§11.100(b)). Kenwerk records who enabled it and how the person was identified, as a choice of four ways; it never stores the number of an identity document.
 - **Certification to the FDA** that your electronic signatures are the legally binding equivalent of handwritten ones, where you need it (§11.100(c)).
 - **Periodic review** of the system and of who may sign.
-- **Backups and restores** as part of your procedure. A restore brings back the signatures of the backup and loses those made after it; run `diffluence signatures verify` after every restore.
-- **Retention periods.** Diffluence keeps signed records without end. A space that must let them go after a period needs a decision of the product owner first.
+- **Backups and restores** as part of your procedure. A restore brings back the signatures of the backup and loses those made after it; run `kenwerk signatures verify` after every restore.
+- **Retention periods.** Kenwerk keeps signed records without end. A space that must let them go after a period needs a decision of the product owner first.
 
 ## Review dates, reading and absence
 
 - **Periodic review** (Annex 11 clause 11). A timed approved state gives each approved version a next review date, shown to everyone who sees the page. The page owner is reminded before it; on the date the workflow starts a review of the same text, and passing it confirms the version without a new one.
-- **Read and understood.** An approved state can ask groups to confirm that they read each new version. The button appears only after the person opened that version, in the same session. It records an acknowledgement: that the person says they read it. It is not a test of understanding, and Diffluence makes no claim beyond that.
+- **Read and understood.** An approved state can ask groups to confirm that they read each new version. The button appears only after the person opened that version, in the same session. It records an acknowledgement: that the person says they read it. It is not a test of understanding, and Kenwerk makes no claim beyond that.
 - **Due dates** count working days of the working week set under **Administration, Rules, Language, time and help**, in its time zone. Holidays are not known: set a longer period around them.
 - **Delegation and absence.** A reviewer can hand a review only to someone the workflow names for it in the same way, and someone who looks after the workflows can choose another person who may review. A stand-in takes a review only when the workflow names them too. Nobody signs for someone else.
 - **Bundles from another installation** bring their signatures as records of that installation. They verify against the content here, but they are not signatures of this installation, and they approve nothing here.
@@ -48,7 +48,7 @@ Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a valida
 
 - **On the page:** the band names each signature of the version on display, with its mark. The mark compares the record with the hash its version keeps.
 - **In the history:** each version lists its signatures, and **Verify signatures** recomputes the hash from the content and checks the audit entry and its place in the chain.
-- **For the whole installation:** `diffluence signatures verify` checks every signature and exits 1 when one does not match.
+- **For the whole installation:** `kenwerk signatures verify` checks every signature and exits 1 when one does not match.
 - **Control history:** whoever reads the audit of a space sees, under the history of a page, every audit entry about it with its place in the chain, and the verification of each signature.
 
 ## The auditor's export
@@ -68,11 +68,11 @@ The file is JSON Lines: one object per line, each with a `type`:
 | `audit_entry` | Each audit entry about the pages: `seq`, `payload`, `prev_hash`, `hash` |
 | `end` | The last line, with the number of lines before it |
 
-## Verifying a signature outside Diffluence
+## Verifying a signature outside Kenwerk
 
 `scripts/verify-signatures.mjs` follows these steps with Node.js and nothing else: `node scripts/verify-signatures.mjs auditor-export.jsonl`. They can also be followed by hand.
 
-1. **Rebuild the canonical form of the signed version (form 1)** from the `content` of its `version` line. It is UTF-8 bytes: the line `diffluence-signed-content`, a newline, the line `1`, a newline, then a sequence of fields. Each field is its name, a space, the length of its value in bytes, a newline, the value, and a newline. The fields are, in order: `title`; `schema` (the document format version, as a number in decimal); `document` (the document as canonical JSON, exactly as the export gives it); `files` (how many files, in decimal); then for each file, sorted by its id as text: `file` (the id), `version`, `name`, `sha256` (the hash of that file version's bytes, in lower-case hex).
+1. **Rebuild the canonical form of the signed version (form 1)** from the `content` of its `version` line. It is UTF-8 bytes: the line `kenwerk-signed-content`, a newline, the line `1`, a newline, then a sequence of fields. Each field is its name, a space, the length of its value in bytes, a newline, the value, and a newline. The fields are, in order: `title`; `schema` (the document format version, as a number in decimal); `document` (the document as canonical JSON, exactly as the export gives it); `files` (how many files, in decimal); then for each file, sorted by its id as text: `file` (the id), `version`, `name`, `sha256` (the hash of that file version's bytes, in lower-case hex).
 2. **Hash it** with SHA-256. The lower-case hex must equal the version's `content_hash` and the record's `content_hash`. A record that names another hash was moved, copied or edited; content that gives another hash was changed.
 3. **Find the audit entry** whose `id` is the record's `audit_event_id`. Its `payload` is JSON with `action` = `page.signed`, `object_id` = the page, `actor_id` = the signer, and `details` naming the signature id, version, content hash, canonical form and meaning of the record.
 4. **Check its place in the chain:** SHA-256 over the bytes of `prev_hash` (from hex) followed by the UTF-8 bytes of `payload` must give its `hash`, and the entry with the next `seq` in the export must name that hash as its `prev_hash`.

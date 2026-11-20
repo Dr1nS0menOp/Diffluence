@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Me, type Preferences } from './api';
 
-const THEME_KEY = 'diffluence.theme';
+const THEME_KEY = 'kenwerk.theme';
 const SYSTEM_THEME = 'system';
 
 export const DEFAULT_PREFERENCES: Preferences = {

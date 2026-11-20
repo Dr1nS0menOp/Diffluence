@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/health"
+	"github.com/kenwerk/kenwerk/internal/health"
 )
 
 // Draft and published spaces, wave PB4 of spec 073: the consistency check runs by itself once a

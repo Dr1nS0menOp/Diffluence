@@ -16,7 +16,7 @@ The three classes, written the same way everywhere:
 | **Show only** | S | The console shows it, with its value and where the value came from, but cannot change it |
 | **Command only, because …** | K | It stays on the command line or in a file, and the console at most explains it. The reason is always given |
 
-This is a study of Diffluence's own operations. The five products of chapter 04 were read in their public documentation, for how they split the work, never for code (`02-clean-room-and-licensing.md`). The sources are in [sources.md](sources.md).
+This is a study of Kenwerk's own operations. The five products of chapter 04 were read in their public documentation, for how they split the work, never for code (`02-clean-room-and-licensing.md`). The sources are in [sources.md](sources.md).
 
 ## Chapters
 
@@ -24,7 +24,7 @@ This is a study of Diffluence's own operations. The five products of chapter 04 
 |---|---|---|
 | [02 Inventory](02-inventory.md) | CSL-100 to CSL-280 | Every command, variable, setting, fixed value and script: what it does, who may use it, whether it is in the console |
 | [03 Sorting](03-sorting.md) | CSL-300 to CSL-322 | The criteria, the three classes with a reason per item, the counts, and the platforms |
-| [04 What others do](04-what-others-do.md) | CSL-350 to CSL-362 | GitLab, Mattermost, Nextcloud, Discourse and Gitea, and what Diffluence takes from them |
+| [04 What others do](04-what-others-do.md) | CSL-350 to CSL-362 | GitLab, Mattermost, Nextcloud, Discourse and Gitea, and what Kenwerk takes from them |
 | [05 The worker pattern](05-the-worker-pattern.md) | CSL-400 to CSL-448 | Requests in the database, a worker per platform, capabilities, codes from the log, reporting back |
 | [06 A stolen session](06-a-stolen-session.md) | CSL-450 to CSL-472 | Three tiers of guard, judged against the threat model |
 | [07 The console areas](07-console-areas.md) | CSL-500 to CSL-596 | Each area: backups, restore test, audit, sessions, `master.key`, upgrades, log level, maintenance and disk, monitoring files, events |
@@ -37,9 +37,9 @@ This is a study of Diffluence's own operations. The five products of chapter 04 
 
 ## 1.1 What exists today
 
-Read in the code on 2026-11-14: `cmd/diffluence`, `internal/httpapi/handlers_running.go` and the other admin handlers, `web/src/views/admin-running.tsx` and `admin.tsx`, `internal/config`, `internal/settings/sections.go`, `internal/health/health.go`, `compose.yaml`, `.env.example`, `deploy/` and `scripts/`.
+Read in the code on 2026-11-14: `cmd/kenwerk`, `internal/httpapi/handlers_running.go` and the other admin handlers, `web/src/views/admin-running.tsx` and `admin.tsx`, `internal/config`, `internal/settings/sections.go`, `internal/health/health.go`, `compose.yaml`, `.env.example`, `deploy/` and `scripts/`.
 
-- **CSL-001** · built · **The meeting point is the database.** The console writes requests and settings; the backup service of `compose.yaml` asks `diffluence backup next` every minute, does the work and answers with `backup report` and `backup restore-checked` (spec 058, D1 to D3). The tables are `backup_requests`, `backup_runs`, `backup_restore_checks`, `backup_worker` and `backup_mail`; restores live in the schema `ops` (spec 059).
+- **CSL-001** · built · **The meeting point is the database.** The console writes requests and settings; the backup service of `compose.yaml` asks `kenwerk backup next` every minute, does the work and answers with `backup report` and `backup restore-checked` (spec 058, D1 to D3). The tables are `backup_requests`, `backup_runs`, `backup_restore_checks`, `backup_worker` and `backup_mail`; restores live in the schema `ops` (spec 059).
 - **CSL-002** · built · **The worker holds what the server does not** (ADR-044, spec 070): the owner of the tables, the backup key, and the keys derived from it, which sign the audit checkpoints and make the codes that confirm a restore.
 - **CSL-003** · built · **A dangerous request waits for a code from the worker's own log**: the restore of spec 070, ten digits, 30 minutes, three tries, sealed and checked at every step.
 - **CSL-004** · built · **In the console under System:** System health, Backups (worker state, key fingerprint, back up now, schedule, the list with test restores, the restore), Configuration (the settings the server started with, with their source, secrets hidden), Care, Settings (including audit retention and maintenance mode), Mail and Audit (the list, the export and the check of the chain). Under People: Sessions (one person, everyone).
@@ -60,12 +60,12 @@ Each was decided on the product owner's behalf on 2026-11-14, and may be overrul
 |---|---|---|
 | CSL-1201 | The prefix of this study is CSL | CON may be wanted by a later roadmap; CSL is unused in the repository |
 | CSL-1202 | One request table for every new kind of work, `ops.tasks`, beside the existing backup and restore tables, which stay as they are | The backup tables already work on two releases at once; moving them gains nothing and risks the upgrade |
-| CSL-1203 | The worker's loop moves from the shell script into Go, `diffluence worker run`; `pg_dump`, `pg_restore` and `gpg` stay outside tools | The loop is past 300 lines of bash with tricky control flow; Go makes it the same on every platform and testable. No new dependency |
+| CSL-1203 | The worker's loop moves from the shell script into Go, `kenwerk worker run`; `pg_dump`, `pg_restore` and `gpg` stay outside tools | The loop is past 300 lines of bash with tricky control flow; Go makes it the same on every platform and testable. No new dependency |
 | CSL-1204 | Three tiers of guard: administrator; system administrator with a fresh login; system administrator with a fresh login, a second factor and a code from the worker's log (chapter 06) | Matches what exists for maintenance and the restore, and states it once |
 | CSL-1205 | Everything that shortens or removes history (backups kept, the backup target, audit retention, a contract migration, retiring a key) is in the third tier | A stolen session must not be able to erase the evidence of what it did |
 | CSL-1206 | The worker offers what it can do (its capabilities), and the console offers only that | Platforms differ: a key from a Kubernetes Secret cannot be written by anyone in the installation |
-| CSL-1207 | On Kubernetes the worker is a Deployment of one pod running `diffluence worker run`, not a CronJob | A CronJob every minute starts a pod each minute and loses the log line with the code between runs |
-| CSL-1208 | On LXC and the packages the worker is a second systemd unit, `diffluence-worker.service`, under its own user | The server's unit then loses the owner address, as in Compose |
+| CSL-1207 | On Kubernetes the worker is a Deployment of one pod running `kenwerk worker run`, not a CronJob | A CronJob every minute starts a pod each minute and loses the log line with the code between runs |
+| CSL-1208 | On LXC and the packages the worker is a second systemd unit, `kenwerk-worker.service`, under its own user | The server's unit then loses the owner address, as in Compose |
 | CSL-1209 | The restore test restores into a scratch database on the same PostgreSQL, made once by the install, never into a new Compose project | The worker must never hold the Docker socket; a scratch database needs no new right at run time |
 | CSL-1210 | The witness comparison stays a command, run from the operator's log pipeline, which reports its result to the console | The witness exists to be outside what the database owner and the console can touch (ADR-039) |
 | CSL-1211 | Audit retention is applied by the worker once a day; lowering it takes effect only after a code from the worker's log and a waiting time of seven days, during which it can be cancelled | Pruning is irreversible; seven days give the other administrators, who are mailed, time to see it |

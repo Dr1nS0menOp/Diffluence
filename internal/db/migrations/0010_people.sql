@@ -94,7 +94,7 @@ CREATE TABLE space_category_links (
     PRIMARY KEY (space_id, category_id)
 );
 
--- Left behind by "diffluence audit prune": where the chain starts after pruning.
+-- Left behind by "kenwerk audit prune": where the chain starts after pruning.
 CREATE TABLE audit_anchors (
     seq          bigint PRIMARY KEY,
     prev_hash    bytea NOT NULL,

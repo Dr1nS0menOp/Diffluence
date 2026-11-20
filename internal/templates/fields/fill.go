@@ -5,10 +5,10 @@ package fields
 import (
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
-// The words a yes/no field puts in a page. Diffluence speaks one language today, so the
+// The words a yes/no field puts in a page. Kenwerk speaks one language today, so the
 // words of a space are these (TPL-212).
 const (
 	wordYes = "Yes"

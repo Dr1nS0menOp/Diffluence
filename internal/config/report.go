@@ -9,10 +9,10 @@ import (
 	"strings"
 )
 
-// Setting is one setting as diffluence config check shows it: the value in effect, with a
+// Setting is one setting as kenwerk config check shows it: the value in effect, with a
 // secret shown as (set), and where the value came from.
 type Setting struct {
-	Name   string // the name without DIFFLUENCE_, such as SMTP_HOST
+	Name   string // the name without KENWERK_, such as SMTP_HOST
 	Value  string
 	Source string // default, "file, line N", environment, or "environment, over the file"
 }

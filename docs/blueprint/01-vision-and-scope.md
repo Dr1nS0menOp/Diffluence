@@ -6,7 +6,7 @@ Organisations want a team wiki that they **own**. It should be self-hosted, secu
 
 ## The vision
 
-**Diffluence is an open-source (Apache 2.0), self-hosted knowledge platform.** Over time it matches what teams use in commercial enterprise wikis, but its foundation is security, stability and upgrades that just work. Later it grows into a platform with AI, apps and a work-management module.
+**Kenwerk is an open-source (Apache 2.0), self-hosted knowledge platform.** Over time it matches what teams use in commercial enterprise wikis, but its foundation is security, stability and upgrades that just work. Later it grows into a platform with AI, apps and a work-management module.
 
 ## Who it is for
 

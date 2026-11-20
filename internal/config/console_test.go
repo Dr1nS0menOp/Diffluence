@@ -17,12 +17,12 @@ func TestTheTracingVariablesShowWithoutCredentials(t *testing.T) {
 		"OTEL_EXPORTER_OTLP_TRACES_HEADERS=x-token=hunter2-secret",
 		"OTEL_EXPORTER_OTLP_CLIENT_KEY=/run/secrets/hunter2-secret.key",
 		"OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf",
-		"OTEL_SERVICE_NAME=diffluence",
+		"OTEL_SERVICE_NAME=kenwerk",
 		"OTEL_RESOURCE_ATTRIBUTES=deployment.environment=production",
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=not a url hunter2-secret",
 		"OTEL_SDK_DISABLED=false",
 		"HOME=/root",
-		"DIFFLUENCE_TRACING=true",
+		"KENWERK_TRACING=true",
 	}
 	got := map[string]Setting{}
 	for _, s := range TracingVariables(environ) {
@@ -40,7 +40,7 @@ func TestTheTracingVariablesShowWithoutCredentials(t *testing.T) {
 		"OTEL_EXPORTER_OTLP_TRACES_HEADERS":  "(set)",
 		"OTEL_EXPORTER_OTLP_CLIENT_KEY":      "(set)",
 		"OTEL_EXPORTER_OTLP_PROTOCOL":        "http/protobuf",
-		"OTEL_SERVICE_NAME":                  "diffluence",
+		"OTEL_SERVICE_NAME":                  "kenwerk",
 		"OTEL_RESOURCE_ATTRIBUTES":           "(set)",
 		"OTEL_EXPORTER_OTLP_TRACES_ENDPOINT": "(set)",
 	}

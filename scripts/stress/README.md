@@ -4,7 +4,7 @@ The scripts of the stress test in `docs/reports/2026-11-10-stress-test.md`. Run 
 
 | File | Runs on | Does |
 |---|---|---|
-| `app-vm.sh` | the app machine | Installs Docker and Diffluence as the install guide says, with `compose.stress.yaml` as the override |
+| `app-vm.sh` | the app machine | Installs Docker and Kenwerk as the install guide says, with `compose.stress.yaml` as the override |
 | `compose.stress.yaml` | the app machine | PostgreSQL settings for a 32 GB machine, and `pg_stat_statements` |
 | `load-vm.sh` | the load machine | Installs k6 from its official release |
 | `seed.py` | the load machine | Fills the instance with 5,000 people, 300 spaces, 60,000 pages and more, through the API; `--resume` adds what is missing |

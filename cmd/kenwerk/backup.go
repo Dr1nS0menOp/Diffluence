@@ -1,0 +1,181 @@
+// SPDX-License-Identifier: Apache-2.0
+
+package main
+
+import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"io"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/restore"
+	"github.com/kenwerk/kenwerk/internal/settings"
+)
+
+// The backup worker (the backup service of Compose, a Kubernetes CronJob or a systemd
+// timer) talks to the console through these commands, with the database access of the
+// application role it already has (spec 058, D2). Nothing here reads or prints a key.
+
+// openBackups connects with the application's role and returns the backups module.
+func openBackups(ctx context.Context) (*backups.Service, func(), error) {
+	svc, _, done, err := openBackupsPool(ctx)
+	return svc, done, err
+}
+
+// openBackupsPool is openBackups with its connection, for the restore queries.
+func openBackupsPool(ctx context.Context) (*backups.Service, *pgxpool.Pool, func(), error) {
+	cfg, err := config.FromEnvironment()
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	pool, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	// The worker never mails: only a server node holds the key that seals mail.
+	return backups.NewService(pool, settings.NewService(pool, nil), nil, ""), pool, pool.Close, nil
+}
+
+// defaultHeldFile is where the backup service of compose.yaml keeps what it holds to: in its
+// own backup folder, which the server never reaches (spec 076).
+const defaultHeldFile = "/backups/.kenwerk-held.json"
+
+// cmdBackupNext prints what the worker should do now, as one line it can read in a shell:
+//
+//	restore <id> <backup>          restore <backup> over the installation (spec 059)
+//	code <backup> <code> <minutes> write the code that confirms the restore of <backup> to the
+//	                               log; it lasts <minutes> (spec 070)
+//	say <sentence>                 write the sentence to the log: the code that confirms
+//	                               keeping fewer backups or backing up less often (spec 076)
+//	now <reason> <keep>            make a backup now, then keep the newest <keep>
+//	wait <seconds> <keep>          ask again after <seconds>
+func cmdBackupNext(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("backup next", flag.ContinueOnError)
+	interval := fs.Duration("default-interval", 4*time.Hour, "how often to back up when the console did not choose")
+	keep := fs.Int("default-keep", 42, "how many backups to keep when the console did not choose")
+	key := fs.String("key-fingerprint", "", "the first 16 hexadecimal characters of a SHA-256 of the backup key; empty when there is no key")
+	keyPath := fs.String("key", defaultBackupKey, "the backup key, which makes and checks the code that confirms a restore")
+	heldPath := fs.String("held", defaultHeldFile, "the file where the worker keeps how many backups it holds to")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	svc, pool, done, err := openBackupsPool(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	gate := workerGate(*keyPath, stderr)
+	// A restore goes before any backup: the console asked for it, and it makes its own
+	// safety backup. It goes on only with the code this service wrote to its log.
+	c, err := restore.Claim(ctx, pool, gate)
+	if err != nil {
+		return err
+	}
+	if c.Restore != nil {
+		fmt.Fprintf(stdout, "restore %s %s\n", c.Restore.ID, c.Restore.BackupName)
+		return nil
+	}
+	if c.Show != nil {
+		fmt.Fprintf(stdout, "code %s %s %d\n", c.Show.BackupName, c.Code, int(restore.CodeLifetime.Minutes()))
+		return nil
+	}
+	// A file that cannot be read stops this answer, and with it the console's schedule; the
+	// shell then backs up on its own interval and removes nothing (spec 076).
+	held, err := backups.LoadHeld(*heldPath)
+	if err != nil {
+		return err
+	}
+	defaults := backups.Defaults{Interval: *interval, Keep: *keep, KeyFingerprint: *key, Held: &held}
+	line, err := svc.ConfirmFewer(ctx, gate, defaults)
+	if err != nil {
+		return err
+	}
+	if line != "" {
+		fmt.Fprintf(stdout, "say %s\n", line)
+		return nil
+	}
+	d, err := svc.Next(ctx, defaults)
+	if err != nil {
+		return err
+	}
+	if d.Now {
+		fmt.Fprintf(stdout, "now %s %d\n", d.Reason, d.Keep)
+		return nil
+	}
+	fmt.Fprintf(stdout, "wait %d %d\n", int(d.Wait.Seconds()), d.Keep)
+	return nil
+}
+
+// cmdBackupHeld prints how many backups the worker holds to, 0 when it holds nothing yet, so
+// the shell never removes more old backups than that, whatever keep it was given (spec 076).
+// It reads only the file: it works while the database cannot be reached.
+func cmdBackupHeld(args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("backup held", flag.ContinueOnError)
+	heldPath := fs.String("held", defaultHeldFile, "the file where the worker keeps how many backups it holds to")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	keep, err := backups.HeldKeep(*heldPath)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, keep)
+	return nil
+}
+
+// cmdBackupReport tells the console how a backup went.
+func cmdBackupReport(ctx context.Context, args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("backup report", flag.ContinueOnError)
+	name := fs.String("name", "", "the folder of the backup, such as kenwerk-20261111T071618Z")
+	reason := fs.String("reason", backups.ReasonManual, "schedule, request or manual")
+	started := fs.String("started", "", "when the backup started, in RFC 3339")
+	size := fs.Int64("size", 0, "the size of the finished backup in bytes")
+	failed := fs.String("failed", "", "the step that failed; empty when the backup is complete")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	at, err := time.Parse(time.RFC3339, *started)
+	if err != nil {
+		return errors.New("give --started as an RFC 3339 time, such as 2026-11-11T07:16:18Z")
+	}
+	svc, done, err := openBackups(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	if err := svc.ReportRun(ctx, backups.Report{Name: *name, Reason: *reason, StartedAt: at,
+		OK: *failed == "", SizeBytes: *size, Message: *failed}); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "reported to the console")
+	return nil
+}
+
+// cmdBackupRestoreChecked tells the console how the restore of a backup into a throw-away
+// copy went.
+func cmdBackupRestoreChecked(ctx context.Context, args []string, stdout io.Writer) error {
+	fs := flag.NewFlagSet("backup restore-checked", flag.ContinueOnError)
+	name := fs.String("name", "", "the folder of the backup that was restored")
+	seconds := fs.Int("seconds", 0, "how long the restore took")
+	failed := fs.String("failed", "", "what went wrong; empty when the restore passed")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	svc, done, err := openBackups(ctx)
+	if err != nil {
+		return err
+	}
+	defer done()
+	if err := svc.ReportRestore(ctx, backups.RestoreReport{Name: *name, OK: *failed == "", Seconds: *seconds, Message: *failed}); err != nil {
+		return err
+	}
+	fmt.Fprintln(stdout, "reported to the console")
+	return nil
+}

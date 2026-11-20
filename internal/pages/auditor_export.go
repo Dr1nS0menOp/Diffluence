@@ -13,10 +13,10 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The auditor's export (DOC-1020, DOC-1021, DOC-742): the record of document control of one
@@ -25,7 +25,7 @@ import (
 // every signature with its record and verification, the workflow versions that applied, and
 // the audit entries of all of these with their place in the chain. For each signed version
 // it holds the content its hash covers, so an auditor can verify the signatures outside
-// Diffluence with docs/operations/regulated-use.md.
+// Kenwerk with docs/operations/regulated-use.md.
 
 // AuditorExportFormat is the version of the layout of the export.
 const AuditorExportFormat = 1

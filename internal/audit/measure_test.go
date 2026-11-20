@@ -12,17 +12,17 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // TestMeasureSavesUnderTheChainLock measures what ADR-041 changes, for spec 052: many saves
 // at once, each one transaction with an audit event, first holding the lock of the chain
 // until commit as every save did before, then without it, with a sealer running. It only
-// runs when DIFFLUENCE_MEASURE is set, because it measures rather than checks.
+// runs when KENWERK_MEASURE is set, because it measures rather than checks.
 func TestMeasureSavesUnderTheChainLock(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_MEASURE") == "" {
-		t.Skip("set DIFFLUENCE_MEASURE=1 to measure")
+	if os.Getenv("KENWERK_MEASURE") == "" {
+		t.Skip("set KENWERK_MEASURE=1 to measure")
 	}
 	const writers, each = 32, 40
 	for _, holdLock := range []bool{true, false} {

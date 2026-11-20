@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // TestAReviewerReadsTheirPageThroughRestrictionsForTheRoundOnly is DOC-203 and DOC-1224 on

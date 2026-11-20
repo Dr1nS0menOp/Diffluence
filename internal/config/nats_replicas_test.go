@@ -9,7 +9,7 @@ import (
 
 // The embedded server is one node, so its stream keeps one copy (spec 063).
 func TestTheEventStreamKeepsOneCopyByDefault(t *testing.T) {
-	c, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x"}))
+	c, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x"}))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -22,8 +22,8 @@ func TestTheEventStreamKeepsOneCopyByDefault(t *testing.T) {
 func TestAClusterKeepsThreeOrFiveCopies(t *testing.T) {
 	for _, n := range []string{"3", "5"} {
 		c, err := Load(env(map[string]string{
-			"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_NATS_URL": "nats://a:4222,nats://b:4222,nats://c:4222",
-			"DIFFLUENCE_NATS_REPLICAS": n,
+			"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_NATS_URL": "nats://a:4222,nats://b:4222,nats://c:4222",
+			"KENWERK_NATS_REPLICAS": n,
 		}))
 		if err != nil {
 			t.Fatalf("%s copies: %v", n, err)
@@ -38,8 +38,8 @@ func TestAClusterKeepsThreeOrFiveCopies(t *testing.T) {
 func TestOtherCopyCountsAreRefused(t *testing.T) {
 	for _, n := range []string{"0", "2", "4", "7", "-1"} {
 		_, err := Load(env(map[string]string{
-			"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_NATS_URL": "nats://a:4222",
-			"DIFFLUENCE_NATS_REPLICAS": n,
+			"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_NATS_URL": "nats://a:4222",
+			"KENWERK_NATS_REPLICAS": n,
 		}))
 		if err == nil || !strings.Contains(err.Error(), "NATS_REPLICAS") || !strings.Contains(err.Error(), "1, 3 or 5") {
 			t.Errorf("%s copies: err = %v, want a refusal naming 1, 3 or 5", n, err)
@@ -49,7 +49,7 @@ func TestOtherCopyCountsAreRefused(t *testing.T) {
 
 // The embedded server cannot hold more than one copy, so asking for more is refused.
 func TestTheEmbeddedServerRefusesMoreThanOneCopy(t *testing.T) {
-	_, err := Load(env(map[string]string{"DIFFLUENCE_DATABASE_URL": "postgres://x", "DIFFLUENCE_NATS_REPLICAS": "3"}))
+	_, err := Load(env(map[string]string{"KENWERK_DATABASE_URL": "postgres://x", "KENWERK_NATS_REPLICAS": "3"}))
 	if err == nil || !strings.Contains(err.Error(), "NATS_URL") {
 		t.Errorf("err = %v, want a refusal that names NATS_URL", err)
 	}

@@ -20,10 +20,10 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/app"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/app"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/outbox"
 )
 
 // eventsLagBudget is the pass mark of spec 068 (D9): an event handled by every consumer
@@ -149,9 +149,9 @@ func writeRealEvent(ctx context.Context, pool *pgxpool.Pool, e realEvent) error 
 // writers at rising rates; B4, the same without LISTEN; a backlog after downtime (part of
 // B5); and B2, the notifications consumer alone on a space with many watchers.
 func TestEventsOnRealData(t *testing.T) {
-	realURL := os.Getenv("DIFFLUENCE_REALDATA_URL")
+	realURL := os.Getenv("KENWERK_REALDATA_URL")
 	if realURL == "" {
-		t.Skip("DIFFLUENCE_REALDATA_URL is not set; see scripts/stress/real-data.sh")
+		t.Skip("KENWERK_REALDATA_URL is not set; see scripts/stress/real-data.sh")
 	}
 	public, _ := url.Parse("http://localhost")
 	cfg := config.Config{Role: config.RoleAll, HTTPAddr: "127.0.0.1:0", PublicURL: public, InstanceName: "Real data",

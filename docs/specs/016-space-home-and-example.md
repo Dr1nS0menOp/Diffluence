@@ -47,7 +47,7 @@ Two things make a first visit harder than it should be.
 | D7 | The worker makes the example space, within seconds of the first administrator | The command line process cannot run the whole application safely beside a server. |
 | D8 | It is made once. A mark in the settings remembers that, also when nothing was made | Deleting it must not bring it back, and an instance with spaces gets none. |
 | D9 | An administrator can add it later, with a button in Settings | Instances that exist today, such as the product owner's, have spaces already. |
-| D10 | A setting turns it off: `DIFFLUENCE_EXAMPLE_SPACE=false` | Some installations want to start empty, and the picture tests need an empty database. |
+| D10 | A setting turns it off: `KENWERK_EXAMPLE_SPACE=false` | Some installations want to start empty, and the picture tests need an empty database. |
 | D11 | All members can edit it | It is for trying things out. |
 | D12 | One page has an edit restriction, not a view restriction | Everyone sees the lock and what it does, and nobody misses a page. |
 | D13 | Each page has two versions: a short first one, and the full one | So History and Compare have something to show. |
@@ -122,7 +122,7 @@ At the very top of the sidebar, above the name of the space.
 
 Shortcuts in the sidebar: one to a page, and one to the project's source. The tree has two levels, and links between pages feed Details.
 
-**Words:** own text, written for this product. It explains Diffluence by doing what it describes. Nothing comes from a sample space of another product.
+**Words:** own text, written for this product. It explains Kenwerk by doing what it describes. Nothing comes from a sample space of another product.
 
 ### H5. The button in Administration
 

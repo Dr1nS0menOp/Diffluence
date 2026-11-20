@@ -11,10 +11,10 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/setup"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/setup"
 )
 
 // setupWindow and setupTriesPerAddress limit how often one address may try a code,
@@ -131,7 +131,7 @@ func (s *Server) setupRefused(w http.ResponseWriter, r *http.Request, err error)
 		writeError(w, http.StatusNotFound, "not_found", "Not found.")
 	case errors.Is(err, setup.ErrRefused):
 		writeError(w, http.StatusForbidden, "setup_code_refused",
-			"That setup code does not work. Run `diffluence setup-code` on the server for a new one.")
+			"That setup code does not work. Run `kenwerk setup-code` on the server for a new one.")
 	default:
 		s.internalError(w, r, err)
 	}

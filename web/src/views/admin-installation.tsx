@@ -20,9 +20,9 @@ const INSTALLATION_POLL_MS = 15_000;
 /** The ways to upgrade, as commands: the console cannot upgrade (CSL-1001). */
 const UPGRADE_COMMANDS = {
   compose: 'git pull && docker compose up -d --build',
-  helm: 'helm upgrade wiki deploy/helm/diffluence --reuse-values',
+  helm: 'helm upgrade wiki deploy/helm/kenwerk --reuse-values',
   package:
-    'sudo apt install ./diffluence_<release>_amd64.deb   # or: sudo dnf install ./diffluence_<release>_amd64.rpm',
+    'sudo apt install ./kenwerk_<release>_amd64.deb   # or: sudo dnf install ./kenwerk_<release>_amd64.rpm',
 } as const;
 
 interface NodeRow {
@@ -247,7 +247,7 @@ interface EventsState {
   problem: string;
 }
 
-/** System, Events (CSL-590): what diffluence events status says, read-only. */
+/** System, Events (CSL-590): what kenwerk events status says, read-only. */
 export function EventsTab() {
   const { t } = useTranslation();
   const dates = useDates();

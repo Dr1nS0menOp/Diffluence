@@ -11,7 +11,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 const (
@@ -197,7 +197,7 @@ func ConsumersNeeded(ctx context.Context, q db.Querier) (bool, error) {
 // migrates: it names what still needs NATS and what to do about it, or returns "" when nothing
 // does (spec 068, 2.11). It reads the database as any earlier release leaves it.
 func NATSRemovalProblem(ctx context.Context, q db.Querier) (string, error) {
-	const upgradeFirst = "this database comes from a release that still needs NATS: upgrade to the release that switches the events to PostgreSQL first, run diffluence events switch postgres, and wait until diffluence events status says NATS is drained"
+	const upgradeFirst = "this database comes from a release that still needs NATS: upgrade to the release that switches the events to PostgreSQL first, run kenwerk events switch postgres, and wait until kenwerk events status says NATS is drained"
 	canSwitch, err := hasTheSwitch(ctx, q)
 	if err != nil || !canSwitch {
 		return upgradeFirst, err
@@ -208,11 +208,11 @@ func NATSRemovalProblem(ctx context.Context, q db.Querier) (string, error) {
 	}
 	switch {
 	case s.Transport != TransportPostgres:
-		return "the events still go through NATS: run diffluence events switch postgres, then wait until diffluence events status says NATS is drained", nil
+		return "the events still go through NATS: run kenwerk events switch postgres, then wait until kenwerk events status says NATS is drained", nil
 	case len(s.OlderNodes) > 0:
 		return (&NodesBehindError{Nodes: s.OlderNodes}).Error() + ": a node of an older release may still publish to NATS", nil
 	case s.DrainedAt.IsZero():
-		return "NATS may still hold events from before the switch: wait until diffluence events status says NATS is drained, up to about 1.5 hours while a retry waits", nil
+		return "NATS may still hold events from before the switch: wait until kenwerk events status says NATS is drained, up to about 1.5 hours while a retry waits", nil
 	}
 	// Once, before an upgrade: no index serves it, and none is worth its cost on every save.
 	var late bool
@@ -220,7 +220,7 @@ func NATSRemovalProblem(ctx context.Context, q db.Querier) (string, error) {
 		return "", fmt.Errorf("events: look for events published after the drain: %w", err)
 	}
 	if late {
-		return "a node of an older release published events to NATS after it was drained: stop that node, run diffluence events switch postgres again, and wait until diffluence events status says NATS is drained", nil
+		return "a node of an older release published events to NATS after it was drained: stop that node, run kenwerk events switch postgres again, and wait until kenwerk events status says NATS is drained", nil
 	}
 	return "", nil
 }

@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # A NATS JetStream cluster member of the HA topology (spec 062), from the pinned release
 # with its checksum checked. Run as root on nats1, nats2 and nats3.
-# Usage: bash roles/nats.sh diffluence-ha-nats1
+# Usage: bash roles/nats.sh kenwerk-ha-nats1
 set -eu
 # shellcheck source=common.sh
 . "$(dirname "$0")/common.sh"

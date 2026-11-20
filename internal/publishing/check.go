@@ -10,9 +10,9 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // The consistency check of a pair (PUB-343, PUB-921): it recomputes every status from the
@@ -52,7 +52,7 @@ func (s *Service) Check(ctx context.Context, c identity.Caller, spaceID uuid.UUI
 	return checkPair(ctx, s.pool, c, p, fix)
 }
 
-// CheckAll runs the check of every active pair, for `diffluence check publishing`.
+// CheckAll runs the check of every active pair, for `kenwerk check publishing`.
 func CheckAll(ctx context.Context, pool *pgxpool.Pool, fix bool) ([]CheckResult, error) {
 	return checkAllAs(ctx, pool, identity.Caller{System: "cli"}, fix)
 }

@@ -7,7 +7,7 @@ A **set template** makes several pages in one action. Today a template is one hi
 ## 3.1 The structure
 
 - **TPL-100** · built · A template has one or more **entries**, ordered as a tree with one **root entry**. Each entry has:
-  - a stable key, made by Diffluence and never shown as text to fill in;
+  - a stable key, made by Kenwerk and never shown as text to fill in;
   - a name for the template's editor;
   - a kind: page or folder (ADR-028);
   - its own text, a title pattern and labels;

@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/diffluence/diffluence/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/conditions"
 )
 
 // A section of a template's text that a condition switches (spec 074, TPL-422). When a page

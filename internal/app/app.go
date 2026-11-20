@@ -21,55 +21,55 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/analytics"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/automation"
-	"github.com/diffluence/diffluence/internal/backups"
-	"github.com/diffluence/diffluence/internal/blocks"
-	"github.com/diffluence/diffluence/internal/collab"
-	"github.com/diffluence/diffluence/internal/comments"
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/console"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/events"
-	"github.com/diffluence/diffluence/internal/example"
-	"github.com/diffluence/diffluence/internal/exchange"
-	"github.com/diffluence/diffluence/internal/failures"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/feed"
-	"github.com/diffluence/diffluence/internal/httpapi"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/instance"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/keys"
-	"github.com/diffluence/diffluence/internal/mail"
-	"github.com/diffluence/diffluence/internal/notify"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/outward"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/people"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/presence"
-	"github.com/diffluence/diffluence/internal/publishing"
-	"github.com/diffluence/diffluence/internal/queue"
-	"github.com/diffluence/diffluence/internal/savedblocks"
-	"github.com/diffluence/diffluence/internal/scim"
-	"github.com/diffluence/diffluence/internal/search"
-	"github.com/diffluence/diffluence/internal/settings"
-	"github.com/diffluence/diffluence/internal/setup"
-	"github.com/diffluence/diffluence/internal/sharing"
-	"github.com/diffluence/diffluence/internal/sites"
-	"github.com/diffluence/diffluence/internal/spaces"
-	"github.com/diffluence/diffluence/internal/sso"
-	"github.com/diffluence/diffluence/internal/storage"
-	"github.com/diffluence/diffluence/internal/tasks"
-	"github.com/diffluence/diffluence/internal/templates"
-	"github.com/diffluence/diffluence/internal/tracing"
-	"github.com/diffluence/diffluence/internal/trash"
-	"github.com/diffluence/diffluence/internal/version"
-	"github.com/diffluence/diffluence/internal/watches"
-	"github.com/diffluence/diffluence/internal/webhooks"
+	"github.com/kenwerk/kenwerk/internal/analytics"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/automation"
+	"github.com/kenwerk/kenwerk/internal/backups"
+	"github.com/kenwerk/kenwerk/internal/blocks"
+	"github.com/kenwerk/kenwerk/internal/collab"
+	"github.com/kenwerk/kenwerk/internal/comments"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/console"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/events"
+	"github.com/kenwerk/kenwerk/internal/example"
+	"github.com/kenwerk/kenwerk/internal/exchange"
+	"github.com/kenwerk/kenwerk/internal/failures"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/feed"
+	"github.com/kenwerk/kenwerk/internal/httpapi"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/instance"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/keys"
+	"github.com/kenwerk/kenwerk/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/outward"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/people"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/presence"
+	"github.com/kenwerk/kenwerk/internal/publishing"
+	"github.com/kenwerk/kenwerk/internal/queue"
+	"github.com/kenwerk/kenwerk/internal/savedblocks"
+	"github.com/kenwerk/kenwerk/internal/scim"
+	"github.com/kenwerk/kenwerk/internal/search"
+	"github.com/kenwerk/kenwerk/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/setup"
+	"github.com/kenwerk/kenwerk/internal/sharing"
+	"github.com/kenwerk/kenwerk/internal/sites"
+	"github.com/kenwerk/kenwerk/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/sso"
+	"github.com/kenwerk/kenwerk/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/tasks"
+	"github.com/kenwerk/kenwerk/internal/templates"
+	"github.com/kenwerk/kenwerk/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/trash"
+	"github.com/kenwerk/kenwerk/internal/version"
+	"github.com/kenwerk/kenwerk/internal/watches"
+	"github.com/kenwerk/kenwerk/internal/webhooks"
 )
 
 // NewLogger returns the JSON logger used everywhere. While tracing is on, a line written with
@@ -79,7 +79,7 @@ func NewLogger(level slog.Leveler) *slog.Logger {
 	return slog.New(tracing.LogHandler(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
 }
 
-// App is one running Diffluence process.
+// App is one running Kenwerk process.
 type App struct {
 	cfg config.Config
 	log *slog.Logger
@@ -411,7 +411,7 @@ func (a *App) Setup() *setup.Service { return a.setup }
 // Pool exposes the database pool (used by the CLI and tests).
 func (a *App) Pool() *pgxpool.Pool { return a.pool }
 
-// Backups is the backups module, for "diffluence backup" and tests.
+// Backups is the backups module, for "kenwerk backup" and tests.
 func (a *App) Backups() *backups.Service { return a.backups }
 
 // StoreGuard is the guard in front of the stored files, which refuses new files when the
@@ -534,13 +534,13 @@ func (a *App) Serve(ctx context.Context, ln net.Listener) error {
 	}
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- srv.Serve(ln) }()
-	a.log.Info("diffluence started", "version", version.Version, "role", a.cfg.Role, "addr", ln.Addr().String(),
+	a.log.Info("kenwerk started", "version", version.Version, "role", a.cfg.Role, "addr", ln.Addr().String(),
 		"instance_id", a.instanceID)
 	if a.cfg.Role.RunsAPI() {
 		a.announceSetup(ctx)
 	}
 	if a.cfg.PlainToOthers() {
-		a.log.Warn("DIFFLUENCE_PUBLIC_URL is plain http on another host: cookies go without Secure and no HSTS is sent. Set it to the https address people use.",
+		a.log.Warn("KENWERK_PUBLIC_URL is plain http on another host: cookies go without Secure and no HSTS is sent. Set it to the https address people use.",
 			"public_origin", a.cfg.PublicOrigin())
 	}
 

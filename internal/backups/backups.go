@@ -21,12 +21,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/ids"
-	"github.com/diffluence/diffluence/internal/settings"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/ids"
+	"github.com/kenwerk/kenwerk/internal/settings"
 )
 
 // Limits of the protocol between console and worker (spec 058, load budget).
@@ -63,8 +63,8 @@ const (
 	MailRestoreCheckFailed = "restore_check_failed"
 )
 
-// backupName is the folder name the worker writes: diffluence-20261111T071618Z.
-var backupName = regexp.MustCompile(`^diffluence-[0-9]{8}T[0-9]{6}Z$`)
+// backupName is the folder name the worker writes: kenwerk-20261111T071618Z.
+var backupName = regexp.MustCompile(`^kenwerk-[0-9]{8}T[0-9]{6}Z$`)
 
 // fingerprint is the start of a SHA-256 of the key, which shows the key changed without
 // saying anything about it.
@@ -243,7 +243,7 @@ func cleanMessage(m string) string {
 
 func (r Report) validate() error {
 	if !backupName.MatchString(r.Name) {
-		return apperr.Invalid("A backup is named diffluence- with its time, such as diffluence-20261111T071618Z.")
+		return apperr.Invalid("A backup is named kenwerk- with its time, such as kenwerk-20261111T071618Z.")
 	}
 	if r.Reason != ReasonSchedule && r.Reason != ReasonRequest && r.Reason != ReasonManual {
 		return apperr.Invalid("A backup is made on schedule, on request or by hand.")
@@ -306,7 +306,7 @@ type RestoreReport struct {
 // administrators when the backup did not come back.
 func (s *Service) ReportRestore(ctx context.Context, r RestoreReport) error {
 	if !backupName.MatchString(r.Name) {
-		return apperr.Invalid("A backup is named diffluence- with its time, such as diffluence-20261111T071618Z.")
+		return apperr.Invalid("A backup is named kenwerk- with its time, such as kenwerk-20261111T071618Z.")
 	}
 	if r.Seconds < 0 {
 		return apperr.Invalid("A restore does not take negative time.")

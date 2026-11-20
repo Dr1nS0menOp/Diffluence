@@ -12,11 +12,11 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/db"
+	"github.com/kenwerk/kenwerk/internal/db"
 )
 
 // EnvDatabaseURL must point to a PostgreSQL role that may create databases.
-const EnvDatabaseURL = "DIFFLUENCE_TEST_DATABASE_URL"
+const EnvDatabaseURL = "KENWERK_TEST_DATABASE_URL"
 
 // TestDB is a throw-away database.
 type TestDB struct {
@@ -32,7 +32,7 @@ const AllExperimentalOn = `{"on": ["automation", "bundles", "console_restore", "
 // Database creates a migrated database with every experimental part on, and drops it
 // after the test. The suites test each part itself, so they start with it on; the
 // switch itself is tested on InstalledDatabase. The test is skipped when
-// DIFFLUENCE_TEST_DATABASE_URL is not set.
+// KENWERK_TEST_DATABASE_URL is not set.
 func Database(t testing.TB) TestDB {
 	t.Helper()
 	tdb := InstalledDatabase(t)

@@ -5,7 +5,7 @@ package identity
 import (
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/audit"
 )
 
 // Caller is who is performing an action, passed to every module. Modules check

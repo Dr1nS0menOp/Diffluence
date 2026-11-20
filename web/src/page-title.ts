@@ -3,7 +3,7 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 
-const SCROLL_KEY = 'diffluence.scroll';
+const SCROLL_KEY = 'kenwerk.scroll';
 const SAVE_DELAY_MS = 200;
 
 /** The tab shows what is on screen and where it lives, so many open tabs stay readable. */

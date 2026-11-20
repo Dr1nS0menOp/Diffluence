@@ -8,8 +8,8 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Document control, wave DC1 of spec 064. The pure rule is proved by the permission matrix;

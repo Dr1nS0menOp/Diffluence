@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 func TestTitlePatternsFillInDateSpaceAndFields(t *testing.T) {

@@ -1,6 +1,6 @@
 # 06: Security and compliance
 
-A wiki holds what an organisation knows, including what it would rather keep inside. So this blueprint goes through Diffluence surface by surface: what can go wrong, what stops it today, and what is still needed. It then maps that to the standards customers ask about.
+A wiki holds what an organisation knows, including what it would rather keep inside. So this blueprint goes through Kenwerk surface by surface: what can go wrong, what stops it today, and what is still needed. It then maps that to the standards customers ask about.
 
 This file is the index. The detail is in the chapters below.
 

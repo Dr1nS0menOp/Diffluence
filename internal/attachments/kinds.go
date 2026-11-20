@@ -8,7 +8,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 // extensionFamilies are other names for the same type, so a block on one holds for both.

@@ -9,8 +9,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/health"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/health"
 )
 
 // roomFreshFor is how long one reading of the free space is trusted (spec 051 load

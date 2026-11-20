@@ -20,8 +20,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/oauth2"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 const (
@@ -82,7 +82,7 @@ const discoveryTimeout = 10 * time.Second
 const failurePause = 30 * time.Second
 
 // New creates a provider. Discovery happens on first use, so a provider that is
-// down cannot stop Diffluence from starting.
+// down cannot stop Kenwerk from starting.
 func New(cfg Config, pool *pgxpool.Pool, id *identity.Service) *Provider {
 	return &Provider{cfg: cfg, pool: pool, identity: id, discoveryTimeout: discoveryTimeout, now: time.Now}
 }
@@ -178,7 +178,7 @@ func (p *Provider) Start(ctx context.Context) (redirect, binding string, err err
 
 // StartFresh begins a login in which the provider must ask again, also when the
 // person is still logged in there. It is the step-up of an account without a
-// password in Diffluence (spec 013, F6).
+// password in Kenwerk (spec 013, F6).
 func (p *Provider) StartFresh(ctx context.Context) (redirect, binding string, err error) {
 	// prompt=login asks the provider to ask again, and max_age=0 makes it say when it did
 	// (auth_time), so Callback can check that it really asked: a provider may ignore prompt.

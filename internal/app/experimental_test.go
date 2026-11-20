@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/config"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 // Automation rules, databases, bundles and restore from the console are experimental for
@@ -56,7 +56,7 @@ func TestANewInstallationRefusesEveryExperimentalPart(t *testing.T) {
 		{"POST", "/api/v1/spaces/" + space + "/bundles", nil},
 		{"GET", "/api/v1/admin/bundles/key", nil},
 		{"POST", "/api/v1/admin/bundles?filename=a.zip", "x"},
-		{"POST", "/api/v1/admin/backups/restore", map[string]any{"name": "diffluence-20260101T000000Z", "confirm": "Test", "code": "123456"}},
+		{"POST", "/api/v1/admin/backups/restore", map[string]any{"name": "kenwerk-20260101T000000Z", "confirm": "Test", "code": "123456"}},
 	}
 	for _, r := range refused {
 		if out := root.want(http.StatusNotFound, r.method, r.path, r.body); !strings.Contains(out, "experimental_off") {
@@ -203,7 +203,7 @@ func TestAnUpgradeKeepsEveryExperimentalPartInUse(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := e.app.Pool().Exec(ctx, `INSERT INTO ops.restores (id, backup_name, requested_by_name, state, finished_at)
-		VALUES (gen_random_uuid(), 'diffluence-20260101T000000Z', 'Test', 'refused', now())`); err != nil {
+		VALUES (gen_random_uuid(), 'kenwerk-20260101T000000Z', 'Test', 'refused', now())`); err != nil {
 		t.Fatal(err)
 	}
 	forgetExperimental(t, e)

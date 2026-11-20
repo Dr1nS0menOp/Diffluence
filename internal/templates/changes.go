@@ -7,9 +7,9 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/conditions"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/templates/fields"
+	"github.com/kenwerk/kenwerk/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/templates/fields"
 )
 
 // The readable change list of a version (spec 074, TPL-602): what changed besides the texts,

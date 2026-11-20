@@ -8,7 +8,7 @@ Tools in this field take one of two roads:
 - **Code or an expression language**, which is powerful and hard to review. Document assembly with Python, the `#if` and `#switch` functions of MediaWiki templates, Jinja conditions in project generators, and the `{name}` expressions of form libraries all take this road.
 - **Structured rules picked from lists**, which are limited and readable. Templating.app's conditions ("all" or "any" of tests on field values and the user's groups) take this road.
 
-Diffluence takes the second road, as document control did for transitions (DOC-1404).
+Kenwerk takes the second road, as document control did for transitions (DOC-1404).
 
 ## 6.1 What a condition is
 

@@ -1,6 +1,6 @@
 # Design standard
 
-This is how Diffluence looks and behaves, and how that stays true for every future change. It binds every build session: `CLAUDE.md` makes it a hard rule, and `make check` and the browser tests enforce most of it.
+This is how Kenwerk looks and behaves, and how that stays true for every future change. It binds every build session: `CLAUDE.md` makes it a hard rule, and `make check` and the browser tests enforce most of it.
 
 Status: agreed with the product owner, 2026-11-04 (ADR-021). The look changed to **Stil** on 2026-11-07 (ADR-034, spec 033); where this document and ADR-034 differ, ADR-034 wins.
 
@@ -344,7 +344,7 @@ Every screen handles all of these:
 
 `web/src/components/icons.tsx` is the only file that draws. Icons are our own line drawings on a 24 by 24 grid, stroke 1.8, round ends, `currentColor`, hidden from screen readers. To add one, add a line to that file. An icon needs words beside it, or an `aria-label` and `title` on its button.
 
-The logo is a river that splits in two, which is what the word diffluence means. User marks use four tints, chosen by the name, so they never change by themselves.
+The logo is a river that splits in two, a mark kept from the former working name of the product (spec 095). User marks use four tints, chosen by the name, so they never change by themselves.
 
 A space has a cartoon animal (ADR-031), picked from its key until someone chooses, and it can choose a character instead, which uses the tints. The animals are pictures from `web/public/animals/`, the one exception to our own line drawings, because they carry character and not meaning. They are always next to the name of the space.
 

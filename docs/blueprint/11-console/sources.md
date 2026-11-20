@@ -57,7 +57,7 @@ All outside sources were consulted on **2026-11-14**, in their public documentat
 | [Gitea Command Line](https://docs.gitea.com/administration/command-line) | Read | Log outputs and levels changed at run time by a command |
 | [Upgrade from an old Gitea](https://docs.gitea.com/installation/upgrade-from-gitea) | Read | Upgrades by replacing the binary; migrations at start |
 
-## Diffluence's own documents and code
+## Kenwerk's own documents and code
 
 Read on 2026-11-14 in main `4b8a343`:
 
@@ -66,4 +66,4 @@ Read on 2026-11-14 in main `4b8a343`:
 - Security: `docs/security/threat-model.md`, `docs/security/risks.md`.
 - Operations: `install.md`, `upgrade.md`, `backup-restore.md`, `monitoring.md`, `incidents.md`, `limits.md`.
 - Design: `docs/design/README.md`.
-- Code: `cmd/diffluence/` (`main.go`, `key.go`, `client.go`, `worker.go`), `internal/config/`, `internal/settings/sections.go`, `internal/health/health.go`, `internal/httpapi/handlers_running.go` and the routes of the other admin handlers, `internal/httpapi/router.go`, `web/src/views/admin.tsx` and `admin-running.tsx`, `compose.yaml`, `.env.example`, `deploy/` and `scripts/`.
+- Code: `cmd/kenwerk/` (`main.go`, `key.go`, `client.go`, `worker.go`), `internal/config/`, `internal/settings/sections.go`, `internal/health/health.go`, `internal/httpapi/handlers_running.go` and the routes of the other admin handlers, `internal/httpapi/router.go`, `web/src/views/admin.tsx` and `admin-running.tsx`, `compose.yaml`, `.env.example`, `deploy/` and `scripts/`.

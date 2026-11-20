@@ -6,7 +6,7 @@ A template saves the person who starts a page from a blank sheet. A guided templ
 
 ## 2.1 Situations
 
-These are typical uses of a wiki in a mid-sized organisation. They are written for Diffluence; no product's examples were used.
+These are typical uses of a wiki in a mid-sized organisation. They are written for Kenwerk; no product's examples were used.
 
 | Situation | Pages in one go | Answers that vary | Content that depends on an answer |
 |---|---|---|---|
@@ -30,7 +30,7 @@ These are typical uses of a wiki in a mid-sized organisation. They are written f
 - **TPL-018** · new · A template can be meant for **some people only**: HR's onboarding template for HR, the incident template for the on-call team. Others do not see it in the gallery. *Why:* Templating.app restricts who may browse, apply and edit a template, beside the project's own rights. *Met in:* TPL-500 to TPL-503.
 - **TPL-019** · new · A template that many people will use is **checked by someone responsible** before they can use it. A change to it is checked again, while the checked version stays in use. *Why:* the roadmap asks for it. A template is a multiplier: a mistake in it is copied into every page made from it. *Met in:* TPL-510 to TPL-524.
 - **TPL-021** · new · A template can be **improved without breaking** anything: the pages made from it stay as they are, and people mid-way through the form are not surprised. *Why:* ORG-058, and the rule of DOC-110 that a running process keeps its version. *Met in:* chapter 08.
-- **TPL-022** · new · Everything works by **keyboard and screen reader**, on a phone, and right to left, like the rest of Diffluence. *Why:* WCAG 2.2 AA is the goal of the design standard. *Met in:* chapter 12.
+- **TPL-022** · new · Everything works by **keyboard and screen reader**, on a phone, and right to left, like the rest of Kenwerk. *Why:* WCAG 2.2 AA is the goal of the design standard. *Met in:* chapter 12.
 - **TPL-023** · new · Creating a large set must **not slow down** the space for others. *Why:* the load rule of ARC-238, and the headroom the product keeps. *Met in:* chapter 11.
 - **TPL-024** · new · Templates that exist today keep **working unchanged**. *Why:* the upgrade promise of blueprint 07. *Met in:* chapter 13.
 - **TPL-025** · built · A person can tell **where a page came from**: which template, which version, made by whom and when, and which pages were made with it. *Why:* teams that look after templates need to know what an older version produced. *Met in:* TPL-610 to TPL-612.
@@ -43,4 +43,4 @@ These were considered and are left out, with reasons, in chapter 14:
 - forms that send data anywhere else;
 - a page per item of a list, which is later.
 
-Templating.app also offers templates for whole projects and boards. The closest thing in Diffluence is the space template, which stays as it is (TPL-1203).
+Templating.app also offers templates for whole projects and boards. The closest thing in Kenwerk is the space template, which stays as it is (TPL-1203).

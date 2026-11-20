@@ -33,7 +33,7 @@ Since spec 032, `master.key` protects every stored file as well as TOTP seeds, w
 | # | Decision | Why |
 |---|---|---|
 | D1 | A sealed value now starts with format 2 and an 8-byte key id. Values in format 1 still open: every loaded key is tried on them, and GCM refuses a wrong one | A node can pick the right key at once, and a check can count values per key without opening them |
-| D2 | The key id is an HMAC of the fixed text `diffluence key id v1` under the key | It can be shown and logged; it gives nothing away about the key |
+| D2 | The key id is an HMAC of the fixed text `kenwerk key id v1` under the key | It can be shown and logged; it gives nothing away about the key |
 | D3 | Fingerprints and signing keys come from a **root** that stays when the KEK is replaced. A key file of 32 bytes is both; after the first change the file holds `DFK2`, the root and the new KEK | Login fingerprints, audit checkpoints and bundles keep their meaning. Replacing the root as well is a different job, see "Left" |
 | D4 | Three steps, each safe to stop after and to run again: `key add` writes `master.key.next`, `key promote` makes it seal and keeps the old key in `master.key.previous`, `key retire` removes the old key | Every key that sealed anything is in a file at every moment |
 | D5 | `key add` and `key promote` refuse while a previous change has not finished | Two changes at once could drop a key that is still in use |
@@ -49,11 +49,11 @@ Since spec 032, `master.key` protects every stored file as well as TOTP seeds, w
 ## Behaviour
 
 ```
-diffluence key add                      # writes master.key.next; restart every node
-diffluence key promote                  # the new key seals; the old one moves to master.key.previous; restart every node
-diffluence key reseal                   # seals every value and file again, in runs of 2 minutes
-diffluence key check --require-current  # proves everything opens and uses the new key
-diffluence key retire                   # removes master.key.previous, only if the check passes
+kenwerk key add                      # writes master.key.next; restart every node
+kenwerk key promote                  # the new key seals; the old one moves to master.key.previous; restart every node
+kenwerk key reseal                   # seals every value and file again, in runs of 2 minutes
+kenwerk key check --require-current  # proves everything opens and uses the new key
+kenwerk key retire                   # removes master.key.previous, only if the check passes
 ```
 
 On several nodes, the key files are copied to every node after `add` and after `promote`, and each node is restarted before the next step. A node that has not loaded the new key yet still opens everything that the old key sealed, and nothing is sealed with the new key until every node knows it.
@@ -62,7 +62,7 @@ Where `master.key` comes from a read-only mount, such as a Kubernetes secret, th
 
 ## Permissions and audit
 
-The commands run on the server, with access to the data directory and the database, as the backup does. They need no account in Diffluence. Each step is audited as system actor `cli`, with the key id as object id. No key, value or file content appears in output, logs, errors or audit details.
+The commands run on the server, with access to the data directory and the database, as the backup does. They need no account in Kenwerk. Each step is audited as system actor `cli`, with the key id as object id. No key, value or file content appears in output, logs, errors or audit details.
 
 ## Load budget
 
@@ -93,7 +93,7 @@ Class: maintenance, run beside the instance, in the class of search and reports 
 
 ## How the product owner tests it
 
-On a test installation with a few pages, files and an authenticator app set up: run the five commands above in order, restarting Diffluence after `add` and after `promote`. After each step, open a page with a file and log in with the authenticator app. `key check` should report no problems, and the audit log should show the four key events.
+On a test installation with a few pages, files and an authenticator app set up: run the five commands above in order, restarting Kenwerk after `add` and after `promote`. After each step, open a page with a file and log in with the authenticator app. `key check` should report no problems, and the audit log should show the four key events.
 
 ## Left
 

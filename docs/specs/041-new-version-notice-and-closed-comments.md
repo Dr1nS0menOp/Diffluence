@@ -8,7 +8,7 @@ Two small points: one the product owner ran into, one the module rule asked for.
 
 **What happened.** The product owner rebuilt the app and went on working in a tab that was opened before the rebuild. The tab kept running the old frontend, and nothing said so: the Roles screen of the new version stayed out of sight until a manual reload.
 
-**What the person gets.** When the server ships a newer frontend than the tab runs, a calm note appears under the top bar: "A newer version of Diffluence is running. Reload when it suits you; text you are writing stays." It has one button, Reload. It never reloads by itself, takes no focus and opens no dialog, so typing goes on. A screen reader hears it once, as a status.
+**What the person gets.** When the server ships a newer frontend than the tab runs, a calm note appears under the top bar: "A newer version of Kenwerk is running. Reload when it suits you; text you are writing stays." It has one button, Reload. It never reloads by itself, takes no focus and opens no dialog, so typing goes on. A screen reader hears it once, as a status.
 
 **How the tab knows.**
 
@@ -22,7 +22,7 @@ Two small points: one the product owner ran into, one the module rule asked for.
 
 The tab keeps the id of its first answer. When a later answer differs, the note shows. Besides the poll, the tab asks again when a person comes back to it (`visibilitychange`), the likely moment after a rebuild.
 
-**Reload without losing text.** Before, a reload in the middle of typing lost nothing either, but the words came back only through "Put it back", one click more. Now Reload sends one event, `diffluence:before-reload`; an open editor answers by saving its draft at once, and the tab reloads when the save is done, or after 5 seconds at most. The editor's existing browser backup on `pagehide` stays as the safety net when the save fails. The event carries the list of promises, so there is no shared state.
+**Reload without losing text.** Before, a reload in the middle of typing lost nothing either, but the words came back only through "Put it back", one click more. Now Reload sends one event, `kenwerk:before-reload`; an open editor answers by saving its draft at once, and the tab reloads when the save is done, or after 5 seconds at most. The editor's existing browser backup on `pagehide` stays as the safety net when the save fails. The event carries the list of promises, so there is no shared state.
 
 **Load budget (ARC-238).** Reading: no new request, no database query; one more field on an answer that is polled anyway, plus one extra appearance request when a person returns to the tab. Saving: on Reload, one draft save that the editor would have made a moment later anyway.
 

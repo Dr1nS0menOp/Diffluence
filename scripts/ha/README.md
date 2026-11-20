@@ -12,13 +12,13 @@ tests that break it. Nothing here runs in CI; spec 062 is the plan and the pass 
 | `roles/db.sh` | PostgreSQL 16, Patroni, etcd, the softdog watchdog | db1 to db3 |
 | `roles/nats.sh` | A NATS JetStream cluster member | nats1 to nats3 |
 | `roles/edge.sh` | HAProxy (PostgreSQL leader and app) and PgBouncer | edge |
-| `roles/app.sh` | The `diffluence` package as `api` or `worker` | api1, api2, work1, work2 |
+| `roles/app.sh` | The `kenwerk` package as `api` or `worker` | api1, api2, work1, work2 |
 | `conf/` | Templates the role scripts fill in | |
 | `tests/` | The fault tests and the write ledger | the load VM and the host |
 | `validate.sh` | Checks every script and config without a host | a development machine |
 
 `ha.local.env` holds what may not be committed: the addresses on the test network, the
-database passwords, `DIFFLUENCE_COLLAB_TOKEN` if used, and the path of the shared
+database passwords, `KENWERK_COLLAB_TOKEN` if used, and the path of the shared
 `master.key`. Copy `ha.local.env.example` and fill it in.
 
 Run `bash scripts/ha/validate.sh` before a session: it checks the shell scripts and runs

@@ -21,7 +21,7 @@ esac
 ls secrets/*.txt >/dev/null
 
 stamp=$(date -u +%Y%m%dT%H%M%SZ)
-dir="$target/diffluence-$stamp"
+dir="$target/kenwerk-$stamp"
 mkdir -p "$dir"
 
 encrypt_to() {
@@ -33,10 +33,10 @@ encrypt_to() {
 # pointing at a file that is not in the backup is not.
 # The schema ops steers a restore from the console and is never restored, so a backup
 # holds its tables without their rows (spec 059).
-docker compose exec -T postgres pg_dump -U diffluence_owner -d diffluence -Fc --exclude-table-data='ops.*' | encrypt_to database.dump.gpg
+docker compose exec -T postgres pg_dump -U kenwerk_owner -d kenwerk -Fc --exclude-table-data='ops.*' | encrypt_to database.dump.gpg
 
 # Stored files and the encryption key, read through a throw-away container.
-volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/diffluence"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq diffluence)")
+volume=$(docker inspect --format '{{range .Mounts}}{{if eq .Destination "/var/lib/kenwerk"}}{{.Name}}{{end}}{{end}}' "$(docker compose ps -aq kenwerk)")
 docker run --rm -v "$volume:/data:ro" busybox tar -C /data -czf - --exclude=./master.key --exclude=./master.key.next \
   --exclude=./master.key.previous --exclude=./nats . | encrypt_to files.tar.gz.gpg
 docker run --rm -v "$volume:/data:ro" busybox cat /data/master.key | encrypt_to master.key.gpg
@@ -56,24 +56,24 @@ echo "backup written to $dir"
 # (docs/operations/upgrade.md). An older release that refuses to upgrade without a backup
 # keeps restarting, so the note cannot wait for it: then a one-off container writes it.
 # -a: a stopped node is listed too, and its volume is still the one to back up.
-node=$(docker compose ps -aq diffluence)
+node=$(docker compose ps -aq kenwerk)
 note_backup() {
   if [ "$(docker inspect --format '{{.State.Running}} {{.State.Restarting}}' "$node" 2>/dev/null)" = "true false" ]; then
-    docker compose exec -T diffluence diffluence backup note
+    docker compose exec -T kenwerk kenwerk backup note
   else
-    # The image's entrypoint is the diffluence binary, so run takes only its arguments.
-    docker compose run --rm --no-deps -T diffluence backup note
+    # The image's entrypoint is the kenwerk binary, so run takes only its arguments.
+    docker compose run --rm --no-deps -T kenwerk backup note
   fi
 }
 if ! note_backup >/dev/null; then
-  echo "the backup is complete, but noting it in Diffluence failed: an upgrade that asks for a recent backup will refuse" >&2
+  echo "the backup is complete, but noting it in Kenwerk failed: an upgrade that asks for a recent backup will refuse" >&2
   exit 1
 fi
 # A node waiting before an upgrade is running but not healthy. SIGHUP makes it check again
 # now instead of within the minute (spec 054). A healthy node is left alone: a release
 # from before spec 054 would stop on SIGHUP.
 if [ "$(docker inspect --format '{{if .State.Health}}{{.State.Health.Status}}{{end}}' "$node" 2>/dev/null)" = unhealthy ]; then
-  if docker compose kill -s HUP diffluence >/dev/null 2>&1; then
+  if docker compose kill -s HUP kenwerk >/dev/null 2>&1; then
     echo "asked the waiting node to check again"
   else
     echo "could not signal the node; it checks again within a minute" >&2

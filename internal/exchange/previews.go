@@ -12,7 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/storage"
+	"github.com/kenwerk/kenwerk/internal/storage"
 )
 
 // previewPrefix holds derived files (ARC-195). They can always be made again, so a backup may

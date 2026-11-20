@@ -26,7 +26,7 @@ Blueprint 07 plans an HA topology for phase 3: two or more `api` and `worker` no
 | Application | Stateless nodes behind a load balancer, readiness checks, graceful drain | Any node can die |
 | Files | S3-compatible storage with versioning and replication | Files outside any one machine |
 
-## 3.4 Where Diffluence stands
+## 3.4 Where Kenwerk stands
 
 | Part | State | Where |
 |---|---|---|
@@ -39,7 +39,7 @@ Blueprint 07 plans an HA topology for phase 3: two or more `api` and `worker` no
 | Embedded NATS for one node, external NATS by URL | Built | `internal/queue/queue.go` |
 | NATS cluster, Patroni, HAProxy, S3 | Not run | OPS-012 to OPS-014 |
 
-Diffluence has one design choice that limits the damage of a lost queue: jobs live in PostgreSQL, and events stay in the outbox until the queue accepted them. What the queue holds after that, such as notifications, webhooks, automation and the signal to the editing service, is only as safe as the queue's own storage.
+Kenwerk has one design choice that limits the damage of a lost queue: jobs live in PostgreSQL, and events stay in the outbox until the queue accepted them. What the queue holds after that, such as notifications, webhooks, automation and the signal to the editing service, is only as safe as the queue's own storage.
 
 ## 3.5 Recommendations
 

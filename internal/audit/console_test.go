@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // Before any witness report, the console has nothing to show and nothing warns (CSL-533).

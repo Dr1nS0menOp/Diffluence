@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { IconSidebar } from './icons';
 import { useShortcut } from './shortcuts';
 
-const SIDEBAR_KEY = 'diffluence.sidebar';
+const SIDEBAR_KEY = 'kenwerk.sidebar';
 const SIDEBAR_HIDDEN = 'hidden';
 const NARROW_SCREEN = '(max-width: 50rem)';
 const SIDEBAR_ICON_SIZE = 20;

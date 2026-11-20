@@ -1,6 +1,6 @@
 {
  "key": "WELCOME",
- "name": "Welcome to Diffluence",
+ "name": "Welcome to Kenwerk",
  "description": "An example of everything a page can do. Change it, or delete it when you are done.",
  "icon": "owl",
  "home": "home.json",
@@ -151,7 +151,7 @@
   },
   {
    "label": "Source code",
-   "target": "https://github.com/Dr1nS0menOp/Diffluence"
+   "target": "https://github.com/Dr1nS0menOp/Kenwerk"
   }
  ],
  "posts": [

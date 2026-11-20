@@ -230,7 +230,7 @@ test('logging out leaves nothing of a person in the browser', async ({ page, bro
   const { pageId, email, other } = await team(page, browser);
   await other.context().close();
   const personal = () =>
-    page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('diffluence.person.')));
+    page.evaluate(() => Object.keys(localStorage).filter((key) => key.startsWith('kenwerk.person.')));
   await openPage(page, pageId);
   await page.keyboard.press('/');
   await page.keyboard.type('kumquat plans');

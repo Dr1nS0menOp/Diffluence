@@ -16,11 +16,11 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // StreamEvents holds all domain events published by the outbox relay.
-const StreamEvents = "DIFFLUENCE_EVENTS"
+const StreamEvents = "KENWERK_EVENTS"
 
 // Queue is a JetStream connection, plus the embedded server if there is one.
 type Queue struct {
@@ -38,7 +38,7 @@ type Queue struct {
 func Open(ctx context.Context, natsURL, dataDir string, replicas int, log *slog.Logger) (*Queue, error) {
 	q := &Queue{log: log, retryWaits: defaultRetryWaits}
 	opts := []nats.Option{
-		nats.Name("diffluence"),
+		nats.Name("kenwerk"),
 		nats.MaxReconnects(-1),
 		nats.ReconnectWait(2 * time.Second),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
@@ -52,7 +52,7 @@ func Open(ctx context.Context, natsURL, dataDir string, replicas int, log *slog.
 	var err error
 	if natsURL == "" {
 		ns, nerr := server.NewServer(&server.Options{
-			ServerName: "diffluence-embedded",
+			ServerName: "kenwerk-embedded",
 			DontListen: true, // only reachable in-process
 			JetStream:  true,
 			StoreDir:   filepath.Join(dataDir, "nats"),
@@ -97,7 +97,7 @@ func Open(ctx context.Context, natsURL, dataDir string, replicas int, log *slog.
 	}
 	_, err = q.js.CreateOrUpdateStream(sctx, jetstream.StreamConfig{
 		Name:       StreamEvents,
-		Subjects:   []string{"diffluence.events.>"},
+		Subjects:   []string{"kenwerk.events.>"},
 		Storage:    jetstream.FileStorage,
 		Retention:  jetstream.LimitsPolicy,
 		MaxAge:     7 * 24 * time.Hour,

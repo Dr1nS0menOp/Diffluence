@@ -1,6 +1,6 @@
 # Sources of the study of guided templates
 
-Every source was read on **2026-11-14**, for behaviour or research findings only. No product's source was read. No text, field names, icons or layouts were copied; every requirement is written in Diffluence's own words (`docs/blueprint/02-clean-room-and-licensing.md`).
+Every source was read on **2026-11-14**, for behaviour or research findings only. No product's source was read. No text, field names, icons or layouts were copied; every requirement is written in Kenwerk's own words (`docs/blueprint/02-clean-room-and-licensing.md`).
 
 ## The behaviour meant: Templating.app
 
@@ -52,7 +52,7 @@ Templating.app is named in blueprint 08 only to say which behaviour is meant. It
 - W3C, [Web Content Accessibility Guidelines 2.2](https://www.w3.org/TR/WCAG22/): 1.3.1, 2.1.1, 2.1.2, 2.4.3, 3.2.2, 3.3.1, 3.3.2, 3.3.3, 3.3.7 (redundant entry), 4.1.3.
 - OWASP, [Cross Site Scripting Prevention Cheat Sheet](https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html): only safe URL schemes become links.
 
-## Diffluence's own documents and code
+## Kenwerk's own documents and code
 
 - Blueprint 03, ORG-045 to ORG-061, PAG-004, PAG-008, PAG-009, SPC-006, BLK-039 to BLK-042.
 - Blueprint 08, "Enterprise document features", and `08-roadmap/02-enterprise-document-needs.md` (RMP-014).

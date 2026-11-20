@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // hold is a handler that keeps its place until released, so a test can fill a class.

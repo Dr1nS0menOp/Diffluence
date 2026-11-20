@@ -55,8 +55,8 @@ The settings the server reads, from `internal/config/config.go` and `compose.yam
 | `COLLAB_*`, `PDF_*`, `COLLABORA_URL`, `DRAWING_URL`, `METRICS_TOKEN` | show only, secrets hidden | Addresses and tokens of other services. |
 | `PASSWORD_BLOCKLIST_FILE`, `EXAMPLE_SPACE`, `OUTWARD_ALLOW_PRIVATE`, `INSTANCE_NAME` | show only | Read at start. |
 | `LOG_LEVEL` | show only now; "log level for an hour" is planned in 3.3 | Needs every node to pick up a change; the settings cache can carry it. |
-| `DIFFLUENCE_BACKUP_INTERVAL`, `DIFFLUENCE_BACKUP_KEEP` | **console** (this wave): the console's choice wins, the variable is the default | The worker asks the console each minute. |
-| `DIFFLUENCE_BACKUP_DIR`, `DIFFLUENCE_BACKUP_KEY_DIR` | show only, through the worker | Folders of the worker's machine. |
+| `KENWERK_BACKUP_INTERVAL`, `KENWERK_BACKUP_KEEP` | **console** (this wave): the console's choice wins, the variable is the default | The worker asks the console each minute. |
+| `KENWERK_BACKUP_DIR`, `KENWERK_BACKUP_KEY_DIR` | show only, through the worker | Folders of the worker's machine. |
 | Disk thresholds (10% and 2%, spec 051) | command only for now; planned in 3.3 | Constants today; making them settings is small but is its own change with its own tests. |
 
 ## 2. Decisions
@@ -64,7 +64,7 @@ The settings the server reads, from `internal/config/config.go` and `compose.yam
 | # | Decision | Reason |
 |---|---|---|
 | D1 | The console controls, a worker does the work, and they meet in the database: `backup_requests`, `backup_runs`, `backup_restore_checks`, `backup_worker`, `backup_mail` (migration 0048). | The same tables work for the Compose service, a Kubernetes CronJob and a systemd timer. The key that opens backups never reaches the server. |
-| D2 | The worker talks to the console through the `diffluence` binary in its image (`backup next`, `backup report`, `backup restore-checked`), with the **application role's database access it already has** for `backup note`. Not an API token. | The worker needs the database anyway (the dump reads it as the owner). An API token would add a secret, a network path to the app, and would fail exactly when the app is in its waiting page during an upgrade, when a backup matters most. The application role can do nothing here a token with one scope could not. |
+| D2 | The worker talks to the console through the `kenwerk` binary in its image (`backup next`, `backup report`, `backup restore-checked`), with the **application role's database access it already has** for `backup note`. Not an API token. | The worker needs the database anyway (the dump reads it as the owner). An API token would add a secret, a network path to the app, and would fail exactly when the app is in its waiting page during an upgrade, when a backup matters most. The application role can do nothing here a token with one scope could not. |
 | D3 | Every minute the worker asks `backup next`. It answers "now" for a console request or when the interval since the last try has passed, otherwise "wait" for at most 60 seconds. | A request is picked up within a minute, and the worker is seen as alive. |
 | D4 | A request is claimed in the same transaction that hands it out. A claim older than 6 hours may be taken again. | Two workers never take the same request; a worker that died does not block "back up now" for ever. |
 | D5 | One open request at a time, at most 4 an hour. | A backup reads the whole database and every file; pressing it in a loop must not wear the server down. |
@@ -83,7 +83,7 @@ The settings the server reads, from `internal/config/config.go` and `compose.yam
 1. Migration 0048: the five tables of D1.
 2. `internal/backups`: `Next`, `ReportRun`, `ReportRestore`, `RequestNow`, `Overview`, `MailFailures`.
 3. The settings section `backups` (interval in hours, number kept; zero is the worker's default).
-4. `diffluence backup next | report | restore-checked`.
+4. `kenwerk backup next | report | restore-checked`.
 5. The backup service of Compose asks the console and reports each backup with the step that failed; a release without `backup next` falls back to the folder's own schedule.
 6. `scripts/restore-check.sh` reports each weekly test restore to the console, through the running node or a one-off container.
 7. The console: **Backups** (state of the worker, key, back up now, schedule, list with test restores, the restore command for a chosen backup), **Configuration** (show only), **Sessions** (one person, everyone).
@@ -103,7 +103,7 @@ Decided by the product owner on 2026-11-11: a full restore over the live install
 1. The console writes a restore request (backup name, who, when) and an audit entry.
 2. Every node sees the request in the database and switches to the waiting page of spec 054, the same one an upgrade without a backup uses; `/readyz` says `restoring`. No node writes to the database or the files while it waits.
 3. The worker makes the safety backup, then restores the chosen backup into the database and the data folder, with the steps of `scripts/restore.sh`.
-4. The worker runs `diffluence audit verify` and `diffluence key check` against the restored installation.
+4. The worker runs `kenwerk audit verify` and `kenwerk key check` against the restored installation.
 5. Only when both pass does it clear the request; the nodes leave the waiting page within a minute.
 
 **Failure.** When any step fails, the nodes stay on the waiting page, which names the step and the safety backup. Restoring that safety backup is the way back, by the same page or by `scripts/restore.sh`.

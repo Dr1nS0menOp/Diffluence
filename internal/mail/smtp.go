@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/config"
+	"github.com/kenwerk/kenwerk/internal/config"
 )
 
 const smtpTimeout = 30 * time.Second

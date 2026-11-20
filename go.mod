@@ -1,4 +1,4 @@
-module github.com/diffluence/diffluence
+module github.com/kenwerk/kenwerk
 
 go 1.26.0
 

@@ -11,13 +11,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/conditions"
-	"github.com/diffluence/diffluence/internal/document"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/templates/fields"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/conditions"
+	"github.com/kenwerk/kenwerk/internal/document"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/templates/fields"
 )
 
 // A template as one file, for moving it between installations (ORG-059; spec 074, wave GT5,
@@ -31,7 +31,7 @@ import (
 // file whole, instead of importing a part of it (TPL-1106).
 const bundleFormat = 2
 
-// maxKeyRunes bounds the key of an entry a file names; Diffluence makes keys of 36.
+// maxKeyRunes bounds the key of an entry a file names; Kenwerk makes keys of 36.
 const maxKeyRunes = 64
 
 // BundleSubject is a group a restriction of the file names, with its name so the importer

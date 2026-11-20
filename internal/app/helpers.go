@@ -9,7 +9,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/exchange"
+	"github.com/kenwerk/kenwerk/internal/exchange"
 )
 
 // collabLivePath is where the editing service says it runs (collab/server.mjs).

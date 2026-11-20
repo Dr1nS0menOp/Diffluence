@@ -19,10 +19,10 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 	"go.opentelemetry.io/otel/trace"
 
-	"github.com/diffluence/diffluence/internal/failures"
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/testutil"
-	"github.com/diffluence/diffluence/internal/tracing"
+	"github.com/kenwerk/kenwerk/internal/failures"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/tracing"
 )
 
 // recorder keeps what each consumer was handed, in order, and fails the events it is told to.

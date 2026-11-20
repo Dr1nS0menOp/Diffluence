@@ -53,7 +53,7 @@ func TestABadEventStopsComingBackAndIsHandedOver(t *testing.T) {
 			},
 		})
 	}()
-	if err := q.Publish(ctx, "diffluence.events.test", []byte("the event"), "one"); err != nil {
+	if err := q.Publish(ctx, "kenwerk.events.test", []byte("the event"), "one"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, gaveUp)
@@ -85,7 +85,7 @@ func TestAnEventThatRecoversIsNotHandedOver(t *testing.T) {
 			GiveUp: func(context.Context, string, []byte, error) error { t.Error("gave up"); return nil },
 		})
 	}()
-	if err := q.Publish(ctx, "diffluence.events.test", []byte("x"), "two"); err != nil {
+	if err := q.Publish(ctx, "kenwerk.events.test", []byte("x"), "two"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, done)
@@ -117,7 +117,7 @@ func TestAnEventWaitingForItsRetryCountsAsWaiting(t *testing.T) {
 	if _, err := q.Waiting(ctx, []string{"never-made"}); err == nil {
 		t.Fatal("a consumer that does not exist has nothing waiting")
 	}
-	if err := q.Publish(ctx, "diffluence.events.test", []byte("x"), "four"); err != nil {
+	if err := q.Publish(ctx, "kenwerk.events.test", []byte("x"), "four"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, failed)
@@ -164,7 +164,7 @@ func TestAFailureThatCannotBeStoredIsTriedAgain(t *testing.T) {
 			},
 		})
 	}()
-	if err := q.Publish(ctx, "diffluence.events.test", []byte("x"), "three"); err != nil {
+	if err := q.Publish(ctx, "kenwerk.events.test", []byte("x"), "three"); err != nil {
 		t.Fatal(err)
 	}
 	waitFor(t, stored)

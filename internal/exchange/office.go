@@ -10,7 +10,7 @@ import (
 	"path"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 const (

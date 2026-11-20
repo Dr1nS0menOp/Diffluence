@@ -21,11 +21,11 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/jobs"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/jobs"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // fakeMail catches account mail, so a test can follow the link in it.
@@ -151,7 +151,7 @@ func TestTokensStayInsideTheirScope(t *testing.T) {
 
 	made := owner.ok("POST", "/api/v1/me/tokens", map[string]any{"name": "script", "expires_at": ends})
 	read := made["secret"].(string)
-	if !strings.HasPrefix(read, "dfl_") {
+	if !strings.HasPrefix(read, "kenwerk_") {
 		t.Fatalf("a scanner cannot find this token: %s", read)
 	}
 	if status, out := e.bearer("GET", "/api/v1/pages/"+page, read, ""); status != 200 {

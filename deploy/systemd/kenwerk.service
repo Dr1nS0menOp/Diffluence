@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: Apache-2.0
+# Kenwerk as a systemd service, for LXC containers and bare Linux.
+[Unit]
+Description=Kenwerk wiki
+Documentation=https://github.com/Dr1nS0menOp/Kenwerk
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=kenwerk
+Group=kenwerk
+# Defaults that fit the sandbox below: the data, the key and the queue's store live in the
+# one folder the service may write, and it listens for a reverse proxy on this machine.
+# The environment file is read after these, so it may change them.
+Environment=KENWERK_DATA_DIR=/var/lib/kenwerk
+Environment=KENWERK_HTTP_ADDR=127.0.0.1:8080
+EnvironmentFile=/etc/kenwerk/kenwerk.env
+ExecStart=/usr/local/bin/kenwerk serve
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=45
+
+# Sandboxing: the process sees almost nothing of the host.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+CapabilityBoundingSet=
+StateDirectory=kenwerk
+StateDirectoryMode=0700
+ReadWritePaths=/var/lib/kenwerk
+
+[Install]
+WantedBy=multi-user.target

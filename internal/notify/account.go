@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"html"
 
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/mail"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/mail"
 )
 
 // accountWord holds the words of one kind of account mail. Body has room for the

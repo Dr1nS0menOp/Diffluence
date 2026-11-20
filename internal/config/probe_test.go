@@ -75,7 +75,7 @@ func TestAMailServerThatAnswersDoesNotWarn(t *testing.T) {
 
 func TestAMailServerWhoseNameDoesNotResolveWarns(t *testing.T) {
 	// .invalid never resolves (RFC 6761).
-	c := Config{SMTP: SMTP{Host: "mail.diffluence.invalid", Port: 587}}
+	c := Config{SMTP: SMTP{Host: "mail.kenwerk.invalid", Port: 587}}
 	w, ok := warningFor(Probe(context.Background(), c), "SMTP_HOST")
 	if !ok || !strings.Contains(w.Message, "resolve") {
 		t.Fatalf("want a warning that the name does not resolve, got %+v", w)

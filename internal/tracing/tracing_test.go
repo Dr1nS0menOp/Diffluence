@@ -84,7 +84,7 @@ func TestOffDoesNothingAndChangesNothing(t *testing.T) {
 		t.Error("the log handler is wrapped while off")
 	}
 	headers := map[string][]string{}
-	_, end := Publish(ctx, "diffluence.events.page.created", headers)
+	_, end := Publish(ctx, "kenwerk.events.page.created", headers)
 	end(nil)
 	if len(headers) != 0 {
 		t.Errorf("headers written while off: %v", headers)
@@ -275,19 +275,19 @@ func TestAQueryInATraceNotKeptMakesNoSpan(t *testing.T) {
 func TestAnEventCarriesItsTraceThroughTheQueue(t *testing.T) {
 	exporter := record(t, 1)
 	headers := map[string][]string{}
-	_, end := Publish(context.Background(), "diffluence.events.page.created", headers)
+	_, end := Publish(context.Background(), "kenwerk.events.page.created", headers)
 	end(nil)
 	if len(headers) == 0 {
 		t.Fatal("no headers written")
 	}
-	_, done := Consume(context.Background(), "diffluence.events.page.created", "notify", headers)
+	_, done := Consume(context.Background(), "kenwerk.events.page.created", "notify", headers)
 	done(errors.New("the listener failed"))
 	spans := exporter.GetSpans()
 	if len(spans) != 2 {
 		t.Fatalf("%d spans", len(spans))
 	}
 	publish, consume := spans[0], spans[1]
-	if publish.Name != "queue publish diffluence.events.page.created" || consume.Name != "queue consume notify" {
+	if publish.Name != "queue publish kenwerk.events.page.created" || consume.Name != "queue consume notify" {
 		t.Fatalf("names %q %q", publish.Name, consume.Name)
 	}
 	if consume.SpanContext.TraceID() != publish.SpanContext.TraceID() || consume.Parent.SpanID() != publish.SpanContext.SpanID() {
@@ -378,13 +378,13 @@ func TestALogLineNamesItsSpan(t *testing.T) {
 func TestSpanRecordsAFailureWithoutItsMessageAndACount(t *testing.T) {
 	exporter := record(t, 1)
 	ctx, end := Span(context.Background(), "audit seal", "")
-	Count(ctx, "diffluence.audit.sealed", 3)
+	Count(ctx, "kenwerk.audit.sealed", 3)
 	end(errors.New("x@example.org"))
 	span := only(t, exporter)
 	if span.Name != "audit seal" || span.Status.Code != codes.Error || span.Status.Description != "error" {
 		t.Fatalf("span %q status %v", span.Name, span.Status)
 	}
-	if attrs(span)["diffluence.audit.sealed"] != "3" {
+	if attrs(span)["kenwerk.audit.sealed"] != "3" {
 		t.Errorf("attributes %v", attrs(span))
 	}
 }
@@ -420,7 +420,7 @@ func TestTheResourceNamesTheService(t *testing.T) {
 	for _, kv := range spans[0].Resource.Attributes() {
 		got[string(kv.Key)] = kv.Value.String()
 	}
-	if got["service.name"] != "diffluence" || got["service.version"] != "1.2.3" || got["diffluence.role"] != "api" {
+	if got["service.name"] != "kenwerk" || got["service.version"] != "1.2.3" || got["kenwerk.role"] != "api" {
 		t.Errorf("resource %v", got)
 	}
 	if On() {

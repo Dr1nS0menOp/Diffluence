@@ -5,7 +5,7 @@ package app
 import (
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/config"
+	"github.com/kenwerk/kenwerk/internal/config"
 )
 
 func TestOnlyARoleThatConsumesEventsNeedsTheQueueToBeReady(t *testing.T) {

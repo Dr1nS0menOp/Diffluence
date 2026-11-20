@@ -1,6 +1,6 @@
 # 07.2: Backup, restore and disaster recovery
 
-Blueprint 07 promises to lose at most 4 hours of work (RPO) and to be back within 4 hours (RTO). This chapter checks how the industry reaches such numbers, what goes wrong in practice, and what Diffluence still needs.
+Blueprint 07 promises to lose at most 4 hours of work (RPO) and to be back within 4 hours (RTO). This chapter checks how the industry reaches such numbers, what goes wrong in practice, and what Kenwerk still needs.
 
 ## 2.1 The terms
 
@@ -14,7 +14,7 @@ Blueprint 07 promises to lose at most 4 hours of work (RPO) and to be back withi
 
 **The 3-2-1 rule.** Three copies, on two kinds of media, one away from the site. It comes from practice, not research, and US-CERT published it as advice for everyone in 2012. For a self-hosted wiki it means: the database server, a backup on another disk, and a copy that leaves the building, encrypted.
 
-**Keys kept with the data.** An encrypted backup is only useful with its key, and a key stored next to the backup protects nothing. Diffluence already refuses a backup key inside the backup folder.
+**Keys kept with the data.** An encrypted backup is only useful with its key, and a key stored next to the backup protects nothing. Kenwerk already refuses a backup key inside the backup folder.
 
 ## 2.3 How PostgreSQL installations reach minutes of RPO
 
@@ -23,12 +23,12 @@ Blueprint 07 promises to lose at most 4 hours of work (RPO) and to be back withi
 | `pg_dump` on a schedule | The interval | Restore time grows with size, and indexes are rebuilt | Simple, portable between major versions. What `scripts/backup.sh` does |
 | Base backup plus continuous **WAL archiving** | Seconds to minutes | Copy the base backup, replay WAL | Point-in-time recovery to any moment. The PostgreSQL manual's chapter on continuous archiving is the reference |
 | **pgBackRest** | As WAL archiving | Fast: parallel, compressed, incremental and differential, checks every file | The common tool for this; encrypts and sends to S3-compatible storage. MIT licence |
-| PostgreSQL 17 incremental `pg_basebackup` | As WAL archiving | Incremental chains with `pg_combinebackup` | Newer, in core; Diffluence supports 16 today |
+| PostgreSQL 17 incremental `pg_basebackup` | As WAL archiving | Incremental chains with `pg_combinebackup` | Newer, in core; Kenwerk supports 16 today |
 | A standby replica | Near zero for hardware loss | Fail over in seconds | **Not a backup**: a deleted page is deleted on the standby too |
 
 A full disk is a known way for WAL archiving to fail: if `archive_command` keeps failing, WAL piles up on the primary until the disk fills and PostgreSQL stops. Every guide therefore asks for an alert on archive failures and on WAL size.
 
-## 2.4 Where Diffluence stands
+## 2.4 Where Kenwerk stands
 
 | Promise | State | Where |
 |---|---|---|
@@ -44,9 +44,9 @@ A full disk is a known way for WAL archiving to fail: if `archive_command` keeps
 
 ## 2.5 Recommendations
 
-- **OPS-077** · built (spec 051) · **High.** Show the age of the last noted backup: a metric (`diffluence_backup_last_noted_timestamp_seconds`), a line in the System health page, and a warning to administrators when it is older than 26 hours. The note already exists (OPS-041); nobody sees it today unless they upgrade. An unnoticed stopped backup is the GitLab failure.
+- **OPS-077** · built (spec 051) · **High.** Show the age of the last noted backup: a metric (`kenwerk_backup_last_noted_timestamp_seconds`), a line in the System health page, and a warning to administrators when it is older than 26 hours. The note already exists (OPS-041); nobody sees it today unless they upgrade. An unnoticed stopped backup is the GitLab failure.
 - **OPS-078** · new · **High.** Measure RTO on real disks: restore 10 GB and 100 GB of generated data on the test machine, with the time of each step (copy, database, indexes, files, checks). Write the numbers in `limits.md`. If 100 GB takes longer than 4 hours with `pg_dump`, the guide must say pgBackRest is required above a stated size. This closes OPS-055.
-- **OPS-079** · partly · **Medium.** A tested pgBackRest set-up for the Compose and LXC targets: a documented configuration, WAL archiving to a second disk or S3-compatible storage, encryption on, an alert when archiving fails, and the restore drill run against it on the test machine. pgBackRest runs beside PostgreSQL; Diffluence itself gains no dependency. This closes OPS-051.
+- **OPS-079** · partly · **Medium.** A tested pgBackRest set-up for the Compose and LXC targets: a documented configuration, WAL archiving to a second disk or S3-compatible storage, encryption on, an alert when archiving fails, and the restore drill run against it on the test machine. pgBackRest runs beside PostgreSQL; Kenwerk itself gains no dependency. This closes OPS-051.
 - **OPS-080** · built · **Medium.** A scheduled backup without cron for Compose: an optional service in `compose.yaml` that runs `backup.sh` on an interval (default every 4 hours, which matches the RPO). Operators who keep cron lose nothing.
 - **OPS-081** · built · **Medium.** The weekly restore of a **real** installation (OPS-054): a script an operator runs from a timer that restores the newest backup into a throw-away Compose project, runs the same checks as the drill, reports the time and the counts, and exits with an error an alert can read. It never touches the live installation.
 - **OPS-082** · built · **Low.** Say plainly in `backup-restore.md` that a standby or RAID is not a backup, and what the 3-2-1 rule asks of a small installation.

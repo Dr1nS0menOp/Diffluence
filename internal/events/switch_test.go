@@ -17,8 +17,8 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"github.com/diffluence/diffluence/internal/outbox"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/outbox"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // natsStream stands in for NATS: it keeps the id of every event published to it, from several
@@ -638,7 +638,7 @@ func TestTheReleaseWithoutNATSRefusesUntilNATSIsDrained(t *testing.T) {
 	}{
 		{"a release before the log", []string{"DROP TABLE event_transport"}, "upgrade to the release that switches"},
 		{"release A, part 1", []string{"ALTER TABLE event_transport DROP COLUMN nats_drained_at"}, "upgrade to the release that switches"},
-		{"still on NATS", nil, "diffluence events switch postgres"},
+		{"still on NATS", nil, "kenwerk events switch postgres"},
 		{"switched, not yet drained", []string{"UPDATE event_transport SET transport = 'postgres'"}, "wait until"},
 		{"an older node runs", []string{drained, `INSERT INTO nodes (id, role, version, max_migration) VALUES (gen_random_uuid(), 'worker', 'old', 52)`}, "older release"},
 		{"published to NATS after the drain", []string{drained,

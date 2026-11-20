@@ -17,7 +17,7 @@ change + audit + outbox row   (one transaction)
 relay in the worker           (SKIP LOCKED, batches of 100)
         │  Nats-Msg-Id = event id
         ▼
-stream DIFFLUENCE_EVENTS      (7 days, file storage)
+stream KENWERK_EVENTS      (7 days, file storage)
         │
         ▼
 durable consumers             (one per listener, shared by all workers)

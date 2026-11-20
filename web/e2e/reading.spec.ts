@@ -493,7 +493,7 @@ test('the look of a page: emoji, width, title and header image', async ({ page }
   await expect(page.locator('h1')).toHaveClass(/title-center/);
   await expect(page.locator('.page-layout')).toHaveClass(/full/);
   await expect(page.locator('.page-header-image')).toBeVisible();
-  await expect(page).toHaveTitle(/Looks · Diffluence/);
+  await expect(page).toHaveTitle(/Looks · Kenwerk/);
   await expect(page.getByRole('navigation', { name: 'Pages' }).locator('.page-emoji')).toBeVisible();
 });
 

@@ -6,7 +6,7 @@ Blueprint 09 holds the enterprise document features that come before 1.0 (ADR-03
 
 Every line has a number (DOC-NNN) and a status: **built**, **partly**, **new** (planned in spec 064) or **later**. Each line gives the behaviour, then *Why* (with the clause of a standard where one applies), *Edge cases*, and *Proof* (how a test will show it). The standards are listed in [sources.md](sources.md).
 
-This is a clean-room study (`docs/blueprint/02-clean-room-and-licensing.md`). Blueprint 08 names a document-management product only to say which behaviour is meant. This study did not read that product's pages, and every requirement comes from the standards (ISO 9001 clause 7.5, 21 CFR Part 11, EU GMP Annex 11, eIDAS) and from Diffluence's own code and blueprints. No text, names, workflow or layout of any product is used.
+This is a clean-room study (`docs/blueprint/02-clean-room-and-licensing.md`). Blueprint 08 names a document-management product only to say which behaviour is meant. This study did not read that product's pages, and every requirement comes from the standards (ISO 9001 clause 7.5, 21 CFR Part 11, EU GMP Annex 11, eIDAS) and from Kenwerk's own code and blueprints. No text, names, workflow or layout of any product is used.
 
 ## Chapters
 
@@ -82,7 +82,7 @@ Each may be overruled before the wave that uses it.
 
 ## 1.4 Only the product owner can decide
 
-- **Qualified signatures:** whether Diffluence should ever offer qualified electronic signatures under eIDAS through an outside trust service provider (DOC-791). It needs a provider and a contract, and likely money, which this project does not have.
+- **Qualified signatures:** whether Kenwerk should ever offer qualified electronic signatures under eIDAS through an outside trust service provider (DOC-791). It needs a provider and a contract, and likely money, which this project does not have.
 - **Retention against erasure:** whether keeping signed records against erasure requests (DOC-1417) is acceptable for the European audience, or should be a per-space choice that the space owner signs off on.
 
 ## Sources

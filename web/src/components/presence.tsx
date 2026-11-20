@@ -9,7 +9,7 @@ import { Avatar } from './ui';
 const BEAT_MS = 20_000;
 const ENGAGED_AFTER_MS = 20_000;
 const MAX_PICTURES = 5;
-const LAST_PAGE_KEY = 'diffluence-last-page';
+const LAST_PAGE_KEY = 'kenwerk-last-page';
 
 export interface PresentPerson {
   id: string;

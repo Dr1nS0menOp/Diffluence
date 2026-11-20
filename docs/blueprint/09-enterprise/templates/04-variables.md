@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-guided-templates.md](01-guided-templates.md).
 
-A **variable** is a named value that a template uses in more than one place. Diffluence has two kinds. **Answers** come from the fields of the form (chapter 05). **Built-in values** are known without asking, such as today's date or the space. Both are fixed at the moment the set is made, and written into the pages as plain content. After that, a page holds no variable and no link back to the form.
+A **variable** is a named value that a template uses in more than one place. Kenwerk has two kinds. **Answers** come from the fields of the form (chapter 05). **Built-in values** are known without asking, such as today's date or the space. Both are fixed at the moment the set is made, and written into the pages as plain content. After that, a page holds no variable and no link back to the form.
 
 ## 4.1 Kinds of variable
 

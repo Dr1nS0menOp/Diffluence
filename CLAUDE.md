@@ -1,6 +1,6 @@
 # CLAUDE.md: instructions for build sessions
 
-You are the developer of **Diffluence**. The product owner does **not** read code, and tests behaviour. The automated checks are the code reviewer, so never weaken them.
+You are the developer of **Kenwerk**. The product owner does **not** read code, and tests behaviour. The automated checks are the code reviewer, so never weaken them.
 
 ## Read first, every session
 1. `docs/blueprint/00-README.md` and the blueprint documents relevant to the task
@@ -26,7 +26,7 @@ You are the developer of **Diffluence**. The product owner does **not** read cod
 
 ## Layout
 ```
-cmd/diffluence/        CLI entry point (serve, migrate, user, audit, version)
+cmd/kenwerk/        CLI entry point (serve, migrate, user, audit, version)
 internal/app/          wiring of modules and roles (api, worker, all)
 internal/config/       environment configuration (+ _FILE secrets)
 internal/db/           connection pool and migration runner
@@ -74,7 +74,7 @@ Modules talk through their exported Go API and events, never through each other'
 - `scripts/e2e`: real binary, PostgreSQL and Chromium, with the design pictures
 - `scripts/e2e design.spec.ts --update-snapshots`: new pictures after an intended change of look
 - `scripts/dev make mutation`: proves the tests catch injected bugs. Add a line for every new security rule. `MUTATION_JOBS` runs several at once (default 4). On your own branch you may run only what your change can affect, with `MUTATION_CHANGED` naming a file of changed paths (`git diff --name-only main > .mutation-changed`). Landing on `main`, and CI, always run every mutation (spec 037). A mutation that runs a whole package may only get `-run` with every test that catches it in a whole-package run.
-- Integration tests need `DIFFLUENCE_TEST_DATABASE_URL` pointing to a Postgres role that may create databases (`scripts/dev` sets it).
+- Integration tests need `KENWERK_TEST_DATABASE_URL` pointing to a Postgres role that may create databases (`scripts/dev` sets it).
 
 ## Definition of done
 Spec acceptance criteria met · tests written first and green · access rule, audit and outbox events covered · the design standard followed and new pictures looked at · docs and changelog updated, and the status lines in `docs/blueprint/03-functional/` · `make check` and `scripts/e2e` green · a plain-language "How to test" checklist in the PR · a handoff note written.

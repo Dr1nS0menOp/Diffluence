@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // k6 load test: the real pattern of a reader, with the polling the frontend does.
-// k6 is a tool an operator installs, not a dependency of Diffluence.
+// k6 is a tool an operator installs, not a dependency of Kenwerk.
 //   k6 run -e BASE_URL=http://localhost:8080 -e EMAIL=you@example.com \
 //     -e PASSWORD=... -e SPACE=<space id> -e PAGE=<page id> scripts/load/reading.js
 // The targets per query are the ones of blueprint 04 (ARC-199, ARC-200). A run at full

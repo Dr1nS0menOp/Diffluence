@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/exchange"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/exchange"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
 )
 
 const maxExchangeBody = 1 << 20

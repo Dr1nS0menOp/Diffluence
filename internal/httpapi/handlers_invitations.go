@@ -5,7 +5,7 @@ package httpapi
 import (
 	"net/http"
 
-	"github.com/diffluence/diffluence/internal/sharing"
+	"github.com/kenwerk/kenwerk/internal/sharing"
 )
 
 func (s *Server) handleInvitationAsk(w http.ResponseWriter, r *http.Request) {

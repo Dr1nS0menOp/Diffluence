@@ -3,7 +3,7 @@
 # Docker. Start it with: scripts/dev up    (see docs/development.md)
 #
 # Do NOT use this for real data: the database runs without crash safety for speed.
-name: diffluence-dev
+name: kenwerk-dev
 
 services:
   db:
@@ -11,9 +11,9 @@ services:
     # test database in the middle of a run.
     image: postgres:16@sha256:63e83b5a3dc36a917dccb76fe1bd2ac51f1ec9c1deb47ff20d4f04233bf6eae9
     environment:
-      POSTGRES_USER: diffluence
-      POSTGRES_PASSWORD: diffluence
-      POSTGRES_DB: diffluence
+      POSTGRES_USER: kenwerk
+      POSTGRES_PASSWORD: kenwerk
+      POSTGRES_DB: kenwerk
     # Fast and unsafe on purpose; tests create and drop many databases.
     command: >-
       postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off
@@ -21,7 +21,7 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U diffluence"]
+      test: ["CMD-SHELL", "pg_isready -U kenwerk"]
       interval: 2s
       retries: 30
 
@@ -33,7 +33,7 @@ services:
       db:
         condition: service_healthy
     environment:
-      DIFFLUENCE_TEST_DATABASE_URL: postgres://diffluence:diffluence@db:5432/diffluence?sslmode=disable
+      KENWERK_TEST_DATABASE_URL: postgres://kenwerk:kenwerk@db:5432/kenwerk?sslmode=disable
       GOCACHE: /cache/go-build
       GOMODCACHE: /cache/go-mod
       npm_config_cache: /cache/npm

@@ -23,7 +23,7 @@ const (
 
 var (
 	builtInValues = []string{ValueDate, ValueSpace, ValueCreator, ValueSet, ValueTemplate}
-	// An entry key is made by Diffluence, so it is short and plain; anything else is refused.
+	// An entry key is made by Kenwerk, so it is short and plain; anything else is refused.
 	entryKeyPattern = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 )
 

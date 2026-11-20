@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/apperr"
 )
 
 type errorBody struct {

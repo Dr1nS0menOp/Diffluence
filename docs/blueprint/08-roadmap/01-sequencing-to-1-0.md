@@ -1,6 +1,6 @@
 # 08.1: The road to 1.0 and beyond
 
-Blueprint 08 sets the phases, ADR-024 put all of blueprint 03 first, ADR-028 placed migration last, and ADR-038 put the enterprise document features before 1.0. This chapter asks what research and comparable projects say about the order of such work, and what "1.0" should mean for Diffluence.
+Blueprint 08 sets the phases, ADR-024 put all of blueprint 03 first, ADR-028 placed migration last, and ADR-038 put the enterprise document features before 1.0. This chapter asks what research and comparable projects say about the order of such work, and what "1.0" should mean for Kenwerk.
 
 ## 1.1 What the research and practice say
 
@@ -11,21 +11,21 @@ Blueprint 08 sets the phases, ADR-024 put all of blueprint 03 first, ADR-028 pla
 
 ## 1.2 How comparable projects sequenced
 
-| Pattern | What it means for Diffluence |
+| Pattern | What it means for Kenwerk |
 |---|---|
-| A long 0.x period with a stable upgrade path before 1.0 | Diffluence already upgrades every build with the same machinery (OPS-060): a strength to keep |
+| A long 0.x period with a stable upgrade path before 1.0 | Kenwerk already upgrades every build with the same machinery (OPS-060): a strength to keep |
 | A public beta when the product can be run by strangers without help | The beta needs installation, upgrade, backup and restore to work for someone who did not build it |
 | 1.0 when the interfaces stop changing and a support policy exists | The API, the export bundle format, the configuration keys and the metric names are frozen with rules for change |
 | Features that many ask for beat features that are interesting to build | The enterprise document features were asked for by the product owner as basic enterprise needs (ADR-038) |
 
-## 1.3 Where Diffluence stands
+## 1.3 Where Kenwerk stands
 
 Blueprint 03 is 888 of 1,003 lines built; blueprints 04, 05 and 06 are mostly built, with what needs real servers left open; blueprint 07 is studied now. The phases of blueprint 08 after 1.0 (AI, platform, linked instances, work module, mobile, migration) are not started, which is right.
 
 ## 1.4 Recommendations
 
 - **RMP-001** · new · **High.** Write the **beta criteria** before the beta: a stranger can install, upgrade, back up and restore with the guides alone; the HA topology ran on several machines (OPS-084); the load test met the targets on server hardware (OPS-109); no open High line in blueprints 04 to 07; signed releases with an SBOM (OPS-094). The beta is announced when they all hold.
-- **RMP-002** · new · **High.** Write the **1.0 promises** as a page: what is frozen (API v1, bundle format, configuration keys, metric and log names, the `diffluence` commands), how each may change afterwards (only with a deprecation of at least one release), the support policy (OPS-098), and the upgrade promise (one command, no downtime between consecutive releases, a jump of up to six months in one step).
+- **RMP-002** · new · **High.** Write the **1.0 promises** as a page: what is frozen (API v1, bundle format, configuration keys, metric and log names, the `kenwerk` commands), how each may change afterwards (only with a deprecation of at least one release), the support policy (OPS-098), and the upgrade promise (one command, no downtime between consecutive releases, a jump of up to six months in one step).
 - **RMP-003** · new · **Medium.** Order before 1.0, after the waves already decided: (1) what makes the product safe to run for others (spec 048 waves 1 to 4), (2) the enterprise document features, in the order of chapter 2, (3) the phase 3 lines that need servers, run on the test machine, (4) the beta. The release candidate follows the beta once nothing High is open.
 - **RMP-004** · new · **Medium.** Keep the truck factor in mind: every wave leaves a handoff and a report (already the way of working), every operation has a script and a guide, and nothing depends on knowledge outside the repository.
 - **RMP-005** · new · **Low.** After 1.0, the phases of blueprint 08 each start with their own study and a written list of what they will *not* do (chapter 3), so none of them grows into a second product by accident.

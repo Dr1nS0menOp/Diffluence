@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // Spec 074, wave GT4: what a set and an approval tell people, and what the gallery costs.
@@ -153,8 +153,8 @@ func TestTheGalleryCostsTheSameWithListsAsWithout(t *testing.T) {
 // with 100 templates, 10 of them with lists, within 30 ms, and the plan it runs. It runs only
 // when asked, outside the race detector.
 func TestTheLoadBudgetOfTheGallery(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
-		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	if os.Getenv("KENWERK_LOAD_BUDGET") == "" {
+		t.Skip("KENWERK_LOAD_BUDGET is not set")
 	}
 	tt := newTemplateTeam(t)
 	galleryWith(tt, 100, 10)

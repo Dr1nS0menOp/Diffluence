@@ -12,8 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/document"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/document"
 )
 
 // Limits on a Word file, which is always hostile until proven otherwise.

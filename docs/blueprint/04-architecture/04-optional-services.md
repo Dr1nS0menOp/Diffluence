@@ -45,7 +45,7 @@ The product owner chose these in ADR-026. They are separate programs, so their l
 
 Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the browser. That matters a lot: a preview only needs a file turned into a PDF.
 
-- **ARC-088** · built · One small interface: `Convert(file) → PDF`. Which program does it is chosen at installation with `DIFFLUENCE_OFFICE_CONVERTER` and its address.
+- **ARC-088** · built · One small interface: `Convert(file) → PDF`. Which program does it is chosen at installation with `KENWERK_OFFICE_CONVERTER` and its address.
 - **ARC-089** · partly · **Collabora** is the default choice, through `/cool/convert-to/pdf`. It only answers hosts on its `post_allow` list, so the install guide must set that. Confirm the path and the terms of the image at build time: the SDK pages could not be read for this study. Built in `internal/exchange/office.go` (wave J). Still open: one try with the real service, which only a fake has answered so far.
 - **ARC-090** · built · **LibreOffice** needs no extra container when Gotenberg is there, through `/forms/libreoffice/convert`. This is the choice that costs least. Built in `internal/exchange/office.go` (wave J), and tried with the real Gotenberg 8.40 (spec 025).
 - **ARC-091** · later · **Euro-Office** joins when its way of connecting is known. It is AGPLv3, which is fine for a separate program, and no source read here confirms how it connects.
@@ -85,10 +85,10 @@ Blueprint 03 asks for a **preview** (BLK-067, FIL-027), not for editing in the b
 The product owner chose the service from blueprint 04. Part 5 of spec 015 is the plan. This is its place in the architecture.
 
 ```
-browser ──wss /collab──► diffluence (proxy) ──► collab service (Node.js, Hocuspocus)
+browser ──wss /collab──► kenwerk (proxy) ──► collab service (Node.js, Hocuspocus)
                                                    │  authorize, load, store
                                                    ▼
-                                          diffluence API, service token
+                                          kenwerk API, service token
 ```
 
 - **ARC-113** · built · The service merges and relays. It has no business logic, holds no database password, and never writes a version.
@@ -96,7 +96,7 @@ browser ──wss /collab──► diffluence (proxy) ──► collab service (
 - **ARC-115** · built · The service asks again every minute. A change of permissions closes the connection at once: the API tells it through an event, and that listener is the only one the service has.
 - **ARC-116** · built · The shared state is stored through the API in `collab_documents`, as Yjs bytes, with `onStoreDocument`. If storing fails, the document stays in memory and is tried again, which is how Hocuspocus behaves.
 - **ARC-117** · built · Publishing stays in Go. The document is taken from the shared state and passes `document.Normalize`, so a hostile client that wrote into the shared state gets stopped there.
-- **ARC-118** · built · The binary proxies `/collab` to the service when `DIFFLUENCE_COLLAB_URL` is set. That keeps one address, one cookie and no path rule at the reverse proxy. A large installation may route it at the load balancer instead. Test that the WebSocket survives the server's write timeout.
+- **ARC-118** · built · The binary proxies `/collab` to the service when `KENWERK_COLLAB_URL` is set. That keeps one address, one cookie and no path rule at the reverse proxy. A large installation may route it at the load balancer instead. Test that the WebSocket survives the server's write timeout.
 - **ARC-119** · built · `'self'` in the content policy covers `wss:` on the same host, as CSP Level 3 says, so same-origin routing needs no change to `connect-src`. Confirm this in the browser test.
 - **ARC-120** · built · **Two ways of drafting must live side by side**, because the service is optional. With it, a page has one shared draft. Without it, drafts stay private. Both paths keep their tests, and the editor picks one from `/system/capabilities`.
 - **ARC-121** · built · When the service goes down, `y-indexeddb` keeps typing safe in the browser, and the strip says that changes are not reaching others. Publish waits until the document has synced.

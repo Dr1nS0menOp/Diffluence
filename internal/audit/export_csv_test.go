@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/diffluence/diffluence/internal/audit"
-	"github.com/diffluence/diffluence/internal/testutil"
+	"github.com/kenwerk/kenwerk/internal/audit"
+	"github.com/kenwerk/kenwerk/internal/testutil"
 )
 
 // exportRows exports everything in pages of two events.

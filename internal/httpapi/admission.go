@@ -9,8 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/permissions"
 )
 
 // workClass is what a request asks of the database. Under too much load the classes are
@@ -32,7 +32,7 @@ var signInPaths = []string{"/api/v1/auth/", "/api/v1/setup"}
 
 // busyMessage is what a refused request says. Text being written stays in the browser,
 // so the person loses nothing by trying again.
-const busyMessage = "Diffluence is very busy right now. Try again in a moment."
+const busyMessage = "Kenwerk is very busy right now. Try again in a moment."
 
 // heavyPrefixes are reads that cost far more than a page view. People can try them again.
 var heavyPrefixes = []string{

@@ -4,7 +4,7 @@
 // sessionStorage; after it, each comes back as its form appears again. A password never is.
 import { onBeforeReload } from './before-reload';
 
-const KEPT_KEY = 'diffluence.kept-fields';
+const KEPT_KEY = 'kenwerk.kept-fields';
 const SETTINGS_FORMS = '.settings-area form';
 const KEPT_TYPES = new Set(['text', 'email', 'url', 'number', 'tel']);
 // Long enough for a settings screen to load its data, short enough that a value never

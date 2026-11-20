@@ -30,7 +30,7 @@ Owner of these tables: `internal/identity`, unless a line says otherwise.
 | **DAT-032** | built | `sessions` | `token_hash`, `user_id`, times, `ip`, `user_agent` | Logout, expiry, password change, disabling |
 | **DAT-033** | built | `auth_challenges` | `token_hash`, `kind`, `user_id`, `data`, `attempts`, `expires_at`. Reset, invitation and sign-up links reuse it in wave F | Expire |
 | **DAT-034** | built | `scim_tokens` | `name`, `token_hash`, `created_by`, `last_used_at`, `revoked_at` | Revoked, kept as a record |
-| **DAT-035** | built | `api_tokens` | Name, hash, scope, expiry at most a year, last use. Prefix `dfl_` | Revoked, expired, on anonymise |
+| **DAT-035** | built | `api_tokens` | Name, hash, scope, expiry at most a year, last use. Prefix `kenwerk_` | Revoked, expired, on anonymise |
 | **DAT-036** | built | `login_history`, `known_devices` | Last 20 logins with time, method, address and device. No place (ADR-026) | Rolling, on anonymise |
 | **DAT-037** | built | `sessions.reauth_at`, `sessions.needs_second_factor` | Step-up and a forced second factor | With the session |
 

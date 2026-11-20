@@ -1,4 +1,4 @@
-# Contributing to Diffluence
+# Contributing to Kenwerk
 
 Thank you for helping. Two rules are non-negotiable: the **DCO** and the **clean-room rules**.
 
@@ -14,11 +14,11 @@ That adds `Signed-off-by: Your Name <you@example.com>`. With it you certify the 
 
 ## 2. Clean-room rules
 
-Diffluence offers behaviour similar to other wikis, but **all code, text and design must be our own**. See `docs/blueprint/02-clean-room-and-licensing.md`.
+Kenwerk offers behaviour similar to other wikis, but **all code, text and design must be our own**. See `docs/blueprint/02-clean-room-and-licensing.md`.
 
 **Never:**
 - read, copy or translate source code of Confluence, Docmost, Plane, OpenProject, Huly or any other copyleft or proprietary wiki or issue tracker
-- use an Atlassian product, account or export from your employer to develop or test Diffluence
+- use an Atlassian product, account or export from your employer to develop or test Kenwerk
 - copy documentation text, UI copy, icons, illustrations or pixel-exact layouts
 - add a dependency with a copyleft licence (GPL, AGPL, LGPL) or an unknown licence
 

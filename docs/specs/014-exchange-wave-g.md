@@ -297,7 +297,7 @@ Migration 0017, expand only (`page_versions` also gains `imported`, and `export_
 - `public_site_builds`: site, number, state, counts, report, folder, times.
 - `public_links`: page, version, token, created by, created at, withdrawn at.
 
-The settings gain `public_sites_enabled`, `public_links_enabled` and `max_import_mib`. The target folder is configuration, not a setting, because a person must not be able to write anywhere on the server. `DIFFLUENCE_PUBLISH_DIR` holds it, and a site's target is a name below it.
+The settings gain `public_sites_enabled`, `public_links_enabled` and `max_import_mib`. The target folder is configuration, not a setting, because a person must not be able to write anywhere on the server. `KENWERK_PUBLISH_DIR` holds it, and a site's target is a name below it.
 
 ## Build order
 

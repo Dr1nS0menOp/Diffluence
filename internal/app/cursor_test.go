@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/notify"
+	"github.com/kenwerk/kenwerk/internal/notify"
 )
 
 // Notifications that share a time must all be reached, page by page, with the exact cursor.

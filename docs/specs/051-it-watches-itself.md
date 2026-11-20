@@ -10,7 +10,7 @@ The failures that hurt self-hosted installations are quiet ones: a backup that s
 
 | Line | Today on `main` (`37423d7`) | Missing |
 |---|---|---|
-| OPS-077 backup age | `system.backup_noted` is written by `diffluence backup note`; only an upgrade reads it | A metric, a line on System health, a warning past 26 hours |
+| OPS-077 backup age | `system.backup_noted` is written by `kenwerk backup note`; only an upgrade reads it | A metric, a line on System health, a warning past 26 hours |
 | OPS-103 health page | System health lists nodes, the version, queues, failed jobs and the trash | Disk, database size and growth, backup age, the age of pending contract migrations, mail, login, the age of the release, each with a sentence and what to do |
 | OPS-104 low disk | The summary warns below 10% free | Every console page warns; below 2% uploads, imports and exports are refused while text saves; `/readyz` says so |
 | OPS-105 what grows | Cleaners for trash, outbox, event failures, rule runs, webhook log, notifications, exports, previews, imports, analytics, sessions and challenges | Finished jobs, sent mail and nodes that crashed grow for ever; no guide lists the cleaners |
@@ -40,8 +40,8 @@ The failures that hurt self-hosted installations are quiet ones: a backup that s
 2. **The guard** (`storage.Guarded`): refused below 2%, allowed at 2%, unknown room allowed, the free space read at most every 30 seconds, `Space` passed on. Then `apperr.NoRoom` and its 507. A test through the API: an upload refused with 507 and a page still saved.
 3. **Facts and cache** (`app`): one `statfs`, one query for counts, backup, size samples and the last migration, and the existing `db.Status`; kept 30 seconds per node. `GET /api/v1/admin/health` for the console; `/api/v1/admin/system` gains `checks`.
 4. **Size samples and cleaners**: migration 0046 (`database_size_samples`), the hourly sample, the daily cleaner. Tests fill each table with old and new rows and check that only the old go.
-5. **Metrics**: `diffluence_disk_free_bytes`, `diffluence_disk_total_bytes`, `diffluence_backup_last_noted_timestamp_seconds`, `diffluence_database_size_bytes`, `diffluence_migration_applied_timestamp_seconds`, `diffluence_build_timestamp_seconds`, `diffluence_event_failures`, `diffluence_health_problems` and `diffluence_health_warnings`.
-6. **`/readyz` note**, the build date in `Makefile` and `Dockerfile`, and `diffluence doctor`.
+5. **Metrics**: `kenwerk_disk_free_bytes`, `kenwerk_disk_total_bytes`, `kenwerk_backup_last_noted_timestamp_seconds`, `kenwerk_database_size_bytes`, `kenwerk_migration_applied_timestamp_seconds`, `kenwerk_build_timestamp_seconds`, `kenwerk_event_failures`, `kenwerk_health_problems` and `kenwerk_health_warnings`.
+6. **`/readyz` note**, the build date in `Makefile` and `Dockerfile`, and `kenwerk doctor`.
 7. **Console**: System health lists the checks first; the band on every administrator page; the summary links to them.
 8. **Rules, dashboard and the guide**: `deploy/monitoring/`, `docs/operations/monitoring.md` with every metric, alert and cleaner, and the test of D9.
 

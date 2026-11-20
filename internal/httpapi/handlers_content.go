@@ -13,15 +13,15 @@ import (
 
 	"github.com/google/uuid"
 
-	"github.com/diffluence/diffluence/internal/apperr"
-	"github.com/diffluence/diffluence/internal/attachments"
-	"github.com/diffluence/diffluence/internal/db"
-	"github.com/diffluence/diffluence/internal/features"
-	"github.com/diffluence/diffluence/internal/identity"
-	"github.com/diffluence/diffluence/internal/pages"
-	"github.com/diffluence/diffluence/internal/permissions"
-	"github.com/diffluence/diffluence/internal/search"
-	"github.com/diffluence/diffluence/internal/spaces"
+	"github.com/kenwerk/kenwerk/internal/apperr"
+	"github.com/kenwerk/kenwerk/internal/attachments"
+	"github.com/kenwerk/kenwerk/internal/db"
+	"github.com/kenwerk/kenwerk/internal/features"
+	"github.com/kenwerk/kenwerk/internal/identity"
+	"github.com/kenwerk/kenwerk/internal/pages"
+	"github.com/kenwerk/kenwerk/internal/permissions"
+	"github.com/kenwerk/kenwerk/internal/search"
+	"github.com/kenwerk/kenwerk/internal/spaces"
 )
 
 // Bodies are small, except documents, which are limited by the document format.
@@ -851,7 +851,7 @@ func (s *Server) handleSpaceExport(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	s.exportZip(w, r, id, nil, "diffluence-space.zip")
+	s.exportZip(w, r, id, nil, "kenwerk-space.zip")
 }
 
 func (s *Server) handlePageExportZip(w http.ResponseWriter, r *http.Request) {
@@ -864,7 +864,7 @@ func (s *Server) handlePageExportZip(w http.ResponseWriter, r *http.Request) {
 		s.fail(w, r, err)
 		return
 	}
-	s.exportZip(w, r, spaceID, &id, "diffluence-pages.zip")
+	s.exportZip(w, r, spaceID, &id, "kenwerk-pages.zip")
 }
 
 func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {

@@ -3,7 +3,7 @@
 // Package health holds the rules of the health checks (spec 051): from facts an
 // installation knows about itself to a short list of what is fine, what needs a look soon
 // and what needs a person now. It reads nothing itself, so the console, the metrics and
-// "diffluence doctor" judge alike, and every threshold can be tested on its own.
+// "kenwerk doctor" judge alike, and every threshold can be tested on its own.
 package health
 
 import (
@@ -90,7 +90,7 @@ type Facts struct {
 	// LastMigrationAt is when the last migration was applied.
 	PendingContract int
 	LastMigrationAt time.Time
-	// ContractGrace is how long contract migrations wait on purpose (DIFFLUENCE_CONTRACT_GRACE).
+	// ContractGrace is how long contract migrations wait on purpose (KENWERK_CONTRACT_GRACE).
 	ContractGrace time.Duration
 	FailedJobs7d  int
 	// OutboxStuck counts events that waited more than an hour to reach the queue.
@@ -412,21 +412,21 @@ var Sentences = map[string]string{
 	"audit_ok":          "Audit events are sealed in the chain within seconds.",
 	"audit_lagging":     "{count} audit event(s) have waited {seconds} seconds to be sealed. Check that a worker runs.",
 	"audit_stuck":       "{count} audit event(s) have waited {seconds} seconds to be sealed, so no checkpoint covers them. Start a worker now.",
-	"witness_failed":    "The last comparison of the audit chain with the witness in the log store did not match. Run diffluence audit verify --witness and follow the incident steps.",
-	"witness_old":       "The audit chain was last compared with the witness {days} days ago. Check the timer that runs diffluence audit verify --witness --report.",
-	"mail_off":          "No mail server is set, so nobody gets mail. Set DIFFLUENCE_SMTP_HOST and DIFFLUENCE_SMTP_FROM.",
+	"witness_failed":    "The last comparison of the audit chain with the witness in the log store did not match. Run kenwerk audit verify --witness and follow the incident steps.",
+	"witness_old":       "The audit chain was last compared with the witness {days} days ago. Check the timer that runs kenwerk audit verify --witness --report.",
+	"mail_off":          "No mail server is set, so nobody gets mail. Set KENWERK_SMTP_HOST and KENWERK_SMTP_FROM.",
 	"mail_ok":           "Mail is set up.",
 	"mail_failed":       "{count} mail(s) failed in the last day. Check the mail server.",
 	"login_ok":          "Logging in works as set up.",
 	"password_stopped":  "{count} account(s) can no longer log in with a password after many wrong guesses. Look under Users.",
-	"proxy_not_trusted": "Every login of the last day came from {address}, probably the reverse proxy. Add its address to DIFFLUENCE_TRUSTED_PROXIES, or the login limits treat everyone as one.",
+	"proxy_not_trusted": "Every login of the last day came from {address}, probably the reverse proxy. Add its address to KENWERK_TRUSTED_PROXIES, or the login limits treat everyone as one.",
 	"version_unknown":   "This build has no build date, so its age is not known.",
 	"version_ok":        "Release {version} is {days} days old.",
 	"version_old":       "Release {version} is {days} days old. A newer release probably exists; see the release notes.",
 	"publishing_off":    "Draft and published spaces are off.",
 	"publishing_new":    "The check of draft and published spaces has not run yet; the worker runs it within the hour.",
 	"publishing_ok":     "The check of {pairs} pair(s) of draft and published spaces found every status as stored.",
-	"publishing_drift":  "The check of draft and published spaces found {count} difference(s) between the stored statuses and the versions. Fix them on System health, or run diffluence check publishing --fix.",
+	"publishing_drift":  "The check of draft and published spaces found {count} difference(s) between the stored statuses and the versions. Fix them on System health, or run kenwerk check publishing --fix.",
 	"publishing_old":    "The check of draft and published spaces last ran {days} days ago. Check that a worker runs.",
 }
 

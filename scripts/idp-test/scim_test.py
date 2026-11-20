@@ -33,8 +33,8 @@ def check(name, ok, detail=''):
     results.append(ok)
     print(('PASS ' if ok else 'FAIL ') + name + ('' if ok else f'   -> {detail}'))
 
-# Diffluence: an administrator and a token.
-p = subprocess.run(['docker', 'compose', 'exec', '-T', 'diffluence', 'diffluence', 'user', 'create-admin', '--email', 'admin@example.com', '--name', 'Admin'],
+# Kenwerk: an administrator and a token.
+p = subprocess.run(['docker', 'compose', 'exec', '-T', 'kenwerk', 'kenwerk', 'user', 'create-admin', '--email', 'admin@example.com', '--name', 'Admin'],
                    input=PASSWORD + '\n', text=True, capture_output=True, cwd=HERE)
 print(p.stdout.strip().splitlines()[-1] if p.stdout else p.stderr)
 s, r = df('POST', '/auth/login', {'email': 'admin@example.com', 'password': PASSWORD})
@@ -52,28 +52,28 @@ for _ in range(100):
         break
     time.sleep(3)
 s, provider = ak('POST', '/providers/scim/', {
-    'name': 'Diffluence', 'url': 'http://diffluence:8080/scim/v2', 'token': token,
+    'name': 'Kenwerk', 'url': 'http://kenwerk:8080/scim/v2', 'token': token,
     'property_mappings': [maps['goauthentik.io/providers/scim/user']],
     'property_mappings_group': [maps['goauthentik.io/providers/scim/group']],
     'exclude_users_service_account': True,
 })
 assert s == 201, provider
 pid = provider['pk']
-s, app = ak('POST', '/core/applications/', {'name': 'Diffluence', 'slug': 'diffluence-scim', 'backchannel_providers': [pid]})
+s, app = ak('POST', '/core/applications/', {'name': 'Kenwerk', 'slug': 'kenwerk-scim', 'backchannel_providers': [pid]})
 assert s == 201, app
 
 def sync(model, obj):
     s, r = ak('POST', f'/providers/scim/{pid}/sync/object/', {'sync_object_model': model, 'sync_object_id': str(obj)})
     return s, r
 
-def diffluence_user(email):
+def kenwerk_user(email):
     s, r = df('GET', '/admin/users?q=' + email)
     for u in r.get('users', []):
         if u['email'] == email:
             return u
     return None
 
-def diffluence_group(name):
+def kenwerk_group(name):
     s, r = df('GET', '/admin/groups')
     for g in r.get('groups', []):
         if g['name'] == name:
@@ -93,7 +93,7 @@ def wait_for(fn, seconds=120):
 s, user = ak('POST', '/core/users/', {'username': 'jdoe', 'name': 'Jane Doe', 'email': 'jane@example.com', 'is_active': True, 'path': 'users'})
 assert s == 201, user
 print('sync user:', sync('authentik_core.user', user['pk'])[0])
-u = wait_for(lambda: diffluence_user('jane@example.com'))
+u = wait_for(lambda: kenwerk_user('jane@example.com'))
 check('a user created in Authentik arrives', bool(u), u)
 if u:
     check('  with name and source', u['display_name'] == 'Jane Doe' and u['source'] == 'scim', u)
@@ -102,50 +102,50 @@ if u:
 # 2. Update a user.
 s, r = ak('PATCH', f"/core/users/{user['pk']}/", {'name': 'Jane Smith'})
 print('sync user:', sync('authentik_core.user', user['pk'])[0])
-u = wait_for(lambda: (lambda x: x if x and x['display_name'] == 'Jane Smith' else None)(diffluence_user('jane@example.com')))
-check('a changed name arrives', bool(u), diffluence_user('jane@example.com'))
+u = wait_for(lambda: (lambda x: x if x and x['display_name'] == 'Jane Smith' else None)(kenwerk_user('jane@example.com')))
+check('a changed name arrives', bool(u), kenwerk_user('jane@example.com'))
 
 # 3. A group with a member.
 s, group = ak('POST', '/core/groups/', {'name': 'Finance', 'users': [user['pk']]})
 assert s == 201, group
 print('sync group:', sync('authentik_core.group', group['pk'])[0])
-g = wait_for(lambda: diffluence_group('Finance'))
+g = wait_for(lambda: kenwerk_group('Finance'))
 check('a group created in Authentik arrives', bool(g), g)
 if g:
     check('  read-only here', g['source'] == 'scim', g)
-    m = wait_for(lambda: (lambda x: x if x['members'] == 1 else None)(diffluence_group('Finance')))
-    check('  with its member', bool(m), diffluence_group('Finance'))
+    m = wait_for(lambda: (lambda x: x if x['members'] == 1 else None)(kenwerk_group('Finance')))
+    check('  with its member', bool(m), kenwerk_group('Finance'))
 
 # 4. A second user joins, the first leaves.
 s, user2 = ak('POST', '/core/users/', {'username': 'bob', 'name': 'Bob Stone', 'email': 'bob@example.com', 'is_active': True, 'path': 'users'})
 print('sync user2:', sync('authentik_core.user', user2['pk'])[0])
-wait_for(lambda: diffluence_user('bob@example.com'))
+wait_for(lambda: kenwerk_user('bob@example.com'))
 s, r = ak('POST', f"/core/groups/{group['pk']}/add_user/", {'pk': user2['pk']})
 print('add_user:', s)
 print('sync group:', sync('authentik_core.group', group['pk'])[0])
-m = wait_for(lambda: (lambda x: x if x and x['members'] == 2 else None)(diffluence_group('Finance')))
-check('a new member arrives', bool(m), diffluence_group('Finance'))
+m = wait_for(lambda: (lambda x: x if x and x['members'] == 2 else None)(kenwerk_group('Finance')))
+check('a new member arrives', bool(m), kenwerk_group('Finance'))
 s, r = ak('POST', f"/core/groups/{group['pk']}/remove_user/", {'pk': user['pk']})
 print('remove_user:', s)
 print('sync group:', sync('authentik_core.group', group['pk'])[0])
-m = wait_for(lambda: (lambda x: x if x and x['members'] == 1 else None)(diffluence_group('Finance')))
-check('a member who leaves is removed', bool(m), diffluence_group('Finance'))
+m = wait_for(lambda: (lambda x: x if x and x['members'] == 1 else None)(kenwerk_group('Finance')))
+check('a member who leaves is removed', bool(m), kenwerk_group('Finance'))
 
 # 5. Deactivate.
 s, r = ak('PATCH', f"/core/users/{user['pk']}/", {'is_active': False})
 print('sync user:', sync('authentik_core.user', user['pk'])[0])
-u = wait_for(lambda: (lambda x: x if x and x['status'] == 'disabled' else None)(diffluence_user('jane@example.com')))
-check('deactivating in Authentik disables the account', bool(u), diffluence_user('jane@example.com'))
+u = wait_for(lambda: (lambda x: x if x and x['status'] == 'disabled' else None)(kenwerk_user('jane@example.com')))
+check('deactivating in Authentik disables the account', bool(u), kenwerk_user('jane@example.com'))
 
 # 6. Delete a user and a group.
 s, r = ak('DELETE', f"/core/users/{user2['pk']}/")
 print('delete user:', s)
-u = wait_for(lambda: (lambda x: x if x and x['status'] == 'disabled' else None)(diffluence_user('bob@example.com')))
-check('deleting in Authentik disables the account here', bool(u), diffluence_user('bob@example.com'))
+u = wait_for(lambda: (lambda x: x if x and x['status'] == 'disabled' else None)(kenwerk_user('bob@example.com')))
+check('deleting in Authentik disables the account here', bool(u), kenwerk_user('bob@example.com'))
 s, r = ak('DELETE', f"/core/groups/{group['pk']}/")
 print('delete group:', s)
-gone = wait_for(lambda: diffluence_group('Finance') is None)
-check('deleting a group removes it', bool(gone), diffluence_group('Finance'))
+gone = wait_for(lambda: kenwerk_group('Finance') is None)
+check('deleting a group removes it', bool(gone), kenwerk_group('Finance'))
 
 # What Authentik recorded about the provider.
 s, r = ak('GET', f'/providers/scim/{pid}/sync/status/')

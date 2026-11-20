@@ -2,7 +2,7 @@
 
 How to read this chapter: see [01-draft-and-published-spaces.md](01-draft-and-published-spaces.md).
 
-A page of the draft space links to other pages of the draft space. Released as they are, those links would lead readers back into the draft space, where they may not go: the link would show as a page they cannot see (PUB-002). So a release **rewrites** links. Diffluence stores a link by page id, with an optional fragment for a heading or anchor, and looks up what it shows for each reader; that makes rewriting exact: one id is replaced by another, and nothing else of the link changes.
+A page of the draft space links to other pages of the draft space. Released as they are, those links would lead readers back into the draft space, where they may not go: the link would show as a page they cannot see (PUB-002). So a release **rewrites** links. Kenwerk stores a link by page id, with an optional fragment for a heading or anchor, and looks up what it shows for each reader; that makes rewriting exact: one id is replaced by another, and nothing else of the link changes.
 
 ## 6.1 What is rewritten
 
@@ -23,7 +23,7 @@ A page of the draft space links to other pages of the draft space. Released as t
 ## 6.3 Links that stay as they are
 
 - **PUB-520** · partly · Links to pages of **other spaces** stay as they are: they are ordinary links in the published space, and each reader sees them as their rights allow. *Why:* they are not part of the pair. *Edge cases:* a link to a page of another pair's draft space stays a link into that draft space, which readers usually cannot open; the preview counts links into other draft spaces and warns, so the writer can link to the other published space instead. *Proof:* a test of the warning.
-- **PUB-521** · built · Links to **addresses outside** Diffluence, mail links and file links within the page are not changed (files are mapped by PUB-320). *Proof:* a test.
+- **PUB-521** · built · Links to **addresses outside** Kenwerk, mail links and file links within the page are not changed (files are mapped by PUB-320). *Proof:* a test.
 - **PUB-522** · built · **Links into the draft space from other spaces** are not touched by a release. The draft space's settings list the pages of other spaces that link into it, as far as the person may see them, so writers can point them to the published space. *Why:* those links usually should lead to the published copy, but changing another space's pages is not this feature's right. *Proof:* a test of the list, as the person may see it.
 - **PUB-523** · built · An embedded **database view** and a link to a database show "This part is not available here." in the twin (PUB-232). *Proof:* a test.
 

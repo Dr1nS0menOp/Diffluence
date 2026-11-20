@@ -131,7 +131,7 @@ export function matchParts(title: string, text: string): TitlePart[] {
 export type TreeView = 'tree' | 'visited' | 'updated' | 'alphabet' | 'changed';
 
 /** Lets a dragged row reach the Spaces menu in the top bar. */
-export const PAGE_DRAG_TYPE = 'application/x-diffluence-page';
+export const PAGE_DRAG_TYPE = 'application/x-kenwerk-page';
 
 /** Ctrl, Space and a click on a checkbox add or take away one row. */
 export function toggleRow(picked: string[], id: string): string[] {

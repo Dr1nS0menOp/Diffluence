@@ -30,8 +30,8 @@ func medianUse(u *user, n int, path string, body func(i int) map[string]any, wan
 // page, the case every set must stay within 10% of (TPL-901). It runs only when asked,
 // outside the race detector, which makes every timing meaningless.
 func TestASinglePageFromATemplateCostsWhatItDidBefore(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
-		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	if os.Getenv("KENWERK_LOAD_BUDGET") == "" {
+		t.Skip("KENWERK_LOAD_BUDGET is not set")
 	}
 	e := newEnv(t)
 	owner, _, _, space := e.team("LOAD")
@@ -56,8 +56,8 @@ func p95(took []time.Duration) time.Duration {
 // within 300 ms at p95, of 100 pages within 3 s as background work, and the audit queue
 // empty within 5 s of a 100-page set. Run it outside the race detector.
 func TestTheLoadBudgetOfASet(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
-		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	if os.Getenv("KENWERK_LOAD_BUDGET") == "" {
+		t.Skip("KENWERK_LOAD_BUDGET is not set")
 	}
 	e := newEnv(t)
 	owner, _, _, space := e.team("LOAD")
@@ -131,8 +131,8 @@ func TestTheLoadBudgetOfASet(t *testing.T) {
 // 30 ms), the filter template: over the pages of 40 sets (TPL-703), and a burst of 20 sets of 10
 // pages, the case TPL-907 leaves to the stress test of the server. Run it outside the race detector.
 func TestTheLoadOfFindingTemplatesAndTheirPages(t *testing.T) {
-	if os.Getenv("DIFFLUENCE_LOAD_BUDGET") == "" {
-		t.Skip("DIFFLUENCE_LOAD_BUDGET is not set")
+	if os.Getenv("KENWERK_LOAD_BUDGET") == "" {
+		t.Skip("KENWERK_LOAD_BUDGET is not set")
 	}
 	tt := newTemplateTeam(t)
 	for i := range 150 {

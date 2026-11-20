@@ -12,7 +12,7 @@ Each surface below has three parts: what can go wrong, what stops it today, and 
 - **SEC-103** · built · A password can be 1024 bytes long, far over the 64 characters ASVS 6.2.9 asks for. The limit stops a very long password from becoming a denial of service.
 - **SEC-104** · built · No rules about character types, and no forced changes on a schedule. NIST forbids both (ASVS 6.2.5, 6.2.10).
 - **SEC-105** · built · New passwords are checked offline against a list of leaked passwords, up to 50 MB, from SecLists (MIT, ADR-026). NIST requires a blocklist (ASVS 6.2.4, 6.2.12).
-- **SEC-106** · partly · The check also refuses words from the context: the instance name, the person's own name and address, and `diffluence` (ASVS 6.1.2, 6.2.11). Belongs in wave F, with SEC-105.
+- **SEC-106** · partly · The check also refuses words from the context: the instance name, the person's own name and address, and `kenwerk` (ASVS 6.1.2, 6.2.11). Belongs in wave F, with SEC-105.
 - **SEC-107** · built · Passwords are normalised to Unicode NFC before hashing, as NIST advises, so the same password typed on two systems is the same password. Old hashes need a fallback at login. Low. Belongs in wave F.
 - **SEC-108** · built · Login answers with one message, and an unknown address costs the same time as a known one, through a dummy hash. A disabled account gets the same answer (ASVS 6.3.8).
 - **SEC-109** · partly · Failed logins are limited to 10 per account and 50 per address in 15 minutes. The counters live in memory per node, so a restart clears them and two nodes count apart. Shared counters belong in phase 3 (ASVS 6.3.1).
@@ -112,7 +112,7 @@ The product owner's decision (ADR-026): push people towards a second factor and 
 - **SEC-186** · built · The last administrator cannot be removed by a person, and *system administrator* can only be granted by one.
 - **SEC-187** · built · A reset link has a hashed random token, works once, lasts an hour, and always gets the same answer with equal timing. It ends all sessions and logs nobody in (ASVS 6.4.3, 6.3.8).
 - **SEC-188** · built · The second factor still applies after a reset. Losing a factor goes through an administrator, who must check who is asking (ASVS 6.4.3, 6.4.4). The guide must say how.
-- **SEC-189** · built · Links in mail are built from `DIFFLUENCE_PUBLIC_URL`, never from the `Host` header, or a forged request could send a victim a reset link to an attacker's site. Spec 013 should say this in so many words, with a test.
+- **SEC-189** · built · Links in mail are built from `KENWERK_PUBLIC_URL`, never from the `Host` header, or a forged request could send a victim a reset link to an attacker's site. Spec 013 should say this in so many words, with a test.
 - **SEC-190** · built · Reset and invitation are limited per address and per account, so nobody can be flooded with mail. Built (spec 042): per address, and at most 3 reset or sign-up mails per recipient in 15 minutes from any address, with the same answer either way, `TestResetMailToOnePersonStopsAtALimitFromAnyAddress`.
 - **SEC-191** · built · Invitations expire. Self sign-up is off by default and limited to chosen domains. Guests can have an end date.
 - **SEC-192** · new · An address can only change through the provider today: a local account has no way to change it, not even through an administrator. If wave F adds that, it needs a step-up, a confirmation at the new address and a notice to the old one, because the address is what `Login` matches on.

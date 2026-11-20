@@ -17,11 +17,11 @@ stamp() { date -u +%FT%T.%3NZ; }
 upgrade() {
   local addr=$1 name=$2
   echo "$(stamp) $name: copy and stop"
-  scp -q -o BatchMode=yes "$deb" "$user@$addr:/tmp/diffluence-new.deb"
-  ssh -o BatchMode=yes "$user@$addr" "sudo systemctl stop diffluence && sudo apt-get install -y -q /tmp/diffluence-new.deb >/dev/null && sudo systemctl start diffluence"
+  scp -q -o BatchMode=yes "$deb" "$user@$addr:/tmp/kenwerk-new.deb"
+  ssh -o BatchMode=yes "$user@$addr" "sudo systemctl stop kenwerk && sudo apt-get install -y -q /tmp/kenwerk-new.deb >/dev/null && sudo systemctl start kenwerk"
   for _ in $(seq 1 60); do
     if ssh -o BatchMode=yes "$user@$addr" "curl -fsS -o /dev/null http://127.0.0.1:8080/readyz"; then
-      echo "$(stamp) $name: ready on $(ssh -o BatchMode=yes "$user@$addr" 'diffluence version')"
+      echo "$(stamp) $name: ready on $(ssh -o BatchMode=yes "$user@$addr" 'kenwerk version')"
       return 0
     fi
     sleep 2

@@ -92,7 +92,7 @@ func listenOnce(ctx context.Context, connString string, w *Wakeups, listening fu
 		// Never the address itself: it may hold a password.
 		return errors.New("events: the listen address is not valid")
 	}
-	cfg.RuntimeParams["application_name"] = "diffluence-listen"
+	cfg.RuntimeParams["application_name"] = "kenwerk-listen"
 	conn, err := pgx.ConnectConfig(ctx, cfg)
 	if err != nil {
 		return err

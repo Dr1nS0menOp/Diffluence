@@ -4,7 +4,7 @@ How to read this chapter: see `../06-security-and-compliance.md`. Every line has
 
 ## 1.1 What we aim for
 
-- **SEC-001** · partly · Diffluence aims for OWASP ASVS 5.0.0 Level 2 for the whole product. The standard says most applications should strive for this level. Level 3 items are taken where they are cheap or where a wiki holds company secrets. Chapter 12 shows where each requirement stands today.
+- **SEC-001** · partly · Kenwerk aims for OWASP ASVS 5.0.0 Level 2 for the whole product. The standard says most applications should strive for this level. Level 3 items are taken where they are cheap or where a wiki holds company secrets. Chapter 12 shows where each requirement stands today.
 - **SEC-002** · built · Deny by default: a route without an access rule cannot be registered, a person without a grant has no access, and a block or attribute that is not on the list does not get through.
 - **SEC-003** · built · One rule, several places that cannot drift: the access rule lives in `permissions.Evaluate`, the same rule in SQL for lists, and a matrix test that compares the two with a literal transcription.
 - **SEC-004** · built · Checks are the reviewer. The product owner does not read code, so every security rule has a test, and the mutation check proves that a test fails when the rule is broken on purpose.
@@ -58,7 +58,7 @@ ASVS 14.1.1 asks for classes with protection rules. These hold for every new tab
 ## 1.5 Trust boundaries
 
 ```
-Browser ──TLS── reverse proxy ──http── diffluence (api, worker)
+Browser ──TLS── reverse proxy ──http── kenwerk (api, worker)
                                          │  │  │
                      PostgreSQL ─────────┘  │  └───── NATS (embedded, or external in HA)
                      Disk or object store ──┘
@@ -69,7 +69,7 @@ Outward, only where switched on:
 ```
 
 - **SEC-011** · built · Everything from the browser is untrusted, also from a logged-in administrator: the server decides again.
-- **SEC-012** · built · The reverse proxy is trusted only through `DIFFLUENCE_TRUSTED_PROXIES`. Without it, `X-Forwarded-For` is ignored, so an address cannot be faked.
+- **SEC-012** · built · The reverse proxy is trusted only through `KENWERK_TRUSTED_PROXIES`. Without it, `X-Forwarded-For` is ignored, so an address cannot be faked.
 - **SEC-013** · wave E · An optional service is untrusted in both directions: it only gets what the person may see, and what comes back is treated like an upload (chapter 6).
 
 ## 1.6 How a risk is weighed

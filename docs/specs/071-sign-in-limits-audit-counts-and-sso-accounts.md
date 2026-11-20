@@ -20,7 +20,7 @@ Wave RV4. Small, self-contained changes to signing in, the audit log, permission
 - **An export says how it ended.** The last line of an audit CSV has `#complete`, `#limit-reached` or `#incomplete` in its first cell and the number of events in its second, as wide as the header. A file without such a line was cut off on the way.
 - **An export reads in pages** of 5,000 sealed events, each a query of its own after the last seq it wrote, so the limit on one query of a read applies to each page. Events that wait for the sealer come last, as before.
 - **Sending takes as long as it needs.** The audit export and the download of an export file move their write deadline as an attachment does.
-- **The check from the console** walks the chain with a query limit of ten minutes instead of the fifteen seconds of a read, and its answer may take as long. The nightly check and `diffluence audit verify` have no limit, as before.
+- **The check from the console** walks the chain with a query limit of ten minutes instead of the fifteen seconds of a read, and its answer may take as long. The nightly check and `kenwerk audit verify` have no limit, as before.
 
 **Proof.** `TestAnExportEndsWithTheCountOfItsEvents` (pages of two over five sealed events and one waiting), `TestAnExportCutAtItsLimitSaysSo`, `TestTheConsoleCheckOfTheAuditLogIsNotCutAtTheLimitOfARead`.
 
@@ -60,9 +60,9 @@ The architecture principle "Permissions are never cached" now says what is built
 
 **What is built.**
 
-- `DIFFLUENCE_OIDC_AUTO_CREATE` is off by default. A login through the provider then opens only an account that exists already, through SCIM or an invitation.
+- `KENWERK_OIDC_AUTO_CREATE` is off by default. A login through the provider then opens only an account that exists already, through SCIM or an invitation.
 - When it is on, a new account is made only when the token says `email_verified: true`. Otherwise the login is refused as "no account", and the audit log names the reason `email_not_verified`.
-- `DIFFLUENCE_OIDC_ALLOW_UNVERIFIED_EMAIL=true` lets an operator accept unverified addresses, for a provider that never sends the claim and where only the organisation can set an address.
+- `KENWERK_OIDC_ALLOW_UNVERIFIED_EMAIL=true` lets an operator accept unverified addresses, for a provider that never sends the claim and where only the organisation can set an address.
 
 **Decided on the product owner's behalf on 2026-11-13, may be overruled:** both defaults are the safe ones. An installation that relied on accounts at the first login sets the switches before upgrading (`docs/operations/upgrade.md`).
 

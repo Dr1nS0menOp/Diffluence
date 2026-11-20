@@ -5,10 +5,10 @@
 // tab, which opens them again.
 import { useEffect, useRef, useState } from 'react';
 
-const BEFORE_RELOAD = 'diffluence:before-reload';
+const BEFORE_RELOAD = 'kenwerk:before-reload';
 const SAVE_WAIT_MS = 5_000;
 // sessionStorage, so it belongs to this tab and goes with it.
-const REOPEN_KEY = 'diffluence.reopen';
+const REOPEN_KEY = 'kenwerk.reopen';
 
 interface BeforeReloadDetail {
   wait: (work: Promise<unknown>) => void;
