@@ -502,7 +502,11 @@
 }
 
 .access-choice {
-  min-block-size: 0;
+  /* A 24px target that takes no more room in the line than its text (WCAG 2.5.8). */
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--size-twist);
+  margin-block: calc((1lh - var(--size-twist)) / 2);
   padding: 0;
   background: none;
   color: var(--color-ink);
