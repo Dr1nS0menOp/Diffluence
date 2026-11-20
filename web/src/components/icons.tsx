@@ -223,6 +223,15 @@ export const IconTheme = line('M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM12 3v18M12 
 export const IconLogout = line('M10 5H5v14h5M14 8l4 4-4 4M18 12H9');
 /** A flash: something that runs by itself, automation (SPC-107). */
 export const IconAutomation = line('M13 3L5 14h6l-1 7 8-11h-6z');
+/** System health: a line that beats. */
+export const IconPulse = line('M3 12h4l2-5 4 10 2-5h6');
+/** Announcements to everyone on the instance. */
+export const IconMegaphone = line('M4 10v4h3l7 4V6l-7 4zM17 9a4 4 0 0 1 0 6M7 14l1 5h3l-1-4');
+/** Service accounts, which act with a token. */
+export const IconKey = line('M8 15a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 11h9M18 11v3M15 11v2');
+export const IconMail = line('M3 6h18v12H3zM3 7l9 6 9-6');
+/** A list of entries, such as the events of the installation. */
+export const IconList = line('M9 6h11M9 12h11M9 18h11M4 6h.01M4 12h.01M4 18h.01');
 export const IconPerson = line('M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM4 20a8 8 0 0 1 16 0');
 
 /** The same link icon, for the heading marks that ProseMirror builds outside React. */

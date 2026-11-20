@@ -6,6 +6,8 @@ import { api } from '../api';
 import { Chart } from '../components/chart';
 import { SortTable, type SortColumn } from '../components/sort-table';
 import { ConfirmButton, ErrorNote, Field, Loading } from '../components/ui';
+import { Notice } from '../components/notice';
+import { EmbedHostsForm } from './admin-rules';
 
 interface InstanceDay {
   day: string;
@@ -179,11 +181,7 @@ function AnalyticsForm({ current }: { current: Settings }) {
           onConfirm={() => remove.mutate()}
         />
       </div>
-      {remove.isSuccess && (
-        <p role="status" className="note">
-          {t('analytics.deleted')}
-        </p>
-      )}
+      {remove.isSuccess && <Notice kind="info">{t('analytics.deleted')}</Notice>}
     </form>
   );
 }
@@ -216,37 +214,41 @@ export function OutgoingTab() {
   });
   return (
     <>
-      <p className="muted">{t('outgoing.help')}</p>
-      <ErrorNote error={q.error ?? save.error} />
-      {q.data && hosts.length === 0 && <p className="muted">{t('outgoing.empty')}</p>}
-      <ul className="plain-list">
-        {hosts.map((h) => (
-          <li key={h} className="row">
-            <span className="grow">{h}</span>
-            <button
-              type="button"
-              className="ghost"
-              aria-label={t('outgoing.remove', { host: h })}
-              onClick={() => save.mutate(hosts.filter((x) => x !== h))}
-            >
-              {t('common.remove')}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          save.mutate([...hosts, host]);
-        }}
-      >
-        <Field label={t('outgoing.host')} help={t('outgoing.hostHelp')}>
-          <input value={host} onChange={(e) => setHost(e.target.value)} required />
-        </Field>
-        <button type="submit" className="primary" disabled={save.isPending}>
-          {t('outgoing.add')}
-        </button>
-      </form>
+      <section className="settings-unit">
+        <h2>{t('outgoing.hostsTitle')}</h2>
+        <p className="muted">{t('outgoing.help')}</p>
+        <ErrorNote error={q.error ?? save.error} />
+        {q.data && hosts.length === 0 && <p className="muted">{t('outgoing.empty')}</p>}
+        <ul className="plain-list">
+          {hosts.map((h) => (
+            <li key={h} className="row">
+              <span className="grow">{h}</span>
+              <button
+                type="button"
+                className="ghost"
+                aria-label={t('outgoing.remove', { host: h })}
+                onClick={() => save.mutate(hosts.filter((x) => x !== h))}
+              >
+                {t('common.remove')}
+              </button>
+            </li>
+          ))}
+        </ul>
+        <form
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            save.mutate([...hosts, host]);
+          }}
+        >
+          <Field label={t('outgoing.host')} help={t('outgoing.hostHelp')}>
+            <input value={host} onChange={(e) => setHost(e.target.value)} required />
+          </Field>
+          <button type="submit" className="primary" disabled={save.isPending}>
+            {t('outgoing.add')}
+          </button>
+        </form>
+      </section>
+      <EmbedHostsForm />
     </>
   );
 }

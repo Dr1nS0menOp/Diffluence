@@ -234,6 +234,82 @@ fieldset.matrix label {
   background: var(--color-danger-tint);
 }
 
+/* A notice (NAV-149, NAV-150): the icon of its kind in a column of its own, level with the first
+   line, then an optional bold title, the text and a row of actions. */
+.notice {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2-5);
+  margin-block: var(--space-2);
+  padding: var(--space-2-5) var(--space-3);
+  border-radius: var(--radius);
+}
+
+.notice-info {
+  background: var(--color-accent-tint);
+}
+
+.notice-warning {
+  background: var(--color-lozenge);
+}
+
+.notice-error {
+  background: var(--color-danger-tint);
+}
+
+.notice-icon {
+  display: flex;
+  padding-block-start: var(--space-0-5);
+}
+
+.notice-info > .notice-icon {
+  color: var(--color-accent);
+}
+
+.notice-warning > .notice-icon {
+  color: var(--color-on-lozenge);
+}
+
+.notice-error > .notice-icon {
+  color: var(--color-danger);
+}
+
+.notice-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-inline-size: 0;
+}
+
+.notice-title {
+  margin: 0;
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+.notice-text > p {
+  margin: 0;
+}
+
+.notice a {
+  text-decoration: underline;
+}
+
+.notice-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Save and Reset changes, small and close together at the start side under their fields. */
+.save-reset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-block-start: var(--space-3);
+}
+
 /* The band of a controlled page (spec 064): a note of a few lines, and the steps on offer. */
 .control-band > p {
   margin-block: var(--space-1);
@@ -973,6 +1049,38 @@ td {
   border-block-end: 1px solid var(--color-line);
   text-align: start;
   vertical-align: top;
+}
+
+/* A table in its box (NAV-157): a quiet heading row with a line under it, rows set apart by space
+   rather than lines, a line after the last row, and a tint on the row under the pointer. */
+.table-box > table > tbody > tr > * {
+  border-block-end: 0;
+}
+
+.table-box > table > tbody > tr:last-child > * {
+  border-block-end: 1px solid var(--color-line);
+}
+
+.table-box > table > tbody > tr:hover > * {
+  background: var(--color-side);
+}
+
+/* An empty table keeps its heading row, with one muted sentence centred under it (NAV-172). */
+.table-box > table > tbody > tr.table-empty > td {
+  padding-block: var(--space-5);
+  background: none;
+  color: var(--color-muted);
+  text-align: center;
+}
+
+/* Row actions sit in the last column, at its end. */
+td.row-actions {
+  text-align: end;
+  white-space: nowrap;
+}
+
+td.row-actions > * + * {
+  margin-inline-start: var(--space-2);
 }
 
 th {

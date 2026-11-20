@@ -35,3 +35,15 @@ export function TableBox({ children }: { children: ReactNode }) {
     </div>
   );
 }
+
+/**
+ * The one row of a table with nothing in it (NAV-172): the heading row stays above it, and one
+ * muted sentence stands centred where the rows would be.
+ */
+export function TableEmpty({ columns, children }: { columns: number; children: ReactNode }) {
+  return (
+    <tr className="table-empty">
+      <td colSpan={columns}>{children}</td>
+    </tr>
+  );
+}

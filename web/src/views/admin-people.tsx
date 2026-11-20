@@ -7,9 +7,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Group, type UserDetail } from '../api';
 import { appearanceQuery } from '../appearance';
 import { useDates } from '../dates';
-import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
+import { Dialog, ErrorNote, Field, FilePicker, Loading } from '../components/ui';
+import { Notice } from '../components/notice';
 import { permissionLabel } from '../permission-words';
 import { TableBox } from '../components/table-box';
+import { EmptyState } from '../components/empty-state';
+import { SectionActions } from '../components/settings-section';
 
 const DAY_MS = 86_400_000;
 const SERVICE_TOKEN_DAYS = 365;
@@ -218,14 +221,14 @@ export function InvitationsTab() {
   });
   return (
     <>
-      {mailReady === false && <p className="note">{t('admin.invitationNoMail')}</p>}
+      {mailReady === false && (
+        <Notice kind="warning" title={t('admin.mailOffTitle')}>
+          {t('admin.invitationNoMail')}
+        </Notice>
+      )}
       <WaitingRequests onLink={setLink} />
       <NewInvitation onLink={setLink} />
-      {link && (
-        <p role="status" className="note">
-          {t('access.inviteLink', { link })}
-        </p>
-      )}
+      {link && <Notice kind="info">{t('access.inviteLink', { link })}</Notice>}
       <ErrorNote error={q.error ?? cancel.error} />
       {q.data?.invitations.length === 0 && <p className="muted">{t('admin.invitationsNone')}</p>}
       <ImportSection />
@@ -446,19 +449,60 @@ export function BulkBar({ users, onDone }: { users: string[]; onDone: () => void
   );
 }
 
+/** A dialog that asks for one name and makes something with it, such as a group. */
+export function NameDialog({
+  title,
+  label,
+  error,
+  busy,
+  onCreate,
+  onClose,
+}: {
+  title: string;
+  label: string;
+  error: unknown;
+  busy: boolean;
+  onCreate: (name: string) => void;
+  onClose: () => void;
+}) {
+  const { t } = useTranslation();
+  const [name, setName] = useState('');
+  return (
+    <Dialog title={title} onClose={onClose}>
+      <form
+        onSubmit={(e: FormEvent) => {
+          e.preventDefault();
+          onCreate(name);
+        }}
+      >
+        <ErrorNote error={error} />
+        <Field label={label}>
+          <input value={name} onChange={(e) => setName(e.target.value)} required autoFocus />
+        </Field>
+        <div className="dialog-actions">
+          <button type="submit" className="primary" disabled={busy}>
+            {t('common.create')}
+          </button>
+        </div>
+      </form>
+    </Dialog>
+  );
+}
+
+/** Service accounts (ADM-070): accounts for scripts, which act with a token. */
 export function ServiceAccounts() {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
   const [secret, setSecret] = useState('');
   const q = useQuery({
     queryKey: ['admin-users', 'service'],
     queryFn: () => api.get<{ users: UserDetail[] }>('/admin/users?type=service'),
   });
   const create = useMutation({
-    mutationFn: () => api.post('/admin/service-accounts', { name }),
+    mutationFn: (name: string) => api.post('/admin/service-accounts', { name }),
     onSuccess: async () => {
-      setName('');
+      setCreating(false);
       await client.invalidateQueries({ queryKey: ['admin-users', 'service'] });
     },
   });
@@ -471,43 +515,64 @@ export function ServiceAccounts() {
       }),
     onSuccess: (r) => setSecret(r.secret),
   });
+  const isEmpty = q.data?.users.length === 0;
+  const newAccount = (
+    <button type="button" className="primary" onClick={() => setCreating(true)}>
+      {t('admin.newServiceAccount')}
+    </button>
+  );
   return (
-    <section>
-      <h2>{t('admin.serviceAccounts')}</h2>
-      <p className="muted">{t('admin.serviceAccountsHelp')}</p>
-      <ErrorNote error={q.error ?? create.error ?? token.error} />
-      <ul className="plain-list">
-        {q.data?.users.map((u) => (
-          <li key={u.id} className="row">
-            <span className="grow">{u.display_name}</span>
-            <button type="button" className="ghost" onClick={() => token.mutate(u.id)}>
-              {t('admin.newToken')}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        className="row"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          create.mutate();
-        }}
-      >
-        <input
-          value={name}
-          aria-label={t('admin.serviceName')}
-          placeholder={t('admin.serviceName')}
-          onChange={(e) => setName(e.target.value)}
-          required
+    <>
+      {q.data && !isEmpty && <SectionActions>{newAccount}</SectionActions>}
+      <ErrorNote error={q.error ?? token.error} />
+      {q.isPending && <Loading />}
+      {q.data && (
+        <TableBox>
+          <table>
+            <thead>
+              <tr>
+                <th>{t('common.name')}</th>
+                <th>
+                  <span className="visually-hidden">{t('common.actions')}</span>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {q.data.users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.display_name}</td>
+                  <td className="row-actions">
+                    <button type="button" className="ghost" onClick={() => token.mutate(u.id)}>
+                      {t('admin.newToken')}
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableBox>
+      )}
+      {isEmpty && (
+        <EmptyState title={t('admin.serviceEmptyTitle')} action={newAccount}>
+          {t('admin.serviceAccountsHelp')}
+        </EmptyState>
+      )}
+      {creating && (
+        <NameDialog
+          title={t('admin.newServiceAccount')}
+          label={t('admin.serviceName')}
+          error={create.error}
+          busy={create.isPending}
+          onCreate={(name) => create.mutate(name)}
+          onClose={() => setCreating(false)}
         />
-        <button type="submit">{t('common.add')}</button>
-      </form>
+      )}
       {secret && (
         <Dialog title={t('admin.newToken')} onClose={() => setSecret('')}>
           <p>{t('admin.tokenHelp')}</p>
           <code className="secret">{secret}</code>
         </Dialog>
       )}
-    </section>
+    </>
   );
 }

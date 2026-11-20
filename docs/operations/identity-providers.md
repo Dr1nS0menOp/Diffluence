@@ -23,7 +23,7 @@ DIFFLUENCE_OIDC_GROUPS_CLAIM=groups        # optional
 DIFFLUENCE_OIDC_AUTO_CREATE=true           # optional: accounts at first login, see "Who gets an account"
 ```
 
-**SCIM.** In Diffluence: Administration, Provisioning, New token. In Authentik: create a SCIM provider with URL `https://wiki.example.com/scim/v2` and that token, using the default user and group mappings, then add it as a backchannel provider of the application. Users and groups arrive automatically.
+**SCIM.** In Diffluence: Administration, Security, Provisioning, New token. In Authentik: create a SCIM provider with URL `https://wiki.example.com/scim/v2` and that token, using the default user and group mappings, then add it as a backchannel provider of the application. Users and groups arrive automatically.
 
 Authentik sets `externalId` to the same value as the OIDC subject. That is how an account created through SCIM is linked at first login, without trusting an e-mail address. Authentik does not mark addresses as verified by default, so linking on e-mail would not work there anyway.
 

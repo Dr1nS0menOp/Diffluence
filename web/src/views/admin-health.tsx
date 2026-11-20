@@ -8,6 +8,7 @@ import { api } from '../api';
 import { Link } from '../router';
 import { ErrorNote, formatSize, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
+import { Notice } from '../components/notice';
 
 type HealthState = 'ok' | 'warn' | 'problem';
 
@@ -126,17 +127,23 @@ function PublishingCheck({ drift }: { drift: boolean }) {
   );
 }
 
-/** The band on every page of the console while the disk for files runs out (OPS-104). */
+/**
+ * The notice under the introduction of every section of the console while the disk for files
+ * runs out (OPS-104, spec 081 D15).
+ */
 export function HealthBand() {
   const { t } = useTranslation();
   const q = useHealth();
   const disk = q.data?.checks.find((check) => check.name === 'disk');
   if (!disk || !DISK_TROUBLE.includes(disk.code)) return null;
   return (
-    <p role="status" className={disk.state === 'problem' ? 'note note-error' : 'note'}>
-      {t('health.band', { refuse: disk.values.refuse })}{' '}
-      <Link href="/admin/system">{t('health.bandLook')}</Link>
-    </p>
+    <Notice
+      kind={disk.state === 'problem' ? 'error' : 'warning'}
+      title={t('health.bandTitle')}
+      actions={<Link href="/admin/system">{t('health.bandLook')}</Link>}
+    >
+      {t('health.band', { refuse: disk.values.refuse })}
+    </Notice>
   );
 }
 

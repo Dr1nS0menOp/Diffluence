@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
+import { EmptyState } from '../components/empty-state';
 
 interface Endpoint {
   id: string;
@@ -204,7 +205,10 @@ export function WebhookList({ path }: { path: string }) {
       <p className="muted">{t('webhooks.help')}</p>
       <ErrorNote error={q.error} />
       {q.isPending && <Loading />}
-      {q.data?.webhooks.length === 0 && <p className="muted">{t('webhooks.none')}</p>}
+      {/* The form for a new webhook follows, and is how the first one is made (NAV-173). */}
+      {q.data?.webhooks.length === 0 && (
+        <EmptyState title={t('webhooks.emptyTitle')}>{t('webhooks.emptyText')}</EmptyState>
+      )}
       <ul className="plain-list">
         {q.data?.webhooks.map((w) => (
           <EndpointRow key={w.id} endpoint={w} path={path} onSecret={setSecret} />

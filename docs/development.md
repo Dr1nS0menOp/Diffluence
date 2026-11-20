@@ -44,7 +44,7 @@ DIFFLUENCE_SMTP_TLS=none
 DIFFLUENCE_SMTP_FROM=diffluence@example.test
 ```
 
-Then Administration, Mail, Send test should show up in Mailpit. `none` means no encryption, which is only fine because this mail never leaves the machine. Automated tests use a fake server of their own, and need none of this.
+Then Administration, Instance, Mail, Send a test mail to yourself should show up in Mailpit. `none` means no encryption, which is only fine because this mail never leaves the machine. Automated tests use a fake server of their own, and need none of this.
 
 ## Conventions that tests enforce
 

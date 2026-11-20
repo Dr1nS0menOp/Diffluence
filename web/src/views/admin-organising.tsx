@@ -8,6 +8,8 @@ import { PagePicker } from '../components/picker';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TemplateManager } from './templates';
 import { TableBox } from '../components/table-box';
+import { differs, SaveReset } from '../components/save-reset';
+import { Categories } from './admin-rules';
 
 const PRESETS = ['team_space', 'read_only_kb'];
 
@@ -23,17 +25,34 @@ interface InstanceFeatures {
   all: string[];
 }
 
-function OrganisingForm({ start }: { start: Organising }) {
-  const { t } = useTranslation();
+const ORGANISING_KEY = ['admin-organising'];
+
+/** The organising settings as stored: Organising and Defaults for new spaces each change a part. */
+function useOrganising() {
+  return useQuery({ queryKey: ORGANISING_KEY, queryFn: () => api.get<Organising>('/admin/organising') });
+}
+
+/**
+ * Edits a part of the organising settings and saves them whole, as the single screen did before
+ * the two were apart (spec 081, D17).
+ */
+function useOrganisingForm(start: Organising) {
   const client = useQueryClient();
   const [form, setForm] = useState(start);
-  const home = form.company_home === NIL_ID ? '' : form.company_home;
   const save = useMutation({
     mutationFn: () => api.put('/admin/organising', { ...form, company_home: form.company_home || NIL_ID }),
-    onSuccess: () => client.invalidateQueries({ queryKey: ['admin-organising'] }),
+    onSuccess: () => client.invalidateQueries({ queryKey: ORGANISING_KEY }),
   });
+  return { form, setForm, save, changed: differs(start, form), reset: () => setForm(start) };
+}
+
+function OrganisingForm({ start }: { start: Organising }) {
+  const { t } = useTranslation();
+  const { form, setForm, save, changed, reset } = useOrganisingForm(start);
+  const home = form.company_home === NIL_ID ? '' : form.company_home;
   return (
     <form
+      className="settings-unit"
       onSubmit={(e: FormEvent) => {
         e.preventDefault();
         save.mutate();
@@ -54,7 +73,24 @@ function OrganisingForm({ start }: { start: Organising }) {
           onChange={(e) => setForm({ ...form, draft_days: Number(e.target.value) })}
         />
       </Field>
-      <Field label={t('adminOrganise.defaultPreset')}>
+      <SaveReset changed={changed} busy={save.isPending} onReset={reset} />
+    </form>
+  );
+}
+
+function SpaceDefaultsForm({ start }: { start: Organising }) {
+  const { t } = useTranslation();
+  const { form, setForm, save, changed, reset } = useOrganisingForm(start);
+  return (
+    <form
+      className="settings-unit"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <ErrorNote error={save.error} />
+      <Field label={t('adminOrganise.defaultPreset')} help={t('adminOrganise.defaultPresetHelp')}>
         <select
           value={form.default_preset}
           onChange={(e) => setForm({ ...form, default_preset: e.target.value })}
@@ -67,11 +103,17 @@ function OrganisingForm({ start }: { start: Organising }) {
           ))}
         </select>
       </Field>
-      <button type="submit" className="primary">
-        {t('common.save')}
-      </button>
+      <SaveReset changed={changed} busy={save.isPending} onReset={reset} />
     </form>
   );
+}
+
+/** Defaults for new spaces (ADM-073): the permissions a new space starts with. */
+export function SpaceDefaultsTab() {
+  const settings = useOrganising();
+  if (settings.error) return <ErrorNote error={settings.error} />;
+  if (!settings.data) return <Loading />;
+  return <SpaceDefaultsForm key={JSON.stringify(settings.data)} start={settings.data} />;
 }
 
 function FeatureTable({ start }: { start: InstanceFeatures }) {
@@ -84,7 +126,7 @@ function FeatureTable({ start }: { start: InstanceFeatures }) {
   const flip = (list: string[], name: string, on: boolean) =>
     on ? list.filter((x) => x !== name) : [...list, name];
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('spaceSettings.features')}</h2>
       <ErrorNote error={save.error} />
       <TableBox>
@@ -149,7 +191,7 @@ function ExperimentalTable({ start }: { start: ExperimentalParts }) {
     },
   });
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('experimental.title')}</h2>
       <p className="muted">{t('experimental.help')}</p>
       <ErrorNote error={save.error} />
@@ -203,7 +245,7 @@ function SaveSpaceAsTemplate() {
     },
   });
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('adminOrganise.spaceTemplates')}</h2>
       <p className="muted">{t('adminOrganise.spaceTemplatesHelp')}</p>
       <ErrorNote error={save.error} />
@@ -241,10 +283,7 @@ function SaveSpaceAsTemplate() {
 }
 
 export function OrganisingTab() {
-  const settings = useQuery({
-    queryKey: ['admin-organising'],
-    queryFn: () => api.get<Organising>('/admin/organising'),
-  });
+  const settings = useOrganising();
   const features = useQuery({
     queryKey: ['admin-features'],
     queryFn: () => api.get<InstanceFeatures>('/admin/features'),
@@ -259,21 +298,25 @@ export function OrganisingTab() {
   }
   return (
     <>
-      <OrganisingForm start={settings.data} />
+      <OrganisingForm key={JSON.stringify(settings.data)} start={settings.data} />
       <FeatureTable start={features.data} />
       <ExperimentalTable start={experimental.data} />
-      <SaveSpaceAsTemplate />
+      <Categories />
     </>
   );
 }
 
+/** Templates of the instance, and saving a space as a template for new spaces (D19). */
 export function TemplatesTab() {
   return (
-    <TemplateManager
-      listPath="/admin/templates"
-      base="/admin/templates"
-      reviewPath="/admin/template-review"
-      canSetReview
-    />
+    <>
+      <TemplateManager
+        listPath="/admin/templates"
+        base="/admin/templates"
+        reviewPath="/admin/template-review"
+        canSetReview
+      />
+      <SaveSpaceAsTemplate />
+    </>
   );
 }

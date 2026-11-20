@@ -2379,7 +2379,21 @@
     "perm_invite_people": "Ask to invite people",
     "perm_administrator": "Administrator",
     "perm_system_administrator": "System administrator",
-    "control": "Document control"
+    "control": "Document control",
+    "font": "Font",
+    "groupsEmptyTitle": "No groups yet",
+    "groupsEmptyText": "A group gathers people, so a space, a page or a permission can be given to all of them at once.",
+    "newServiceAccount": "New service account",
+    "serviceNone": "No service accounts yet.",
+    "serviceEmptyTitle": "No service accounts yet",
+    "limitsTitle": "Trash and files",
+    "mailSwitches": "What is sent",
+    "purgeWarning": "Removing a space for good cannot be undone: its pages, files and history are gone.",
+    "purgeAfter": "Removed for good",
+    "trashEmpty": "No space is in the trash.",
+    "usersNoneFit": "No one fits these filters.",
+    "auditNoneFit": "No event fits these filters.",
+    "mailOffTitle": "No mail server"
   },
   "site": {
     "banner": "Announcement",
@@ -2658,7 +2672,8 @@
     "publishingFix": "Fix what it found",
     "publishingChecked_one": "Checked: {{count}} difference.",
     "publishingChecked_other": "Checked: {{count}} differences.",
-    "publishingFixed": "Fixed: every status was recomputed from the versions."
+    "publishingFixed": "Fixed: every status was recomputed from the versions.",
+    "bandTitle": "The disk is filling up"
   },
   "running": {
     "backupsIntro": "The backup service of your installation makes the backups; this page tells it how often, and shows what it reported. It picks up a change within a minute.",
@@ -2740,7 +2755,10 @@
     "endAll": "Log everyone out",
     "endAllConfirm": "Log everyone out, you included?",
     "ended_one": "{{count}} session ended.",
-    "ended_other": "{{count}} sessions ended."
+    "ended_other": "{{count}} sessions ended.",
+    "restoreLossTitle": "Everything after this backup is lost",
+    "workerAbsentTitle": "The backup service is quiet",
+    "keyMissingTitle": "The backup service has no key"
   },
   "installation": {
     "upgradesIntro": "What runs this installation, and what an upgrade waits for. The console cannot upgrade; how to upgrade on your platform is below.",
@@ -2870,7 +2888,9 @@
     "why_backup": "The backup before an upgrade is a safety rule a session must not switch off.",
     "why_grace": "The grace is the window in which a rollback still works.",
     "why_oidc": "Who may get an account through the identity provider is set where the server starts.",
-    "why_logLevel": "Change it for a while under System health."
+    "why_logLevel": "Change it for a while under System health.",
+    "probeWarnedTitle": "An outside system did not answer",
+    "witnessOldTitle": "The witness is out of date"
   },
   "rules": {
     "general": "General",
@@ -2925,7 +2945,11 @@
     "confirmCodeHelp": "Leave it empty if you just confirmed who you are with a passkey.",
     "confirmButton": "Confirm and save",
     "retentionLowering": "From {{when}}, audit rows are kept for {{days}} days, because: {{because}}. Until then the longer time holds.",
-    "retentionLoweringCancel": "Keep the longer time"
+    "retentionLoweringCancel": "Keep the longer time",
+    "languageTimeHelp": "Language, time and help",
+    "embedHostsField": "Addresses",
+    "retentionLoweringTitle": "A shorter time is coming",
+    "confirmTitle": "A system administrator confirms this"
   },
   "instance": {
     "title": "Look of this instance",
@@ -2951,7 +2975,9 @@
     "welcomePageHelp": "Paste the address of a page. It shows for those who may read it.",
     "reset": "Back to the defaults",
     "resetHelp": "Returns name, logo, colours, texts and the banner to the defaults.",
-    "resetConfirm": "Return the whole look of this instance to the defaults?"
+    "resetConfirm": "Return the whole look of this instance to the defaults?",
+    "bannerHelp": "The banner shows on every screen, for everyone who is logged in, until the day it ends.",
+    "resetWarning": "This cannot be undone: the name, logo, colours, texts and the banner go back to their defaults."
   },
   "care": {
     "maintenance": "Maintenance mode",
@@ -3704,7 +3730,8 @@
     "onForNewNamed": "{{name}} on for new spaces",
     "spaceTemplates": "Space templates",
     "spaceTemplatesHelp": "Saves pages, labels and templates, without files.",
-    "chooseSpace": "Choose a space"
+    "chooseSpace": "Choose a space",
+    "defaultPresetHelp": "Who may do what in a space someone creates, until its administrators change it."
   },
   "move": {
     "space": "Space",
@@ -4003,7 +4030,8 @@
     "host": "Host",
     "hostHelp": "Such as hooks.example.com, without a path.",
     "add": "Allow this host",
-    "remove": "Remove {{host}}"
+    "remove": "Remove {{host}}",
+    "hostsTitle": "Hosts that rules and webhooks may call"
   },
   "webhooks": {
     "title": "Webhooks",
@@ -4028,7 +4056,9 @@
     "turnOn": "Turn on",
     "turnOff": "Turn off",
     "rotate": "New secret",
-    "deleteConfirm": "Delete the webhook to {{address}}?"
+    "deleteConfirm": "Delete the webhook to {{address}}?",
+    "emptyTitle": "No webhooks yet",
+    "emptyText": "A webhook tells an outside system what happens here, as it happens. Add its address below and choose the events it hears about."
   },
   "together": {
     "sharedDraft": "This is one shared draft: everyone who can edit this page sees it while it is typed.",
@@ -4171,7 +4201,8 @@
     "countComments_one": "{{count}} comment",
     "countComments_other": "{{count}} comments",
     "countVersions_one": "{{count}} version",
-    "countVersions_other": "{{count}} versions"
+    "countVersions_other": "{{count}} versions",
+    "noHelperTitle": "PDF is not available"
   },
   "sites": {
     "title": "Public site",
@@ -4886,5 +4917,169 @@
         "quality-changes": "Ask for changes"
       }
     }
+  },
+  "adminSections": {
+    "summary": {
+      "name": "Summary",
+      "intro": "How the instance is doing, and what needs your attention."
+    },
+    "insights": {
+      "name": "Insights",
+      "intro": "Figures over time on pages, people and search, to see how the instance is used."
+    },
+    "analytics": {
+      "name": "Analytics",
+      "intro": "Whether views of pages are counted, and what is kept of them."
+    },
+    "audit": {
+      "name": "Audit log",
+      "intro": "Every change to the instance and its content, in a chain that shows whether a row was altered."
+    },
+    "system": {
+      "name": "System health",
+      "intro": "The checks of the installation, its nodes and queues, and how much it logs."
+    },
+    "events": {
+      "name": "Events",
+      "intro": "How events travel between the nodes, and which nodes run an older release."
+    },
+    "upgrades": {
+      "name": "Upgrades",
+      "intro": "The release on each node, the cleanup migrations that wait, and how to upgrade."
+    },
+    "configuration": {
+      "name": "Configuration",
+      "intro": "The values the installation started with, and where each one was set."
+    },
+    "automation": {
+      "name": "Automation",
+      "intro": "Rules that act on their own when something happens, in every space or in the spaces you choose."
+    },
+    "spaces": {
+      "name": "Spaces",
+      "intro": "Every space of the instance, how large it is, and when it was last used."
+    },
+    "announcements": {
+      "name": "Announcements",
+      "intro": "A banner that everyone sees at the top of every screen, until the day you choose."
+    },
+    "users": {
+      "name": "Users",
+      "intro": "Everyone who can log in, how they got their account, and when they last logged in."
+    },
+    "groups": {
+      "name": "Groups",
+      "intro": "Groups gather people, so a space or a page can be shared with all of them at once."
+    },
+    "invitations": {
+      "name": "Invitations",
+      "intro": "Invite people by their address, answer requests to join, and import many people from a file."
+    },
+    "service-accounts": {
+      "name": "Service accounts",
+      "intro": "Accounts for scripts and other systems. They never log in, and act with a token instead."
+    },
+    "settings": {
+      "name": "General",
+      "intro": "How long the trash keeps things, which files are allowed, when the disk counts as full, and an example space to start from."
+    },
+    "rules": {
+      "name": "Rules",
+      "intro": "The language, time and help address of the instance, which features are on, and how long the audit log is kept."
+    },
+    "organising": {
+      "name": "Organising",
+      "intro": "What holds for every space: the home of the organisation, old drafts, features, experimental parts and categories."
+    },
+    "mail": {
+      "name": "Mail",
+      "intro": "What the instance sends by mail, and the mail that waits to be sent."
+    },
+    "templates": {
+      "name": "Templates",
+      "intro": "Page templates that every space can use, and templates for new spaces."
+    },
+    "control": {
+      "name": "Document control",
+      "intro": "The steps a controlled document goes through, as templates that spaces can use."
+    },
+    "login": {
+      "name": "Login and second factor",
+      "intro": "Who must use a second factor, when an idle session ends, who may sign up, and how people log in."
+    },
+    "sessions": {
+      "name": "Sessions",
+      "intro": "End the sessions of one person or of everyone, for example after an incident."
+    },
+    "scim": {
+      "name": "Provisioning",
+      "intro": "Tokens that let an identity provider create and change accounts through SCIM."
+    },
+    "export": {
+      "name": "Export and publishing",
+      "intro": "Which export formats are on, how large an export or import may be, and what may be public."
+    },
+    "outgoing": {
+      "name": "Outgoing calls",
+      "intro": "What may leave this instance: the hosts that rules and webhooks may call, and the addresses that link cards and embeds may show."
+    },
+    "instance-permissions": {
+      "name": "Instance permissions",
+      "intro": "Who holds a permission over the whole instance, such as administration or creating spaces. Change it on the person or the group."
+    },
+    "permissions": {
+      "name": "Roles",
+      "intro": "The roles of the instance and of spaces, and which permissions each one holds."
+    },
+    "space-defaults": {
+      "name": "Defaults for new spaces",
+      "intro": "The permissions a new space starts with, until its administrators change them."
+    },
+    "look": {
+      "name": "Look",
+      "intro": "The name, logo, colours, font and login text of the instance."
+    },
+    "care": {
+      "name": "Care",
+      "intro": "Maintenance mode, jobs and events that failed, the largest pages, and files that nothing uses."
+    },
+    "backups": {
+      "name": "Backups",
+      "intro": "When backups run, which ones there are, and restoring one over this installation."
+    },
+    "import-space": {
+      "name": "Import a space",
+      "intro": "Bring a space in from another instance, as a bundle of its pages and files."
+    },
+    "spaces-trash": {
+      "name": "Spaces in the trash",
+      "intro": "Deleted spaces wait here until their time is up. Restore one, or remove it for good."
+    },
+    "webhooks": {
+      "name": "Webhooks",
+      "intro": "Addresses that hear about events of the instance as they happen."
+    }
+  },
+  "adminGroups": {
+    "overview": "Overview",
+    "tools": "Tools",
+    "people": "People and access",
+    "admin-instance": "Instance",
+    "admin-security": "Security",
+    "admin-permissions": "Permissions",
+    "admin-look": "Look",
+    "admin-data": "Data"
+  },
+  "adminFrame": {
+    "back": "Back to the start screen",
+    "settings": "Settings",
+    "experimental": "Experimental"
+  },
+  "settingsSection": {
+    "guide": "Read more in the documentation"
+  },
+  "saveReset": {
+    "reset": "Reset changes",
+    "unchanged": "Nothing has changed yet."
   }
 }

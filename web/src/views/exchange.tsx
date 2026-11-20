@@ -20,6 +20,8 @@ import { offeredNames, useCapabilities } from '../capabilities';
 import { ExperimentalOff } from '../components/experimental-off';
 import { Link } from '../router';
 import { TableBox } from '../components/table-box';
+import { Notice } from '../components/notice';
+import { differs, SaveReset } from '../components/save-reset';
 import { pageTitle } from '../page-name';
 
 const POLL_MS = 1500;
@@ -641,7 +643,37 @@ function PolicyRow({
   );
 }
 
-/** Administration, Export: which formats, what sizes, and the two public switches. */
+/**
+ * Administration, Import a space (ADM-075): the fingerprint of this instance and the upload of a
+ * bundle from another, while the experimental part of bundles is on.
+ */
+export function ImportSpaceTab() {
+  const { t } = useTranslation();
+  const capabilities = useCapabilities();
+  const key = useQuery({
+    queryKey: ['bundle-key'],
+    queryFn: () => api.get<{ fingerprint: string }>('/admin/bundles/key'),
+    enabled: capabilities.bundles,
+  });
+  const [bundle, setBundle] = useState<string | null>(null);
+  const upload = useMutation({
+    mutationFn: (f: File) =>
+      api.upload<{ id: string }>(`/admin/bundles?filename=${encodeURIComponent(f.name)}`, f),
+    onSuccess: (r) => setBundle(r.id),
+  });
+  if (!capabilities.bundles) return <ExperimentalOff />;
+  return (
+    <section className="settings-unit">
+      <h2>{t('exchange.bundles')}</h2>
+      <p className="muted">{t('exchange.ownFingerprint', { fingerprint: key.data?.fingerprint ?? '' })}</p>
+      <ErrorNote error={key.error ?? upload.error} />
+      <FilePicker label={t('exchange.importBundle')} accept=".zip" onPick={(f) => upload.mutate(f)} />
+      {bundle && <ImportSteps id={bundle} />}
+    </section>
+  );
+}
+
+/** Administration, Export and publishing: which formats, what sizes, and the two public switches. */
 export function ExportTab() {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -649,18 +681,11 @@ export function ExportTab() {
     queryKey: ['export-policy'],
     queryFn: () => api.get<ExportPolicy>('/admin/export-policy'),
   });
-  const capabilities = useCapabilities();
-  const key = useQuery({
-    queryKey: ['bundle-key'],
-    queryFn: () => api.get<{ fingerprint: string }>('/admin/bundles/key'),
-    enabled: capabilities.bundles,
-  });
   const links = useQuery({
     queryKey: ['public-links'],
     queryFn: () => api.get<{ links: PublicLink[] }>('/admin/public-links'),
   });
   const [form, setForm] = useState<ExportPolicy | null>(null);
-  const [bundle, setBundle] = useState<string | null>(null);
   useEffect(() => {
     if (q.data) setForm(q.data);
   }, [q.data]);
@@ -668,21 +693,21 @@ export function ExportTab() {
     mutationFn: () => api.put('/admin/export-policy', { rules: form?.rules, limits: form?.limits }),
     onSuccess: () => client.invalidateQueries({ queryKey: ['export-policy'] }),
   });
-  const upload = useMutation({
-    mutationFn: (f: File) =>
-      api.upload<{ id: string }>(`/admin/bundles?filename=${encodeURIComponent(f.name)}`, f),
-    onSuccess: (r) => setBundle(r.id),
-  });
   if (q.error) return <ErrorNote error={q.error} />;
-  if (!form) return <Loading />;
+  if (!form || !q.data) return <Loading />;
+  const stored = q.data;
   const limits = form.limits;
   const setLimits = (next: Partial<ExportPolicy['limits']>) =>
     setForm({ ...form, limits: { ...limits, ...next } });
   return (
     <>
-      <section>
+      <section className="settings-unit">
         <h2>{t('exchange.formats')}</h2>
-        {!form.pdf_available && <p className="note">{t('exchange.noHelper')}</p>}
+        {!form.pdf_available && (
+          <Notice kind="warning" title={t('exchange.noHelperTitle')}>
+            {t('exchange.noHelper')}
+          </Notice>
+        )}
         <form
           onSubmit={(e: FormEvent) => {
             e.preventDefault();
@@ -746,29 +771,17 @@ export function ExportTab() {
             />{' '}
             {t('exchange.linksOn')}
           </label>
-          <p>
-            <button type="submit" className="primary">
-              {t('common.save')}
-            </button>
-          </p>
+          <SaveReset
+            changed={differs(
+              { rules: stored.rules, limits: stored.limits },
+              { rules: form.rules, limits: form.limits },
+            )}
+            busy={save.isPending}
+            onReset={() => setForm(stored)}
+          />
         </form>
       </section>
-      <section>
-        <h2>{t('exchange.bundles')}</h2>
-        {capabilities.bundles ? (
-          <>
-            <p className="muted">
-              {t('exchange.ownFingerprint', { fingerprint: key.data?.fingerprint ?? '' })}
-            </p>
-            <FilePicker label={t('exchange.importBundle')} accept=".zip" onPick={(f) => upload.mutate(f)} />
-            <ErrorNote error={upload.error} />
-            {bundle && <ImportSteps id={bundle} />}
-          </>
-        ) : (
-          <ExperimentalOff />
-        )}
-      </section>
-      <section>
+      <section className="settings-unit">
         <h2>{t('exchange.publicLinks')}</h2>
         {(links.data?.links.length ?? 0) === 0 && <p className="muted">{t('exchange.noPublicLinks')}</p>}
         <ul>

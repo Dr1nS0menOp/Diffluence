@@ -157,7 +157,7 @@ A jump over several releases is allowed: the binary runs every migration in orde
 
 ## Watching an upgrade
 
-Administration, System, **Upgrades** shows each node with its release, the newest migration it knows and when it was last seen, the migrations that wait, each cleanup (contract) migration with the nodes it waits for and when its grace ends, and the last upgrade marker with the backup it names. It only shows: the upgrade itself stays the command of your platform.
+Administration, Overview, **Upgrades** shows each node with its release, the newest migration it knows and when it was last seen, the migrations that wait, each cleanup (contract) migration with the nodes it waits for and when its grace ends, and the last upgrade marker with the backup it names. It only shows: the upgrade itself stays the command of your platform.
 
 
 `/metrics` shows how far it is:

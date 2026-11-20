@@ -6,6 +6,7 @@ import { api, type Me } from '../api';
 import { useCapabilities } from '../capabilities';
 import { ExperimentalOff } from '../components/experimental-off';
 import { ConfirmDialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { Notice } from '../components/notice';
 import { useDates } from '../dates';
 import { TableBox } from '../components/table-box';
 import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
@@ -150,9 +151,9 @@ function BackupSchedule({ data, isSystem }: { data: BackupOverview; isSystem: bo
     <form onSubmit={submit} className="settings-form">
       <h2>{t('running.schedule')}</h2>
       {w && holdsMore(data) && (
-        <p role="status" className="note">
+        <Notice kind="info">
           {t('running.heldMore', { keep: w.held_keep, hours: w.held_interval_hours })}
-        </p>
+        </Notice>
       )}
       <Field
         label={t('running.intervalHours')}
@@ -187,18 +188,10 @@ function FewerBackups({ data, isSystem }: { data: BackupOverview; isSystem: bool
   const c = data.confirmation;
   if (!c) return null;
   if (!c.code_shown) {
-    return (
-      <p role="status" className="note">
-        {t('running.fewerAsked')}
-      </p>
-    );
+    return <Notice kind="info">{t('running.fewerAsked')}</Notice>;
   }
   if (!isSystem) {
-    return (
-      <p role="status" className="note">
-        {t('running.fewerSystemOnly')}
-      </p>
-    );
+    return <Notice kind="info">{t('running.fewerSystemOnly')}</Notice>;
   }
   return (
     <LogCode
@@ -216,24 +209,26 @@ function WorkerState({ data }: { data: BackupOverview }) {
   const dates = useDates();
   const w = data.worker;
   if (!w) {
-    return (
-      <p role="status" className="note">
-        {t('running.workerNone')}
-      </p>
-    );
+    return <Notice kind="info">{t('running.workerNone')}</Notice>;
   }
   return (
     <>
-      <p role="status" className={w.absent ? 'note' : 'muted'}>
-        {w.absent
-          ? t('running.workerAbsent', { when: dates.moment(w.seen_at) })
-          : t('running.workerSeen', { when: dates.moment(w.seen_at) })}
-      </p>
-      <p className={w.key_present ? 'muted' : 'note'}>
-        {w.key_present
-          ? t('running.keyPresent', { fingerprint: w.key_fingerprint })
-          : t('running.keyMissing')}
-      </p>
+      {w.absent ? (
+        <Notice kind="warning" title={t('running.workerAbsentTitle')}>
+          {t('running.workerAbsent', { when: dates.moment(w.seen_at) })}
+        </Notice>
+      ) : (
+        <p role="status" className="muted">
+          {t('running.workerSeen', { when: dates.moment(w.seen_at) })}
+        </p>
+      )}
+      {w.key_present ? (
+        <p className="muted">{t('running.keyPresent', { fingerprint: w.key_fingerprint })}</p>
+      ) : (
+        <Notice kind="warning" title={t('running.keyMissingTitle')}>
+          {t('running.keyMissing')}
+        </Notice>
+      )}
     </>
   );
 }
@@ -318,7 +313,7 @@ function RestoreCheck({ data }: { data: BackupOverview }) {
     <>
       <h2>{t('running.restoreTitle')}</h2>
       {!c ? (
-        <p className="note">{t('running.restoreNone')}</p>
+        <Notice kind="info">{t('running.restoreNone')}</Notice>
       ) : c.ok ? (
         <p>
           {t('running.restoreOk', {
@@ -328,9 +323,9 @@ function RestoreCheck({ data }: { data: BackupOverview }) {
           })}
         </p>
       ) : (
-        <p role="alert" className="note note-error">
+        <Notice kind="error">
           {t('running.restoreFailed', { name: c.name, when: dates.moment(c.checked_at), message: c.message })}
-        </p>
+        </Notice>
       )}
     </>
   );
@@ -372,9 +367,9 @@ function LogCode({
   return (
     <form onSubmit={submit} className="settings-form">
       {wrongCodes > 0 && (
-        <p role="alert" className="note">
+        <Notice kind="error">
           {t('running.restoreCodeWrong', { count: Math.max(tries - wrongCodes, 0) })}
-        </p>
+        </Notice>
       )}
       <p>{t('running.restoreCodeShown')}</p>
       <pre>
@@ -456,20 +451,16 @@ function RestoreState({
     );
   }
   if (r.state === 'refused') {
-    return (
-      <p role="status" className="note">
-        {t('running.restoreRefused', { name: r.backup_name, step: r.step })}
-      </p>
-    );
+    return <Notice kind="info">{t('running.restoreRefused', { name: r.backup_name, step: r.step })}</Notice>;
   }
   if (r.state === 'failed') {
     return (
-      <div role="alert" className="note note-error">
+      <Notice kind="error">
         <p>{t('running.restoreBroke', { name: r.backup_name, step: r.step })}</p>
         <pre>
           <code>{WAY_BACK_COMMAND}</code>
         </pre>
-      </div>
+      </Notice>
     );
   }
   return <p role="status">{t('running.restoreRunning', { name: r.backup_name, step: r.step })}</p>;
@@ -516,9 +507,9 @@ function RestoreOver({ data }: { data: BackupOverview }) {
               ))}
             </select>
           </Field>
-          <p className="note">
+          <Notice kind="warning" title={t('running.restoreLossTitle')}>
             {t('running.restoreLoss', { name: chosen.name, when: dates.moment(chosen.started_at) })}
-          </p>
+          </Notice>
           <p>{t('running.restoreSafety')}</p>
           <Field label={t('running.restoreConfirmLabel', { name: data.installation_name })}>
             <input value={confirm} onChange={(e) => setConfirm(e.target.value)} autoComplete="off" />
@@ -670,7 +661,7 @@ function ConfigurationProbe({ probe }: { probe: Configuration['probe'] }) {
     return <p>{t('installation.probeOk', { when: dates.moment(probe.at) })}</p>;
   }
   return (
-    <div className="note">
+    <Notice kind="warning" title={t('installation.probeWarnedTitle')}>
       <p>{t('installation.probeWarned', { when: dates.moment(probe.at) })}</p>
       <ul>
         {probe.warnings.map((w) => (
@@ -679,7 +670,7 @@ function ConfigurationProbe({ probe }: { probe: Configuration['probe'] }) {
           </li>
         ))}
       </ul>
-    </div>
+    </Notice>
   );
 }
 
@@ -725,14 +716,14 @@ export function ConfigurationTab() {
     <>
       <p>{t('running.configIntro')}</p>
       {q.data.problems.length > 0 && (
-        <div role="alert" className="note note-error">
+        <Notice kind="error">
           <p>{t('running.configProblems')}</p>
           <ul>
             {q.data.problems.map((p) => (
               <li key={p}>{p}</li>
             ))}
           </ul>
-        </div>
+        </Notice>
       )}
       <TableBox>
         <table>
@@ -832,7 +823,7 @@ export function SessionsTab() {
         </div>
       </form>
       <h2>{t('running.everyoneTitle')}</h2>
-      <p>{t('running.endAllWarn')}</p>
+      <p className="warning-line">{t('running.endAllWarn')}</p>
       <EndEveryone onConfirm={() => end.mutate({ all: true })} />
       <p className="muted">{t('installation.incident')}</p>
       <ErrorNote error={end.error} />

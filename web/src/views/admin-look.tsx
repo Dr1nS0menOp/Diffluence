@@ -7,6 +7,7 @@ import { api } from '../api';
 import { appearanceQuery } from '../appearance';
 import { ConfirmButton, ErrorNote, Field, FilePicker } from '../components/ui';
 import { SectionForm } from './admin-rules';
+import { AppearanceSection } from './admin-appearance';
 
 const LOGO_TYPES = 'image/png,image/jpeg,image/webp';
 const BANNER_LEVELS = ['info', 'warning'];
@@ -35,7 +36,7 @@ function LogoSection() {
   });
   const remove = useMutation({ mutationFn: () => api.del('/admin/appearance/logo'), onSettled: refresh });
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('instance.logo')}</h2>
       <p className="muted">{t('instance.logoHelp')}</p>
       <ErrorNote error={set.error ?? remove.error} />
@@ -77,13 +78,12 @@ function LookForm() {
           <Field label={t('instance.instanceName')}>
             <input value={form.instance_name} onChange={(e) => set({ instance_name: e.target.value })} />
           </Field>
-          <Field label={t('instance.organisationName')}>
+          <Field label={t('instance.organisationName')} help={t('instance.organisationHelp')}>
             <input
               value={form.organisation_name ?? ''}
               onChange={(e) => set({ organisation_name: e.target.value })}
             />
           </Field>
-          <p className="muted">{t('instance.organisationHelp')}</p>
           <h3>{t('instance.accent')}</h3>
           <p className="muted">{t('instance.accentHelp')}</p>
           <ColourField
@@ -106,7 +106,25 @@ function LookForm() {
           <Field label={t('instance.termsUrl')}>
             <input type="url" value={form.terms_url} onChange={(e) => set({ terms_url: e.target.value })} />
           </Field>
-          <h3>{t('instance.banner')}</h3>
+          <Field label={t('instance.welcomePage')} help={t('instance.welcomePageHelp')}>
+            <input value={form.welcome_page} onChange={(e) => set({ welcome_page: e.target.value })} />
+          </Field>
+        </>
+      )}
+    </SectionForm>
+  );
+}
+
+/**
+ * Announcements (ADM-069): the banner everyone sees, which is part of the settings of the look.
+ * The form loads the section fresh and saves it whole, as the look's own form does (D17).
+ */
+export function AnnouncementsTab() {
+  const { t } = useTranslation();
+  return (
+    <SectionForm<Look> section="look" title={t('instance.banner')} intro={t('instance.bannerHelp')}>
+      {(form, set) => (
+        <>
           <Field label={t('instance.bannerText')}>
             <input value={form.banner_text} onChange={(e) => set({ banner_text: e.target.value })} />
           </Field>
@@ -131,9 +149,6 @@ function LookForm() {
               }
             />
           </Field>
-          <Field label={t('instance.welcomePage')} help={t('instance.welcomePageHelp')}>
-            <input value={form.welcome_page} onChange={(e) => set({ welcome_page: e.target.value })} />
-          </Field>
         </>
       )}
     </SectionForm>
@@ -154,9 +169,11 @@ export function LookTab() {
     <>
       <LogoSection />
       <LookForm />
-      <section>
+      <AppearanceSection />
+      <section className="settings-unit">
         <h2>{t('instance.reset')}</h2>
         <p className="muted">{t('instance.resetHelp')}</p>
+        <p className="warning-line">{t('instance.resetWarning')}</p>
         <ErrorNote error={reset.error} />
         <ConfirmButton
           label={t('instance.reset')}

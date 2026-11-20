@@ -13,9 +13,15 @@ export const DOCUMENTATION_ADDRESS = 'https://github.com/Dr1nS0menOp/Diffluence/
 
 const MARK_SIZE = 14;
 
-export function GuideLink({ children }: { children: ReactNode }) {
+/** Where a part of the documentation lives: under the address set, or ours, at its path. */
+export function guideAddress(base: string, path?: string): string {
+  if (!path) return base;
+  return `${base.replace(/\/+$/, '')}/${path.replace(/^\/+/, '')}`;
+}
+
+export function GuideLink({ children, path }: { children: ReactNode; path?: string }) {
   const { t } = useTranslation();
-  const address = useQuery(appearanceQuery).data?.help_url || DOCUMENTATION_ADDRESS;
+  const address = guideAddress(useQuery(appearanceQuery).data?.help_url || DOCUMENTATION_ADDRESS, path);
   return (
     <a className="guide-link" href={address} target="_blank" rel="noopener noreferrer">
       {children}

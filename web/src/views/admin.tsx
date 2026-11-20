@@ -12,33 +12,32 @@ import {
   type Me,
   type ResetLink,
   type Space,
-  type TrashItem,
   type UserDetail,
 } from '../api';
 import { Link, navigate, useLocation } from '../router';
 import { PersonName } from '../components/person';
 import { SubjectPicker } from '../components/picker';
-import { ConfirmButton, Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
+import { Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { useDates } from '../dates';
-import { AppearanceSection } from './admin-appearance';
+import { useCapabilities } from '../capabilities';
 import { AnalyticsTab, InsightsTab, OutgoingTab } from './admin-platform';
 import { RuleList } from './rules';
 import { WebhookList } from './webhooks';
-import { OrganisingTab, TemplatesTab } from './admin-organising';
+import { OrganisingTab, SpaceDefaultsTab, TemplatesTab } from './admin-organising';
 import { CareTab } from './admin-care';
-import { ExportTab } from './exchange';
-import { LookTab } from './admin-look';
+import { ExportTab, ImportSpaceTab } from './exchange';
+import { AnnouncementsTab, LookTab } from './admin-look';
 import {
   AnonymiseButton,
   BulkBar,
   ExpiryField,
   InvitationsTab,
+  NameDialog,
   ServiceAccounts,
   TypeChange,
 } from './admin-people';
-import { PermissionsTab, RulesTab } from './admin-rules';
-import { StorageLimitDialog } from './admin-storage';
-import { matchesSpaceFilter, NO_SPACE_FILTER, QUIET_MONTHS, type SpaceFilter } from './admin-space-filter';
+import { InstancePermissionsTab, LoginTab, PermissionsTab, RulesTab } from './admin-rules';
+import { SpacesTab, SpacesTrashTab } from './admin-spaces';
 import { SettingsSearch, SummaryTab } from './admin-summary';
 import { HealthBand, HealthChecks } from './admin-health';
 import { BackupsTab, ConfigurationTab, SessionsTab } from './admin-running';
@@ -50,65 +49,23 @@ import {
   MonitoringFiles,
   UpgradesTab,
 } from './admin-installation';
-import { SettingsFrame } from '../components/settings-frame';
+import { SettingsFrame, type SettingsGroup } from '../components/settings-frame';
+import { SettingsSection, SectionActions } from '../components/settings-section';
+import { EmptyState } from '../components/empty-state';
+import { Notice } from '../components/notice';
+import { differs, SaveReset } from '../components/save-reset';
 import { ControlTab } from './admin-control';
-import { TableBox } from '../components/table-box';
+import { TableBox, TableEmpty } from '../components/table-box';
 import { pageTitle } from '../page-name';
+import {
+  ADMIN_GROUPS,
+  adminSection,
+  sectionIntroKey,
+  sectionNameKey,
+  sectionsShown,
+  type AdminSection,
+} from './admin-sections';
 
-const TABS = [
-  'summary',
-  'users',
-  'invitations',
-  'groups',
-  'spaces',
-  'templates',
-  'organising',
-  'control',
-  'export',
-  'audit',
-  'permissions',
-  'rules',
-  'look',
-  'settings',
-  'mail',
-  'care',
-  'scim',
-  'system',
-  'backups',
-  'upgrades',
-  'events',
-  'configuration',
-  'sessions',
-  'insights',
-  'analytics',
-  'automation',
-  'outgoing',
-  'webhooks',
-] as const;
-/** The administration in categories (ADR-034). Every tab sits in exactly one. */
-const ADMIN_GROUPS: { id: string; tabs: (typeof TABS)[number][] }[] = [
-  { id: 'overview', tabs: ['summary'] },
-  { id: 'people', tabs: ['users', 'invitations', 'groups', 'permissions', 'scim', 'sessions'] },
-  { id: 'content', tabs: ['spaces', 'templates', 'organising', 'control', 'rules', 'export'] },
-  { id: 'automation', tabs: ['automation', 'webhooks', 'outgoing'] },
-  { id: 'look', tabs: ['look'] },
-  {
-    id: 'system',
-    tabs: [
-      'system',
-      'backups',
-      'upgrades',
-      'configuration',
-      'care',
-      'settings',
-      'mail',
-      'audit',
-      'events',
-      'insights',
-      'analytics',
-    ],
-  },
-];
 const USER_FILTERS = ['type', 'status', 'source', 'role', 'space_id', 'group_id', 'idle_days'] as const;
 /** The global permissions the server can filter people on. */
 const USER_ROLES = ['administrator', 'system_administrator', 'create_space', 'invite_people'];
@@ -127,6 +84,8 @@ const AUDIT_FILTERS = [
   'until',
 ] as const;
 const SYSTEM_POLL_MS = 10_000;
+const USER_COLUMNS = 7;
+const AUDIT_COLUMNS = 6;
 const DATE_LENGTH = 10;
 const MAIL_SWITCHES = ['mail_enabled', 'mail_excerpts', 'reactions_enabled', 'group_mentions'] as const;
 
@@ -315,11 +274,11 @@ function UserDialog({ user, onClose }: { user: UserDetail; onClose: () => void }
         </div>
       )}
       {reset.data && (
-        <p role="status" className="note">
+        <Notice kind="info">
           {reset.data.mailed
             ? t('admin.resetLinkMailed')
             : t('admin.resetLinkOnce', { link: reset.data.link })}
-        </p>
+        </Notice>
       )}
     </Dialog>
   );
@@ -529,6 +488,7 @@ function UserTable({
           </tr>
         </thead>
         <tbody>
+          {users.length === 0 && <TableEmpty columns={USER_COLUMNS}>{t('admin.usersNoneFit')}</TableEmpty>}
           {users.map((u) => (
             <tr key={u.id}>
               <td>
@@ -584,6 +544,11 @@ function UsersTab() {
     setPicked(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
   return (
     <>
+      <SectionActions>
+        <button type="button" className="primary" onClick={() => setAdding(true)}>
+          {t('admin.newUser')}
+        </button>
+      </SectionActions>
       <div className="row">
         <input
           type="search"
@@ -592,9 +557,6 @@ function UsersTab() {
           aria-label={t('common.search')}
           placeholder={t('common.search')}
         />
-        <button type="button" className="primary" onClick={() => setAdding(true)}>
-          {t('admin.newUser')}
-        </button>
       </div>
       <UserFilters values={values} set={set} />
       <ErrorNote error={q.error} />
@@ -607,8 +569,8 @@ function UsersTab() {
           }}
         />
       )}
-      <UserTable users={q.data?.users ?? []} picked={picked} onToggle={toggle} onOpen={setOpen} />
-      <ServiceAccounts />
+      {q.isPending && <Loading />}
+      {q.data && <UserTable users={q.data.users} picked={picked} onToggle={toggle} onOpen={setOpen} />}
       {adding && <NewUserDialog onClose={() => setAdding(false)} />}
       {selected && <UserDialog user={selected} onClose={() => setOpen(null)} />}
     </>
@@ -640,9 +602,7 @@ function GroupDeleteDialog({
         <>
           <p>{t('admin.groupSpaces', { list: q.data.spaces.join(', ') || '-' })}</p>
           <p>{t('admin.groupRestrictions', { count: q.data.restrictions })}</p>
-          {q.data.leaves_space_without_admin && (
-            <p className="note note-error">{t('admin.groupLastAdmin')}</p>
-          )}
+          {q.data.leaves_space_without_admin && <Notice kind="error">{t('admin.groupLastAdmin')}</Notice>}
         </>
       )}
       <div className="dialog-actions">
@@ -711,7 +671,7 @@ function GroupDialog({ group, onClose }: { group: Group; onClose: () => void }) 
   const managed = group.source !== 'local';
   return (
     <Dialog title={group.name} onClose={onClose}>
-      {managed && <p className="note">{t('admin.managed')}</p>}
+      {managed && <Notice kind="info">{t('admin.managed')}</Notice>}
       <ErrorNote error={add.error ?? remove.error ?? save.error ?? del.error ?? saveOwners.error} />
       <h3>{t('admin.members')}</h3>
       <ul className="plain-list">
@@ -757,44 +717,33 @@ function GroupDialog({ group, onClose }: { group: Group; onClose: () => void }) 
 function GroupsTab() {
   const { t } = useTranslation();
   const client = useQueryClient();
-  const [name, setName] = useState('');
+  const [creating, setCreating] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ['admin-groups'],
     queryFn: () => api.get<{ groups: Group[] }>('/admin/groups'),
   });
   const create = useMutation({
-    mutationFn: () => api.post('/admin/groups', { name }),
+    mutationFn: (name: string) => api.post('/admin/groups', { name }),
     onSuccess: async () => {
-      setName('');
+      setCreating(false);
       await client.invalidateQueries({ queryKey: ['admin-groups'] });
     },
   });
   const selected = q.data?.groups.find((g) => g.id === open);
+  const isEmpty = q.data?.groups.length === 0;
+  const newGroup = (
+    <button type="button" className="primary" onClick={() => setCreating(true)}>
+      {t('admin.newGroup')}
+    </button>
+  );
   return (
     <>
-      <form
-        className="row"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          create.mutate();
-        }}
-      >
-        <input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          aria-label={t('admin.newGroup')}
-          placeholder={t('admin.newGroup')}
-          required
-        />
-        <button type="submit" className="primary">
-          {t('common.create')}
-        </button>
-      </form>
-      <ErrorNote error={q.error ?? create.error} />
-      {q.data?.groups.length === 0 ? (
-        <p className="muted">{t('admin.noGroups')}</p>
-      ) : (
+      {/* While there is no group, the empty block holds the one button that makes the first (NAV-173). */}
+      {q.data && !isEmpty && <SectionActions>{newGroup}</SectionActions>}
+      <ErrorNote error={q.error} />
+      {q.isPending && <Loading />}
+      {q.data && (
         <TableBox>
           <table>
             <thead>
@@ -805,7 +754,7 @@ function GroupsTab() {
               </tr>
             </thead>
             <tbody>
-              {q.data?.groups.map((g) => (
+              {q.data.groups.map((g) => (
                 <tr key={g.id}>
                   <td>
                     <button type="button" className="ghost" onClick={() => setOpen(g.id)}>
@@ -820,203 +769,22 @@ function GroupsTab() {
           </table>
         </TableBox>
       )}
+      {/* An empty table keeps its heading row, with the block of NAV-173 in place of its rows. */}
+      {isEmpty && (
+        <EmptyState title={t('admin.groupsEmptyTitle')} action={newGroup}>
+          {t('admin.groupsEmptyText')}
+        </EmptyState>
+      )}
       {selected && <GroupDialog group={selected} onClose={() => setOpen(null)} />}
-    </>
-  );
-}
-
-interface SpaceTotal {
-  id: string;
-  pages: number;
-  bytes: number;
-  last_activity: string | null;
-  limit_mib: number;
-}
-
-const MEBIBYTE = 1 << 20;
-
-function SpacesTab() {
-  const { t } = useTranslation();
-  const dates = useDates();
-  const client = useQueryClient();
-  const q = useQuery({
-    queryKey: ['admin-spaces'],
-    queryFn: () => api.get<{ spaces: Space[]; totals: SpaceTotal[] }>('/admin/spaces'),
-  });
-  const trashed = useQuery({
-    queryKey: ['admin-trash'],
-    queryFn: () => api.get<{ items: TrashItem[] }>('/admin/trash/spaces'),
-  });
-  const [recovering, setRecovering] = useState<Space | null>(null);
-  const [limiting, setLimiting] = useState<Space | null>(null);
-  const [reason, setReason] = useState('');
-  const recover = useMutation({
-    mutationFn: () => api.post(`/admin/spaces/${recovering?.id}/recover`, { reason }),
-    onSuccess: async () => {
-      setRecovering(null);
-      setReason('');
-      await client.invalidateQueries({ queryKey: ['spaces'] });
-    },
-  });
-  const refresh = async () => {
-    await client.invalidateQueries({ queryKey: ['admin-trash'] });
-    await client.invalidateQueries({ queryKey: ['admin-spaces'] });
-  };
-  const restore = useMutation({
-    mutationFn: (id: string) => api.post(`/trash/${id}/restore`),
-    onSettled: refresh,
-  });
-  const purge = useMutation({ mutationFn: (id: string) => api.del(`/trash/${id}`), onSettled: refresh });
-  const [filter, setFilter] = useState<SpaceFilter>(NO_SPACE_FILTER);
-  const now = new Date();
-  const shown = (q.data?.spaces ?? []).filter((s) => {
-    const total = q.data?.totals.find((row) => row.id === s.id);
-    return matchesSpaceFilter(
-      {
-        name: s.name,
-        key: s.key,
-        pages: total?.pages ?? 0,
-        bytes: total?.bytes ?? 0,
-        lastActivity: total?.last_activity ?? null,
-      },
-      filter,
-      now,
-    );
-  });
-  const count = (raw: string) => Math.max(0, Number.parseInt(raw, 10) || 0);
-  return (
-    <>
-      <ErrorNote error={q.error ?? restore.error ?? purge.error} />
-      <div className="row">
-        <input
-          type="search"
-          value={filter.text}
-          onChange={(e) => setFilter({ ...filter, text: e.target.value })}
-          aria-label={t('admin.spaceFind')}
-          placeholder={t('admin.spaceFind')}
+      {creating && (
+        <NameDialog
+          title={t('admin.newGroup')}
+          label={t('common.name')}
+          error={create.error}
+          busy={create.isPending}
+          onCreate={(name) => create.mutate(name)}
+          onClose={() => setCreating(false)}
         />
-        <input
-          type="number"
-          min={0}
-          value={filter.minPages || ''}
-          onChange={(e) => setFilter({ ...filter, minPages: count(e.target.value) })}
-          aria-label={t('admin.spaceMinPages')}
-          placeholder={t('admin.spaceMinPages')}
-        />
-        <input
-          type="number"
-          min={0}
-          value={filter.minMiB || ''}
-          onChange={(e) => setFilter({ ...filter, minMiB: count(e.target.value) })}
-          aria-label={t('admin.spaceMinMiB')}
-          placeholder={t('admin.spaceMinMiB')}
-        />
-        <select
-          aria-label={t('admin.spaceQuiet')}
-          value={filter.quietMonths}
-          onChange={(e) => setFilter({ ...filter, quietMonths: Number(e.target.value) })}
-        >
-          {QUIET_MONTHS.map((m) => (
-            <option key={m} value={m}>
-              {m === 0
-                ? `${t('admin.spaceQuiet')}: ${t('admin.any')}`
-                : t('admin.spaceQuietFor', { count: m })}
-            </option>
-          ))}
-        </select>
-      </div>
-      {q.data && shown.length === 0 && <p className="muted">{t('admin.spaceNoneFit')}</p>}
-      <TableBox>
-        <table>
-          <thead>
-            <tr>
-              <th>{t('common.name')}</th>
-              <th>{t('space.key')}</th>
-              <th>{t('common.status')}</th>
-              <th>{t('admin.spacePages')}</th>
-              <th>{t('admin.spaceStorage')}</th>
-              <th>{t('admin.spaceActivity')}</th>
-              <th>{t('common.actions')}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {shown.map((s) => {
-              const total = q.data?.totals.find((row) => row.id === s.id);
-              return (
-                <tr key={s.id}>
-                  <td>
-                    <Link href={`/spaces/${s.key}`}>{s.name}</Link>
-                  </td>
-                  <td>{s.key}</td>
-                  <td>{s.status}</td>
-                  <td>{total?.pages ?? 0}</td>
-                  <td>
-                    {formatSize(total?.bytes ?? 0)}
-                    {total?.limit_mib ? ` / ${formatSize(total.limit_mib * MEBIBYTE)}` : ''}
-                  </td>
-                  <td>{total?.last_activity ? dates.moment(total.last_activity) : ''}</td>
-                  <td className="row">
-                    <button type="button" className="ghost" onClick={() => setLimiting(s)}>
-                      {t('admin.storageLimit')}
-                    </button>
-                    <button type="button" className="ghost" onClick={() => setRecovering(s)}>
-                      {t('admin.recover')}
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </TableBox>
-      {(trashed.data?.items.length ?? 0) > 0 && (
-        <>
-          <h2>{t('admin.trashedSpaces')}</h2>
-          <ul className="plain-list">
-            {trashed.data?.items.map((i) => (
-              <li key={i.id} className="row">
-                {i.title} <span className="muted">{dates.moment(i.purge_after)}</span>
-                <button type="button" onClick={() => restore.mutate(i.id)}>
-                  {t('trash.restore')}
-                </button>
-                <ConfirmButton
-                  label={t('trash.purge')}
-                  message={t('trash.confirmPurge')}
-                  className="danger"
-                  onConfirm={() => purge.mutate(i.id)}
-                />
-              </li>
-            ))}
-          </ul>
-        </>
-      )}
-      {limiting && (
-        <StorageLimitDialog
-          space={limiting}
-          limitMiB={q.data?.totals.find((row) => row.id === limiting.id)?.limit_mib ?? 0}
-          onClose={() => setLimiting(null)}
-        />
-      )}
-      {recovering && (
-        <Dialog title={t('admin.recover')} onClose={() => setRecovering(null)}>
-          <p>{t('admin.recoverHelp')}</p>
-          <form
-            onSubmit={(e: FormEvent) => {
-              e.preventDefault();
-              recover.mutate();
-            }}
-          >
-            <ErrorNote error={recover.error} />
-            <Field label={t('admin.reason')}>
-              <input value={reason} onChange={(e) => setReason(e.target.value)} required autoFocus />
-            </Field>
-            <div className="dialog-actions">
-              <button type="submit" className="primary">
-                {t('admin.recover')}
-              </button>
-            </div>
-          </form>
-        </Dialog>
       )}
     </>
   );
@@ -1149,11 +917,11 @@ function AuditTab() {
       </div>
       <ErrorNote error={q.error ?? verify.error} />
       {verify.data && (
-        <p role="status" className={verify.data.ok ? 'note' : 'note note-error'}>
+        <Notice kind={verify.data.ok ? 'info' : 'error'}>
           {verify.data.ok
             ? t('admin.verifyOk', { checked: verify.data.checked })
             : t('admin.verifyBad', { seq: verify.data.first_bad_seq, reason: verify.data.reason })}
-        </p>
+        </Notice>
       )}
       <AuditSignatures />
       <TableBox>
@@ -1169,6 +937,9 @@ function AuditTab() {
             </tr>
           </thead>
           <tbody>
+            {q.data?.events.length === 0 && (
+              <TableEmpty columns={AUDIT_COLUMNS}>{t('admin.auditNoneFit')}</TableEmpty>
+            )}
             {q.data?.events.map((e) => (
               <tr key={e.id}>
                 <td>
@@ -1218,49 +989,57 @@ function ExampleSpaceSection() {
     },
   });
   return (
-    <>
+    <section className="settings-unit">
       <h2>{t('admin.exampleTitle')}</h2>
       <p className="muted">{t('admin.exampleHelp')}</p>
       <ErrorNote error={add.error} />
       <button type="button" disabled={add.isPending} onClick={() => add.mutate()}>
         {t('admin.exampleAdd')}
       </button>
-    </>
+    </section>
   );
 }
 
+/** The fields of the general settings this form shows; the section holds more, such as mail. */
+const pickGeneral = (s: Settings): Settings => ({
+  trash_retention_days: s.trash_retention_days,
+  max_upload_mib: s.max_upload_mib,
+  blocked_file_types: s.blocked_file_types,
+});
+
+/** General (the section `settings`): limits on the trash and on files, and the health of the disk. */
 function SettingsTab({ me }: { me: Me }) {
   const { t } = useTranslation();
+  const client = useQueryClient();
   const q = useQuery({ queryKey: ['settings'], queryFn: () => api.get<Settings>('/admin/settings') });
-  const system = useQuery({
-    queryKey: ['system'],
-    queryFn: () => api.get<{ oidc_configured: boolean }>('/admin/system'),
-  });
   const [form, setForm] = useState<Settings | null>(null);
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    if (q.data) setForm(q.data);
+    if (q.data) setForm(pickGeneral(q.data));
   }, [q.data]);
   const save = useMutation({
     mutationFn: () => api.put('/admin/settings', form),
-    onSuccess: () => setSaved(true),
+    onSuccess: async () => {
+      setSaved(true);
+      await client.invalidateQueries({ queryKey: ['settings'] });
+    },
   });
-  if (!form) return <Loading />;
+  if (q.error) return <ErrorNote error={q.error} />;
+  if (!form || !q.data) return <Loading />;
+  const stored = pickGeneral(q.data);
   return (
     <>
       <form
+        className="settings-unit"
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
           setSaved(false);
           save.mutate();
         }}
       >
+        <h2>{t('admin.limitsTitle')}</h2>
         <ErrorNote error={save.error} />
-        {saved && (
-          <p role="status" className="note">
-            {t('admin.saved')}
-          </p>
-        )}
+        {saved && <Notice kind="info">{t('admin.saved')}</Notice>}
         <Field label={t('admin.retention')}>
           <input
             type="number"
@@ -1285,16 +1064,10 @@ function SettingsTab({ me }: { me: Me }) {
             onChange={(e) => setForm({ ...form, blocked_file_types: e.target.value.split(',') })}
           />
         </Field>
-        <button type="submit" className="primary">
-          {t('common.save')}
-        </button>
+        <SaveReset changed={differs(stored, form)} busy={save.isPending} onReset={() => setForm(stored)} />
       </form>
       <DiskThresholds isSystem={me.global_permissions.includes('system_administrator')} />
-      <AppearanceSection />
       <ExampleSpaceSection />
-      <h2>{t('admin.authTitle')}</h2>
-      <p className="muted">{t('admin.authHelp')}</p>
-      <p>{system.data?.oidc_configured ? t('admin.oidcOn') : t('admin.oidcOff')}</p>
     </>
   );
 }
@@ -1333,6 +1106,43 @@ function MailQueue({ entries }: { entries: MailEntry[] }) {
   );
 }
 
+const pickMail = (s: MailSettings): MailSettings =>
+  Object.fromEntries(MAIL_SWITCHES.map((name) => [name, s[name]])) as MailSettings;
+
+/** What the instance sends by mail: one unit that saves apart (NAV-163). */
+function MailSwitches({ stored }: { stored: MailSettings }) {
+  const { t } = useTranslation();
+  const client = useQueryClient();
+  const [form, setForm] = useState(stored);
+  const save = useMutation({
+    mutationFn: () => api.put('/admin/settings', form),
+    onSuccess: () => client.invalidateQueries({ queryKey: ['settings'] }),
+  });
+  return (
+    <form
+      className="settings-unit"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <h2>{t('admin.mailSwitches')}</h2>
+      <ErrorNote error={save.error} />
+      {MAIL_SWITCHES.map((name) => (
+        <label key={name} className="check">
+          <input
+            type="checkbox"
+            checked={form[name]}
+            onChange={(e) => setForm({ ...form, [name]: e.target.checked })}
+          />
+          {t(`admin.${name}`)}
+        </label>
+      ))}
+      <SaveReset changed={differs(stored, form)} busy={save.isPending} onReset={() => setForm(stored)} />
+    </form>
+  );
+}
+
 function MailTab() {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -1344,41 +1154,32 @@ function MailTab() {
     queryKey: ['mail-queue'],
     queryFn: () => api.get<{ configured: boolean; queue: MailEntry[] }>('/admin/mail'),
   });
-  const save = useMutation({
-    mutationFn: (change: Partial<MailSettings>) => api.put('/admin/settings', change),
-    onSettled: () => client.invalidateQueries({ queryKey: ['settings'] }),
-  });
   const test = useMutation({
     mutationFn: () => api.post('/admin/mail/test'),
     onSettled: () => client.invalidateQueries({ queryKey: ['mail-queue'] }),
   });
   if (settings.error || mail.error) return <ErrorNote error={settings.error ?? mail.error} />;
   if (!settings.data || !mail.data) return <Loading />;
-  const current = settings.data;
+  const stored = pickMail(settings.data);
   return (
     <>
-      <ErrorNote error={save.error ?? test.error} />
-      {!mail.data.configured && <p className="note">{t('admin.mailOff')}</p>}
-      {MAIL_SWITCHES.map((name) => (
-        <label key={name} className="check">
-          <input
-            type="checkbox"
-            checked={current[name]}
-            onChange={(e) => save.mutate({ [name]: e.target.checked })}
-          />
-          {t(`admin.${name}`)}
-        </label>
-      ))}
-      <button type="button" disabled={!mail.data.configured} onClick={() => test.mutate()}>
-        {t('admin.mailTest')}
-      </button>
-      {test.isSuccess && (
-        <p role="status" className="note">
-          {t('admin.mailTestQueued')}
-        </p>
+      {!mail.data.configured && (
+        <Notice kind="warning" title={t('admin.mailOffTitle')}>
+          {t('admin.mailOff')}
+        </Notice>
       )}
-      <h2>{t('admin.mailQueue')}</h2>
-      <MailQueue entries={mail.data.queue} />
+      <MailSwitches key={JSON.stringify(stored)} stored={stored} />
+      <section className="settings-unit">
+        <h2>{t('admin.mailQueue')}</h2>
+        <ErrorNote error={test.error} />
+        <p>
+          <button type="button" disabled={!mail.data.configured} onClick={() => test.mutate()}>
+            {t('admin.mailTest')}
+          </button>
+        </p>
+        {test.isSuccess && <Notice kind="info">{t('admin.mailTestQueued')}</Notice>}
+        <MailQueue entries={mail.data.queue} />
+      </section>
     </>
   );
 }
@@ -1597,58 +1398,130 @@ function SystemTab({ me }: { me: Me }) {
   );
 }
 
+/** The content of one section, by its id. Every part calls the routes it called before the move. */
+function SectionContent({ id, me }: { id: string; me: Me }) {
+  switch (id) {
+    case 'summary':
+      return <SummaryTab />;
+    case 'insights':
+      return <InsightsTab />;
+    case 'analytics':
+      return <AnalyticsTab />;
+    case 'audit':
+      return <AuditTab />;
+    case 'system':
+      return <SystemTab me={me} />;
+    case 'events':
+      return <EventsTab />;
+    case 'upgrades':
+      return <UpgradesTab />;
+    case 'configuration':
+      return <ConfigurationTab />;
+    case 'automation':
+      return <RuleList spaceId={null} />;
+    case 'spaces':
+      return <SpacesTab />;
+    case 'announcements':
+      return <AnnouncementsTab />;
+    case 'users':
+      return <UsersTab />;
+    case 'groups':
+      return <GroupsTab />;
+    case 'invitations':
+      return <InvitationsTab />;
+    case 'service-accounts':
+      return <ServiceAccounts />;
+    case 'settings':
+      return <SettingsTab me={me} />;
+    case 'rules':
+      return <RulesTab me={me} />;
+    case 'organising':
+      return <OrganisingTab />;
+    case 'mail':
+      return <MailTab />;
+    case 'templates':
+      return <TemplatesTab />;
+    case 'control':
+      return <ControlTab />;
+    case 'login':
+      return <LoginTab me={me} />;
+    case 'sessions':
+      return <SessionsTab />;
+    case 'scim':
+      return <ScimTab />;
+    case 'export':
+      return <ExportTab />;
+    case 'outgoing':
+      return <OutgoingTab />;
+    case 'instance-permissions':
+      return <InstancePermissionsTab />;
+    case 'permissions':
+      return <PermissionsTab />;
+    case 'space-defaults':
+      return <SpaceDefaultsTab />;
+    case 'look':
+      return <LookTab />;
+    case 'care':
+      return <CareTab me={me} />;
+    case 'backups':
+      return <BackupsTab me={me} />;
+    case 'import-space':
+      return <ImportSpaceTab />;
+    case 'spaces-trash':
+      return <SpacesTrashTab />;
+    case 'webhooks':
+      return <WebhookList path="/admin/webhooks" />;
+    default:
+      return null;
+  }
+}
+
 export function AdminView({ tab, me }: { tab: string; me: Me }) {
   const { t } = useTranslation();
-  const isKnownTab = TABS.some((name) => name === tab);
-  if (!me.global_permissions.includes('administrator') || !isKnownTab) {
+  const capabilities = useCapabilities();
+  const section = adminSection(tab);
+  // The server refuses every route of the administration to anyone else; this only spares a
+  // person a broken screen. An unknown address is not found either.
+  if (!me.global_permissions.includes('administrator') || !section) {
     return (
       <main id="main" className="plain reading">
         <p role="alert">{t('app.notFound')}</p>
       </main>
     );
   }
+  const shown = sectionsShown(capabilities);
+  const entry = (s: AdminSection) => ({
+    id: s.id,
+    label: t(sectionNameKey(s.id)),
+    href: `/admin/${s.id}`,
+    icon: s.icon,
+    mark: s.experimental ? t('adminFrame.experimental') : undefined,
+  });
+  const groupsOf = (tier: 'tool' | 'settings'): SettingsGroup[] =>
+    ADMIN_GROUPS.filter((group) => group.tier === tier).map((group) => ({
+      id: group.id,
+      title: t(`adminGroups.${group.id}`),
+      items: shown.filter((s) => s.group === group.id).map(entry),
+    }));
   return (
     <SettingsFrame
       title={t('admin.title')}
-      head={<p className="settings-title">{t('admin.title')}</p>}
-      search={<SettingsSearch />}
-      groups={ADMIN_GROUPS.map((group) => ({
-        id: group.id,
-        title: t(`admin.group_${group.id}`),
-        items: group.tabs.map((name) => ({ id: name, label: t(`admin.${name}`), href: `/admin/${name}` })),
-      }))}
-      current={tab}
+      back={{ href: '/', label: t('adminFrame.back') }}
+      search={<SettingsSearch shown={shown} />}
+      tools={groupsOf('tool')}
+      settingsTitle={t('adminFrame.settings')}
+      groups={groupsOf('settings')}
+      current={section.id}
+      width={section.width}
     >
-      <h1>{t(`admin.${TABS.find((name) => name === tab) ?? 'title'}`)}</h1>
-      <HealthBand />
-      {tab === 'summary' && <SummaryTab />}
-      {tab === 'users' && <UsersTab />}
-      {tab === 'invitations' && <InvitationsTab />}
-      {tab === 'permissions' && <PermissionsTab />}
-      {tab === 'rules' && <RulesTab me={me} />}
-      {tab === 'look' && <LookTab />}
-      {tab === 'care' && <CareTab me={me} />}
-      {tab === 'groups' && <GroupsTab />}
-      {tab === 'spaces' && <SpacesTab />}
-      {tab === 'templates' && <TemplatesTab />}
-      {tab === 'organising' && <OrganisingTab />}
-      {tab === 'control' && <ControlTab />}
-      {tab === 'export' && <ExportTab />}
-      {tab === 'audit' && <AuditTab />}
-      {tab === 'settings' && <SettingsTab me={me} />}
-      {tab === 'mail' && <MailTab />}
-      {tab === 'scim' && <ScimTab />}
-      {tab === 'system' && <SystemTab me={me} />}
-      {tab === 'backups' && <BackupsTab me={me} />}
-      {tab === 'upgrades' && <UpgradesTab />}
-      {tab === 'events' && <EventsTab />}
-      {tab === 'configuration' && <ConfigurationTab />}
-      {tab === 'sessions' && <SessionsTab />}
-      {tab === 'insights' && <InsightsTab />}
-      {tab === 'analytics' && <AnalyticsTab />}
-      {tab === 'automation' && <RuleList spaceId={null} />}
-      {tab === 'outgoing' && <OutgoingTab />}
-      {tab === 'webhooks' && <WebhookList path="/admin/webhooks" />}
+      <SettingsSection
+        title={t(sectionNameKey(section.id))}
+        intro={t(sectionIntroKey(section.id))}
+        doc={section.doc}
+        notices={<HealthBand />}
+      >
+        <SectionContent id={section.id} me={me} />
+      </SettingsSection>
     </SettingsFrame>
   );
 }

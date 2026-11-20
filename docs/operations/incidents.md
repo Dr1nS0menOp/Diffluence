@@ -15,18 +15,18 @@ Written for the operator of an instance. Do the steps in this order, and write d
 | `master.key` | Data directory, or `DIFFLUENCE_MASTER_KEY_FILE` | `diffluence key add`, then `promote`, `reseal`, `check` and `retire`. See [backup and restore](backup-restore.md#replace-it). It runs while people work |
 | Database passwords | `secrets/` | Change the role's password in PostgreSQL, update the file, restart |
 | OIDC client secret | `DIFFLUENCE_OIDC_CLIENT_SECRET` | Make a new one at the provider, set it, restart, then remove the old one there |
-| SCIM tokens | Administration, Provisioning | Make a new token, set it at the provider, revoke the old one |
+| SCIM tokens | Administration, Security, Provisioning | Make a new token, set it at the provider, revoke the old one |
 | Personal API tokens | Each person's account | Revoke them in Administration, Users, or ask people to |
 | Mail password | `DIFFLUENCE_SMTP_PASSWORD` | Change it at the mail server, set it, restart |
 | Helper secrets | `DIFFLUENCE_PDF_PASSWORD`, `DIFFLUENCE_COLLAB_TOKEN` | Set a new value for both sides, restart both |
-| Webhook secrets | Administration, Webhooks | Rotate per endpoint: both signatures go out for a day |
+| Webhook secrets | Administration, Data, Webhooks | Rotate per endpoint: both signatures go out for a day |
 | Metrics token | `DIFFLUENCE_METRICS_TOKEN` | Set a new one for Diffluence and the scraper |
 
 Replace a secret on a schedule as well, not only after an incident: at least once a year, and whenever someone who knew it leaves.
 
 ## 3. Find out what happened
 
-- **The audit log** shows who did what, and its chain shows whether it was changed: run `diffluence audit verify --witness` with the application log your log server kept, so a removed tail shows too; Administration, Audit shows the newest comparison reported with `--report` ([install.md](install.md#a-copy-of-the-audit-log-outside-the-database)).
+- **The audit log** shows who did what, and its chain shows whether it was changed: run `diffluence audit verify --witness` with the application log your log server kept, so a removed tail shows too; Administration, Audit log shows the newest comparison reported with `--report` ([install.md](install.md#a-copy-of-the-audit-log-outside-the-database)).
 - **Password login stopped for someone** after 100 wrong passwords in a row: the audit log has `auth.password_locked`, and the failed logins before it show from which addresses.
 - **Refused requests and failed logins** are audit events too. Filter on them for the time in question.
 - **The request log** of the server holds addresses and times, never tokens or passwords.

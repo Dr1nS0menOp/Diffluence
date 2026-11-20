@@ -472,10 +472,10 @@ test('the console opens on a summary, and finds a setting by name', async ({ pag
   await expect(page.getByRole('term').filter({ hasText: 'Pages' })).toBeVisible();
   await page.getByPlaceholder('Find a setting').fill('idle');
   await page.getByRole('button', { name: /idle minutes/ }).click();
-  await expect(page).toHaveURL(/\/admin\/rules$/);
+  await expect(page).toHaveURL(/\/admin\/login$/);
   await expect(page.getByLabel(/idle minutes/)).toBeVisible();
   await checkAccessibility(page);
-  await page.goto('/admin/permissions');
+  await page.goto('/admin/instance-permissions');
   await expect(page.getByRole('heading', { name: 'Who holds what' })).toBeVisible();
   await checkAccessibility(page);
   await page.goto('/admin/care');

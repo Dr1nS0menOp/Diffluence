@@ -11,6 +11,7 @@ import {
   adminRequest,
   checkAccessibility,
   createNamedUser,
+  createUser,
   EDITOR,
   editorSettled,
   expect,
@@ -23,6 +24,7 @@ import {
   signer,
   test,
   totpCode,
+  unique,
   pageMenu,
   openRestrictions,
 } from './helpers';
@@ -601,7 +603,7 @@ test.describe('the look of every kind of screen', () => {
   test('AdminView: the admin console', async ({ page }) => {
     await login(page, ADMIN.email, ADMIN.password);
     await page.goto('/admin/settings');
-    await expect(page.getByRole('heading', { name: 'Appearance' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'General', level: 1 })).toBeVisible();
     await picture(page, 'admin-settings');
   });
 
@@ -2063,13 +2065,17 @@ test.describe('the settings area at the widths of a laptop', () => {
     return page;
   }
 
-  test('every screen starts beside the sidebar and stays inside the window', async ({ browser }) => {
+  // A wide list starts beside the sidebar; a form or short list of the administration stands in a
+  // column centred between the sidebar and the far edge (spec 081, ADM-078).
+  test('every screen starts beside the sidebar or centred, and stays inside the window', async ({
+    browser,
+  }) => {
     const page = await newAdminPage(browser, 'light');
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: LAPTOP.height });
       for (const address of SCREENS) {
         await page.goto(address);
-        await expect(page.locator('.settings-area > h1')).toBeVisible();
+        await expect(page.locator('.settings-area h1')).toBeVisible();
         const place = await page.evaluate(() => {
           const main = document.querySelector('main.content') as HTMLElement;
           const area = (document.querySelector('.settings-area') as HTMLElement).getBoundingClientRect();
@@ -2079,10 +2085,13 @@ test.describe('the settings area at the widths of a laptop', () => {
             (el) => !el.closest('.table-box') && el.getBoundingClientRect().width > 0,
           );
           const right = Math.max(...loose.map((el) => el.getBoundingClientRect().right));
+          const room = main.getBoundingClientRect();
+          const padding = parseFloat(getComputedStyle(main).paddingInlineStart);
+          const before = area.left - sidebar.right - padding;
+          const after = room.right - padding - area.right;
+          const centred = document.querySelector('.settings-area')?.classList.contains('centred') ?? false;
           return {
-            band: Math.round(
-              area.left - sidebar.right - parseFloat(getComputedStyle(main).paddingInlineStart),
-            ),
+            band: Math.trunc(centred ? Math.abs(before - after) / 2 : before),
             past: Math.round(right - main.getBoundingClientRect().right),
             pageScrolls: document.documentElement.scrollWidth > document.documentElement.clientWidth,
           };
@@ -2912,6 +2921,193 @@ test.describe('the history of guided templates', () => {
     await checkAccessibility(page);
     const gone = await page.request.delete(`/api/v1/spaces/${space}`);
     expect(gone.ok(), await gone.text()).toBeTruthy();
+    await page.context().close();
+  });
+});
+
+test.describe('the administration as blueprint 03 arranges it', () => {
+  const SHORT_SCREEN = { width: 1280, height: 520 };
+  const TALL_SCREEN = { width: 1280, height: 1300 };
+
+  /** A fresh administrator in a browser of their own, so what they fold reaches no other picture. */
+  async function adminPage(
+    browser: Browser,
+    colorScheme: 'light' | 'dark' = 'light',
+    permissions = ['use_product', 'administrator'],
+  ): Promise<Page> {
+    const email = `${unique('settings')}@example.com`;
+    await createUser(browser, email, 'member', permissions);
+    const page = await (
+      await browser.newContext({ baseURL: 'http://localhost:8080', colorScheme })
+    ).newPage();
+    await login(page, email, PASSWORD);
+    return page;
+  }
+
+  /** Shuts a group of the settings, and waits until the person's preferences hold it. */
+  async function shut(page: Page, group: string) {
+    const saved = page.waitForResponse(
+      (r) => r.url().includes('/me/preferences') && r.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: group, exact: true }).click();
+    await saved;
+    // The pointer leaves the sidebar, so the picture shows the rows at rest.
+    await page.mouse.move(900, 600);
+    // The section opened by address scrolled the sidebar to it; the picture is of its top.
+    await page.locator('aside.settings-sidebar').evaluate((element) => element.scrollTo({ top: 0 }));
+  }
+
+  for (const colorScheme of ['light', 'dark'] as const) {
+    test(`AdminView: the sidebar in two tiers, one group shut, ${colorScheme}`, async ({ browser }) => {
+      const page = await adminPage(browser, colorScheme);
+      // Tall enough for both tiers and every group in one picture.
+      await page.setViewportSize(TALL_SCREEN);
+      await page.goto('/admin/space-defaults');
+      await expect(page.getByRole('heading', { name: 'Defaults for new spaces', level: 1 })).toBeVisible();
+      await shut(page, 'Security');
+      await picture(page, `admin-sidebar-${colorScheme}`);
+      await checkAccessibility(page);
+      await page.context().close();
+    });
+  }
+
+  test('AdminView: the sidebar right to left', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.setViewportSize(TALL_SCREEN);
+    await page.goto('/admin/space-defaults');
+    await page.evaluate(() => document.documentElement.setAttribute('dir', 'rtl'));
+    await expect(page.getByRole('heading', { name: 'Defaults for new spaces', level: 1 })).toBeVisible();
+    await shut(page, 'Security');
+    await picture(page, 'admin-sidebar-rtl');
+    await page.context().close();
+  });
+
+  /** The webhooks of the instance as an empty list, whatever other tests made. */
+  async function noWebhooks(page: Page) {
+    await page.route('**/api/v1/admin/webhooks', async (route) => {
+      if (route.request().method() !== 'GET') return route.fallback();
+      const response = await route.fetch();
+      const listing = (await response.json()) as Record<string, unknown>;
+      return route.fulfill({ response, json: { ...listing, webhooks: [] } });
+    });
+  }
+
+  test('AdminView: the sidebar scrolled, with the current entry deep in Data', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.setViewportSize(SHORT_SCREEN);
+    await noWebhooks(page);
+    await page.goto('/admin/webhooks');
+    await expect(page.getByText('No webhooks yet', { exact: true })).toBeVisible();
+    await expect(page.locator('.settings-head')).toHaveClass(/scrolled/);
+    await picture(page, 'admin-sidebar-scrolled');
+    await page.context().close();
+  });
+
+  test('AdminView: empty sections, with the block that makes the first', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await noWebhooks(page);
+    await page.goto('/admin/webhooks');
+    await expect(page.getByText('No webhooks yet', { exact: true })).toBeVisible();
+    await picture(page, 'admin-webhooks-empty');
+    await checkAccessibility(page);
+    await page.route('**/api/v1/admin/users?type=service', (route) => route.fulfill({ json: { users: [] } }));
+    await page.goto('/admin/service-accounts');
+    await expect(page.getByText('No service accounts yet', { exact: true })).toBeVisible();
+    await picture(page, 'admin-service-accounts-empty');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('AdminView: login and second factor, and a change that a system administrator confirms', async ({
+    browser,
+  }) => {
+    const page = await adminPage(browser, 'light', ['use_product', 'administrator', 'system_administrator']);
+    await page.goto('/admin/login');
+    await expect(page.getByRole('heading', { name: 'Login and second factor', level: 1 })).toBeVisible();
+    await expect(page.getByText(/OIDC provider/)).toBeVisible();
+    await picture(page, 'admin-login');
+    await page.getByLabel('Second factor required for').selectOption('none');
+    await page.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(page.getByLabel('Code from your authenticator app, or a recovery code')).toBeVisible();
+    await picture(page, 'admin-login-confirm');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('AdminView: a form with a change, its Save and Reset changes active', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto('/admin/settings');
+    const upload = page.getByLabel('Maximum upload size (MiB)');
+    await upload.fill(String(Number(await upload.inputValue()) + 1));
+    await expect(page.getByRole('button', { name: 'Reset changes' }).first()).toBeEnabled();
+    await picture(page, 'admin-general-changed');
+    await page.setViewportSize(NARROW_SCREEN);
+    await page.getByRole('button', { name: 'Reset changes' }).first().scrollIntoViewIfNeeded();
+    await picture(page, 'admin-general-changed-narrow');
+    await page.context().close();
+  });
+
+  test('AdminView: announcements', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto('/admin/announcements');
+    await expect(page.getByLabel('Text', { exact: true })).toBeVisible();
+    await picture(page, 'admin-announcements');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('AdminView: the three kinds of notice', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.setViewportSize(TALL_SCREEN);
+    // The disk is nearly full: a warning under the introduction of every section (D15).
+    await page.route('**/api/v1/admin/health', (route) =>
+      route.fulfill({
+        json: { checks: [{ name: 'disk', state: 'warn', code: 'disk_low', values: { refuse: 5 } }] },
+      }),
+    );
+    // A save that went through, without changing what the other pictures show.
+    await page.route('**/api/v1/admin/settings', (route) =>
+      route.request().method() === 'PUT' ? route.fulfill({ status: 204 }) : route.fallback(),
+    );
+    await page.route('**/api/v1/admin/settings/health', (route) =>
+      route.request().method() === 'PUT'
+        ? route.fulfill({
+            status: 500,
+            json: { error: { code: 'internal', message: 'The database did not answer.' } },
+          })
+        : route.fallback(),
+    );
+    await page.goto('/admin/settings');
+    await expect(page.getByText('The disk is filling up')).toBeVisible();
+    const upload = page.getByLabel('Maximum upload size (MiB)');
+    await upload.fill(String(Number(await upload.inputValue()) + 1));
+    await page
+      .locator('form')
+      .filter({ has: page.getByRole('heading', { name: 'Trash and files' }) })
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+    await expect(page.getByRole('status').filter({ hasText: 'Saved.' })).toBeVisible();
+    await page.getByLabel('Warn when less than this share of the disk is free (percent)').fill('7');
+    await page
+      .locator('form')
+      .filter({ has: page.getByRole('heading', { name: 'Health' }) })
+      .getByRole('button', { name: 'Save', exact: true })
+      .click();
+    await expect(page.getByRole('alert').filter({ hasText: 'The database did not answer.' })).toBeVisible();
+    await picture(page, 'admin-notices');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('AdminView: a short and a long section in the centred column', async ({ browser }) => {
+    const page = await adminPage(browser);
+    await page.goto('/admin/space-defaults');
+    await expect(page.getByLabel('Default permission set for new spaces')).toBeVisible();
+    await picture(page, 'admin-column-short');
+    await page.goto('/admin/rules');
+    await expect(page.getByRole('heading', { name: 'Retention' })).toBeVisible();
+    await picture(page, 'admin-column-long');
+    await checkAccessibility(page);
     await page.context().close();
   });
 });

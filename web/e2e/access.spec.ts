@@ -222,7 +222,7 @@ test('every tab of the admin console works and is accessible', async ({ page }) 
   await login(page, ADMIN.email, ADMIN.password);
   for (const [tab, marker] of [
     ['users', 'New user'],
-    ['groups', 'Create'],
+    ['groups', 'New group'],
     ['spaces', 'Key'],
     ['audit', 'Verify the chain'],
     ['settings', 'Keep deleted items for'],
@@ -258,7 +258,7 @@ test('an imported font is used everywhere, also before logging in, and can be re
   browser,
 }) => {
   await login(page, ADMIN.email, ADMIN.password);
-  await page.goto('/admin/settings');
+  await page.goto('/admin/look');
   await expect(page.getByText('This installation uses the system font.')).toBeVisible();
 
   await page.getByLabel('Import a font').setInputFiles({
@@ -305,6 +305,22 @@ test('a normal user has no way into the admin console', async ({ page, browser }
   await expect(page.getByRole('alert')).toBeVisible();
   const res = await page.request.get('/api/v1/admin/users');
   expect(res.status()).toBe(403);
+  // The sections added in spec 081 are not found either, and the routes behind them refuse.
+  const added: [string, string][] = [
+    ['announcements', '/api/v1/admin/settings/look'],
+    ['service-accounts', '/api/v1/admin/users?type=service'],
+    ['login', '/api/v1/admin/settings/access'],
+    ['instance-permissions', '/api/v1/admin/global-permissions'],
+    ['space-defaults', '/api/v1/admin/organising'],
+    ['import-space', '/api/v1/admin/bundles/key'],
+    ['spaces-trash', '/api/v1/admin/trash/spaces'],
+  ];
+  for (const [section, route] of added) {
+    await page.goto(`/admin/${section}`);
+    await expect(page.getByRole('alert')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Administration' })).toHaveCount(0);
+    expect((await page.request.get(route)).status(), route).toBe(403);
+  }
 });
 
 test.describe('the policy itself', () => {

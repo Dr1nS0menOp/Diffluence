@@ -21,7 +21,7 @@ The intuition of a familiar wiki is the aim, never a copy. The clean-room rules 
 
 ## The arrangement decided on 2026-11-14 (ADR-045)
 
-**Built so far:** the frame (spec 078, ADR-046): the top bar, the sidebar outside a space, its panels, the space's block of the sidebar, the start screen, the current item and the line of the frame. The rules below for those parts now describe the built screens, and the old rules they replaced are gone from this document.
+**Built so far:** the frame (spec 078, ADR-046): the top bar, the sidebar outside a space, its panels, the space's block of the sidebar, the start screen, the current item and the line of the frame; the page (spec 079); and the administration (spec 081, ADR-048): its sidebar in two tiers, the head of a section, the centred column, notices, app tables, Save and Reset changes and empty sections. The rules below for those parts now describe the built screens, and the old rules they replaced are gone from this document.
 
 On 2026-11-14 the product owner decided that, for the arrangement of a screen, a study of pictures of another wiki product wins over this document: which regions a screen has, where they sit, what each holds, their order and grouping, what stays in view and how a state is marked. The look does not change: colours, icons, fonts and every token value stay as this document and `tokens.css` set them. Each change below replaces the named rule of this document when its screen is rebuilt, in a wave with its own study and new design pictures; until then the existing rule describes the built screen, and the pictures in `web/e2e/design-baselines/` keep guarding it. The requirement lines of blueprint 03 that end with "(changes the design standard, decided 2026-11-14)" are the source of truth for the detail; this list only names what changes and which rule it touches.
 
@@ -63,21 +63,21 @@ On 2026-11-14 the product owner decided that, for the arrangement of a screen, a
 
 - Space settings: a sidebar of sections about a quarter wide, with a thin line beside it, in the place of the space's sidebar; a head that stays in place with a way back, the space's badge and name, and the jump field; four sections on their own, a divider, then five groups that fold. Replaces "the sections in the sidebar in groups that fold, with a way to jump to one" (Settings frame) and "The sidebar holds the sections in groups that fold" (Settings and lists). SPC-134, SPC-136, SPC-138.
 - Within those groups: sections indented as plain text, a chevron in its own column, every group open at first, the scroll position kept, and a set reach for the band of the current section. Same rules. SPC-146, SPC-147.
-- The administration's sidebar: a header row with a way back that stays in place, tool sections with icons that are always open, then a settings heading with the jump field and the groups that fold, their state kept per person; a thin line beside it. Same rules. ADM-060, ADM-061, ADM-062.
-- The administration's sections regroup into three tool sections and five settings groups, with each section in exactly one. Replaces "The administration has these groups: Overview; People and access; Content; Automation; Look; System" (Settings and lists). ADM-068 to ADM-075, ADM-077.
-- The large area holds forms and short lists in one column of reading width, centred between the sidebar and the far edge, and wide lists and builders at full width beside the sidebar. Replaces "It starts beside the sidebar, not in the middle of the room" (Settings and lists) and the Look item of ADR-038. ADM-078, SPC-150.
-- A section from top to bottom: its name as the largest heading with More or its primary action on that line, the description with its help link, notes, a row of tools, then the content, with no breadcrumb and no save bar. Its parts get visible sub-headings, set apart by space. Replaces "The large area shows one section, with its name as the page title" (Settings and lists) and spec 033 D7. SPC-148, SPC-149.
+- The administration's sidebar: a header row with a way back that stays in place, tool sections with icons that are always open, then a settings heading with the jump field and the groups that fold, their state kept per person; a thin line beside it. Same rules. ADM-060, ADM-061, ADM-062. Built in spec 081.
+- The administration's sections regroup into three tool sections and five settings groups, with each section in exactly one. Replaces "The administration has these groups: Overview; People and access; Content; Automation; Look; System" (Settings and lists). ADM-068 to ADM-075, ADM-077. Built in spec 081.
+- The large area holds forms and short lists in one column of reading width, centred between the sidebar and the far edge, and wide lists and builders at full width beside the sidebar. Replaces "It starts beside the sidebar, not in the middle of the room" (Settings and lists) and the Look item of ADR-038. ADM-078, SPC-150. Built for the administration in spec 081.
+- A section from top to bottom: its name as the largest heading with More or its primary action on that line, the description with its help link, notes, a row of tools, then the content, with no breadcrumb and no save bar. Its parts get visible sub-headings, set apart by space. Replaces "The large area shows one section, with its name as the page title" (Settings and lists) and spec 033 D7. SPC-148, SPC-149. Built for the administration in spec 081 (`SettingsSection`), without the row of tools.
 
 ### Settings forms
 
 - One column of reading width, small bold labels above narrow fields of one width, and facts that cannot change below the fields; tiles for a choice among a few, a slider for a number on a scale, and a preview beside the form. Replaces "A labelled input" with `Field` (Components) as the whole rule for a form. NAV-160, SPC-151.
-- Save and Reset changes as one unit at the start side, directly under its fields and inactive until something changes, with one Save per group that saves apart. Replaces "Main action, one per view" (Components), which now counts per group, and adds an inactive state beside "Busy" (States). NAV-162, NAV-163.
+- Save and Reset changes as one unit at the start side, directly under its fields and inactive until something changes, with one Save per group that saves apart. Replaces "Main action, one per view" (Components), which now counts per group, and adds an inactive state beside "Busy" (States). NAV-162, NAV-163. Built for the administration in spec 081 (`SaveReset`).
 - A list of switches is one bordered card with headed groups and lines between rows, and settings that belong together may be rows in one outlined card with their controls in one column. Replaces "hardly any lines or boxes" (The decision) for these lists. NAV-167, ADM-096.
 - A section that starts an action: heading, explanation, choices, then one primary button at the foot and no Cancel. Sets where the "Main action, one per view" (Components) goes in such a section. SPC-153.
 
 ### Lists and tables
 
-- Tables of the app have a quiet heading row with a line under it, rows set apart by space without lines between them, a line after the last row, a hover tint and one sort mark; rows are compact in the administration and up to two lines for tokens and sessions. Replaces "a line under each row" (Settings and lists). NAV-157, ADM-107, ACC-085, SPC-154.
+- Tables of the app have a quiet heading row with a line under it, rows set apart by space without lines between them, a line after the last row, a hover tint and one sort mark; rows are compact in the administration and up to two lines for tokens and sessions. Replaces "a line under each row" (Settings and lists). NAV-157, ADM-107, ACC-085, SPC-154. Built for every table in a `TableBox` in spec 081.
 - Several rows of one item form a group under one spanning cell, and a two-level list shows its levels by weight. Same rule. SPC-155.
 - A long list has one row of tools above it: search first, a button per filter that shows its value in words, more filters, and the screen's own action at the end; a filter applies at once. Replaces "Long lists filter with dropdowns above them" (Settings and lists). ADM-103.
 - Lists of people have a checkbox column, the picture and name with a second line, the role chosen in the row with a button that explains it and how the holder got it, and More at the end; the list of users shows status and last login. Replaces "Lists of people show a picture, the name, how they got in and the role" (Settings and lists). SPC-118, ADM-131.
@@ -122,7 +122,7 @@ On 2026-11-14 the product owner decided that, for the arrangement of a screen, a
 
 ### Notices and states
 
-- An empty section that the person may fill shows a centred block with a bold heading, a few lines, the primary button and a guide link, and no create button in its heading. Replaces "A muted sentence that says what will appear here" (States, Empty) for such a section. NAV-173.
+- An empty section that the person may fill shows a centred block with a bold heading, a few lines, the primary button and a guide link, and no create button in its heading. Replaces "A muted sentence that says what will appear here" (States, Empty) for such a section. NAV-173. Built in spec 081 (`EmptyState`) for Groups, Service accounts and Webhooks.
 - A part that is still loading shows a framed box with a sentence and a placeholder in the shape of the result, and a figure that loads is a pale bar. Replaces `Loading` (States, Loading). NAV-177, PLT-128.
 - Three states join Busy and No permission: a button that starts something stays inactive until its form is complete, with a line that says what is missing; a read-only setting keeps its control in view, muted; a section whose optional service is missing says what it needs. Adds to "Every screen handles all of these" (States). ADM-094, ADM-102, ADM-115.
 - Before an export, a warning panel with a bold title names what the chosen format cannot hold. Adds a kind to "A message in the flow" (Components). EXC-052.
@@ -188,7 +188,7 @@ Every screen is one of these. Do not invent another.
 | --- | --- | --- |
 | **Plain** | Search, your account, people, labels | Top bar, `Plain` in `app.tsx` (wide, or `reading`) |
 | **Space** | Everything inside a space | Top bar, `Frame` or `SpaceShell` in `components/frame.tsx`: sidebar and a centred `.column` |
-| **Settings** | The administration, and the settings of a space | Top bar, `SettingsFrame` in `components/settings-frame.tsx`: the sections in the sidebar in groups that fold, with a way to jump to one, and the large area that changes them. One section at a time, at its own address (`?section=`) |
+| **Settings** | The administration, and the settings of a space | Top bar, `SettingsFrame` in `components/settings-frame.tsx`: the sections in the sidebar in groups that fold, with a way to jump to one, and the large area that changes them. One section at a time, at its own address (`?section=` in a space, `/admin/<id>` in the administration). The administration adds a header row with a way back, tool sections with icons before the groups, and the jump field under a Settings heading; its sections and their places are one list, `views/admin-sections.ts` |
 | **Personal** | The start screen, Recent, Favourites, Drafts, Tasks, Watching, all spaces | Top bar, `HomeFrame` in `components/home-frame.tsx`: the sidebar with the global part (`GlobalPart`) and the favourite spaces, beside a `.column` |
 | **Focus** | The editor | Top bar, sidebar, `main.focus`: `SpaceShell` with `focus`, and no reading column around it |
 
@@ -236,7 +236,10 @@ Use these. Reuse beats a new variant.
 | A block that fills itself | `.dynamic`, with `.dynamic-head` only while editing. Empty is one muted sentence |
 | A chart | `Chart` in `components/chart.tsx`. Series differ by shape as well as colour, and the numbers are one press away |
 | Something drawn | Only `components/icons.tsx`, `components/chart.tsx` and `components/drawing.tsx` may hold SVG (ADR-026) |
-| A message in the flow | `.note`, `.note-error`, `ErrorNote` |
+| A message in the flow | `Notice` in `components/notice.tsx`: information, warning (always with a title) or error, with its icon in a column of its own; `ErrorNote` is its error kind. `.note` and `.note-error` remain outside the administration until each screen adopts `Notice` |
+| The head of a section of the settings | `SettingsSection` in `components/settings-section.tsx`: title, introduction with its guide link, notices; the content puts its primary action in the title row with `SectionActions` |
+| Save and Reset changes of a unit | `SaveReset` in `components/save-reset.tsx`, inactive until the unit changed |
+| A section with nothing in it yet | `EmptyState` in `components/empty-state.tsx`, and `TableEmpty` for the one row of an empty table |
 | A short message, maybe with Undo | `useToast`, and `useCopy` for copying |
 | A time | `RelativeTime` |
 | Switching between lists | `Tabs`, which brings the arrow keys; on the start screen, pills (`.pill` with `aria-pressed`) |
@@ -248,9 +251,9 @@ Use these. Reuse beats a new variant.
 
 ## Settings and lists (ADR-034)
 
-- Settings of a space and of the instance use the **Settings** frame. The sidebar holds the sections in groups that fold, and **Jump to a setting** narrows them; the administration's own search also finds settings inside a section. The large area shows one section, with its name as the page title. It starts beside the sidebar, not in the middle of the room, and nothing in it runs past the window: a wide table scrolls in its own `TableBox`, and the page itself never scrolls sideways.
-- The administration has these groups: Overview; People and access; Content; Automation; Look; System. Care and System health sit under System. A new tab goes into exactly one group.
-- Tables of the app show rows, not boxes: a line under each row, a quiet heading, no cell borders. Tables inside a page keep their own rules.
+- Settings of a space and of the instance use the **Settings** frame. The sidebar holds the sections in groups that fold, and **Jump to a setting** narrows them; the administration's own search finds its sections by name and the settings inside them. Nothing in the large area runs past the window: a wide table scrolls in its own `TableBox`, and the page itself never scrolls sideways. The settings of a space show one section beside the sidebar, with its name as the page title, until wave SC5.
+- The administration (spec 081) has three tool sections, Overview, Tools and People and access, and five settings groups, Instance, Security, Permissions, Look and Data. A new section goes into exactly one group, in `views/admin-sections.ts`, with its width: `column` for forms and short lists, `full` for wide lists. Every section starts with `SettingsSection`.
+- Tables of the app show rows, not boxes: a quiet heading row with a line under it, rows set apart by space, a line after the last row and a tint under the pointer, no cell borders. Row actions sit in the last column, whose heading only screen readers hear. Tables inside a page keep their own rules.
 - Lists of people show a picture, the name, how they got in and the role. Someone who may change a role picks it in the row. Long lists filter with dropdowns above them.
 - A rule of the instance says where it acts: in every space, or only in the chosen spaces, shown as chips.
 ## The page tree
@@ -359,7 +362,7 @@ UI text is English, in sentence case, through `web/src/locales/en.json`. Name th
 
 ## Fonts
 
-The default is the system font: nothing to ship, license or download, and it fits each person's device. An administrator can import a font under **Administration, Settings, Appearance** (spec 006). `web/src/appearance.ts` is the only code that applies it, by replacing `--font-sans`. The system stack stays behind it, so a font that fails to load changes nothing. The licence of an imported font is the responsibility of whoever imports it.
+The default is the system font: nothing to ship, license or download, and it fits each person's device. An administrator can import a font under **Administration, Look, Font** (spec 006). `web/src/appearance.ts` is the only code that applies it, by replacing `--font-sans`. The system stack stays behind it, so a font that fails to load changes nothing. The licence of an imported font is the responsibility of whoever imports it.
 
 ## Adding or changing a screen
 

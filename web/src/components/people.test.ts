@@ -82,9 +82,9 @@ describe('the idle timeout', () => {
 describe('the settings search', () => {
   const word = (key: string) => (key === 'rules.idleMinutes' ? 'Log out after idle minutes' : key);
 
-  it('finds a setting by the word on its screen', () => {
+  it('finds a setting by the word on its screen, at the section that holds it (spec 081)', () => {
     const found = findSettings(SETTINGS_INDEX, 'IDLE', word);
-    expect(found.map((f) => f.tab)).toContain('rules');
+    expect(found.map((f) => f.tab)).toContain('login');
   });
 
   it('finds nothing for empty text', () => {

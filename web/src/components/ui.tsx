@@ -5,6 +5,7 @@ import { ApiError, type Space } from '../api';
 import { useDates } from '../dates';
 import { animalOf, animalPicture } from './animals';
 import { IconClose, IconUpload } from './icons';
+import { Notice } from './notice';
 
 const TINT_COUNT = 4;
 
@@ -22,11 +23,8 @@ export function ErrorNote({ error }: { error: unknown }) {
   if (!error) return null;
   const notFound = error instanceof ApiError && error.status === 404;
   const text = notFound ? t('app.notFound') : error instanceof Error ? error.message : t('app.error');
-  return (
-    <p role="alert" className="note note-error">
-      {text}
-    </p>
-  );
+  // Every failure looks the same: an error notice, which is an alert (NAV-150).
+  return <Notice kind="error">{text}</Notice>;
 }
 
 /** A modal built on the native dialog element: focus trap and Escape come for free. */

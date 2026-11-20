@@ -5,7 +5,7 @@ import { api } from '../api';
 import { appearanceQuery } from '../appearance';
 import { ErrorNote, FilePicker } from '../components/ui';
 
-/** The system font is the default; an organisation can bring its own. */
+/** The system font is the default; an organisation can bring its own. It sits under Look. */
 export function AppearanceSection() {
   const { t } = useTranslation();
   const client = useQueryClient();
@@ -22,8 +22,8 @@ export function AppearanceSection() {
   });
   const font = q.data?.font;
   return (
-    <section>
-      <h2>{t('admin.appearance')}</h2>
+    <section className="settings-unit">
+      <h2>{t('admin.font')}</h2>
       <p role="status">{font ? t('admin.fontImported', { name: font.name }) : t('admin.fontSystem')}</p>
       <p className="muted">{t('admin.fontHelp')}</p>
       <ErrorNote error={q.error ?? importFont.error ?? removeFont.error} />

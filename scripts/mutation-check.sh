@@ -3173,6 +3173,16 @@ mutate "the appearance answer has no limit per address" internal/httpapi/handler
   's.replace("if PrincipalFrom(r.Context()) == nil \x26\x26 !s.appearanceCalls.allow(", "if false \x26\x26 !s.appearanceCalls.allow(")' $app -run '^TestTheAppearanceAnswerIsLimitedPerAddressWithoutALogin$'
 mutate "a saved link keeps its title" internal/document/attrs.go \
   's.replace("\treturn Mark{Type: MarkLink, Attrs: map[string]any{\"href\": safe}}, nil", "\tattrs := map[string]any{\"href\": safe}\n\tkeepText(m.Attrs, attrs, \"title\", 1000)\n\treturn Mark{Type: MarkLink, Attrs: attrs}, nil")' ./internal/document/
+# Spec 081, wave SC4: the administration answers only the sections of its registry, hides a
+# section whose experimental part is off, and its jump field finds nothing of a hidden section.
+mutate_web "an unknown address opens a section of the administration" src/views/admin-sections.ts \
+  's.replace("return ADMIN_SECTIONS.find((section) => section.id === id);", "return ADMIN_SECTIONS.find((section) => section.id === id) ?? ADMIN_SECTIONS[0];")' src/views/admin-sections.test.ts
+mutate_web "a section whose experimental part is off stays in the sidebar" src/views/admin-sections.ts \
+  's.replace("!section.experimental || capabilities[section.experimental]", "true")' src/views/admin-sections.test.ts
+mutate_web "the jump field finds settings of a section that is not shown" src/views/admin-search.ts \
+  's.replace("...SETTINGS_INDEX.filter((entry) => ids.has(entry.tab)),", "...SETTINGS_INDEX,")' src/views/admin-search.test.ts
+mutate_web "a section sits in two groups" src/views/admin-sections.ts \
+  's.replace("{ id: \x27webhooks\x27, group: \x27admin-data\x27, width: \x27column\x27 },", "{ id: \x27webhooks\x27, group: \x27admin-data\x27, width: \x27column\x27 },\n  { id: \x27webhooks\x27, group: \x27tools\x27, width: \x27column\x27, icon: IconList },")' src/views/admin-sections.test.ts
 finish_mutations
 if [ "$survived" -gt 0 ]; then
   echo "$survived mutation(s) were not caught"

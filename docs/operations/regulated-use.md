@@ -33,14 +33,14 @@ Diffluence is not "Part 11 compliant" on its own. Compliance belongs to a valida
 
 - **Periodic review** (Annex 11 clause 11). A timed approved state gives each approved version a next review date, shown to everyone who sees the page. The page owner is reminded before it; on the date the workflow starts a review of the same text, and passing it confirms the version without a new one.
 - **Read and understood.** An approved state can ask groups to confirm that they read each new version. The button appears only after the person opened that version, in the same session. It records an acknowledgement: that the person says they read it. It is not a test of understanding, and Diffluence makes no claim beyond that.
-- **Due dates** count working days of the working week set under **Administration, Settings, General**, in its time zone. Holidays are not known: set a longer period around them.
+- **Due dates** count working days of the working week set under **Administration, Rules, Language, time and help**, in its time zone. Holidays are not known: set a longer period around them.
 - **Delegation and absence.** A reviewer can hand a review only to someone the workflow names for it in the same way, and someone who looks after the workflows can choose another person who may review. A stand-in takes a review only when the workflow names them too. Nobody signs for someone else.
 - **Bundles from another installation** bring their signatures as records of that installation. They verify against the content here, but they are not signatures of this installation, and they approve nothing here.
 
 ## Who may sign
 
 1. Set up an authenticator app or a passkey under **Your account**. A password alone never signs.
-2. An administrator opens the person under **Administration, People**, confirms who they are, chooses how, and enables signing. An administrator cannot enable their own signing.
+2. An administrator opens the person under **Administration, Users**, confirms who they are, chooses how, and enables signing. An administrator cannot enable their own signing.
 3. A space adds its own meanings of signatures beside the four every space has (reviewed, approved, released, verified), in the workflow settings of the space. A meaning is never removed or changed.
 4. A step of a workflow requires a signature by naming a meaning. On an author's step, its author signs; on the step after an approved review, every reviewer who approves signs. A signed approval cannot be changed into a request for changes.
 

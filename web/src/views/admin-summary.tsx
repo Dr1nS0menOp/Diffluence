@@ -5,9 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
 import { Link, navigate } from '../router';
+import { IconSearch } from '../components/icons';
 import { SubjectPicker } from '../components/picker';
 import { Dialog, ErrorNote, Field, formatSize, Loading } from '../components/ui';
-import { findSettings, SETTINGS_INDEX } from './admin-search';
+import { findSettings, jumpIndex } from './admin-search';
+import type { AdminSection } from './admin-sections';
 import { HealthAttention, summaryChecks, useHealth } from './admin-health';
 
 interface OrphanedPage {
@@ -41,6 +43,8 @@ interface Attention {
   unmanaged_spaces: UnmanagedSpace[];
   orphaned_pages: OrphanedPage[];
 }
+
+const SEARCH_MARK_SIZE = 16;
 
 /** Where to go to act on what needs attention. */
 const ATTENTION_LINKS: Record<string, string> = {
@@ -211,13 +215,14 @@ export function SummaryTab() {
   );
 }
 
-/** Finds a setting by name, and goes to its screen. */
-export function SettingsSearch() {
+/** Finds a section or a setting by name, and goes to its screen (ADM-063, D6). */
+export function SettingsSearch({ shown }: { shown: AdminSection[] }) {
   const { t } = useTranslation();
   const [text, setText] = useState('');
-  const found = findSettings(SETTINGS_INDEX, text, (key) => t(key));
+  const found = findSettings(jumpIndex(shown), text, (key) => t(key));
   return (
     <div className="picker settings-search">
+      <IconSearch size={SEARCH_MARK_SIZE} />
       <input
         type="search"
         value={text}
@@ -228,7 +233,7 @@ export function SettingsSearch() {
       {found.length > 0 && (
         <ul className="plain-list">
           {found.map((entry) => (
-            <li key={entry.label}>
+            <li key={`${entry.label} ${entry.tab}`}>
               <button
                 type="button"
                 className="ghost"

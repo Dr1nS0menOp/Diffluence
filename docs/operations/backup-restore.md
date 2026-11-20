@@ -43,7 +43,7 @@ docker compose run --rm backup once     # one backup now
 docker compose logs backup              # what it did, and why it did not
 ```
 
-**In the console** (Administration, System, Backups; spec 058): the schedule and the number kept set there win over these two variables, which stay the default. "Back up now" asks the service for a backup, which it starts within a minute (at most 4 an hour). The page lists every backup with its size, whether it was complete or which step failed, and whether a test restore of it passed; it shows when the service last checked in and whether it holds a key (only a fingerprint, never the key). A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service talks to the console through the database, with the access it already has, so the same page works when the worker is a Kubernetes CronJob or a systemd timer that runs `diffluence backup next` and `diffluence backup report`.
+**In the console** (Administration, Data, Backups; spec 058): the schedule and the number kept set there win over these two variables, which stay the default. "Back up now" asks the service for a backup, which it starts within a minute (at most 4 an hour). The page lists every backup with its size, whether it was complete or which step failed, and whether a test restore of it passed; it shows when the service last checked in and whether it holds a key (only a fingerprint, never the key). A failed backup or test restore shows on System health and is mailed to the administrators, at most twice a day. The service talks to the console through the database, with the access it already has, so the same page works when the worker is a Kubernetes CronJob or a systemd timer that runs `diffluence backup next` and `diffluence backup report`.
 
 **Keeping fewer backups, or backing up less often** (spec 076), is a system administrator's change, with a fresh login and a second factor. The service then writes a code to its log, valid 30 minutes, which a system administrator enters on the same page:
 
@@ -120,7 +120,7 @@ The dump does not carry the defaults of the database itself, the settings `plan_
 
 ### Over the live installation, from the console
 
-To put a running installation back to an earlier backup, an administrator uses Administration, System, Backups (spec 059). The page says what is lost, asks for the installation's name typed out, and asks for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day.
+To put a running installation back to an earlier backup, an administrator uses Administration, Data, Backups (spec 059). The page says what is lost, asks for the installation's name typed out, and asks for a second factor: a code from the authenticator app, a recovery code, or a passkey confirmed just before. At most one restore a day.
 
 **The backup service asks for a code first** (spec 070). Within a minute of the request it writes one line to its own log, which the server cannot read or write:
 

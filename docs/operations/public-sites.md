@@ -5,7 +5,7 @@ Diffluence writes public sites as plain files. It never serves them: a web serve
 ## Set-up
 
 1. Set `DIFFLUENCE_PUBLISH_DIR` to a folder that both the API and the worker can write to: a withdrawal happens in the API.
-2. Turn on public sites and public links under Administration, Export and publishing.
+2. Turn on public sites and public links under Administration, Security, Export and publishing.
 3. Point a web server at `<folder>/<site>/live` for a site, and at `<folder>/links` for public links.
 
 `live` is a link to the current build, changed in one atomic step. The folder name of a site is on its page in Space settings.

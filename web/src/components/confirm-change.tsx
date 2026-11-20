@@ -4,6 +4,7 @@
 import { useTranslation } from 'react-i18next';
 import { ApiError } from '../api';
 import { Field } from './ui';
+import { Notice } from './notice';
 
 /** What a confirmed change adds to a form: a second factor, and a reason where one is asked. */
 export interface Confirmation {
@@ -30,7 +31,9 @@ export function ConfirmFields({
   const { t } = useTranslation();
   return (
     <>
-      <p className="note">{note}</p>
+      <Notice kind="warning" title={t('rules.confirmTitle')}>
+        {note}
+      </Notice>
       {withReason && (
         <Field label={t('rules.confirmReason')} help={t('rules.confirmReasonHelp')}>
           <input value={value.reason} onChange={(e) => onChange({ ...value, reason: e.target.value })} />

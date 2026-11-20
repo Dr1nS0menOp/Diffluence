@@ -1645,8 +1645,25 @@ a.byline-part:hover {
   gap: var(--space-3);
 }
 
+/* The jump field of the administration: a search mark at its start and a border at rest (ADM-063). */
 .settings-search {
+  position: relative;
   flex: none;
+}
+
+.settings-search > svg {
+  position: absolute;
+  inset-block-start: var(--space-2-5);
+  inset-inline-start: var(--space-2-5);
+  color: var(--color-muted);
+  pointer-events: none;
+}
+
+.settings-search > input {
+  inline-size: 100%;
+  padding-inline-start: var(--space-8);
+  border-color: var(--color-field);
+  font-size: var(--text-small);
 }
 
 .audit-details {
@@ -1766,7 +1783,8 @@ a.byline-part:hover {
   margin-block-end: var(--space-2);
 }
 
-/* The page title already names the section, so its own first heading only speaks to screen readers. */
+/* In the settings of a space the page title already names the section, so its own first heading
+   only speaks to screen readers (spec 033 D7). The administration has its own head (spec 081). */
 .settings-area > h1 + section > h2:first-child {
   position: absolute;
   inline-size: 1px;
@@ -1774,6 +1792,94 @@ a.byline-part:hover {
   overflow: hidden;
   clip-path: inset(50%);
   white-space: nowrap;
+}
+
+/* Forms and short lists of the administration stand in one column of reading width, centred
+   between the sidebar and the far edge (ADM-078). */
+.settings-area.centred {
+  margin-inline: auto;
+}
+
+/* The head of a section (ADM-080, NAV-113): the title row, the introduction and the notices,
+   with the largest gap of the screen under it. */
+.settings-section-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-end: var(--space-4);
+}
+
+.section-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.settings-area .section-title-row h1 {
+  margin: 0;
+  font-size: var(--text-greeting);
+}
+
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.section-intro {
+  margin: 0;
+  color: var(--color-muted);
+}
+
+/* Fields of the administration are narrow and of one width (NAV-160). */
+.settings-area:has(> .settings-section-head) .field {
+  max-inline-size: var(--size-summary);
+}
+
+/* Parts of a section: a heading one step smaller, more space above than below (ADM-082). The
+   settings of a space keep their headings until wave SC5. */
+.settings-area:has(> .settings-section-head) h2 {
+  margin-block: var(--space-6) var(--space-2);
+  font-size: var(--text-section);
+}
+
+/* Each unit that saves apart is set off from the next by a thin rule and space (NAV-163). */
+.settings-unit + .settings-unit {
+  padding-block-start: var(--space-2);
+  border-block-start: 1px solid var(--color-line);
+}
+
+.settings-unit > h2:first-child {
+  margin-block-start: var(--space-4);
+}
+
+/* A sentence that says what a destructive action cannot undo, above its button (ADM-095). */
+.warning-line {
+  margin-block: var(--space-2);
+  color: var(--color-danger);
+}
+
+/* A section with nothing in it yet (NAV-173): one centred block in its upper part. */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding-block: var(--space-8);
+  text-align: center;
+}
+
+.empty-state > p {
+  max-inline-size: var(--size-summary);
+  margin: 0;
+}
+
+.empty-state > .empty-state-title {
+  color: var(--color-strong);
+  font-size: var(--text-section);
+  font-weight: var(--weight-strong);
 }
 
 .settings-form {
@@ -1785,6 +1891,100 @@ a.byline-part:hover {
   padding-inline: var(--space-2);
   color: var(--color-strong);
   font-weight: var(--weight-strong);
+}
+
+/* The administration's sidebar (ADM-060 to ADM-066). Its header row stays in place while the
+   list scrolls, with a line under it only once something scrolled beneath it. */
+.settings-scroll-mark {
+  position: absolute;
+  inset-block-start: 0;
+  inset-inline: 0;
+  block-size: 1px;
+  pointer-events: none;
+}
+
+.settings-head {
+  position: sticky;
+  /* Sticks at the top edge of the sidebar itself, above its padding, so nothing shows over it. */
+  inset-block-start: calc(var(--space-4) * -1);
+  z-index: var(--layer-sticky);
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-1);
+  margin-block-start: calc(var(--space-4) * -1);
+  margin-inline: calc(var(--space-3) * -1);
+  padding: var(--space-2) var(--space-3);
+  border-block-end: 1px solid transparent;
+  background: var(--color-side);
+}
+
+.settings-head.scrolled {
+  border-block-end-color: var(--color-line);
+}
+
+.settings-head .settings-title {
+  padding-inline: 0;
+}
+
+.settings-head + .settings-nav {
+  margin-block-start: var(--space-2);
+}
+
+.settings-tools {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.settings-tools-title {
+  margin: 0;
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-strong);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+/* The settings tier starts after extra space, under a heading one step larger than a group's. */
+.settings-part {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-block-start: var(--space-4);
+}
+
+.settings-part-title {
+  margin: 0;
+  padding-inline: var(--space-2);
+  color: var(--color-strong);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-strong);
+}
+
+.tiered .sidebar-part-toggle {
+  color: var(--color-strong);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+/* The fold arrow of a settings group sits in a small box of its own (ADM-062). */
+.tiered .part-chevron {
+  display: inline-flex;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius);
+}
+
+/* Text entries of a group start where the names of the icon entries start: the row's padding,
+   the icon and the gap after it. */
+.tiered .settings-group .side-link {
+  padding-block: var(--space-1);
+  padding-inline-start: calc(var(--space-2) * 2 + var(--space-4-5));
+}
+
+.side-link > .lozenge {
+  flex: none;
 }
 
 /* The People screen of a space: rows with a picture, how they got in, and their role. */

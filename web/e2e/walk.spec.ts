@@ -129,9 +129,14 @@ test('an empty list says it is empty, instead of showing only a head', async ({ 
   await page.route('**/api/v1/admin/scim-tokens', (route) =>
     route.request().method() === 'GET' ? route.fulfill({ json: { tokens: [] } }) : route.fallback(),
   );
+  // An empty section keeps the heading row of its table, with a block that says what goes here
+  // and holds the one button that makes the first; the title row has none while empty (NAV-173).
   await page.goto('/admin/groups');
-  await expect(page.getByText('No groups yet.')).toBeVisible();
-  await expect(page.locator('main table')).toHaveCount(0);
+  await expect(page.getByText('No groups yet', { exact: true })).toBeVisible();
+  await expect(page.getByRole('columnheader', { name: 'Members' })).toBeVisible();
+  await expect(page.locator('main tbody tr')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'New group' })).toHaveCount(1);
+  await expect(page.locator('.section-actions').getByRole('button')).toHaveCount(0);
   await page.goto('/admin/scim');
   await expect(page.getByText('No tokens yet.')).toBeVisible();
   await expect(page.locator('main table')).toHaveCount(0);

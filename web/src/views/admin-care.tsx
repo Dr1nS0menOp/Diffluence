@@ -7,6 +7,7 @@ import { api, type Me } from '../api';
 import { appearanceQuery } from '../appearance';
 import { useDates } from '../dates';
 import { ConfirmButton, ErrorNote, Field, formatSize } from '../components/ui';
+import { Notice } from '../components/notice';
 import { TableBox } from '../components/table-box';
 
 interface Job {
@@ -235,11 +236,7 @@ function UnusedFiles() {
       <h2>{t('care.unused')}</h2>
       <p className="muted">{t('care.unusedHelp')}</p>
       <ErrorNote error={q.error ?? remove.error} />
-      {remove.data && (
-        <p role="status" className="note">
-          {t('care.unusedRemoved', { count: remove.data.removed })}
-        </p>
-      )}
+      {remove.data && <Notice kind="info">{t('care.unusedRemoved', { count: remove.data.removed })}</Notice>}
       <div className="row">
         <button type="button" disabled={q.isFetching} onClick={() => void q.refetch()}>
           {t('care.unusedFind')}

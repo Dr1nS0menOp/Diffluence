@@ -9,6 +9,8 @@ import { api, type Me } from '../api';
 import { Dialog, ErrorNote, Field, Loading } from '../components/ui';
 import { Menu, MenuDownload } from '../components/menu';
 import { TableBox } from '../components/table-box';
+import { Notice } from '../components/notice';
+import { SaveReset } from '../components/save-reset';
 import { useDates } from '../dates';
 import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
 
@@ -226,9 +228,7 @@ export function UpgradesTab() {
         {t('installation.postgres', { version: d.postgres, newest: d.newest, known: d.known })}
       </p>
       {d.expand_waiting > 0 && (
-        <p role="status" className="note">
-          {t('installation.expandWaiting', { count: d.expand_waiting })}
-        </p>
+        <Notice kind="info">{t('installation.expandWaiting', { count: d.expand_waiting })}</Notice>
       )}
       <h2>{t('installation.nodesTitle')}</h2>
       <NodesTable nodes={d.nodes} />
@@ -283,12 +283,11 @@ export function EventsTab() {
         </ul>
       )}
       {s.problem ? (
-        <div className="note">
-          <p>{t('installation.withoutNatsNot')}</p>
+        <Notice kind="warning" title={t('installation.withoutNatsNot')}>
           <p>{s.problem}</p>
-        </div>
+        </Notice>
       ) : (
-        <p className="note">{t('installation.withoutNatsOk')}</p>
+        <Notice kind="info">{t('installation.withoutNatsOk')}</Notice>
       )}
     </>
   );
@@ -320,16 +319,18 @@ function WitnessLine({ area }: { area: AuditArea }) {
       {w.ok ? (
         <p>{t('installation.witnessOk', { when: dates.moment(w.checked_at), compared: w.compared })}</p>
       ) : (
-        <p role="alert" className="note note-error">
+        <Notice kind="error">
           {t('installation.witnessFailed', {
             when: dates.moment(w.checked_at),
             seq: w.first_bad_seq ?? 0,
             reason: w.reason ?? '',
           })}
-        </p>
+        </Notice>
       )}
       {days > area.witness_warn_after_days && (
-        <p className="note">{t('installation.witnessOld', { days, limit: area.witness_warn_after_days })}</p>
+        <Notice kind="warning" title={t('installation.witnessOldTitle')}>
+          {t('installation.witnessOld', { days, limit: area.witness_warn_after_days })}
+        </Notice>
       )}
     </>
   );
@@ -592,6 +593,13 @@ export function DiskThresholds({ isSystem }: { isSystem: boolean }) {
   const [refuse, setRefuse] = useState('');
   const [confirm, setConfirm] = useState<Confirmation | null>(null);
   const [saved, setSaved] = useState(false);
+  const storedWarn = q.data?.disk_warn_percent ? String(q.data.disk_warn_percent) : '';
+  const storedRefuse = q.data?.disk_refuse_percent ? String(q.data.disk_refuse_percent) : '';
+  const reset = () => {
+    setWarn(storedWarn);
+    setRefuse(storedRefuse);
+    setConfirm(null);
+  };
   useEffect(() => {
     if (!q.data) return;
     setWarn(q.data.disk_warn_percent ? String(q.data.disk_warn_percent) : '');
@@ -622,7 +630,7 @@ export function DiskThresholds({ isSystem }: { isSystem: boolean }) {
     save.mutate();
   };
   return (
-    <form onSubmit={submit} className="settings-form">
+    <form onSubmit={submit} className="settings-form settings-unit">
       <h2>{t('installation.healthTitle')}</h2>
       <p className="muted">{t('installation.healthIntro')}</p>
       {q.error && <ErrorNote error={q.error} />}
@@ -636,16 +644,13 @@ export function DiskThresholds({ isSystem }: { isSystem: boolean }) {
       {confirm && (
         <ConfirmFields value={confirm} onChange={setConfirm} note={t('installation.diskLowerNote')} />
       )}
-      {saved && (
-        <p role="status" className="note">
-          {t('installation.saved')}
-        </p>
-      )}
-      <div>
-        <button type="submit" disabled={save.isPending}>
-          {confirm ? t('rules.confirmButton') : t('common.save')}
-        </button>
-      </div>
+      {saved && <Notice kind="info">{t('installation.saved')}</Notice>}
+      <SaveReset
+        changed={q.data !== undefined && (warn !== storedWarn || refuse !== storedRefuse)}
+        busy={save.isPending}
+        saveLabel={confirm ? t('rules.confirmButton') : undefined}
+        onReset={reset}
+      />
     </form>
   );
 }

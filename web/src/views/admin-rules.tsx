@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type Category, type Me } from '../api';
 import { ConfirmFields, needsConfirmation, type Confirmation } from '../components/confirm-change';
 import { ErrorNote, Field, Loading } from '../components/ui';
+import { Notice } from '../components/notice';
+import { differs, SaveReset } from '../components/save-reset';
 import { useDates } from '../dates';
 import { permissionLabel } from '../permission-words';
 import { RolesTab } from './roles';
@@ -60,6 +62,7 @@ interface Retention {
 export function SectionForm<T extends object>({
   section,
   title,
+  intro,
   canConfirm = false,
   confirmNote = '',
   withReason = false,
@@ -67,6 +70,8 @@ export function SectionForm<T extends object>({
 }: {
   section: string;
   title: string;
+  /** A line under the heading that says what the part is for. */
+  intro?: string;
   /** Whether this person is a system administrator, who may confirm such a change. */
   canConfirm?: boolean;
   confirmNote?: string;
@@ -101,9 +106,16 @@ export function SectionForm<T extends object>({
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
   const form: T = { ...q.data, ...changes };
+  // Resetting takes the confirmation away too: it belonged to the change that is gone.
+  const reset = () => {
+    setChanges({});
+    setConfirm(null);
+    save.reset();
+  };
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{title}</h2>
+      {intro && <p className="muted">{intro}</p>}
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();
@@ -111,18 +123,17 @@ export function SectionForm<T extends object>({
         }}
       >
         <ErrorNote error={save.error} />
-        {save.isSuccess && (
-          <p role="status" className="note">
-            {t('admin.saved')}
-          </p>
-        )}
+        {save.isSuccess && <Notice kind="info">{t('admin.saved')}</Notice>}
         {children(form, (change) => setChanges({ ...changes, ...change }))}
         {confirm && (
           <ConfirmFields value={confirm} onChange={setConfirm} note={confirmNote} withReason={withReason} />
         )}
-        <button type="submit" className="primary" disabled={save.isPending}>
-          {confirm ? t('rules.confirmButton') : t('common.save')}
-        </button>
+        <SaveReset
+          changed={differs(q.data, form)}
+          busy={save.isPending}
+          saveLabel={confirm ? t('rules.confirmButton') : undefined}
+          onReset={reset}
+        />
       </form>
     </section>
   );
@@ -148,7 +159,7 @@ function Switch({
 function GeneralForm() {
   const { t } = useTranslation();
   return (
-    <SectionForm<General> section="general" title={t('rules.general')}>
+    <SectionForm<General> section="general" title={t('rules.languageTimeHelp')}>
       {(form, set) => (
         <>
           <Field label={t('rules.defaultLanguage')}>
@@ -190,14 +201,28 @@ function GeneralForm() {
           <Field label={t('rules.helpUrl')}>
             <input type="url" value={form.help_url} onChange={(e) => set({ help_url: e.target.value })} />
           </Field>
-          <Field label={t('rules.embedHosts')} help={t('rules.embedHostsHelp')}>
-            <textarea
-              rows={2}
-              value={form.embed_hosts.join('\n')}
-              onChange={(e) => set({ embed_hosts: e.target.value.split('\n').filter(Boolean) })}
-            />
-          </Field>
         </>
+      )}
+    </SectionForm>
+  );
+}
+
+/**
+ * The outside addresses that link cards and embeds may show (ADM-024). They are part of the
+ * general settings, and sit with the outgoing calls because both say what may leave (D20).
+ */
+export function EmbedHostsForm() {
+  const { t } = useTranslation();
+  return (
+    <SectionForm<General> section="general" title={t('rules.embedHosts')} intro={t('rules.embedHostsHelp')}>
+      {(form, set) => (
+        <Field label={t('rules.embedHostsField')}>
+          <textarea
+            rows={3}
+            value={form.embed_hosts.join('\n')}
+            onChange={(e) => set({ embed_hosts: e.target.value.split('\n').filter(Boolean) })}
+          />
+        </Field>
       )}
     </SectionForm>
   );
@@ -280,19 +305,22 @@ function RetentionLowering({ lowering }: { lowering: NonNullable<Retention['lowe
     onSuccess: () => client.invalidateQueries({ queryKey: ['section', 'retention'] }),
   });
   return (
-    <div className="note" role="status">
-      <p>
-        {t('rules.retentionLowering', {
-          days: lowering.audit_days,
-          when: dates.moment(lowering.from),
-          because: lowering.because,
-        })}
-      </p>
+    <Notice
+      kind="warning"
+      title={t('rules.retentionLoweringTitle')}
+      actions={
+        <button type="button" onClick={() => takeBack.mutate()} disabled={takeBack.isPending}>
+          {t('rules.retentionLoweringCancel')}
+        </button>
+      }
+    >
+      {t('rules.retentionLowering', {
+        days: lowering.audit_days,
+        when: dates.moment(lowering.from),
+        because: lowering.because,
+      })}
       <ErrorNote error={takeBack.error} />
-      <button type="button" onClick={() => takeBack.mutate()} disabled={takeBack.isPending}>
-        {t('rules.retentionLoweringCancel')}
-      </button>
-    </div>
+    </Notice>
   );
 }
 
@@ -326,14 +354,41 @@ function RetentionForm({ canConfirm }: { canConfirm: boolean }) {
   );
 }
 
+const isSystemAdministrator = (me: Me) => me.global_permissions.includes('system_administrator');
+
 export function RulesTab({ me }: { me: Me }) {
-  const canConfirm = me.global_permissions.includes('system_administrator');
   return (
     <>
       <GeneralForm />
       <FeaturesForm />
-      <AccessForm canConfirm={canConfirm} />
-      <RetentionForm canConfirm={canConfirm} />
+      <RetentionForm canConfirm={isSystemAdministrator(me)} />
+    </>
+  );
+}
+
+/** How people log in: the identity provider is set in the environment, because it holds secrets. */
+function LoginMethods() {
+  const { t } = useTranslation();
+  const system = useQuery({
+    queryKey: ['system'],
+    queryFn: () => api.get<{ oidc_configured: boolean }>('/admin/system'),
+  });
+  return (
+    <section className="settings-unit">
+      <h2>{t('admin.authTitle')}</h2>
+      <p className="muted">{t('admin.authHelp')}</p>
+      <ErrorNote error={system.error} />
+      {system.data && <p>{system.data.oidc_configured ? t('admin.oidcOn') : t('admin.oidcOff')}</p>}
+    </section>
+  );
+}
+
+/** Login and second factor (ADM-072): the access rules with their guard, and the login methods. */
+export function LoginTab({ me }: { me: Me }) {
+  return (
+    <>
+      <AccessForm canConfirm={isSystemAdministrator(me)} />
+      <LoginMethods />
     </>
   );
 }
@@ -344,14 +399,15 @@ interface GlobalHolder {
   name: string;
 }
 
-function GlobalHolders() {
+/** Instance permissions (ADM-073): who holds a permission over the whole instance, read only. */
+export function InstancePermissionsTab() {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['global-holders'],
     queryFn: () => api.get<{ holders: GlobalHolder[] }>('/admin/global-permissions'),
   });
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('admin.holders')}</h2>
       <ErrorNote error={q.error} />
       <TableBox>
@@ -378,7 +434,8 @@ function GlobalHolders() {
   );
 }
 
-function Categories() {
+/** The categories that group spaces in the directory; they sit with Organising (D19). */
+export function Categories() {
   const { t } = useTranslation();
   const client = useQueryClient();
   const [name, setName] = useState('');
@@ -399,7 +456,7 @@ function Categories() {
     onSettled: refresh,
   });
   return (
-    <section>
+    <section className="settings-unit">
       <h2>{t('admin.categories')}</h2>
       <ErrorNote error={q.error ?? add.error ?? remove.error} />
       <ul className="plain-list">
@@ -432,13 +489,7 @@ function Categories() {
   );
 }
 
-/** The roles of the instance and its spaces, and who holds what, in words (spec 036). */
+/** The roles of the instance and its spaces, in words (spec 036). */
 export function PermissionsTab() {
-  return (
-    <>
-      <RolesTab />
-      <GlobalHolders />
-      <Categories />
-    </>
-  );
+  return <RolesTab />;
 }
