@@ -181,7 +181,7 @@ export function BlogView({ spaceKey }: { spaceKey?: string }) {
   return <InSpace spaceKey={spaceKey}>{(space) => <PostList path={`/spaces/${space.id}/posts`} />}</InSpace>;
 }
 
-function ArchiveList({ space }: { space: Space }) {
+export function ArchiveList({ space }: { space: Space }) {
   const { t } = useTranslation();
   const client = useQueryClient();
   const { searchParams } = useLocation();
@@ -202,7 +202,6 @@ function ArchiveList({ space }: { space: Space }) {
   const pages = q.data?.pages.filter((p) => p.title.toLowerCase().includes(wanted)) ?? [];
   return (
     <>
-      <h1>{t('organise.archive')}</h1>
       <input
         type="search"
         className="list-filter"
@@ -257,5 +256,15 @@ export function MissingPage({ spaceKey }: { spaceKey: string }) {
 }
 
 export function ArchiveView({ spaceKey }: { spaceKey: string }) {
-  return <InSpace spaceKey={spaceKey}>{(space) => <ArchiveList space={space} />}</InSpace>;
+  const { t } = useTranslation();
+  return (
+    <InSpace spaceKey={spaceKey}>
+      {(space) => (
+        <>
+          <h1>{t('organise.archive')}</h1>
+          <ArchiveList space={space} />
+        </>
+      )}
+    </InSpace>
+  );
 }

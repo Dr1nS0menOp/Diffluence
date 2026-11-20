@@ -39,8 +39,8 @@ test.beforeEach(async ({ page }) => {
 
 test('a space has an animal by itself, and can pick another or a character', async ({ page }) => {
   const space = await newSpace(page, 'Zoo space');
-  await page.goto(`/spaces/${space.key}/settings`);
-  const badge = page.locator('.sidebar-head .space-badge');
+  await page.goto(`/spaces/${space.key}/settings?section=picture`);
+  const badge = page.locator('.space-head-name .space-badge');
   await expect(badge).toHaveAttribute('src', /\/animals\/\w+\.png$/);
   const loaded = await badge.evaluate((image) => (image as HTMLImageElement).naturalWidth);
   expect(loaded).toBeGreaterThan(0);
@@ -54,11 +54,11 @@ test('a space has an animal by itself, and can pick another or a character', asy
 
   await choice.getByLabel('Or a character of your own').fill('Z');
   await page.getByRole('button', { name: 'Save', exact: true }).first().click();
-  await expect(page.locator('.sidebar-head .space-badge')).toHaveText('Z');
+  await expect(page.locator('.space-head-name .space-badge')).toHaveText('Z');
 
   await choice.getByRole('button', { name: 'Pick one from the key' }).click();
   await page.getByRole('button', { name: 'Save', exact: true }).first().click();
-  await expect(page.locator('.sidebar-head img.space-badge')).toBeVisible();
+  await expect(page.locator('.space-head-name img.space-badge')).toBeVisible();
 });
 
 test('a comparison looks like the page, with green, red and words beside them', async ({ page }) => {

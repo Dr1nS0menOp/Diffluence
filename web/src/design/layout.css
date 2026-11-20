@@ -1838,8 +1838,7 @@ a.byline-part:hover {
   max-inline-size: var(--size-summary);
 }
 
-/* Parts of a section: a heading one step smaller, more space above than below (ADM-082). The
-   settings of a space keep their headings until wave SC5. */
+/* Parts of a section: a heading one step smaller, more space above than below (ADM-082, SPC-149). */
 .settings-area:has(> .settings-section-head) h2 {
   margin-block: var(--space-6) var(--space-2);
   font-size: var(--text-section);
@@ -1849,6 +1848,11 @@ a.byline-part:hover {
 .settings-unit + .settings-unit {
   padding-block-start: var(--space-2);
   border-block-start: 1px solid var(--color-line);
+}
+
+/* A switch under a row of controls keeps room around it, so each stays easy to hit (WCAG 2.5.8). */
+.settings-unit > .switch {
+  margin-block-start: var(--space-3);
 }
 
 .settings-unit > h2:first-child {
@@ -1963,14 +1967,14 @@ a.byline-part:hover {
   font-weight: var(--weight-strong);
 }
 
-.tiered .sidebar-part-toggle {
+.settings-admin .sidebar-part-toggle {
   color: var(--color-strong);
   font-size: var(--text-small);
   font-weight: var(--weight-strong);
 }
 
 /* The fold arrow of a settings group sits in a small box of its own (ADM-062). */
-.tiered .part-chevron {
+.settings-admin .part-chevron {
   display: inline-flex;
   border: 1px solid var(--color-line);
   border-radius: var(--radius);
@@ -1978,13 +1982,254 @@ a.byline-part:hover {
 
 /* Text entries of a group start where the names of the icon entries start: the row's padding,
    the icon and the gap after it. */
-.tiered .settings-group .side-link {
+.settings-admin .settings-group .side-link {
   padding-block: var(--space-1);
   padding-inline-start: calc(var(--space-2) * 2 + var(--space-4-5));
 }
 
+/* The sidebar of space settings (SPC-136 to SPC-147). Its head of a way back, the space and the
+   jump field stays in place, opaque, with no line under it at any time. */
+.settings-space .space-head {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  padding-block-end: var(--space-3);
+  border-block-end: 0;
+}
+
+.space-head-back {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.space-head-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-inline-size: 0;
+  padding-inline: var(--space-2);
+  color: var(--color-strong);
+}
+
+/* Only the list under the head scrolls, so no entry ever slides beneath the head and is half
+   hidden there (SPC-136, and the size of a target, WCAG 2.5.8). */
+.settings-sidebar.settings-space {
+  overflow-y: hidden;
+}
+
+.settings-space .space-head {
+  position: static;
+  margin-block-start: 0;
+  padding-block-start: 0;
+}
+
+.settings-space .settings-head + .settings-nav {
+  flex: 1;
+  min-block-size: 0;
+  margin-block-start: 0;
+  overflow-y: auto;
+}
+
+/* The divider between the pinned entries and the groups is as wide as the jump field. */
+.settings-divider {
+  inline-size: 100%;
+  margin-block: var(--space-1);
+  border: 0;
+  border-block-start: 1px solid var(--color-line);
+}
+
+/* No lines between groups; group entries sit close in rows of one height (SPC-146). */
+.settings-space .settings-nav {
+  gap: var(--space-2);
+}
+
+/* A group heading reads like an entry, with a thin chevron in a column of its own (SPC-146). */
+.settings-space .sidebar-part-toggle {
+  gap: var(--space-2);
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+  font-weight: var(--weight-regular);
+}
+
+/* An entry of a group is indented one step past its heading; its band and hover tint start at
+   the chevrons' column and end where the jump field ends (SPC-147). */
+.settings-space .settings-group .side-link {
+  padding-block: var(--space-1);
+  padding-inline-start: calc(var(--space-2) * 2 + var(--space-3-5) + var(--space-3));
+}
+
 .side-link > .lozenge {
   flex: none;
+}
+
+/* Forms of space settings: one field per row (SPC-151). A group of fields without a box of its
+   own reads like a field, with its name as a small bold label. */
+.plain-fieldset {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1-5);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.field-legend {
+  padding: 0;
+  color: var(--color-strong);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+/* A form of space settings: one field per row, with room between them (SPC-151). */
+.space-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-inline-size: var(--size-reading);
+}
+
+.space-form > .space-badge {
+  align-self: flex-start;
+}
+
+/* The administrators of a space as overlapping pictures (SPC-095). */
+.avatar-stack {
+  display: inline-flex;
+}
+
+.avatar-stack > .avatar + .avatar {
+  margin-inline-start: calc(var(--space-2) * -1);
+  outline: 2px solid var(--color-surface);
+}
+
+/* A fold of more fields, shut at first (NAV-169). */
+.fold > summary {
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+  cursor: pointer;
+}
+
+.fold[open] {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* A number field as wide as its content, its unit after it (SPC-140). */
+.field > .number-unit {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--color-ink);
+  font-weight: var(--weight-regular);
+}
+
+.field input.narrow-number {
+  inline-size: calc(var(--space-12) + var(--space-8));
+}
+
+/* A choice among a few as tiles: a bold title, a muted line, a radio (SPC-151). */
+.choice-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(calc(var(--size-summary) / 2), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.choice-tiles > legend {
+  margin-block-end: var(--space-2);
+  padding: 0;
+  color: var(--color-strong);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+.choice-tile {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  cursor: pointer;
+}
+
+.choice-tile:has(input:checked) {
+  border-color: var(--color-accent);
+  background: var(--color-accent-tint);
+}
+
+.choice-tile-text {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-0-5);
+}
+
+.choice-tile-title {
+  color: var(--color-strong);
+  font-weight: var(--weight-strong);
+}
+
+.choice-tile-help {
+  color: var(--color-muted);
+  font-size: var(--text-small);
+}
+
+/* A list of switches as one bordered card with a muted heading band and lines between rows
+   (NAV-167, SPC-115). */
+.settings-card {
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+}
+
+.settings-area .settings-card > .settings-card-head {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-subtle);
+  color: var(--color-muted);
+  font-size: var(--text-small);
+  font-weight: var(--weight-strong);
+}
+
+.settings-card-rows {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.settings-card-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2-5) var(--space-3);
+}
+
+.settings-card-row + .settings-card-row {
+  border-block-start: 1px solid var(--color-line);
+}
+
+/* The name of a switch in a row of the card reads as the row's text, the switch at its end. */
+.settings-card-row > .switch {
+  flex: 1;
+  justify-content: space-between;
+  color: var(--color-ink);
+  font-size: var(--text-ui);
+}
+
+/* An action section: what it does, then one button at its foot (SPC-153). */
+.action-section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+
+.action-section > p {
+  margin: 0;
 }
 
 /* The People screen of a space: rows with a picture, how they got in, and their role. */

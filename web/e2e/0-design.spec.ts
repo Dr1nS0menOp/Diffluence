@@ -203,6 +203,13 @@ async function addComment(page: Page, pageId: string, data: object) {
 
 async function picture(page: Page, name: string, mask: Locator[] = []) {
   await useFixedFont(page);
+  // The settings sidebar of a space brings its current entry into view while entries still arrive;
+  // centring it once more when everything is there gives the same place in every run (spec 083).
+  await page.evaluate(() =>
+    document
+      .querySelector('.settings-space [aria-current="page"]')
+      ?.scrollIntoView({ block: 'center', behavior: 'instant' }),
+  );
   // The header row of a page says when it was last published (PAG-142): the day of the run.
   await fixText(page.getByTestId('last-updated'), 'Published Nov 1, 2026');
   await page.evaluate(() => document.fonts.ready);
@@ -733,18 +740,13 @@ test.describe('the look of every kind of screen', () => {
     await page.context().close();
   });
 
-  test('SpaceAccessView: who has access', async ({ browser }) => {
+  test('SpaceAccessView: permissions, who can open the space and how', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/access');
-    await expect(page.getByRole('tab', { name: 'People' })).toBeVisible();
-    // People and groups with a role each, not a matrix of ticks (spec 043).
-    await expect(page.locator('.member-row').first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Give access' })).toBeVisible();
-    await picture(page, 'space-access');
-    await page.getByRole('tab', { name: 'People' }).click();
+    await expect(page.getByRole('heading', { name: 'Permissions', level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /CSV/ })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
-    await picture(page, 'space-access-people');
+    await picture(page, 'space-permissions');
     await page.context().close();
   });
 
@@ -761,7 +763,7 @@ test.describe('the look of every kind of screen', () => {
   test('SpaceAuditView: the audit of a space', async ({ browser }) => {
     const page = await newReaderPage(browser, 'light');
     await page.goto('/spaces/HANDBOOK/audit');
-    await expect(page.getByRole('heading', { name: 'Audit of this space' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Audit of the space' })).toBeVisible();
     await expect(page.getByRole('table')).toBeVisible();
     await picture(page, 'space-audit', [page.locator('table')]);
     await page.context().close();
@@ -827,8 +829,8 @@ test.describe('the look of every kind of screen', () => {
     await expect(page.getByRole('group', { name: 'People and access' })).toBeVisible();
     await picture(page, 'role-editor');
     await page.getByRole('dialog').getByRole('button', { name: 'Cancel' }).click();
-    await page.goto('/spaces/HANDBOOK/settings?section=roles');
-    await expect(page.getByRole('heading', { name: 'People and roles', level: 1 })).toBeVisible();
+    await page.goto('/spaces/HANDBOOK/settings?section=people');
+    await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Give access' })).toBeVisible();
     await expect(page.locator('.member-row').first()).toBeVisible();
     await picture(page, 'space-roles');
@@ -3108,6 +3110,187 @@ test.describe('the administration as blueprint 03 arranges it', () => {
     await expect(page.getByRole('heading', { name: 'Retention' })).toBeVisible();
     await picture(page, 'admin-column-long');
     await checkAccessibility(page);
+    await page.context().close();
+  });
+});
+
+// The settings of a space as blueprint 03 arranges them (spec 083). One space with a fixed key and
+// one person with a fixed name, so the badge, the animal and the pictures of people never change.
+test.describe('the settings of a space as blueprint 03 arranges them', () => {
+  test.describe.configure({ mode: 'serial' });
+  const KEY = 'TIDY';
+  const TALL_SCREEN = { width: 1280, height: 1300 };
+  const SHORT_SCREEN = { width: 1280, height: 520 };
+  const KEEPER = { email: `${unique('keeper')}@example.com`, name: 'Robin Vos' };
+  const LOOKER = { email: `${unique('looker')}@example.com`, name: 'Sam de Wit' };
+  let spaceId = '';
+
+  test.beforeAll(async ({ browser }) => {
+    const keeper = await createNamedUser(browser, KEEPER.email, KEEPER.name);
+    const looker = await createNamedUser(browser, LOOKER.email, LOOKER.name);
+    const { api, close } = await adminRequest(browser);
+    const made = await api.post('/api/v1/spaces', { data: { key: KEY, name: 'Team handbook' } });
+    expect(made.status(), await made.text()).toBe(201);
+    spaceId = ((await made.json()) as { id: string }).id;
+    for (const [id, permissions] of [
+      [
+        keeper,
+        [
+          'space.view',
+          'space.administer',
+          'space.manage_access',
+          'space.look',
+          'space.statuses',
+          'space.approvals',
+          'space.labels',
+          'space.workflows',
+          'space.audit',
+          'space.templates',
+          'space.automation',
+          'page.create',
+        ],
+      ],
+      [looker, ['space.view', 'space.look']],
+    ] as const) {
+      const res = await api.put(`/api/v1/spaces/${spaceId}/grants`, {
+        data: { subject: { type: 'user', id }, permissions },
+      });
+      expect(res.status(), await res.text()).toBe(204);
+    }
+    await close();
+  });
+
+  async function pageOf(browser: Browser, who: { email: string }): Promise<Page> {
+    const page = await (await browser.newContext({ baseURL: 'http://localhost:8080' })).newPage();
+    await login(page, who.email, PASSWORD);
+    return page;
+  }
+
+  /** Opens an entry and waits for its title; the pointer rests outside the sidebar. */
+  async function openEntry(page: Page, address: string, title: string) {
+    await page.goto(`/spaces/${KEY}${address}`);
+    await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible();
+    await page.mouse.move(900, 600);
+  }
+
+  /** Folds or unfolds a group, and waits until the person's preferences hold it. */
+  async function toggle(page: Page, group: string) {
+    const saved = page.waitForResponse(
+      (r) => r.url().includes('/me/preferences') && r.request().method() === 'PUT',
+    );
+    await page.getByRole('button', { name: group, exact: true }).click();
+    await saved;
+    await page.mouse.move(900, 600);
+  }
+
+  test('SpaceSettingsView: the sidebar, one group shut', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await page.setViewportSize(TALL_SCREEN);
+    await openEntry(page, '/settings?section=features', 'Features');
+    await toggle(page, 'Look');
+    await picture(page, 'space-settings-sidebar');
+    await picture(page, 'space-features');
+    await checkAccessibility(page);
+    await toggle(page, 'Look');
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: the sidebar scrolled to an entry deep in Connections', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await page.setViewportSize(SHORT_SCREEN);
+    await openEntry(page, '/settings/webhooks', 'Webhooks');
+    await picture(page, 'space-settings-scrolled');
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: the jump field, a match by an old name and none', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/settings?section=layout', 'Layout');
+    await picture(page, 'space-layout');
+    const jump = page.getByRole('searchbox', { name: 'Jump to a setting' });
+    await jump.fill('key');
+    await picture(page, 'space-settings-jump');
+    await jump.fill('nothing like this');
+    await expect(page.getByText('No setting has that name.')).toBeVisible();
+    await picture(page, 'space-settings-jump-none');
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: Details at rest, changed, and for someone who sets the look', async ({
+    browser,
+  }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/settings?section=details', 'Details');
+    await expect(page.locator('.avatar-stack')).toBeVisible();
+    await picture(page, 'space-details');
+    await page.getByText('More details').click();
+    await page.getByLabel('Name', { exact: true }).fill('Team handbook, renamed');
+    await expect(page.getByRole('button', { name: 'Save', exact: true })).toBeEnabled();
+    await page.mouse.move(900, 600);
+    await picture(page, 'space-details-changed');
+    await checkAccessibility(page);
+    await page.context().close();
+    const looker = await pageOf(browser, LOOKER);
+    await openEntry(looker, '/settings?section=details', 'Details');
+    await expect(looker.getByLabel('Home page')).toBeVisible();
+    await picture(looker, 'space-details-look');
+    await looker.context().close();
+  });
+
+  test('SpaceSettingsView: Statuses and approvals', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/settings?section=statuses', 'Statuses and approvals');
+    await expect(page.getByRole('heading', { name: 'Approval before publishing' })).toBeVisible();
+    await picture(page, 'space-statuses');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: Archive the space, archived, and Delete the space', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/settings?section=archive', 'Archive the space');
+    await picture(page, 'space-archive');
+    const archived = await page.request.post(`/api/v1/spaces/${spaceId}/archive`);
+    expect(archived.ok(), await archived.text()).toBeTruthy();
+    await openEntry(page, '/settings?section=archive', 'Archive the space');
+    await expect(page.getByRole('button', { name: 'Restore the space' })).toBeVisible();
+    await picture(page, 'space-archive-restore');
+    const restored = await page.request.post(`/api/v1/spaces/${spaceId}/unarchive`);
+    expect(restored.ok(), await restored.text()).toBeTruthy();
+    await openEntry(page, '/settings?section=delete', 'Delete the space');
+    await picture(page, 'space-delete');
+    await picture(page, 'space-settings-column-short');
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: Pages still to write, with rows and empty', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/settings?section=placeholders', 'Pages still to write');
+    await expect(page.getByText('When a page links to a title')).toBeVisible();
+    await picture(page, 'space-placeholders-empty');
+    // Rows need pages that link to titles nobody started; the answer is fixed instead.
+    const source = { id: '00000000-0000-7000-8000-000000000001', title: 'Onboarding' };
+    await page.route('**/api/v1/spaces/*/placeholders', (route) =>
+      route.fulfill({
+        json: {
+          placeholders: [
+            { title: 'Expense policy', source },
+            { title: 'Meeting notes', source: { ...source, title: 'How we meet' } },
+          ],
+        },
+      }),
+    );
+    await openEntry(page, '/settings?section=placeholders', 'Pages still to write');
+    await expect(page.getByRole('table')).toBeVisible();
+    await picture(page, 'space-placeholders');
+    await checkAccessibility(page);
+    await page.context().close();
+  });
+
+  test('SpaceSettingsView: Permissions and Content at full width', async ({ browser }) => {
+    const page = await pageOf(browser, KEEPER);
+    await openEntry(page, '/content', 'Content');
+    await picture(page, 'space-settings-full', [page.locator('table')]);
     await page.context().close();
   });
 });

@@ -305,7 +305,7 @@ test('a space administrator adds and orders shortcuts, and outside addresses ope
 }) => {
   const space = await newSpace(page, 'Shortcut space');
   await page.goto(`/spaces/${space.key}/settings?section=shortcuts`);
-  const shortcuts = page.locator('section', { has: page.getByRole('heading', { name: 'Shortcuts' }) });
+  const shortcuts = page.locator('.settings-area');
   await shortcuts.getByLabel('Label', { exact: true }).fill('Runbook');
   await shortcuts.getByPlaceholder(/Address/).fill(`/pages/${space.home_page_id}`);
   await shortcuts.getByRole('button', { name: 'Add', exact: true }).click();

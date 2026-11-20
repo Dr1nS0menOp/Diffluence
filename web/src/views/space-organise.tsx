@@ -1,33 +1,39 @@
 // SPDX-License-Identifier: Apache-2.0
-// The parts of Space settings that shape how a space is organised.
+// The parts of Space settings that shape how a space is organised and how it looks.
 import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, type LabelCount, type Space } from '../api';
+import { useCapabilities } from '../capabilities';
+import { AnimalChoice } from '../components/animal-choice';
+import { ChoiceTiles } from '../components/choice-tiles';
 import {
-  api,
-  type DirectoryEntry,
-  type LabelCount,
-  type PageRef,
-  type Space,
-  type SpaceOverview,
-  type Stage,
-} from '../api';
-import { Link, navigate } from '../router';
-import { SubjectPicker } from '../components/picker';
+  IconAutomation,
+  IconBlog,
+  IconChart,
+  IconComment,
+  IconDate,
+  IconEmoji,
+  IconLock,
+  IconStatus,
+} from '../components/icons';
+import { SaveReset } from '../components/save-reset';
+import { Switch } from '../components/switch';
+import { useSaved } from '../components/toast';
 import { Dialog, ErrorNote, Field, FilePicker } from '../components/ui';
-import { pageTitle } from '../page-name';
 
+/** The switches of a space, each with its icon (SPC-115). Requests for access stay (D14). */
 const FEATURES = [
-  'blog',
-  'comments',
-  'reactions',
-  'access_requests',
-  'stages',
-  'analytics',
-  'automation',
-  'calendar',
-];
-const MARK_COLOURS = ['grey', 'yellow', 'green', 'blue', 'purple', 'red'];
+  { id: 'blog', icon: IconBlog },
+  { id: 'comments', icon: IconComment },
+  { id: 'reactions', icon: IconEmoji },
+  { id: 'access_requests', icon: IconLock },
+  { id: 'stages', icon: IconStatus },
+  { id: 'analytics', icon: IconChart },
+  { id: 'automation', icon: IconAutomation },
+  { id: 'calendar', icon: IconDate },
+] as const;
+const FEATURE_ICON_SIZE = 18;
 
 function useSpaceRefresh(space: Space) {
   const client = useQueryClient();
@@ -38,263 +44,40 @@ function useSpaceRefresh(space: Space) {
   };
 }
 
-export function SpaceLinksSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  return (
-    <section>
-      <h2>{t('spaceSettings.keepTidy')}</h2>
-      <ul className="plain-list">
-        <li>
-          <Link href={`/spaces/${space.key}/content`}>{t('content.title')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/templates`}>{t('templates.title')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/archive`}>{t('organise.archive')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/labels`}>{t('organise.labels')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/insights`}>{t('insights.spaceTitle')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/settings/automation`}>{t('rules2.title')}</Link>
-        </li>
-        <li>
-          <Link href={`/spaces/${space.key}/settings/webhooks`}>{t('webhooks.title')}</Link>
-        </li>
-      </ul>
-    </section>
-  );
-}
-
-export function KeySection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const [key, setKey] = useState(space.key);
-  const save = useMutation({
-    mutationFn: () => api.put<Space>(`/spaces/${space.id}/key`, { key }),
-    onSuccess: async (s) => {
-      await client.invalidateQueries({ queryKey: ['spaces'] });
-      navigate(`/spaces/${s.key}/settings`, true);
-    },
-  });
-  const old = useQuery({
-    queryKey: ['old-keys', space.id],
-    queryFn: () => api.get<{ keys: string[] }>(`/spaces/${space.id}/old-keys`),
-  });
-  const release = useMutation({
-    mutationFn: (alias: string) => api.del(`/spaces/${space.id}/old-keys/${encodeURIComponent(alias)}`),
-    onSettled: () => client.invalidateQueries({ queryKey: ['old-keys', space.id] }),
-  });
-  return (
-    <section>
-      <h2>{t('spaceSettings.key')}</h2>
-      <p className="muted">{t('spaceSettings.keyHelp')}</p>
-      <ErrorNote error={save.error ?? release.error} />
-      <form
-        className="row"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          save.mutate();
-        }}
-      >
-        <input value={key} aria-label={t('space.key')} onChange={(e) => setKey(e.target.value)} />
-        <button type="submit">{t('common.save')}</button>
-      </form>
-      <ul className="plain-list">
-        {old.data?.keys.map((alias) => (
-          <li key={alias} className="row">
-            {alias}
-            <button type="button" className="ghost" onClick={() => release.mutate(alias)}>
-              {t('spaceSettings.release')}
-            </button>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
-}
-
-export function PeopleSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const refresh = useSpaceRefresh(space);
-  const overview = useQuery({
-    queryKey: ['overview', space.id],
-    queryFn: () => api.get<SpaceOverview>(`/spaces/${space.id}/overview`),
-  });
-  const owners = overview.data?.owners ?? [];
-  const save = useMutation({
-    mutationFn: (ids: string[]) => api.put(`/spaces/${space.id}/owners`, { user_ids: ids }),
-    onSettled: refresh,
-  });
-  const [home, setHome] = useState('');
-  const setHomePage = useMutation({
-    mutationFn: () => api.put(`/spaces/${space.id}/home`, { page_id: home }),
-    onSuccess: refresh,
-  });
-  const pages = useQuery({
-    queryKey: ['tree-pages', space.id],
-    queryFn: () => api.get<{ pages: PageRef[] }>(`/spaces/${space.id}/tree`),
-  });
-  const mayOwn = space.can?.['space.administer'] ?? false;
-  const mayLook = space.can?.['space.look'] ?? false;
-  return (
-    <section>
-      <ErrorNote error={save.error ?? setHomePage.error} />
-      {mayOwn && (
-        <>
-          <h2>{t('spaceSettings.owners')}</h2>
-          <p className="muted">{t('spaceSettings.ownersHelp')}</p>
-          <ul className="plain-list">
-            {owners.map((o) => (
-              <li key={o.id} className="row">
-                {o.name}
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => save.mutate(owners.filter((x) => x.id !== o.id).map((x) => x.id))}
-                >
-                  {t('common.remove')}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <SubjectPicker
-            label={t('spaceSettings.addOwner')}
-            usersOnly
-            onPick={(e: DirectoryEntry) => save.mutate([...owners.map((o) => o.id), e.id])}
-          />
-        </>
-      )}
-      {mayLook && (
-        <>
-          <h2>{t('spaceSettings.home')}</h2>
-          <div className="row">
-            <select
-              aria-label={t('spaceSettings.home')}
-              value={home || (space.home_page_id ?? '')}
-              onChange={(e) => setHome(e.target.value)}
-            >
-              {pages.data?.pages.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {pageTitle(t, p.title)}
-                </option>
-              ))}
-            </select>
-            <button type="button" disabled={!home} onClick={() => setHomePage.mutate()}>
-              {t('common.save')}
-            </button>
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
+/** The switches of a space in one card; each applies at once and says so (SPC-116, NAV-167). */
 export function FeaturesSection({ space }: { space: Space }) {
   const { t } = useTranslation();
   const refresh = useSpaceRefresh(space);
+  const saved = useSaved();
+  const capabilities = useCapabilities();
   const save = useMutation({
     mutationFn: (values: Record<string, boolean>) => api.put(`/spaces/${space.id}/features`, values),
+    onSuccess: saved,
     onSettled: refresh,
   });
+  // A switch of an experimental part is absent while the part is off for the instance.
+  const shown = FEATURES.filter((f) => f.id !== 'automation' || capabilities.automation);
   return (
-    <section>
-      <h2>{t('spaceSettings.features')}</h2>
-      <p className="muted">{t('spaceSettings.featuresHelp')}</p>
+    <>
       <ErrorNote error={save.error} />
-      {FEATURES.map((f) => (
-        <label key={f} className="check">
-          <input
-            type="checkbox"
-            checked={space.features?.[f] ?? true}
-            onChange={(e) => save.mutate({ [f]: e.target.checked })}
-          />
-          {t(`spaceSettings.feature_${f}`)}
-        </label>
-      ))}
-    </section>
-  );
-}
-
-export function StatusesSection({ space }: { space: Space }) {
-  const { t } = useTranslation();
-  const client = useQueryClient();
-  const key = ['statuses', space.id];
-  const q = useQuery({
-    queryKey: key,
-    queryFn: () => api.get<{ statuses: Stage[]; free: boolean }>(`/spaces/${space.id}/statuses`),
-  });
-  const save = useMutation({
-    mutationFn: (v: { statuses: Stage[]; free: boolean }) => api.put(`/spaces/${space.id}/statuses`, v),
-    onSettled: () => client.invalidateQueries({ queryKey: key }),
-  });
-  const [word, setWord] = useState('');
-  const [color, setColor] = useState('blue');
-  const list = q.data?.statuses ?? [];
-  const free = q.data?.free ?? false;
-  return (
-    <section>
-      <h2>{t('spaceSettings.statuses')}</h2>
-      <ErrorNote error={q.error ?? save.error} />
-      <ul className="plain-list">
-        {list.map((s) => (
-          <li key={s.text} className="row">
-            <span className={`status-mark mark-${s.color}`}>{s.text}</span>
-            <button
-              type="button"
-              className="ghost"
-              onClick={() => save.mutate({ statuses: list.filter((x) => x.text !== s.text), free })}
-            >
-              {t('common.remove')}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <form
-        className="row"
-        onSubmit={(e: FormEvent) => {
-          e.preventDefault();
-          save.mutate({ statuses: [...list, { text: word, color }], free });
-          setWord('');
-        }}
-      >
-        <input
-          required
-          maxLength={30}
-          value={word}
-          aria-label={t('organise.statusWord')}
-          placeholder={t('organise.statusWord')}
-          onChange={(e) => setWord(e.target.value)}
-        />
-        <select
-          aria-label={t('spaceSettings.colour')}
-          value={color}
-          onChange={(e) => setColor(e.target.value)}
-        >
-          {MARK_COLOURS.map((c) => (
-            <option key={c} value={c}>
-              {t(`editor.colors.${c}`)}
-            </option>
+      <section className="settings-card" aria-labelledby="features-card">
+        <h2 id="features-card" className="settings-card-head">
+          {t('spaceFeatures.card')}
+        </h2>
+        <ul className="settings-card-rows">
+          {shown.map(({ id, icon: Icon }) => (
+            <li key={id} className="settings-card-row">
+              <Icon size={FEATURE_ICON_SIZE} />
+              <Switch checked={space.features?.[id] ?? true} onChange={(on) => save.mutate({ [id]: on })}>
+                {t(`spaceSettings.feature_${id}`)}
+              </Switch>
+            </li>
           ))}
-        </select>
-        <button type="submit">{t('common.add')}</button>
-      </form>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={free}
-          onChange={(e) => save.mutate({ statuses: list, free: e.target.checked })}
-        />
-        {t('spaceSettings.freeStatus')}
-      </label>
-    </section>
+        </ul>
+      </section>
+    </>
   );
 }
-
 /** A fixed list, and renaming, which merges when the new name already exists. */
 export function LabelsSection({ space }: { space: Space }) {
   const { t } = useTranslation();
@@ -324,7 +107,6 @@ export function LabelsSection({ space }: { space: Space }) {
   const list = q.data?.fixed_labels ?? [];
   return (
     <section>
-      <h2>{t('organise.labels')}</h2>
       <ErrorNote error={q.error ?? fixed.error ?? rename.error} />
       <label className="check">
         <input
@@ -373,40 +155,14 @@ export function LabelsSection({ space }: { space: Space }) {
   );
 }
 
-export function RulesSection({ space }: { space: Space }) {
+/** The animal or character of a space, and a picture of its own (spec 083, step 4a). */
+export function PictureSection({ space }: { space: Space }) {
   const { t } = useTranslation();
   const refresh = useSpaceRefresh(space);
-  const [months, setMonths] = useState(space.review_months ?? 0);
-  const review = useMutation({
-    mutationFn: () => api.put(`/spaces/${space.id}/review`, { months }),
-    onSuccess: refresh,
-  });
-  const client = useQueryClient();
-  const ruleKey = ['approval-rule', space.id];
-  const rule = useQuery({
-    enabled: space.can?.['space.approvals'] ?? false,
-    queryKey: ruleKey,
-    queryFn: () =>
-      api.get<{ required: boolean; approvers: { id: string; name: string }[] }>(
-        `/spaces/${space.id}/approvals`,
-      ),
-  });
-  const required = rule.data?.required ?? false;
-  const approvers = rule.data?.approvers ?? [];
-  const approval = useMutation({
-    mutationFn: (v: { required: boolean; approvers: string[] }) =>
-      api.put(`/spaces/${space.id}/approvals`, v),
-    onSuccess: async () => {
-      await client.invalidateQueries({ queryKey: ruleKey });
-      await refresh();
-    },
-  });
-  const approverIds = approvers.map((a) => a.id);
-  const mayStatuses = space.can?.['space.statuses'] ?? false;
-  const mayApprovals = space.can?.['space.approvals'] ?? false;
-  const mayLook = space.can?.['space.look'] ?? false;
-  const align = useMutation({
-    mutationFn: (value: string) => api.put(`/spaces/${space.id}/title-align`, { align: value }),
+  const [icon, setIcon] = useState(space.icon);
+  const choose = useMutation({
+    mutationFn: () =>
+      api.patch(`/spaces/${space.id}`, { name: space.name, description: space.description, icon }),
     onSuccess: refresh,
   });
   const upload = useMutation({
@@ -418,80 +174,81 @@ export function RulesSection({ space }: { space: Space }) {
     onSuccess: refresh,
   });
   return (
-    <section>
-      <h2>{t('spaceSettings.rules')}</h2>
-      <ErrorNote error={review.error ?? approval.error ?? align.error ?? upload.error ?? removeIcon.error} />
-      {mayStatuses && (
-        <Field label={t('spaceSettings.reviewMonths')} help={t('spaceSettings.reviewHelp')}>
-          <input
-            type="number"
-            min={0}
-            max={120}
-            value={months}
-            onChange={(e) => setMonths(Number(e.target.value))}
-            onBlur={() => review.mutate()}
+    <>
+      {space.can?.['space.administer'] && (
+        <form
+          className="settings-unit"
+          onSubmit={(e: FormEvent) => {
+            e.preventDefault();
+            choose.mutate();
+          }}
+        >
+          <ErrorNote error={choose.error} />
+          <AnimalChoice spaceKey={space.key} name={space.name} value={icon} onChange={setIcon} />
+          <SaveReset
+            changed={icon !== space.icon}
+            busy={choose.isPending}
+            onReset={() => setIcon(space.icon)}
           />
-        </Field>
+        </form>
       )}
-      {mayLook && (
-        <Field label={t('spaceSettings.titleAlign')}>
-          <select value={space.title_align ?? 'start'} onChange={(e) => align.mutate(e.target.value)}>
-            <option value="start">{t('look.alignStart')}</option>
-            <option value="center">{t('look.alignCenter')}</option>
-          </select>
-        </Field>
-      )}
-      {mayApprovals && (
-        <>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={required}
-              onChange={(e) => approval.mutate({ required: e.target.checked, approvers: approverIds })}
+      {space.can?.['space.look'] && (
+        <section className="settings-unit" aria-labelledby="uploaded-picture">
+          <h2 id="uploaded-picture">{t('spaceDetails.uploaded')}</h2>
+          <p className="muted">{t('spaceDetails.uploadedHelp')}</p>
+          <ErrorNote error={upload.error ?? removeIcon.error} />
+          <div className="row">
+            <FilePicker
+              label={t('spaceSettings.picture')}
+              accept="image/png,image/jpeg,image/gif,image/webp"
+              onPick={(f) => upload.mutate(f)}
             />
-            {t('spaceSettings.requireApproval')}
-          </label>
-          <ul className="plain-list">
-            {approvers.map((a) => (
-              <li key={a.id} className="row">
-                {a.name}
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() =>
-                    approval.mutate({ required, approvers: approverIds.filter((id) => id !== a.id) })
-                  }
-                >
-                  {t('common.remove')}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <SubjectPicker
-            label={t('spaceSettings.fixedApprover')}
-            usersOnly
-            onPick={(e) => approval.mutate({ required, approvers: [...approverIds, e.id] })}
-          />
-        </>
+            {space.has_icon && (
+              <button type="button" className="quiet" onClick={() => removeIcon.mutate()}>
+                {t('spaceSettings.removePicture')}
+              </button>
+            )}
+          </div>
+        </section>
       )}
-      {mayLook && (
-        <div className="row">
-          <FilePicker
-            label={t('spaceSettings.picture')}
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            onPick={(f) => upload.mutate(f)}
-          />
-          {space.has_icon && (
-            <button type="button" className="quiet" onClick={() => removeIcon.mutate()}>
-              {t('spaceSettings.removePicture')}
-            </button>
-          )}
-        </div>
-      )}
-    </section>
+    </>
   );
 }
 
+type TitleAlign = 'start' | 'center';
+
+/** The title alignment of new pages as two tiles (PAG-126, SPC-143, SPC-151). */
+export function LayoutSection({ space }: { space: Space }) {
+  const { t } = useTranslation();
+  const refresh = useSpaceRefresh(space);
+  const stored: TitleAlign = space.title_align === 'center' ? 'center' : 'start';
+  const [align, setAlign] = useState<TitleAlign>(stored);
+  const save = useMutation({
+    mutationFn: () => api.put(`/spaces/${space.id}/title-align`, { align }),
+    onSuccess: refresh,
+  });
+  return (
+    <form
+      className="space-form"
+      onSubmit={(e: FormEvent) => {
+        e.preventDefault();
+        save.mutate();
+      }}
+    >
+      <ErrorNote error={save.error} />
+      <ChoiceTiles
+        legend={t('spaceLayout.title')}
+        value={align}
+        onChange={setAlign}
+        tiles={[
+          { value: 'start', title: t('spaceLayout.start'), help: t('spaceLayout.startHelp') },
+          { value: 'center', title: t('spaceLayout.centre'), help: t('spaceLayout.centreHelp') },
+        ]}
+      />
+      <SaveReset changed={align !== stored} busy={save.isPending} onReset={() => setAlign(stored)} />
+    </form>
+  );
+}
 /** Deleting a space asks for its key, and offers something milder first (SPC-073). */
 export function DeleteSpaceDialog({
   space,

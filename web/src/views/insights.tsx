@@ -4,7 +4,8 @@ import { useTranslation } from 'react-i18next';
 import { useQuery } from '@tanstack/react-query';
 import { api, type Space } from '../api';
 import { Chart, type ChartData } from '../components/chart';
-import { Frame, spaceByKeyQuery } from '../components/frame';
+import { spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { SortTable, type SortColumn } from '../components/sort-table';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { Link } from '../router';
@@ -339,8 +340,8 @@ export function SpaceInsightsView({ spaceKey }: { spaceKey: string }) {
   }
   if (!q.data) return <Loading />;
   return (
-    <Frame space={q.data}>
+    <SpaceToolFrame space={q.data} entry="insights">
       <SpaceReport space={q.data} />
-    </Frame>
+    </SpaceToolFrame>
   );
 }

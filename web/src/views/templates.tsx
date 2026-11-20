@@ -14,7 +14,8 @@ import {
 import { Link, navigate } from '../router';
 import { DocumentEditor } from '../components/editor/editor';
 import { IconArrowBack } from '../components/icons';
-import { Frame, spaceByKeyQuery } from '../components/frame';
+import { spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { templateFileAddress } from '../components/template-gallery';
 import { ErrorNote, Field, FilePicker, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
@@ -205,7 +206,11 @@ function InSpace({ spaceKey, children }: { spaceKey: string; children: (space: S
   const q = useQuery(spaceByKeyQuery(spaceKey));
   if (q.error) return <ErrorNote error={q.error} />;
   if (!q.data) return <Loading />;
-  return <Frame space={q.data}>{children(q.data)}</Frame>;
+  return (
+    <SpaceToolFrame space={q.data} entry="templates">
+      {children(q.data)}
+    </SpaceToolFrame>
+  );
 }
 
 export function TemplatesView({ spaceKey }: { spaceKey: string }) {

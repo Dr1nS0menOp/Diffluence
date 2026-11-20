@@ -63,7 +63,7 @@ test('a manager cannot make an administrator, and taking access away asks first'
   }
 
   const as = await pageAs(browser, managerMail);
-  await as.goto(`/spaces/${space.key}/access`);
+  await as.goto(`/spaces/${space.key}/settings?section=people`);
   await checkAccessibility(as);
   const row = as.locator('.member-row').filter({ hasText: writerName });
   const held = row.getByRole('list', { name: `Roles of ${writerName}` });
@@ -96,7 +96,7 @@ test('someone holds several roles, and each opens to show what it gives', async 
   const space = await newSpace(page, 'Several roles');
   const name = unique('helper');
   const id = await createNamedUser(browser, `${name}@example.com`, name);
-  await page.goto(`/spaces/${space.key}/access`);
+  await page.goto(`/spaces/${space.key}/settings?section=people`);
   await page.getByPlaceholder('Give a role to').fill(name);
   await page.getByRole('option', { name: new RegExp(`${name}@example.com`) }).click();
   await page.getByLabel(`Role to give ${name}`).selectOption({ label: 'Viewer' });
@@ -133,7 +133,7 @@ test('a combination without a name shows as it is, and an administrator names it
   // The older route for single permissions makes a role named after them.
   await grant(page, space.id, { type: 'user', id }, EDITOR);
   const before = await permissionsOf(page, space.id, id);
-  await page.goto(`/spaces/${space.key}/access`);
+  await page.goto(`/spaces/${space.key}/settings?section=people`);
   const row = page.locator('.member-row').filter({ hasText: name });
   // Spec 049: a short name, never cut off, that says how many permissions it holds.
   const role = row.locator('summary');

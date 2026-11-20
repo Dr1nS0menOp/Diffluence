@@ -7,15 +7,13 @@ import { api, type Holder, type Space } from '../api';
 import { useDates } from '../dates';
 import { Frame, spaceByKeyQuery } from '../components/frame';
 import { PersonName } from '../components/person';
-import { Tabs } from '../components/tabs';
 import { ErrorNote, Loading } from '../components/ui';
-import { SpaceRolesPanel } from './access-roles';
 import { SpacePeople } from './space-people';
 import { TEMPLATES } from './space-grants';
 import { TableBox } from '../components/table-box';
+import { Link } from '../router';
+import { SpaceToolFrame } from './space-settings-frame';
 
-const ACCESS_TABS = ['grants', 'people'] as const;
-type AccessTab = (typeof ACCESS_TABS)[number];
 const AUDIT_ID_LENGTH = 8;
 
 function InviteGuest({ space }: { space: Space }) {
@@ -27,7 +25,7 @@ function InviteGuest({ space }: { space: Space }) {
   });
   return (
     <section>
-      <h3>{t('access.inviteGuest')}</h3>
+      <h2>{t('access.inviteGuest')}</h2>
       <p className="muted">{t('access.inviteGuestHelp')}</p>
       <ErrorNote error={invite.error} />
       {invite.data && (
@@ -69,11 +67,13 @@ function Presets({ space }: { space: Space }) {
     onSettled: async () => {
       await client.invalidateQueries({ queryKey: ['grants', space.id] });
       await client.invalidateQueries({ queryKey: ['role-assignments'] });
+      // Who has access is on the same screen now that the tabs are gone (spec 083, D9).
+      await client.invalidateQueries({ queryKey: ['space-access', space.id] });
     },
   });
   return (
     <>
-      <h3>{t('permissions.preset')}</h3>
+      <h2>{t('permissions.preset')}</h2>
       <ErrorNote error={preset.error} />
       <div className="row">
         <button type="button" onClick={() => preset.mutate('team_space')}>
@@ -87,15 +87,6 @@ function Presets({ space }: { space: Space }) {
   );
 }
 
-function GrantsPanel({ space }: { space: Space }) {
-  return (
-    <>
-      <SpaceRolesPanel space={space} />
-      {space.can?.['space.administer'] && <Presets space={space} />}
-      <InviteGuest space={space} />
-    </>
-  );
-}
 function HolderSource({ holder }: { holder: Holder }) {
   const { t } = useTranslation();
   if (holder.source === 'group') return <>{t('access.viaGroup', { group: holder.via })}</>;
@@ -166,12 +157,17 @@ function PeoplePanel({ space }: { space: Space }) {
   );
 }
 
-/** Loads the space of a screen, and frames it. */
+/**
+ * Loads the space of a screen, and frames it: an entry of space settings opens beside their
+ * sidebar for whoever may open them (spec 083, D5), any other screen in the frame of the space.
+ */
 function SpaceScreen({
   spaceKey,
+  entry,
   children,
 }: {
   spaceKey: string;
+  entry?: string;
   children: (space: Space) => React.ReactNode;
 }) {
   const q = useQuery(spaceByKeyQuery(spaceKey));
@@ -183,34 +179,41 @@ function SpaceScreen({
     );
   }
   if (!q.data) return <Loading />;
-  return <Frame space={q.data}>{children(q.data)}</Frame>;
+  if (!entry) return <Frame space={q.data}>{children(q.data)}</Frame>;
+  return (
+    <SpaceToolFrame space={q.data} entry={entry}>
+      {children(q.data)}
+    </SpaceToolFrame>
+  );
 }
 
+/**
+ * Permissions: who can open the space and how, the presets and inviting a guest. Who holds which
+ * role is changed in People, so the role list is not here a second time (spec 083, D9).
+ */
 export function SpaceAccessView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
-  const [tab, setTab] = useState<AccessTab>('grants');
   return (
-    <SpaceScreen spaceKey={spaceKey}>
+    <SpaceScreen spaceKey={spaceKey} entry="permissions">
       {(space) => (
         <>
-          <h1>{t('access.title')}</h1>
-          <Tabs
-            label={t('access.title')}
-            panel="access-panel"
-            tabs={ACCESS_TABS}
-            current={tab}
-            name={(name) => t(`access.tab_${name}`)}
-            onChange={setTab}
-          />
-          <div id="access-panel" role="tabpanel" aria-labelledby={`access-panel-tab-${tab}`}>
-            {tab === 'grants' ? <GrantsPanel space={space} /> : <PeoplePanel space={space} />}
-          </div>
+          <h1>{t('spaceSections.permissions.name')}</h1>
+          <p className="muted">
+            {t('spaceSections.permissions.intro')}{' '}
+            <Link href={`/spaces/${space.key}/settings?section=people`}>
+              {t('spaceSections.people.name')}
+            </Link>
+            .
+          </p>
+          <h2>{t('spacePermissions.who')}</h2>
+          <PeoplePanel space={space} />
+          {space.can?.['space.administer'] && <Presets space={space} />}
+          <InviteGuest space={space} />
         </>
       )}
     </SpaceScreen>
   );
 }
-
 export function SpacePeopleView({ spaceKey }: { spaceKey: string }) {
   return <SpaceScreen spaceKey={spaceKey}>{(space) => <SpacePeople space={space} />}</SpaceScreen>;
 }
@@ -275,10 +278,10 @@ function SpaceAuditTable({ space }: { space: Space }) {
 export function SpaceAuditView({ spaceKey }: { spaceKey: string }) {
   const { t } = useTranslation();
   return (
-    <SpaceScreen spaceKey={spaceKey}>
+    <SpaceScreen spaceKey={spaceKey} entry="audit">
       {(space) => (
         <>
-          <h1>{t('access.auditTitle')}</h1>
+          <h1>{t('spaceSections.audit.name')}</h1>
           <SpaceAuditTable space={space} />
         </>
       )}

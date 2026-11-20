@@ -25,6 +25,13 @@ const ToastContext = createContext<(toast: Toast) => void>(() => undefined);
 /** Shows a short message at the bottom of the screen. */
 export const useToast = () => useContext(ToastContext);
 
+/** Says that a setting which applies at once was saved, also to screen readers (NAV-161). */
+export function useSaved() {
+  const { t } = useTranslation();
+  const show = useToast();
+  return () => show({ message: t('settings.saved') });
+}
+
 /** Copies text, and says so. A browser can refuse, and then the person must know. */
 export function useCopy() {
   const { t } = useTranslation();

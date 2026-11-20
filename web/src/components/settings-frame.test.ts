@@ -29,6 +29,17 @@ describe('jumping to a setting', () => {
     ]);
   });
 
+  it('finds an entry by a name of a section it took over (spec 083, D11)', () => {
+    const merged: SettingsGroup[] = [
+      {
+        id: 'pinned',
+        title: '',
+        items: [{ id: 'details', label: 'Details', href: '?section=details', formerly: ['Space key'] }],
+      },
+    ];
+    expect(matchingItems(merged, 'key')[0]?.items.map((item) => item.id)).toEqual(['details']);
+  });
+
   it('leaves nothing when nothing matches', () => {
     expect(matchingItems(groups, 'nothing')).toEqual([]);
   });
@@ -42,5 +53,9 @@ describe('folding a group', () => {
 
   it('keeps the old ids of other settings in the list untouched (spec 081, Data)', () => {
     expect(toggledGroups(['content', 'system'], 'admin-look')).toEqual(['content', 'system', 'admin-look']);
+  });
+
+  it('folds a group of space settings under its space- id, leaving those of the administration', () => {
+    expect(toggledGroups(['admin-look'], 'space-look')).toEqual(['admin-look', 'space-look']);
   });
 });

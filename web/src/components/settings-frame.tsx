@@ -1,21 +1,27 @@
 // SPDX-License-Identifier: Apache-2.0
-// Settings of a space or of the instance: the sections in the sidebar, in groups that
-// fold, with a way to jump to one; the large area beside it changes them (ADR-034).
-// The administration passes tool sections and a way back as well (spec 081, ADM-060 to ADM-067).
+// Settings of a space, of the instance or of one template: the sections in the sidebar, in groups
+// that fold, with a way to jump to one; the large area beside it changes them (ADR-034). One
+// description per kind of sidebar says how they differ (spec 083, D4): the administration has tool
+// sections and a search of its own (spec 081), a space has a head with its badge and four pinned
+// entries (spec 083, SPC-136 to SPC-147), and a single template keeps the plain list (D19).
 import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { usePreferences } from '../preferences';
-import { Link } from '../router';
-import { IconArrowBack, IconChevronDown } from './icons';
+import { Link, navigate } from '../router';
+import { IconArrowBack, IconChevronDown, IconSearch } from './icons';
+
+export type SettingsIcon = (props: { size?: number }) => ReactElement;
 
 export interface SettingsItem {
   id: string;
   label: string;
   href: string;
-  /** Tool sections only: the icon before the name. */
-  icon?: (props: { size?: number }) => ReactElement;
+  /** Tool sections and pinned entries only: the icon before the name. */
+  icon?: SettingsIcon;
   /** A word in a lozenge after the name, such as Experimental (ADM-067). */
   mark?: string;
+  /** Names of sections this entry took over, which the jump field also finds (spec 083, D11). */
+  formerly?: string[];
 }
 
 export interface SettingsGroup {
@@ -24,26 +30,55 @@ export interface SettingsGroup {
   items: SettingsItem[];
 }
 
-/** The way back out of the settings, and the name that heads its sidebar (ADM-060). */
+/** The way back out of the settings, and the name that heads its sidebar (ADM-060, SPC-136). */
 export interface SettingsBack {
   href: string;
   /** What the way back says to a screen reader. */
   label: string;
 }
 
+/** What sits in the sidebar besides the groups that fold, one description per kind (D4). */
+export type SettingsSidebar =
+  | {
+      kind: 'admin';
+      back: SettingsBack;
+      /** The administration's own search, which finds settings inside sections too. */
+      search: ReactNode;
+      /** Sections that are always open, each entry with an icon, before the groups that fold. */
+      tools: SettingsGroup[];
+      /** The heading over the groups that fold, with the search under it. */
+      settingsTitle: string;
+    }
+  | {
+      kind: 'space';
+      back: SettingsBack;
+      /** The row under the way back: the space's badge and name. */
+      head: ReactNode;
+      /** The entries on their own above the divider, each with an icon (SPC-138). */
+      pinned: SettingsItem[];
+    }
+  | {
+      kind: 'single';
+      /** What sits above the sections, such as the way back to a template. */
+      head?: ReactNode;
+    };
+
 const CHEVRON_SIZE = 14;
 const ICON_SIZE = 18;
 const BACK_SIZE = 18;
+const SEARCH_SIZE = 16;
+
+/** Whether an item's name, or a name it took over, holds the typed words. */
+function itemMatches(item: SettingsItem, wanted: string): boolean {
+  return [item.label, ...(item.formerly ?? [])].some((name) => name.toLowerCase().includes(wanted));
+}
 
 /** Which items a typed text leaves, matching the words people see. */
 export function matchingItems(groups: SettingsGroup[], text: string): SettingsGroup[] {
   const wanted = text.trim().toLowerCase();
   if (!wanted) return groups;
   return groups
-    .map((group) => ({
-      ...group,
-      items: group.items.filter((item) => item.label.toLowerCase().includes(wanted)),
-    }))
+    .map((group) => ({ ...group, items: group.items.filter((item) => itemMatches(item, wanted)) }))
     .filter((group) => group.items.length > 0);
 }
 
@@ -78,14 +113,23 @@ function ItemLink({
   );
 }
 
-/** The header row of the administration: a way back and the name, which stays in place. */
-function BackRow({ back, title, scrolled }: { back: SettingsBack; title: string; scrolled: boolean }) {
+/** A way back and the name of the settings, in one row. */
+function BackLine({ back, title }: { back: SettingsBack; title: string }) {
   return (
-    <div className={scrolled ? 'settings-head scrolled' : 'settings-head'}>
+    <>
       <Link href={back.href} className="button icon quiet" aria-label={back.label} title={back.label}>
         <IconArrowBack size={BACK_SIZE} />
       </Link>
       <p className="settings-title">{title}</p>
+    </>
+  );
+}
+
+/** The header row of the administration: it stays in place, with a line once something is under it. */
+function BackRow({ back, title, scrolled }: { back: SettingsBack; title: string; scrolled: boolean }) {
+  return (
+    <div className={scrolled ? 'settings-head scrolled' : 'settings-head'}>
+      <BackLine back={back} title={title} />
     </div>
   );
 }
@@ -108,9 +152,8 @@ function useScrolledBeneath(active: boolean) {
 
 /**
  * Brings the current section into view once when it was opened from somewhere other than the
- * sidebar, such as an address or the jump field (D7): its group shows open while it is the one
- * revealed, and the sidebar scrolls without motion. Moving by the sidebar never scrolls it. Only the
- * administration, which passes tool sections, does this; the settings of a space follow in SC5.
+ * sidebar, such as an address or the jump field (SC4 D7): its group shows open while it is the
+ * one revealed, and the sidebar scrolls without motion. Moving by the sidebar never scrolls it.
  */
 function useCurrentInView(active: boolean, current: string, holder: string | null, entries: number) {
   const aside = useRef<HTMLElement>(null);
@@ -137,29 +180,57 @@ function useCurrentInView(active: boolean, current: string, holder: string | nul
   return { aside, revealed, hide: () => setRevealed(null), follow: () => (followed.current = true) };
 }
 
+/** The jump field of a space or a template: Enter opens the first match, Escape empties it. */
+function JumpField({
+  text,
+  onText,
+  first,
+  marked,
+}: {
+  text: string;
+  onText: (text: string) => void;
+  first: SettingsItem | undefined;
+  /** With a search mark at its start and a border at rest, as in the administration. */
+  marked: boolean;
+}) {
+  const { t } = useTranslation();
+  const field = (
+    <input
+      type="search"
+      className="settings-jump"
+      value={text}
+      aria-label={t('settings.jump')}
+      placeholder={t('settings.jump')}
+      onChange={(e) => onText(e.target.value)}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' && text.trim() && first) {
+          e.preventDefault();
+          onText('');
+          navigate(first.href);
+        }
+        if (e.key === 'Escape') onText('');
+      }}
+    />
+  );
+  if (!marked) return field;
+  return (
+    <div className="settings-search">
+      <IconSearch size={SEARCH_SIZE} />
+      {field}
+    </div>
+  );
+}
+
 export function SettingsFrame({
   title,
-  head,
-  back,
-  search,
-  tools,
-  settingsTitle,
+  sidebar,
   groups,
   current,
   width = 'full',
   children,
 }: {
   title: string;
-  /** What sits above the sections, such as the way back to a space. */
-  head?: ReactNode;
-  /** A header row with a way back and the title, which stays in place while the list scrolls. */
-  back?: SettingsBack;
-  /** A search of the caller's own; without one, typing narrows the sections. */
-  search?: ReactNode;
-  /** Sections that are always open, each entry with an icon, before the groups that fold. */
-  tools?: SettingsGroup[];
-  /** The heading over the groups that fold, with the search under it. */
-  settingsTitle?: string;
+  sidebar: SettingsSidebar;
   groups: SettingsGroup[];
   current: string;
   /** One column of reading width centred in the area, or the full width beside the sidebar. */
@@ -172,20 +243,20 @@ export function SettingsFrame({
   const { preferences, update } = usePreferences();
   const shut = preferences.settings_shut ?? [];
   const shown = matchingItems(groups, text);
-  const { mark, scrolled } = useScrolledBeneath(back !== undefined);
+  const pinned = sidebar.kind === 'space' ? matchingItems([pinnedGroup(sidebar.pinned)], text) : [];
+  const pinnedShown = pinned[0]?.items ?? [];
+  const { mark, scrolled } = useScrolledBeneath(sidebar.kind === 'admin');
   const holder = groups.find((group) => group.items.some((item) => item.id === current))?.id ?? null;
-  const entries = [...(tools ?? []), ...groups].reduce((sum, group) => sum + group.items.length, 0);
-  const { aside, revealed, hide, follow } = useCurrentInView(tools !== undefined, current, holder, entries);
-  const jump = search ?? (
-    <input
-      type="search"
-      className="settings-jump"
-      value={text}
-      aria-label={t('settings.jump')}
-      placeholder={t('settings.jump')}
-      onChange={(e) => setText(e.target.value)}
-    />
+  const tools = sidebar.kind === 'admin' ? sidebar.tools : [];
+  const entries = [...tools, ...groups].reduce((sum, group) => sum + group.items.length, 0);
+  const { aside, revealed, hide, follow } = useCurrentInView(
+    sidebar.kind !== 'single',
+    current,
+    holder,
+    entries + pinnedShown.length,
   );
+  const first = [...pinnedShown, ...shown.flatMap((group) => group.items)][0];
+  const jump = <JumpField text={text} onText={setText} first={first} marked={sidebar.kind === 'space'} />;
   const folding = (
     <>
       {shown.map((group) => {
@@ -219,19 +290,37 @@ export function SettingsFrame({
           </div>
         );
       })}
-      {shown.length === 0 && <p className="muted">{t('settings.nothing')}</p>}
+      {shown.length === 0 && pinnedShown.length === 0 && <p className="muted">{t('settings.nothing')}</p>}
     </>
   );
   return (
     <div className="split">
       <div className="sidebar-frame">
-        <aside ref={aside} className={tools ? 'sidebar settings-sidebar tiered' : 'sidebar settings-sidebar'}>
-          {back && <div ref={mark} className="settings-scroll-mark" />}
-          {back && <BackRow back={back} title={title} scrolled={scrolled} />}
-          {head}
-          {!tools && jump}
+        <aside ref={aside} className={`sidebar settings-sidebar settings-${sidebar.kind}`}>
+          {sidebar.kind === 'admin' && (
+            <>
+              <div ref={mark} className="settings-scroll-mark" />
+              <BackRow back={sidebar.back} title={title} scrolled={scrolled} />
+            </>
+          )}
+          {sidebar.kind === 'space' && (
+            // The head stays in place, opaque, with no line under it at any time (SPC-136).
+            <div className="settings-head space-head">
+              <div className="space-head-back">
+                <BackLine back={sidebar.back} title={title} />
+              </div>
+              {sidebar.head}
+              {jump}
+            </div>
+          )}
+          {sidebar.kind === 'single' && (
+            <>
+              {sidebar.head}
+              {jump}
+            </>
+          )}
           <nav aria-label={title} className="settings-nav">
-            {tools?.map((group) => (
+            {tools.map((group) => (
               <div key={group.id} className="settings-tools">
                 <h2 className="settings-tools-title">{group.title}</h2>
                 <div className="side-links">
@@ -241,11 +330,21 @@ export function SettingsFrame({
                 </div>
               </div>
             ))}
-            {tools && (
+            {sidebar.kind === 'admin' && (
               <div className="settings-part">
-                <h2 className="settings-part-title">{settingsTitle}</h2>
-                {jump}
+                <h2 className="settings-part-title">{sidebar.settingsTitle}</h2>
+                {sidebar.search}
               </div>
+            )}
+            {pinnedShown.length > 0 && (
+              <>
+                <div className="side-links">
+                  {pinnedShown.map((item) => (
+                    <ItemLink key={item.id} item={item} current={current} onFollow={follow} />
+                  ))}
+                </div>
+                {shown.length > 0 && <hr className="settings-divider" />}
+              </>
             )}
             {folding}
           </nav>
@@ -258,4 +357,8 @@ export function SettingsFrame({
       </main>
     </div>
   );
+}
+
+function pinnedGroup(items: SettingsItem[]): SettingsGroup {
+  return { id: 'pinned', title: '', items };
 }

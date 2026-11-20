@@ -5,7 +5,8 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type PublicSite, type SiteBuild, type SiteChoice, type SiteReport, type Space } from '../api';
-import { Frame, spaceByKeyQuery } from '../components/frame';
+import { spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { ErrorNote, Field, Loading } from '../components/ui';
 import { TableBox } from '../components/table-box';
 import { pageTitle } from '../page-name';
@@ -328,7 +329,7 @@ export function SitesView({ spaceKey }: { spaceKey: string }) {
   if (q.error) return <ErrorNote error={q.error} />;
   if (!space) return <Loading />;
   return (
-    <Frame space={space}>
+    <SpaceToolFrame space={space} entry="sites">
       <h1>{t('sites.title')}</h1>
       <p className="muted">{t('sites.intro')}</p>
       <ErrorNote error={sites.error} />
@@ -336,6 +337,6 @@ export function SitesView({ spaceKey }: { spaceKey: string }) {
         <SiteCard key={site.id} site={site} space={space} />
       ))}
       <NewSite space={space} />
-    </Frame>
+    </SpaceToolFrame>
   );
 }

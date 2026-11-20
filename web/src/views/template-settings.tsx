@@ -823,7 +823,7 @@ export function TemplateSettingsView({ templateId }: { templateId: string }) {
   return (
     <SettingsFrame
       title={t('templates.settingsOf', { name: template.name })}
-      head={<SettingsHead template={template} space={shownSpace} />}
+      sidebar={{ kind: 'single', head: <SettingsHead template={template} space={shownSpace} /> }}
       groups={[
         {
           id: 'template',

@@ -610,8 +610,6 @@
     "language": "Language of this page",
     "languageHelp": "Sets the spell checker, hyphenation and what screen readers pronounce.",
     "languageDefault": "Language of the site",
-    "alignStart": "At the start",
-    "alignCenter": "In the centre",
     "emoji": "Emoji",
     "addEmoji": "Add emoji",
     "changeEmoji": "Change emoji",
@@ -726,7 +724,8 @@
   },
   "settings": {
     "jump": "Jump to a setting",
-    "nothing": "No setting has that name."
+    "nothing": "No setting has that name.",
+    "saved": "Saved."
   },
   "home": {
     "noSpaces": "There are no spaces you can see yet.",
@@ -786,24 +785,19 @@
     "icon": "Icon",
     "pages": "Pages",
     "settings": "Space settings",
-    "trash": "Trash",
     "newPage": "New page",
     "starterWelcome": "Welcome to this space. Start by saying what it is for.",
     "starterNext": "Add pages with Create, and invite people under Access.",
     "archived": "This space is archived and read-only.",
-    "details": "Details",
     "permissions": "Permissions",
     "archive": "Archive",
-    "unarchive": "Unarchive",
     "deleteSpace": "Delete space",
     "confirmDelete": "Delete this space? It stays in the trash for the retention period.",
     "import": "Import a file",
     "emptyTree": "No pages yet.",
     "addChild": "Add a page under {{title}}",
     "hideSidebar": "Hide sidebar",
-    "showSidebar": "Show sidebar",
-    "placeholders": "Pages that do not exist yet",
-    "placeholdersHelp": "Links on these pages lead to a title nobody has started. Follow one to start it."
+    "showSidebar": "Show sidebar"
   },
   "permissions": {
     "global_administrator": "Administrator",
@@ -2515,7 +2509,6 @@
     "otherSessionsEnded": "You are logged out everywhere else."
   },
   "access": {
-    "title": "Access",
     "open": "Who has access",
     "tab_grants": "Roles",
     "tab_people": "People",
@@ -2535,7 +2528,6 @@
     "inviteWaiting": "An administrator decides first. You will hear the answer.",
     "inviteLink": "Send this link: {{link}}",
     "peopleTitle": "People",
-    "auditTitle": "Audit of this space",
     "auditHelp": "Rows about pages you may not see show the action and the time only.",
     "hiddenPage": "Hidden",
     "rolesHelp": "Each person and group here holds one or more roles, and may do what any of them allows. Open a role to see its permissions. What a role allows is set under Roles in the administration.",
@@ -3666,24 +3658,14 @@
     "rulesNeedGuided": "Rules are part of guided templates, which can be turned on under Administration, Experimental."
   },
   "spaceSettings": {
-    "groupGeneral": "General",
-    "groupAccess": "Who can do what",
-    "groupContent": "Content",
-    "groupAutomation": "Automation",
-    "groupExchange": "Import and export",
-    "groupDanger": "Archive or delete",
     "archiveOrDelete": "Archive or delete the space",
     "back": "Back to the space",
-    "keepTidy": "Keep it tidy",
     "key": "Space key",
     "keyHelp": "The old key keeps working as a redirect, and stays taken until you free it.",
-    "release": "Free the old key",
     "owners": "Space owners",
-    "ownersHelp": "The people to ask about this space.",
     "addOwner": "Add an owner",
     "home": "Home page",
     "features": "Features",
-    "featuresHelp": "Turning something off hides it and deletes nothing.",
     "feature_blog": "Blog",
     "feature_comments": "Comments",
     "feature_reactions": "Reactions",
@@ -3697,7 +3679,6 @@
     "rules": "Rules for pages",
     "reviewMonths": "Review after months",
     "reviewHelp": "Sets a review date when a page is first published. 0 means no date.",
-    "titleAlign": "Title alignment for new pages",
     "requireApproval": "Require approval before publishing",
     "fixedApprover": "Add a fixed approver",
     "picture": "Upload a picture",
@@ -3715,8 +3696,185 @@
     "preset_private": "Only the person who makes it",
     "whoGetsAccess": "Who gets access",
     "access_private": "Only you can see it, until you add people.",
-    "feature_access_requests": "Requests for access",
-    "pickOne": "Choose a part of the settings on the left."
+    "feature_access_requests": "Requests for access"
+  },
+  "spaceGroups": {
+    "space-general": "General",
+    "space-access": "Access",
+    "space-pages": "Pages and files",
+    "space-look": "Look",
+    "space-connections": "Connections"
+  },
+  "spaceSections": {
+    "automation": {
+      "name": "Automation",
+      "intro": "Rules that act on the pages of this space when something happens."
+    },
+    "people": {
+      "name": "People",
+      "intro": "Who holds which role in this space. A role decides what someone may do here."
+    },
+    "content": {
+      "name": "Content",
+      "intro": "Every page of the space in one table, to find, move, archive or delete many at once."
+    },
+    "details": {
+      "name": "Details",
+      "intro": "The name, key and owners of the space, and what it is about."
+    },
+    "features": {
+      "name": "Features",
+      "intro": "Parts of the space that can be turned off. Turning one off hides it and deletes nothing."
+    },
+    "archive": {
+      "name": "Archive the space",
+      "intro": "Keep the space as it is, read-only and out of the way."
+    },
+    "delete": {
+      "name": "Delete the space",
+      "intro": "Remove the space and everything in it."
+    },
+    "export": {
+      "name": "Export",
+      "intro": "Take pages out as a file. A bundle holds everything, to move this space to another instance."
+    },
+    "import": {
+      "name": "Import",
+      "intro": "Upload Markdown, Word or HTML, or a .zip of those. You first see what will happen."
+    },
+    "picture": {
+      "name": "Picture of the space",
+      "intro": "The animal or character beside the space's name, or a picture of your own."
+    },
+    "statuses": {
+      "name": "Statuses and approvals",
+      "intro": "The statuses a page can carry, when pages come up for review, and who approves before publishing."
+    },
+    "workflows": {
+      "name": "Workflows",
+      "intro": "Steps of review, approval and signing that a page goes through before it is published."
+    },
+    "insights": {
+      "name": "Insights",
+      "intro": "How much the pages of this space are read, and which ones."
+    },
+    "permissions": {
+      "name": "Permissions",
+      "intro": "Everyone who can open this space, and how they got in. Who holds which role is changed in"
+    },
+    "sites": {
+      "name": "Public site",
+      "intro": "A copy of pages that anyone may read without logging in."
+    },
+    "audit": {
+      "name": "Audit of the space",
+      "intro": "What happened in this space, when, and who did it."
+    },
+    "placeholders": {
+      "name": "Pages still to write",
+      "intro": "Titles that pages of this space link to, but that nobody has started yet."
+    },
+    "files": {
+      "name": "Files",
+      "intro": "Every file on the pages of this space."
+    },
+    "trash": {
+      "name": "Trash",
+      "intro": "Pages and files deleted from this space, until they are removed for good."
+    },
+    "archived": {
+      "name": "Archived pages",
+      "intro": "Pages taken out of the tree but kept, read-only."
+    },
+    "labels": {
+      "name": "Labels",
+      "intro": "Which labels writers may use, and renaming a label everywhere at once."
+    },
+    "shortcuts": {
+      "name": "Shortcuts",
+      "intro": "Links at the top of the space's sidebar."
+    },
+    "published": {
+      "name": "Published space",
+      "intro": "A draft space and the space its releases publish to."
+    },
+    "templates": {
+      "name": "Templates",
+      "intro": "Templates that start new pages in this space."
+    },
+    "layout": {
+      "name": "Layout",
+      "intro": "How new pages of this space are laid out."
+    },
+    "pdf": {
+      "name": "PDF design",
+      "intro": "How the pages of this space look on paper."
+    },
+    "webhooks": {
+      "name": "Webhooks",
+      "intro": "Addresses that hear about events of this space as they happen."
+    }
+  },
+  "spaceDetails": {
+    "key": "Space key",
+    "oldKey": "Old key {{key}}",
+    "free": "Free this key",
+    "owners": "Owners",
+    "ownersHelp": "The people to ask about this space. A space keeps at least one.",
+    "removeOwner": "Remove {{name}} as an owner",
+    "administrators": "Administrators",
+    "seeAll": "See all administrators",
+    "more": "More details",
+    "categories": "Categories",
+    "refused": "{{part}} was not saved, and nothing after it was sent.",
+    "savedBefore": "Saved: {{parts}}.",
+    "part_details": "Name and description",
+    "part_owners": "Owners",
+    "part_categories": "Categories",
+    "part_home": "Home page",
+    "part_key": "Space key",
+    "uploaded": "A picture of your own",
+    "uploadedHelp": "An uploaded picture shows instead of the animal or character."
+  },
+  "spaceStatuses": {
+    "statuses": "Statuses",
+    "statusesHelp": "The statuses writers can give a page. Adding or removing one applies at once.",
+    "review": "Review",
+    "months": "months",
+    "approval": "Approval before publishing",
+    "approvalHelp": "A page waits for approval before its changes are published."
+  },
+  "spaceLayout": {
+    "title": "Title of new pages",
+    "start": "At the start",
+    "startHelp": "The title lines up with the start of the text.",
+    "centre": "In the centre",
+    "centreHelp": "The title stands in the middle of the page."
+  },
+  "spaceArchive": {
+    "info": "The space becomes read-only for everyone. It leaves the Spaces menu, the directory and quick search, can still be found with a search filter, and can be restored at any time.",
+    "archived": "This space is archived and read-only. Restoring it opens it for writing again.",
+    "archive": "Archive the space",
+    "restore": "Restore the space"
+  },
+  "spaceDelete": {
+    "explain": "The space and everything in it go to the trash for the retention period. An administrator can restore it from there.",
+    "milder": "Something milder:",
+    "archiveInstead": "archive the space",
+    "exportFirst": "export it first",
+    "delete": "Delete the space"
+  },
+  "spaceFeatures": {
+    "card": "Features of the space"
+  },
+  "spacePermissions": {
+    "who": "Who has access"
+  },
+  "spacePlaceholders": {
+    "title": "Missing page",
+    "linkedFrom": "Linked from",
+    "create": "Create page",
+    "none": "When a page links to a title that nobody has started, it appears here."
   },
   "adminOrganise": {
     "companyHome": "Company home page",
@@ -4098,7 +4256,6 @@
     "export": "Export",
     "exportButton": "Export",
     "exportBundle": "Make a bundle of this space",
-    "exportHelp": "Take pages out as a file. A bundle holds everything, to move this space to another instance.",
     "format": "Format",
     "what": "What to export",
     "scopePage": "This page",
@@ -4143,7 +4300,6 @@
     "restrictedLeft_other": "{{count}} restricted pages were left out.",
     "draftsLeft": "Not published, so left out: {{names}}",
     "pagesFailed": "These pages could not be exported: {{names}}",
-    "importHelp": "Upload Markdown, Word or HTML, or a .zip of those. You first see what will happen.",
     "reading": "Reading the file…",
     "importing": "Importing…",
     "importFailed": "The import failed.",
@@ -4185,7 +4341,6 @@
     "linkHelp": "A later publish does not change it. Make it again to show a newer version.",
     "makeLink": "Make a public link",
     "withdraw": "Withdraw",
-    "pdfDesign": "PDF design",
     "coverTitle": "Cover title",
     "coverSubtitle": "Cover subtitle",
     "header": "Header",

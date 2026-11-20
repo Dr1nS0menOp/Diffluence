@@ -394,7 +394,7 @@ test('a manager runs access, and cannot reach administer or the settings', async
   await grant(page, space.id, { type: 'user', id: viewer }, VIEWER);
 
   const as = await browserAs(browser, email);
-  await as.goto(`/spaces/${space.key}/access`);
+  await as.goto(`/spaces/${space.key}/settings?section=people`);
   await checkAccessibility(as);
   const viewerName = viewerMail.split('@')[0] ?? '';
   const row = as.locator('.member-row').filter({ hasText: viewerName });
@@ -428,7 +428,6 @@ test('everyone who can view a space sees who has access, and the export is safe'
   const space = await newSpace(page, 'Open list');
   await grant(page, space.id, { type: 'user', id }, VIEWER);
   await page.goto(`/spaces/${space.key}/access`);
-  await page.getByRole('tab', { name: 'People' }).click();
   await checkAccessibility(page);
   await expect(page.getByRole('row', { name: new RegExp(email.split('@')[0] ?? '') })).toContainText(
     'Directly',
@@ -641,7 +640,7 @@ test('a space administrator reads the audit of their space', async ({ page }) =>
   const space = await newSpace(page, 'Audited space');
   await publishedPage(page, space.id, 'Logged page', 'text');
   await page.goto(`/spaces/${space.key}/audit`);
-  await expect(page.getByRole('heading', { name: 'Audit of this space' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Audit of the space' })).toBeVisible();
   await expect(page.getByRole('table')).toContainText('page.');
   await checkAccessibility(page);
 });

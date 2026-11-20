@@ -6,6 +6,7 @@ import { api, type Space } from '../api';
 import { useCapabilities } from '../capabilities';
 import { ExperimentalOff } from '../components/experimental-off';
 import { Frame, spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { ConfirmButton, Dialog, ErrorNote, Field, FilePicker, Loading, RelativeTime } from '../components/ui';
 import { Link, navigate } from '../router';
 import { TableBox } from '../components/table-box';
@@ -382,10 +383,10 @@ export function RulesView({ spaceKey }: { spaceKey: string }) {
   }
   if (!q.data) return <Loading />;
   return (
-    <Frame space={q.data}>
+    <SpaceToolFrame space={q.data} entry="automation">
       <h1>{t('rules2.title')}</h1>
       <RuleList spaceId={q.data.id} />
-    </Frame>
+    </SpaceToolFrame>
   );
 }
 

@@ -99,7 +99,7 @@ function FileTable({
   );
 }
 
-function SpaceUsage({ space }: { space: Space }) {
+export function SpaceUsage({ space }: { space: Space }) {
   const { t } = useTranslation();
   const q = useQuery({
     queryKey: ['file-usage', space.id],
@@ -221,7 +221,7 @@ function BulkDelete({ space, picked, onDone }: { space: Space; picked: string[];
   );
 }
 
-function FileList({ space }: { space: Space }) {
+export function FileList({ space }: { space: Space }) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [filters, setFilters] = useState<FileFilters>({ kind: '', label: '', uploader: '' });

@@ -606,9 +606,7 @@ export function ImportSection({ space }: { space: Space }) {
     onSuccess: (r) => setId(r.import_id),
   });
   return (
-    <section>
-      <h2>{t('space.import')}</h2>
-      <p className="muted">{t('exchange.importHelp')}</p>
+    <section className="action-section">
       <FilePicker
         label={t('space.import')}
         accept=".md,.markdown,.docx,.html,.htm,.zip"
@@ -883,13 +881,11 @@ export function ExportSection({ space }: { space: Space }) {
     onSuccess: (run) => setBundle(run.id),
   });
   return (
-    <section>
-      <h2>{t('exchange.export')}</h2>
-      <p className="muted">{t('exchange.exportHelp')}</p>
+    <section className="action-section">
       <ErrorNote error={start.error} />
       <div className="row">
         {space.can?.['space.export'] && (
-          <button type="button" onClick={() => setOpen(true)}>
+          <button type="button" className="primary" onClick={() => setOpen(true)}>
             {t('exchange.exportButton')}
           </button>
         )}
@@ -931,7 +927,6 @@ export function PDFDesignSection({ space }: { space: Space }) {
   if (!form) return null;
   return (
     <section>
-      <h2>{t('exchange.pdfDesign')}</h2>
       <form
         onSubmit={(e: FormEvent) => {
           e.preventDefault();

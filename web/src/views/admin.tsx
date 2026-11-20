@@ -1506,10 +1506,13 @@ export function AdminView({ tab, me }: { tab: string; me: Me }) {
   return (
     <SettingsFrame
       title={t('admin.title')}
-      back={{ href: '/', label: t('adminFrame.back') }}
-      search={<SettingsSearch shown={shown} />}
-      tools={groupsOf('tool')}
-      settingsTitle={t('adminFrame.settings')}
+      sidebar={{
+        kind: 'admin',
+        back: { href: '/', label: t('adminFrame.back') },
+        search: <SettingsSearch shown={shown} />,
+        tools: groupsOf('tool'),
+        settingsTitle: t('adminFrame.settings'),
+      }}
       groups={groupsOf('settings')}
       current={section.id}
       width={section.width}

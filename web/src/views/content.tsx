@@ -5,7 +5,8 @@ import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, type BulkFailure, type ContentRow, type DirectoryEntry, type Job, type TreeNode } from '../api';
 import { Link, navigate, useLocation } from '../router';
-import { Frame, spaceByKeyQuery } from '../components/frame';
+import { spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { SubjectPicker } from '../components/picker';
 import { StageMark } from '../components/page-marks';
 import { Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
@@ -199,7 +200,7 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
   }
   if (!space) return <Loading />;
   return (
-    <Frame space={space}>
+    <SpaceToolFrame space={space} entry="content">
       <div className="wide-area">
         <h1>{t('content.title')}</h1>
         <form
@@ -360,6 +361,6 @@ export function ContentView({ spaceKey }: { spaceKey: string }) {
           />
         )}
       </div>
-    </Frame>
+    </SpaceToolFrame>
   );
 }

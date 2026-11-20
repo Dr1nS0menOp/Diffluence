@@ -140,6 +140,7 @@ test('text typed into a settings form comes back after the reload, unsaved', asy
   let newer = false;
   await serveBuilds(page, () => newer);
   await page.goto(`/spaces/${space.key}/settings?section=details`);
+  await page.getByText('More details').click();
   await page.getByLabel('Description').fill('typed before the reload');
   await page.getByLabel('Name', { exact: true }).fill('Settings renamed');
 

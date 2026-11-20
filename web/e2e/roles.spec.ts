@@ -27,7 +27,7 @@ test('a role is made, given in a space, and changed after a preview', async ({ p
 
   // Give it to a person in the space, from the space's settings.
   await page.goto(`/spaces/${space.key}/settings?section=roles`);
-  await expect(page.getByRole('heading', { name: 'People and roles', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
   await page.getByPlaceholder('Give a role to').fill(person);
   await page.getByRole('option', { name: new RegExp(email) }).click();
   await page.getByLabel(`Role to give ${person}`).selectOption({ label: roleName });

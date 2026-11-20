@@ -499,17 +499,17 @@ test('changing a key: the old address still leads there', async ({ page }) => {
   const space = await newSpace(page, 'Rekeyed');
   await page.goto(`/spaces/${space.key}/settings?section=key`);
   const key = unique('NEW');
-  await page.getByRole('textbox', { name: 'Key', exact: true }).fill(key);
-  await page.getByRole('textbox', { name: 'Key', exact: true }).press('Enter');
-  await expect(page).toHaveURL(new RegExp(`/spaces/${key}/settings`));
+  await page.getByRole('textbox', { name: /^Space key/ }).fill(key);
+  await page.getByRole('textbox', { name: /^Space key/ }).press('Enter');
+  await expect(page).toHaveURL(new RegExp(`/spaces/${key}/settings\\?section=details`));
   await page.goto(`/spaces/${space.key}/overview`);
   await expect(page.getByRole('heading', { name: 'Rekeyed', level: 1 })).toBeVisible();
 });
 
 test('deleting a space asks for its key', async ({ page }) => {
   const space = await newSpace(page, 'Doomed space');
-  await page.goto(`/spaces/${space.key}/settings?section=danger`);
-  await page.getByRole('button', { name: 'Delete space' }).click();
+  await page.goto(`/spaces/${space.key}/settings?section=delete`);
+  await page.getByRole('button', { name: 'Delete the space' }).click();
   const dialog = page.getByRole('dialog', { name: 'Delete space' });
   await expect(dialog.getByRole('button', { name: 'Delete space' })).toBeDisabled();
   await dialog.getByRole('textbox').fill(space.key);

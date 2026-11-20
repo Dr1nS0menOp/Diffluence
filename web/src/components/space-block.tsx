@@ -15,6 +15,7 @@ import { ArchiveDialog, KindDialog, SortChildrenDialog } from '../views/page-act
 import { DeleteDialog, RenameDialog } from '../views/page-dialogs';
 import { ExportDialog } from '../views/exchange';
 import { DeleteSpaceDialog } from '../views/space-organise';
+import { mayOpenSpaceSettings } from '../views/space-sections';
 import { NewDatabaseDialog, NewLinkDialog, NewPageDialog, NewPostDialog } from './create';
 import {
   IconApps,
@@ -50,30 +51,6 @@ const MENU_ICON_SIZE = 18;
 const ROW_ICON_SIZE = 16;
 const POSTS_SHOWN = 5;
 const HEAD_LINK_ID = 'space-head-link';
-
-/** Permissions that each open a part of the space settings (spec 036). */
-const SETTINGS_PERMISSIONS = [
-  'space.administer',
-  'space.audit',
-  'space.templates',
-  'space.automation',
-  'site.publish',
-  'space.labels',
-  'space.statuses',
-  'space.approvals',
-  'space.workflows',
-  'space.release',
-  'space.bundle',
-  'space.look',
-];
-
-/** `also` are permissions that open a part only while it is on, such as proposing templates. */
-function mayOpenSettings(space: Space, also: readonly string[] = []): boolean {
-  return [...SETTINGS_PERMISSIONS, ...also].some((p) => space.can?.[p]);
-}
-
-/** Proposing templates opens My templates while guided templates are on (spec 074, TPL-1002). */
-const PROPOSING = ['template.propose'];
 
 /** Whether you watch a space, and the way to change it. */
 export function useSpaceWatch(space: Space) {
@@ -141,7 +118,8 @@ type SpaceDialog = 'export' | 'archive' | 'delete' | null;
 /** The space menu, from the More button of the header row (SPC-107, SPC-108). */
 function SpaceMenu({ space }: { space: Space }) {
   const [dialog, setDialog] = useState<SpaceDialog>(null);
-  const { guided_templates: guidedOn, automation } = useCapabilities();
+  const capabilities = useCapabilities();
+  const { automation } = capabilities;
   const { t } = useTranslation();
   const copy = useCopy();
   const watch = useSpaceWatch(space);
@@ -176,7 +154,9 @@ function SpaceMenu({ space }: { space: Space }) {
           <MenuLink href={`${base}/overview`}>
             <IconInfo size={MENU_ICON_SIZE} /> {t('space.overview')}
           </MenuLink>
-          <MenuLink href={space.can?.['space.manage_access'] ? `${base}/access` : `${base}/people`}>
+          <MenuLink
+            href={space.can?.['space.manage_access'] ? `${base}/settings?section=people` : `${base}/people`}
+          >
             <IconPeople size={MENU_ICON_SIZE} /> {t('access.peopleTitle')}
           </MenuLink>
           <MenuLink href={`${base}/files`}>
@@ -197,7 +177,7 @@ function SpaceMenu({ space }: { space: Space }) {
             <IconAutomation size={MENU_ICON_SIZE} /> {t('admin.automation')}
           </MenuLink>
         )}
-        {mayOpenSettings(space, guidedOn ? PROPOSING : []) && (
+        {mayOpenSpaceSettings(space, capabilities) && (
           <MenuLink href={`${base}/settings`}>
             <IconSliders size={MENU_ICON_SIZE} /> {t('space.settings')}
           </MenuLink>

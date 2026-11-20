@@ -192,7 +192,7 @@ test('a placeholder starts a page below it, and leads there from then on', async
   await publish(page);
 
   await page.goto(`/spaces/${space.key}/settings?section=placeholders`);
-  const list = page.getByRole('region', { name: 'Pages that do not exist yet' });
+  const list = page.getByRole('table');
   await expect(list).toContainText('Meeting notes');
   await expect(list.getByRole('link', { name: 'Planned' })).toBeVisible();
 

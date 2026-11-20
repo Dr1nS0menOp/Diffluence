@@ -3,7 +3,8 @@ import { useState, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api';
-import { Frame, spaceByKeyQuery } from '../components/frame';
+import { spaceByKeyQuery } from '../components/frame';
+import { SpaceToolFrame } from './space-settings-frame';
 import { ConfirmButton, Dialog, ErrorNote, Field, Loading, RelativeTime } from '../components/ui';
 import { EmptyState } from '../components/empty-state';
 
@@ -233,9 +234,9 @@ export function WebhooksView({ spaceKey }: { spaceKey: string }) {
   }
   if (!q.data) return <Loading />;
   return (
-    <Frame space={q.data}>
+    <SpaceToolFrame space={q.data} entry="webhooks">
       <h1>{t('webhooks.title')}</h1>
       <WebhookList path={`/spaces/${q.data.id}/webhooks`} />
-    </Frame>
+    </SpaceToolFrame>
   );
 }
