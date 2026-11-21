@@ -8,11 +8,27 @@
 >
 > **Experimental parts** are off on a new installation, and an administrator turns each on under Administration, Organising: automation rules, databases, bundles between instances, restore from the console, draft and published spaces, and guided templates. Public sites and analytics are experimental too, with their own switches, which also start off ([ADR-043](docs/blueprint/10-decision-log.md)).
 
-Kenwerk is a team wiki with spaces, pages and enterprise-grade permissions, licensed under Apache 2.0. The plan and every design decision live in [`docs/blueprint/`](docs/blueprint/00-README.md).
+Kenwerk is a team wiki with spaces, pages and enterprise-grade permissions, licensed under Apache 2.0. You run it yourself, on one machine, with Docker. The plan and every design decision live in [`docs/blueprint/`](docs/blueprint/00-README.md).
+
+| A page | Writing |
+|---|---|
+| ![A page in a space, with the page tree beside it](web/e2e/design-baselines/page-light.png) | ![The editor with its formatting row](web/e2e/design-baselines/editor-title.png) |
+| **Search** | **Administration** |
+| ![Search results with filters](web/e2e/design-baselines/search-filters.png) | ![The administration overview](web/e2e/design-baselines/admin-summary.png) |
+
+The pictures are the design tests themselves: every screen of the product is photographed by its browser tests on each change, so they show the product as it is now.
 
 ## What it does
 
-Spaces and a page tree, a visual editor with Markdown shortcuts, drafts and version history with compare and restore, attachments, full-text search, a trash, Markdown import and export, a tamper-evident audit log with CSV export. Local accounts with an authenticator app, passkeys, OIDC login and SCIM provisioning. Roles, groups, guests, page restrictions and a "why can or can't they?" view. An admin console.
+- **Write together.** Spaces and a page tree, a visual editor with Markdown shortcuts, tables, tasks, mentions and comments, drafts and version history with compare and restore, templates and attachments.
+- **Find things.** Full-text search over pages, comments, tasks, people and spaces, with filters, and a search box that is always one key away.
+- **Keep it safe.** Roles, groups, guests and page restrictions, with a "why can or can't they?" view. Local accounts with an authenticator app or passkeys, OIDC login and SCIM provisioning. A tamper-evident audit log, and every settings change recorded with what changed.
+- **Run it calmly.** One binary and PostgreSQL. Backups, restore from the console, health checks and upgrades that refuse to run without a recent backup.
+- **Automate it.** Every feature is reachable through the REST API ([`docs/api/`](docs/api/)), so scripts and AI assistants can do what a person can. Automation rules and webhooks are built in.
+
+| Notifications | Dark |
+|---|---|
+| ![The notifications list](web/e2e/design-baselines/notifications.png) | ![A page in the dark theme](web/e2e/design-baselines/page-dark.png) |
 
 ## Try it
 
